@@ -6,6 +6,7 @@ import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.misc.BigLight
 import jp.awabi2048.cccontent.items.misc.SmallLight
 import jp.awabi2048.cccontent.items.misc.GulliverItemListener
+import jp.awabi2048.cccontent.items.arena.*
 import org.bukkit.plugin.java.JavaPlugin
 
 class CCContent : JavaPlugin() {
@@ -33,16 +34,28 @@ class CCContent : JavaPlugin() {
         
         // リスナー登録
         server.pluginManager.registerEvents(GulliverItemListener(), this)
+        server.pluginManager.registerEvents(ArenaItemListener(), this)
         
         logger.info("CC-Content v${description.version} が有効化されました")
         logger.info("作成者: ${description.authors}")
         logger.info("登録されたアイテム数: ${CustomItemManager.getItemCount()}")
+        
+        // フィーチャー別のアイテム数を表示
+        logger.info("  - misc: ${CustomItemManager.getItemCountByFeature("misc")}")
+        logger.info("  - arena: ${CustomItemManager.getItemCountByFeature("arena")}")
     }
     
     private fun registerCustomItems() {
         // GulliverLight アイテム
         CustomItemManager.register(BigLight())
         CustomItemManager.register(SmallLight())
+        
+        // KotaArena アイテム
+        CustomItemManager.register(SoulBottleItem())
+        CustomItemManager.register(BoosterItem())
+        CustomItemManager.register(MobDropSackItem())
+        CustomItemManager.register(HunterTalismanItem())
+        CustomItemManager.register(GolemTalismanItem())
     }
     
     override fun onDisable() {
