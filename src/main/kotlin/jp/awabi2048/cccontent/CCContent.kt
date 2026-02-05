@@ -30,8 +30,8 @@ class CCContent : JavaPlugin() {
         val giveCommand = GiveCommand()
         val ccCommand = CCCommand(giveCommand)
         
-        getCommand("cc")?.setExecutor(ccCommand)
-        getCommand("cc")?.tabCompleter = giveCommand
+         getCommand("cc")?.setExecutor(ccCommand)
+         getCommand("cc")?.tabCompleter = ccCommand
         
         // リスナー登録
         server.pluginManager.registerEvents(GulliverItemListener(), this)
