@@ -1,0 +1,6 @@
+name: CC-Content
+version: 1.0.0
+main: jp.awabi2048.cccontent.CCContent
+api-version: '1.21'
+author: awabi2048
+description: Paper 1.21.8用コンテンツプラグイン
