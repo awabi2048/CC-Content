@@ -3,4 +3,22 @@ version: 1.0.0
 main: jp.awabi2048.cccontent.CCContent
 api-version: '1.21'
 author: awabi2048
-description: Paper 1.21.8用コンテンツプラグイン
+description: Paper 1.21.8用統合コンテンツプラグイン
+
+commands:
+  cc:
+    description: CC-Contentメインコマンド
+    usage: /cc <subcommand> [args]
+    aliases: [ccc]
+  arena:
+    description: アリーナコマンド
+    usage: /arena
+  arenaa:
+    description: アリーナ管理コマンド
+    usage: /arenaa
+  party:
+    description: パーティコマンド
+    usage: /party
+  sukima_dungeon:
+    description: スキマダンジョンコマンド
+    usage: /sukima_dungeon
