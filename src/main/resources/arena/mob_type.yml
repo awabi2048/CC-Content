@@ -1,0 +1,128 @@
+# Mob Type Definitions
+# Defines different arena types and their properties
+
+zombie:
+  name: "ゾンビ"
+  structure: "zombie_arena"
+  icon_material: ZOMBIE_HEAD
+  is_boss: false
+  base_summon_count: 5
+  base_cost: 3
+  reward:
+    ticket: 10
+    point: 100
+    level_experience: 50
+  spawn_locations:
+    - "17, 0"
+    - "0, 17"
+    - "-18, 0"
+    - "0, -18"
+
+skeleton:
+  name: "スケルトン"
+  structure: "skeleton_arena"
+  icon_material: SKELETON_SKULL
+  is_boss: false
+  base_summon_count: 5
+  base_cost: 4
+  reward:
+    ticket: 12
+    point: 120
+    level_experience: 55
+  spawn_locations:
+    - "17, 0"
+    - "0, 17"
+    - "-18, 0"
+    - "0, -18"
+
+spider:
+  name: "クモ"
+  structure: "spider_arena"
+  icon_material: SPIDER_EYE
+  is_boss: false
+  base_summon_count: 6
+  base_cost: 3
+  reward:
+    ticket: 11
+    point: 110
+    level_experience: 52
+  spawn_locations:
+    - "17, 0"
+    - "0, 17"
+    - "-18, 0"
+    - "0, -18"
+
+blaze:
+  name: "ブレイズ"
+  structure: "blaze_arena"
+  icon_material: BLAZE_ROD
+  is_boss: false
+  base_summon_count: 4
+  base_cost: 6
+  reward:
+    ticket: 15
+    point: 150
+    level_experience: 65
+  spawn_locations:
+    - "17, 0"
+    - "0, 17"
+    - "-18, 0"
+    - "0, -18"
+
+guardian:
+  name: "ガーディアン"
+  structure: "guardian_arena"
+  icon_material: PRISMARINE_SHARD
+  is_boss: true
+  base_summon_count: 4
+  base_cost: 7
+  reward:
+    ticket: 16
+    point: 160
+    level_experience: 70
+  spawn_locations:
+    - "17, 0"
+    - "0, 17"
+    - "-18, 0"
+    - "0, -18"
+
+enderman:
+  name: "エンダーマン"
+  structure: "enderman_arena"
+  icon_material: ENDER_PEARL
+  is_boss: true
+  base_summon_count: 3
+  base_cost: 8
+  reward:
+    ticket: 18
+    point: 180
+    level_experience: 75
+  spawn_locations:
+    - "17, 0"
+    - "0, 17"
+    - "-18, 0"
+    - "0, -18"
+
+slime:
+  name: "スライム"
+  structure: "slime_arena"
+  icon_material: SLIME_BALL
+  is_boss: false
+  base_summon_count: 5
+  base_cost: 4
+  reward:
+    ticket: 11
+    point: 110
+    level_experience: 55
+  spawn_locations:
+    - "17, 0"
+    - "0, 17"
+    - "-18, 0"
+    - "0, -18"
+
+quick_arena:
+  spawn_locations:
+    - "18, 0"
+    - "0, 18"
+    - "-19, 0"
+    - "0, -19"

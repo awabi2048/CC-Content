@@ -1,0 +1,78 @@
+# Custom Items Configuration
+
+# Booster items settings
+booster:
+  booster_50:
+    multiplier: 1.5
+    duration_minutes: 30
+    label: "§b§l50％"
+  booster_100:
+    multiplier: 2.0
+    duration_minutes: 45
+    label: "§d§l100％"
+  booster_150:
+    multiplier: 2.5
+    duration_minutes: 60
+    label: "§d§n150％"
+
+# Arena Gate Key settings
+gate_key:
+  gate_key_20:
+    reduction_percentage: 20
+    max_durability: 10
+  gate_key_40:
+    reduction_percentage: 40
+    max_durability: 25
+  gate_key_60:
+    reduction_percentage: 60
+    max_durability: 40
+
+# Mob Drop Sack settings
+mob_drop_sack:
+  # Maximum storage per item type
+  max_capacity: 1000
+  # Allowed items (Material names)
+  allowed_items:
+    - CREEPER_HEAD
+    - SPIDER_EYE
+    - STRING
+    - BONE
+    - ROTTEN_FLESH
+    - GUNPOWDER
+    - ENDER_PEARL
+    - BLAZE_ROD
+    - MAGMA_CREAM
+    - SLIME_BALL
+
+# Talisman settings
+talisman:
+  talisman_hunter:
+    damage_multiplier: 1.25
+    drain_chance: 0.2
+    drain_percentage: 0.1
+  talisman_golem:
+    damage_reduction: 0.25
+    low_health_threshold: 0.1
+    low_health_reduction: 0.5
+
+# Item Appearance Settings (CustomModelData IDs)
+custom_model_data:
+  ticket_easy: "easy"
+  ticket_normal: "normal"
+  ticket_hard: "hard"
+  ticket_extreme: "extreme"
+  ticket_quick: "quick"
+  soul_fragment: "soul_fragment"
+  quest_ticket: "quest"
+  empty_soul_bottle: "empty_soul_bottle"
+  filled_soul_bottle: "filled_bottle"
+  booster_50: "arena_booster_50"
+  booster_100: "arena_booster_100"
+  booster_150: "arena_booster_150"
+  gate_key_20: "arena_gate_key_20"
+  gate_key_40: "arena_gate_key_40"
+  gate_key_60: "arena_gate_key_60"
+  mob_drop_sack: "mob_drop_sack"
+  talisman_hunter: "arena_talisman_hunter"
+  talisman_golem: "arena_talisman_golem"
+  entrance_ticket: "entrance_ticket"

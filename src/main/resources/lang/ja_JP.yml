@@ -148,3 +148,232 @@ message:
     - "§a§lランクアップ！"
     - "§f%old_rank% → %new_rank%"
     - "§6§l=========================================="
+
+# PvE Arena Plugin - KotaArena 統合翻訳
+prefix: "&7«&cArena&7»"
+
+# Party Related
+party:
+  create:
+    success: "{prefix} &aパーティ \"{0}\" を作成しました！"
+  join:
+    success: "{prefix} &aパーティに参加しました！"
+    broadcast: "{prefix} &7[&bパーティ&7] &6{0} &7がパーティに参加しました。"
+  leave:
+    success: "{prefix} &aパーティを抜けました。"
+    broadcast: "{prefix} &7[&bパーティ&7] &6{0} &7がパーティを抜けました。"
+  disband:
+    leader_left: "{prefix} &cリーダーが抜けたため、パーティは解散されました。"
+    success: "{prefix} &aパーティを解散しました。"
+  invite:
+    success: "{prefix} &6{0} &aを招待しました。"
+    received: "{prefix} &6{0} &7からパーティへの招待が届きました！"
+    click_to_join: "&7クリックして参加: &a/party join {0}"
+  kick:
+    success: "{prefix} &6{0} &aを追放しました。"
+    kicked: "{prefix} &cパーティから追放されました。"
+  list:
+    header: "&6=== パーティメンバー ({0}) ==="
+    leader: "&7リーダー: &e{0}"
+    member: "&7- {0}"
+  chat:
+    format: "{prefix} &7[&bパーティ&7] {0}"
+  error:
+    already_in_party: "{prefix} &cすでにパーティに入っています。"
+    not_in_party: "{prefix} &cパーティに入っていません。"
+    not_leader: "{prefix} &cリーダーのみが {0} できます。"
+    player_not_found: "{prefix} &cプレイヤーが見つかりません。"
+    not_party_leader: "{prefix} &cそのプレイヤーはパーティリーダーではありません。"
+    not_invited: "{prefix} &c招待されていません。"
+    already_member: "{prefix} &cすでにパーティメンバーです。"
+    not_member: "{prefix} &cそのプレイヤーはパーティメンバーではありません。"
+    cannot_kick_self: "{prefix} &c自分自身を追放することはできません。"
+    specify_name: "{prefix} &c{0} するプレイヤー名を指定してください。"
+    specify_party_name: "{prefix} &c参加するパーティのリーダー名を指定してください。"
+
+# Arena Related
+arena:
+  entrance:
+    entered: "{prefix} &eアリーナに入場しました。"
+    entered_quick: "{prefix} &eクイックアリーナに入場しました。"
+    first_wave_countdown: "{prefix} &b第一ウェーブ&7開始まであと &e&n{0}秒&7です。"
+    creating_session: "{prefix} &aアリーナセッションを作成中..."
+    creating_quick_session: "{prefix} &bクイックアリーナセッションを作成中..."
+    ticket_consumed: "{prefix} &7入場チケットを1枚消費しました。"
+    ticket_from_enderchest: "{prefix} &7エンダーチェスト内のチケットを使用しました。"
+  wave:
+    countdown: "{prefix} &7ゲーム開始まであと &e&n{0}秒&7です。"
+    completed: "{prefix} &6ウェーブ {0}&7 クリア！\n&e&n{1}秒&7後に次のウェーブを開始します。"
+    last_wave_completed: "{prefix} &6最終ウェーブ &7クリア！"
+  session:
+    status:
+      waiting_start: "§e開始待機中"
+      waiting_generation: "§7生成中..."
+      ingame: "§a進行中"
+      unknown: "§7不明"
+  list:
+    header: "&6=== 稼働中のアリーナセッション ==="
+    none: "&7稼働中のアリーナはありません。"
+    entry: "&7- &e{0} &7({1}, ウェーブ {2})"
+  admin:
+    left: "&aアリーナを退出しました。"
+    session_ended: "&7セッションが終了しました（プレイヤー不在）。"
+  announcement:
+    cleared: "{prefix} &e{0} &7さんが {1} &7をクリアしました！"
+    arena_name: "{0}・{1} アリーナ"
+  error:
+    only_leader: "{prefix} &cリーダーのみがアリーナを開始できます。"
+    no_ticket: "{prefix} &c入場チケットを持っていません！"
+    party_no_tickets: "{prefix} &c以下のプレイヤーのチケットが不足しています:"
+    party_all_need_tickets: "{prefix} &c入場にはパーティ全員がチケットを持っている必要があります！"
+    not_in_session: "&cアリーナセッションに参加していません。"
+
+# Quest Related
+quest:
+  accept:
+    success: "{prefix} &aクエストを受注しました！"
+  complete:
+    reward: "{prefix} &6クエスト達成！ &7報酬: &e経験値{0}&7, §#00ff7fアリーナチケット &e{1}枚"
+    bonus_ticket: "&aボーナス報酬: &bクイックチケット x1"
+    success: "&a&lクエスト達成！"
+    reward_received: "&7報酬を受け取りました: {0} &e{1}枚 &7/ &a{2} Exp"
+    ticket_normal: "&#00ff7fアリーナチケット"
+
+# Reward Related
+reward:
+  header: "&8&m                                                "
+  title: "&eアリーナをクリアし、報酬を受け取りました！"
+  ticket: "&7→ {0} x{1}"
+  point: "&7→ &eアリーナポイント {0} &7Point"
+  experience: "&7→ &aアリーナレベル経験値 {0} &7Exp &8(次のレベルまであと &a{1} &7Exp&8)"
+  footer: "&8&m                                                "
+  inventory_full_warning: "&c警告: &7インベントリがいっぱいです！"
+  items_dropped: "&7アイテムが足元にドロップしました。"
+
+# GUI Related
+gui:
+  common:
+    close: "&c閉じる"
+    back: "&e戻る"
+  arena_menu:
+    title: "アリーナメニュー"
+    statistics: "&6統計"
+    quests: "&eクエスト"
+    settings: "&b個人設定"
+  entrance:
+    title_normal: "&6シミュレーションアリーナ入場"
+    title_quick: "&bクイックアリーナ入場"
+    mob_type: "&aモブタイプ"
+    mob_type_zombie: "&aゾンビ"
+    mob_type_skeleton: "&7スケルトン"
+    mob_type_spider: "&cスパイダー"
+    mob_type_blaze: "&6ブレイズ"
+    mob_type_guardian: "&bガーディアン"
+    mob_type_enderman: "&dエンダーマン"
+    mob_type_slime: "&aスライム"
+    difficulty: "&c難易度"
+    start: "&a開始"
+    quick_start: "&bクイックアリーナ開始"
+    quick_info: "&bクイックアリーナ情報"
+    next_page: "&e次のページ"
+    prev_page: "&e前のページ"
+    lore:
+      click_next: "&7左クリック: &a次へ"
+      click_prev: "&7右クリック: &c前へ"
+      click_start: "&eクリックして開始"
+      quick_desc:
+        - "&7ランダムなモブと難易度で"
+        - "&7手軽にアリーナを楽しめます。"
+        - "&7報酬は通常アリーナと同じです。"
+    difficulty_easy: "&aイージー"
+    difficulty_normal: "&eノーマル"
+    difficulty_hard: "&cハード"
+    difficulty_expert: "&dエキスパート"
+    difficulty_nightmare: "&2ナイトメア"
+    mob_type_desc: "&7出現するモブのタイプを選択します。"
+    difficulty_desc: "&7アリーナの難易度を設定します。"
+    party_toggle: "&6パーティー参加の如何"
+    party_toggle_desc: "&7パーティーで挑戦するかどうかを切り替えます。"
+    offering: "&d捧げ物"
+    offering_desc: "&7何を捧げる?"
+    offering_current: "&f&l| &e現在の設定 {0}{1}"
+    offering_lacking: "（必要数が足りません）"
+    start_desc: "&7クリックして&cアリーナへのゲート&7を開きます。"
+    cost: "&bコスト"
+    soul_fragment: "ソウルフラグメント"
+    offering_item: "捧げ物"
+    lacking_cost: "&c&n入場コストが足りません。"
+    quick_desc_lore:
+      - "&7ランダムなモブと難易度で"
+      - "&7手軽にアリーナを楽しめます。"
+      - "&7報酬は通常アリーナと同じです。"
+  settings:
+    title: "個人設定"
+    clear_announcements: "&eクリア通知"
+    clear_announcements_desc: "&7他のプレイヤーのクリア通知を受け取る"
+    music: "&d音楽"
+    music_desc: "&7ゲーム中の音楽を再生する"
+    language: "&b言語設定"
+    language_desc: "&7表示言語を変更する"
+    language_japanese: "&e日本語"
+    language_english: "&e英語"
+    enabled: "&a有効"
+    disabled: "&c無効"
+    current: "&7現在: {0}"
+  quest:
+    title: "クエスト"
+    daily_prefix: "[デイリー]"
+    progress: "&7進捗: &e{0}/{1}"
+    reward: "&7報酬: &e経験値{0} &7+ &bクエスト引換券 &e{1}枚"
+    not_accepted: "&7未受注"
+    in_progress: "&e進行中"
+    completed: "&a達成済み"
+    click_to_accept: "&aクリックして受注"
+    no_quest: "&c受注可能なクエストはありません"
+    refresh: "&6&lクエストを更新する"
+    refresh_desc:
+      - "&7すべてのクエストが完了しました！"
+      - "&7クリックして新しいクエストセットを受け取ります。"
+    lore:
+      mob: "&f&l| &7モブ &b{0}"
+      difficulty: "&f&l| &7討伐難易度 &b{0}"
+      reward_ticket: "&f&l| {0} &e{1}枚"
+      reward_exp: "&f&l| &7アリーナレベル経験値 &a{0} &7Exp"
+      completed: "&c&l本日分完了済み"
+      click_to_start: "&e&nクリックしてクエストを開始します"
+  quest_confirm:
+    title: "クエストの開始確認"
+    info_title: "&e&lクエスト内容の確認"
+    info_mob: "&7モブ: &b{0}"
+    info_difficulty: "&7難易度: &b{0}"
+    info_reward: "&7報酬: {0} &e{1}枚 &7/ &a{2} Exp"
+    info_warn: "&7※開始するとアリーナへ移動します。"
+    confirm: "&a&l[ 挑戦する ]"
+    cancel: "&c&l[ やめる ]"
+  stats:
+    title: "統計データ"
+    player_head: "&6{0} の統計"
+    total_stats: "&6全体データ"
+    combat_stats: "&c戦闘データ"
+    playtime_stats: "&bプレイ時間 & 経験値"
+    mob_stats: "&e{0}"
+    kills: "&7討伐数: &e{0}"
+    deaths: "&7死亡数: &e{0}"
+    kd_ratio: "&7K/D比: &e{0}"
+    games_played: "&7プレイ回数: &e{0}"
+    wins: "&7勝利数: &e{0}"
+    playtime: "&7プレイ時間: &e{0}"
+    total_exp: "&7累計経験値: &e{0}"
+    win_rate: "&7勝率: &e{0}%"
+
+# Admin Commands
+admin:
+  usage: "&6使用法: /arenaa <list|leave>"
+  reload_success: "{prefix} &a設定ファイルを再読み込みしました。"
+  reload_failed: "{prefix} &c設定の再読み込みに失敗しました: {0}"
+
+# Miscellaneous
+misc:
+  click_sound: "クリック音"
+  enabled: "&a有効"
+  disabled: "&c無効"

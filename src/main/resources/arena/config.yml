@@ -1,0 +1,83 @@
+# PvE Arena Configuration
+# Main configuration file for the plugin
+
+# Mob statistics scaling
+mob_stats:
+  # Percentage increase per wave (0.1 = 10%)
+  per_wave: 0.1
+  
+  # Percentage increase per additional player (0.15 = 15%)
+  per_player_count: 0.15
+  
+  # Speed modifier exponent (lower = slower speed scaling)
+  speed_modifier_pow: 0.3
+
+# Drop scaling settings
+drop_stats:
+  # Percentage increase per wave (0.05 = 5%)
+  per_wave: 0.05
+  
+  # Percentage increase per additional player (0.1 = 10%)
+  per_player_count: 0.1
+  
+  # Ratio of strength multiplier to drop multiplier (1.0 = 1:1 ratio)
+  strength_to_drop_ratio: 1.0
+
+# Soul Bottle Settings (魂の瓶)
+soul_bottle:
+  # Maximum charge required for a full bottle
+  max_charge: 100
+  
+  # Charge amount per mob type (when killed while holding empty bottle)
+  mob_charge:
+    zombie: 5
+    skeleton: 5
+    spider: 6
+    creeper: 8
+    enderman: 15
+    blaze: 10
+    witch: 12
+    guardian: 10
+    wither_skeleton: 20
+    phantom: 8
+    default: 3
+
+# Internal Score System (内部スコア)
+# Score = (cost_weight * entry_cost) + (player_weight * player_count) + (offering_weight * offering_count)
+internal_score:
+  # Weight for entry cost (based on mob type base_cost * difficulty cost_multiplier)
+  cost_weight: 1.0
+  
+  # Weight per participating player
+  player_weight: 5.0
+  
+  # Weight per offering (魂入りの瓶)
+  offering_weight: 10.0
+  
+  # Reward multiplier formula: base + (score * score_to_reward_ratio)
+  score_to_reward_ratio: 0.02
+  
+  # Drop multiplier formula: base + (score * score_to_drop_ratio)
+  score_to_drop_ratio: 0.015
+
+# Arena Quest Settings
+arena:
+  quest:
+    reward_random_range: [0.8, 1.2]
+
+# Miscellaneous game settings
+misc:
+  game:
+    # Interval between mob spawns in ticks (20 = 1 second)
+    mob_summon_interval: 20
+    
+    # Seconds until AFK timeout (600 = 10 minutes)
+    second_until_timeout: 600
+
+    # Interval between waves in seconds
+    wave_interval: 20
+
+# Reward multipliers (global)
+rewards:
+  # Quick arena profession experience
+  quick_arena_exp: 100

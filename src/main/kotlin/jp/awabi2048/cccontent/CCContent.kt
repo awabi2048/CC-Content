@@ -9,6 +9,7 @@ import jp.awabi2048.cccontent.items.misc.GulliverItemListener
 import jp.awabi2048.cccontent.items.misc.GulliverConfig
 import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
 import jp.awabi2048.cccontent.items.arena.*
+import jp.awabi2048.cccontent.arena.ArenaMain
 import jp.awabi2048.cccontent.items.sukima_dungeon.*
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.impl.RankManagerImpl
@@ -45,6 +46,9 @@ class CCContent : JavaPlugin() {
         
         // アイテム登録
         registerCustomItems()
+        
+        // アリーナシステムの初期化
+        ArenaMain.initialize(this)
         
         // ランクシステムの初期化
         initializeRankSystem()
@@ -375,6 +379,8 @@ class CCContent : JavaPlugin() {
         if (playTimeTrackerTaskId != -1) {
             server.scheduler.cancelTask(playTimeTrackerTaskId)
         }
+        // アリーナシステムのクリーンアップ
+        ArenaMain.cleanup()
         logger.info("CC-Content v${description.version} が無効化されました")
     }
 }
