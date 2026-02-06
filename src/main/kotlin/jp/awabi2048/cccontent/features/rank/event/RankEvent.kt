@@ -15,14 +15,14 @@ class TutorialRankUpEvent(
     val newRank: TutorialRank,
     val currentExp: Long
 ) : Event() {
+    override fun getHandlers(): HandlerList = Companion.getHandlerList()
+    
     companion object {
         private val handlers = HandlerList()
         
         @JvmStatic
         fun getHandlerList(): HandlerList = handlers
     }
-    
-    override fun getHandlers(): HandlerList = handlers
 }
 
 /**
@@ -32,14 +32,14 @@ class ProfessionSelectedEvent(
     val player: Player,
     val profession: Profession
 ) : Event() {
+    override fun getHandlers(): HandlerList = Companion.getHandlerList()
+    
     companion object {
         private val handlers = HandlerList()
         
         @JvmStatic
         fun getHandlerList(): HandlerList = handlers
     }
-    
-    override fun getHandlers(): HandlerList = handlers
 }
 
 /**
@@ -50,14 +50,14 @@ class ProfessionChangedEvent(
     val oldProfession: Profession,
     val newProfession: Profession
 ) : Event() {
+    override fun getHandlers(): HandlerList = Companion.getHandlerList()
+    
     companion object {
         private val handlers = HandlerList()
         
         @JvmStatic
         fun getHandlerList(): HandlerList = handlers
     }
-    
-    override fun getHandlers(): HandlerList = handlers
 }
 
 /**
@@ -69,14 +69,14 @@ class SkillAcquiredEvent(
     val skillId: String,
     val skillName: String
 ) : Event() {
+    override fun getHandlers(): HandlerList = Companion.getHandlerList()
+    
     companion object {
         private val handlers = HandlerList()
         
         @JvmStatic
         fun getHandlerList(): HandlerList = handlers
     }
-    
-    override fun getHandlers(): HandlerList = handlers
 }
 
 /**
@@ -88,12 +88,12 @@ class PlayerExperienceGainEvent(
     val amount: Long,
     val newExp: Long
 ) : Event() {
+    override fun getHandlers(): HandlerList = Companion.getHandlerList()
+    
     companion object {
         private val handlers = HandlerList()
         
         @JvmStatic
         fun getHandlerList(): HandlerList = handlers
     }
-    
-    override fun getHandlers(): HandlerList = handlers
 }
