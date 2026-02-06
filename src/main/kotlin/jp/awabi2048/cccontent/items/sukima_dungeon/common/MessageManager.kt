@@ -27,6 +27,14 @@ class MessageManager(private val langManager: LangManager) {
         const val ERROR_NOT_IN_DUNGEON = "sukima_dungeon.error.not_in_dungeon"
         const val ERROR_NO_PERMISSION = "sukima_dungeon.error.no_permission"
         const val ERROR_GENERIC = "sukima_dungeon.error.generic"
+        const val ERROR_INVALID_BOOKMARK = "sukima_dungeon.error.invalid_bookmark"
+        
+        // ブックマークアイテム翻訳キー
+        const val BOOKMARK_BROKEN_NAME = "sukima_dungeon.item.bookmark.broken.name"
+        const val BOOKMARK_WORN_NAME = "sukima_dungeon.item.bookmark.worn.name"
+        const val BOOKMARK_FADED_NAME = "sukima_dungeon.item.bookmark.faded.name"
+        const val BOOKMARK_NEW_NAME = "sukima_dungeon.item.bookmark.new.name"
+        const val BOOKMARK_LORE = "sukima_dungeon.item.bookmark.lore"
     }
     
     /**

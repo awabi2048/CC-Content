@@ -284,6 +284,10 @@ class CCContent : JavaPlugin() {
         CustomItemManager.register(CompassTier2Item())
         CustomItemManager.register(CompassTier3Item())
         CustomItemManager.register(TalismanItem())
+        CustomItemManager.register(BookmarkBrokenItem())
+        CustomItemManager.register(BookmarkWornItem())
+        CustomItemManager.register(BookmarkFadedItem())
+        CustomItemManager.register(BookmarkNewItem())
         
         // Arena アイテム
         CustomItemManager.register(ArenaTicketItem())
@@ -467,6 +471,9 @@ class CCContent : JavaPlugin() {
               server.pluginManager.registerEvents(sukimaTalismanListener, this)
               server.pluginManager.registerEvents(sukimaSproutHarvestListener, this)
               server.pluginManager.registerEvents(sukimaEntranceListener, this)
+              
+              // ブックマークアイテムの初期化（翻訳マネージャーを設定）
+              BookmarkItem.initialize(sukimaMessageManager, sukimaLangManager)
              
              // 定期的なクリーンアップタスクを開始（5分ごと）
              server.scheduler.runTaskTimer(this, Runnable {

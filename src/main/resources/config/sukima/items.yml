@@ -90,6 +90,55 @@ talisman:
   max_stack_size: 1
   enchant_glint: true
 
+# ふしぎなしおり (Bookmark)
+bookmark_broken:
+  display_name: "§5ぼろぼろのふしぎなしおり"
+  lore:
+    - "§7§m――――――――――――――――――――――――――――――"
+    - "§7スキマダンジョンに進入するための"
+    - "§7ふしぎなしおり。"
+    - "§7右クリックでダンジョンに入ることができる。"
+    - "§7§m――――――――――――――――――――――――――――――"
+  item_model: "sukimadungeon:bookmark_broken"
+  max_stack_size: 1
+  enchant_glint: true
+
+bookmark_worn:
+  display_name: "§5擦り切れたふしぎなしおり"
+  lore:
+    - "§7§m――――――――――――――――――――――――――――――"
+    - "§7スキマダンジョンに進入するための"
+    - "§7ふしぎなしおり。"
+    - "§7右クリックでダンジョンに入ることができる。"
+    - "§7§m――――――――――――――――――――――――――――――"
+  item_model: "sukimadungeon:bookmark_worn"
+  max_stack_size: 1
+  enchant_glint: true
+
+bookmark_faded:
+  display_name: "§5色褪せたふしぎなしおり"
+  lore:
+    - "§7§m――――――――――――――――――――――――――――――"
+    - "§7スキマダンジョンに進入するための"
+    - "§7ふしぎなしおり。"
+    - "§7右クリックでダンジョンに入ることができる。"
+    - "§7§m――――――――――――――――――――――――――――――"
+  item_model: "sukimadungeon:bookmark_faded"
+  max_stack_size: 1
+  enchant_glint: true
+
+bookmark_new:
+  display_name: "§5新品のふしぎなしおり"
+  lore:
+    - "§7§m――――――――――――――――――――――――――――――"
+    - "§7スキマダンジョンに進入するための"
+    - "§7ふしぎなしおり。"
+    - "§7右クリックでダンジョンに入ることができる。"
+    - "§7§m――――――――――――――――――――――――――――――"
+  item_model: "sukimadungeon:bookmark_new"
+  max_stack_size: 1
+  enchant_glint: true
+
 # アイテム共通設定
 common:
   # マテリアル（POISONOUS_POTATO固定）

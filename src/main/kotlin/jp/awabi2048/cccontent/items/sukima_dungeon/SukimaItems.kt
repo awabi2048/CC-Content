@@ -1,6 +1,8 @@
 package jp.awabi2048.cccontent.items.sukima_dungeon
 
 import jp.awabi2048.cccontent.items.CustomItem
+import jp.awabi2048.cccontent.items.sukima_dungeon.common.MessageManager
+import jp.awabi2048.cccontent.items.sukima_dungeon.common.LangManager
 import io.papermc.paper.datacomponent.DataComponentTypes
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -394,3 +396,121 @@ class TalismanItem : CustomItem {
         return itemType == "talisman"
     }
 }
+
+/**
+ * ふしぎなしおり 基底クラス
+ */
+abstract class BookmarkItem(
+    private val tierName: String,
+    private val tierKey: String
+) : CustomItem {
+    override val feature = "sukima_dungeon"
+    override val id = "bookmark_${tierName.lowercase()}"
+    
+    // 翻訳キー（実際の値はcreateItemで動的に取得）
+    override val displayName: String
+        get() = "§5ふしぎなしおり" // デフォルト値、実際は翻訳から取得
+    
+    override val lore: List<String>
+        get() = listOf(
+            "§7§m――――――――――――――――――――――――――――――",
+            "§7スキマダンジョンに進入するための",
+            "§7ふしぎなしおり。",
+            "§7右クリックでダンジョンに入ることができる。",
+            "§7§m――――――――――――――――――――――――――――――"
+        ) // デフォルト値、実際は翻訳から取得
+    
+    companion object {
+        // シングルトンインスタンス用のMessageManager参照
+        var messageManager: MessageManager? = null
+        var langManager: LangManager? = null
+        
+        fun initialize(manager: MessageManager, lang: LangManager) {
+            messageManager = manager
+            langManager = lang
+        }
+    }
+    
+    override fun createItem(amount: Int): ItemStack {
+        val item = ItemStack(Material.POISONOUS_POTATO, 1)
+        val meta = item.itemMeta ?: return item
+        
+        meta.setItemModel(NamespacedKey("sukimadungeon", "bookmark_${tierName.lowercase()}"))
+        meta.setMaxStackSize(1)
+        
+        // 翻訳から表示名を取得
+        val displayNameKey = when (tierKey) {
+            "broken" -> MessageManager.BOOKMARK_BROKEN_NAME
+            "worn" -> MessageManager.BOOKMARK_WORN_NAME
+            "faded" -> MessageManager.BOOKMARK_FADED_NAME
+            "new" -> MessageManager.BOOKMARK_NEW_NAME
+            else -> MessageManager.BOOKMARK_BROKEN_NAME
+        }
+        
+        val actualDisplayName = langManager?.get(displayNameKey) ?: "§5ふしぎなしおり"
+        meta.displayName(Component.text(actualDisplayName))
+        
+        // 翻訳からloreを取得
+        val loreList = langManager?.getList(MessageManager.BOOKMARK_LORE) ?: lore
+        meta.lore(loreList.map { Component.text(it) })
+        
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
+        
+        val pdc = meta.persistentDataContainer
+        pdc.set(
+            NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "sukima_item"),
+            PersistentDataType.STRING,
+            "bookmark"
+        )
+        pdc.set(
+            NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "bookmark_tier"),
+            PersistentDataType.STRING,
+            tierName.lowercase()
+        )
+        
+        item.itemMeta = meta
+        
+        // コンポーネント設定：食べられないように設定
+        item.unsetData(DataComponentTypes.CONSUMABLE)
+        
+        return item
+    }
+    
+    override fun matches(item: ItemStack): Boolean {
+        if (item.type != Material.POISONOUS_POTATO) return false
+        val meta = item.itemMeta ?: return false
+        
+        val pdc = meta.persistentDataContainer
+        val itemType = pdc.get(
+            NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "sukima_item"),
+            PersistentDataType.STRING
+        ) ?: return false
+        
+        val tier = pdc.get(
+            NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "bookmark_tier"),
+            PersistentDataType.STRING
+        ) ?: return false
+        
+        return itemType == "bookmark" && tier == tierName.lowercase()
+    }
+}
+
+/**
+ * ぼろぼろのふしぎなしおり (Tier 1)
+ */
+class BookmarkBrokenItem : BookmarkItem("BROKEN", "broken")
+
+/**
+ * 擦り切れたふしぎなしおり (Tier 2)
+ */
+class BookmarkWornItem : BookmarkItem("WORN", "worn")
+
+/**
+ * 色褪せたふしぎなしおり (Tier 3)
+ */
+class BookmarkFadedItem : BookmarkItem("FADED", "faded")
+
+/**
+ * 新品のふしぎなしおり (Tier 4)
+ */
+class BookmarkNewItem : BookmarkItem("NEW", "new")
