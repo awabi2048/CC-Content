@@ -31,7 +31,7 @@ data class PlayerTutorialRank(
         currentExp += amount
         lastUpdated = System.currentTimeMillis()
         
-        // ランクアップ判定
+        // ランクアップ判定（1回のみ）
         if (currentExp >= currentRank.requiredExp) {
             val nextRank = TutorialRank.values().getOrNull(currentRank.ordinal + 1)
             if (nextRank != null) {
