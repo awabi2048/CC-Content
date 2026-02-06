@@ -9,6 +9,8 @@ import jp.awabi2048.cccontent.items.misc.GulliverItemListener
 import jp.awabi2048.cccontent.items.misc.GulliverConfig
 import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
 import jp.awabi2048.cccontent.items.sukima_dungeon.*
+import jp.awabi2048.cccontent.items.arena.*
+import jp.awabi2048.cccontent.features.arena.ArenaItemListener
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.impl.RankManagerImpl
 import jp.awabi2048.cccontent.features.rank.impl.YamlRankStorage
@@ -61,6 +63,7 @@ class CCContent : JavaPlugin() {
         // リスナー登録
         server.pluginManager.registerEvents(GulliverItemListener(this), this)
         server.pluginManager.registerEvents(SukimaItemListener(), this)
+        server.pluginManager.registerEvents(ArenaItemListener(), this)
         
         // ScaleManagerタスクの開始（毎tick実行）
         server.scheduler.runTaskTimer(this, GulliverScaleManager(), 0L, 1L)
@@ -72,6 +75,7 @@ class CCContent : JavaPlugin() {
         // フィーチャー別のアイテム数を表示
         logger.info("  - misc: ${CustomItemManager.getItemCountByFeature("misc")}")
         logger.info("  - sukima_dungeon: ${CustomItemManager.getItemCountByFeature("sukima_dungeon")}")
+        logger.info("  - arena: ${CustomItemManager.getItemCountByFeature("arena")}")
     }
     
     /**
@@ -253,6 +257,11 @@ class CCContent : JavaPlugin() {
         CustomItemManager.register(SproutItem())
         CustomItemManager.register(CompassItem())
         CustomItemManager.register(TalismanItem())
+        
+        // Arena アイテム
+        CustomItemManager.register(ArenaTicketItem())
+        CustomItemManager.register(ArenaMedalItem())
+        CustomItemManager.register(ArenaPrizeItem())
     }
     
     /**
