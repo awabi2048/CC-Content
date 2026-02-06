@@ -16,7 +16,9 @@ import org.bukkit.entity.Player
  */
 class RankCommand(
     private val rankManager: RankManager,
-    private val messageProvider: MessageProvider
+    private val messageProvider: MessageProvider,
+    private val taskLoader: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader? = null,
+    private val taskChecker: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskChecker? = null
 ) : CommandExecutor, TabCompleter {
     
     override fun onCommand(
@@ -293,42 +295,83 @@ class RankCommand(
             return false
         }
         
+        if (taskLoader == null || taskChecker == null) {
+            sender.sendMessage("§cタスクシステムが初期化されていません")
+            return false
+        }
+        
         val uuid = targetPlayer.uniqueId
         val tutorial = rankManager.getPlayerTutorial(uuid)
         val progress = tutorial.taskProgress
+        val requirement = taskLoader.getRequirement(tutorial.currentRank.name)
         
         sender.sendMessage("§6=== ${targetPlayer.name} のタスク進捗 ===")
         sender.sendMessage("§aランク: ${tutorial.currentRank.name}")
-        sender.sendMessage("§aプレイ時間: ${progress.playTime}分")
-        sender.sendMessage("§aバニラEXP: ${progress.vanillaExp}")
         
-        if (progress.mobKills.isNotEmpty()) {
-            sender.sendMessage("§aモブ討伐数:")
-            progress.mobKills.forEach { (mobType, count) ->
-                sender.sendMessage("  - $mobType: $count")
-            }
+        // タスク要件が空（最終ランク）の場合
+        if (requirement.isEmpty()) {
+            sender.sendMessage("§a§lすべてのタスク完了！")
+            return true
         }
         
-        if (progress.blockMines.isNotEmpty()) {
-            sender.sendMessage("§aブロック採掘数:")
-            progress.blockMines.forEach { (blockType, count) ->
-                sender.sendMessage("  - $blockType: $count")
-            }
+        sender.sendMessage("§6--- タスク要件と進捗 ---")
+        
+        // プレイ時間
+        if (requirement.playTimeMin > 0) {
+            val progress_min = minOf(progress.playTime, requirement.playTimeMin.toLong())
+            val percent = (progress_min.toDouble() / requirement.playTimeMin.toDouble() * 100).toInt()
+            val status = if (progress.playTime >= requirement.playTimeMin) "§a✓" else "§c✗"
+            sender.sendMessage("$status プレイ時間: $progress_min/${requirement.playTimeMin}分 ($percent%)")
         }
         
-        if (progress.bossKills.isNotEmpty()) {
-            sender.sendMessage("§aボス討伐数:")
-            progress.bossKills.forEach { (bossType, count) ->
-                sender.sendMessage("  - $bossType: $count")
-            }
+        // モブ討伐
+        requirement.mobKills.forEach { (mobType, required) ->
+            val current = progress.getMobKillCount(mobType)
+            val progress_count = minOf(current, required)
+            val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
+            val status = if (current >= required) "§a✓" else "§c✗"
+            sender.sendMessage("$status $mobType 討伐: $current/$required ($percent%)")
         }
         
-        if (progress.items.isNotEmpty()) {
-            sender.sendMessage("§aアイテム所持数:")
-            progress.items.forEach { (material, count) ->
-                sender.sendMessage("  - $material: $count")
-            }
+        // ブロック採掘
+        requirement.blockMines.forEach { (blockType, required) ->
+            val current = progress.getBlockMineCount(blockType)
+            val progress_count = minOf(current, required)
+            val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
+            val status = if (current >= required) "§a✓" else "§c✗"
+            sender.sendMessage("$status $blockType 採掘: $current/$required ($percent%)")
         }
+        
+        // バニラEXP
+        if (requirement.vanillaExp > 0) {
+            val progress_exp = minOf(progress.vanillaExp, requirement.vanillaExp)
+            val percent = (progress_exp.toDouble() / requirement.vanillaExp.toDouble() * 100).toInt()
+            val status = if (progress.vanillaExp >= requirement.vanillaExp) "§a✓" else "§c✗"
+            sender.sendMessage("$status バニラEXP: $progress_exp/${requirement.vanillaExp} ($percent%)")
+        }
+        
+        // アイテム
+        requirement.itemsRequired.forEach { (material, required) ->
+            val current = progress.getItemCount(material)
+            val progress_count = minOf(current, required)
+            val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
+            val status = if (current >= required) "§a✓" else "§c✗"
+            sender.sendMessage("$status $material 所持: $current/$required ($percent%)")
+        }
+        
+        // ボス討伐
+        requirement.bossKills.forEach { (bossType, required) ->
+            val current = progress.getBossKillCount(bossType)
+            val progress_count = minOf(current, required)
+            val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
+            val status = if (current >= required) "§a✓" else "§c✗"
+            sender.sendMessage("$status $bossType 討伐: $current/$required ($percent%)")
+        }
+        
+        // 全体進捗
+        val overallProgress = taskChecker.getProgress(progress, requirement, targetPlayer)
+        val progressPercent = (overallProgress * 100).toInt()
+        sender.sendMessage("§6--- 全体進捗: $progressPercent% ---")
         
         return true
     }

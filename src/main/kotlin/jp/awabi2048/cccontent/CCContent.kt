@@ -90,10 +90,10 @@ class CCContent : JavaPlugin() {
             registerSkillTrees()
             
             // チュートリアルランク タスクシステムの初期化
-            initializeTutorialTaskSystem(rankManager, storage)
+            val (taskLoader, taskChecker) = initializeTutorialTaskSystem(rankManager, storage)
             
             // /rank コマンドを登録
-            val rankCommand = RankCommand(rankManager, messageProvider)
+            val rankCommand = RankCommand(rankManager, messageProvider, taskLoader, taskChecker)
             getCommand("rank")?.setExecutor(rankCommand)
             getCommand("rank")?.tabCompleter = rankCommand
             
@@ -106,8 +106,9 @@ class CCContent : JavaPlugin() {
     
     /**
      * チュートリアルランク タスクシステムの初期化
+     * @return Pair<TutorialTaskLoader, TutorialTaskChecker>
      */
-    private fun initializeTutorialTaskSystem(rankManager: RankManager, storage: YamlRankStorage) {
+    private fun initializeTutorialTaskSystem(rankManager: RankManager, storage: YamlRankStorage): Pair<TutorialTaskLoader?, TutorialTaskCheckerImpl?> {
         try {
             // tutorial-tasks.yml ファイルを確認・抽出
             val tutorialTasksFile = File(dataFolder, "tutorial-tasks.yml")
@@ -160,9 +161,12 @@ class CCContent : JavaPlugin() {
             } else {
                 logger.info("既存プレイヤーをNewbieにリセット: OFF")
             }
+            
+            return Pair(taskLoader, taskChecker)
         } catch (e: Exception) {
             logger.warning("チュートリアルランク タスクシステムの初期化に失敗しました: ${e.message}")
             e.printStackTrace()
+            return Pair(null, null)
         }
     }
     
