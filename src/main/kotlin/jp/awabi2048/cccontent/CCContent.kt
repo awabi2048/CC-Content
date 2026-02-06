@@ -13,6 +13,8 @@ import jp.awabi2048.cccontent.items.sukima_dungeon.common.ConfigManager
 import jp.awabi2048.cccontent.items.sukima_dungeon.common.DungeonManager
 import jp.awabi2048.cccontent.items.sukima_dungeon.common.LangManager
 import jp.awabi2048.cccontent.items.sukima_dungeon.common.MessageManager
+import jp.awabi2048.cccontent.features.sukima_dungeon.gui.GuiManager
+import jp.awabi2048.cccontent.features.sukima_dungeon.gui.DungeonEntranceGui
 import jp.awabi2048.cccontent.items.arena.*
 import jp.awabi2048.cccontent.features.arena.ArenaItemListener
 import jp.awabi2048.cccontent.features.rank.RankManager
@@ -39,14 +41,17 @@ class CCContent : JavaPlugin() {
     
     private var playTimeTrackerTaskId: Int = -1
     
-    // SukimaDungeon マネージャー
-    private lateinit var sukimaConfigManager: ConfigManager
-    private lateinit var sukimaDungeonManager: DungeonManager
-    private lateinit var sukimaLangManager: LangManager
-    private lateinit var sukimaMessageManager: MessageManager
-    private lateinit var sukimaCompassListener: CompassListener
-    private lateinit var sukimaTalismanListener: TalismanListener
-    private lateinit var sukimaSproutHarvestListener: SproutHarvestListener
+     // SukimaDungeon マネージャー
+     private lateinit var sukimaConfigManager: ConfigManager
+     private lateinit var sukimaDungeonManager: DungeonManager
+     private lateinit var sukimaLangManager: LangManager
+     private lateinit var sukimaMessageManager: MessageManager
+     private lateinit var sukimaGuiManager: GuiManager
+     private lateinit var sukimaEntranceGui: DungeonEntranceGui
+     private lateinit var sukimaCompassListener: CompassListener
+     private lateinit var sukimaTalismanListener: TalismanListener
+     private lateinit var sukimaSproutHarvestListener: SproutHarvestListener
+     private lateinit var sukimaEntranceListener: EntranceListener
     
     override fun onEnable() {
         instance = this
@@ -401,32 +406,50 @@ class CCContent : JavaPlugin() {
             // 言語マネージャーを初期化
             sukimaLangManager = LangManager(this)
             
-            // メッセージマネージャーを初期化
-            sukimaMessageManager = MessageManager(sukimaLangManager)
-            
-            // リスナーを初期化
-            sukimaCompassListener = CompassListener(
-                this, 
-                sukimaDungeonManager, 
-                sukimaConfigManager, 
-                sukimaMessageManager
-            )
-            sukimaTalismanListener = TalismanListener(
-                this, 
-                sukimaDungeonManager, 
-                sukimaConfigManager, 
-                sukimaMessageManager
-            )
-            sukimaSproutHarvestListener = SproutHarvestListener(
-                sukimaDungeonManager,
-                sukimaConfigManager,
-                sukimaMessageManager
-            )
-            
-            // リスナーを登録
-            server.pluginManager.registerEvents(sukimaCompassListener, this)
-            server.pluginManager.registerEvents(sukimaTalismanListener, this)
-            server.pluginManager.registerEvents(sukimaSproutHarvestListener, this)
+             // メッセージマネージャーを初期化
+             sukimaMessageManager = MessageManager(sukimaLangManager)
+             
+             // GUI マネージャーを初期化
+             sukimaGuiManager = GuiManager()
+             
+             // GUI を初期化
+             sukimaEntranceGui = DungeonEntranceGui(
+                 this,
+                 sukimaGuiManager,
+                 sukimaConfigManager
+             )
+             
+             // リスナーを初期化
+             sukimaCompassListener = CompassListener(
+                 this, 
+                 sukimaDungeonManager, 
+                 sukimaConfigManager, 
+                 sukimaMessageManager
+             )
+             sukimaTalismanListener = TalismanListener(
+                 this, 
+                 sukimaDungeonManager, 
+                 sukimaConfigManager, 
+                 sukimaMessageManager
+             )
+             sukimaSproutHarvestListener = SproutHarvestListener(
+                 sukimaDungeonManager,
+                 sukimaConfigManager,
+                 sukimaMessageManager
+             )
+             sukimaEntranceListener = EntranceListener(
+                 this,
+                 sukimaDungeonManager,
+                 sukimaConfigManager,
+                 sukimaMessageManager,
+                 sukimaEntranceGui
+             )
+             
+             // リスナーを登録
+             server.pluginManager.registerEvents(sukimaCompassListener, this)
+             server.pluginManager.registerEvents(sukimaTalismanListener, this)
+             server.pluginManager.registerEvents(sukimaSproutHarvestListener, this)
+             server.pluginManager.registerEvents(sukimaEntranceListener, this)
             
             // 定期的なクリーンアップタスクを開始（5分ごと）
             server.scheduler.runTaskTimer(this, Runnable {

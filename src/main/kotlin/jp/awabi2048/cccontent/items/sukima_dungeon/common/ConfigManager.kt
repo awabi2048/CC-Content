@@ -46,14 +46,39 @@ class ConfigManager(private val plugin: JavaPlugin) {
     var talismanEscapeDelay: Int = 3
         private set
     
-    // ワールドの芽設定
-    var sproutDropChance: Double = 1.0
-        private set
-    
-    var sproutRespawnTime: Int = 300
-        private set
-    
-    init {
+     // ワールドの芽設定
+     var sproutDropChance: Double = 1.0
+         private set
+     
+     var sproutRespawnTime: Int = 300
+         private set
+     
+     // ダンジョンティア設定
+     data class DungeonTierConfig(
+         val availableSizes: List<String>,
+         val availableThemes: List<String>
+     )
+     
+     val dungeonTiers: MutableMap<String, DungeonTierConfig> = mutableMapOf()
+     
+     // ダンジョンサイズ設定
+     data class DungeonSizeConfig(
+         val tiles: Int,
+         val duration: Int,
+         val sproutBaseCount: Int
+     )
+     
+     val dungeonSizes: MutableMap<String, DungeonSizeConfig> = mutableMapOf()
+     
+     // ダンジョンテーマ設定
+     data class DungeonThemeConfig(
+         val displayName: String,
+         val icon: String = "BOOK"
+     )
+     
+     val dungeonThemes: MutableMap<String, DungeonThemeConfig> = mutableMapOf()
+     
+     init {
         val configDir = File(plugin.dataFolder, "config/sukima").apply { mkdirs() }
         configFile = File(configDir, "config.yml")
         
@@ -134,23 +159,62 @@ class ConfigManager(private val plugin: JavaPlugin) {
             // タリスマン設定
             talismanEscapeDelay = config?.getInt("talisman.escape_delay") ?: 3
             
-            // ワールドの芽設定
-            sproutDropChance = config?.getDouble("sprout.drop_chance") ?: 1.0
-            sproutRespawnTime = config?.getInt("sprout.respawn_time") ?: 300
-            
-            // デバッグ設定
-            debugEnabled = config?.getBoolean("debug.enabled") ?: false
-            verboseLogging = config?.getBoolean("debug.verbose_logging") ?: false
-            
-            plugin.logger.info("[SukimaDungeon] 設定ファイルを読み込みました")
-            if (debugEnabled) {
-                plugin.logger.info("[SukimaDungeon] デバッグモードが有効です")
-            }
-        } catch (e: Exception) {
-            plugin.logger.warning("[SukimaDungeon] 設定ファイルの読み込みに失敗しました: ${e.message}")
-            e.printStackTrace()
-        }
-    }
+             // ワールドの芽設定
+             sproutDropChance = config?.getDouble("sprout.drop_chance") ?: 1.0
+             sproutRespawnTime = config?.getInt("sprout.respawn_time") ?: 300
+             
+             // ダンジョンティア設定を読み込む
+             dungeonTiers.clear()
+             val tiersSection = config?.getConfigurationSection("tiers")
+             if (tiersSection != null) {
+                 for (tierKey in tiersSection.getKeys(false)) {
+                     val tierSection = tiersSection.getConfigurationSection(tierKey)
+                     if (tierSection != null) {
+                         val tierConfig = DungeonTierConfig(
+                             availableSizes = tierSection.getStringList("available_sizes"),
+                             availableThemes = tierSection.getStringList("available_themes")
+                         )
+                         dungeonTiers[tierKey] = tierConfig
+                     }
+                 }
+             }
+             
+             // ダンジョンサイズ設定を読み込む
+             dungeonSizes.clear()
+             val sizesSection = config?.getConfigurationSection("sizes")
+             if (sizesSection != null) {
+                 for (sizeKey in sizesSection.getKeys(false)) {
+                     val sizeSection = sizesSection.getConfigurationSection(sizeKey)
+                     if (sizeSection != null) {
+                         val sizeConfig = DungeonSizeConfig(
+                             tiles = sizeSection.getInt("tiles", 5),
+                             duration = sizeSection.getInt("duration", 600),
+                             sproutBaseCount = sizeSection.getInt("sprout_base_count", 3)
+                         )
+                         dungeonSizes[sizeKey] = sizeConfig
+                     }
+                 }
+             }
+             
+             // ダンジョンテーマ設定を読み込む（デフォルト）
+             dungeonThemes.clear()
+             dungeonThemes["default"] = DungeonThemeConfig("デフォルト", "BOOK")
+             dungeonThemes["nether"] = DungeonThemeConfig("ネザー", "NETHERITE_BLOCK")
+             dungeonThemes["end"] = DungeonThemeConfig("エンド", "DRAGON_BREATH")
+             
+             // デバッグ設定
+             debugEnabled = config?.getBoolean("debug.enabled") ?: false
+             verboseLogging = config?.getBoolean("debug.verbose_logging") ?: false
+             
+             plugin.logger.info("[SukimaDungeon] 設定ファイルを読み込みました")
+             if (debugEnabled) {
+                 plugin.logger.info("[SukimaDungeon] デバッグモードが有効です")
+             }
+         } catch (e: Exception) {
+             plugin.logger.warning("[SukimaDungeon] 設定ファイルの読み込みに失敗しました: ${e.message}")
+             e.printStackTrace()
+         }
+     }
     
     /**
      * 設定をリロード
@@ -159,19 +223,61 @@ class ConfigManager(private val plugin: JavaPlugin) {
         loadConfig()
     }
     
-    /**
-     * 指定されたTierの設定を取得
-     */
-    fun getCompassTierConfig(tier: Int): CompassTierConfig? {
-        return compassTiers[tier]
-    }
-    
-    /**
-     * デバッグログを出力
-     */
-    fun debug(message: String) {
-        if (debugEnabled && verboseLogging) {
-            plugin.logger.info("[SukimaDungeon-DEBUG] $message")
-        }
-    }
-}
+     /**
+      * 指定されたTierの設定を取得
+      */
+     fun getCompassTierConfig(tier: Int): CompassTierConfig? {
+         return compassTiers[tier]
+     }
+     
+     /**
+      * 指定されたダンジョンティアの設定を取得
+      */
+     fun getDungeonTierConfig(tier: String): DungeonTierConfig? {
+         return dungeonTiers[tier]
+     }
+     
+     /**
+      * 指定されたダンジョンサイズの設定を取得
+      */
+     fun getDungeonSizeConfig(size: String): DungeonSizeConfig? {
+         return dungeonSizes[size]
+     }
+     
+     /**
+      * 指定されたダンジョンテーマの設定を取得
+      */
+     fun getDungeonThemeConfig(theme: String): DungeonThemeConfig? {
+         return dungeonThemes[theme]
+     }
+     
+     /**
+      * 全ダンジョンティア名を取得
+      */
+     fun getAllDungeonTiers(): List<String> {
+         return dungeonTiers.keys.toList()
+     }
+     
+     /**
+      * 全ダンジョンサイズ名を取得
+      */
+     fun getAllDungeonSizes(): List<String> {
+         return dungeonSizes.keys.toList()
+     }
+     
+     /**
+      * 全ダンジョンテーマ名を取得
+      */
+     fun getAllDungeonThemes(): List<String> {
+         return dungeonThemes.keys.toList()
+     }
+     
+     /**
+      * デバッグログを出力
+      */
+     fun debug(message: String) {
+         if (debugEnabled && verboseLogging) {
+             plugin.logger.info("[SukimaDungeon-DEBUG] $message")
+         }
+     }
+ }
