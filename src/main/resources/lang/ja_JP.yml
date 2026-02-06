@@ -1,0 +1,122 @@
+# 日本語言語ファイル
+
+# 職業情報
+profession:
+  lumberjack:
+    name: "木こり"
+    description: "木を伐採して経験値を得る職業"
+  brewer:
+    name: "醸造家"
+    description: "ポーション醸造で経験値を得る職業"
+  miner:
+    name: "鉱夫"
+    description: "鉱石採掘で経験値を得る職業"
+
+# スキル情報
+skill:
+  # 木こりのスキルツリー
+  lumberjack:
+    skill0:
+      name: "初心者の木こり"
+      description: "基本的な木の伐採を学んだ"
+    skill1:
+      name: "修行中の木こり"
+      description: "より効率的な伐採方法を習得"
+    skill2:
+      name: "熟練の木こり（斧マスター）"
+      description: "斧の扱いに精通した者"
+    skill3:
+      name: "伝説の木こり（斧極人）"
+      description: "斧を極めた者"
+    skill4:
+      name: "守護者の木こり（盾マスター）"
+      description: "防御を重視した伐採法を習得"
+    skill5:
+      name: "鉄壁の木こり（盾極人）"
+      description: "防御を極めた者"
+    skill6:
+      name: "速度の達人（左腕）"
+      description: "片手伐採の極意を習得"
+    skill7:
+      name: "伐採の皇帝（両腕）"
+      description: "両手伐採の究極形態"
+    skill8:
+      name: "自然の化身"
+      description: "自然界との完全な調和を実現"
+    skill9:
+      name: "伝説を超えし者"
+      description: "すべての伐採技術を極めた最高位の木こり"
+  
+  # 醸造家のスキルツリー
+  brewer:
+    skill0:
+      name: "初心者の醸造家"
+      description: "基本的なポーション醸造を学んだ"
+    skill1:
+      name: "修行中の醸造家"
+      description: "複雑なポーション配合を習得"
+    skill2:
+      name: "熟練の醸造家（火焰の道）"
+      description: "火属性ポーション製造の達人"
+    skill3:
+      name: "炎の大魔導師"
+      description: "火焰ポーション製造を極めた者"
+    skill4:
+      name: "熟練の醸造家（氷結の道）"
+      description: "冷気属性ポーション製造の達人"
+    skill5:
+      name: "氷結の大魔導師"
+      description: "冷気ポーション製造を極めた者"
+    skill6:
+      name: "闇の錬金術師"
+      description: "禁忌のポーション製造法を習得"
+    skill7:
+      name: "光の調和者"
+      description: "聖なるポーション製造を習得"
+    skill8:
+      name: "元素の支配者"
+      description: "すべての属性ポーション製造を習得"
+    skill9:
+      name: "ポーション神"
+      description: "ポーション製造の最高位に達した者"
+  
+  # 鉱夫のスキルツリー
+  miner:
+    skill0:
+      name: "初心者の鉱夫"
+      description: "基本的な採掘を学んだ"
+    skill1:
+      name: "修行中の鉱夫"
+      description: "より効率的な採掘方法を習得"
+    skill2:
+      name: "熟練の鉱夫（石職人）"
+      description: "石材採掘の専門家"
+    skill3:
+      name: "石の大工匠"
+      description: "石材採掘を極めた者"
+    skill4:
+      name: "熟練の鉱夫（金属職人）"
+      description: "鉱石採掘の専門家"
+    skill5:
+      name: "金属の大工匠"
+      description: "鉱石採掘を極めた者"
+    skill6:
+      name: "深淵の探究者"
+      description: "深層鉱物の採掘法を習得"
+    skill7:
+      name: "地脈の読み手"
+      description: "鉱物の位置を感知する能力を習得"
+    skill8:
+      name: "地殻変動の支配者"
+      description: "採掘の物理学を完全に理解"
+    skill9:
+      name: "大地の王"
+      description: "採掘技術の最高位に達した者"
+
+# メッセージ
+message:
+  rank_up: "§a§l【ランクアップ！】§r§a%s になりました"
+  profession_selected: "§a§l【職業選択】§r§a職業 %s を選択しました"
+  profession_changed: "§a§l【職業変更】§r§a職業を %s に変更しました"
+  skill_acquired: "§a§l【スキル習得】§r§a%s を習得しました"
+  experience_gained: "§b経験値を %s 獲得しました"

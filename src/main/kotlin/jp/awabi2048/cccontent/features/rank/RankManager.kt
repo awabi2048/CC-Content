@@ -1,66 +1,99 @@
 package jp.awabi2048.cccontent.features.rank
 
+import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
+import jp.awabi2048.cccontent.features.rank.tutorial.PlayerTutorialRank
+import jp.awabi2048.cccontent.features.rank.profession.Profession
+import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
 import java.util.UUID
 
 /**
- * ランクシステムの管理インターフェース
- * プレイヤーのランク情報の保存・読み込み・更新を行う
+ * ランクシステムの統合管理インターフェース
+ * チュートリアルランクと職業管理を一元的に管理
  */
 interface RankManager {
     
     /**
-     * プレイヤーのランクデータを取得
-     * 存在しない場合は新規作成
-     * @param playerUuid プレイヤーのUUID
-     * @return プレイヤーのランクデータ
+     * プレイヤーのチュートリアルランク情報を取得
      */
-    fun getPlayerRankData(playerUuid: UUID): PlayerRankData
+    fun getPlayerTutorial(playerUuid: UUID): PlayerTutorialRank
     
     /**
-     * プレイヤーの特定のランクを取得
-     * @param playerUuid プレイヤーのUUID
-     * @param rankType ランクのタイプ
-     * @return プレイヤーのランク情報
+     * プレイヤーのチュートリアルランクを取得
      */
-    fun getPlayerRank(playerUuid: UUID, rankType: RankType): PlayerRank
+    fun getTutorialRank(playerUuid: UUID): TutorialRank
     
     /**
-     * プレイヤーのランクにスコアを追加
-     * @param playerUuid プレイヤーのUUID
-     * @param rankType ランクのタイプ
-     * @param score 追加するスコア
-     * @return ティアが変更されたかどうか
+     * プレイヤーがATTAINERに達しているか確認
      */
-    fun addScore(playerUuid: UUID, rankType: RankType, score: Long): Boolean
+    fun isAttainer(playerUuid: UUID): Boolean
     
     /**
-     * プレイヤーのランクをリセット
-     * @param playerUuid プレイヤーのUUID
-     * @param rankType ランクのタイプ
+     * チュートリアルランクに経験値を追加
      */
-    fun resetRank(playerUuid: UUID, rankType: RankType)
+    fun addTutorialExp(playerUuid: UUID, amount: Long): Boolean
     
     /**
-     * プレイヤーの全ランクデータを削除
-     * @param playerUuid プレイヤーのUUID
+     * チュートリアルランクを直接設定（デバッグ用）
      */
-    fun deletePlayerData(playerUuid: UUID)
+    fun setTutorialRank(playerUuid: UUID, rank: TutorialRank)
     
     /**
-     * 変更をストレージに保存
+     * プレイヤーの職業情報を取得
+     */
+    fun getPlayerProfession(playerUuid: UUID): PlayerProfession?
+    
+    /**
+     * プレイヤーが職業を選択しているか確認
+     */
+    fun hasProfession(playerUuid: UUID): Boolean
+    
+    /**
+     * プレイヤーに職業を選択させる
+     */
+    fun selectProfession(playerUuid: UUID, profession: Profession): Boolean
+    
+    /**
+     * プレイヤーの職業を変更
+     */
+    fun changeProfession(playerUuid: UUID, profession: Profession): Boolean
+    
+    /**
+     * 職業経験値を追加
+     */
+    fun addProfessionExp(playerUuid: UUID, amount: Long): Boolean
+    
+    /**
+     * スキルを習得
+     */
+    fun acquireSkill(playerUuid: UUID, skillId: String): Boolean
+    
+    /**
+     * 習得可能なスキル一覧を取得
+     */
+    fun getAvailableSkills(playerUuid: UUID): List<String>
+    
+    /**
+     * 習得済みスキルを取得
+     */
+    fun getAcquiredSkills(playerUuid: UUID): Set<String>
+    
+    /**
+     * 現在の職業経験値を取得
+     */
+    fun getCurrentProfessionExp(playerUuid: UUID): Long
+    
+    /**
+     * 職業をリセット（デバッグ用）
+     */
+    fun resetProfession(playerUuid: UUID): Boolean
+    
+    /**
+     * データを保存
      */
     fun saveData()
     
     /**
-     * ストレージからデータを読み込む
+     * データを読み込む
      */
     fun loadData()
-    
-    /**
-     * 指定されたRankTypeの全プレイヤーランキングを取得
-     * @param rankType ランクのタイプ
-     * @param limit ランキング上位数
-     * @return スコアで降順ソートされた(UUID, スコア, ティア)のリスト
-     */
-    fun getRanking(rankType: RankType, limit: Int = 10): List<Triple<UUID, Long, RankTier>>
 }

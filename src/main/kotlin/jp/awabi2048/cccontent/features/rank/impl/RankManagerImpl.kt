@@ -1,114 +1,100 @@
 package jp.awabi2048.cccontent.features.rank.impl
 
-import jp.awabi2048.cccontent.features.rank.*
-import org.bukkit.Bukkit
-import org.bukkit.entity.Player
+import jp.awabi2048.cccontent.features.rank.RankManager
+import jp.awabi2048.cccontent.features.rank.RankStorage
+import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
+import jp.awabi2048.cccontent.features.rank.tutorial.PlayerTutorialRank
+import jp.awabi2048.cccontent.features.rank.profession.Profession
+import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
 import java.util.UUID
 
 /**
- * ランクシステムの標準実装
+ * ランクシステムの統合実装
  */
 class RankManagerImpl(
-    private val storage: RankStorage
+    storage: RankStorage,
+    private var messageProvider: jp.awabi2048.cccontent.features.rank.localization.MessageProvider? = null
 ) : RankManager {
     
-    /** メモリ上にキャッシュされたランクデータ */
-    private val rankDataCache: MutableMap<UUID, PlayerRankData> = mutableMapOf()
-    
-    init {
-        storage.init()
-        storage.getAllPlayerRanks(RankType.ARENA).forEach { data ->
-            rankDataCache[data.playerUuid] = data
-        }
+    private val tutorialManager = TutorialRankManagerImpl(storage)
+    private val professionManager: ProfessionManagerImpl by lazy {
+        ProfessionManagerImpl(storage, messageProvider!!)
     }
     
-    override fun getPlayerRankData(playerUuid: UUID): PlayerRankData {
-        return rankDataCache.getOrPut(playerUuid) {
-            storage.loadPlayerRank(playerUuid) ?: PlayerRankData(playerUuid)
-        }
+    /**
+     * MessageProviderを設定
+     */
+    fun setMessageProvider(provider: jp.awabi2048.cccontent.features.rank.localization.MessageProvider) {
+        this.messageProvider = provider
     }
     
-    override fun getPlayerRank(playerUuid: UUID, rankType: RankType): PlayerRank {
-        return getPlayerRankData(playerUuid).getRank(rankType)
+    override fun getPlayerTutorial(playerUuid: UUID): PlayerTutorialRank {
+        return tutorialManager.getPlayerTutorial(playerUuid)
     }
     
-    override fun addScore(playerUuid: UUID, rankType: RankType, score: Long): Boolean {
-        val rankData = getPlayerRankData(playerUuid)
-        val playerRank = rankData.getRank(rankType)
-        
-        val oldTier = playerRank.tier
-        val oldScore = playerRank.score
-        val tierChanged = playerRank.addScore(score)
-        
-        // プレイヤーがオンラインの場合、イベントを発火
-        val player = Bukkit.getPlayer(playerUuid)
-        if (player != null) {
-            // ScoreAddイベント
-            val scoreEvent = PlayerScoreAddEvent(
-                player,
-                rankType,
-                score,
-                oldScore,
-                playerRank.score
-            )
-            Bukkit.getPluginManager().callEvent(scoreEvent)
-            
-            // ティアが変更された場合、RankChangeイベント
-            if (tierChanged) {
-                val changeEvent = PlayerRankChangeEvent(
-                    player,
-                    rankType,
-                    oldTier,
-                    playerRank.tier,
-                    playerRank.score
-                )
-                Bukkit.getPluginManager().callEvent(changeEvent)
-                
-                // ランクアップの場合、RankUpイベント
-                if (oldTier.level < playerRank.tier.level) {
-                    val upEvent = PlayerRankUpEvent(
-                        player,
-                        rankType,
-                        oldTier,
-                        playerRank.tier,
-                        playerRank.score
-                    )
-                    Bukkit.getPluginManager().callEvent(upEvent)
-                }
-            }
-        }
-        
-        return tierChanged
+    override fun getTutorialRank(playerUuid: UUID): TutorialRank {
+        return tutorialManager.getRank(playerUuid)
     }
     
-    override fun resetRank(playerUuid: UUID, rankType: RankType) {
-        val rankData = getPlayerRankData(playerUuid)
-        rankData.getRank(rankType).resetScore()
+    override fun isAttainer(playerUuid: UUID): Boolean {
+        return tutorialManager.isAttainer(playerUuid)
     }
     
-    override fun deletePlayerData(playerUuid: UUID) {
-        rankDataCache.remove(playerUuid)
-        storage.deletePlayerRank(playerUuid)
+    override fun addTutorialExp(playerUuid: UUID, amount: Long): Boolean {
+        return tutorialManager.addExperience(playerUuid, amount)
+    }
+    
+    override fun setTutorialRank(playerUuid: UUID, rank: TutorialRank) {
+        tutorialManager.setRank(playerUuid, rank)
+    }
+    
+    override fun getPlayerProfession(playerUuid: UUID): PlayerProfession? {
+        return professionManager.getPlayerProfession(playerUuid)
+    }
+    
+    override fun hasProfession(playerUuid: UUID): Boolean {
+        return professionManager.hasProfession(playerUuid)
+    }
+    
+    override fun selectProfession(playerUuid: UUID, profession: Profession): Boolean {
+        return professionManager.selectProfession(playerUuid, profession)
+    }
+    
+    override fun changeProfession(playerUuid: UUID, profession: Profession): Boolean {
+        return professionManager.changeProfession(playerUuid, profession)
+    }
+    
+    override fun addProfessionExp(playerUuid: UUID, amount: Long): Boolean {
+        return professionManager.addExperience(playerUuid, amount)
+    }
+    
+    override fun acquireSkill(playerUuid: UUID, skillId: String): Boolean {
+        return professionManager.acquireSkill(playerUuid, skillId)
+    }
+    
+    override fun getAvailableSkills(playerUuid: UUID): List<String> {
+        return professionManager.getAvailableSkills(playerUuid)
+    }
+    
+    override fun getAcquiredSkills(playerUuid: UUID): Set<String> {
+        return professionManager.getAcquiredSkills(playerUuid)
+    }
+    
+    override fun getCurrentProfessionExp(playerUuid: UUID): Long {
+        return professionManager.getCurrentExp(playerUuid)
+    }
+    
+    override fun resetProfession(playerUuid: UUID): Boolean {
+        return professionManager.resetProfession(playerUuid)
     }
     
     override fun saveData() {
-        rankDataCache.values.forEach { storage.savePlayerRank(it) }
+        tutorialManager.saveData()
+        professionManager.saveData()
     }
     
     override fun loadData() {
-        rankDataCache.clear()
-        RankType.values().forEach { rankType ->
-            storage.getAllPlayerRanks(rankType).forEach { data ->
-                rankDataCache[data.playerUuid] = data
-            }
-        }
-    }
-    
-    override fun getRanking(rankType: RankType, limit: Int): List<Triple<UUID, Long, RankTier>> {
-        return rankDataCache.values
-            .map { it.playerUuid to it.getRank(rankType) }
-            .sortedByDescending { it.second.score }
-            .take(limit)
-            .map { (uuid, rank) -> Triple(uuid, rank.score, rank.tier) }
+        tutorialManager.loadData()
+        professionManager.loadData()
     }
 }

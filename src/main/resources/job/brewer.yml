@@ -1,0 +1,71 @@
+# 醸造家のスキルツリー定義
+skills:
+  skill0:
+    nameKey: "skill.brewer.skill0.name"
+    descriptionKey: "skill.brewer.skill0.description"
+    requiredExp: 0
+    prerequisites: []
+    children: ["skill1"]
+  
+  skill1:
+    nameKey: "skill.brewer.skill1.name"
+    descriptionKey: "skill.brewer.skill1.description"
+    requiredExp: 100
+    prerequisites: ["skill0"]
+    children: ["skill2", "skill4"]
+  
+  skill2:
+    nameKey: "skill.brewer.skill2.name"
+    descriptionKey: "skill.brewer.skill2.description"
+    requiredExp: 250
+    prerequisites: ["skill1"]
+    children: ["skill3"]
+  
+  skill3:
+    nameKey: "skill.brewer.skill3.name"
+    descriptionKey: "skill.brewer.skill3.description"
+    requiredExp: 500
+    prerequisites: ["skill2"]
+    children: ["skill8"]
+  
+  skill4:
+    nameKey: "skill.brewer.skill4.name"
+    descriptionKey: "skill.brewer.skill4.description"
+    requiredExp: 250
+    prerequisites: ["skill1"]
+    children: ["skill5"]
+  
+  skill5:
+    nameKey: "skill.brewer.skill5.name"
+    descriptionKey: "skill.brewer.skill5.description"
+    requiredExp: 500
+    prerequisites: ["skill4"]
+    children: ["skill8"]
+  
+  skill6:
+    nameKey: "skill.brewer.skill6.name"
+    descriptionKey: "skill.brewer.skill6.description"
+    requiredExp: 300
+    prerequisites: ["skill1"]
+    children: ["skill7"]
+  
+  skill7:
+    nameKey: "skill.brewer.skill7.name"
+    descriptionKey: "skill.brewer.skill7.description"
+    requiredExp: 600
+    prerequisites: ["skill6"]
+    children: ["skill8"]
+  
+  skill8:
+    nameKey: "skill.brewer.skill8.name"
+    descriptionKey: "skill.brewer.skill8.description"
+    requiredExp: 800
+    prerequisites: ["skill3", "skill5", "skill7"]
+    children: ["skill9"]
+  
+  skill9:
+    nameKey: "skill.brewer.skill9.name"
+    descriptionKey: "skill.brewer.skill9.description"
+    requiredExp: 1000
+    prerequisites: ["skill8"]
+    children: []

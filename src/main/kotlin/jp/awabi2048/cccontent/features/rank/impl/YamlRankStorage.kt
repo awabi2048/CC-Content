@@ -1,6 +1,10 @@
 package jp.awabi2048.cccontent.features.rank.impl
 
-import jp.awabi2048.cccontent.features.rank.*
+import jp.awabi2048.cccontent.features.rank.RankStorage
+import jp.awabi2048.cccontent.features.rank.tutorial.PlayerTutorialRank
+import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
+import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
+import jp.awabi2048.cccontent.features.rank.profession.Profession
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
 import java.util.UUID
@@ -23,19 +27,15 @@ class YamlRankStorage(
         // クリーンアップ処理が必要に応じて追加
     }
     
-    override fun savePlayerRank(rankData: PlayerRankData) {
-        val file = File(playerdataDirectory, "${rankData.playerUuid}.yml")
+    override fun saveTutorialRank(tutorialRank: PlayerTutorialRank) {
+        val file = File(playerdataDirectory, "${tutorialRank.playerUuid}.yml")
         val config = if (file.exists()) YamlConfiguration.loadConfiguration(file) else YamlConfiguration()
         
-        // "rank"セクションを作成または更新
-        val rankSection = config.createSection("rank")
-        
-        rankData.ranks.forEach { (rankType, playerRank) ->
-            val rankTypeSection = rankSection.createSection(rankType.name)
-            rankTypeSection.set("score", playerRank.score)
-            rankTypeSection.set("tier", playerRank.tier.name)
-            rankTypeSection.set("lastUpdated", playerRank.lastUpdated)
-        }
+        // "rank.tutorial"セクションを作成または更新
+        val tutorialSection = config.createSection("rank.tutorial")
+        tutorialSection.set("currentRank", tutorialRank.currentRank.name)
+        tutorialSection.set("currentExp", tutorialRank.currentExp)
+        tutorialSection.set("lastUpdated", tutorialRank.lastUpdated)
         
         try {
             config.save(file)
@@ -44,68 +44,92 @@ class YamlRankStorage(
         }
     }
     
-    override fun loadPlayerRank(playerUuid: UUID): PlayerRankData? {
+    override fun loadTutorialRank(playerUuid: UUID): PlayerTutorialRank? {
         val file = File(playerdataDirectory, "$playerUuid.yml")
         if (!file.exists()) return null
         
         return try {
             val config = YamlConfiguration.loadConfiguration(file)
-            val rankSection = config.getConfigurationSection("rank") ?: return null
+            val tutorialSection = config.getConfigurationSection("rank.tutorial") ?: return null
             
-            val rankData = PlayerRankData(playerUuid)
-            
-            RankType.values().forEach { rankType ->
-                val rankTypeSection = rankSection.getConfigurationSection(rankType.name)
-                if (rankTypeSection != null) {
-                    val score = rankTypeSection.getLong("score")
-                    val tierName = rankTypeSection.getString("tier", "BRONZE_I") ?: "BRONZE_I"
-                    val lastUpdated = rankTypeSection.getLong("lastUpdated", System.currentTimeMillis())
-                    
-                    val tier = try {
-                        RankTier.valueOf(tierName)
-                    } catch (e: IllegalArgumentException) {
-                        RankTier.BRONZE_I
-                    }
-                    
-                    rankData.ranks[rankType] = PlayerRank(
-                        playerUuid,
-                        rankType,
-                        score,
-                        tier,
-                        lastUpdated
-                    )
-                }
+            val rankName = tutorialSection.getString("currentRank", "VISITOR") ?: "VISITOR"
+            val rank = try {
+                TutorialRank.valueOf(rankName)
+            } catch (e: IllegalArgumentException) {
+                TutorialRank.VISITOR
             }
             
-            rankData
+            val currentExp = tutorialSection.getLong("currentExp", 0L)
+            val lastUpdated = tutorialSection.getLong("lastUpdated", System.currentTimeMillis())
+            
+            PlayerTutorialRank(
+                playerUuid,
+                rank,
+                currentExp,
+                lastUpdated
+            )
         } catch (e: Exception) {
             e.printStackTrace()
             null
         }
     }
     
-    override fun deletePlayerRank(playerUuid: UUID) {
+    override fun saveProfession(profession: PlayerProfession) {
+        val file = File(playerdataDirectory, "${profession.playerUuid}.yml")
+        val config = if (file.exists()) YamlConfiguration.loadConfiguration(file) else YamlConfiguration()
+        
+        // "rank.profession"セクションを作成または更新
+        val professionSection = config.createSection("rank.profession")
+        professionSection.set("profession", profession.profession.id)
+        professionSection.set("acquiredSkills", profession.acquiredSkills.toList())
+        professionSection.set("currentExp", profession.currentExp)
+        professionSection.set("lastUpdated", profession.lastUpdated)
+        
+        try {
+            config.save(file)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    
+    override fun loadProfession(playerUuid: UUID): PlayerProfession? {
+        val file = File(playerdataDirectory, "$playerUuid.yml")
+        if (!file.exists()) return null
+        
+        return try {
+            val config = YamlConfiguration.loadConfiguration(file)
+            val professionSection = config.getConfigurationSection("rank.profession") ?: return null
+            
+            val professionId = professionSection.getString("profession") ?: return null
+            val profession = Profession.fromId(professionId) ?: return null
+            
+            val acquiredSkills = professionSection.getStringList("acquiredSkills").toMutableSet()
+            val currentExp = professionSection.getLong("currentExp", 0L)
+            val lastUpdated = professionSection.getLong("lastUpdated", System.currentTimeMillis())
+            
+            PlayerProfession(
+                playerUuid,
+                profession,
+                acquiredSkills,
+                currentExp,
+                lastUpdated
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+    
+    override fun deleteProfession(playerUuid: UUID) {
         val file = File(playerdataDirectory, "$playerUuid.yml")
         if (file.exists()) {
-            val config = YamlConfiguration.loadConfiguration(file)
-            config.set("rank", null)  // "rank"セクションを削除
             try {
+                val config = YamlConfiguration.loadConfiguration(file)
+                config.set("rank.profession", null)  // "rank.profession"セクションを削除
                 config.save(file)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
-    }
-    
-    override fun getAllPlayerRanks(rankType: RankType): List<PlayerRankData> {
-        return playerdataDirectory.listFiles { file -> file.extension == "yml" }
-            ?.mapNotNull { file ->
-                try {
-                    val uuid = UUID.fromString(file.nameWithoutExtension)
-                    loadPlayerRank(uuid)
-                } catch (e: Exception) {
-                    null
-                }
-            } ?: emptyList()
     }
 }
