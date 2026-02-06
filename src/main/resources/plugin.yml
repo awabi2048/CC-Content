@@ -14,15 +14,6 @@ commands:
     description: ランクシステムコマンド（デバッグ用）
     usage: /rank <subcommand> [args]
     permission: cc-content.admin
-  arena:
-    description: アリーナコマンド
-    usage: /arena
-  arenaa:
-    description: アリーナ管理コマンド
-    usage: /arenaa
-  party:
-    description: パーティコマンド
-    usage: /party
   sukima_dungeon:
     description: スキマダンジョンコマンド
     usage: /sukima_dungeon

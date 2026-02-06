@@ -8,8 +8,6 @@ import jp.awabi2048.cccontent.items.misc.SmallLight
 import jp.awabi2048.cccontent.items.misc.GulliverItemListener
 import jp.awabi2048.cccontent.items.misc.GulliverConfig
 import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
-import jp.awabi2048.cccontent.items.arena.*
-import jp.awabi2048.cccontent.arena.ArenaMain
 import jp.awabi2048.cccontent.items.sukima_dungeon.*
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.impl.RankManagerImpl
@@ -44,9 +42,6 @@ class CCContent : JavaPlugin() {
         // GulliverLight設定の初期化
         GulliverConfig.initialize(this)
         
-        // アリーナシステムの初期化（アイテム登録前に設定ファイルを読み込む）
-        ArenaMain.initialize(this)
-        
         // アイテム登録
         registerCustomItems()
         
@@ -65,7 +60,6 @@ class CCContent : JavaPlugin() {
         
         // リスナー登録
         server.pluginManager.registerEvents(GulliverItemListener(this), this)
-        server.pluginManager.registerEvents(ArenaItemListener(), this)
         server.pluginManager.registerEvents(SukimaItemListener(), this)
         
         // ScaleManagerタスクの開始（毎tick実行）
@@ -77,7 +71,6 @@ class CCContent : JavaPlugin() {
         
         // フィーチャー別のアイテム数を表示
         logger.info("  - misc: ${CustomItemManager.getItemCountByFeature("misc")}")
-        logger.info("  - arena: ${CustomItemManager.getItemCountByFeature("arena")}")
         logger.info("  - sukima_dungeon: ${CustomItemManager.getItemCountByFeature("sukima_dungeon")}")
     }
     
@@ -256,20 +249,6 @@ class CCContent : JavaPlugin() {
         CustomItemManager.register(BigLight())
         CustomItemManager.register(SmallLight())
         
-        // KotaArena アイテム（既存）
-        CustomItemManager.register(SoulBottleItem())
-        CustomItemManager.register(BoosterItem())
-        CustomItemManager.register(MobDropSackItem())
-        CustomItemManager.register(HunterTalismanItem())
-        CustomItemManager.register(GolemTalismanItem())
-        
-        // KotaArena アイテム（新規）
-        CustomItemManager.register(TicketNormalItem())
-        CustomItemManager.register(TicketBossItem())
-        CustomItemManager.register(TicketQuickItem())
-        CustomItemManager.register(SoulFragmentItem())
-        CustomItemManager.register(QuestTicketItem())
-        
         // SukimaDungeon アイテム
         CustomItemManager.register(SproutItem())
         CustomItemManager.register(CompassItem())
@@ -386,8 +365,6 @@ class CCContent : JavaPlugin() {
         if (playTimeTrackerTaskId != -1) {
             server.scheduler.cancelTask(playTimeTrackerTaskId)
         }
-        // アリーナシステムのクリーンアップ
-        ArenaMain.cleanup()
         logger.info("CC-Content v${description.version} が無効化されました")
     }
 }
