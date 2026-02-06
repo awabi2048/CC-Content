@@ -272,21 +272,100 @@ class CCContent : JavaPlugin() {
         try {
             logger.info("CC-Content の設定ファイルをリロード中...")
             
-            // チュートリアルタスク設定をリロード
-            val tutorialTasksFile = File(dataFolder, "tutorial-tasks.yml")
-            if (tutorialTasksFile.exists()) {
-                logger.info("tutorial-tasks.yml をリロードしました")
+            // 必須ファイルのリスト
+            val requiredFiles = listOf(
+                "tutorial-tasks.yml",
+                "lang/ja_JP.yml",
+                "config/gulliverlight.yml"
+            )
+            
+            // 必須ディレクトリのリスト
+            val requiredDirs = listOf(
+                "job",
+                "lang",
+                "config",
+                "data/cccontent/advancement/tutorial"
+            )
+            
+            // 欠損しているファイルを確認してコピー
+            for (fileName in requiredFiles) {
+                val file = File(dataFolder, fileName)
+                if (!file.exists()) {
+                    logger.info("欠損しているファイルを検出: $fileName")
+                    copyResourceFile(fileName, file)
+                }
             }
             
-            // スキルツリーをリロード
+            // 欠損しているディレクトリを作成
+            for (dirName in requiredDirs) {
+                val dir = File(dataFolder, dirName)
+                if (!dir.exists()) {
+                    logger.info("欠損しているディレクトリを検出: $dirName")
+                    dir.mkdirs()
+                    logger.info("ディレクトリを作成: $dirName")
+                }
+            }
+            
+            // スキルツリーファイルをチェック
             val jobDir = File(dataFolder, "job")
             if (jobDir.exists()) {
-                logger.info("スキルツリーファイルをリロードしました")
+                val requiredJobFiles = listOf("brewer.yml", "lumberjack.yml", "miner.yml")
+                for (jobFile in requiredJobFiles) {
+                    val file = File(jobDir, jobFile)
+                    if (!file.exists()) {
+                        logger.info("欠損しているジョブファイルを検出: job/$jobFile")
+                        copyResourceFile("job/$jobFile", file)
+                    }
+                }
+            }
+            
+            // チュートリアルランク Advancement ファイルをチェック
+            val advancementDir = File(dataFolder, "data/cccontent/advancement/tutorial")
+            if (advancementDir.exists()) {
+                val requiredAdvancementFiles = listOf(
+                    "newbie.json", "visitor.json", "pioneer.json", 
+                    "adventurer.json", "attainer.json"
+                )
+                for (advFile in requiredAdvancementFiles) {
+                    val file = File(advancementDir, advFile)
+                    if (!file.exists()) {
+                        logger.info("欠損しているAdvancementファイルを検出: data/cccontent/advancement/tutorial/$advFile")
+                        copyResourceFile("data/cccontent/advancement/tutorial/$advFile", file)
+                    }
+                }
             }
             
             logger.info("CC-Content の設定ファイルをすべてリロードしました")
         } catch (e: Exception) {
             logger.warning("リロード中にエラーが発生しました: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+    
+    /**
+     * リソースファイルをデータフォルダにコピー
+     */
+    private fun copyResourceFile(resourcePath: String, targetFile: File) {
+        try {
+            // ターゲットファイルの親ディレクトリを作成
+            targetFile.parentFile?.mkdirs()
+            
+            // リソースから入力ストリームを取得
+            val inputStream = this::class.java.classLoader.getResourceAsStream(resourcePath)
+                ?: return run {
+                    logger.warning("リソースファイルが見つかりません: $resourcePath")
+                }
+            
+            // ファイルにコピー
+            inputStream.use { input ->
+                targetFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            
+            logger.info("ファイルをコピーしました: $resourcePath → ${targetFile.absolutePath}")
+        } catch (e: Exception) {
+            logger.warning("ファイルのコピーに失敗しました ($resourcePath): ${e.message}")
             e.printStackTrace()
         }
     }
