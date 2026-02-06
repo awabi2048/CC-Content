@@ -102,21 +102,42 @@ class CCContent : JavaPlugin() {
      * 各職業のスキルツリーを登録
      */
     private fun registerSkillTrees() {
-        val jobDir = File(dataFolder, "job")
+        val jobDir = File(dataFolder, "job").apply { mkdirs() }
         
         for (profession in Profession.values()) {
             val ymlFile = File(jobDir, "${profession.id}.yml")
             
-            if (ymlFile.exists()) {
+            // ファイルが存在しない場合はリソースからコピー
+            if (!ymlFile.exists()) {
                 try {
-                    val skillTree = ConfigBasedSkillTree(profession.id, ymlFile)
-                    SkillTreeRegistry.register(profession, skillTree)
-                    logger.info("スキルツリーを登録しました: ${profession.id}")
+                    extractJobFile("${profession.id}.yml", ymlFile)
+                    logger.info("スキルツリーファイルを作成しました: ${profession.id}.yml")
                 } catch (e: Exception) {
-                    logger.warning("スキルツリー読み込み失敗 (${profession.id}): ${e.message}")
+                    logger.warning("スキルツリーファイルのコピーに失敗しました (${profession.id}): ${e.message}")
+                    continue
                 }
-            } else {
-                logger.warning("スキルツリーファイルが見つかりません: ${ymlFile.path}")
+            }
+            
+            try {
+                val skillTree = ConfigBasedSkillTree(profession.id, ymlFile)
+                SkillTreeRegistry.register(profession, skillTree)
+                logger.info("スキルツリーを登録しました: ${profession.id}")
+            } catch (e: Exception) {
+                logger.warning("スキルツリー読み込み失敗 (${profession.id}): ${e.message}")
+            }
+        }
+    }
+    
+    /**
+     * リソースからジョブファイルをコピー
+     */
+    private fun extractJobFile(resourceName: String, destination: File) {
+        val resourceStream = getResource("job/$resourceName")
+            ?: throw IllegalArgumentException("リソースが見つかりません: job/$resourceName")
+        
+        resourceStream.use { input ->
+            destination.outputStream().use { output ->
+                input.copyTo(output)
             }
         }
     }
