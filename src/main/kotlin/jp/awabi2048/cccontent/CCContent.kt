@@ -108,7 +108,8 @@ class CCContent : JavaPlugin() {
             }
             
             // /rank コマンドを登録
-            val rankCommand = RankCommand(rankManager, messageProvider, taskLoader, taskChecker)
+            val translator = jp.awabi2048.cccontent.features.rank.tutorial.task.EntityBlockTranslator(messageProvider)
+            val rankCommand = RankCommand(rankManager, messageProvider, taskLoader, taskChecker, translator)
             getCommand("rank")?.setExecutor(rankCommand)
             getCommand("rank")?.tabCompleter = rankCommand
             

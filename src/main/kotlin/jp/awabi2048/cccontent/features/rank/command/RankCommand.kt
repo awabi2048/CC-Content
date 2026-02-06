@@ -18,7 +18,8 @@ class RankCommand(
     private val rankManager: RankManager,
     private val messageProvider: MessageProvider,
     private val taskLoader: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader? = null,
-    private val taskChecker: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskChecker? = null
+    private val taskChecker: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskChecker? = null,
+    private val translator: jp.awabi2048.cccontent.features.rank.tutorial.task.EntityBlockTranslator? = null
 ) : CommandExecutor, TabCompleter {
     
     override fun onCommand(
@@ -332,7 +333,9 @@ class RankCommand(
             val progress_count = minOf(current, required)
             val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
             val status = if (current >= required) "§a✓" else "§c✗"
-            sender.sendMessage("$status $mobType 討伐: $current/$required ($percent%)")
+            // translator が存在する場合は翻訳、ない場合はそのまま表示
+            val mobName = translator?.translateEntity(mobType, targetPlayer) ?: mobType
+            sender.sendMessage("$status $mobName 討伐: $current/$required ($percent%)")
         }
         
         // ブロック採掘
@@ -341,7 +344,9 @@ class RankCommand(
             val progress_count = minOf(current, required)
             val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
             val status = if (current >= required) "§a✓" else "§c✗"
-            sender.sendMessage("$status $blockType 採掘: $current/$required ($percent%)")
+            // translator が存在する場合は翻訳、ない場合はそのまま表示
+            val blockName = translator?.translateBlock(blockType, targetPlayer) ?: blockType
+            sender.sendMessage("$status $blockName 採掘: $current/$required ($percent%)")
         }
         
         // バニラEXP
