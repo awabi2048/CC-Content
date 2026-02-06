@@ -49,6 +49,7 @@ class LanguageLoader(
         try {
             val config = YamlConfiguration.loadConfiguration(langFile)
             flattenConfig(config, "")
+            plugin.logger.info("言語ファイルを読み込みました: ${langFile.absolutePath}")
         } catch (e: Exception) {
             plugin.logger.warning("言語ファイルの読み込みに失敗しました: ${e.message}")
         }

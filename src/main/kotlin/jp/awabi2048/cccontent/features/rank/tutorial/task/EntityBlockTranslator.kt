@@ -62,14 +62,18 @@ class EntityBlockTranslator(
      */
     fun translateItem(itemName: String): String {
         val key = itemName.lowercase()
+        val translationKey = "item.$key"
         
         // ローカライズファイルから翻訳を取得
-        val customMessage = messageProvider.getMessage("item.$key")
+        val customMessage = messageProvider.getMessage(translationKey)
         
         // 翻訳が見つかった場合はそれを使用
         if (!customMessage.startsWith("§c[Missing:")) {
             return customMessage
         }
+        
+        // デバッグ：翻訳がない場合はログを出力
+        // println("DEBUG translateItem: key=$translationKey, result=$customMessage")
         
         // 翻訳がない場合は、キャメルケース形式にフォールバック
         return formatName(key)
