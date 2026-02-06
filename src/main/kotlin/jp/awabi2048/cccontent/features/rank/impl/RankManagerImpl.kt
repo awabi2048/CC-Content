@@ -103,4 +103,8 @@ class RankManagerImpl(
         tutorialManager.loadData()
         professionManager?.loadData()
     }
+    
+    override fun rankUpByTask(playerUuid: UUID): Boolean {
+        return tutorialManager.rankUpByTask(playerUuid)
+    }
 }

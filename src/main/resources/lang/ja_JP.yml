@@ -113,6 +113,24 @@ skill:
       name: "大地の王"
       description: "採掘技術の最高位に達した者"
 
+# チュートリアルランク
+tutorial_rank:
+  newbie:
+    name: "Newbie"
+    description: "新規プレイヤー"
+  visitor:
+    name: "Visitor"
+    description: "訪問者"
+  pioneer:
+    name: "Pioneer"
+    description: "開拓者"
+  adventurer:
+    name: "Adventurer"
+    description: "冒険者"
+  attainer:
+    name: "Attainer"
+    description: "達成者"
+
 # メッセージ
 message:
   rank_up: "§a§l【ランクアップ！】§r§a%s になりました"
@@ -120,3 +138,8 @@ message:
   profession_changed: "§a§l【職業変更】§r§a職業を %s に変更しました"
   skill_acquired: "§a§l【スキル習得】§r§a%s を習得しました"
   experience_gained: "§b経験値を %s 獲得しました"
+  tutorial_rankup:
+    - "§6§l=========================================="
+    - "§a§lランクアップ！"
+    - "§f%old_rank% → %new_rank%"
+    - "§6§l=========================================="

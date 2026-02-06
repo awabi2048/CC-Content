@@ -1,7 +1,7 @@
 package jp.awabi2048.cccontent.features.rank.listener
 
 import jp.awabi2048.cccontent.features.rank.RankStorage
-import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRankManager
+import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskChecker
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader
 import org.bukkit.event.EventHandler
@@ -16,7 +16,7 @@ import org.bukkit.event.block.BlockBreakEvent
  * - データを保存
  */
 class TutorialBlockBreakListener(
-    private val rankManager: TutorialRankManager,
+    private val rankManager: RankManager,
     private val taskChecker: TutorialTaskChecker,
     private val taskLoader: TutorialTaskLoader,
     private val storage: RankStorage

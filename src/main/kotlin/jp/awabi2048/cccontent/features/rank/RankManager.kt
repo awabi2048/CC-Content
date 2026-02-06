@@ -96,4 +96,9 @@ interface RankManager {
      * データを読み込む
      */
     fun loadData()
+    
+    /**
+     * タスク完了によるランクアップを実行
+     */
+    fun rankUpByTask(playerUuid: UUID): Boolean
 }

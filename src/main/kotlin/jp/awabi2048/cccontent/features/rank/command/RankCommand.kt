@@ -45,6 +45,9 @@ class RankCommand(
             "skill-available" -> handleSkillAvailable(sender, args)
             "reset" -> handleReset(sender, args)
             "info" -> handleInfo(sender, args)
+            "task-info" -> handleTaskInfo(sender, args)
+            "task-reset" -> handleTaskReset(sender, args)
+            "complete-task" -> handleCompleteTask(sender, args)
             else -> {
                 sendUsage(sender)
                 false
@@ -275,6 +278,120 @@ class RankCommand(
         return true
     }
     
+    /**
+     * タスク進捗情報を表示
+     */
+    private fun handleTaskInfo(sender: CommandSender, args: Array<out String>): Boolean {
+        if (args.size < 2) {
+            sender.sendMessage("§c使用法: /rank task-info <player>")
+            return false
+        }
+        
+        val targetPlayer = Bukkit.getPlayer(args[1])
+        if (targetPlayer == null) {
+            sender.sendMessage("§cプレイヤーが見つかりません")
+            return false
+        }
+        
+        val uuid = targetPlayer.uniqueId
+        val tutorial = rankManager.getPlayerTutorial(uuid)
+        val progress = tutorial.taskProgress
+        
+        sender.sendMessage("§6=== ${targetPlayer.name} のタスク進捗 ===")
+        sender.sendMessage("§aランク: ${tutorial.currentRank.name}")
+        sender.sendMessage("§aプレイ時間: ${progress.playTime}分")
+        sender.sendMessage("§aバニラEXP: ${progress.vanillaExp}")
+        
+        if (progress.mobKills.isNotEmpty()) {
+            sender.sendMessage("§aモブ討伐数:")
+            progress.mobKills.forEach { (mobType, count) ->
+                sender.sendMessage("  - $mobType: $count")
+            }
+        }
+        
+        if (progress.blockMines.isNotEmpty()) {
+            sender.sendMessage("§aブロック採掘数:")
+            progress.blockMines.forEach { (blockType, count) ->
+                sender.sendMessage("  - $blockType: $count")
+            }
+        }
+        
+        if (progress.bossKills.isNotEmpty()) {
+            sender.sendMessage("§aボス討伐数:")
+            progress.bossKills.forEach { (bossType, count) ->
+                sender.sendMessage("  - $bossType: $count")
+            }
+        }
+        
+        if (progress.items.isNotEmpty()) {
+            sender.sendMessage("§aアイテム所持数:")
+            progress.items.forEach { (material, count) ->
+                sender.sendMessage("  - $material: $count")
+            }
+        }
+        
+        return true
+    }
+    
+    /**
+     * タスク進捗をリセット
+     */
+    private fun handleTaskReset(sender: CommandSender, args: Array<out String>): Boolean {
+        if (args.size < 2) {
+            sender.sendMessage("§c使用法: /rank task-reset <player>")
+            return false
+        }
+        
+        val targetPlayer = Bukkit.getPlayer(args[1])
+        if (targetPlayer == null) {
+            sender.sendMessage("§cプレイヤーが見つかりません")
+            return false
+        }
+        
+        val uuid = targetPlayer.uniqueId
+        val tutorial = rankManager.getPlayerTutorial(uuid)
+        tutorial.taskProgress.reset()
+        
+        sender.sendMessage("§a${targetPlayer.name} のタスク進捗をリセットしました")
+        return true
+    }
+    
+    /**
+     * 現在のランクのすべてのタスクを完了扱いに
+     */
+    private fun handleCompleteTask(sender: CommandSender, args: Array<out String>): Boolean {
+        if (args.size < 2) {
+            sender.sendMessage("§c使用法: /rank complete-task <player>")
+            return false
+        }
+        
+        val targetPlayer = Bukkit.getPlayer(args[1])
+        if (targetPlayer == null) {
+            sender.sendMessage("§cプレイヤーが見つかりません")
+            return false
+        }
+        
+        val uuid = targetPlayer.uniqueId
+        val tutorial = rankManager.getPlayerTutorial(uuid)
+        
+        // 非常に大きな値を設定してすべてのタスクを完了扱いに
+        tutorial.taskProgress.playTime = Int.MAX_VALUE.toLong()
+        tutorial.taskProgress.vanillaExp = Long.MAX_VALUE
+        tutorial.taskProgress.mobKills.clear()
+        tutorial.taskProgress.blockMines.clear()
+        tutorial.taskProgress.bossKills.clear()
+        tutorial.taskProgress.items.clear()
+        
+        sender.sendMessage("§a${targetPlayer.name} のタスクをすべて完了扱いにしました")
+        
+        // ランクアップを試みる
+        if (rankManager.rankUpByTask(uuid)) {
+            sender.sendMessage("§a${targetPlayer.name} がランクアップしました！")
+        }
+        
+        return true
+    }
+    
     private fun sendUsage(sender: CommandSender) {
         sender.sendMessage("§6=== ランクシステムコマンド ===")
         sender.sendMessage("§a/rank add-exp <player> <amount> §7- チュートリアル経験値を追加")
@@ -285,6 +402,9 @@ class RankCommand(
         sender.sendMessage("§a/rank skill-available <player> §7- 習得可能なスキル一覧")
         sender.sendMessage("§a/rank reset <player> §7- 職業をリセット")
         sender.sendMessage("§a/rank info [player] §7- ランク情報表示")
+        sender.sendMessage("§a/rank task-info <player> §7- タスク進捗を表示")
+        sender.sendMessage("§a/rank task-reset <player> §7- タスク進捗をリセット")
+        sender.sendMessage("§a/rank complete-task <player> §7- タスクをすべて完了扱いに")
     }
     
     override fun onTabComplete(
@@ -294,7 +414,7 @@ class RankCommand(
         args: Array<out String>
     ): List<String> {
         return when {
-            args.size == 1 -> listOf("add-exp", "rankup", "profession", "add-prof-exp", "skill", "skill-available", "reset", "info")
+            args.size == 1 -> listOf("add-exp", "rankup", "profession", "add-prof-exp", "skill", "skill-available", "reset", "info", "task-info", "task-reset", "complete-task")
                 .filter { it.startsWith(args[0].lowercase()) }
             args.size == 2 -> Bukkit.getOnlinePlayers().map { it.name }
                 .filter { it.startsWith(args[1], ignoreCase = true) }

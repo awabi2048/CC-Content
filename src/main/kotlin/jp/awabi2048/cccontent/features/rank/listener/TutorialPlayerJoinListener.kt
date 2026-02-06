@@ -1,6 +1,6 @@
 package jp.awabi2048.cccontent.features.rank.listener
 
-import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRankManager
+import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.tutorial.PlayerTutorialRank
 import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TaskProgress
@@ -14,7 +14,7 @@ import org.bukkit.event.player.PlayerJoinEvent
  * - プレイ時間計測の開始
  */
 class TutorialPlayerJoinListener(
-    private val rankManager: TutorialRankManager,
+    private val rankManager: RankManager,
     private val resetExistingPlayers: Boolean
 ) : Listener {
     
