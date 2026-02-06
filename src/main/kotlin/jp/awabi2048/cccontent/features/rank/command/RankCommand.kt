@@ -334,7 +334,7 @@ class RankCommand(
             val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
             val status = if (current >= required) "§a✓" else "§c✗"
             // translator が存在する場合は翻訳、ない場合はそのまま表示
-            val mobName = translator?.translateEntity(mobType, targetPlayer) ?: mobType
+            val mobName = translator?.translateEntity(mobType) ?: mobType
             sender.sendMessage("$status $mobName 討伐: $current/$required ($percent%)")
         }
         
@@ -345,7 +345,7 @@ class RankCommand(
             val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
             val status = if (current >= required) "§a✓" else "§c✗"
             // translator が存在する場合は翻訳、ない場合はそのまま表示
-            val blockName = translator?.translateBlock(blockType, targetPlayer) ?: blockType
+            val blockName = translator?.translateBlock(blockType) ?: blockType
             sender.sendMessage("$status $blockName 採掘: $current/$required ($percent%)")
         }
         
