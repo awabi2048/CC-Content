@@ -9,15 +9,79 @@ general:
   # ダンジョンワールド名（複数指定可能）
   dungeon_worlds:
     - "world"
+
+# 脱出地点（CC-Content全体で使用）
+escape_location:
+  world: "world"
+  x: 0.0
+  y: 64.0
+  z: 0.0
+  yaw: 0.0
+  pitch: 0.0
+
+# ふしぎなしおり（ブックマーク）のティア別設定
+tiers:
+  broken:
+    available_sizes:
+      - small
+    available_themes:
+      - default
   
-  # 脱出地点
-  escape_location:
-    world: "world"
-    x: 0.0
-    y: 64.0
-    z: 0.0
-    yaw: 0.0
-    pitch: 0.0
+  worn:
+    available_sizes:
+      - small
+      - medium
+    available_themes:
+      - default
+  
+  faded:
+    available_sizes:
+      - small
+      - medium
+      - large
+    available_themes:
+      - default
+      - nether
+  
+  new:
+    available_sizes:
+      - small
+      - medium
+      - large
+      - huge
+    available_themes:
+      - default
+      - nether
+      - end
+
+# ダンジョンサイズ設定
+sizes:
+  small:
+    tiles: 5
+    duration: 600
+    sprout_base_count: 3
+  
+  medium:
+    tiles: 7
+    duration: 1200
+    sprout_base_count: 5
+  
+  large:
+    tiles: 10
+    duration: 1800
+    sprout_base_count: 8
+  
+  huge:
+    tiles: 12
+    duration: 2400
+    sprout_base_count: 10
+
+# ジェネレーター設定
+generator:
+  cells_per_tick: 5
+  marker_search_radius_y: 20.0
+  miniboss_chance: 0.1
+  trap_chance: 0.05
 
 # コンパス設定
 compass:
