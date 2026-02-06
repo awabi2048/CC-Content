@@ -109,64 +109,60 @@ class TalismanListener(
         return dungeonManager.isInDungeon(player)
     }
     
-    /**
-     * エスケープ確認GUIを表示
-     */
-    private fun showEscapeConfirmationGui(player: Player) {
-        val gui = Bukkit.createInventory(null, 27, escapeGuiTitle)
-        
-        // 背景を黒色のガラスで埋める
-        val background = ItemStack(Material.BLACK_STAINED_GLASS_PANE).apply {
-            val meta = itemMeta
-            meta?.displayName(Component.text(" "))
-            itemMeta = meta
-        }
-        
-        for (i in 0 until 27) {
-            gui.setItem(i, background)
-        }
-        
-        // 確認メッセージ
-        val infoItem = ItemStack(Material.PAPER).apply {
-            val meta = itemMeta
-            meta?.displayName(Component.text("§6§l脱出確認"))
-            meta?.lore(listOf(
-                Component.text("§7スキマダンジョンから脱出します"),
-                Component.text("§7本当に脱出しますか？"),
-                Component.text(""),
-                Component.text("§e左: §a脱出する"),
-                Component.text("§e右: §cキャンセル")
-            ))
-            itemMeta = meta
-        }
-        gui.setItem(13, infoItem)
-        
-        // 脱出ボタン（緑色羊毛）
-        val escapeButton = ItemStack(Material.LIME_WOOL).apply {
-            val meta = itemMeta
-            meta?.displayName(Component.text("§a§l脱出する"))
-            meta?.lore(listOf(
-                Component.text("§7クリックで脱出します"),
-                Component.text("§7ダンジョンから退出します")
-            ))
-            itemMeta = meta
-        }
-        gui.setItem(11, escapeButton)
-        
-        // キャンセルボタン（赤色羊毛）
-        val cancelButton = ItemStack(Material.RED_WOOL).apply {
-            val meta = itemMeta
-            meta?.displayName(Component.text("§c§lキャンセル"))
-            meta?.lore(listOf(
-                Component.text("§7クリックでキャンセルします"),
-                Component.text("§7ダンジョンに残ります")
-            ))
-            itemMeta = meta
-        }
-        gui.setItem(15, cancelButton)
-        
-        player.openInventory(gui)
-    }
+     /**
+      * エスケープ確認GUIを表示
+      */
+     private fun showEscapeConfirmationGui(player: Player) {
+         val gui = Bukkit.createInventory(null, 27, escapeGuiTitle)
+         
+         // 背景を黒色のガラスで埋める
+         val background = ItemStack(Material.BLACK_STAINED_GLASS_PANE)
+         background.editMeta { meta ->
+             meta.displayName(Component.text(" "))
+         }
+         
+         for (i in 0 until 27) {
+             gui.setItem(i, background)
+         }
+         
+         // 確認メッセージ
+         val infoItem = ItemStack(Material.PAPER)
+         infoItem.editMeta { meta ->
+             meta.displayName(Component.text("§6§l脱出確認"))
+             meta.lore(listOf(
+                 Component.text("§7スキマダンジョンから脱出します"),
+                 Component.text("§7本当に脱出しますか？"),
+                 Component.text(""),
+                 Component.text("§e左: §a脱出する"),
+                 Component.text("§e右: §cキャンセル")
+             ))
+         }
+         gui.setItem(13, infoItem)
+         
+         // 脱出ボタン（緑色羊毛）
+         val escapeButton = ItemStack(Material.LIME_WOOL)
+         escapeButton.editMeta { meta ->
+             meta.displayName(Component.text("§a§l脱出する"))
+             meta.lore(listOf(
+                 Component.text("§7クリックで脱出します"),
+                 Component.text("§7ダンジョンから退出します")
+             ))
+         }
+         gui.setItem(11, escapeButton)
+         
+         // キャンセルボタン（赤色羊毛）
+         val cancelButton = ItemStack(Material.RED_WOOL)
+         cancelButton.editMeta { meta ->
+             meta.displayName(Component.text("§c§lキャンセル"))
+             meta.lore(listOf(
+                 Component.text("§7クリックでキャンセルします"),
+                 Component.text("§7ダンジョンに残ります")
+             ))
+         }
+         gui.setItem(15, cancelButton)
+         
+         player.openInventory(gui)
+     }
     
     /**
      * 脱出を実行
