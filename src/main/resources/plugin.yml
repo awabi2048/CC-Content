@@ -6,10 +6,10 @@ author: awabi2048
 description: Paper 1.21.8用統合コンテンツプラグイン
 
 commands:
-  cc:
+  cc-content:
     description: CC-Contentメインコマンド
-    usage: /cc <subcommand> [args]
-    aliases: [ccc]
+    usage: /cc-content reload
+    aliases: [cc, ccc]
   rank:
     description: ランクシステムコマンド（デバッグ用）
     usage: /rank <subcommand> [args]

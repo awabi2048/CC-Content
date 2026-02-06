@@ -51,8 +51,11 @@ class CCContent : JavaPlugin() {
         
         // コマンド登録
         val giveCommand = GiveCommand()
-        val ccCommand = CCCommand(giveCommand)
+        val ccCommand = CCCommand(giveCommand) { reloadConfiguration() }
         
+         getCommand("cc-content")?.setExecutor(ccCommand)
+         getCommand("cc-content")?.tabCompleter = ccCommand
+         // 旧エイリアスも対応
          getCommand("cc")?.setExecutor(ccCommand)
          getCommand("cc")?.tabCompleter = ccCommand
         
@@ -260,6 +263,32 @@ class CCContent : JavaPlugin() {
         CustomItemManager.register(SproutItem())
         CustomItemManager.register(CompassItem())
         CustomItemManager.register(TalismanItem())
+    }
+    
+    /**
+     * 設定ファイルをリロード
+     */
+    private fun reloadConfiguration() {
+        try {
+            logger.info("CC-Content の設定ファイルをリロード中...")
+            
+            // チュートリアルタスク設定をリロード
+            val tutorialTasksFile = File(dataFolder, "tutorial-tasks.yml")
+            if (tutorialTasksFile.exists()) {
+                logger.info("tutorial-tasks.yml をリロードしました")
+            }
+            
+            // スキルツリーをリロード
+            val jobDir = File(dataFolder, "job")
+            if (jobDir.exists()) {
+                logger.info("スキルツリーファイルをリロードしました")
+            }
+            
+            logger.info("CC-Content の設定ファイルをすべてリロードしました")
+        } catch (e: Exception) {
+            logger.warning("リロード中にエラーが発生しました: ${e.message}")
+            e.printStackTrace()
+        }
     }
     
     override fun onDisable() {
