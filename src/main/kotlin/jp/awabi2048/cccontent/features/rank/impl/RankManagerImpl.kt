@@ -12,20 +12,26 @@ import java.util.UUID
  * ランクシステムの統合実装
  */
 class RankManagerImpl(
-    storage: RankStorage,
+    private val storage: RankStorage,
     private var messageProvider: jp.awabi2048.cccontent.features.rank.localization.MessageProvider? = null
 ) : RankManager {
     
     private val tutorialManager = TutorialRankManagerImpl(storage)
-    private val professionManager: ProfessionManagerImpl by lazy {
-        ProfessionManagerImpl(storage, messageProvider!!)
-    }
+    private var professionManager: ProfessionManagerImpl? = null
     
     /**
-     * MessageProviderを設定
+     * MessageProviderを設定して、ProfessionManagerを初期化
      */
     fun setMessageProvider(provider: jp.awabi2048.cccontent.features.rank.localization.MessageProvider) {
         this.messageProvider = provider
+        this.professionManager = ProfessionManagerImpl(storage, provider)
+    }
+    
+    /**
+     * ProfessionManagerを取得（初期化済みか確認）
+     */
+    private fun getProfessionManager(): ProfessionManagerImpl {
+        return professionManager ?: throw IllegalStateException("ProfessionManager is not initialized. Call setMessageProvider first.")
     }
     
     override fun getPlayerTutorial(playerUuid: UUID): PlayerTutorialRank {
@@ -49,52 +55,52 @@ class RankManagerImpl(
     }
     
     override fun getPlayerProfession(playerUuid: UUID): PlayerProfession? {
-        return professionManager.getPlayerProfession(playerUuid)
+        return getProfessionManager().getPlayerProfession(playerUuid)
     }
     
     override fun hasProfession(playerUuid: UUID): Boolean {
-        return professionManager.hasProfession(playerUuid)
+        return getProfessionManager().hasProfession(playerUuid)
     }
     
     override fun selectProfession(playerUuid: UUID, profession: Profession): Boolean {
-        return professionManager.selectProfession(playerUuid, profession)
+        return getProfessionManager().selectProfession(playerUuid, profession)
     }
     
     override fun changeProfession(playerUuid: UUID, profession: Profession): Boolean {
-        return professionManager.changeProfession(playerUuid, profession)
+        return getProfessionManager().changeProfession(playerUuid, profession)
     }
     
     override fun addProfessionExp(playerUuid: UUID, amount: Long): Boolean {
-        return professionManager.addExperience(playerUuid, amount)
+        return getProfessionManager().addExperience(playerUuid, amount)
     }
     
     override fun acquireSkill(playerUuid: UUID, skillId: String): Boolean {
-        return professionManager.acquireSkill(playerUuid, skillId)
+        return getProfessionManager().acquireSkill(playerUuid, skillId)
     }
     
     override fun getAvailableSkills(playerUuid: UUID): List<String> {
-        return professionManager.getAvailableSkills(playerUuid)
+        return getProfessionManager().getAvailableSkills(playerUuid)
     }
     
     override fun getAcquiredSkills(playerUuid: UUID): Set<String> {
-        return professionManager.getAcquiredSkills(playerUuid)
+        return getProfessionManager().getAcquiredSkills(playerUuid)
     }
     
     override fun getCurrentProfessionExp(playerUuid: UUID): Long {
-        return professionManager.getCurrentExp(playerUuid)
+        return getProfessionManager().getCurrentExp(playerUuid)
     }
     
     override fun resetProfession(playerUuid: UUID): Boolean {
-        return professionManager.resetProfession(playerUuid)
+        return getProfessionManager().resetProfession(playerUuid)
     }
     
     override fun saveData() {
         tutorialManager.saveData()
-        professionManager.saveData()
+        professionManager?.saveData()
     }
     
     override fun loadData() {
         tutorialManager.loadData()
-        professionManager.loadData()
+        professionManager?.loadData()
     }
 }

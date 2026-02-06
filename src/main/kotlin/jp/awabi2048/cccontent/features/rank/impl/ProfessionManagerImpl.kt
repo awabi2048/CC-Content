@@ -30,9 +30,20 @@ class ProfessionManagerImpl(
     }
     
     override fun getPlayerProfession(playerUuid: UUID): PlayerProfession? {
-        return professionCache.getOrPut(playerUuid) {
-            storage.loadProfession(playerUuid) ?: return null
+        // キャッシュに存在する場合はそれを返す
+        if (playerUuid in professionCache) {
+            return professionCache[playerUuid]
         }
+        
+        // ストレージから読み込む
+        val loaded = storage.loadProfession(playerUuid)
+        
+        // 読み込めた場合のみキャッシュに追加
+        if (loaded != null) {
+            professionCache[playerUuid] = loaded
+        }
+        
+        return loaded
     }
     
     override fun hasProfession(playerUuid: UUID): Boolean {
