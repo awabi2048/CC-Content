@@ -1,0 +1,104 @@
+# SukimaDungeon アイテム設定ファイル
+# 元の SukimaDungeon プラグインの items.yml を再現
+
+# ワールドの芽 (World Sprout)
+sprout:
+  # 表示名（カラーコード使用可能）
+  display_name: "§dワールドの芽"
+  
+  # 説明文（リスト形式）
+  lore:
+    - "§7§m――――――――――――――――――――――――――――――"
+    - "§7スキマダンジョンで刈り取ってきた、"
+    - "§7ワールドの芽。"
+    - "§7おあげちゃんに渡すと、アイテムと"
+    - "§7交換してもらえる。"
+    - "§7§m――――――――――――――――――――――――――――――"
+  
+  # アイテムモデル (namespace:path)
+  item_model: "sukimadungeon:world_sprout"
+  
+  # スタックサイズ
+  max_stack_size: 1
+  
+  # エンチャントグリント
+  enchant_glint: true
+
+# コンパス Tier 1
+compass_tier1:
+  display_name: "§bワールドの芽コンパス [Tier 1]"
+  lore:
+    - "§7§m――――――――――――――――――――――――――――――"
+    - "§7スキマダンジョン内で§bShiftを長押し"
+    - "§7することで、近くにある"
+    - "§aワールドの芽§7の場所を知ることができます！"
+    - ""
+    - "§7探知半径: §b48 block"
+    - "§7最大展開: §b30 秒"
+    - "§7クールダウン: §b60 秒"
+    - "§7§m――――――――――――――――――――――――――――――"
+  item_model: "sukimadungeon:compass_tier1"
+  max_stack_size: 1
+  enchant_glint: true
+
+# コンパス Tier 2
+compass_tier2:
+  display_name: "§bワールドの芽コンパス [Tier 2]"
+  lore:
+    - "§7§m――――――――――――――――――――――――――――――"
+    - "§7スキマダンジョン内で§bShiftを長押し"
+    - "§7することで、近くにある"
+    - "§aワールドの芽§7の場所を知ることができます！"
+    - ""
+    - "§7探知半径: §b48 block"
+    - "§7最大展開: §b20 秒"
+    - "§7クールダウン: §b40 秒"
+    - "§7§m――――――――――――――――――――――――――――――"
+  item_model: "sukimadungeon:compass_tier2"
+  max_stack_size: 1
+  enchant_glint: true
+
+# コンパス Tier 3
+compass_tier3:
+  display_name: "§bワールドの芽コンパス [Tier 3]"
+  lore:
+    - "§7§m――――――――――――――――――――――――――――――"
+    - "§7スキマダンジョン内で§bShiftを長押し"
+    - "§7することで、近くにある"
+    - "§aワールドの芽§7の場所を知ることができます！"
+    - ""
+    - "§7探知半径: §b48 block"
+    - "§7最大展開: §b10 秒"
+    - "§7クールダウン: §b20 秒"
+    - "§7§m――――――――――――――――――――――――――――――"
+  item_model: "sukimadungeon:compass_tier3"
+  max_stack_size: 1
+  enchant_glint: true
+
+# おあげちゃんのお札 (Talisman)
+talisman:
+  display_name: "§6おあげちゃんのお札"
+  lore:
+    - "§7§m――――――――――――――――――――――――――――――"
+    - "§7スキマダンジョンに送り出したクラフターを守り、"
+    - "§7帰り道を作るために"
+    - "§7おあげちゃんが渡してくれたお札。"
+    - "§7ダンジョン内部で使うと、"
+    - "§b脱出§7することができる。"
+    - "§7§m――――――――――――――――――――――――――――――"
+  item_model: "sukimadungeon:talisman"
+  max_stack_size: 1
+  enchant_glint: true
+
+# アイテム共通設定
+common:
+  # マテリアル（POISONOUS_POTATO固定）
+  material: "POISONOUS_POTATO"
+  
+  # !consumable 設定
+  not_consumable: true
+  
+  # アイテムフラグ
+  item_flags:
+    - "HIDE_ATTRIBUTES"
+    - "HIDE_ENCHANTS"

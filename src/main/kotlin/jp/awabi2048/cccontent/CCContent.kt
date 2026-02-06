@@ -9,6 +9,8 @@ import jp.awabi2048.cccontent.items.misc.GulliverItemListener
 import jp.awabi2048.cccontent.items.misc.GulliverConfig
 import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
 import jp.awabi2048.cccontent.items.sukima_dungeon.*
+import jp.awabi2048.cccontent.items.sukima_dungeon.common.LangManager
+import jp.awabi2048.cccontent.items.sukima_dungeon.common.MessageManager
 import jp.awabi2048.cccontent.items.arena.*
 import jp.awabi2048.cccontent.features.arena.ArenaItemListener
 import jp.awabi2048.cccontent.features.rank.RankManager
@@ -35,6 +37,12 @@ class CCContent : JavaPlugin() {
     
     private var playTimeTrackerTaskId: Int = -1
     
+    // SukimaDungeon マネージャー
+    private lateinit var sukimaLangManager: LangManager
+    private lateinit var sukimaMessageManager: MessageManager
+    private lateinit var sukimaCompassListener: CompassListener
+    private lateinit var sukimaTalismanListener: TalismanListener
+    
     override fun onEnable() {
         instance = this
         
@@ -46,6 +54,9 @@ class CCContent : JavaPlugin() {
         
         // アイテム登録
         registerCustomItems()
+        
+        // SukimaDungeon マネージャー初期化
+        initializeSukimaDungeon()
         
         // ランクシステムの初期化
         initializeRankSystem()
@@ -371,7 +382,42 @@ class CCContent : JavaPlugin() {
         }
     }
     
+    /**
+     * SukimaDungeon マネージャーを初期化
+     */
+    private fun initializeSukimaDungeon() {
+        try {
+            // 言語マネージャーを初期化
+            sukimaLangManager = LangManager(this)
+            
+            // メッセージマネージャーを初期化
+            sukimaMessageManager = MessageManager(sukimaLangManager)
+            
+            // リスナーを初期化
+            sukimaCompassListener = CompassListener(this, sukimaMessageManager)
+            sukimaTalismanListener = TalismanListener(this, sukimaMessageManager)
+            
+            // リスナーを登録
+            server.pluginManager.registerEvents(sukimaCompassListener, this)
+            server.pluginManager.registerEvents(sukimaTalismanListener, this)
+            
+            logger.info("[SukimaDungeon] マネージャーとリスナーを初期化しました")
+        } catch (e: Exception) {
+            logger.warning("[SukimaDungeon] 初期化に失敗しました: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+    
     override fun onDisable() {
+        // SukimaDungeon クリーンアップ
+        try {
+            if (::sukimaCompassListener.isInitialized) {
+                sukimaCompassListener.cleanup()
+            }
+        } catch (e: Exception) {
+            logger.warning("[SukimaDungeon] クリーンアップ中にエラーが発生しました: ${e.message}")
+        }
+        
         // プレイ時間トラッカータスクを停止
         if (playTimeTrackerTaskId != -1) {
             server.scheduler.cancelTask(playTimeTrackerTaskId)

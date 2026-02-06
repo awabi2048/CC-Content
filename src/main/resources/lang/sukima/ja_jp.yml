@@ -1,0 +1,51 @@
+# SukimaDungeon 日本語言語ファイル
+# 元の SukimaDungeon プラグインの言語ファイルを再現
+
+# プレフィックス
+prefix: "§7[§dスキマダンジョン§7]"
+
+# コンパス関連
+compass:
+  activate: "§bワールドの芽コンパス [Tier %1] を起動しました (§a%2秒§b)"
+  deactivate: "§cコンパスを停止しました"
+  detected: "§aワールドの芽を検知！ §7距離: §e%1m §7方向: §6%2"
+  cooldown: "§cクールダウン中: あと §e%1秒"
+  no_sprouts: "§c近くにワールドの芽はありません"
+
+# タリスマン関連
+talisman:
+  use: "§6おあげちゃんのお札§7を使用しました"
+  escape: "§d§l脱出！"
+  cancelled: "§c脱出をキャンセルしました"
+
+# スプラウト関連
+sprout:
+  harvest: "§aワールドの芽を収穫しました"
+
+# エラーメッセージ
+error:
+  not_in_dungeon: "§cスキマダンジョン内でしか使用できません"
+  no_permission: "§c権限がありません"
+  generic: "§cエラーが発生しました"
+
+# GUIメッセージ
+gui:
+  escape:
+    title: "§8脱出確認"
+    confirm: "§a§l脱出する"
+    cancel: "§c§lキャンセル"
+    lore:
+      - "§7スキマダンジョンから脱出します"
+      - "§7本当に脱出しますか？"
+
+# アイテム説明 (アイテムのloreとは別)
+item:
+  sprout:
+    name: "§dワールドの芽"
+    description: "スキマダンジョンで刈り取ってきたワールドの芽"
+  compass:
+    name: "§bワールドの芽コンパス"
+    description: "ワールドの芽の場所を探知するコンパス"
+  talisman:
+    name: "§6おあげちゃんのお札"
+    description: "スキマダンジョンから脱出するためのお札"

@@ -1,0 +1,89 @@
+# SukimaDungeon 設定ファイル
+# 元の SukimaDungeon プラグインの設定を再現
+
+# 基本設定
+general:
+  # 言語設定 (ja_jp, en_us)
+  language: "ja_jp"
+  
+  # ダンジョンワールド名（複数指定可能）
+  dungeon_worlds:
+    - "world"
+  
+  # 脱出地点
+  escape_location:
+    world: "world"
+    x: 0.0
+    y: 64.0
+    z: 0.0
+    yaw: 0.0
+    pitch: 0.0
+
+# コンパス設定
+compass:
+  # デフォルト検知半径
+  default_radius: 48.0
+  
+  # 各ティアの設定
+  tiers:
+    tier1:
+      name: "Tier 1"
+      duration: 30  # 秒
+      cooldown: 60  # 秒
+      debuffs:
+        - "HUNGER:1:5"
+    tier2:
+      name: "Tier 2"
+      duration: 20
+      cooldown: 40
+      debuffs:
+        - "HUNGER:1:5"
+        - "BLINDNESS:1:5"
+    tier3:
+      name: "Tier 3"
+      duration: 10
+      cooldown: 20
+      debuffs:
+        - "HUNGER:1:5"
+        - "BLINDNESS:1:5"
+        - "SLOWNESS:2:5"
+
+# タリスマン設定
+talisman:
+  # 脱出遅延（秒）
+  escape_delay: 3
+  
+  # 脱出時のエフェクト
+  escape_effects:
+    - "ENDER_SIGNAL:10"
+    - "SMOKE_NORMAL:5"
+
+# ワールドの芽設定
+sprout:
+  # 生成ブロック
+  block_type: "MANGROVE_PROPAGULE"
+  
+  # 収穫時のドロップ確率（0.0〜1.0）
+  drop_chance: 1.0
+  
+  # 再生成時間（秒）
+  respawn_time: 300
+
+# メッセージ設定
+messages:
+  # アクションバー表示時間（ティック, 20ティック = 1秒）
+  action_bar_duration: 60
+  
+  # タイトル表示時間
+  title:
+    fade_in: 10
+    stay: 70
+    fade_out: 20
+
+# デバッグ設定
+debug:
+  # デバッグモード
+  enabled: false
+  
+  # 詳細ログ出力
+  verbose_logging: false

@@ -1,0 +1,107 @@
+# SukimaDungeon GUIテーマ設定ファイル
+# 元の SukimaDungeon プラグインの theme.yml を再現
+
+# 色設定
+colors:
+  primary: "§d"     # メインカラー（紫）
+  secondary: "§b"   # サブカラー（水色）
+  accent: "§6"      # アクセントカラー（金色）
+  success: "§a"     # 成功カラー（緑）
+  error: "§c"       # エラーカラー（赤）
+  warning: "§e"     # 警告カラー（黄色）
+  info: "§7"        # 情報カラー（灰色）
+
+# GUI設定
+gui:
+  # エスケープ確認GUI
+  escape_confirmation:
+    title: "§8脱出確認"
+    size: 27
+    background:
+      material: "BLACK_STAINED_GLASS_PANE"
+      name: " "
+    info_item:
+      material: "PAPER"
+      name: "%primary%%bold%脱出確認"
+      lore:
+        - "%info%スキマダンジョンから脱出します"
+        - "%info%本当に脱出しますか？"
+        - ""
+        - "%accent%左: %success%脱出する"
+        - "%accent%右: %error%キャンセル"
+    confirm_button:
+      material: "LIME_WOOL"
+      name: "%success%%bold%脱出する"
+      lore:
+        - "%info%クリックで脱出します"
+        - "%info%ダンジョンから退出します"
+      slot: 11
+    cancel_button:
+      material: "RED_WOOL"
+      name: "%error%%bold%キャンセル"
+      lore:
+        - "%info%クリックでキャンセルします"
+        - "%info%ダンジョンに残ります"
+      slot: 15
+
+# アクションバー設定
+action_bar:
+  # フォーマット
+  format: "%prefix% %message%"
+  
+  # 持続時間（ティック）
+  duration: 60
+
+# タイトル設定
+title:
+  # 脱出タイトル
+  escape:
+    title: "%primary%%bold%脱出！"
+    subtitle: "%secondary%ダンジョンから脱出します"
+    fade_in: 10
+    stay: 70
+    fade_out: 20
+
+# サウンド設定
+sounds:
+  # コンパス起動音
+  compass_activate:
+    sound: "BLOCK_BEACON_ACTIVATE"
+    volume: 1.0
+    pitch: 1.0
+    
+  # コンパス停止音
+  compass_deactivate:
+    sound: "BLOCK_BEACON_DEACTIVATE"
+    volume: 1.0
+    pitch: 1.0
+    
+  # タリスマン使用音
+  talisman_use:
+    sound: "ENTITY_ENDERMAN_TELEPORT"
+    volume: 0.5
+    pitch: 1.5
+    
+  # 脱出音
+  escape:
+    sound: "ENTITY_PLAYER_LEVELUP"
+    volume: 1.0
+    pitch: 2.0
+
+# エフェクト設定
+effects:
+  # コンパス検知エフェクト
+  compass_detect:
+    particle: "VILLAGER_HAPPY"
+    count: 10
+    offset_x: 0.5
+    offset_y: 0.5
+    offset_z: 0.5
+    
+  # タリスマン使用エフェクト
+  talisman_use:
+    particle: "PORTAL"
+    count: 50
+    offset_x: 1.0
+    offset_y: 1.0
+    offset_z: 1.0
