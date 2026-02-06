@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.items.sukima_dungeon
 
+import jp.awabi2048.cccontent.items.sukima_dungeon.common.ConfigManager
+import jp.awabi2048.cccontent.items.sukima_dungeon.common.DungeonManager
 import jp.awabi2048.cccontent.items.sukima_dungeon.common.MessageManager
 import org.bukkit.Bukkit
 import org.bukkit.NamespacedKey
@@ -18,6 +20,8 @@ import java.util.*
  */
 class CompassListener(
     private val plugin: JavaPlugin,
+    private val dungeonManager: DungeonManager,
+    private val configManager: ConfigManager,
     private val messageManager: MessageManager
 ) : Listener {
     
@@ -69,13 +73,10 @@ class CompassListener(
     }
     
     /**
-     * ダンジョン内にいるかどうか（仮実装）
-     * TODO: 実際のダンジョン判定ロジックを実装
+     * ダンジョン内にいるかどうか
      */
     private fun isInDungeon(player: Player): Boolean {
-        // 仮実装：常にtrueを返す
-        // 実際の実装では、ワールドや領域をチェックする必要がある
-        return true
+        return dungeonManager.isInDungeon(player)
     }
     
     /**
@@ -199,20 +200,31 @@ class CompassListener(
     
     /**
      * 最も近いワールドの芽を検索
-     * TODO: 実際のワールドの芽エンティティ/ブロックを検索するロジックを実装
      */
     private fun findNearestSprout(player: Player, radius: Double): org.bukkit.Location? {
-        // 仮実装：常にnullを返す
-        // 実際の実装では、MANGROVE_PROPAGULE ブロックやエンティティを検索する必要がある
-        return null
+        return dungeonManager.findNearestSprout(player, radius)
     }
     
     /**
      * 方角を文字列で取得
      */
     private fun getDirection(playerYaw: Float, targetLocation: org.bukkit.Location): String {
-        // 簡易実装
-        return "北"
+        // プレイヤーの向きとターゲットの方向から相対的な方角を計算
+        // yaw: 0=南, 90=西, 180=北, 270=東
+        
+        val normalizedYaw = ((playerYaw % 360) + 360) % 360
+        
+        return when {
+            normalizedYaw >= 337.5 || normalizedYaw < 22.5 -> "南"
+            normalizedYaw >= 22.5 && normalizedYaw < 67.5 -> "南西"
+            normalizedYaw >= 67.5 && normalizedYaw < 112.5 -> "西"
+            normalizedYaw >= 112.5 && normalizedYaw < 157.5 -> "北西"
+            normalizedYaw >= 157.5 && normalizedYaw < 202.5 -> "北"
+            normalizedYaw >= 202.5 && normalizedYaw < 247.5 -> "北東"
+            normalizedYaw >= 247.5 && normalizedYaw < 292.5 -> "東"
+            normalizedYaw >= 292.5 && normalizedYaw < 337.5 -> "南東"
+            else -> "不明"
+        }
     }
     
     /**

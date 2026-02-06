@@ -9,6 +9,8 @@ import jp.awabi2048.cccontent.items.misc.GulliverItemListener
 import jp.awabi2048.cccontent.items.misc.GulliverConfig
 import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
 import jp.awabi2048.cccontent.items.sukima_dungeon.*
+import jp.awabi2048.cccontent.items.sukima_dungeon.common.ConfigManager
+import jp.awabi2048.cccontent.items.sukima_dungeon.common.DungeonManager
 import jp.awabi2048.cccontent.items.sukima_dungeon.common.LangManager
 import jp.awabi2048.cccontent.items.sukima_dungeon.common.MessageManager
 import jp.awabi2048.cccontent.items.arena.*
@@ -38,10 +40,13 @@ class CCContent : JavaPlugin() {
     private var playTimeTrackerTaskId: Int = -1
     
     // SukimaDungeon マネージャー
+    private lateinit var sukimaConfigManager: ConfigManager
+    private lateinit var sukimaDungeonManager: DungeonManager
     private lateinit var sukimaLangManager: LangManager
     private lateinit var sukimaMessageManager: MessageManager
     private lateinit var sukimaCompassListener: CompassListener
     private lateinit var sukimaTalismanListener: TalismanListener
+    private lateinit var sukimaSproutHarvestListener: SproutHarvestListener
     
     override fun onEnable() {
         instance = this
@@ -387,6 +392,12 @@ class CCContent : JavaPlugin() {
      */
     private fun initializeSukimaDungeon() {
         try {
+            // 設定マネージャーを初期化
+            sukimaConfigManager = ConfigManager(this)
+            
+            // ダンジョンマネージャーを初期化
+            sukimaDungeonManager = DungeonManager(this, sukimaConfigManager)
+            
             // 言語マネージャーを初期化
             sukimaLangManager = LangManager(this)
             
@@ -394,12 +405,33 @@ class CCContent : JavaPlugin() {
             sukimaMessageManager = MessageManager(sukimaLangManager)
             
             // リスナーを初期化
-            sukimaCompassListener = CompassListener(this, sukimaMessageManager)
-            sukimaTalismanListener = TalismanListener(this, sukimaMessageManager)
+            sukimaCompassListener = CompassListener(
+                this, 
+                sukimaDungeonManager, 
+                sukimaConfigManager, 
+                sukimaMessageManager
+            )
+            sukimaTalismanListener = TalismanListener(
+                this, 
+                sukimaDungeonManager, 
+                sukimaConfigManager, 
+                sukimaMessageManager
+            )
+            sukimaSproutHarvestListener = SproutHarvestListener(
+                sukimaDungeonManager,
+                sukimaConfigManager,
+                sukimaMessageManager
+            )
             
             // リスナーを登録
             server.pluginManager.registerEvents(sukimaCompassListener, this)
             server.pluginManager.registerEvents(sukimaTalismanListener, this)
+            server.pluginManager.registerEvents(sukimaSproutHarvestListener, this)
+            
+            // 定期的なクリーンアップタスクを開始（5分ごと）
+            server.scheduler.runTaskTimer(this, Runnable {
+                sukimaDungeonManager.cleanup()
+            }, 0L, 6000L)
             
             logger.info("[SukimaDungeon] マネージャーとリスナーを初期化しました")
         } catch (e: Exception) {
@@ -413,6 +445,9 @@ class CCContent : JavaPlugin() {
         try {
             if (::sukimaCompassListener.isInitialized) {
                 sukimaCompassListener.cleanup()
+            }
+            if (::sukimaDungeonManager.isInitialized) {
+                sukimaDungeonManager.clearAll()
             }
         } catch (e: Exception) {
             logger.warning("[SukimaDungeon] クリーンアップ中にエラーが発生しました: ${e.message}")

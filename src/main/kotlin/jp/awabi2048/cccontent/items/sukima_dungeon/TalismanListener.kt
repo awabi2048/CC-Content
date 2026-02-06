@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.items.sukima_dungeon
 
+import jp.awabi2048.cccontent.items.sukima_dungeon.common.ConfigManager
+import jp.awabi2048.cccontent.items.sukima_dungeon.common.DungeonManager
 import jp.awabi2048.cccontent.items.sukima_dungeon.common.MessageManager
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -22,6 +24,8 @@ import org.bukkit.plugin.java.JavaPlugin
  */
 class TalismanListener(
     private val plugin: JavaPlugin,
+    private val dungeonManager: DungeonManager,
+    private val configManager: ConfigManager,
     private val messageManager: MessageManager
 ) : Listener {
     
@@ -99,11 +103,10 @@ class TalismanListener(
     }
     
     /**
-     * ダンジョン内にいるかどうか（仮実装）
+     * ダンジョン内にいるかどうか
      */
     private fun isInDungeon(player: Player): Boolean {
-        // 仮実装：常にtrueを返す
-        return true
+        return dungeonManager.isInDungeon(player)
     }
     
     /**
@@ -169,14 +172,14 @@ class TalismanListener(
      * 脱出を実行
      */
     private fun performEscape(player: Player) {
-        // ダンジョンから脱出するロジック
-        // TODO: 実際の脱出ロジックを実装（スポーン地点へのテレポートなど）
+        // 脱出地点を取得
+        val escapeLocation = configManager.escapeLocation
         
-        messageManager.sendTalismanEscape(player)
-        messageManager.send(player, "talisman.use")
-        
-        // 仮実装：プレイヤーにメッセージを送信
-        player.sendMessage(Component.text("§aダンジョンから脱出しました！"))
+        if (escapeLocation == null) {
+            messageManager.sendError(player, "error.generic")
+            plugin.logger.warning("[SukimaDungeon] 脱出地点が設定されていません")
+            return
+        }
         
         // タリスマンを消費（!consumable 設定があるため、手動で削除）
         val itemInHand = player.inventory.itemInMainHand
@@ -188,5 +191,39 @@ class TalismanListener(
                 player.inventory.setItemInMainHand(ItemStack(Material.AIR))
             }
         }
+        
+        // 遅延後にテレポート
+        val delay = configManager.talismanEscapeDelay
+        
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            // テレポート実行
+            player.teleport(escapeLocation)
+            
+            // エフェクトとメッセージ
+            messageManager.sendTalismanEscape(player)
+            messageManager.send(player, "talisman.escape")
+            
+            // パーティクルエフェクト
+            player.world.spawnParticle(
+                org.bukkit.Particle.PORTAL,
+                player.location,
+                50,
+                1.0, 1.0, 1.0,
+                0.5
+            )
+            
+            // サウンド
+            player.playSound(
+                player.location,
+                org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT,
+                1.0f,
+                1.5f
+            )
+            
+            // ダンジョン入場記録から削除
+            dungeonManager.removePlayerFromDungeon(player)
+            
+            configManager.debug("${player.name} がタリスマンで脱出しました")
+        }, (delay * 20).toLong())
     }
 }
