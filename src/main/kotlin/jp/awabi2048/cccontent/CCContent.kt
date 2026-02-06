@@ -6,6 +6,8 @@ import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.misc.BigLight
 import jp.awabi2048.cccontent.items.misc.SmallLight
 import jp.awabi2048.cccontent.items.misc.GulliverItemListener
+import jp.awabi2048.cccontent.items.misc.GulliverConfig
+import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
 import jp.awabi2048.cccontent.items.arena.*
 import jp.awabi2048.cccontent.items.sukima_dungeon.*
 import org.bukkit.plugin.java.JavaPlugin
@@ -23,6 +25,9 @@ class CCContent : JavaPlugin() {
         // ロガーをCustomItemManagerに設定
         CustomItemManager.setLogger(logger)
         
+        // GulliverLight設定の初期化
+        GulliverConfig.initialize(this)
+        
         // アイテム登録
         registerCustomItems()
         
@@ -34,9 +39,12 @@ class CCContent : JavaPlugin() {
          getCommand("cc")?.tabCompleter = ccCommand
         
         // リスナー登録
-        server.pluginManager.registerEvents(GulliverItemListener(), this)
+        server.pluginManager.registerEvents(GulliverItemListener(this), this)
         server.pluginManager.registerEvents(ArenaItemListener(), this)
         server.pluginManager.registerEvents(SukimaItemListener(), this)
+        
+        // ScaleManagerタスクの開始（毎tick実行）
+        server.scheduler.runTaskTimer(this, GulliverScaleManager(), 0L, 1L)
         
         logger.info("CC-Content v${description.version} が有効化されました")
         logger.info("作成者: ${description.authors}")

@@ -1,67 +1,92 @@
 package jp.awabi2048.cccontent.items.misc
 
-import jp.awabi2048.cccontent.items.CustomItemManager
-import org.bukkit.Sound
-import org.bukkit.entity.Player
+import jp.awabi2048.cccontent.CCContent
+import org.bukkit.NamespacedKey
+import org.bukkit.attribute.Attribute
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
+import org.bukkit.event.block.Action
 import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.event.player.PlayerItemConsumeEvent
+import org.bukkit.persistence.PersistentDataType
+import org.bukkit.plugin.java.JavaPlugin
 
 /**
  * GulliverLight アイテムのイベント処理
+ * 統合元プラグインのGulliverListenerをそのまま移植
  */
-class GulliverItemListener : Listener {
-    
+class GulliverItemListener(private val plugin: JavaPlugin) : Listener {
+
     @EventHandler
-    fun onPlayerInteract(event: PlayerInteractEvent) {
+    fun onInteract(event: PlayerInteractEvent) {
+        if (event.action != Action.RIGHT_CLICK_AIR && event.action != Action.RIGHT_CLICK_BLOCK) return
+        
+        val item = event.item ?: return
+        val meta = item.itemMeta ?: return
+        val container = meta.persistentDataContainer
+        
+        val isBigLight = container.has(GulliverItems.BIG_LIGHT_KEY, PersistentDataType.BYTE)
+        val isSmallLight = container.has(GulliverItems.SMALL_LIGHT_KEY, PersistentDataType.BYTE)
+        
+        if (!isBigLight && !isSmallLight) return
+
         val player = event.player
-        val item = player.inventory.itemInMainHand
-        
-        // カスタムアイテムを識別
-        val customItem = CustomItemManager.identify(item) ?: return
-        if (customItem.feature != "misc") return
-        
-        // アイテムの種類による処理
-        when (customItem.id) {
-            "big_light" -> handleBigLight(player, event)
-            "small_light" -> handleSmallLight(player, event)
-        }
-    }
-    
-    private fun handleBigLight(player: Player, event: PlayerInteractEvent) {
-        // Shift + 右クリック: スケールをリセット
-        if (player.isSneaking && event.action.name.contains("RIGHT")) {
-            resetScale(player)
-            return
-        }
-        
-        // 右クリック長押しの場合のみ処理
-        if (event.action.name.contains("RIGHT")) {
-            if (player.isHandRaised) {
-                // スケール増加
-                player.sendMessage("§aビッグライトの機能は将来実装予定です")
+        val config = GulliverConfig
+
+        if (player.isSneaking) {
+            // Reset Scale
+            val scaleAttribute = player.getAttribute(Attribute.valueOf("GENERIC_SCALE"))
+            if (scaleAttribute != null) {
+                scaleAttribute.baseValue = 1.0
+                
+                val resetSoundKey = config.getResetSound()
+                val vol = config.getDefaultVolume()
+                val pitch = config.getDefaultPitch()
+                
+                // Try parse sound, fallback if invalid
+                try {
+                    player.playSound(player.location, resetSoundKey, vol, pitch)
+                } catch (e: Exception) {
+                    plugin.logger.warning("Invalid sound key: $resetSoundKey")
+                }
             }
-        }
-    }
-    
-    private fun handleSmallLight(player: Player, event: PlayerInteractEvent) {
-        // Shift + 右クリック: スケールをリセット
-        if (player.isSneaking && event.action.name.contains("RIGHT")) {
-            resetScale(player)
-            return
-        }
-        
-        // 右クリック長押しの場合のみ処理
-        if (event.action.name.contains("RIGHT")) {
-            if (player.isHandRaised) {
-                // スケール減少
-                player.sendMessage("§aスモールライトの機能は将来実装予定です")
+        } else {
+            // Start using (just play sound, logic is in ScaleManager)
+            // Prevent multiple sounds if already using (hand raised)
+            if (player.isHandRaised) return
+
+            // Check if limit is reached
+            val scaleAttribute = player.getAttribute(Attribute.valueOf("GENERIC_SCALE"))
+            val currentScale = scaleAttribute?.baseValue ?: 1.0
+            val maxScale = config.getBigLightMaxScale()
+            val minScale = config.getSmallLightMinScale()
+
+            var isLimit = false
+            if (isBigLight && currentScale >= maxScale) isLimit = true
+            if (isSmallLight && currentScale <= minScale) isLimit = true
+
+            if (isLimit) {
+                val limitSound = config.getLimitSound()
+                val vol = config.getDefaultVolume()
+                val pitch = config.getDefaultPitch()
+                player.playSound(player.location, limitSound, vol, pitch)
+                return
             }
+            
+            val soundConfig = config.getSoundConfig("use")
+            player.playSound(player.location, soundConfig.soundKey, soundConfig.volume, soundConfig.pitch)
         }
     }
-    
-    private fun resetScale(player: Player) {
-        player.playSound(player.location, Sound.BLOCK_BEACON_DEACTIVATE, 1.0f, 1.0f)
-        player.sendMessage("§aスケールをリセットしました")
+
+    @EventHandler
+    fun onConsume(event: PlayerItemConsumeEvent) {
+        val item = event.item
+        val meta = item.itemMeta ?: return
+        val container = meta.persistentDataContainer
+        
+        if (container.has(GulliverItems.BIG_LIGHT_KEY, PersistentDataType.BYTE) ||
+            container.has(GulliverItems.SMALL_LIGHT_KEY, PersistentDataType.BYTE)) {
+            event.isCancelled = true
+        }
     }
 }

@@ -1,0 +1,25 @@
+# GulliverLight Configuration
+
+# Maximum scale for Big Light
+big_light:
+  max_scale: 5.0
+  scale_speed: 0.05
+
+# Minimum scale for Small Light
+small_light:
+  min_scale: 0.1
+  scale_speed: 0.05
+
+# Sound settings
+sounds:
+  # Sound played when starting to use the light (right-click)
+  use_sound:
+    sound: "minecraft:block.beacon.activate"
+    pitch: 1.0
+    volume: 1.0
+  # Sound played when resetting size (shift + right-click)
+  reset_sound: "minecraft:block.beacon.deactivate"
+  # Sound played when limit is reached
+  limit_sound: "minecraft:block.note_block.bass"
+  volume: 1.0
+  pitch: 1.0
