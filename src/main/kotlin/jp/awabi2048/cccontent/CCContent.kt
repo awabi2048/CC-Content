@@ -10,7 +10,17 @@ import jp.awabi2048.cccontent.items.misc.GulliverConfig
 import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
 import jp.awabi2048.cccontent.items.arena.*
 import jp.awabi2048.cccontent.items.sukima_dungeon.*
+import jp.awabi2048.cccontent.features.rank.RankManager
+import jp.awabi2048.cccontent.features.rank.impl.RankManagerImpl
+import jp.awabi2048.cccontent.features.rank.impl.YamlRankStorage
+import jp.awabi2048.cccontent.features.rank.localization.LanguageLoader
+import jp.awabi2048.cccontent.features.rank.localization.MessageProviderImpl
+import jp.awabi2048.cccontent.features.rank.command.RankCommand
+import jp.awabi2048.cccontent.features.rank.profession.Profession
+import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
+import jp.awabi2048.cccontent.features.rank.profession.skilltree.ConfigBasedSkillTree
 import org.bukkit.plugin.java.JavaPlugin
+import java.io.File
 
 class CCContent : JavaPlugin() {
     
@@ -30,6 +40,9 @@ class CCContent : JavaPlugin() {
         
         // アイテム登録
         registerCustomItems()
+        
+        // ランクシステムの初期化
+        initializeRankSystem()
         
         // コマンド登録
         val giveCommand = GiveCommand()
@@ -54,6 +67,58 @@ class CCContent : JavaPlugin() {
         logger.info("  - misc: ${CustomItemManager.getItemCountByFeature("misc")}")
         logger.info("  - arena: ${CustomItemManager.getItemCountByFeature("arena")}")
         logger.info("  - sukima_dungeon: ${CustomItemManager.getItemCountByFeature("sukima_dungeon")}")
+    }
+    
+    /**
+     * ランクシステムの初期化
+     */
+    private fun initializeRankSystem() {
+        try {
+            // ランクストレージとマネージャーを初期化
+            val storage = YamlRankStorage(dataFolder)
+            val rankManager = RankManagerImpl(storage)
+            
+            // 言語ファイルを読み込み
+            val languageLoader = LanguageLoader(this, "ja_JP")
+            val messageProvider = MessageProviderImpl(languageLoader)
+            rankManager.setMessageProvider(messageProvider)
+            
+            // スキルツリーを登録
+            registerSkillTrees()
+            
+            // /rank コマンドを登録
+            val rankCommand = RankCommand(rankManager, messageProvider)
+            getCommand("rank")?.setExecutor(rankCommand)
+            getCommand("rank")?.tabCompleter = rankCommand
+            
+            logger.info("ランクシステムが初期化されました")
+        } catch (e: Exception) {
+            logger.warning("ランクシステムの初期化に失敗しました: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+    
+    /**
+     * 各職業のスキルツリーを登録
+     */
+    private fun registerSkillTrees() {
+        val jobDir = File(dataFolder, "job")
+        
+        for (profession in Profession.values()) {
+            val ymlFile = File(jobDir, "${profession.id}.yml")
+            
+            if (ymlFile.exists()) {
+                try {
+                    val skillTree = ConfigBasedSkillTree(profession.id, ymlFile)
+                    SkillTreeRegistry.register(profession, skillTree)
+                    logger.info("スキルツリーを登録しました: ${profession.id}")
+                } catch (e: Exception) {
+                    logger.warning("スキルツリー読み込み失敗 (${profession.id}): ${e.message}")
+                }
+            } else {
+                logger.warning("スキルツリーファイルが見つかりません: ${ymlFile.path}")
+            }
+        }
     }
     
     private fun registerCustomItems() {

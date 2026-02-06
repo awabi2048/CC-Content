@@ -10,6 +10,10 @@ commands:
     description: CC-Contentメインコマンド
     usage: /cc <subcommand> [args]
     aliases: [ccc]
+  rank:
+    description: ランクシステムコマンド（デバッグ用）
+    usage: /rank <subcommand> [args]
+    permission: cc-content.admin
   arena:
     description: アリーナコマンド
     usage: /arena
