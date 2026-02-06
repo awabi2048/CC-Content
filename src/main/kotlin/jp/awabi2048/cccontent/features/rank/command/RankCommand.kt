@@ -26,7 +26,7 @@ class RankCommand(
         args: Array<out String>
     ): Boolean {
         // 権限確認
-        if (!sender.hasPermission("cc.admin")) {
+        if (!sender.hasPermission("cc-content.admin")) {
             sender.sendMessage("§c権限がありません")
             return false
         }
