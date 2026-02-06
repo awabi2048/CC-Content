@@ -21,11 +21,13 @@ class EntityBlockTranslator(
         val key = entityType.lowercase()
         
         // 翻訳ファイルから取得を試みる
-        return try {
-            messageProvider.getMessage("entity.$key", null)
-        } catch (e: Exception) {
-            // 翻訳がない場合は、キャメルケースに変換して返す
+        val message = messageProvider.getMessage("entity.$key")
+        
+        // "Missing:" で始まる場合は翻訳がない、キャメルケースに変換
+        return if (message.startsWith("§c[Missing:")) {
             formatName(key)
+        } else {
+            message
         }
     }
     
@@ -40,11 +42,13 @@ class EntityBlockTranslator(
         val key = blockType.lowercase()
         
         // 翻訳ファイルから取得を試みる
-        return try {
-            messageProvider.getMessage("block.$key", null)
-        } catch (e: Exception) {
-            // 翻訳がない場合は、キャメルケースに変換して返す
+        val message = messageProvider.getMessage("block.$key")
+        
+        // "Missing:" で始まる場合は翻訳がない、キャメルケースに変換
+        return if (message.startsWith("§c[Missing:")) {
             formatName(key)
+        } else {
+            message
         }
     }
     
