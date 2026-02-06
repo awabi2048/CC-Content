@@ -113,10 +113,89 @@ skill:
       name: "大地の王"
       description: "採掘技術の最高位に達した者"
 
-# カスタム翻訳
-# バニラアイテム・モブ等はMinecraftの公式翻訳を使用するため、
-# ここにはカスタムアイテムなど、Minecraft公式に存在しない項目のみを記載します
-custom:
+# モブ名の翻訳
+entity:
+  zombie: "ゾンビ"
+  skeleton: "スケルトン"
+  creeper: "クリーパー"
+  spider: "スパイダー"
+  enderman: "エンダーマン"
+  ghast: "ガスト"
+  slime: "スライム"
+  witch: "ウィッチ"
+  wither: "ウィザー"
+  ender_dragon: "エンダードラゴン"
+  elder_guardian: "エルダーガーディアン"
+  warden: "ワーデン"
+  husk: "ハスク"
+  drowned: "ドラウンド"
+  stray: "ストレイ"
+  zombie_villager: "ゾンビ村人"
+  cave_spider: "ケイブスパイダー"
+  piglin: "ピグリン"
+  piglin_brute: "ピグリンブルート"
+  hoglin: "ホグリン"
+
+# ブロック名の翻訳
+block:
+  stone: "石"
+  granite: "花崗岩"
+  diorite: "閃緑岩"
+  andesite: "安山岩"
+  dirt: "土"
+  grass_block: "草ブロック"
+  cobblestone: "丸石"
+  oak_wood: "オークの木"
+  spruce_wood: "トウヒの木"
+  birch_wood: "白樺の木"
+  jungle_wood: "ジャングルの木"
+  acacia_wood: "アカシアの木"
+  dark_oak_wood: "ダークオークの木"
+  coal_ore: "石炭鉱石"
+  iron_ore: "鉄鉱石"
+  copper_ore: "銅鉱石"
+  gold_ore: "金鉱石"
+  redstone_ore: "レッドストーン鉱石"
+  lapis_ore: "ラピスラズリ鉱石"
+  diamond_ore: "ダイヤモンド鉱石"
+  deepslate: "ディープスレート"
+  deepslate_coal_ore: "ディープスレート石炭鉱石"
+  deepslate_iron_ore: "ディープスレート鉄鉱石"
+  deepslate_copper_ore: "ディープスレート銅鉱石"
+  deepslate_gold_ore: "ディープスレート金鉱石"
+  deepslate_redstone_ore: "ディープスレートレッドストーン鉱石"
+  deepslate_lapis_ore: "ディープスレートラピスラズリ鉱石"
+  deepslate_diamond_ore: "ディープスレートダイヤモンド鉱石"
+  obsidian: "黒曜石"
+  end_stone: "エンドストーン"
+  sand: "砂"
+  gravel: "砂利"
+  oak_leaves: "オークの葉"
+  spruce_leaves: "トウヒの葉"
+  birch_leaves: "白樺の葉"
+  jungle_leaves: "ジャングルの葉"
+  acacia_leaves: "アカシアの葉"
+  dark_oak_leaves: "ダークオークの葉"
+
+# アイテム名の翻訳
+item:
+  obsidian: "黒曜石"
+  flint: "火打ち石"
+  steel: "鉄インゴット"
+  ender_eye: "エンダーアイ"
+  diamond: "ダイヤモンド"
+  gold_ingot: "金インゴット"
+  iron_ingot: "鉄インゴット"
+  copper_ingot: "銅インゴット"
+  emerald: "エメラルド"
+  amethyst_shard: "アメジストの欠片"
+  netherite_ingot: "ネザライトインゴット"
+
+# ボス名の翻訳
+boss:
+  ender_dragon: "エンダードラゴン"
+  wither: "ウィザー"
+  elder_guardian: "エルダーガーディアン"
 
 # チュートリアルランク
 tutorial_rank:
