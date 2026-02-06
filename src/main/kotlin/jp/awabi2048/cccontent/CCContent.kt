@@ -32,6 +32,8 @@ class CCContent : JavaPlugin() {
             private set
     }
     
+    private var playTimeTrackerTaskId: Int = -1
+    
     override fun onEnable() {
         instance = this
         
@@ -91,6 +93,19 @@ class CCContent : JavaPlugin() {
             
             // チュートリアルランク タスクシステムの初期化
             val (taskLoader, taskChecker) = initializeTutorialTaskSystem(rankManager, storage)
+            
+            // プレイ時間トラッカータスクを起動（1分ごとに更新）
+            if (taskLoader != null && taskChecker != null) {
+                val playTimeTracker = jp.awabi2048.cccontent.features.rank.tutorial.task.PlayTimeTrackerTask(
+                    this,
+                    rankManager,
+                    taskChecker,
+                    taskLoader,
+                    storage
+                )
+                playTimeTrackerTaskId = playTimeTracker.start()
+                logger.info("プレイ時間トラッカーが起動しました（1分ごとに更新）")
+            }
             
             // /rank コマンドを登録
             val rankCommand = RankCommand(rankManager, messageProvider, taskLoader, taskChecker)
@@ -247,6 +262,10 @@ class CCContent : JavaPlugin() {
     }
     
     override fun onDisable() {
+        // プレイ時間トラッカータスクを停止
+        if (playTimeTrackerTaskId != -1) {
+            server.scheduler.cancelTask(playTimeTrackerTaskId)
+        }
         logger.info("CC-Content v${description.version} が無効化されました")
     }
 }

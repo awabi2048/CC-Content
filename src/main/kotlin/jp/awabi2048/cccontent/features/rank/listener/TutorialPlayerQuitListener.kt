@@ -28,9 +28,12 @@ class TutorialPlayerQuitListener(
         
         val tutorial = rankManager.getPlayerTutorial(uuid)
         
-        // プレイ時間を加算
+        // 最後のプレイ時間（Join時から現在までのプレイ時間）を加算
+        // PlayTimeTrackerTask で1分単位で加算されているため、残りの秒数のみを加算
         val playedTime = (System.currentTimeMillis() - tutorial.lastPlayTime) / 60000  // ミリ秒 → 分
-        tutorial.taskProgress.playTime += playedTime
+        if (playedTime > 0) {
+            tutorial.taskProgress.playTime += playedTime
+        }
         
         // タスク完了判定
         val requirement = taskLoader.getRequirement(tutorial.currentRank.name)
