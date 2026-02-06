@@ -321,7 +321,9 @@ class RankCommand(
             val progress_min = minOf(progress.playTime, requirement.playTimeMin.toLong())
             val percent = (progress_min.toDouble() / requirement.playTimeMin.toDouble() * 100).toInt()
             val status = if (progress.playTime >= requirement.playTimeMin) "§a✓" else "§c✗"
-            sender.sendMessage("$status プレイ時間: $progress_min/${requirement.playTimeMin}分 ($percent%)")
+            val progressStr = formatPlayTime(progress.playTime)
+            val requiredStr = formatPlayTime(requirement.playTimeMin.toLong())
+            sender.sendMessage("$status プレイ時間: $progressStr / $requiredStr ($percent%)")
         }
         
         // モブ討伐
@@ -352,7 +354,7 @@ class RankCommand(
         
         // アイテム
         requirement.itemsRequired.forEach { (material, required) ->
-            val current = progress.getItemCount(material)
+            val current = jp.awabi2048.cccontent.features.rank.listener.TutorialInventoryHelper.countItemInInventory(targetPlayer, material.uppercase())
             val progress_count = minOf(current, required)
             val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
             val status = if (current >= required) "§a✓" else "§c✗"
@@ -433,6 +435,21 @@ class RankCommand(
         }
         
         return true
+    }
+    
+    /**
+     * プレイ時間（分）を時間と分に変換
+     * @param minutes プレイ時間（分）
+     * @return "X時間Y分" または "Y分" の形式
+     */
+    private fun formatPlayTime(minutes: Long): String {
+        return if (minutes >= 60) {
+            val hours = minutes / 60
+            val mins = minutes % 60
+            "${hours}時間${mins}分"
+        } else {
+            "${minutes}分"
+        }
     }
     
     private fun sendUsage(sender: CommandSender) {

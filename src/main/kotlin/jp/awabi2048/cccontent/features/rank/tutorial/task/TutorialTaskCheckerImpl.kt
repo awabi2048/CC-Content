@@ -89,9 +89,11 @@ class TutorialTaskCheckerImpl : TutorialTaskChecker {
         }
         
         for ((material, count) in required) {
+            // Material 名を大文字で統一して比較
+            val materialName = material.uppercase()
             val totalCount = player.inventory.contents
                 .filterNotNull()
-                .filter { it.type.name == material }
+                .filter { it.type.name.uppercase() == materialName }
                 .sumOf { it.amount }
             
             if (totalCount < count) {
