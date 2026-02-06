@@ -379,7 +379,11 @@ class RankCommand(
             val progress_count = minOf(current, required)
             val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
             val status = if (current >= required) "§a✓" else "§c✗"
-            sender.sendMessage("$status $bossType 討伐: $current/$required ($percent%)")
+            // translator が存在する場合は翻訳、ない場合はそのまま表示
+            val bossName = translator?.translateBoss(bossType) ?: bossType
+            sender.sendMessage("$status $bossName 討伐: $current/$required ($percent%)")
+            // デバッグログ
+            CCContent.instance.logger.info("DEBUG: bossType=$bossType, translated=$bossName, current=$current, required=$required")
         }
         
         // 全体進捗

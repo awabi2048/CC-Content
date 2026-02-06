@@ -1,81 +1,111 @@
 package jp.awabi2048.cccontent.features.rank.tutorial.task
 
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
-import org.bukkit.entity.Player
+import org.bukkit.entity.EntityType
+import org.bukkit.Material
 import net.kyori.adventure.text.Component
 
 /**
  * モブやブロックの名前をプレイヤーの言語に翻訳するヘルパークラス
- * ローカルな日本語翻訳ファイルを使用
- * 
- * 注：Minecraft公式のTextComponentを使用する場合、プレイヤーに送信する際に自動翻訳されます。
- * ここでは、サーバーメッセージ用に日本語翻訳ファイルを使用します。
+ * 優先順位：
+ * 1. Minecraft公式翻訳キー（entity.minecraft.*, block.minecraft.*, item.minecraft.*）
+ * 2. カスタム翻訳ファイル（lang/ja_JP.yml）
+ * 3. キャメルケース形式へのフォールバック
  */
 class EntityBlockTranslator(
     private val messageProvider: MessageProvider
 ) {
     
     /**
-     * モブ名を翻訳（サーバーメッセージ用）
+     * モブ名を翻訳
+     * Minecraft公式翻訳を優先的に使用
      * @param entityType モブのタイプ名（大文字）例: "ZOMBIE", "SKELETON"
      * @return 翻訳されたモブ名
      */
     fun translateEntity(entityType: String): String {
         val key = entityType.lowercase()
         
-        // ローカライズファイルから翻訳を取得
-        val customMessage = messageProvider.getMessage("entity.$key")
-        
-        // 翻訳が見つかった場合はそれを使用
+        // 1. カスタム翻訳を確認（Minecraftの公式翻訳がない場合のオーバーライド）
+        val customKey = "custom.entity.$key"
+        val customMessage = messageProvider.getMessage(customKey)
         if (!customMessage.startsWith("§c[Missing:")) {
             return customMessage
         }
         
-        // 翻訳がない場合は、キャメルケース形式にフォールバック
+        // 2. Minecraft公式翻訳キーを文字列で返す
+        // （実際の翻訳はプレイヤーに送信する時にComponent形式で行う）
+        val minecraftKey = "entity.minecraft.$key"
+        
+        // 3. キャメルケース形式にフォールバック
         return formatName(key)
     }
     
     /**
-     * ブロック名を翻訳（サーバーメッセージ用）
+     * ブロック名を翻訳
+     * Minecraft公式翻訳を優先的に使用
      * @param blockType ブロックのタイプ名（大文字か小文字）例: "DIAMOND_ORE", "diamond_ore"
      * @return 翻訳されたブロック名
      */
     fun translateBlock(blockType: String): String {
         val key = blockType.lowercase()
         
-        // ローカライズファイルから翻訳を取得
-        val customMessage = messageProvider.getMessage("block.$key")
-        
-        // 翻訳が見つかった場合はそれを使用
+        // 1. カスタム翻訳を確認
+        val customKey = "custom.block.$key"
+        val customMessage = messageProvider.getMessage(customKey)
         if (!customMessage.startsWith("§c[Missing:")) {
             return customMessage
         }
         
-        // 翻訳がない場合は、キャメルケース形式にフォールバック
+        // 2. Minecraft公式翻訳キーを文字列で返す
+        val minecraftKey = "block.minecraft.$key"
+        
+        // 3. キャメルケース形式にフォールバック
         return formatName(key)
     }
     
     /**
-     * アイテム名を翻訳（サーバーメッセージ用）
+     * アイテム名を翻訳
+     * Minecraft公式翻訳を優先的に使用
      * @param itemName アイテムの名前（大文字か小文字）例: "OBSIDIAN", "obsidian"
      * @return 翻訳されたアイテム名
      */
     fun translateItem(itemName: String): String {
         val key = itemName.lowercase()
-        val translationKey = "item.$key"
         
-        // ローカライズファイルから翻訳を取得
-        val customMessage = messageProvider.getMessage(translationKey)
-        
-        // 翻訳が見つかった場合はそれを使用
+        // 1. カスタム翻訳を確認
+        val customKey = "custom.item.$key"
+        val customMessage = messageProvider.getMessage(customKey)
         if (!customMessage.startsWith("§c[Missing:")) {
             return customMessage
         }
         
-        // デバッグ：翻訳がない場合はログを出力
-        // println("DEBUG translateItem: key=$translationKey, result=$customMessage")
+        // 2. Minecraft公式翻訳キーを文字列で返す
+        val minecraftKey = "item.minecraft.$key"
         
-        // 翻訳がない場合は、キャメルケース形式にフォールバック
+        // 3. キャメルケース形式にフォールバック
+        return formatName(key)
+    }
+    
+    /**
+     * ボス名を翻訳
+     * Minecraft公式翻訳を優先的に使用（ボスはminecraft:entityに含まれる）
+     * @param bossType ボスのタイプ名（大文字か小文字）例: "ENDER_DRAGON", "ender_dragon"
+     * @return 翻訳されたボス名
+     */
+    fun translateBoss(bossType: String): String {
+        val key = bossType.lowercase()
+        
+        // 1. カスタム翻訳を確認
+        val customKey = "custom.boss.$key"
+        val customMessage = messageProvider.getMessage(customKey)
+        if (!customMessage.startsWith("§c[Missing:")) {
+            return customMessage
+        }
+        
+        // 2. Minecraft公式翻訳キーを文字列で返す（ボスもエンティティ）
+        val minecraftKey = "entity.minecraft.$key"
+        
+        // 3. キャメルケース形式にフォールバック
         return formatName(key)
     }
     
