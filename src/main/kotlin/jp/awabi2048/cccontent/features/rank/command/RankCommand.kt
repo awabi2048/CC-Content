@@ -11,6 +11,7 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
+import net.kyori.adventure.text.Component
 
 /**
  * ランクシステムのデバッグコマンド実装
@@ -334,9 +335,15 @@ class RankCommand(
             val progress_count = minOf(current, required)
             val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
             val status = if (current >= required) "§a✓" else "§c✗"
-            // translator が存在する場合は翻訳、ない場合はそのまま表示
-            val mobName = translator?.translateEntity(mobType) ?: mobType
-            sender.sendMessage("$status $mobName 討伐: $current/$required ($percent%)")
+            
+            // 翻訳キーを取得
+            val translationKey = translator?.translateEntity(mobType) ?: mobType
+            
+            // Component形式でメッセージを構築
+            val messageComponent = Component.text("$status ")
+                .append(Component.translatable(translationKey))
+                .append(Component.text(" 討伐: $current/$required ($percent%)"))
+            sender.sendMessage(messageComponent)
         }
         
         // ブロック採掘
@@ -345,11 +352,15 @@ class RankCommand(
             val progress_count = minOf(current, required)
             val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
             val status = if (current >= required) "§a✓" else "§c✗"
-            // translator が存在する場合は翻訳、ない場合はそのまま表示
-            val blockName = translator?.translateBlock(blockType) ?: blockType
-            sender.sendMessage("$status $blockName 採掘: $current/$required ($percent%)")
-            // デバッグログ
-            CCContent.instance.logger.info("DEBUG: blockType=$blockType, blockName=$blockName, current=$current, required=$required")
+            
+            // 翻訳キーを取得
+            val translationKey = translator?.translateBlock(blockType) ?: blockType
+            
+            // Component形式でメッセージを構築
+            val messageComponent = Component.text("$status ")
+                .append(Component.translatable(translationKey))
+                .append(Component.text(" 採掘: $current/$required ($percent%)"))
+            sender.sendMessage(messageComponent)
         }
         
         // バニラEXP
@@ -366,11 +377,15 @@ class RankCommand(
             val progress_count = minOf(current, required)
             val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
             val status = if (current >= required) "§a✓" else "§c✗"
-            // translator が存在する場合は翻訳、ない場合はそのまま表示
-            val itemName = translator?.translateItem(material) ?: material
-            sender.sendMessage("$status $itemName 所持: $current/$required ($percent%)")
-            // デバッグログ
-            CCContent.instance.logger.info("DEBUG: itemName=$material, translated=$itemName, current=$current, required=$required")
+            
+            // 翻訳キーを取得
+            val translationKey = translator?.translateItem(material) ?: material
+            
+            // Component形式でメッセージを構築
+            val messageComponent = Component.text("$status ")
+                .append(Component.translatable(translationKey))
+                .append(Component.text(" 所持: $current/$required ($percent%)"))
+            sender.sendMessage(messageComponent)
         }
         
         // ボス討伐
@@ -379,11 +394,15 @@ class RankCommand(
             val progress_count = minOf(current, required)
             val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
             val status = if (current >= required) "§a✓" else "§c✗"
-            // translator が存在する場合は翻訳、ない場合はそのまま表示
-            val bossName = translator?.translateBoss(bossType) ?: bossType
-            sender.sendMessage("$status $bossName 討伐: $current/$required ($percent%)")
-            // デバッグログ
-            CCContent.instance.logger.info("DEBUG: bossType=$bossType, translated=$bossName, current=$current, required=$required")
+            
+            // 翻訳キーを取得
+            val translationKey = translator?.translateBoss(bossType) ?: bossType
+            
+            // Component形式でメッセージを構築
+            val messageComponent = Component.text("$status ")
+                .append(Component.translatable(translationKey))
+                .append(Component.text(" 討伐: $current/$required ($percent%)"))
+            sender.sendMessage(messageComponent)
         }
         
         // 全体進捗
