@@ -42,4 +42,11 @@ interface TutorialRankManager {
      * @param rank 設定するランク
      */
     fun setRank(playerUuid: UUID, rank: TutorialRank)
+    
+    /**
+     * タスク完了によるランクアップを実行
+     * @param playerUuid プレイヤーのUUID
+     * @return ランクアップに成功した場合true
+     */
+    fun rankUpByTask(playerUuid: UUID): Boolean
 }

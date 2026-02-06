@@ -34,8 +34,33 @@ class YamlRankStorage(
         // "rank.tutorial"セクションを作成または更新
         val tutorialSection = config.createSection("rank.tutorial")
         tutorialSection.set("currentRank", tutorialRank.currentRank.name)
-        tutorialSection.set("currentExp", tutorialRank.currentExp)
         tutorialSection.set("lastUpdated", tutorialRank.lastUpdated)
+        tutorialSection.set("lastPlayTime", tutorialRank.lastPlayTime)
+        
+        // タスク進捗を保存
+        val taskProgress = tutorialRank.taskProgress
+        tutorialSection.set("taskProgress.playTime", taskProgress.playTime)
+        tutorialSection.set("taskProgress.vanillaExp", taskProgress.vanillaExp)
+        
+        // モブ討伐数
+        taskProgress.mobKills.forEach { (mobType, count) ->
+            tutorialSection.set("taskProgress.mobKills.$mobType", count)
+        }
+        
+        // ブロック採掘数
+        taskProgress.blockMines.forEach { (blockType, count) ->
+            tutorialSection.set("taskProgress.blockMines.$blockType", count)
+        }
+        
+        // ボス討伐数
+        taskProgress.bossKills.forEach { (bossType, count) ->
+            tutorialSection.set("taskProgress.bossKills.$bossType", count)
+        }
+        
+        // アイテム所持数
+        taskProgress.items.forEach { (material, count) ->
+            tutorialSection.set("taskProgress.items.$material", count)
+        }
         
         try {
             config.save(file)
@@ -52,21 +77,58 @@ class YamlRankStorage(
             val config = YamlConfiguration.loadConfiguration(file)
             val tutorialSection = config.getConfigurationSection("rank.tutorial") ?: return null
             
-            val rankName = tutorialSection.getString("currentRank", "VISITOR") ?: "VISITOR"
+            val rankName = tutorialSection.getString("currentRank", "NEWBIE") ?: "NEWBIE"
             val rank = try {
                 TutorialRank.valueOf(rankName)
             } catch (e: IllegalArgumentException) {
-                TutorialRank.VISITOR
+                TutorialRank.NEWBIE
             }
             
-            val currentExp = tutorialSection.getLong("currentExp", 0L)
             val lastUpdated = tutorialSection.getLong("lastUpdated", System.currentTimeMillis())
+            val lastPlayTime = tutorialSection.getLong("lastPlayTime", System.currentTimeMillis())
+            
+            // タスク進捗を読み込み
+            val taskProgress = jp.awabi2048.cccontent.features.rank.tutorial.task.TaskProgress(
+                playerUuid,
+                rank.name,
+                tutorialSection.getLong("taskProgress.playTime", 0L),
+                mutableMapOf(),
+                mutableMapOf(),
+                tutorialSection.getLong("taskProgress.vanillaExp", 0L),
+                mutableMapOf(),
+                mutableMapOf()
+            )
+            
+            // モブ討伐数を読み込み
+            tutorialSection.getConfigurationSection("taskProgress.mobKills")?.getKeys(false)?.forEach { mobType ->
+                val count = tutorialSection.getInt("taskProgress.mobKills.$mobType", 0)
+                taskProgress.mobKills[mobType] = count
+            }
+            
+            // ブロック採掘数を読み込み
+            tutorialSection.getConfigurationSection("taskProgress.blockMines")?.getKeys(false)?.forEach { blockType ->
+                val count = tutorialSection.getInt("taskProgress.blockMines.$blockType", 0)
+                taskProgress.blockMines[blockType] = count
+            }
+            
+            // ボス討伐数を読み込み
+            tutorialSection.getConfigurationSection("taskProgress.bossKills")?.getKeys(false)?.forEach { bossType ->
+                val count = tutorialSection.getInt("taskProgress.bossKills.$bossType", 0)
+                taskProgress.bossKills[bossType] = count
+            }
+            
+            // アイテム所持数を読み込み
+            tutorialSection.getConfigurationSection("taskProgress.items")?.getKeys(false)?.forEach { material ->
+                val count = tutorialSection.getInt("taskProgress.items.$material", 0)
+                taskProgress.items[material] = count
+            }
             
             PlayerTutorialRank(
                 playerUuid,
                 rank,
-                currentExp,
-                lastUpdated
+                taskProgress,
+                lastUpdated,
+                lastPlayTime
             )
         } catch (e: Exception) {
             e.printStackTrace()

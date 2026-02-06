@@ -13,7 +13,8 @@ class TutorialRankUpEvent(
     val player: Player,
     val oldRank: TutorialRank,
     val newRank: TutorialRank,
-    val currentExp: Long
+    @Deprecated("タスクベースのシステムに移行したため使用しません", level = DeprecationLevel.WARNING)
+    val currentExp: Long = 0L
 ) : Event() {
     override fun getHandlers(): HandlerList = Companion.getHandlerList()
     

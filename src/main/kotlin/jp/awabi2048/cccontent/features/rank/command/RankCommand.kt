@@ -261,7 +261,7 @@ class RankCommand(
         
         sender.sendMessage("§6=== ${targetPlayer.name} のランク情報 ===")
         sender.sendMessage("§aチュートリアルランク: ${tutorial.currentRank.name}")
-        sender.sendMessage("§a経験値: ${tutorial.currentExp}/${tutorial.currentRank.requiredExp}")
+        sender.sendMessage("§aランクレベル: ${tutorial.currentRank.level}")
         
         val profession = rankManager.getPlayerProfession(uuid)
         if (profession != null) {

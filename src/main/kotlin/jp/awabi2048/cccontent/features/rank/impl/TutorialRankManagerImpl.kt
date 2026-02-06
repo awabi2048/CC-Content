@@ -33,22 +33,9 @@ class TutorialRankManagerImpl(
     }
     
     override fun addExperience(playerUuid: UUID, amount: Long): Boolean {
-        val tutorial = getPlayerTutorial(playerUuid)
-        val oldRank = tutorial.currentRank
-        
-        val rankChanged = tutorial.addExperience(amount)
-        storage.saveTutorialRank(tutorial)
-        
-        // プレイヤーがオンラインの場合、ランクアップイベントを発火
-        if (rankChanged) {
-            val player = Bukkit.getPlayer(playerUuid)
-            if (player != null) {
-                val event = TutorialRankUpEvent(player, oldRank, tutorial.currentRank, tutorial.currentExp)
-                Bukkit.getPluginManager().callEvent(event)
-            }
-        }
-        
-        return rankChanged
+        // 経験値ベースシステムから移行したため、このメソッドは廃止予定
+        // タスクベースのランクアップに対応させるため、実装なし
+        return false
     }
     
     override fun isAttainer(playerUuid: UUID): Boolean {
@@ -57,10 +44,39 @@ class TutorialRankManagerImpl(
     
     override fun setRank(playerUuid: UUID, rank: TutorialRank) {
         val tutorial = getPlayerTutorial(playerUuid)
+        val oldRank = tutorial.currentRank
         tutorial.currentRank = rank
-        tutorial.currentExp = 0L
         tutorial.lastUpdated = System.currentTimeMillis()
         storage.saveTutorialRank(tutorial)
+        
+        // ランクが変更された場合、イベントを発火
+        if (oldRank != rank) {
+            val player = Bukkit.getPlayer(playerUuid)
+            if (player != null) {
+                val event = TutorialRankUpEvent(player, oldRank, rank)
+                Bukkit.getPluginManager().callEvent(event)
+            }
+        }
+    }
+    
+    /**
+     * タスク完了によるランクアップを実行
+     */
+    override fun rankUpByTask(playerUuid: UUID): Boolean {
+        val tutorial = getPlayerTutorial(playerUuid)
+        val oldRank = tutorial.currentRank
+        
+        if (tutorial.rankUp()) {
+            storage.saveTutorialRank(tutorial)
+            
+            val player = Bukkit.getPlayer(playerUuid)
+            if (player != null) {
+                val event = TutorialRankUpEvent(player, oldRank, tutorial.currentRank)
+                Bukkit.getPluginManager().callEvent(event)
+            }
+            return true
+        }
+        return false
     }
     
     fun saveData() {

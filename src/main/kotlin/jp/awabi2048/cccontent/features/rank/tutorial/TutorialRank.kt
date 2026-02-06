@@ -2,38 +2,48 @@ package jp.awabi2048.cccontent.features.rank.tutorial
 
 /**
  * チュートリアルランクの定義
+ * 
+ * 仕様：タスク完了によるランクアップシステム
+ * - NEWBIE: 初期ランク（プレイ時間 3分）
+ * - VISITOR: 訪問者（複数タスク達成）
+ * - PIONEER: 開拓者（複数タスク達成）
+ * - ADVENTURER: 冒険者（エンダードラゴン討伐）
+ * - ATTAINER: 達成者（最終ランク、職業分岐へ）
  */
 enum class TutorialRank(
     val level: Int,
-    val requiredExp: Long
+    @Deprecated("タスクベースのシステムに移行したため使用しません", level = DeprecationLevel.WARNING)
+    val requiredExp: Long = 0L
 ) {
     /**
-     * 訪問者 - ゲーム開始時のランク
-     * 次のランク: PIONEER
-     * 必要経験値: 100（このランクから次に上がるまでに必要）
+     * 新規プレイヤー - ゲーム開始時のランク
+     * タスク: プレイ時間 3分
      */
-    VISITOR(1, 100L),
+    NEWBIE(0, 0L),
+    
+    /**
+     * 訪問者 - 基本タスクを達成したプレイヤー向け
+     * 次のランク: PIONEER
+     */
+    VISITOR(1, 0L),
     
     /**
      * 開拓者 - 基本を学んだプレイヤー向け
      * 次のランク: ADVENTURER
-     * 必要経験値: 200（このランクから次に上がるまでに必要）
      */
-    PIONEER(2, 200L),
+    PIONEER(2, 0L),
     
     /**
      * 冒険者 - 経験を積んだプレイヤー向け
      * 次のランク: ATTAINER
-     * 必要経験値: 300（このランクから次に上がるまでに必要）
      */
-    ADVENTURER(3, 300L),
+    ADVENTURER(3, 0L),
     
     /**
      * 達成者 - チュートリアル完了、職業選択可能
      * 次のランク: なし（職業分岐へ）
-     * 必要経験値: Long.MAX_VALUE（最終ランク）
      */
-    ATTAINER(4, Long.MAX_VALUE);
+    ATTAINER(4, 0L);
     
     companion object {
         /**

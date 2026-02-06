@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.rank.tutorial
 
+import jp.awabi2048.cccontent.features.rank.tutorial.task.TaskProgress
 import java.util.UUID
 
 /**
@@ -10,56 +11,47 @@ data class PlayerTutorialRank(
     val playerUuid: UUID,
     
     /** 現在のランク */
-    var currentRank: TutorialRank = TutorialRank.VISITOR,
+    var currentRank: TutorialRank = TutorialRank.NEWBIE,
     
-    /** 現在の経験値（次のランクまで） */
-    var currentExp: Long = 0L,
+    /** タスク進捗 */
+    var taskProgress: TaskProgress = TaskProgress(playerUuid, currentRank.name),
     
     /** 最後の更新日時 */
-    var lastUpdated: Long = System.currentTimeMillis()
+    var lastUpdated: Long = System.currentTimeMillis(),
+    
+    /** サーバーにログインした時刻（プレイ時間計算用） */
+    var lastPlayTime: Long = System.currentTimeMillis()
 ) {
     /**
-     * 経験値を追加してランクアップ判定を実行
-     * @param amount 追加する経験値
-     * @return ランクアップした場合true
+     * ランクアップを実行
+     * @return ランクアップに成功した場合true
      */
-    fun addExperience(amount: Long): Boolean {
+    fun rankUp(): Boolean {
         if (currentRank == TutorialRank.ATTAINER) {
             return false  // 最終ランクではランクアップしない
         }
         
-        currentExp += amount
-        lastUpdated = System.currentTimeMillis()
-        
-        // ランクアップ判定（1回のみ）
-        if (currentExp >= currentRank.requiredExp) {
-            val nextRank = TutorialRank.values().getOrNull(currentRank.ordinal + 1)
-            if (nextRank != null) {
-                currentExp = 0L  // 経験値をリセット
-                currentRank = nextRank
-                return true
-            }
+        val nextRank = TutorialRank.values().getOrNull(currentRank.ordinal + 1)
+        if (nextRank != null) {
+            currentRank = nextRank
+            taskProgress = TaskProgress(playerUuid, nextRank.name)  // 新しいランクのタスク進捗を初期化
+            lastUpdated = System.currentTimeMillis()
+            return true
         }
         return false
     }
     
     /**
-     * 次のランクに必要な経験値を取得
-     * @return 必要な経験値量
+     * 次のランクを取得
      */
-    fun getRequiredExpForNextRank(): Long {
-        return currentRank.requiredExp
+    fun getNextRank(): TutorialRank? {
+        return TutorialRank.values().getOrNull(currentRank.ordinal + 1)
     }
     
     /**
-     * 次のランクまでの進捗度を取得（0.0～1.0）
-     * @return 進捗度
+     * 最終ランクに到達しているか
      */
-    fun getProgress(): Double {
-        if (currentRank == TutorialRank.ATTAINER) {
-            return 1.0
-        }
-        val required = currentRank.requiredExp
-        return if (required <= 0) 1.0 else (currentExp.toDouble() / required.toDouble()).coerceIn(0.0, 1.0)
+    fun isMaxRank(): Boolean {
+        return currentRank == TutorialRank.ATTAINER
     }
 }

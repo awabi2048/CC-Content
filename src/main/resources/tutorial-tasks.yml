@@ -1,0 +1,51 @@
+# チュートリアルランク タスク要件設定ファイル
+
+settings:
+  # 既存プレイヤーを Newbie にリセットするか
+  reset_existing_players: false
+
+tutorial_ranks:
+  newbie:
+    displayName: "§eNewbie"
+    level: 0
+    requirements:
+      play_time_min: 3
+  
+  visitor:
+    displayName: "§eVisitor"
+    level: 1
+    requirements:
+      play_time_min: 120
+      kill_mobs:
+        zombie: 10
+        skeleton: 5
+      items:
+        obsidian: 10
+        flint: 1
+        steel: 1
+  
+  pioneer:
+    displayName: "§aPioneer"
+    level: 2
+    requirements:
+      play_time_min: 1440
+      kill_mobs:
+        enderman: 12
+      mine_blocks:
+        diamond_ore: 8
+        deepslate_diamond_ore: 8
+      vanilla_exp: 350
+      items:
+        ender_eye: 12
+  
+  adventurer:
+    displayName: "§bAdventurer"
+    level: 3
+    requirements:
+      kill_boss:
+        ender_dragon: 1
+  
+  attainer:
+    displayName: "§dAttainer"
+    level: 4
+    requirements: {}
