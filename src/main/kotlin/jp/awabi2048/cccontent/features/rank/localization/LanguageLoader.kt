@@ -76,8 +76,18 @@ class LanguageLoader(
      * メッセージを取得
      */
     fun getMessage(key: String, vararg args: Any?): String {
-        val template = languageData[key] ?: return "§c[Missing: $key]"
-        var result = template
+        val template = languageData[key]
+        if (template == null) {
+            // デバッグログ：見つからないキーを記録
+            plugin.logger.warning("翻訳キーが見つかりません: $key (全キー数: ${languageData.size})")
+            // キーの接頭辞別に存在するキーを表示
+            if (key.startsWith("item.")) {
+                val itemKeys = languageData.keys.filter { it.startsWith("item.") }
+                plugin.logger.warning("  利用可能なアイテムキー: $itemKeys")
+            }
+            return "§c[Missing: $key]"
+        }
+        var result: String = template
         args.forEachIndexed { index, arg ->
             result = result.replace("%${index + 1}\$s", arg?.toString() ?: "null")
             result = result.replace("%s", arg?.toString() ?: "null")
