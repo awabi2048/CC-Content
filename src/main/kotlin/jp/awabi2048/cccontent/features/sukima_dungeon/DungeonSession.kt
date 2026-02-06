@@ -20,6 +20,7 @@ data class DungeonSession(
     val gridWidth: Int,
     val gridLength: Int,
     val worldName: String,
+    val escapeLocation: Location? = null, // 脱出地点
     
     // マーカー情報
     val minibossMarkers: List<Location> = emptyList(),
@@ -85,13 +86,22 @@ data class DungeonSession(
         return String.format("%02d:%02d", minutes, secs)
     }
     
-    /**
-     * 残り時間をMM:SS形式で取得
-     */
-    fun getRemainingFormatted(): String {
-        val remaining = getRemainingTime() / 1000
-        val minutes = (remaining / 60).toInt()
-        val secs = (remaining % 60).toInt()
-        return String.format("%02d:%02d", minutes, secs)
-    }
-}
+     /**
+      * 残り時間をMM:SS形式で取得
+      */
+     fun getRemainingFormatted(): String {
+         val remaining = getRemainingTime() / 1000
+         val minutes = (remaining / 60).toInt()
+         val secs = (remaining % 60).toInt()
+         return String.format("%02d:%02d", minutes, secs)
+     }
+     
+     /**
+      * 経過時間を取得（ミリ秒）
+      */
+     fun getElapsed(): Long {
+         return elapsedMillis
+     }
+     
+
+ }

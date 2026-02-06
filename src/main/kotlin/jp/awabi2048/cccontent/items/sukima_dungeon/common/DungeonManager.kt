@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.items.sukima_dungeon.common
 
+import jp.awabi2048.cccontent.features.sukima_dungeon.DungeonSessionManager
+import jp.awabi2048.cccontent.items.sukima_dungeon.DungeonTier
 import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.Material
@@ -16,7 +18,8 @@ import java.util.UUID
  */
 class DungeonManager(
     private val plugin: JavaPlugin,
-    private val configManager: ConfigManager
+    private val configManager: ConfigManager,
+    private var sessionManager: DungeonSessionManager? = null
 ) {
     // ワールドの芽の位置を記録
     private val sproutLocations: MutableSet<Location> = mutableSetOf()
@@ -26,6 +29,13 @@ class DungeonManager(
     
     // プレイヤーのダンジョン入場記録
     private val playersInDungeon: MutableSet<UUID> = mutableSetOf()
+    
+    /**
+     * セッションマネージャーを設定
+     */
+    fun setSessionManager(manager: DungeonSessionManager) {
+        this.sessionManager = manager
+    }
     
     /**
      * プレイヤーがダンジョン内にいるかを判定
@@ -318,5 +328,47 @@ class DungeonManager(
         } catch (e: Exception) {
             plugin.logger.warning("[SukimaDungeon] 脱出処理中にエラー: ${e.message}")
         }
+    }
+    
+    /**
+     * ダンジョンセッションを開始
+     * @param player プレイヤー
+     * @param tier ブックマークティア
+     * @param theme テーマ名
+     * @param size サイズ名
+     * @param worldName ダンジョンワールド名
+     */
+    fun startDungeonSession(
+        player: Player,
+        tier: String,
+        theme: String,
+        size: String,
+        worldName: String
+    ) {
+        val sessionManager = sessionManager ?: return
+        
+        // サイズ設定を取得
+        val sizeConfig = configManager.getDungeonSizeConfig(size) ?: return
+        
+        // ティア列挙型に変換
+        val tierEnum = try {
+            DungeonTier.valueOf(tier.uppercase())
+        } catch (e: IllegalArgumentException) {
+            DungeonTier.BROKEN
+        }
+        
+        // セッションを開始
+        sessionManager.startSession(
+            player,
+            tierEnum,
+            theme,
+            size,
+            sizeConfig.duration,
+            sizeConfig.sproutBaseCount,
+            worldName,
+            configManager.escapeLocation
+        )
+        
+        plugin.logger.info("[SukimaDungeon] ${player.name} がダンジョンセッションを開始しました")
     }
 }

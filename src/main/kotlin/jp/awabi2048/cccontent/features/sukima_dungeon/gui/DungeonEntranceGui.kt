@@ -1,6 +1,8 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon.gui
 
 import jp.awabi2048.cccontent.items.sukima_dungeon.common.ConfigManager
+import jp.awabi2048.cccontent.items.sukima_dungeon.common.DungeonManager
+import jp.awabi2048.cccontent.items.sukima_dungeon.common.MessageManager
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -15,7 +17,9 @@ import java.util.*
 class DungeonEntranceGui(
     private val plugin: JavaPlugin,
     private val guiManager: GuiManager,
-    private val configManager: ConfigManager
+    private val configManager: ConfigManager,
+    private val dungeonManager: DungeonManager,
+    private val messageManager: MessageManager
 ) {
     // プレイヤーの選択を一時保存
     private val playerSelections: MutableMap<UUID, GuiSelection> = mutableMapOf()
@@ -332,12 +336,13 @@ class DungeonEntranceGui(
             
             player.closeInventory()
             
-            // ここからダンジョン開始処理（別途実装）
-            player.sendMessage("§aダンジョンを開始します...")
-            player.sendMessage("§fテーマ: §e${configManager.getDungeonThemeConfig(theme)?.displayName}")
-            player.sendMessage("§fサイズ: §e${size.uppercase()}")
-            
-            // TODO: startDungeon(player, theme, size)
+            try {
+                startDungeon(player, selection.selectedTier, theme, size)
+            } catch (e: Exception) {
+                messageManager.sendError(player, "ダンジョンの開始に失敗しました")
+                plugin.logger.warning("[SukimaDungeon] ダンジョン開始エラー: ${e.message}")
+                e.printStackTrace()
+            }
             
             playerSelections.remove(player.uniqueId)
             return true
@@ -378,5 +383,56 @@ class DungeonEntranceGui(
      */
     fun cleanup() {
         playerSelections.clear()
+    }
+    
+    /**
+     * ダンジョンを開始
+     * @param player プレイヤー
+     * @param tier ブックマークティア
+     * @param theme テーマ名
+     * @param size サイズ名
+     */
+    private fun startDungeon(player: Player, tier: String, theme: String, size: String) {
+        // サイズ設定を取得
+        val sizeConfig = configManager.getDungeonSizeConfig(size)
+            ?: throw Exception("サイズ設定が見つかりません: $size")
+        
+        // ダンジョン開始メッセージ
+        messageManager.send(player, "§a§lダンジョンを開始します!")
+        messageManager.send(player, "§fテーマ: §e${configManager.getDungeonThemeConfig(theme)?.displayName}")
+        messageManager.send(player, "§fサイズ: §e${size.uppercase()}")
+        messageManager.send(player, "§f制限時間: §e${sizeConfig.duration / 60}分")
+        messageManager.send(player, "§fワールドの芽: §e${sizeConfig.sproutBaseCount}個")
+        
+        // ダンジョンワールドを作成
+        // サイズからグリッドサイズを計算（実装簡略化のため固定値）
+        val gridWidth = sizeConfig.tiles
+        val gridLength = sizeConfig.tiles
+        
+        val dungeonWorld = dungeonManager.createDungeonWorld(
+            theme,
+            gridWidth,
+            gridLength
+        )
+        
+        if (dungeonWorld == null) {
+            messageManager.sendError(player, "ダンジョンワールドの生成に失敗しました")
+            return
+        }
+        
+        // プレイヤーをダンジョン進入地点にテレポート
+        val entranceLocation = dungeonWorld.spawnLocation.add(0.5, 1.0, 0.5)
+        player.teleport(entranceLocation)
+        
+        // セッションを開始
+        dungeonManager.startDungeonSession(
+            player,
+            tier,
+            theme,
+            size,
+            dungeonWorld.name
+        )
+        
+        messageManager.sendActionBar(player, "§eダンジョンに進入しました")
     }
 }

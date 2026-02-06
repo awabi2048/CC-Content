@@ -15,6 +15,8 @@ import jp.awabi2048.cccontent.items.sukima_dungeon.common.LangManager
 import jp.awabi2048.cccontent.items.sukima_dungeon.common.MessageManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.gui.GuiManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.gui.DungeonEntranceGui
+import jp.awabi2048.cccontent.features.sukima_dungeon.DungeonSessionManager
+import jp.awabi2048.cccontent.features.sukima_dungeon.DungeonTimerTask
 import jp.awabi2048.cccontent.items.arena.*
 import jp.awabi2048.cccontent.features.arena.ArenaItemListener
 import jp.awabi2048.cccontent.features.rank.RankManager
@@ -39,9 +41,10 @@ class CCContent : JavaPlugin() {
             private set
     }
     
-    private var playTimeTrackerTaskId: Int = -1
-    
-     // SukimaDungeon マネージャー
+     private var playTimeTrackerTaskId: Int = -1
+     private var sukimaDungeonTimerTaskId: Int = -1
+     
+      // SukimaDungeon マネージャー
      private lateinit var sukimaConfigManager: ConfigManager
      private lateinit var sukimaDungeonManager: DungeonManager
      private lateinit var sukimaLangManager: LangManager
@@ -49,11 +52,12 @@ class CCContent : JavaPlugin() {
      private lateinit var sukimaGuiManager: GuiManager
      private lateinit var sukimaEntranceGui: DungeonEntranceGui
      private lateinit var sukimaCompassListener: CompassListener
-     private lateinit var sukimaTalismanListener: TalismanListener
-     private lateinit var sukimaSproutHarvestListener: SproutHarvestListener
-     private lateinit var sukimaEntranceListener: EntranceListener
-    
-    override fun onEnable() {
+      private lateinit var sukimaTalismanListener: TalismanListener
+      private lateinit var sukimaSproutHarvestListener: SproutHarvestListener
+      private lateinit var sukimaEntranceListener: EntranceListener
+      private lateinit var sukimaDungeonTimerTask: DungeonTimerTask
+     
+     override fun onEnable() {
         instance = this
         
         // ロガーをCustomItemManagerに設定
@@ -412,12 +416,14 @@ class CCContent : JavaPlugin() {
              // GUI マネージャーを初期化
              sukimaGuiManager = GuiManager()
              
-             // GUI を初期化
-             sukimaEntranceGui = DungeonEntranceGui(
-                 this,
-                 sukimaGuiManager,
-                 sukimaConfigManager
-             )
+              // GUI を初期化
+              sukimaEntranceGui = DungeonEntranceGui(
+                  this,
+                  sukimaGuiManager,
+                  sukimaConfigManager,
+                  sukimaDungeonManager,
+                  sukimaMessageManager
+              )
              
              // リスナーを初期化
              sukimaCompassListener = CompassListener(
@@ -445,16 +451,27 @@ class CCContent : JavaPlugin() {
                  sukimaEntranceGui
              )
              
-             // リスナーを登録
-             server.pluginManager.registerEvents(sukimaCompassListener, this)
-             server.pluginManager.registerEvents(sukimaTalismanListener, this)
-             server.pluginManager.registerEvents(sukimaSproutHarvestListener, this)
-             server.pluginManager.registerEvents(sukimaEntranceListener, this)
-            
-            // 定期的なクリーンアップタスクを開始（5分ごと）
-            server.scheduler.runTaskTimer(this, Runnable {
-                sukimaDungeonManager.cleanup()
-            }, 0L, 6000L)
+              // セッションマネージャーを設定
+              sukimaDungeonManager.setSessionManager(DungeonSessionManager)
+              
+              // ダンジョンタイマータスクを初期化して開始
+              sukimaDungeonTimerTask = DungeonTimerTask(
+                  this,
+                  DungeonSessionManager,
+                  sukimaMessageManager
+              )
+              sukimaDungeonTimerTaskId = sukimaDungeonTimerTask.start()
+              
+              // リスナーを登録
+              server.pluginManager.registerEvents(sukimaCompassListener, this)
+              server.pluginManager.registerEvents(sukimaTalismanListener, this)
+              server.pluginManager.registerEvents(sukimaSproutHarvestListener, this)
+              server.pluginManager.registerEvents(sukimaEntranceListener, this)
+             
+             // 定期的なクリーンアップタスクを開始（5分ごと）
+             server.scheduler.runTaskTimer(this, Runnable {
+                 sukimaDungeonManager.cleanup()
+             }, 0L, 6000L)
             
             logger.info("[SukimaDungeon] マネージャーとリスナーを初期化しました")
         } catch (e: Exception) {
@@ -464,22 +481,35 @@ class CCContent : JavaPlugin() {
     }
     
     override fun onDisable() {
-        // SukimaDungeon クリーンアップ
-        try {
-            if (::sukimaCompassListener.isInitialized) {
-                sukimaCompassListener.cleanup()
-            }
-            if (::sukimaDungeonManager.isInitialized) {
-                sukimaDungeonManager.clearAll()
-            }
-        } catch (e: Exception) {
-            logger.warning("[SukimaDungeon] クリーンアップ中にエラーが発生しました: ${e.message}")
-        }
-        
-        // プレイ時間トラッカータスクを停止
-        if (playTimeTrackerTaskId != -1) {
-            server.scheduler.cancelTask(playTimeTrackerTaskId)
-        }
+         // SukimaDungeon クリーンアップ
+         try {
+             if (::sukimaCompassListener.isInitialized) {
+                 sukimaCompassListener.cleanup()
+             }
+             if (::sukimaDungeonManager.isInitialized) {
+                 sukimaDungeonManager.clearAll()
+             }
+             if (::sukimaEntranceGui.isInitialized) {
+                 sukimaEntranceGui.cleanup()
+             }
+             if (::sukimaDungeonTimerTask.isInitialized) {
+                 sukimaDungeonTimerTask.stop()
+             }
+             // セッション情報をクリア
+             DungeonSessionManager.clearAllSessions()
+         } catch (e: Exception) {
+             logger.warning("[SukimaDungeon] クリーンアップ中にエラーが発生しました: ${e.message}")
+         }
+         
+         // プレイ時間トラッカータスクを停止
+         if (playTimeTrackerTaskId != -1) {
+             server.scheduler.cancelTask(playTimeTrackerTaskId)
+         }
+         
+         // ダンジョンタイマータスクを停止
+         if (sukimaDungeonTimerTaskId != -1) {
+             server.scheduler.cancelTask(sukimaDungeonTimerTaskId)
+         }
         logger.info("CC-Content v${description.version} が無効化されました")
     }
 }
