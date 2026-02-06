@@ -255,7 +255,9 @@ class CCContent : JavaPlugin() {
         
         // SukimaDungeon アイテム
         CustomItemManager.register(SproutItem())
-        CustomItemManager.register(CompassItem())
+        CustomItemManager.register(CompassTier1Item())
+        CustomItemManager.register(CompassTier2Item())
+        CustomItemManager.register(CompassTier3Item())
         CustomItemManager.register(TalismanItem())
         
         // Arena アイテム

@@ -9,7 +9,7 @@ import org.bukkit.event.inventory.InventoryClickEvent
 
 /**
  * SukimaDungeon アイテムのイベント処理
- * 各アイテムの機能はPhase 4で詳細実装予定
+ * 各アイテムの機能詳細実装は Phase 5-2 以降で行う
  */
 class SukimaItemListener : Listener {
     
@@ -25,7 +25,9 @@ class SukimaItemListener : Listener {
         // アイテムの種類による処理（スタブ）
         when (customItem.id) {
             "sprout" -> handleSprout(player, event)
-            "compass" -> handleCompass(player, event)
+            "compass_tier1" -> handleCompass(player, event, 1)
+            "compass_tier2" -> handleCompass(player, event, 2)
+            "compass_tier3" -> handleCompass(player, event, 3)
             "talisman" -> handleTalisman(player, event)
         }
     }
@@ -42,16 +44,17 @@ class SukimaItemListener : Listener {
     
     private fun handleSprout(player: Player, event: PlayerInteractEvent) {
         // TODO: スプラウトのハンドリング
-        // ダンジョン内の成長プロセス
+        // ダンジョン内で MANGROVE_PROPAGULE ブロックを破壊
     }
     
-    private fun handleCompass(player: Player, event: PlayerInteractEvent) {
+    private fun handleCompass(player: Player, event: PlayerInteractEvent, tier: Int) {
         // TODO: コンパスのハンドリング
-        // ダンジョン内の方向指示
+        // Shift 長押しで探知開始
+        // Tier ごとにパラメータが異なる
     }
     
     private fun handleTalisman(player: Player, event: PlayerInteractEvent) {
         // TODO: タリスマンのハンドリング
-        // おあげちゃんの力
+        // 右クリックで脱出確認 GUI を表示
     }
 }
