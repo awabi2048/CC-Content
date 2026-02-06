@@ -130,47 +130,47 @@ class PlayerRankUpEvent(
 
 ### ストレージ実装
 
-#### JsonRankStorage
-JSON形式でランクデータを保存します。
+#### YamlRankStorage
+YAML形式でランクデータを保存します。既存の`playerdata/<uuid>.yml`ファイル内の`rank`セクションにランク情報を格納します。
 
 **ファイル構造:**
 ```
-plugins/CC-Content/data/ranks/
-  ├── {uuid1}.json
-  ├── {uuid2}.json
+plugins/CC-Content/playerdata/
+  ├── {uuid1}.yml
+  ├── {uuid2}.yml
   └── ...
 ```
 
-**JSONフォーマット:**
-```json
-{
-  "playerUuid": "550e8400-e29b-41d4-a716-446655440000",
-  "ranks": {
-    "ARENA": {
-      "score": 5000,
-      "tier": "SILVER_I",
-      "lastUpdated": 1643000000000
-    },
-    "SUKIMA_DUNGEON": {
-      "score": 3000,
-      "tier": "BRONZE_III",
-      "lastUpdated": 1643000000000
-    },
-    "CUSTOM_ITEM": {
-      "score": 0,
-      "tier": "BRONZE_I",
-      "lastUpdated": 1643000000000
-    }
-  }
-}
+**YAMLフォーマット:**
+```yaml
+# playerdata/550e8400-e29b-41d4-a716-446655440000.yml
+rank:
+  ARENA:
+    score: 5000
+    tier: SILVER_I
+    lastUpdated: 1643000000000
+  SUKIMA_DUNGEON:
+    score: 3000
+    tier: BRONZE_III
+    lastUpdated: 1643000000000
+  CUSTOM_ITEM:
+    score: 0
+    tier: BRONZE_I
+    lastUpdated: 1643000000000
 ```
+
+**特徴:**
+- プレイヤーの他のデータと同じファイルで管理
+- BukkitのYamlConfiguration APIで簡単に扱える
+- 既存のplayerdataシステムとの統合が容易
+- ファイルフォーマットが人間が読みやすい
 
 ## 使用方法
 
 ### 1. RankManagerの初期化
 
 ```kotlin
-val storage = JsonRankStorage(dataDirectory)
+val storage = YamlRankStorage(plugin.dataFolder)
 val rankManager = RankManagerImpl(storage)
 ```
 
