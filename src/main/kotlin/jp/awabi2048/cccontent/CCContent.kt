@@ -44,11 +44,11 @@ class CCContent : JavaPlugin() {
         // GulliverLight設定の初期化
         GulliverConfig.initialize(this)
         
+        // アリーナシステムの初期化（アイテム登録前に設定ファイルを読み込む）
+        ArenaMain.initialize(this)
+        
         // アイテム登録
         registerCustomItems()
-        
-        // アリーナシステムの初期化
-        ArenaMain.initialize(this)
         
         // ランクシステムの初期化
         initializeRankSystem()
@@ -256,12 +256,19 @@ class CCContent : JavaPlugin() {
         CustomItemManager.register(BigLight())
         CustomItemManager.register(SmallLight())
         
-        // KotaArena アイテム
+        // KotaArena アイテム（既存）
         CustomItemManager.register(SoulBottleItem())
         CustomItemManager.register(BoosterItem())
         CustomItemManager.register(MobDropSackItem())
         CustomItemManager.register(HunterTalismanItem())
         CustomItemManager.register(GolemTalismanItem())
+        
+        // KotaArena アイテム（新規）
+        CustomItemManager.register(TicketNormalItem())
+        CustomItemManager.register(TicketBossItem())
+        CustomItemManager.register(TicketQuickItem())
+        CustomItemManager.register(SoulFragmentItem())
+        CustomItemManager.register(QuestTicketItem())
         
         // SukimaDungeon アイテム
         CustomItemManager.register(SproutItem())

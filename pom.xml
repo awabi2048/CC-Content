@@ -75,22 +75,41 @@
                     <target>21</target>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.5.3</version>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
+             <plugin>
+                 <groupId>org.apache.maven.plugins</groupId>
+                 <artifactId>maven-shade-plugin</artifactId>
+                 <version>3.5.3</version>
+                 <executions>
+                     <execution>
+                         <phase>package</phase>
+                         <goals>
+                             <goal>shade</goal>
+                         </goals>
+                         <configuration>
+                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                         </configuration>
+                     </execution>
+                 </executions>
+             </plugin>
+             <plugin>
+                 <groupId>org.apache.maven.plugins</groupId>
+                 <artifactId>maven-antrun-plugin</artifactId>
+                 <version>3.1.0</version>
+                 <executions>
+                     <execution>
+                         <phase>install</phase>
+                         <goals>
+                             <goal>run</goal>
+                         </goals>
+                         <configuration>
+                             <target>
+                                 <copy file="${project.build.directory}/${project.build.finalName}.jar" todir="D:\Minecraft\Chiyogami 1.21.8\plugins\" overwrite="true"/>
+                                 <echo message="ビルド成果物を配置しました: D:\Minecraft\Chiyogami 1.21.8\plugins\${project.build.finalName}.jar"/>
+                             </target>
+                         </configuration>
+                     </execution>
+                 </executions>
+             </plugin>
         </plugins>
         <resources>
             <resource>
