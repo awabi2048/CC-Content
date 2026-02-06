@@ -6,90 +6,62 @@ import net.kyori.adventure.text.Component
 
 /**
  * モブやブロックの名前をプレイヤーの言語に翻訳するヘルパークラス
- * ローカルな日本語翻訳ファイルを使用
+ * 
+ * 優先順位：
+ * 1. Minecraft公式翻訳キー（entity.minecraft.*, block.minecraft.*, item.minecraft.*）
+ *    - Component.translatable() で返す（クライアント側で自動翻訳）
+ * 2. キャメルケース形式へのフォールバック
  */
 class EntityBlockTranslator(
     private val messageProvider: MessageProvider
 ) {
     
     /**
-     * モブ名を翻訳（サーバーメッセージ用）
+     * モブ名を翻訳キーで返す
+     * Component.translatable() でラップするとクライアント側で自動翻訳される
      * @param entityType モブのタイプ名（大文字）例: "ZOMBIE", "SKELETON"
-     * @return 翻訳されたモブ名
+     * @return 翻訳キー（形式: "entity.minecraft.zombie"）
      */
     fun translateEntity(entityType: String): String {
         val key = entityType.lowercase()
-        
-        // ローカライズファイルから翻訳を取得
-        val customMessage = messageProvider.getMessage("entity.$key")
-        
-        // 翻訳が見つかった場合はそれを使用
-        if (!customMessage.startsWith("§c[Missing:")) {
-            return customMessage
-        }
-        
-        // 翻訳がない場合は、キャメルケース形式にフォールバック
-        return formatName(key)
+        // Minecraft公式翻訳キーを返す
+        return "entity.minecraft.$key"
     }
     
     /**
-     * ブロック名を翻訳（サーバーメッセージ用）
+     * ブロック名を翻訳キーで返す
+     * Component.translatable() でラップするとクライアント側で自動翻訳される
      * @param blockType ブロックのタイプ名（大文字か小文字）例: "DIAMOND_ORE", "diamond_ore"
-     * @return 翻訳されたブロック名
+     * @return 翻訳キー（形式: "block.minecraft.diamond_ore"）
      */
     fun translateBlock(blockType: String): String {
         val key = blockType.lowercase()
-        
-        // ローカライズファイルから翻訳を取得
-        val customMessage = messageProvider.getMessage("block.$key")
-        
-        // 翻訳が見つかった場合はそれを使用
-        if (!customMessage.startsWith("§c[Missing:")) {
-            return customMessage
-        }
-        
-        // 翻訳がない場合は、キャメルケース形式にフォールバック
-        return formatName(key)
+        // Minecraft公式翻訳キーを返す
+        return "block.minecraft.$key"
     }
     
     /**
-     * アイテム名を翻訳（サーバーメッセージ用）
+     * アイテム名を翻訳キーで返す
+     * Component.translatable() でラップするとクライアント側で自動翻訳される
      * @param itemName アイテムの名前（大文字か小文字）例: "OBSIDIAN", "obsidian"
-     * @return 翻訳されたアイテム名
+     * @return 翻訳キー（形式: "item.minecraft.obsidian"）
      */
     fun translateItem(itemName: String): String {
         val key = itemName.lowercase()
-        
-        // ローカライズファイルから翻訳を取得
-        val customMessage = messageProvider.getMessage("item.$key")
-        
-        // 翻訳が見つかった場合はそれを使用
-        if (!customMessage.startsWith("§c[Missing:")) {
-            return customMessage
-        }
-        
-        // 翻訳がない場合は、キャメルケース形式にフォールバック
-        return formatName(key)
+        // Minecraft公式翻訳キーを返す
+        return "item.minecraft.$key"
     }
     
     /**
-     * ボス名を翻訳（サーバーメッセージ用）
+     * ボス名を翻訳キーで返す
+     * Component.translatable() でラップするとクライアント側で自動翻訳される
      * @param bossType ボスのタイプ名（大文字か小文字）例: "ENDER_DRAGON", "ender_dragon"
-     * @return 翻訳されたボス名
+     * @return 翻訳キー（形式: "entity.minecraft.ender_dragon"）
      */
     fun translateBoss(bossType: String): String {
         val key = bossType.lowercase()
-        
-        // ローカライズファイルから翻訳を取得
-        val customMessage = messageProvider.getMessage("boss.$key")
-        
-        // 翻訳が見つかった場合はそれを使用
-        if (!customMessage.startsWith("§c[Missing:")) {
-            return customMessage
-        }
-        
-        // 翻訳がない場合は、キャメルケース形式にフォールバック
-        return formatName(key)
+        // ボスもエンティティなので、entity.minecraft.* を返す
+        return "entity.minecraft.$key"
     }
     
     /**
