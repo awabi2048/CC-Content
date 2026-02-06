@@ -1,9 +1,13 @@
 package jp.awabi2048.cccontent.items.sukima_dungeon.common
 
+import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.Material
+import org.bukkit.World
+import org.bukkit.WorldCreator
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
+import java.io.File
 import java.util.UUID
 
 /**
@@ -209,5 +213,110 @@ class DungeonManager(
         sproutLocations.clear()
         harvestedSprouts.clear()
         playersInDungeon.clear()
+    }
+    
+    // =============== ワールド管理機能 ===============
+    
+    /**
+     * ダンジョンワールドを生成
+     * @param themeName テーマ名
+     * @param gridWidth グリッド幅
+     * @param gridLength グリッド長
+     * @return 生成されたワールド
+     */
+    fun createDungeonWorld(themeName: String, gridWidth: Int, gridLength: Int): World? {
+        // ワールド名を生成（タイムスタンプベース）
+        val worldName = "dungeon_${themeName}_${System.currentTimeMillis()}"
+        
+        try {
+            // ワールド作成
+            val creator = WorldCreator(worldName)
+            creator.environment(World.Environment.NORMAL)
+            creator.generateStructures(false)
+            
+            val world = creator.createWorld()
+            
+            if (world != null) {
+                // ワールド設定
+                world.difficulty = org.bukkit.Difficulty.NORMAL
+                world.isAutoSave = false  // 手動保存
+                
+                plugin.logger.info("[SukimaDungeon] ダンジョンワールドを生成しました: $worldName")
+                return world
+            } else {
+                plugin.logger.warning("[SukimaDungeon] ワールド生成に失敗しました: $worldName")
+                return null
+            }
+        } catch (e: Exception) {
+            plugin.logger.warning("[SukimaDungeon] ワールド生成中にエラー: ${e.message}")
+            e.printStackTrace()
+            return null
+        }
+    }
+    
+    /**
+     * ダンジョンワールドを削除
+     * @param world 削除対象ワールド
+     */
+    fun deleteDungeonWorld(world: World) {
+        try {
+            // プレイヤーを別ワールドへテレポート
+            val mainWorld = Bukkit.getWorlds().firstOrNull { !it.name.startsWith("dungeon_") }
+                ?: Bukkit.getWorld("world")
+            
+            if (mainWorld != null) {
+                for (player in world.players) {
+                    player.teleport(mainWorld.spawnLocation)
+                }
+            }
+            
+            // ワールドをアンロード
+            Bukkit.unloadWorld(world, false)
+            
+            // ワールドフォルダを削除
+            val worldFolder = world.worldFolder
+            if (worldFolder.exists() && worldFolder.isDirectory) {
+                deleteDirectory(worldFolder)
+                plugin.logger.info("[SukimaDungeon] ダンジョンワールドを削除しました: ${world.name}")
+            }
+        } catch (e: Exception) {
+            plugin.logger.warning("[SukimaDungeon] ワールド削除中にエラー: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+    
+    /**
+     * ディレクトリを再帰的に削除
+     */
+    private fun deleteDirectory(dir: File): Boolean {
+        if (dir.isDirectory) {
+            val children = dir.listFiles()
+            if (children != null) {
+                for (child in children) {
+                    deleteDirectory(child)
+                }
+            }
+        }
+        return dir.delete()
+    }
+    
+    /**
+     * プレイヤーをダンジョンから脱出させる
+     * @param player 脱出対象プレイヤー
+     * @param reason 脱出理由（ログ用）
+     */
+    fun escapeDungeon(player: Player, reason: String = "通常脱出") {
+        try {
+            val escapeLocation = configManager.escapeLocation
+            
+            if (escapeLocation != null) {
+                player.teleport(escapeLocation)
+                plugin.logger.info("[SukimaDungeon] ${player.name} がダンジョンから脱出しました: $reason")
+            } else {
+                plugin.logger.warning("[SukimaDungeon] 脱出地点が設定されていません")
+            }
+        } catch (e: Exception) {
+            plugin.logger.warning("[SukimaDungeon] 脱出処理中にエラー: ${e.message}")
+        }
     }
 }
