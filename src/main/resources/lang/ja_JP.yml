@@ -168,14 +168,28 @@ block:
   deepslate_diamond_ore: "ディープスレートダイヤモンド鉱石"
   obsidian: "黒曜石"
   end_stone: "エンドストーン"
-  sand: "砂"
-  gravel: "砂利"
-  oak_leaves: "オークの葉"
-  spruce_leaves: "トウヒの葉"
-  birch_leaves: "白樺の葉"
-  jungle_leaves: "ジャングルの葉"
-  acacia_leaves: "アカシアの葉"
-  dark_oak_leaves: "ダークオークの葉"
+   sand: "砂"
+   gravel: "砂利"
+   oak_leaves: "オークの葉"
+   spruce_leaves: "トウヒの葉"
+   birch_leaves: "白樺の葉"
+   jungle_leaves: "ジャングルの葉"
+   acacia_leaves: "アカシアの葉"
+   dark_oak_leaves: "ダークオークの葉"
+
+# アイテム名の翻訳
+item:
+   obsidian: "黒曜石"
+   flint: "火打ち石"
+   steel: "鉄インゴット"
+   ender_eye: "エンダーアイ"
+   diamond: "ダイヤモンド"
+   gold_ingot: "金インゴット"
+   iron_ingot: "鉄インゴット"
+   copper_ingot: "銅インゴット"
+   emerald: "エメラルド"
+   amethyst_shard: "アメジストの欠片"
+   netherite_ingot: "ネザライトインゴット"
 
 # チュートリアルランク
 tutorial_rank:

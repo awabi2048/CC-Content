@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.rank.command
 
+import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
 import jp.awabi2048.cccontent.features.rank.profession.Profession
@@ -347,6 +348,8 @@ class RankCommand(
             // translator が存在する場合は翻訳、ない場合はそのまま表示
             val blockName = translator?.translateBlock(blockType) ?: blockType
             sender.sendMessage("$status $blockName 採掘: $current/$required ($percent%)")
+            // デバッグログ
+            CCContent.instance.logger.info("DEBUG: blockType=$blockType, blockName=$blockName, current=$current, required=$required")
         }
         
         // バニラEXP
@@ -363,7 +366,11 @@ class RankCommand(
             val progress_count = minOf(current, required)
             val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
             val status = if (current >= required) "§a✓" else "§c✗"
-            sender.sendMessage("$status $material 所持: $current/$required ($percent%)")
+            // translator が存在する場合は翻訳、ない場合はそのまま表示
+            val itemName = translator?.translateItem(material) ?: material
+            sender.sendMessage("$status $itemName 所持: $current/$required ($percent%)")
+            // デバッグログ
+            CCContent.instance.logger.info("DEBUG: itemName=$material, translated=$itemName, current=$current, required=$required")
         }
         
         // ボス討伐

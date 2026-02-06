@@ -37,7 +37,7 @@ class EntityBlockTranslator(
     
     /**
      * ブロック名を翻訳（サーバーメッセージ用）
-     * @param blockType ブロックのタイプ名（大文字）例: "DIAMOND_ORE", "DEEPSLATE_DIAMOND_ORE"
+     * @param blockType ブロックのタイプ名（大文字か小文字）例: "DIAMOND_ORE", "diamond_ore"
      * @return 翻訳されたブロック名
      */
     fun translateBlock(blockType: String): String {
@@ -45,6 +45,26 @@ class EntityBlockTranslator(
         
         // ローカライズファイルから翻訳を取得
         val customMessage = messageProvider.getMessage("block.$key")
+        
+        // 翻訳が見つかった場合はそれを使用
+        if (!customMessage.startsWith("§c[Missing:")) {
+            return customMessage
+        }
+        
+        // 翻訳がない場合は、キャメルケース形式にフォールバック
+        return formatName(key)
+    }
+    
+    /**
+     * アイテム名を翻訳（サーバーメッセージ用）
+     * @param itemName アイテムの名前（大文字か小文字）例: "OBSIDIAN", "obsidian"
+     * @return 翻訳されたアイテム名
+     */
+    fun translateItem(itemName: String): String {
+        val key = itemName.lowercase()
+        
+        // ローカライズファイルから翻訳を取得
+        val customMessage = messageProvider.getMessage("item.$key")
         
         // 翻訳が見つかった場合はそれを使用
         if (!customMessage.startsWith("§c[Missing:")) {
