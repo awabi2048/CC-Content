@@ -32,7 +32,12 @@ class YamlRankStorage(
         val config = if (file.exists()) YamlConfiguration.loadConfiguration(file) else YamlConfiguration()
         
         // "rank.tutorial"セクションを作成または更新
-        val tutorialSection = config.createSection("rank.tutorial")
+        val tutorialSection = config.getConfigurationSection("rank.tutorial")
+            ?: config.createSection("rank.tutorial")
+        tutorialSection.set("taskProgress.mobKills", null)
+        tutorialSection.set("taskProgress.blockMines", null)
+        tutorialSection.set("taskProgress.bossKills", null)
+        tutorialSection.set("taskProgress.items", null)
         tutorialSection.set("currentRank", tutorialRank.currentRank.name)
         tutorialSection.set("lastUpdated", tutorialRank.lastUpdated)
         tutorialSection.set("lastPlayTime", tutorialRank.lastPlayTime)
@@ -141,7 +146,8 @@ class YamlRankStorage(
         val config = if (file.exists()) YamlConfiguration.loadConfiguration(file) else YamlConfiguration()
         
         // "rank.profession"セクションを作成または更新
-        val professionSection = config.createSection("rank.profession")
+        val professionSection = config.getConfigurationSection("rank.profession")
+            ?: config.createSection("rank.profession")
         professionSection.set("profession", profession.profession.id)
         professionSection.set("acquiredSkills", profession.acquiredSkills.toList())
         professionSection.set("currentExp", profession.currentExp)

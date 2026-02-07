@@ -16,6 +16,8 @@ import jp.awabi2048.cccontent.features.rank.impl.YamlRankStorage
 import jp.awabi2048.cccontent.features.rank.localization.LanguageLoader
 import jp.awabi2048.cccontent.features.rank.localization.MessageProviderImpl
 import jp.awabi2048.cccontent.features.rank.command.RankCommand
+import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
+import jp.awabi2048.cccontent.features.rank.job.ProfessionMinerExpListener
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
 import jp.awabi2048.cccontent.features.rank.profession.skilltree.ConfigBasedSkillTree
@@ -115,9 +117,11 @@ class CCContent : JavaPlugin(), Listener {
             
             // スキルツリーを登録
             registerSkillTrees()
+
+            val ignoreBlockStore = IgnoreBlockStore(File(dataFolder, "job/.ignore_blocks.yml"))
             
             // チュートリアルランク タスクシステムの初期化
-            val (taskLoader, taskChecker) = initializeTutorialTaskSystem(rankManager, storage)
+            val (taskLoader, taskChecker) = initializeTutorialTaskSystem(rankManager, storage, ignoreBlockStore)
             
             // プレイ時間トラッカータスクを起動（1分ごとに更新）
             if (taskLoader != null && taskChecker != null) {
@@ -138,6 +142,7 @@ class CCContent : JavaPlugin(), Listener {
             getCommand("rank")?.setExecutor(rankCommand)
             getCommand("rank")?.tabCompleter = rankCommand
             server.pluginManager.registerEvents(rankCommand, this)
+            server.pluginManager.registerEvents(ProfessionMinerExpListener(this, rankManager, ignoreBlockStore), this)
             
             logger.info("ランクシステムが初期化されました")
         } catch (e: Exception) {
@@ -150,7 +155,11 @@ class CCContent : JavaPlugin(), Listener {
      * チュートリアルランク タスクシステムの初期化
      * @return Pair<TutorialTaskLoader, TutorialTaskChecker>
      */
-    private fun initializeTutorialTaskSystem(rankManager: RankManager, storage: YamlRankStorage): Pair<TutorialTaskLoader?, TutorialTaskCheckerImpl?> {
+    private fun initializeTutorialTaskSystem(
+        rankManager: RankManager,
+        storage: YamlRankStorage,
+        ignoreBlockStore: IgnoreBlockStore
+    ): Pair<TutorialTaskLoader?, TutorialTaskCheckerImpl?> {
         try {
             // tutorial-tasks.yml ファイルを確認・抽出
             val tutorialTasksFile = File(dataFolder, "tutorial-tasks.yml")
@@ -185,7 +194,7 @@ class CCContent : JavaPlugin(), Listener {
                 this
             )
             server.pluginManager.registerEvents(
-                TutorialBlockBreakListener(rankManager, taskChecker, taskLoader, storage),
+                TutorialBlockBreakListener(rankManager, taskChecker, taskLoader, storage, ignoreBlockStore),
                 this
             )
             server.pluginManager.registerEvents(
@@ -231,6 +240,16 @@ class CCContent : JavaPlugin(), Listener {
      */
     private fun registerSkillTrees() {
         val jobDir = File(dataFolder, "job").apply { mkdirs() }
+        val expFile = File(jobDir, "exp.yml")
+
+        if (!expFile.exists()) {
+            try {
+                extractJobFile("exp.yml", expFile)
+                logger.info("ジョブ経験値設定ファイルを作成しました: exp.yml")
+            } catch (e: Exception) {
+                logger.warning("ジョブ経験値設定ファイルのコピーに失敗しました: ${e.message}")
+            }
+        }
         
         for (profession in Profession.values()) {
             val ymlFile = File(jobDir, "${profession.id}.yml")
@@ -339,7 +358,7 @@ class CCContent : JavaPlugin(), Listener {
             // スキルツリーファイルをチェック
             val jobDir = File(dataFolder, "job")
             if (jobDir.exists()) {
-                val requiredJobFiles = listOf("brewer.yml", "lumberjack.yml", "miner.yml")
+                val requiredJobFiles = listOf("brewer.yml", "lumberjack.yml", "miner.yml", "exp.yml")
                 for (jobFile in requiredJobFiles) {
                     val file = File(jobDir, jobFile)
                     if (!file.exists()) {

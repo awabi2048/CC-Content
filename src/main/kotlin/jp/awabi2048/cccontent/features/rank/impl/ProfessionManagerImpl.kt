@@ -91,7 +91,6 @@ class ProfessionManagerImpl(
         
         professionCache[playerUuid] = newProf
         storage.saveProfession(newProf)
-        storage.deleteProfession(playerUuid)  // 古い職業データを削除
         
         val player = Bukkit.getPlayer(playerUuid)
         if (player != null) {

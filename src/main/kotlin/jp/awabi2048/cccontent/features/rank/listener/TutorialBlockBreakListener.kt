@@ -2,6 +2,8 @@ package jp.awabi2048.cccontent.features.rank.listener
 
 import jp.awabi2048.cccontent.features.rank.RankStorage
 import jp.awabi2048.cccontent.features.rank.RankManager
+import jp.awabi2048.cccontent.features.rank.job.BlockPositionCodec
+import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskChecker
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader
 import org.bukkit.event.EventHandler
@@ -19,15 +21,21 @@ class TutorialBlockBreakListener(
     private val rankManager: RankManager,
     private val taskChecker: TutorialTaskChecker,
     private val taskLoader: TutorialTaskLoader,
-    private val storage: RankStorage
+    private val storage: RankStorage,
+    private val ignoreBlockStore: IgnoreBlockStore
 ) : Listener {
     
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     fun onBlockBreak(event: BlockBreakEvent) {
         val player = event.player
         val uuid = player.uniqueId
         val block = event.block
         val blockType = block.type.name.lowercase()
+        val packedPosition = BlockPositionCodec.pack(block.x, block.y, block.z)
+
+        if (ignoreBlockStore.contains(block.world.uid, packedPosition)) {
+            return
+        }
         
         val tutorial = rankManager.getPlayerTutorial(uuid)
         
