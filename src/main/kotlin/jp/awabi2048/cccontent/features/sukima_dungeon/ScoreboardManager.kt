@@ -1,147 +1,56 @@
-package jp.awabi2048.cccontent.features.sukima_dungeon
+﻿package jp.awabi2048.cccontent.features.sukima_dungeon
 
-import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.scoreboard.DisplaySlot
-import org.bukkit.scoreboard.Scoreboard
-import java.util.*
+import io.papermc.paper.scoreboard.numbers.NumberFormat
 
-/**
- * スコアボード管理クラス
- * ダンジョン進捗をスコアボードで表示
- */
-class ScoreboardManager {
+object ScoreboardManager {
     
-    private val scoreboards: MutableMap<UUID, Scoreboard> = mutableMapOf()
-    private val objectives: MutableMap<UUID, String> = mutableMapOf()
-    
-    /**
-     * プレイヤー用のスコアボードを作成
-     * @param player プレイヤー
-     * @param session ダンジョンセッション
-     */
-    fun createScoreboard(player: Player, session: DungeonSession) {
-        val scoreboardManager = Bukkit.getScoreboardManager() ?: return
-        val scoreboard = scoreboardManager.newScoreboard
+    fun setupScoreboard(player: Player) {
+        val manager = Bukkit.getScoreboardManager() ?: return
+        val scoreboard = manager.newScoreboard
+        val objective = scoreboard.registerNewObjective("dungeon", "dummy", MessageManager.getMessage(player, "scoreboard_title"))
         
-        // オブジェクティブを作成
-        val objectiveName = "sukima_dungeon_${player.uniqueId}"
-        val objective = scoreboard.registerNewObjective(
-            objectiveName,
-            "dummy",
-            Component.text("§e§lSukima Dungeon")
-        )
-        objective.setDisplaySlot(DisplaySlot.SIDEBAR)
+        objective.displaySlot = DisplaySlot.SIDEBAR
+        objective.numberFormat(NumberFormat.blank())
         
-        // スコアボード内容を設定
-        updateScoreboard(player, session, scoreboard, objective)
+        // Initial setup
+        updateScoreboard(player, scoreboard)
         
-        // プレイヤーにスコアボードを設定
         player.scoreboard = scoreboard
-        
-        scoreboards[player.uniqueId] = scoreboard
-        objectives[player.uniqueId] = objectiveName
     }
     
-    /**
-     * スコアボードを更新
-     * @param player プレイヤー
-     * @param session ダンジョンセッション
-     */
-    fun updateScoreboard(player: Player, session: DungeonSession) {
-        val scoreboard = scoreboards[player.uniqueId] ?: return
-        val objectiveName = objectives[player.uniqueId] ?: return
-        val objective = scoreboard.getObjective(objectiveName) ?: return
+    fun updateScoreboard(player: Player, scoreboard: org.bukkit.scoreboard.Scoreboard? = null) {
+        val session = DungeonSessionManager.getSession(player) ?: return
+        val sb = scoreboard ?: player.scoreboard
+        val objective = sb.getObjective("dungeon") ?: return
         
-        updateScoreboard(player, session, scoreboard, objective)
-    }
-    
-    /**
-     * スコアボード内容を更新（内部用）
-     */
-    private fun updateScoreboard(
-        player: Player,
-        session: DungeonSession,
-        scoreboard: Scoreboard,
-        objective: org.bukkit.scoreboard.Objective
-    ) {
-        // 既存のスコアをクリア
-        for (entry in scoreboard.entries) {
-            scoreboard.resetScores(entry)
+        // Clear old entries
+        sb.entries.forEach { sb.resetScores(it) }
+        
+        val bar = MessageManager.getMessage(player, "common_bar")
+        val sproutMsg = MessageManager.getMessage(player, "scoreboard_sprouts", mapOf(
+            "count" to session.collectedSprouts.toString(),
+            "count_remaining" to session.totalSprouts.toString()
+        ))
+        val timeMsg = MessageManager.getMessage(player, "scoreboard_remaining", mapOf(
+            "time_remaining" to session.getFormattedRemainingTime()
+        ))
+        
+        // Use scores to control order (higher score = top)
+        objective.getScore(bar + "§1").score = 5 // Top bar
+        objective.getScore(sproutMsg).score = 4
+        
+        if (session.isCollapsing) {
+            objective.getScore(timeMsg).score = 3
         }
         
-        var score = 10
-        
-        // タイトル
-        objective.getScore("§7────────────────").score = score--
-        
-        // テーマ
-        objective.getScore("§eテーマ: §f${session.themeName}").score = score--
-        
-        // ティア
-        objective.getScore("§eティア: §f${session.tier.name}").score = score--
-        
-        // 空行
-        objective.getScore("").score = score--
-        
-        // 進捗
-        objective.getScore("§e進捗").score = score--
-        val progress = session.getProgress()
-        objective.getScore("  §f$progress").score = score--
-        
-        // 空行
-        objective.getScore(" ").score = score--
-        
-        // 時間情報
-        objective.getScore("§e時間").score = score--
-        objective.getScore("  経過: §f${session.getElapsedFormatted()}").score = score--
-        objective.getScore("  残り: §f${session.getRemainingFormatted()}").score = score--
-        
-        // 空行
-        objective.getScore("  ").score = score--
-        
-        // 状態
-        val state = if (session.isCollapsing) "§c崩壊中" else "§a進行中"
-        objective.getScore("§e状態: $state").score = score--
-        
-        // フッター
-        objective.getScore("§7────────────────").score = score--
+        objective.getScore(bar + "§2").score = 1 // Bottom bar
     }
     
-    /**
-     * プレイヤーのスコアボードを削除
-     * @param player プレイヤー
-     */
     fun removeScoreboard(player: Player) {
-        val scoreboard = scoreboards[player.uniqueId]
-        val objectiveName = objectives[player.uniqueId]
-        
-        if (scoreboard != null && objectiveName != null) {
-            val objective = scoreboard.getObjective(objectiveName)
-            objective?.unregister()
-        }
-        
-        scoreboards.remove(player.uniqueId)
-        objectives.remove(player.uniqueId)
-        
-        // プレイヤーをメインスコアボードに戻す
-        player.scoreboard = Bukkit.getScoreboardManager().mainScoreboard
-    }
-    
-    /**
-     * 全スコアボードをクリア
-     */
-    fun clearAll() {
-        for ((playerId, scoreboard) in scoreboards) {
-            val objectiveName = objectives[playerId]
-            if (objectiveName != null) {
-                val objective = scoreboard.getObjective(objectiveName)
-                objective?.unregister()
-            }
-        }
-        
-        scoreboards.clear()
-        objectives.clear()
+        val manager = Bukkit.getScoreboardManager() ?: return
+        player.scoreboard = manager.mainScoreboard
     }
 }

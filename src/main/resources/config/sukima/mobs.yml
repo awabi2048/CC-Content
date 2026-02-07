@@ -1,0 +1,32 @@
+mobs:
+  zombie_lvl1:
+    type: ZOMBIE
+    health: 20.0
+    attack: 5.0
+    scale: 1.0
+    equipment:
+      helmet: LEATHER_HELMET
+      chestplate: LEATHER_CHESTPLATE
+      main_hand: WOODEN_SWORD
+    min_dist: 0
+    max_dist: 50
+  skeleton_lvl1:
+    type: SKELETON
+    health: 20.0
+    attack: 4.0
+    scale: 1.0
+    equipment:
+      main_hand: BOW
+    min_dist: 0
+    max_dist: 60
+  zombie_boss:
+    type: ZOMBIE
+    health: 50.0
+    attack: 10.0
+    scale: 1.5
+    equipment:
+      helmet: DIAMOND_HELMET
+      chestplate: DIAMOND_CHESTPLATE
+      main_hand: DIAMOND_SWORD
+    min_dist: 40
+    max_dist: 1000
