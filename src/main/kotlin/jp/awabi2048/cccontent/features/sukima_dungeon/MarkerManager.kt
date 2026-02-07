@@ -1,168 +1,215 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
-import org.bukkit.Location
 import org.bukkit.Material
-import org.bukkit.World
-import org.bukkit.block.Block
+import org.bukkit.NamespacedKey
+import org.bukkit.Particle
+import org.bukkit.entity.EntityType
+import org.bukkit.entity.Marker
+import org.bukkit.entity.Player
+import org.bukkit.event.EventHandler
+import org.bukkit.event.Listener
+import org.bukkit.event.block.Action
+import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.event.player.PlayerItemHeldEvent
+import org.bukkit.inventory.ItemStack
+import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.scheduler.BukkitRunnable
 
-/**
- * マーカー管理クラス
- * ダンジョン内のマーカーブロックを検出・処理
- */
-class MarkerManager(private val plugin: JavaPlugin) {
-    
-    // マーカーの種類定義
-    enum class MarkerType {
-        MINIBOSS,      // ボスエリア
-        MOB_SPAWN,     // モブスポーン地点
-        REST_AREA,     // 休憩エリア
-        TREASURE,      // 宝箱
-        TRAP,          // トラップ
-        UNKNOWN        // 不明
+class MarkerManager(private val plugin: JavaPlugin) : Listener {
+    private val MODE_KEY = NamespacedKey(plugin, "marker_mode")
+    private val TOOL_KEY = NamespacedKey(plugin, "marker_tool")
+    private val lastSwitchTime = mutableMapOf<java.util.UUID, Long>()
+
+    enum class MarkerMode(val tag: String, val displayName: String, val particle: Particle) {
+        MOB("sd.marker.mob", "§cMOB", Particle.FLAME),
+        NPC("sd.marker.npc", "§aNPC", Particle.HAPPY_VILLAGER),
+        ITEM("sd.marker.item", "§bITEM", Particle.SOUL_FIRE_FLAME),
+        SPROUT("sd.marker.sprout", "§dSPROUT", Particle.GLOW),
+        SPAWN("sd.marker.spawn", "§fSPAWN", Particle.CLOUD)
     }
-    
-    /**
-     * 指定された範囲内のマーカーを検索
-     * @param world ワールド
-     * @param center 中心位置
-     * @param radiusXZ 水平検索範囲
-     * @param radiusY 垂直検索範囲
-     * @return マーカー位置 -> マーカータイプ のマップ
-     */
-    fun findMarkers(
-        world: World,
-        center: Location,
-        radiusXZ: Double = 32.0,
-        radiusY: Double = 20.0
-    ): Map<Location, MarkerType> {
-        val markers = mutableMapOf<Location, MarkerType>()
+
+    fun getMarkerTool(player: Player): ItemStack {
+        val item = ItemStack(Material.BLAZE_ROD)
+        val meta = item.itemMeta ?: return item
         
-        val minX = (center.x - radiusXZ).toInt()
-        val maxX = (center.x + radiusXZ).toInt()
-        val minY = (center.y - radiusY).toInt()
-        val maxY = (center.y + radiusY).toInt()
-        val minZ = (center.z - radiusXZ).toInt()
-        val maxZ = (center.z + radiusXZ).toInt()
+        meta.setDisplayName("§dマーカー設置ツール")
+        val mode = getMode(item)
+        updateLore(meta, mode)
         
-        for (x in minX..maxX) {
-            for (y in minY..maxY) {
-                for (z in minZ..maxZ) {
-                    val block = world.getBlockAt(x, y, z)
-                    val markerType = detectMarker(block)
+        meta.persistentDataContainer.set(TOOL_KEY, PersistentDataType.BYTE, 1)
+        meta.persistentDataContainer.set(MODE_KEY, PersistentDataType.STRING, mode.name)
+        
+        item.itemMeta = meta
+        return item
+    }
+
+    private fun getMode(item: ItemStack): MarkerMode {
+        val meta = item.itemMeta ?: return MarkerMode.MOB
+        val modeName = meta.persistentDataContainer.get(MODE_KEY, PersistentDataType.STRING)
+        return try {
+            MarkerMode.valueOf(modeName ?: "MOB")
+        } catch (e: Exception) {
+            MarkerMode.MOB
+        }
+    }
+
+    private fun updateLore(meta: org.bukkit.inventory.meta.ItemMeta, mode: MarkerMode) {
+        val bar = MessageManager.getMessage(null, "common_bar")
+        meta.lore = listOf(
+            bar,
+            "§f§l| §7現在のモード §a${mode.displayName}",
+            "",
+            "§e右クリック§7 マーカーを設置する",
+            "§eShift + スクロール§7 モードを変更する",
+            "§eShift + 右クリック§7 最寄りのマーカーを削除",
+            bar
+        )
+    }
+
+    @EventHandler
+    fun onInteract(event: PlayerInteractEvent) {
+        val item = event.item ?: return
+        val meta = item.itemMeta ?: return
+        if (!meta.persistentDataContainer.has(TOOL_KEY, PersistentDataType.BYTE)) return
+        
+        event.isCancelled = true
+        val player = event.player
+        var mode = getMode(item)
+
+        if (event.action == Action.LEFT_CLICK_AIR || event.action == Action.LEFT_CLICK_BLOCK) {
+            return
+        }
+
+        if (player.world.name.startsWith("dungeon_")) {
+            player.sendMessage("§c[Marker] §fダンジョン内ではマーカー設置ツールを使用できません。")
+            return
+        }
+
+        if (event.action == Action.RIGHT_CLICK_BLOCK || event.action == Action.RIGHT_CLICK_AIR) {
+            if (player.isSneaking) {
+                // Remove nearest marker
+                val markers = player.getNearbyEntities(5.0, 5.0, 5.0).filterIsInstance<Marker>()
+                    .filter { marker -> MarkerMode.values().any { marker.scoreboardTags.contains(it.tag) } }
+                
+                val nearest = markers.minByOrNull { it.location.distanceSquared(player.location) }
+                
+                if (nearest != null) {
+                    val loc = nearest.location
+                    nearest.remove()
+                    player.sendMessage("§b[Marker] §f最寄りのマーカーを削除しました。")
+                    player.playSound(player.location, org.bukkit.Sound.BLOCK_ANVIL_BREAK, 0.5f, 2.0f)
+                    loc.world?.spawnParticle(Particle.SMOKE, loc, 10, 0.1, 0.1, 0.1, 0.02)
+                } else {
+                    player.sendMessage("§c[Marker] §f近くに自身の管理するマーカーが見つかりませんでした。")
+                }
+                return
+            }
+
+            if (event.action == Action.RIGHT_CLICK_BLOCK) {
+                val block = event.clickedBlock ?: return
+                val loc = block.location.add(0.5, 1.1, 0.5) // Slightly above center of block
+                
+                val world = loc.world ?: return
+                val marker = world.spawnEntity(loc, EntityType.MARKER) as Marker
+                marker.addScoreboardTag(mode.tag)
+                
+                player.sendMessage("§b[Marker] ${mode.displayName} §fマーカーを設置しました。")
+                player.playSound(player.location, org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.5f)
+                
+                // Show particle immediately
+                world.spawnParticle(mode.particle, loc, 10, 0.1, 0.1, 0.1, 0.05)
+            }
+        }
+    }
+
+    @EventHandler
+    fun onItemHeld(event: PlayerItemHeldEvent) {
+        val player = event.player
+        val item = player.inventory.getItem(event.previousSlot) ?: return
+        val meta = item.itemMeta ?: return
+        if (!meta.persistentDataContainer.has(TOOL_KEY, PersistentDataType.BYTE)) return
+
+        if (!player.isSneaking) return
+
+        if (player.world.name.startsWith("dungeon_")) {
+            player.sendMessage("§c[Marker] §fダンジョン内ではマーカー設置ツールを使用できません。")
+            return
+        }
+
+        // Apply short cooldown to prevent double switches in a single tick
+        val now = System.currentTimeMillis()
+        val last = lastSwitchTime.getOrDefault(player.uniqueId, 0L)
+        if (now - last < 50) {
+            event.player.inventory.heldItemSlot = event.previousSlot
+            return
+        }
+        lastSwitchTime[player.uniqueId] = now
+
+        // Cancel slot change
+        event.player.inventory.heldItemSlot = event.previousSlot
+
+        val currentMode = getMode(item)
+        val values = MarkerMode.values()
+        
+        val diff = event.newSlot - event.previousSlot
+        // Handle wraparound (from 8 to 0 or 0 to 8)
+        val isNext = if (diff == -8) true else if (diff == 8) false else diff > 0
+        
+        val newMode = if (isNext) {
+            values[(currentMode.ordinal + 1) % values.size]
+        } else {
+            values[(currentMode.ordinal - 1 + values.size) % values.size]
+        }
+
+        meta.persistentDataContainer.set(MODE_KEY, PersistentDataType.STRING, newMode.name)
+        updateLore(meta, newMode)
+        item.itemMeta = meta
+
+        player.sendActionBar(net.kyori.adventure.text.Component.text("§7設置モードを ${newMode.displayName} §7に変更しました。"))
+        player.playSound(player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 1.0f, 2.0f)
+    }
+
+    fun startParticleTask() {
+        object : BukkitRunnable() {
+            override fun run() {
+                for (world in plugin.server.worlds) {
+                    // Marker particles are for development, so maybe only in certain worlds or if players are nearby
+                    val markers = world.entities.filterIsInstance<Marker>()
+                    if (markers.isEmpty()) continue
                     
-                    if (markerType != MarkerType.UNKNOWN) {
-                        markers[block.location] = markerType
+                    for (marker in markers) {
+                        val tags = marker.scoreboardTags
+                        val mode = MarkerMode.values().find { tags.contains(it.tag) } ?: continue
+                        
+                        // Only show if a player with a tool is nearby
+                        val hasToolNearby = marker.getNearbyEntities(16.0, 16.0, 16.0).any { 
+                            it is Player && it.inventory.itemInMainHand.let { item ->
+                                item.itemMeta?.persistentDataContainer?.has(TOOL_KEY, PersistentDataType.BYTE) == true
+                            }
+                        }
+                        
+                        if (hasToolNearby) {
+                            world.spawnParticle(mode.particle, marker.location, 3, 0.05, 0.05, 0.05, 0.02)
+                        }
                     }
                 }
             }
-        }
-        
-        return markers
+        }.runTaskTimer(plugin, 10L, 10L)
     }
-    
-    /**
-     * ブロックからマーカータイプを検出
-     * @param block ブロック
-     * @return マーカータイプ
-     */
-    private fun detectMarker(block: Block): MarkerType {
-        return when (block.type) {
-            // ボスエリア: 赤いブロック
-            Material.RED_CONCRETE,
-            Material.RED_CONCRETE_POWDER,
-            Material.REDSTONE_BLOCK -> MarkerType.MINIBOSS
-            
-            // モブスポーン地点: 黄色いブロック
-            Material.YELLOW_CONCRETE,
-            Material.YELLOW_CONCRETE_POWDER -> MarkerType.MOB_SPAWN
-            
-            // 休憩エリア: 緑のブロック
-            Material.LIME_CONCRETE,
-            Material.LIME_CONCRETE_POWDER -> MarkerType.REST_AREA
-            
-            // 宝箱: オレンジブロック
-            Material.ORANGE_CONCRETE,
-            Material.ORANGE_CONCRETE_POWDER -> MarkerType.TREASURE
-            
-            // トラップ: 紫ブロック
-            Material.PURPLE_CONCRETE,
-            Material.PURPLE_CONCRETE_POWDER -> MarkerType.TRAP
-            
-            else -> MarkerType.UNKNOWN
-        }
-    }
-    
-    /**
-     * マーカーを処理（カスタム処理）
-     * @param markerLocation マーカー位置
-     * @param markerType マーカータイプ
-     * @return 処理成功したか
-     */
-    fun processMarker(markerLocation: Location, markerType: MarkerType): Boolean {
-        return try {
-            val block = markerLocation.block
-            
-            when (markerType) {
-                MarkerType.MINIBOSS -> {
-                    // ボスエリア処理
-                    plugin.logger.info("[SukimaDungeon] ボスエリア検出: ${markerLocation.x}, ${markerLocation.y}, ${markerLocation.z}")
-                    true
+
+    companion object {
+        fun cleanupMarkers(world: org.bukkit.World) {
+            world.entities.forEach { entity ->
+                val hasTag = entity.scoreboardTags.any { it.startsWith("sd.marker.") }
+                val isOldArmorStand = entity is org.bukkit.entity.ArmorStand && 
+                        listOf("MOB", "NPC", "ITEM", "SPROUT", "SPAWN").contains(entity.customName)
+                val isMarkerEntity = entity is org.bukkit.entity.Marker
+                
+                if (hasTag || isOldArmorStand || isMarkerEntity) {
+                    entity.remove()
                 }
-                MarkerType.MOB_SPAWN -> {
-                    // モブスポーン処理
-                    plugin.logger.info("[SukimaDungeon] モブスポーン地点検出: ${markerLocation.x}, ${markerLocation.y}, ${markerLocation.z}")
-                    true
-                }
-                MarkerType.REST_AREA -> {
-                    // 休憩エリア処理
-                    plugin.logger.info("[SukimaDungeon] 休憩エリア検出: ${markerLocation.x}, ${markerLocation.y}, ${markerLocation.z}")
-                    true
-                }
-                MarkerType.TREASURE -> {
-                    // 宝箱処理
-                    plugin.logger.info("[SukimaDungeon] 宝箱検出: ${markerLocation.x}, ${markerLocation.y}, ${markerLocation.z}")
-                    true
-                }
-                MarkerType.TRAP -> {
-                    // トラップ処理
-                    plugin.logger.info("[SukimaDungeon] トラップ検出: ${markerLocation.x}, ${markerLocation.y}, ${markerLocation.z}")
-                    true
-                }
-                MarkerType.UNKNOWN -> false
             }
-        } catch (e: Exception) {
-            plugin.logger.warning("[SukimaDungeon] マーカー処理中にエラー: ${e.message}")
-            false
-        }
-    }
-    
-    /**
-     * マーカーブロックを削除
-     * @param location マーカー位置
-     */
-    fun removeMarker(location: Location) {
-        try {
-            location.block.type = Material.AIR
-            plugin.logger.info("[SukimaDungeon] マーカーを削除しました: ${location.x}, ${location.y}, ${location.z}")
-        } catch (e: Exception) {
-            plugin.logger.warning("[SukimaDungeon] マーカー削除中にエラー: ${e.message}")
-        }
-    }
-    
-    /**
-     * マーカータイプの表示名を取得
-     * @param markerType マーカータイプ
-     * @return 表示名
-     */
-    fun getMarkerTypeName(markerType: MarkerType): String {
-        return when (markerType) {
-            MarkerType.MINIBOSS -> "ボスエリア"
-            MarkerType.MOB_SPAWN -> "モブスポーン地点"
-            MarkerType.REST_AREA -> "休憩エリア"
-            MarkerType.TREASURE -> "宝箱"
-            MarkerType.TRAP -> "トラップ"
-            MarkerType.UNKNOWN -> "不明"
         }
     }
 }

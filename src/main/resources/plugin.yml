@@ -17,3 +17,13 @@ commands:
   sukima_dungeon:
     description: スキマダンジョンコマンド
     usage: /sukima_dungeon
+    aliases: [sd]
+    permission: sukimadungeon.command.base
+
+permissions:
+  sukimadungeon.command.base:
+    description: Allows using the base command
+    default: true
+  sukimadungeon.admin:
+    description: Admin permissions
+    default: op

@@ -8,15 +8,6 @@ import jp.awabi2048.cccontent.items.misc.SmallLight
 import jp.awabi2048.cccontent.items.misc.GulliverItemListener
 import jp.awabi2048.cccontent.items.misc.GulliverConfig
 import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
-import jp.awabi2048.cccontent.items.sukima_dungeon.*
-import jp.awabi2048.cccontent.items.sukima_dungeon.common.ConfigManager
-import jp.awabi2048.cccontent.items.sukima_dungeon.common.DungeonManager
-import jp.awabi2048.cccontent.items.sukima_dungeon.common.LangManager
-import jp.awabi2048.cccontent.items.sukima_dungeon.common.MessageManager
-import jp.awabi2048.cccontent.features.sukima_dungeon.gui.GuiManager
-import jp.awabi2048.cccontent.features.sukima_dungeon.gui.DungeonEntranceGui
-import jp.awabi2048.cccontent.features.sukima_dungeon.DungeonSessionManager
-import jp.awabi2048.cccontent.features.sukima_dungeon.DungeonTimerTask
 import jp.awabi2048.cccontent.items.arena.*
 import jp.awabi2048.cccontent.features.arena.ArenaItemListener
 import jp.awabi2048.cccontent.features.rank.RankManager
@@ -31,34 +22,40 @@ import jp.awabi2048.cccontent.features.rank.profession.skilltree.ConfigBasedSkil
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskCheckerImpl
 import jp.awabi2048.cccontent.features.rank.listener.*
-import jp.awabi2048.cccontent.features.sukima_dungeon.command.SukimaDungeonCommand
+// SukimaDungeon (GitHub版)
+import jp.awabi2048.cccontent.features.sukima_dungeon.*
+import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureLoader
+import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureBuilder
+import jp.awabi2048.cccontent.features.sukima_dungeon.mobs.MobManager
+import jp.awabi2048.cccontent.features.sukima_dungeon.items.ItemManager
+import jp.awabi2048.cccontent.features.sukima_dungeon.listeners.*
+import jp.awabi2048.cccontent.features.sukima_dungeon.tasks.SpecialTileTask
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.event.Listener
+import org.bukkit.event.EventHandler
+import org.bukkit.event.player.PlayerJoinEvent
+import org.bukkit.event.player.PlayerQuitEvent
 import java.io.File
 
-class CCContent : JavaPlugin() {
+class CCContent : JavaPlugin(), Listener {
     
     companion object {
         lateinit var instance: CCContent
             private set
     }
     
-     private var playTimeTrackerTaskId: Int = -1
-     private var sukimaDungeonTimerTaskId: Int = -1
+    private var playTimeTrackerTaskId: Int = -1
+    
+    // SukimaDungeon マネージャー (GitHub版)
+    private lateinit var structureLoader: StructureLoader
+    private lateinit var mobManager: MobManager
+    private lateinit var itemManager: ItemManager
+    private lateinit var markerManager: MarkerManager
+    
+    fun getMarkerManager(): MarkerManager = markerManager
+    fun getItemManager(): ItemManager = itemManager
      
-      // SukimaDungeon マネージャー
-     private lateinit var sukimaConfigManager: ConfigManager
-     private lateinit var sukimaDungeonManager: DungeonManager
-     private lateinit var sukimaLangManager: LangManager
-     private lateinit var sukimaMessageManager: MessageManager
-     private lateinit var sukimaGuiManager: GuiManager
-     private lateinit var sukimaEntranceGui: DungeonEntranceGui
-     private lateinit var sukimaCompassListener: CompassListener
-      private lateinit var sukimaTalismanListener: TalismanListener
-      private lateinit var sukimaSproutHarvestListener: SproutHarvestListener
-      private lateinit var sukimaEntranceListener: EntranceListener
-      private lateinit var sukimaDungeonTimerTask: DungeonTimerTask
-     
-     override fun onEnable() {
+    override fun onEnable() {
         instance = this
         
         // ロガーをCustomItemManagerに設定
@@ -67,33 +64,27 @@ class CCContent : JavaPlugin() {
         // GulliverLight設定の初期化
         GulliverConfig.initialize(this)
         
-        // アイテム登録
+        // アイテム登録（スキマダンジョン以外）
         registerCustomItems()
-        
-        // SukimaDungeon マネージャー初期化
-        initializeSukimaDungeon()
         
         // ランクシステムの初期化
         initializeRankSystem()
         
-         // コマンド登録
-         val giveCommand = GiveCommand()
-         val ccCommand = CCCommand(giveCommand) { reloadConfiguration() }
-         val sukimaDungeonCommand = SukimaDungeonCommand()
-         
-          getCommand("cc-content")?.setExecutor(ccCommand)
-          getCommand("cc-content")?.tabCompleter = ccCommand
-          // 旧エイリアスも対応
-          getCommand("cc")?.setExecutor(ccCommand)
-          getCommand("cc")?.tabCompleter = ccCommand
-          
-          // スキマダンジョンコマンド登録
-          getCommand("sukima_dungeon")?.setExecutor(sukimaDungeonCommand)
-          getCommand("sukima_dungeon")?.tabCompleter = sukimaDungeonCommand
+        // コマンド登録
+        val giveCommand = GiveCommand()
+        val ccCommand = CCCommand(giveCommand) { reloadConfiguration() }
         
-        // リスナー登録
+        getCommand("cc-content")?.setExecutor(ccCommand)
+        getCommand("cc-content")?.tabCompleter = ccCommand
+        // 旧エイリアスも対応
+        getCommand("cc")?.setExecutor(ccCommand)
+        getCommand("cc")?.tabCompleter = ccCommand
+        
+        // SukimaDungeon 初期化（GitHub版）
+        initializeSukimaDungeon()
+        
+        // リスナー登録（スキマダンジョン以外）
         server.pluginManager.registerEvents(GulliverItemListener(this), this)
-        server.pluginManager.registerEvents(SukimaItemListener(), this)
         server.pluginManager.registerEvents(ArenaItemListener(), this)
         
         // ScaleManagerタスクの開始（毎tick実行）
@@ -105,7 +96,6 @@ class CCContent : JavaPlugin() {
         
         // フィーチャー別のアイテム数を表示
         logger.info("  - misc: ${CustomItemManager.getItemCountByFeature("misc")}")
-        logger.info("  - sukima_dungeon: ${CustomItemManager.getItemCountByFeature("sukima_dungeon")}")
         logger.info("  - arena: ${CustomItemManager.getItemCountByFeature("arena")}")
     }
     
@@ -284,21 +274,12 @@ class CCContent : JavaPlugin() {
         CustomItemManager.register(BigLight())
         CustomItemManager.register(SmallLight())
         
-        // SukimaDungeon アイテム
-        CustomItemManager.register(SproutItem())
-        CustomItemManager.register(CompassTier1Item())
-        CustomItemManager.register(CompassTier2Item())
-        CustomItemManager.register(CompassTier3Item())
-        CustomItemManager.register(TalismanItem())
-        CustomItemManager.register(BookmarkBrokenItem())
-        CustomItemManager.register(BookmarkWornItem())
-        CustomItemManager.register(BookmarkFadedItem())
-        CustomItemManager.register(BookmarkNewItem())
-        
         // Arena アイテム
         CustomItemManager.register(ArenaTicketItem())
         CustomItemManager.register(ArenaMedalItem())
         CustomItemManager.register(ArenaPrizeItem())
+        
+        // SukimaDungeon アイテムはGitHub版で管理
     }
     
     /**
@@ -371,6 +352,9 @@ class CCContent : JavaPlugin() {
                 }
             }
             
+            // SukimaDungeonの設定をリロード
+            reloadSukimaDungeon()
+            
             logger.info("CC-Content の設定ファイルをすべてリロードしました")
         } catch (e: Exception) {
             logger.warning("リロード中にエラーが発生しました: ${e.message}")
@@ -407,122 +391,195 @@ class CCContent : JavaPlugin() {
     }
     
     /**
-     * SukimaDungeon マネージャーを初期化
+     * SukimaDungeon マネージャーを初期化（GitHub版）
      */
     private fun initializeSukimaDungeon() {
         try {
-            // 設定マネージャーを初期化
-            sukimaConfigManager = ConfigManager(this)
+            logger.info("[SukimaDungeon] 初期化を開始しています...")
             
-            // ダンジョンマネージャーを初期化
-            sukimaDungeonManager = DungeonManager(this, sukimaConfigManager)
+            // 設定をリロード
+            reloadSukimaDungeon()
+            BGMManager.loadConfig()
             
-            // 言語マネージャーを初期化
-            sukimaLangManager = LangManager(this)
+            // コマンド登録
+            val commandExecutor = MazeCommand(this, structureLoader)
+            getCommand("sukima_dungeon")?.setExecutor(commandExecutor)
+            getCommand("sukima_dungeon")?.tabCompleter = commandExecutor
             
-             // メッセージマネージャーを初期化
-             sukimaMessageManager = MessageManager(sukimaLangManager)
-             
-             // GUI マネージャーを初期化
-             sukimaGuiManager = GuiManager()
-             
-              // GUI を初期化
-              sukimaEntranceGui = DungeonEntranceGui(
-                  this,
-                  sukimaGuiManager,
-                  sukimaConfigManager,
-                  sukimaDungeonManager,
-                  sukimaMessageManager
-              )
-             
-             // リスナーを初期化
-             sukimaCompassListener = CompassListener(
-                 this, 
-                 sukimaDungeonManager, 
-                 sukimaConfigManager, 
-                 sukimaMessageManager
-             )
-             sukimaTalismanListener = TalismanListener(
-                 this, 
-                 sukimaDungeonManager, 
-                 sukimaConfigManager, 
-                 sukimaMessageManager
-             )
-             sukimaSproutHarvestListener = SproutHarvestListener(
-                 sukimaDungeonManager,
-                 sukimaConfigManager,
-                 sukimaMessageManager
-             )
-             sukimaEntranceListener = EntranceListener(
-                 this,
-                 sukimaDungeonManager,
-                 sukimaConfigManager,
-                 sukimaMessageManager,
-                 sukimaEntranceGui
-             )
-             
-              // セッションマネージャーを設定
-              sukimaDungeonManager.setSessionManager(DungeonSessionManager)
-              
-              // ダンジョンタイマータスクを初期化して開始
-              sukimaDungeonTimerTask = DungeonTimerTask(
-                  this,
-                  DungeonSessionManager,
-                  sukimaMessageManager
-              )
-              sukimaDungeonTimerTaskId = sukimaDungeonTimerTask.start()
-              
-              // リスナーを登録
-              server.pluginManager.registerEvents(sukimaCompassListener, this)
-              server.pluginManager.registerEvents(sukimaTalismanListener, this)
-              server.pluginManager.registerEvents(sukimaSproutHarvestListener, this)
-              server.pluginManager.registerEvents(sukimaEntranceListener, this)
-              
-              // ブックマークアイテムの初期化（翻訳マネージャーを設定）
-              BookmarkItem.initialize(sukimaMessageManager, sukimaLangManager)
-             
-             // 定期的なクリーンアップタスクを開始（5分ごと）
-             server.scheduler.runTaskTimer(this, Runnable {
-                 sukimaDungeonManager.cleanup()
-             }, 0L, 6000L)
+            // リスナー登録
+            server.pluginManager.registerEvents(this, this)
+            server.pluginManager.registerEvents(DungeonListener(), this)
+            server.pluginManager.registerEvents(EntranceListener(this, structureLoader), this)
+            server.pluginManager.registerEvents(GravityListener(), this)
+            server.pluginManager.registerEvents(TalismanListener(this), this)
+            server.pluginManager.registerEvents(TrapListener(this), this)
+            server.pluginManager.registerEvents(SproutListener(this), this)
+            server.pluginManager.registerEvents(ItemPickupListener(this), this)
+            server.pluginManager.registerEvents(CompassListener(this), this)
+            server.pluginManager.registerEvents(MobTargetListener(this), this)
             
-            logger.info("[SukimaDungeon] マネージャーとリスナーを初期化しました")
+            markerManager = MarkerManager(this)
+            server.pluginManager.registerEvents(markerManager, this)
+            markerManager.startParticleTask()
+            
+            PortalManager.init(this)
+            
+            // Start sprout particle task
+            SproutManager.startParticleTask(this)
+            
+            // Start scoreboard and session check task
+            server.scheduler.runTaskTimer(this, Runnable {
+                for (session in DungeonSessionManager.getAllSessions().toList()) {
+                    session.updateElapsed()
+                    
+                    val player = session.player
+                    if (player != null && player.isOnline) {
+                        ScoreboardManager.updateScoreboard(player)
+                    }
+                    
+                    val remaining = session.getRemainingTime()
+                    
+                    // 警告処理
+                    when (remaining) {
+                        in 59001..61000 -> {
+                            player?.let { p ->
+                                if (p.isOnline) {
+                                    val msg = MessageManager.getMessage(p, "oage_collapse_warn")
+                                    p.sendMessage("§e§l[おあげちゃん] §f「$msg」")
+                                    p.playSound(p.location, org.bukkit.Sound.BLOCK_NOTE_BLOCK_BELL, 1.0f, 1.0f)
+                                }
+                            }
+                        }
+                        in 4001..6000 -> {
+                            player?.let { p ->
+                                if (p.isOnline) {
+                                    val msg = MessageManager.getMessage(p, "oage_collapse")
+                                    p.sendMessage("§e§l[おあげちゃん] §f「$msg」")
+                                    p.playSound(p.location, org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 0.5f)
+                                }
+                            }
+                        }
+                    }
+
+                    if (remaining <= 0) {
+                        player?.let { p ->
+                            if (p.isOnline) {
+                                if (session.isCollapsing) {
+                                    val failMsg = MessageManager.getList(p, "oage_fail").random()
+                                    MessageManager.sendOageMessage(p, " 「$failMsg」")
+                                    
+                                    p.inventory.contents.filterNotNull().forEach { item ->
+                                        if (jp.awabi2048.cccontent.features.sukima_dungeon.CustomItemManager.isDungeonItem(item)) {
+                                            item.amount = 0
+                                        }
+                                    }
+                                    p.playSound(p.location, org.bukkit.Sound.ENTITY_WITHER_SPAWN, 1.0f, 0.5f)
+                                } else {
+                                    p.sendMessage(MessageManager.getMessage(p, "dungeon_closing"))
+                                }
+                                
+                                p.inventory.contents.filterNotNull().forEach { item ->
+                                    if (jp.awabi2048.cccontent.features.sukima_dungeon.CustomItemManager.isTalismanItem(item)) {
+                                        item.amount = 0
+                                    }
+                                }
+
+                                p.teleport(server.worlds[0].spawnLocation)
+                            }
+                        }
+                        
+                        DungeonSessionManager.endSession(session.playerUUID)
+                        player?.let { ScoreboardManager.removeScoreboard(it) }
+                        
+                        session.dungeonWorldName?.let { worldName ->
+                            server.getWorld(worldName)?.let { world ->
+                                if (world.players.isEmpty()) {
+                                    DungeonManager.deleteDungeonWorld(world)
+                                }
+                            }
+                        }
+                    }
+                }
+                mobManager.tick()
+                SpecialTileTask.tick(this@CCContent, mobManager)
+            }, 20L, 20L)
+
+            // Load sessions
+            DungeonSessionManager.loadSessions(this)
+            
+            logger.info("[SukimaDungeon] 初期化が完了しました")
         } catch (e: Exception) {
             logger.warning("[SukimaDungeon] 初期化に失敗しました: ${e.message}")
             e.printStackTrace()
         }
     }
     
+    /**
+     * SukimaDungeonの設定をリロード
+     */
+    fun reloadSukimaDungeon() {
+        // SukimaDungeon用config読み込み (config/sukima/config.yml)
+        SukimaConfigHelper.reload(this)
+        
+        // Load messages
+        MessageManager.load(this)
+        
+        if (!::structureLoader.isInitialized) {
+            structureLoader = StructureLoader(this)
+        }
+        structureLoader.loadThemes()
+        
+        // Re-initialize or refresh managers
+        if (!::mobManager.isInitialized) {
+            mobManager = MobManager(this)
+        }
+        mobManager.load()
+        
+        if (!::itemManager.isInitialized) {
+            itemManager = ItemManager(this)
+        }
+        itemManager.load()
+
+        StructureBuilder.init(structureLoader, mobManager, itemManager)
+        BGMManager.loadConfig()
+    }
+    
+    @EventHandler
+    fun onJoin(event: PlayerJoinEvent) {
+        PlayerDataManager.load(event.player)
+        
+        // ダンジョン内にいる場合はBGMを再開
+        if (event.player.world.name.startsWith("dungeon_")) {
+            BGMManager.play(event.player, "default")
+        }
+    }
+
+    @EventHandler
+    fun onQuit(event: PlayerQuitEvent) {
+        BGMManager.stop(event.player)
+        PlayerDataManager.unload(event.player)
+        MenuCooldownManager.clearCooldown(event.player.uniqueId)
+    }
+    
     override fun onDisable() {
-         // SukimaDungeon クリーンアップ
-         try {
-             if (::sukimaCompassListener.isInitialized) {
-                 sukimaCompassListener.cleanup()
-             }
-             if (::sukimaDungeonManager.isInitialized) {
-                 sukimaDungeonManager.clearAll()
-             }
-             if (::sukimaEntranceGui.isInitialized) {
-                 sukimaEntranceGui.cleanup()
-             }
-             if (::sukimaDungeonTimerTask.isInitialized) {
-                 sukimaDungeonTimerTask.stop()
-             }
-             // セッション情報をクリア
-             DungeonSessionManager.clearAllSessions()
-         } catch (e: Exception) {
-             logger.warning("[SukimaDungeon] クリーンアップ中にエラーが発生しました: ${e.message}")
-         }
-         
-         // プレイ時間トラッカータスクを停止
-         if (playTimeTrackerTaskId != -1) {
-             server.scheduler.cancelTask(playTimeTrackerTaskId)
-         }
-         
-         // ダンジョンタイマータスクを停止
-         if (sukimaDungeonTimerTaskId != -1) {
-             server.scheduler.cancelTask(sukimaDungeonTimerTaskId)
-         }
+        // SukimaDungeon クリーンアップ
+        try {
+            BGMManager.stopAll()
+            DungeonSessionManager.saveSessions(this)
+            for (player in server.onlinePlayers) {
+                PlayerDataManager.unload(player)
+                MenuCooldownManager.clearCooldown(player.uniqueId)
+            }
+            logger.info("[SukimaDungeon] セッション情報を保存しました")
+        } catch (e: Exception) {
+            logger.warning("[SukimaDungeon] クリーンアップ中にエラーが発生しました: ${e.message}")
+        }
+        
+        // プレイ時間トラッカータスクを停止
+        if (playTimeTrackerTaskId != -1) {
+            server.scheduler.cancelTask(playTimeTrackerTaskId)
+        }
+        
         logger.info("CC-Content v${description.version} が無効化されました")
     }
 }

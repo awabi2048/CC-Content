@@ -4,130 +4,51 @@ import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
-import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
+import java.util.*
 
-/**
- * プレイヤーデータ管理クラス
- * プレイヤーのダンジョン関連データを永続化する
- */
-class PlayerDataManager(private val plugin: JavaPlugin) {
-    
-    /**
-     * プレイヤーデータクラス
-     */
+object PlayerDataManager {
+    private val dataCache = mutableMapOf<UUID, PlayerData>()
+    private lateinit var dataDir: File
+
     data class PlayerData(
-        val uuid: UUID,
-        var language: String = "ja_jp",
-        var isDown: Boolean = false,
-        var currentWorldName: String? = null
+        var lang: String = "ja_jp"
     )
-    
-    private val playerDataCache: MutableMap<UUID, PlayerData> = ConcurrentHashMap()
-    private val dataFolder = File(plugin.dataFolder, "playerdata")
-    
-    init {
-        if (!dataFolder.exists()) {
-            dataFolder.mkdirs()
+
+    fun init(plugin: JavaPlugin) {
+        dataDir = File(plugin.dataFolder, "playerdata")
+        if (!dataDir.exists()) {
+            dataDir.mkdirs()
         }
     }
-    
-    /**
-     * プレイヤーデータを取得（キャッシュから、なければディスクから読み込み）
-     */
-    fun getPlayerData(player: Player): PlayerData {
-        val uuid = player.uniqueId
-        
-        // キャッシュに存在すればそれを返す
-        playerDataCache[uuid]?.let { return it }
-        
-        // ディスクから読み込み
-        return loadPlayerData(uuid)
-    }
-    
-    /**
-     * ディスクからプレイヤーデータを読み込み
-     */
-    fun loadPlayerData(uuid: UUID): PlayerData {
-        val file = File(dataFolder, "$uuid.yml")
-        
+
+    fun load(player: Player): PlayerData {
+        val file = File(dataDir, "${player.uniqueId}.yml")
         val data = if (file.exists()) {
-            try {
-                val config = YamlConfiguration.loadConfiguration(file)
-                PlayerData(
-                    uuid = uuid,
-                    language = config.getString("language", "ja_jp") ?: "ja_jp",
-                    isDown = config.getBoolean("is_down", false),
-                    currentWorldName = config.getString("current_world_name")
-                )
-            } catch (e: Exception) {
-                plugin.logger.warning("[SukimaDungeon] プレイヤーデータ読み込みエラー ($uuid): ${e.message}")
-                PlayerData(uuid = uuid)
-            }
+            val config = YamlConfiguration.loadConfiguration(file)
+            PlayerData(
+                lang = config.getString("lang", "ja_jp") ?: "ja_jp"
+            )
         } else {
-            PlayerData(uuid = uuid)
+            PlayerData()
         }
-        
-        // キャッシュに保存
-        playerDataCache[uuid] = data
+        dataCache[player.uniqueId] = data
         return data
     }
-    
-    /**
-     * プレイヤーデータをディスクに保存
-     */
-    fun savePlayerData(uuid: UUID) {
-        val data = playerDataCache[uuid] ?: return
-        
-        val file = File(dataFolder, "$uuid.yml")
+
+    fun save(player: Player) {
+        val data = dataCache[player.uniqueId] ?: return
+        val file = File(dataDir, "${player.uniqueId}.yml")
         val config = YamlConfiguration()
-        
-        config.set("language", data.language)
-        config.set("is_down", data.isDown)
-        config.set("current_world_name", data.currentWorldName)
-        
-        try {
-            config.save(file)
-        } catch (e: Exception) {
-            plugin.logger.warning("[SukimaDungeon] プレイヤーデータ保存エラー ($uuid): ${e.message}")
-        }
+        config.set("lang", data.lang)
+        config.save(file)
     }
-    
-    /**
-     * すべてのプレイヤーデータを保存
-     */
-    fun saveAllPlayerData() {
-        for ((uuid, _) in playerDataCache) {
-            savePlayerData(uuid)
-        }
+
+    fun getPlayerData(player: Player): PlayerData {
+        return dataCache[player.uniqueId] ?: load(player)
     }
-    
-    /**
-     * プレイヤーデータをアンロード（キャッシュと共に保存）
-     */
-    fun unloadPlayerData(uuid: UUID) {
-        savePlayerData(uuid)
-        playerDataCache.remove(uuid)
-    }
-    
-    /**
-     * プレイヤーデータをクリア（キャッシュのみ）
-     */
-    fun clearPlayerDataCache(uuid: UUID) {
-        playerDataCache.remove(uuid)
-    }
-    
-    /**
-     * すべてのプレイヤーデータをクリア
-     */
-    fun clearAllPlayerDataCache() {
-        playerDataCache.clear()
-    }
-    
-    /**
-     * キャッシュに保存されているデータ数を取得
-     */
-    fun getCacheSize(): Int {
-        return playerDataCache.size
+
+    fun unload(player: Player) {
+        save(player)
+        dataCache.remove(player.uniqueId)
     }
 }

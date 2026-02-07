@@ -1,438 +1,184 @@
-package jp.awabi2048.cccontent.features.sukima_dungeon.gui
+﻿package jp.awabi2048.cccontent.features.sukima_dungeon.gui
 
-import jp.awabi2048.cccontent.items.sukima_dungeon.common.ConfigManager
-import jp.awabi2048.cccontent.items.sukima_dungeon.common.DungeonManager
-import jp.awabi2048.cccontent.items.sukima_dungeon.common.MessageManager
+import jp.awabi2048.cccontent.features.sukima_dungeon.DungeonTier
+import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureLoader
+import jp.awabi2048.cccontent.features.sukima_dungeon.LangManager
+import jp.awabi2048.cccontent.features.sukima_dungeon.PlayerDataManager
+import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
-import org.bukkit.plugin.java.JavaPlugin
-import java.util.*
+import org.bukkit.inventory.InventoryHolder
+import org.bukkit.inventory.ItemStack
+import org.bukkit.inventory.meta.ItemMeta
+import org.bukkit.inventory.ItemFlag
 
-/**
- * ダンジョン進入GUI管理クラス
- * 3段階のGUI（テーマ選択→サイズ選択→確認）をハンドリング
- */
-class DungeonEntranceGui(
-    private val plugin: JavaPlugin,
-    private val guiManager: GuiManager,
-    private val configManager: ConfigManager,
-    private val dungeonManager: DungeonManager,
-    private val messageManager: MessageManager
-) {
-    // プレイヤーの選択を一時保存
-    private val playerSelections: MutableMap<UUID, GuiSelection> = mutableMapOf()
-    
-    /**
-     * プレイヤーの選択情報
-     */
-    data class GuiSelection(
-        var selectedTier: String = "",
-        var selectedTheme: String? = null,
-        var selectedSize: String? = null,
-        var currentStage: GuiStage = GuiStage.THEME
-    )
-    
-    /**
-     * GUI ステージの定義
-     */
-    enum class GuiStage {
-        THEME,      // テーマ選択
-        SIZE,       // サイズ選択
-        CONFIRM     // 最終確認
+class DungeonEntranceGui(private val loader: StructureLoader, val tier: DungeonTier) : InventoryHolder {
+
+    private var inventory: Inventory? = null
+    var currentThemeIndex = 0
+    var isMultiplayer = false
+    private val themes = listOf("random") + loader.getThemeNames()
+        .mapNotNull { loader.getTheme(it) }
+        .filter { it.requiredTier <= tier.tier }
+        .map { it.id }
+
+    val sizes = tier.availableSizes
+    var currentSizeIndex = 0
+
+    override fun getInventory(): Inventory {
+        return inventory ?: Bukkit.createInventory(this, 45, "Dungeon")
     }
-    
-    /**
-     * ダンジョン進入 GUI を表示（テーマ選択から開始）
-     * @param player プレイヤー
-     * @param tier ブックマークのティア（BROKEN, WORN, FADED, NEW）
-     */
-    fun openEntranceGui(player: Player, tier: String) {
-        val selection = GuiSelection(
-            selectedTier = tier,
-            currentStage = GuiStage.THEME
-        )
-        playerSelections[player.uniqueId] = selection
-        
-        showThemeSelectionGui(player, tier)
+
+    fun open(player: Player) {
+        val title = MessageManager.getMessage(player, "gui_entrance_title", mapOf("tier" to MessageManager.getTierName(player, tier.name)))
+        inventory = Bukkit.createInventory(this, 45, title)
+        update(player)
+        player.openInventory(inventory!!)
     }
-    
-    /**
-     * テーマ選択 GUI を表示
-     */
-    private fun showThemeSelectionGui(player: Player, tier: String) {
-        val inventory = guiManager.createInventory("§b§lテーマを選択", 6)
-        guiManager.drawBorder(inventory)
+
+    fun update(player: Player) {
+        val inv = inventory ?: return
         
-        // ティア設定からこのティアで使用可能なテーマを取得
-        val tierConfig = configManager.getDungeonTierConfig(tier)
-        val availableThemes = tierConfig?.availableThemes ?: listOf()
+        val blackGlass = createGuiItem(Material.BLACK_STAINED_GLASS_PANE, " ")
+        val blackMeta = blackGlass.itemMeta
+        blackMeta?.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        blackGlass.itemMeta = blackMeta
         
-        if (availableThemes.isEmpty()) {
-            player.closeInventory()
-            player.sendMessage("§c利用可能なテーマがありません")
-            return
+        val grayGlass = createGuiItem(Material.GRAY_STAINED_GLASS_PANE, " ")
+        val grayMeta = grayGlass.itemMeta
+        grayMeta?.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        grayGlass.itemMeta = grayMeta
+
+        // Fill Header & Footer (Row 0 and 4)
+        for (i in 0..8) inv.setItem(i, blackGlass)
+        for (i in 36..44) inv.setItem(i, blackGlass)
+
+        // Fill Background (Rows 1, 2, 3)
+        for (i in 9..35) inv.setItem(i, grayGlass)
+
+        // ---------------------------------------------
+        // Center: Entrance Button (Slot 22)
+        // ---------------------------------------------
+        val entranceItem = createGuiItem(Material.END_CRYSTAL, 
+            "§bダンジョンへのポータルを開く", 
+            "§7クリックしてダンジョンへのポータルを開きます！")
+        inv.setItem(22, entranceItem)
+
+        val bar = "§7§m――――――――――――――――――――――――――――――"
+
+        // ---------------------------------------------
+        // Slot 38: Play Style Selector
+        // ---------------------------------------------
+        val styleLabel = if (isMultiplayer) {
+            MessageManager.getMessage(player, "gui_style_multi")
+        } else {
+            MessageManager.getMessage(player, "gui_style_single")
         }
-        
-        var slot = 10
-        for (themeName in availableThemes) {
-            val themeConfig = configManager.getDungeonThemeConfig(themeName)
-            if (themeConfig != null) {
-                val material = try {
-                    Material.valueOf(themeConfig.icon)
-                } catch (e: IllegalArgumentException) {
-                    Material.BOOK
-                }
-                
-                val item = guiManager.createItem(
-                    material,
-                    "§a${themeConfig.displayName}",
-                    listOf("§7このテーマでダンジョンに進入します")
-                )
-                
-                inventory.setItem(slot, item)
-                slot += 2
-                
-                if (slot >= 16) {
-                    slot = 19
-                }
-            }
+        val styleItem = createGuiItem(Material.LEATHER_HORSE_ARMOR, 
+            "§6プレイスタイルの選択", 
+            bar,
+            styleLabel,
+            "§7クリックして切り替えます",
+            bar)
+        val styleMeta = styleItem.itemMeta as? org.bukkit.inventory.meta.LeatherArmorMeta
+        styleMeta?.setColor(org.bukkit.Color.WHITE)
+        styleMeta?.addItemFlags(ItemFlag.HIDE_DYE)
+        styleItem.itemMeta = styleMeta
+        inv.setItem(37, styleItem)
+
+        val sizeKey = sizes[currentSizeIndex]
+        if (sizes.size > 1) {
+            val sizeLabel = MessageManager.getMessage(player, "gui_size_$sizeKey")
+            val sizeItem = createGuiItem(Material.DIAMOND_PICKAXE, 
+                "§eサイズの選択",
+                bar,
+                sizeLabel,
+                "§7クリックして切り替えます",
+                bar)
+            val sizeMeta = sizeItem.itemMeta
+            sizeMeta?.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+            sizeItem.itemMeta = sizeMeta
+            inv.setItem(38, sizeItem)
         }
-        
-        // キャンセルボタン
-        inventory.setItem(guiManager.getSlot(5, 4), guiManager.createCancelButton())
-        
-        guiManager.showGui(player, inventory)
-        playerSelections[player.uniqueId]?.currentStage = GuiStage.THEME
-    }
-    
-    /**
-     * サイズ選択 GUI を表示
-     */
-    private fun showSizeSelectionGui(player: Player) {
-        val selection = playerSelections[player.uniqueId] ?: return
-        val tier = selection.selectedTier
-        val theme = selection.selectedTheme ?: return
-        
-        val inventory = guiManager.createInventory("§b§lサイズを選択", 6)
-        guiManager.drawBorder(inventory)
-        
-        // ティア設定からこのティアで使用可能なサイズを取得
-        val tierConfig = configManager.getDungeonTierConfig(tier)
-        val availableSizes = tierConfig?.availableSizes ?: listOf()
-        
-        if (availableSizes.isEmpty()) {
-            player.closeInventory()
-            player.sendMessage("§c利用可能なサイズがありません")
-            return
-        }
-        
-        var slot = 10
-        for (sizeName in availableSizes) {
-            val sizeConfig = configManager.getDungeonSizeConfig(sizeName)
-            if (sizeConfig != null) {
-                val duration = sizeConfig.duration / 60 // 秒を分に変換
-                val sproutCount = sizeConfig.sproutBaseCount
-                val material = when (sizeName) {
-                    "small" -> Material.OAK_WOOD
-                    "medium" -> Material.BIRCH_WOOD
-                    "large" -> Material.JUNGLE_WOOD
-                    "huge" -> Material.DARK_OAK_WOOD
-                    else -> Material.OAK_WOOD
-                }
-                
-                val item = guiManager.createItem(
-                    material,
-                    "§a${sizeName.uppercase()}",
-                    listOf(
-                        "§7制限時間: §f${duration}分",
-                        "§7ワールドの芽: §f${sproutCount}個"
-                    )
-                )
-                
-                inventory.setItem(slot, item)
-                slot += 2
-                
-                if (slot >= 16) {
-                    slot = 19
-                }
-            }
-        }
-        
-        // 戻るボタン
-        inventory.setItem(guiManager.getSlot(5, 0), guiManager.createPreviousButton())
-        
-        // キャンセルボタン
-        inventory.setItem(guiManager.getSlot(5, 4), guiManager.createCancelButton())
-        
-        guiManager.showGui(player, inventory)
-        playerSelections[player.uniqueId]?.currentStage = GuiStage.SIZE
-    }
-    
-    /**
-     * 最終確認 GUI を表示
-     */
-    private fun showConfirmGui(player: Player) {
-        val selection = playerSelections[player.uniqueId] ?: return
-        val theme = selection.selectedTheme ?: return
-        val size = selection.selectedSize ?: return
-        
-        val inventory = guiManager.createInventory("§b§l確認", 5)
-        guiManager.drawBorder(inventory)
-        
-        // テーマ情報
-        val themeConfig = configManager.getDungeonThemeConfig(theme)
-        if (themeConfig != null) {
-            val themeMaterial = try {
-                Material.valueOf(themeConfig.icon)
-            } catch (e: IllegalArgumentException) {
-                Material.BOOK
-            }
+
+        // ---------------------------------------------
+        // Slot 43: Theme Selector
+        // ---------------------------------------------
+        if (themes.isNotEmpty()) {
+            val themeName = themes[currentThemeIndex]
+            val theme = loader.getTheme(themeName)
+            val isRandom = themeName == "random"
             
-            val themeItem = guiManager.createItem(
-                themeMaterial,
-                "§eテーマ",
-                listOf("§f${themeConfig.displayName}")
-            )
-            inventory.setItem(guiManager.getSlot(1, 2), themeItem)
-        }
-        
-        // サイズ情報
-        val sizeConfig = configManager.getDungeonSizeConfig(size)
-        if (sizeConfig != null) {
-            val sizeMaterial = when (size) {
-                "small" -> Material.OAK_WOOD
-                "medium" -> Material.BIRCH_WOOD
-                "large" -> Material.JUNGLE_WOOD
-                "huge" -> Material.DARK_OAK_WOOD
-                else -> Material.OAK_WOOD
-            }
+            val randomDisplayName = MessageManager.getMessage(player, "gui_theme_random")
+            val baseDisplayName = if (isRandom) randomDisplayName else theme?.getDisplayName(player) ?: themeName
+            val displaySuffix = if (isRandom) "" else "の世界"
+            val fullDisplayName = "$baseDisplayName$displaySuffix"
             
-            val duration = sizeConfig.duration / 60
-            val sizeItem = guiManager.createItem(
-                sizeMaterial,
-                "§eサイズ",
-                listOf(
-                    "§f${size.uppercase()}",
-                    "§7制限時間: §f${duration}分"
-                )
-            )
-            inventory.setItem(guiManager.getSlot(1, 6), sizeItem)
-        }
-        
-        // 確認ボタン
-        inventory.setItem(guiManager.getSlot(3, 3), guiManager.createConfirmButton())
-        
-        // 戻るボタン
-        inventory.setItem(guiManager.getSlot(3, 5), guiManager.createPreviousButton())
-        
-        // キャンセルボタン
-        inventory.setItem(guiManager.getSlot(3, 7), guiManager.createCancelButton())
-        
-        guiManager.showGui(player, inventory)
-        playerSelections[player.uniqueId]?.currentStage = GuiStage.CONFIRM
-    }
-    
-    /**
-     * GUI のアイテムクリックを処理
-     * @param player プレイヤー
-     * @param slot クリックされたスロット
-     * @return true: イベントを消費, false: 処理しない
-     */
-    fun handleGuiClick(player: Player, slot: Int): Boolean {
-        val selection = playerSelections[player.uniqueId] ?: return false
-        
-        return when (selection.currentStage) {
-            GuiStage.THEME -> handleThemeSelection(player, slot)
-            GuiStage.SIZE -> handleSizeSelection(player, slot)
-            GuiStage.CONFIRM -> handleConfirmation(player, slot)
-        }
-    }
-    
-    /**
-     * テーマ選択処理
-     */
-    private fun handleThemeSelection(player: Player, slot: Int): Boolean {
-        val selection = playerSelections[player.uniqueId] ?: return false
-        
-        // キャンセルボタンチェック
-        if (slot == guiManager.getSlot(5, 4)) {
-            player.closeInventory()
-            playerSelections.remove(player.uniqueId)
-            return true
-        }
-        
-        // テーマ選択処理
-        val tierConfig = configManager.getDungeonTierConfig(selection.selectedTier)
-        val availableThemes = tierConfig?.availableThemes ?: listOf()
-        
-        var expectedSlot = 10
-        for (themeName in availableThemes) {
-            if (slot == expectedSlot) {
-                selection.selectedTheme = themeName
-                showSizeSelectionGui(player)
-                return true
-            }
-            expectedSlot += 2
-            if (expectedSlot >= 16) {
-                expectedSlot = 19
-            }
-        }
-        
-        return false
-    }
-    
-    /**
-     * サイズ選択処理
-     */
-    private fun handleSizeSelection(player: Player, slot: Int): Boolean {
-        val selection = playerSelections[player.uniqueId] ?: return false
-        
-        // 戻るボタンチェック
-        if (slot == guiManager.getSlot(5, 0)) {
-            showThemeSelectionGui(player, selection.selectedTier)
-            return true
-        }
-        
-        // キャンセルボタンチェック
-        if (slot == guiManager.getSlot(5, 4)) {
-            player.closeInventory()
-            playerSelections.remove(player.uniqueId)
-            return true
-        }
-        
-        // サイズ選択処理
-        val tierConfig = configManager.getDungeonTierConfig(selection.selectedTier)
-        val availableSizes = tierConfig?.availableSizes ?: listOf()
-        
-        var expectedSlot = 10
-        for (sizeName in availableSizes) {
-            if (slot == expectedSlot) {
-                selection.selectedSize = sizeName
-                showConfirmGui(player)
-                return true
-            }
-            expectedSlot += 2
-            if (expectedSlot >= 16) {
-                expectedSlot = 19
-            }
-        }
-        
-        return false
-    }
-    
-    /**
-     * 確認処理
-     */
-    private fun handleConfirmation(player: Player, slot: Int): Boolean {
-        val selection = playerSelections[player.uniqueId] ?: return false
-        
-        // 確認ボタンチェック
-        if (slot == guiManager.getSlot(3, 3)) {
-            // ダンジョン開始
-            val theme = selection.selectedTheme ?: return false
-            val size = selection.selectedSize ?: return false
+            val themeIcon = if (isRandom) Material.MAP else theme?.icon ?: Material.PAPER
+
+            val themeItem = createGuiItem(themeIcon, 
+                "§dポータルの接続先", 
+                bar,
+                "§f§l| §7現在の設定 §d${fullDisplayName}",
+                "§e§nクリックして変更",
+                bar)
+            inv.setItem(43, themeItem)
             
-            player.closeInventory()
-            
-            try {
-                startDungeon(player, selection.selectedTier, theme, size)
-            } catch (e: Exception) {
-                messageManager.sendError(player, "ダンジョンの開始に失敗しました")
-                plugin.logger.warning("[SukimaDungeon] ダンジョン開始エラー: ${e.message}")
-                e.printStackTrace()
-            }
-            
-            playerSelections.remove(player.uniqueId)
-            return true
+            // ---------------------------------------------
+            // Slot 40: Info
+            // ---------------------------------------------
+            val sizeName = LangManager.getMessage(PlayerDataManager.getPlayerData(player).lang, "sizes.$sizeKey")
+            val infoItem = createGuiItem(Material.SPYGLASS, 
+                "§aInfo", 
+                bar,
+                "§f§l| §7ポータルの接続先 §d${fullDisplayName}", 
+                "§f§l| §7サイズ §e${sizeName}",
+                "§7${theme?.getDescription(player) ?: ""}",
+                bar,
+                "§7スキマの世界は非常に不安定です。そのため、ポータルが別の世界に繋がってしまうことがあります。",
+                "§7より上位のしおりを使用すると、望んだ傾向の世界に行きやすくなります。",
+                bar)
+
+            inv.setItem(40, infoItem)
+        } else {
+             val errorItem = createGuiItem(Material.BARRIER, MessageManager.getMessage(player, "gui_theme_error"))
+             inv.setItem(43, errorItem)
+             inv.setItem(40, errorItem)
         }
-        
-        // 戻るボタンチェック
-        if (slot == guiManager.getSlot(3, 5)) {
-            showSizeSelectionGui(player)
-            return true
-        }
-        
-        // キャンセルボタンチェック
-        if (slot == guiManager.getSlot(3, 7)) {
-            player.closeInventory()
-            playerSelections.remove(player.uniqueId)
-            return true
-        }
-        
-        return false
     }
     
-    /**
-     * プレイヤーの選択情報を取得
-     */
-    fun getPlayerSelection(player: Player): GuiSelection? {
-        return playerSelections[player.uniqueId]
-    }
-    
-    /**
-     * プレイヤーの選択情報をクリア
-     */
-    fun clearPlayerSelection(player: Player) {
-        playerSelections.remove(player.uniqueId)
-    }
-    
-    /**
-     * 全選択情報をクリア（プラグイン無効化時など）
-     */
-    fun cleanup() {
-        playerSelections.clear()
-    }
-    
-    /**
-     * ダンジョンを開始
-     * @param player プレイヤー
-     * @param tier ブックマークティア
-     * @param theme テーマ名
-     * @param size サイズ名
-     */
-    private fun startDungeon(player: Player, tier: String, theme: String, size: String) {
-        // サイズ設定を取得
-        val sizeConfig = configManager.getDungeonSizeConfig(size)
-            ?: throw Exception("サイズ設定が見つかりません: $size")
-        
-        // ダンジョン開始メッセージ
-        messageManager.send(player, "§a§lダンジョンを開始します!")
-        messageManager.send(player, "§fテーマ: §e${configManager.getDungeonThemeConfig(theme)?.displayName}")
-        messageManager.send(player, "§fサイズ: §e${size.uppercase()}")
-        messageManager.send(player, "§f制限時間: §e${sizeConfig.duration / 60}分")
-        messageManager.send(player, "§fワールドの芽: §e${sizeConfig.sproutBaseCount}個")
-        
-        // ダンジョンワールドを作成
-        // サイズからグリッドサイズを計算（実装簡略化のため固定値）
-        val gridWidth = sizeConfig.tiles
-        val gridLength = sizeConfig.tiles
-        
-        val dungeonWorld = dungeonManager.createDungeonWorld(
-            theme,
-            gridWidth,
-            gridLength
-        )
-        
-        if (dungeonWorld == null) {
-            messageManager.sendError(player, "ダンジョンワールドの生成に失敗しました")
-            return
+    fun nextTheme(player: Player) {
+        if (themes.isNotEmpty()) {
+            currentThemeIndex = (currentThemeIndex + 1) % themes.size
+            update(player)
         }
-        
-        // プレイヤーをダンジョン進入地点にテレポート
-        val entranceLocation = dungeonWorld.spawnLocation.add(0.5, 1.0, 0.5)
-        player.teleport(entranceLocation)
-        
-        // セッションを開始
-        dungeonManager.startDungeonSession(
-            player,
-            tier,
-            theme,
-            size,
-            dungeonWorld.name
-        )
-        
-        messageManager.sendActionBar(player, "§eダンジョンに進入しました")
     }
+
+    fun togglePlayStyle(player: Player) {
+        isMultiplayer = !isMultiplayer
+        update(player)
+    }
+
+    fun nextSize(player: Player) {
+        currentSizeIndex = (currentSizeIndex + 1) % sizes.size
+        update(player)
+    }
+    
+    fun getCurrentTheme(): String? {
+        return if (themes.isNotEmpty()) themes[currentThemeIndex] else null
+    }
+
+    private fun createGuiItem(material: Material, name: String, vararg lore: String): ItemStack {
+        val item = ItemStack(material, 1)
+        val meta: ItemMeta? = item.itemMeta
+        meta?.setDisplayName(name)
+        if (lore.isNotEmpty()) {
+            meta?.lore = lore.toList()
+        }
+        item.itemMeta = meta
+        return item
+    }
+
 }

@@ -1,153 +1,80 @@
-# SukimaDungeon 設定ファイル
-# 元の SukimaDungeon プラグインの設定を再現
+# SukimaDungeon Config
 
-# 基本設定
-general:
-  # 言語設定 (ja_jp, en_us)
-  language: "ja_jp"
-  
-  # ダンジョンワールド名（複数指定可能）
-  dungeon_worlds:
-    - "world"
-
-# 脱出地点（CC-Content全体で使用）
-escape_location:
-  world: "world"
-  x: 0.0
-  y: 64.0
-  z: 0.0
-  yaw: 0.0
-  pitch: 0.0
-
-# ふしぎなしおり（ブックマーク）のティア別設定
-tiers:
-  broken:
-    available_sizes:
-      - small
-    available_themes:
-      - default
-  
-  worn:
-    available_sizes:
-      - small
-      - medium
-    available_themes:
-      - default
-  
-  faded:
-    available_sizes:
-      - small
-      - medium
-      - large
-    available_themes:
-      - default
-      - nether
-  
-  new:
-    available_sizes:
-      - small
-      - medium
-      - large
-      - huge
-    available_themes:
-      - default
-      - nether
-      - end
-
-# ダンジョンサイズ設定
 sizes:
   small:
-    tiles: 5
-    duration: 600
-    sprout_base_count: 3
-  
+    tiles: 3
+    duration: 900 # 15分
+    npc_base_count: 2
+    sprout_base_count: 1
   medium:
-    tiles: 7
-    duration: 1200
-    sprout_base_count: 5
-  
+    tiles: 5
+    duration: 1800 # 30分
+    npc_base_count: 5
+    sprout_base_count: 3
   large:
-    tiles: 10
-    duration: 1800
-    sprout_base_count: 8
-  
+    tiles: 7
+    duration: 2700 # 45分
+    npc_base_count: 8
+    sprout_base_count: 5
   huge:
-    tiles: 12
-    duration: 2400
-    sprout_base_count: 10
+    tiles: 9
+    duration: 3600 # 60分
+    npc_base_count: 12
+    sprout_base_count: 8
 
-# ジェネレーター設定
-generator:
-  cells_per_tick: 5
-  marker_search_radius_y: 20.0
-  miniboss_chance: 0.1
-  trap_chance: 0.05
+mob_scaling:
+  amplification_ratio: 0.05
 
-# コンパス設定
+miniboss_chance: 0.1
+rest_chance: 0.1
+spawn_rates:
+  MOB: 0.5
+  ITEM: 0.4
+
+mob_spawn:
+  spawn_range: 24.0
+  despawn_range: 32.0
+
+mob_detection:
+  normal_range: 16.0
+  sneak_range: 8.0
+
+npc_count_variation: 0.2
+sprout_count_variation: 0.2
+
+marker_search_radius_y: 20.0
+
+sprout_per_tile: 0.1
+
+restricted_commands:
+  - "tp"
+  - "teleport"
+  - "spawn"
+  - "home"
+  - "sethome"
+  - "warp"
+
+bookmark_blacklist_worlds:
+  - "world_the_end"
+
+oage_message_sound: "entity.villager.ambient"
+oage_message_prefix: "§e【おあげちゃん】§r"
+ 
 compass:
-  # デフォルト検知半径
-  default_radius: 48.0
-  
-  # 各ティアの設定
-  tiers:
-    tier1:
-      name: "Tier 1"
-      duration: 30  # 秒
-      cooldown: 60  # 秒
-      debuffs:
-        - "HUNGER:1:5"
-    tier2:
-      name: "Tier 2"
-      duration: 20
-      cooldown: 40
-      debuffs:
-        - "HUNGER:1:5"
-        - "BLINDNESS:1:5"
-    tier3:
-      name: "Tier 3"
-      duration: 10
-      cooldown: 20
-      debuffs:
-        - "HUNGER:1:5"
-        - "BLINDNESS:1:5"
-        - "SLOWNESS:2:5"
+  max_radius_particle: "flame"
+  current_radius_particle: "soul_fire_flame"
+  radius: 48.0
+  time:
+    tier1: 30
+    tier2: 20
+    tier3: 10
+  cooldown:
+    tier1: 60
+    tier2: 40
+    tier3: 20
 
-# タリスマン設定
-talisman:
-  # 脱出遅延（秒）
-  escape_delay: 3
-  
-  # 脱出時のエフェクト
-  escape_effects:
-    - "ENDER_SIGNAL:10"
-    - "SMOKE_NORMAL:5"
+bgm:
+  default:
+    key: "kota_server:ost_3.sukima_dungeon"
+    duration: 192
 
-# ワールドの芽設定
-sprout:
-  # 生成ブロック
-  block_type: "MANGROVE_PROPAGULE"
-  
-  # 収穫時のドロップ確率（0.0〜1.0）
-  drop_chance: 1.0
-  
-  # 再生成時間（秒）
-  respawn_time: 300
-
-# メッセージ設定
-messages:
-  # アクションバー表示時間（ティック, 20ティック = 1秒）
-  action_bar_duration: 60
-  
-  # タイトル表示時間
-  title:
-    fade_in: 10
-    stay: 70
-    fade_out: 20
-
-# デバッグ設定
-debug:
-  # デバッグモード
-  enabled: false
-  
-  # 詳細ログ出力
-  verbose_logging: false
