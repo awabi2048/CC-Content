@@ -138,6 +138,45 @@ messages:
     large: "大"
     huge: "極大"
 
+  sukima_dungeon:
+    theme:
+      test:
+        name: "テスト"
+        description: "テスト用のテーマです。"
+        oage_messages:
+          - "これはテストみたいです！"
+      cave:
+        name: "洞窟"
+        description: "暗く湿った岩の洞窟です。"
+        oage_messages:
+          - "暗くてジメジメしてるわ...気をつけて！"
+          - "足元注意してね！"
+      mineshaft:
+        name: "廃坑"
+        description: "かつて掘り進められた古い坑道です。"
+        oage_messages:
+          - "古いレールがいっぱい！迷子にならへんようにね！"
+      library:
+        name: "図書館"
+        description: "膨大な知識が眠る静謐な図書館です。"
+        oage_messages:
+          - "静かにね...本がいっぱいあるわ！"
+      ruin:
+        name: "遺跡"
+        description: "長い年月を経て風化した古代の遺跡です。"
+        oage_messages:
+          - "なんか崩れそう...歴史を感じるわね！"
+      see_of_trees:
+        name: "樹海"
+        description: "視界を遮るほどに木々が鬱蒼と生い茂る森です。"
+        oage_messages:
+          - "木がいっぱいで迷っちゃいそう！"
+      maze:
+        name: "立体迷宮"
+        description: "複雑に組み合わさった迷路のような空間です。"
+        oage_messages:
+          - "うわぁ、目が回っちゃいそう！"
+
   oage_fail:
     - "あらら...間に合わへんかったみたいやね...お荷物は置いてきちゃったけど、命があってよかったわ！"
     - "残念...崩落に巻き込まれちゃった！ワールドの芽はスキマに消えちゃったけど、次は頑張りましょう！"
