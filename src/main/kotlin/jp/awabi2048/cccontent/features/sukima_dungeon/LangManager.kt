@@ -12,20 +12,23 @@ object LangManager {
     private var defaultLang = "ja_jp"
 
     fun load(plugin: JavaPlugin) {
-        val langDir = File(plugin.dataFolder, "lang/sukima")
+        val langDir = File(plugin.dataFolder, "lang")
         if (!langDir.exists()) {
             langDir.mkdirs()
         }
 
         // Save default resources
-        saveDefaultLang(plugin, "en_us.yml")
-        saveDefaultLang(plugin, "ja_jp.yml")
+        saveDefaultLang(plugin, "en_US.yml")
+        saveDefaultLang(plugin, "ja_JP.yml")
 
         // Load all yml files in lang dir
         langMap.clear()
-        langDir.listFiles()?.forEach { file ->
-            if (file.name.endsWith(".yml")) {
-                val langName = file.name.removeSuffix(".yml")
+        // Load only specific language files
+        val langFiles = listOf("ja_JP.yml", "en_US.yml")
+        langFiles.forEach { fileName ->
+            val file = File(langDir, fileName)
+            if (file.exists()) {
+                val langName = fileName.removeSuffix(".yml")
                 val config = YamlConfiguration.loadConfiguration(file)
                 langMap[langName] = config
             }
@@ -33,9 +36,9 @@ object LangManager {
     }
 
     private fun saveDefaultLang(plugin: JavaPlugin, fileName: String) {
-        val file = File(plugin.dataFolder, "lang/sukima/$fileName")
+        val file = File(plugin.dataFolder, "lang/$fileName")
         if (!file.exists()) {
-            plugin.saveResource("lang/sukima/$fileName", false)
+            plugin.saveResource("lang/$fileName", false)
         }
     }
 
@@ -43,11 +46,11 @@ object LangManager {
         val config = langMap[lang] ?: langMap[defaultLang] ?: return "Missing Lang Config: $lang"
         
         // Check if it's a list (for random selection)
-        val messageList = config.getStringList("messages.$key")
+        val messageList = config.getStringList("sukima_dungeon.$key")
         var message = if (messageList.isNotEmpty()) {
             messageList.random()
         } else {
-            config.getString("messages.$key") ?: return "Missing message: $key ($lang)"
+            config.getString("sukima_dungeon.$key") ?: return "Missing message: $key ($lang)"
         }
 
         for ((k, v) in params) {
@@ -59,16 +62,16 @@ object LangManager {
 
     fun getList(lang: String, key: String): List<String> {
         val config = langMap[lang] ?: langMap[defaultLang] ?: return emptyList()
-        val list = config.getStringList("messages.$key")
+        val list = config.getStringList("sukima_dungeon.$key")
         if (list.isNotEmpty()) return list.map { ChatColor.translateAlternateColorCodes('&', it) }
         
         // Fallback to single string as list
-        val single = config.getString("messages.$key") ?: return emptyList()
+        val single = config.getString("sukima_dungeon.$key") ?: return emptyList()
         return listOf(ChatColor.translateAlternateColorCodes('&', single))
     }
 
     fun getTierName(lang: String, tier: String): String {
         val config = langMap[lang] ?: langMap[defaultLang] ?: return tier
-        return config.getString("tiers.$tier") ?: tier
+        return config.getString("sukima_dungeon.tiers.$tier") ?: tier
     }
 }

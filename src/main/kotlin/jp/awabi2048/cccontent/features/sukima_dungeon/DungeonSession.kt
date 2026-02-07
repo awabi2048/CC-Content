@@ -108,6 +108,14 @@ object DungeonSessionManager {
         endSession(player.uniqueId)
     }
     
+    fun removeSessionFromFile(plugin: JavaPlugin, playerUUID: UUID) {
+        val file = File(plugin.dataFolder, "sessions.yml")
+        if (!file.exists()) return
+        val config = YamlConfiguration.loadConfiguration(file)
+        config.set("sessions.$playerUUID", null)
+        config.save(file)
+    }
+    
     fun getSession(playerUUID: UUID): DungeonSession? {
         return sessions[playerUUID]
     }

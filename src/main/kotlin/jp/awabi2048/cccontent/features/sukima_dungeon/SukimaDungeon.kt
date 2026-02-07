@@ -1,4 +1,4 @@
-﻿package jp.awabi2048.cccontent.features.sukima_dungeon
+package jp.awabi2048.cccontent.features.sukima_dungeon
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureBuilder
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureLoader

@@ -97,7 +97,7 @@ object DungeonManager {
             
             p.teleport(spawnLocation)
             DungeonSessionManager.endSession(p)
-            DungeonSessionManager.removeSessionFromFile(CCContent.instance, p.uniqueId)
+            jp.awabi2048.cccontent.features.sukima_dungeon.DungeonSessionManager.removeSessionFromFile(CCContent.instance, p.uniqueId)
             ScoreboardManager.removeScoreboard(p)
             BGMManager.stop(p)
 
