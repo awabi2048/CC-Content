@@ -137,6 +137,7 @@ class CCContent : JavaPlugin(), Listener {
             val rankCommand = RankCommand(rankManager, messageProvider, taskLoader, taskChecker, translator)
             getCommand("rank")?.setExecutor(rankCommand)
             getCommand("rank")?.tabCompleter = rankCommand
+            server.pluginManager.registerEvents(rankCommand, this)
             
             logger.info("ランクシステムが初期化されました")
         } catch (e: Exception) {
@@ -288,12 +289,24 @@ class CCContent : JavaPlugin(), Listener {
     private fun reloadConfiguration() {
         try {
             logger.info("CC-Content の設定ファイルをリロード中...")
-            
-            // 必須ファイルのリスト
-            val requiredFiles = listOf(
-                "tutorial-tasks.yml",
-                "lang/ja_JP.yml",
-                "config/gulliverlight.yml"
+
+            data class RequiredResource(
+                val resourcePath: String,
+                val targetPath: String = resourcePath
+            )
+
+            // /ccc reload 時に欠損補完する必須リソース
+            val requiredResources = listOf(
+                RequiredResource("tutorial-tasks.yml"),
+                RequiredResource("lang/ja_jp.yml"),
+                RequiredResource("lang/en_us.yml"),
+                RequiredResource("lang/ja_jp.yml", "lang/ja_JP.yml"),
+                RequiredResource("config/gulliverlight.yml"),
+                RequiredResource("config/sukima/config.yml"),
+                RequiredResource("config/sukima/items.yml"),
+                RequiredResource("config/sukima/mobs.yml"),
+                RequiredResource("config/sukima/mob_spawn.yml"),
+                RequiredResource("config/sukima/theme.yml")
             )
             
             // 必須ディレクトリのリスト
@@ -305,11 +318,11 @@ class CCContent : JavaPlugin(), Listener {
             )
             
             // 欠損しているファイルを確認してコピー
-            for (fileName in requiredFiles) {
-                val file = File(dataFolder, fileName)
+            for (required in requiredResources) {
+                val file = File(dataFolder, required.targetPath)
                 if (!file.exists()) {
-                    logger.info("欠損しているファイルを検出: $fileName")
-                    copyResourceFile(fileName, file)
+                    logger.info("欠損しているファイルを検出: ${required.targetPath}")
+                    copyResourceFile(required.resourcePath, file)
                 }
             }
             

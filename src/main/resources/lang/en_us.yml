@@ -138,3 +138,25 @@ sukima_dungeon:
     medium: "Medium"
     large: "Large"
     huge: "Huge"
+
+rank:
+  tutorial_task_info:
+    usage: "§cUsage: /rank task-info <player>"
+    player_not_found: "§cPlayer not found"
+    system_not_initialized: "§cTask system is not initialized"
+    opened_for_player: "§aOpened task GUI for {player}"
+    title: "§6{player} §7- §e{rank}"
+    complete_title: "§a§lAll tasks complete!"
+    complete_lore: "§7There are no additional requirements for this rank"
+    category:
+      play_time: "§ePlay Time"
+      combat: "{status} §bCombat"
+      mining: "{status} §bMining"
+      vanilla_exp: "§eVanilla EXP"
+      items: "{status} §bItems"
+    line:
+      progress_time: "{status} §7Progress: {current} / {required}"
+      progress_exp: "{status} §7Progress: {current}/{required}"
+      percent: "§8({percent}%)"
+      target_prefix: "{status} "
+      target_suffix: "§7: {current}/{required}"

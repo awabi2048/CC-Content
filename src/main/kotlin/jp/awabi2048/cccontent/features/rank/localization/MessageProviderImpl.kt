@@ -10,9 +10,11 @@ class MessageProviderImpl(
 ) : MessageProvider {
     
      override fun getMessage(key: String, vararg args: Any?): String {
-         // 互換性のため、Any?を受け取る場合は単純にキーのみで取得する
-         // 複数の引数がある場合は無視
-         return languageLoader.getMessage(key)
+         val placeholders = args.mapNotNull { arg ->
+             @Suppress("UNCHECKED_CAST")
+             (arg as? Pair<String, Any?>)
+         }.toTypedArray()
+         return languageLoader.getMessage(key, *placeholders)
      }
     
     override fun getProfessionName(profession: Profession): String {

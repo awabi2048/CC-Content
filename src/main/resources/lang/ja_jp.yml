@@ -469,3 +469,25 @@ gui_buttons:
   confirm: "§a確認"
   next: "§a次へ"
   previous: "§c前へ"
+
+rank:
+  tutorial_task_info:
+    usage: "§c使用法: /rank task-info <player>"
+    player_not_found: "§cプレイヤーが見つかりません"
+    system_not_initialized: "§cタスクシステムが初期化されていません"
+    opened_for_player: "§a{player} にタスクGUIを表示しました"
+    title: "§6{player} §7- §e{rank}"
+    complete_title: "§a§lすべてのタスク完了！"
+    complete_lore: "§7現在のランクでは追加要件はありません"
+    category:
+      play_time: "§eプレイ時間"
+      combat: "{status} §b討伐系"
+      mining: "{status} §b採掘"
+      vanilla_exp: "§eバニラEXP"
+      items: "{status} §bアイテム所持"
+    line:
+      progress_time: "{status} §7進捗: {current} / {required}"
+      progress_exp: "{status} §7進捗: {current}/{required}"
+      percent: "§8({percent}%)"
+      target_prefix: "{status} "
+      target_suffix: "§7: {current}/{required}"

@@ -1,17 +1,30 @@
 package jp.awabi2048.cccontent.features.rank.command
 
-import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.rank.RankManager
+import jp.awabi2048.cccontent.features.rank.listener.TutorialInventoryHelper
 import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
+import jp.awabi2048.cccontent.features.rank.tutorial.task.TaskProgress
+import jp.awabi2048.cccontent.features.rank.tutorial.task.TaskRequirement
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
 import org.bukkit.Bukkit
+import org.bukkit.Material
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
+import org.bukkit.event.EventHandler
+import org.bukkit.event.Listener
+import org.bukkit.event.inventory.InventoryClickEvent
+import org.bukkit.event.inventory.InventoryDragEvent
+import org.bukkit.inventory.Inventory
+import org.bukkit.inventory.InventoryHolder
+import org.bukkit.inventory.ItemFlag
+import org.bukkit.inventory.ItemStack
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+import net.kyori.adventure.text.format.TextDecoration
 
 /**
  * ランクシステムのデバッグコマンド実装
@@ -22,7 +35,7 @@ class RankCommand(
     private val taskLoader: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader? = null,
     private val taskChecker: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskChecker? = null,
     private val translator: jp.awabi2048.cccontent.features.rank.tutorial.task.EntityBlockTranslator? = null
-) : CommandExecutor, TabCompleter {
+) : CommandExecutor, TabCompleter, Listener {
     
     override fun onCommand(
         sender: CommandSender,
@@ -288,18 +301,18 @@ class RankCommand(
      */
     private fun handleTaskInfo(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 2) {
-            sender.sendMessage("§c使用法: /rank task-info <player>")
+            sender.sendMessage(messageProvider.getMessage("rank.tutorial_task_info.usage"))
             return false
         }
-        
+
         val targetPlayer = Bukkit.getPlayer(args[1])
         if (targetPlayer == null) {
-            sender.sendMessage("§cプレイヤーが見つかりません")
+            sender.sendMessage(messageProvider.getMessage("rank.tutorial_task_info.player_not_found"))
             return false
         }
         
         if (taskLoader == null || taskChecker == null) {
-            sender.sendMessage("§cタスクシステムが初期化されていません")
+            sender.sendMessage(messageProvider.getMessage("rank.tutorial_task_info.system_not_initialized"))
             return false
         }
         
@@ -307,110 +320,349 @@ class RankCommand(
         val tutorial = rankManager.getPlayerTutorial(uuid)
         val progress = tutorial.taskProgress
         val requirement = taskLoader.getRequirement(tutorial.currentRank.name)
-        
-        sender.sendMessage("§6=== ${targetPlayer.name} のタスク進捗 ===")
-        sender.sendMessage("§aランク: ${tutorial.currentRank.name}")
-        
-        // タスク要件が空（最終ランク）の場合
-        if (requirement.isEmpty()) {
-            sender.sendMessage("§a§lすべてのタスク完了！")
-            return true
+        val viewer = if (sender is Player) sender else targetPlayer
+
+        openTaskInfoGui(viewer, targetPlayer, tutorial.currentRank.name, progress, requirement)
+
+        if (sender !is Player) {
+            sender.sendMessage(
+                messageProvider.getMessage(
+                    "rank.tutorial_task_info.opened_for_player",
+                    "player" to targetPlayer.name
+                )
+            )
         }
-        
-        sender.sendMessage("§6--- タスク要件と進捗 ---")
-        
-        // プレイ時間
-        if (requirement.playTimeMin > 0) {
-            val progress_min = minOf(progress.playTime, requirement.playTimeMin.toLong())
-            val percent = (progress_min.toDouble() / requirement.playTimeMin.toDouble() * 100).toInt()
-            val status = if (progress.playTime >= requirement.playTimeMin) "§a✓" else "§c✗"
-            val progressStr = formatPlayTime(progress.playTime)
-            val requiredStr = formatPlayTime(requirement.playTimeMin.toLong())
-            sender.sendMessage("$status プレイ時間: $progressStr / $requiredStr ($percent%)")
-        }
-        
-        // モブ討伐
-        requirement.mobKills.forEach { (mobType, required) ->
-            val current = progress.getMobKillCount(mobType)
-            val progress_count = minOf(current, required)
-            val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
-            val status = if (current >= required) "§a✓" else "§c✗"
-            
-            // 翻訳キーを取得
-            val translationKey = translator?.translateEntity(mobType) ?: mobType
-            
-            // Component形式でメッセージを構築
-            val messageComponent = Component.text("$status ")
-                .append(Component.translatable(translationKey))
-                .append(Component.text(" 討伐: $current/$required ($percent%)"))
-            sender.sendMessage(messageComponent)
-        }
-        
-        // ブロック採掘
-        requirement.blockMines.forEach { (blockType, required) ->
-            val current = progress.getBlockMineCount(blockType)
-            val progress_count = minOf(current, required)
-            val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
-            val status = if (current >= required) "§a✓" else "§c✗"
-            
-            // 翻訳キーを取得
-            val translationKey = translator?.translateBlock(blockType) ?: blockType
-            
-            // Component形式でメッセージを構築
-            val messageComponent = Component.text("$status ")
-                .append(Component.translatable(translationKey))
-                .append(Component.text(" 採掘: $current/$required ($percent%)"))
-            sender.sendMessage(messageComponent)
-        }
-        
-        // バニラEXP
-        if (requirement.vanillaExp > 0) {
-            val progress_exp = minOf(progress.vanillaExp, requirement.vanillaExp)
-            val percent = (progress_exp.toDouble() / requirement.vanillaExp.toDouble() * 100).toInt()
-            val status = if (progress.vanillaExp >= requirement.vanillaExp) "§a✓" else "§c✗"
-            sender.sendMessage("$status バニラEXP: $progress_exp/${requirement.vanillaExp} ($percent%)")
-        }
-        
-        // アイテム
-        requirement.itemsRequired.forEach { (material, required) ->
-            val current = jp.awabi2048.cccontent.features.rank.listener.TutorialInventoryHelper.countItemInInventory(targetPlayer, material.uppercase())
-            val progress_count = minOf(current, required)
-            val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
-            val status = if (current >= required) "§a✓" else "§c✗"
-            
-            // 翻訳キーを取得
-            val translationKey = translator?.translateItem(material) ?: material
-            
-            // Component形式でメッセージを構築
-            val messageComponent = Component.text("$status ")
-                .append(Component.translatable(translationKey))
-                .append(Component.text(" 所持: $current/$required ($percent%)"))
-            sender.sendMessage(messageComponent)
-        }
-        
-        // ボス討伐
-        requirement.bossKills.forEach { (bossType, required) ->
-            val current = progress.getBossKillCount(bossType)
-            val progress_count = minOf(current, required)
-            val percent = (progress_count.toDouble() / required.toDouble() * 100).toInt()
-            val status = if (current >= required) "§a✓" else "§c✗"
-            
-            // 翻訳キーを取得
-            val translationKey = translator?.translateBoss(bossType) ?: bossType
-            
-            // Component形式でメッセージを構築
-            val messageComponent = Component.text("$status ")
-                .append(Component.translatable(translationKey))
-                .append(Component.text(" 討伐: $current/$required ($percent%)"))
-            sender.sendMessage(messageComponent)
-        }
-        
-        // 全体進捗
-        val overallProgress = taskChecker.getProgress(progress, requirement, targetPlayer)
-        val progressPercent = (overallProgress * 100).toInt()
-        sender.sendMessage("§6--- 全体進捗: $progressPercent% ---")
-        
         return true
+    }
+
+    private fun openTaskInfoGui(
+        viewer: Player,
+        targetPlayer: Player,
+        rankName: String,
+        progress: TaskProgress,
+        requirement: TaskRequirement
+    ) {
+        val holder = TaskInfoGuiHolder()
+        val title = messageProvider.getMessage(
+            "rank.tutorial_task_info.title",
+            "player" to targetPlayer.name,
+            "rank" to rankName
+        )
+        val inventory = Bukkit.createInventory(holder, 45, title)
+        holder.backingInventory = inventory
+
+        val headerFooter = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
+        val middle = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
+
+        for (slot in 0..8) {
+            inventory.setItem(slot, headerFooter)
+        }
+        for (slot in 36..44) {
+            inventory.setItem(slot, headerFooter)
+        }
+        for (slot in 9..35) {
+            inventory.setItem(slot, middle)
+        }
+
+        val categories = buildTaskCategoryItems(targetPlayer, progress, requirement)
+        val targetSlots = getCenteredSlots(categories.size)
+        categories.zip(targetSlots).forEach { (item, slot) ->
+            inventory.setItem(slot, item)
+        }
+
+        if (categories.isEmpty()) {
+            val completeItem = createGuiItem(
+                Material.LIME_STAINED_GLASS_PANE,
+                toComponent(messageProvider.getMessage("rank.tutorial_task_info.complete_title")),
+                listOf(toComponent(messageProvider.getMessage("rank.tutorial_task_info.complete_lore")))
+            )
+            inventory.setItem(22, completeItem)
+        }
+
+        viewer.openInventory(inventory)
+    }
+
+    private fun buildTaskCategoryItems(
+        targetPlayer: Player,
+        progress: TaskProgress,
+        requirement: TaskRequirement
+    ): List<ItemStack> {
+        val items = mutableListOf<ItemStack>()
+
+        if (requirement.playTimeMin > 0) {
+            val current = minOf(progress.playTime, requirement.playTimeMin.toLong())
+            val required = requirement.playTimeMin.toLong()
+            val done = progress.playTime >= requirement.playTimeMin
+            val lore = listOf(
+                toComponent(
+                    messageProvider.getMessage(
+                        "rank.tutorial_task_info.line.progress_time",
+                        "status" to statusIcon(done),
+                        "current" to formatPlayTime(current),
+                        "required" to formatPlayTime(required)
+                    )
+                ),
+                toComponent(
+                    messageProvider.getMessage(
+                        "rank.tutorial_task_info.line.percent",
+                        "percent" to percent(current, required)
+                    )
+                )
+            )
+            items += createGuiItem(
+                Material.CLOCK,
+                toComponent(messageProvider.getMessage("rank.tutorial_task_info.category.play_time")),
+                lore
+            )
+        }
+
+        if (requirement.mobKills.isNotEmpty() || requirement.bossKills.isNotEmpty()) {
+            val details = mutableListOf<Component>()
+            var allDone = true
+
+            requirement.mobKills.forEach { (mobType, required) ->
+                val current = progress.getMobKillCount(mobType)
+                val done = current >= required
+                if (!done) {
+                    allDone = false
+                }
+
+                val nameComponent = if (translator != null) {
+                    Component.translatable(translator.translateEntity(mobType))
+                } else {
+                    Component.text(mobType)
+                }
+                details += buildTranslatedTargetLine(nameComponent, done, minOf(current, required), required)
+            }
+            requirement.bossKills.forEach { (bossType, required) ->
+                val current = progress.getBossKillCount(bossType)
+                val done = current >= required
+                if (!done) {
+                    allDone = false
+                }
+
+                val nameComponent = if (translator != null) {
+                    Component.translatable(translator.translateBoss(bossType))
+                } else {
+                    Component.text(bossType)
+                }
+                details += buildTranslatedTargetLine(nameComponent, done, minOf(current, required), required)
+            }
+
+            items += createGuiItem(
+                Material.DIAMOND_SWORD,
+                toComponent(
+                    messageProvider.getMessage(
+                        "rank.tutorial_task_info.category.combat",
+                        "status" to statusIcon(allDone)
+                    )
+                ),
+                details.take(7)
+            )
+        }
+
+        if (requirement.blockMines.isNotEmpty()) {
+            val details = mutableListOf<Component>()
+            var allDone = true
+            requirement.blockMines.forEach { (blockType, required) ->
+                val current = progress.getBlockMineCount(blockType)
+                val done = current >= required
+                if (!done) {
+                    allDone = false
+                }
+
+                val nameComponent = if (translator != null) {
+                    Component.translatable(translator.translateBlock(blockType))
+                } else {
+                    Component.text(blockType)
+                }
+                details += buildTranslatedTargetLine(nameComponent, done, minOf(current, required), required)
+            }
+
+            items += createGuiItem(
+                Material.IRON_PICKAXE,
+                toComponent(
+                    messageProvider.getMessage(
+                        "rank.tutorial_task_info.category.mining",
+                        "status" to statusIcon(allDone)
+                    )
+                ),
+                details.take(7)
+            )
+        }
+
+        if (requirement.vanillaExp > 0) {
+            val current = minOf(progress.vanillaExp, requirement.vanillaExp)
+            val required = requirement.vanillaExp
+            val done = progress.vanillaExp >= required
+            val lore = listOf(
+                toComponent(
+                    messageProvider.getMessage(
+                        "rank.tutorial_task_info.line.progress_exp",
+                        "status" to statusIcon(done),
+                        "current" to current,
+                        "required" to required
+                    )
+                ),
+                toComponent(
+                    messageProvider.getMessage(
+                        "rank.tutorial_task_info.line.percent",
+                        "percent" to percent(current, required)
+                    )
+                )
+            )
+            items += createGuiItem(
+                Material.EXPERIENCE_BOTTLE,
+                toComponent(messageProvider.getMessage("rank.tutorial_task_info.category.vanilla_exp")),
+                lore
+            )
+        }
+
+        if (requirement.itemsRequired.isNotEmpty()) {
+            val details = mutableListOf<Component>()
+            var allDone = true
+            requirement.itemsRequired.forEach { (material, required) ->
+                val current = TutorialInventoryHelper.countItemInInventory(targetPlayer, material.uppercase())
+                val done = current >= required
+                if (!done) {
+                    allDone = false
+                }
+
+                val nameComponent = if (translator != null) {
+                    Component.translatable(translator.translateItem(material))
+                } else {
+                    Component.text(material)
+                }
+                details += buildTranslatedTargetLine(nameComponent, done, minOf(current, required), required)
+            }
+
+            items += createGuiItem(
+                Material.BUNDLE,
+                toComponent(
+                    messageProvider.getMessage(
+                        "rank.tutorial_task_info.category.items",
+                        "status" to statusIcon(allDone)
+                    )
+                ),
+                details.take(7)
+            )
+        }
+
+        return items
+    }
+
+    private fun getCenteredSlots(count: Int): List<Int> {
+        if (count <= 0) {
+            return emptyList()
+        }
+
+        val center = 22
+        val slots = mutableListOf<Int>()
+        var offset = 1
+
+        if (count % 2 == 1) {
+            slots += center
+        }
+
+        while (slots.size < count) {
+            val left = center - offset
+            if (left in 18..26) {
+                slots += left
+            }
+            if (slots.size >= count) {
+                break
+            }
+
+            val right = center + offset
+            if (right in 18..26) {
+                slots += right
+            }
+            offset++
+        }
+
+        return slots
+    }
+
+    private fun statusIcon(done: Boolean): String = if (done) "§a✓" else "§c✗"
+
+    private fun percent(current: Long, required: Long): Int {
+        if (required <= 0L) {
+            return 100
+        }
+        return ((current.toDouble() / required.toDouble()) * 100).toInt().coerceIn(0, 100)
+    }
+
+    private fun createBackgroundItem(material: Material): ItemStack {
+        val item = ItemStack(material)
+        val meta = item.itemMeta
+        if (meta != null) {
+            meta.displayName(withoutItalic(Component.text(" ")))
+            meta.lore(emptyList())
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+            meta.setHideTooltip(true)
+            item.itemMeta = meta
+        }
+        return item
+    }
+
+    private fun createGuiItem(material: Material, displayName: Component, lore: List<Component>): ItemStack {
+        val item = ItemStack(material)
+        val meta = item.itemMeta
+        if (meta != null) {
+            meta.displayName(withoutItalic(displayName))
+            meta.lore(lore.map { withoutItalic(it) })
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+            item.itemMeta = meta
+        }
+        return item
+    }
+
+    private fun buildTranslatedTargetLine(nameComponent: Component, done: Boolean, current: Int, required: Int): Component {
+        val prefix = toComponent(
+            messageProvider.getMessage(
+                "rank.tutorial_task_info.line.target_prefix",
+                "status" to statusIcon(done)
+            )
+        )
+        val suffix = toComponent(
+            messageProvider.getMessage(
+                "rank.tutorial_task_info.line.target_suffix",
+                "current" to current,
+                "required" to required
+            )
+        )
+        return prefix.append(nameComponent).append(suffix)
+    }
+
+    private fun toComponent(text: String): Component = LEGACY_SERIALIZER.deserialize(text)
+
+    private fun withoutItalic(component: Component): Component =
+        component.decoration(TextDecoration.ITALIC, false)
+
+    @EventHandler
+    fun onTaskInfoGuiClick(event: InventoryClickEvent) {
+        if (event.view.topInventory.holder !is TaskInfoGuiHolder) {
+            return
+        }
+        event.isCancelled = true
+    }
+
+    @EventHandler
+    fun onTaskInfoGuiDrag(event: InventoryDragEvent) {
+        if (event.view.topInventory.holder !is TaskInfoGuiHolder) {
+            return
+        }
+        event.isCancelled = true
+    }
+
+    private class TaskInfoGuiHolder : InventoryHolder {
+        lateinit var backingInventory: Inventory
+
+        override fun getInventory(): Inventory = backingInventory
+    }
+
+    companion object {
+        private val LEGACY_SERIALIZER: LegacyComponentSerializer = LegacyComponentSerializer.legacySection()
     }
     
     /**
