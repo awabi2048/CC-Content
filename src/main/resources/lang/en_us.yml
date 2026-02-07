@@ -55,84 +55,11 @@ sukima_dungeon:
       name: "§6Oage-chan's Talisman"
       description: "Talisman to escape from SukimaDungeon"
   messages:
-    prefix: "&7[&dSukimaDungeon&7] "
-    no_permission: "&cYou do not have permission."
-    command_player_only: "This command can only be executed by players."
-    command_usage: "&e/sukima_dungeon <bookmark|reload>"
-    command_reload_success: "&aReloaded settings and themes."
-    command_bookmark_received: "&aReceived {tier} bookmark!"
-    bookmark_cannot_use_here: "&cYou cannot use the bookmark here."
-    command_generate_usage: "Usage: /sd generate <width> <length> [theme]"
-    command_generating: "&aGenerating dungeon..."
-    command_unknown: "&cUnknown sub-command."
-    command_restricted: "&cThis command cannot be used inside the dungeon."
-    command_generator_failed: "&cDungeon generation failed."
-    common_bar: "&7&m――――――――――――――――――――――――――――――"
+
+
+
   
-    gui_entrance_title: "&5Connect Portals"
-    gui_entrance_button: "&b&lOpen Dungeon Portal"
-    gui_entrance_button_lore:
-      - "&7Click to open a portal to the dungeon!"
-    gui_style_button: "&6Select Play Style"
-    gui_style_multi: "&f§l| §7Current Setting §eGroup"
-    gui_style_single: "&f§l| §7Current Setting §eSolo"
-    gui_style_lore: "&7Click to switch"
-    gui_size_button: "&eSelect Size"
-    gui_size_small: "&f§l| §7Current Setting §eSmall"
-    gui_size_medium: "&f§l| §7Current Setting §eMedium"
-    gui_size_large: "&f§l| §7Current Setting §eLarge"
-    gui_size_huge: "&f§l| §7Current Setting §eHuge"
-    gui_size_lore: "&7Click to switch"
-    gui_theme_button: "&dPortal Destination"
-    gui_theme_current: "&f§l| §7Current Setting §d{theme} World"
-    gui_theme_lore: "&e§nClick to change"
-    gui_info_title: "&aInfo"
-    gui_info_theme: "&f§l| §7Portal Destination §d{theme} World"
-    gui_info_size: "&f§l| §7Size §e{size}"
-    gui_info_description: "&7The world of Sukima is very unstable. As a result, portals may lead to different worlds. &7Using higher-tier bookmarks makes it easier to reach your desired world."
-    gui_theme_error: "&cTheme not found"
-
-    item_bookmark_name: "&d{tier} Bookmark"
-    item_talisman_name: "&6Oage-chan's Talisman"
-    item_talisman_lore:
-      - "&7&m――――――――――――――――――――――――――――――"
-      - "&7An amulet given by Oage-chan to protect"
-      - "&7crafters sent to the Sukima Dungeon and"
-      - "&7to create a way back. Using it inside"
-      - "&7the dungeon allows you to &bescape&7."
-      - "&7&m――――――――――――――――――――――――――――――"
-
-    gui_talisman_confirm_title: "&0&lReally escape?"
-    gui_talisman_confirm_button: "&c&lEscape"
-    gui_talisman_confirm_button_lore:
-      - "&7Clicking this will make all players"
-      - "&7leave the dungeon midway."
-      - "&c*Items are not lost, but quest fails."
-    gui_talisman_cancel_button: "&a&lStay"
   
-    talisman_cannot_use_here: "&cYou cannot use the talisman here."
-
-    scoreboard_title: "&eSukima&6Dungeon"
-    scoreboard_sprouts: "&f&l| &7World Sprouts &a{count}&7/&a{total}"
-    scoreboard_remaining: "&f&l| &7Return in &b{time}"
-
-    oage_intro: "&6Oage-chan: &f\"Umm, this is the entrance to Sukima Dungeon. Go defeat monsters and close the world!\""
-    oage_result: "&6Oage-chan: &f\"Good job! Looks like you successfully cleared it. Here's your reward!\""
-    oage_start_multi: "&a[Oage-chan] &f\"Group it is! I'll prepare {theme} ({tier})!\""
-    oage_start_single: "&a[Oage-chan] &f\"Solo it is! I'll prepare {theme} ({tier})!\""
-    trap_triggered: "&6Oage-chan: &f\"Oops, caught again? You gotta be careful!\""
-  
-    dungeon_closing: "&cThis dungeon will vanish shortly..."
-
-    sizes:
-      small: "Small"
-      medium: "Medium"
-      large: "Large"
-      huge: "Huge"
-
-
-  prefix: "&7[&dSukimaDungeon&7] "
-  no_permission: "&cYou do not have permission."
   command_player_only: "This command can only be executed by players."
   command_usage: "&e/sukima_dungeon <bookmark|reload>"
   command_reload_success: "&aReloaded settings and themes."
@@ -199,6 +126,12 @@ sukima_dungeon:
   trap_triggered: "&6Oage-chan: &f\"Oops, caught again? You gotta be careful!\""
 
   dungeon_closing: "&cThis dungeon will vanish shortly..."
+
+  tiers:
+    BROKEN: "Tattered"
+    WORN: "Worn-out"
+    FADED: "Faded"
+    NEW: "Brand New"
 
   sizes:
     small: "Small"

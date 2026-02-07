@@ -278,8 +278,8 @@ sukima_dungeon:
 
 
   messages:
-    prefix: "&7[&dスキマダンジョン&7] "
-    no_permission: "&c権限がありません。"
+
+ 
     command_player_only: "このコマンドはプレイヤーのみ実行可能です。"
     command_usage: "&e/sukima_dungeon <bookmark|reload>"
     command_reload_success: "&a設定とテーマを再読み込みしました。"
@@ -424,52 +424,12 @@ sukima_dungeon:
       - "お疲れ様！無事に全部集まったね！崩れる前に早く戻ってきてー！"
 
 
-  tiers:
-    BROKEN: "ぼろぼろの"
-    WORN: "擦り切れた"
-    FADED: "色褪せた"
-    NEW: "新品の"
-
-  themes:
-    test:
-      name: "test"
-      description: "てすとです"
-      oage_messages:
-        - "これはテストみたいです！"
-    cave:
-      name: "洞窟"
-      description: "暗く湿った岩の洞窟です。"
-      oage_messages:
-        - "暗くてジメジメしてるわ...気をつけて！"
-        - "足元注意してね！"
-    mineshaft:
-      name: "廃坑"
-      description: "かつて掘り進められた古い坑道です。"
-      oage_messages:
-        - "古いレールがいっぱい！迷子にならへんようにね！"
-    library:
-      name: "図書館"
-      description: "膨大な知識が眠る静謐な図書館です。"
-      oage_messages:
-        - "静かにね...本がいっぱいあるわ！"
-    ruin:
-      name: "遺跡"
-      description: "長い年月を経て風化した古代の遺跡です。"
-      oage_messages:
-        - "なんか崩れそう...歴史を感じるわね！"
-    see_of_trees:
-      name: "樹海"
-      description: "視界を遮るほどに木々が鬱蒼と生い茂る森です。"
-      oage_messages:
-        - "木がいっぱいで迷っちゃいそう！"
-    maze:
-      name: "立体迷宮"
-      description: "複雑に組み合わさった迷路のような空間です。"
-      oage_messages:
-        - "うわぁ、目が回っちゃいそう！"
 
 
-  prefix: "&7[&dスキマダンジョン&7] "
+
+
+
+
   no_permission: "&c権限がありません。"
   command_player_only: "このコマンドはプレイヤーのみ実行可能です。"
   command_usage: "&e/sukima_dungeon <bookmark|reload>"
@@ -615,11 +575,7 @@ sukima_dungeon:
     - "お疲れ様！無事に全部集まったね！崩れる前に早く戻ってきてー！"
 
 
-  tiers:
-  BROKEN: "ぼろぼろの"
-  WORN: "擦り切れた"
-  FADED: "色褪せた"
-  NEW: "新品の"
+
 
   themes:
   test:
