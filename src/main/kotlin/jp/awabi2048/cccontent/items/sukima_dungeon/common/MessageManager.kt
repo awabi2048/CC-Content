@@ -40,33 +40,33 @@ class MessageManager(private val langManager: LangManager) {
     /**
      * プリフィックス付きメッセージを送信
      */
-    fun send(sender: CommandSender, key: String, vararg args: Any?) {
-        val prefix = langManager.get(PREFIX)
-        val message = langManager.get(key, *args)
-        
-        val fullMessage = if (prefix.isNotEmpty() && !prefix.contains("[Missing")) {
-            "$prefix $message"
-        } else {
-            message
-        }
-        
-        sender.sendMessage(component(fullMessage))
-    }
+     fun send(sender: CommandSender, key: String, vararg args: Any?) {
+         val prefix = langManager.get(PREFIX)
+         val message = langManager.get(key)
+         
+         val fullMessage = if (prefix.isNotEmpty() && !prefix.contains("[Missing")) {
+             "$prefix $message"
+         } else {
+             message
+         }
+         
+         sender.sendMessage(component(fullMessage))
+     }
     
     /**
      * プレイヤーにアクションバーを表示
      */
-    fun sendActionBar(player: Player, key: String, vararg args: Any?) {
-        val message = langManager.get(key, *args)
-        player.sendActionBar(component(message))
-    }
+     fun sendActionBar(player: Player, key: String, vararg args: Any?) {
+         val message = langManager.get(key)
+         player.sendActionBar(component(message))
+     }
     
     /**
      * プレイヤーにタイトルを表示
      */
-    fun sendTitle(player: Player, titleKey: String, subtitleKey: String, vararg args: Any?) {
-        val title = langManager.get(titleKey, *args)
-        val subtitle = langManager.get(subtitleKey, *args)
+     fun sendTitle(player: Player, titleKey: String, subtitleKey: String, vararg args: Any?) {
+         val title = langManager.get(titleKey)
+         val subtitle = langManager.get(subtitleKey)
         
         player.showTitle(
             Title.title(

@@ -73,25 +73,23 @@ class LanguageLoader(
     }
     
     /**
-     * メッセージを取得
+     * メッセージを取得（プレースホルダー対応）
+     * プレースホルダー形式: {key} 例: {rank}, {profession}, {skill}
+     * 使用例: getMessage("message.rank_up", "rank" to "Pioneer")
      */
-    fun getMessage(key: String, vararg args: Any?): String {
+    fun getMessage(key: String, vararg placeholders: Pair<String, Any?>): String {
         val template = languageData[key]
         if (template == null) {
             // デバッグログ：見つからないキーを記録
             plugin.logger.warning("翻訳キーが見つかりません: $key (全キー数: ${languageData.size})")
-            // キーの接頭辞別に存在するキーを表示
-            if (key.startsWith("item.")) {
-                val itemKeys = languageData.keys.filter { it.startsWith("item.") }
-                plugin.logger.warning("  利用可能なアイテムキー: $itemKeys")
-            }
             return "§c[Missing: $key]"
         }
         var result: String = template
-        args.forEachIndexed { index, arg ->
-            result = result.replace("%${index + 1}\$s", arg?.toString() ?: "null")
-            result = result.replace("%s", arg?.toString() ?: "null")
+        for ((placeholderKey, value) in placeholders) {
+            result = result.replace("{$placeholderKey}", value?.toString() ?: "null")
         }
+        // カラーコード変換（& → §）
+        result = result.replace('&', '§')
         return result
     }
     

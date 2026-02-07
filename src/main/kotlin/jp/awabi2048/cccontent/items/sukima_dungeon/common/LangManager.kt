@@ -18,13 +18,14 @@ class LangManager(private val plugin: JavaPlugin) {
     
     /**
      * 言語ファイルを読み込む
+     * 統合言語ファイル（lang/ja_JP.yml）から読み込み
      */
     fun loadLanguage(language: String) {
         languageData.clear()
         currentLanguage = language
         
-        val langDir = File(plugin.dataFolder, "lang/sukima").apply { mkdirs() }
-        val langFile = File(langDir, "$language.yml")
+        val langDir = File(plugin.dataFolder, "lang").apply { mkdirs() }
+        val langFile = File(langDir, "${language.uppercase()}.yml")
         
         // リソースからデフォルトファイルを抽出（存在しない場合）
         if (!langFile.exists()) {
@@ -39,12 +40,12 @@ class LangManager(private val plugin: JavaPlugin) {
      * デフォルト言語ファイルをリソースから抽出
      */
     private fun extractDefaultLanguageFile(language: String) {
-        val resourcePath = "lang/sukima/$language.yml"
+        val resourcePath = "lang/${language.uppercase()}.yml"
         val resourceStream = plugin.getResource(resourcePath)
         
         if (resourceStream != null) {
-            val langDir = File(plugin.dataFolder, "lang/sukima").apply { mkdirs() }
-            val langFile = File(langDir, "$language.yml")
+            val langDir = File(plugin.dataFolder, "lang").apply { mkdirs() }
+            val langFile = File(langDir, "${language.uppercase()}.yml")
             langFile.parentFile?.mkdirs()
             
             resourceStream.use { input ->
@@ -92,16 +93,18 @@ class LangManager(private val plugin: JavaPlugin) {
     
     /**
      * メッセージを取得（プレースホルダー対応）
+     * プレースホルダー形式: {key} 例: {tier}, {distance}, {cooldown}
+     * 使用例: get("sukima.compass.activate", "tier" to 2, "duration" to 30)
      */
-    fun get(key: String, vararg args: Any?): String {
+    fun get(key: String, vararg placeholders: Pair<String, Any?>): String {
         val template = languageData[key] ?: run {
             plugin.logger.warning("[SukimaDungeon] 翻訳キーが見つかりません: $key")
             return "§c[Missing: $key]"
         }
         
         var result = template
-        args.forEachIndexed { index, arg ->
-            result = result.replace("%${index + 1}", arg?.toString() ?: "null")
+        for ((placeholderKey, value) in placeholders) {
+            result = result.replace("{$placeholderKey}", value?.toString() ?: "null")
         }
         
         // カラーコード変換（& → §）
@@ -112,15 +115,15 @@ class LangManager(private val plugin: JavaPlugin) {
     /**
      * メッセージを取得（リスト形式）
      */
-    fun getList(key: String, vararg args: Any?): List<String> {
+    fun getList(key: String, vararg placeholders: Pair<String, Any?>): List<String> {
         val template = languageData[key] ?: run {
             plugin.logger.warning("[SukimaDungeon] 翻訳キーが見つかりません: $key")
             return listOf("§c[Missing: $key]")
         }
         
         var result = template
-        args.forEachIndexed { index, arg ->
-            result = result.replace("%${index + 1}", arg?.toString() ?: "null")
+        for ((placeholderKey, value) in placeholders) {
+            result = result.replace("{$placeholderKey}", value?.toString() ?: "null")
         }
         
         // 改行で分割し、カラーコードを変換

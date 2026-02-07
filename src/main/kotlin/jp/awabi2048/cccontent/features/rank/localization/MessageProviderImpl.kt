@@ -9,9 +9,11 @@ class MessageProviderImpl(
     private val languageLoader: LanguageLoader
 ) : MessageProvider {
     
-    override fun getMessage(key: String, vararg args: Any?): String {
-        return languageLoader.getMessage(key, *args)
-    }
+     override fun getMessage(key: String, vararg args: Any?): String {
+         // 互換性のため、Any?を受け取る場合は単純にキーのみで取得する
+         // 複数の引数がある場合は無視
+         return languageLoader.getMessage(key)
+     }
     
     override fun getProfessionName(profession: Profession): String {
         return getMessage("profession.${profession.id}.name")

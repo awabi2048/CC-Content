@@ -1,4 +1,9 @@
-# 日本語言語ファイル
+# 統合言語ファイル（日本語）
+# すべてのテキストメッセージはこのファイルで管理
+
+# =========================================
+# ランクシステム関連
+# =========================================
 
 # 職業情報
 profession:
@@ -113,11 +118,6 @@ skill:
       name: "大地の王"
       description: "採掘技術の最高位に達した者"
 
-# カスタム翻訳のみを記載
-# バニラアイテム・モブ・ブロックはMinecraftの公式翻訳を使用
-# （Component.translatable("entity.minecraft.xxx") などでクライアント側で自動翻訳）
-custom:
-
 # チュートリアルランク
 tutorial_rank:
   newbie:
@@ -136,73 +136,242 @@ tutorial_rank:
     name: "Attainer"
     description: "達成者"
 
-# メッセージ
+# ランク関連メッセージ
 message:
-  rank_up: "§a§l【ランクアップ！】§r§a%s になりました"
-  profession_selected: "§a§l【職業選択】§r§a職業 %s を選択しました"
-  profession_changed: "§a§l【職業変更】§r§a職業を %s に変更しました"
-  skill_acquired: "§a§l【スキル習得】§r§a%s を習得しました"
-  experience_gained: "§b経験値を %s 獲得しました"
+  rank_up: "§a§l【ランクアップ！】§r§a{rank} になりました"
+  profession_selected: "§a§l【職業選択】§r§a職業 {profession} を選択しました"
+  profession_changed: "§a§l【職業変更】§r§a職業を {profession} に変更しました"
+  skill_acquired: "§a§l【スキル習得】§r§a{skill} を習得しました"
+  experience_gained: "§b経験値を {experience} 獲得しました"
   tutorial_rankup:
     - "§6§l=========================================="
     - "§a§lランクアップ！"
-    - "§f%old_rank% → %new_rank%"
+    - "§f{old_rank} → {new_rank}"
     - "§6§l=========================================="
 
-# Party Related
+# Party関連
 party:
   create:
-    success: "{prefix} &aパーティ \"{0}\" を作成しました！"
+    success: "{prefix} &aパーティ \"{name}\" を作成しました！"
   join:
     success: "{prefix} &aパーティに参加しました！"
-    broadcast: "{prefix} &7[&bパーティ&7] &6{0} &7がパーティに参加しました。"
+    broadcast: "{prefix} &7[&bパーティ&7] &6{player} &7がパーティに参加しました。"
   leave:
     success: "{prefix} &aパーティを抜けました。"
-    broadcast: "{prefix} &7[&bパーティ&7] &6{0} &7がパーティを抜けました。"
+    broadcast: "{prefix} &7[&bパーティ&7] &6{player} &7がパーティを抜けました。"
   disband:
     leader_left: "{prefix} &cリーダーが抜けたため、パーティは解散されました。"
     success: "{prefix} &aパーティを解散しました。"
   invite:
-    success: "{prefix} &6{0} &aを招待しました。"
-    received: "{prefix} &6{0} &7からパーティへの招待が届きました！"
-    click_to_join: "&7クリックして参加: &a/party join {0}"
+    success: "{prefix} &6{player} &aを招待しました。"
+    received: "{prefix} &6{player} &7からパーティへの招待が届きました！"
+    click_to_join: "&7クリックして参加: &a/party join {party}"
   kick:
-    success: "{prefix} &6{0} &aを追放しました。"
+    success: "{prefix} &6{player} &aを追放しました。"
     kicked: "{prefix} &cパーティから追放されました。"
   list:
-    header: "&6=== パーティメンバー ({0}) ==="
-    leader: "&7リーダー: &e{0}"
-    member: "&7- {0}"
+    header: "&6=== パーティメンバー ({count}) ==="
+    leader: "&7リーダー: &e{leader}"
+    member: "&7- {member}"
   chat:
-    format: "{prefix} &7[&bパーティ&7] {0}"
+    format: "{prefix} &7[&bパーティ&7] {message}"
   error:
     already_in_party: "{prefix} &cすでにパーティに入っています。"
     not_in_party: "{prefix} &cパーティに入っていません。"
-    not_leader: "{prefix} &cリーダーのみが {0} できます。"
+    not_leader: "{prefix} &cリーダーのみが {action} できます。"
     player_not_found: "{prefix} &cプレイヤーが見つかりません。"
     not_party_leader: "{prefix} &cそのプレイヤーはパーティリーダーではありません。"
     not_invited: "{prefix} &c招待されていません。"
     already_member: "{prefix} &cすでにパーティメンバーです。"
     not_member: "{prefix} &cそのプレイヤーはパーティメンバーではありません。"
     cannot_kick_self: "{prefix} &c自分自身を追放することはできません。"
-    specify_name: "{prefix} &c{0} するプレイヤー名を指定してください。"
+    specify_name: "{prefix} &c{action} するプレイヤー名を指定してください。"
     specify_party_name: "{prefix} &c参加するパーティのリーダー名を指定してください。"
 
-# Quest Related
+# Quest関連
 quest:
   accept:
     success: "&aクエストを受注しました！"
   complete:
     success: "&a&lクエスト達成！"
 
-# GUI Related
+# GUI関連
 gui:
   common:
-    close: "&c閉じる"
-    back: "&e戻る"
+    close: "§cこのメニューを閉じます"
+    next_page: "§7次のページに進みます"
+    previous_page: "§7前のページに戻ります"
+    confirm: "§7このオプションで確定します"
 
-# Miscellaneous
-misc:
-  click_sound: "クリック音"
-  enabled: "&a有効"
-  disabled: "&c無効"
+# =========================================
+# SukimaDungeon関連
+# =========================================
+
+# プレフィックス
+sukima:
+  prefix: "§7[§dスキマダンジョン§7]"
+  
+  # コンパス関連メッセージ
+  compass:
+    activate: "§bワールドの芽コンパス [Tier {tier}] を起動しました (§a{duration}秒§b)"
+    deactivate: "§cコンパスを停止しました"
+    detected: "§aワールドの芽を検知！ §7距離: §e{distance}m §7方向: §6{direction}"
+    cooldown: "§cクールダウン中: あと §e{cooldown}秒"
+    no_sprouts: "§c近くにワールドの芽はありません"
+  
+  # タリスマン関連メッセージ
+  talisman:
+    use: "§6おあげちゃんのお札§7を使用しました"
+    escape: "§d§l脱出！"
+    cancelled: "§c脱出をキャンセルしました"
+  
+  # スプラウト関連メッセージ
+  sprout:
+    harvest: "§aワールドの芽を収穫しました"
+  
+  # エラーメッセージ
+  error:
+    not_in_dungeon: "§cスキマダンジョン内でしか使用できません"
+    no_permission: "§c権限がありません"
+    generic: "§cエラーが発生しました"
+    invalid_bookmark: "§c無効なふしぎなしおりです"
+  
+  # GUI メッセージ
+  gui:
+    escape:
+      title: "§8脱出確認"
+      confirm: "§a§l脱出する"
+      cancel: "§c§lキャンセル"
+      lore:
+        - "§7スキマダンジョンから脱出します"
+        - "§7本当に脱出しますか？"
+  
+  # アイテム定義
+  item:
+    sprout:
+      name: "§dワールドの芽"
+      lore:
+        - "§7§m――――――――――――――――――――――――――――――"
+        - "§7スキマダンジョンで刈り取ってきた、"
+        - "§7ワールドの芽。"
+        - "§7おあげちゃんに渡すと、アイテムと"
+        - "§7交換してもらえる。"
+        - "§7§m――――――――――――――――――――――――――――――"
+    
+    compass_tier1:
+      name: "§bワールドの芽コンパス [Tier 1]"
+      lore:
+        - "§7§m――――――――――――――――――――――――――――――"
+        - "§7スキマダンジョン内で§bShiftを長押し"
+        - "§7することで、近くにある"
+        - "§aワールドの芽§7の場所を知ることができます！"
+        - ""
+        - "§7探知半径: §b48 block"
+        - "§7最大展開: §b30 秒"
+        - "§7クールタイム: §b60 秒"
+        - "§7§m――――――――――――――――――――――――――――――"
+    
+    compass_tier2:
+      name: "§bワールドの芽コンパス [Tier 2]"
+      lore:
+        - "§7§m――――――――――――――――――――――――――――――"
+        - "§7スキマダンジョン内で§bShiftを長押し"
+        - "§7することで、近くにある"
+        - "§aワールドの芽§7の場所を知ることができます！"
+        - ""
+        - "§7探知半径: §b48 block"
+        - "§7最大展開: §b20 秒"
+        - "§7クールタイム: §b40 秒"
+        - "§7§m――――――――――――――――――――――――――――――"
+    
+    compass_tier3:
+      name: "§bワールドの芽コンパス [Tier 3]"
+      lore:
+        - "§7§m――――――――――――――――――――――――――――――"
+        - "§7スキマダンジョン内で§bShiftを長押し"
+        - "§7することで、近くにある"
+        - "§aワールドの芽§7の場所を知ることができます！"
+        - ""
+        - "§7探知半径: §b48 block"
+        - "§7最大展開: §b10 秒"
+        - "§7クールタイム: §b20 秒"
+        - "§7§m――――――――――――――――――――――――――――――"
+    
+    talisman:
+      name: "§6おあげちゃんのお札"
+      lore:
+        - "§7§m――――――――――――――――――――――――――――――"
+        - "§7スキマダンジョンに送り出したクラフターを守り、"
+        - "§7帰り道を作るために"
+        - "§7おあげちゃんが渡してくれたお札。"
+        - "§7ダンジョン内部で使うと、"
+        - "§b脱出§7することができる。"
+        - "§7§m――――――――――――――――――――――――――――――"
+    
+    bookmark_broken:
+      name: "§5ぼろぼろのふしぎなしおり"
+      lore:
+        - "§7§m――――――――――――――――――――――――――――――"
+        - "§7スキマダンジョンに進入するための"
+        - "§7ふしぎなしおり。"
+        - "§7右クリックでダンジョンに入ることができる。"
+        - "§7§m――――――――――――――――――――――――――――――"
+    
+    bookmark_worn:
+      name: "§5擦り切れたふしぎなしおり"
+      lore:
+        - "§7§m――――――――――――――――――――――――――――――"
+        - "§7スキマダンジョンに進入するための"
+        - "§7ふしぎなしおり。"
+        - "§7右クリックでダンジョンに入ることができる。"
+        - "§7§m――――――――――――――――――――――――――――――"
+    
+    bookmark_faded:
+      name: "§5色褪せたふしぎなしおり"
+      lore:
+        - "§7§m――――――――――――――――――――――――――――――"
+        - "§7スキマダンジョンに進入するための"
+        - "§7ふしぎなしおり。"
+        - "§7右クリックでダンジョンに入ることができる。"
+        - "§7§m――――――――――――――――――――――――――――――"
+    
+    bookmark_new:
+      name: "§5新品のふしぎなしおり"
+      lore:
+        - "§7§m――――――――――――――――――――――――――――――"
+        - "§7スキマダンジョンに進入するための"
+        - "§7ふしぎなしおり。"
+        - "§7右クリックでダンジョンに入ることができる。"
+        - "§7§m――――――――――――――――――――――――――――――"
+    
+    arena_ticket:
+      name: "§6アリーナチケット"
+      lore:
+        - "§7アリーナへの参加チケット"
+    
+    arena_medal:
+      name: "§6アリーナメダル"
+      lore:
+        - "§7アリーナでの戦いの証"
+    
+    arena_prize:
+      name: "§6アリーナ報酬箱"
+      lore:
+        - "§7アリーナでの勝利報酬"
+    
+    big_light:
+      name: "§dビッグライト"
+      lore:
+        - "§7体を大きくするアイテム"
+    
+    small_light:
+      name: "§dスモールライト"
+      lore:
+        - "§7体を小さくするアイテム"
+
+# GUI ボタンテキスト（共通）
+gui_buttons:
+  cancel: "§cキャンセル"
+  confirm: "§a確認"
+  next: "§a次へ"
+  previous: "§c前へ"

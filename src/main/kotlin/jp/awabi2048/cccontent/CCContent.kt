@@ -31,6 +31,7 @@ import jp.awabi2048.cccontent.features.rank.profession.skilltree.ConfigBasedSkil
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskCheckerImpl
 import jp.awabi2048.cccontent.features.rank.listener.*
+import jp.awabi2048.cccontent.features.sukima_dungeon.command.SukimaDungeonCommand
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 
@@ -75,15 +76,20 @@ class CCContent : JavaPlugin() {
         // ランクシステムの初期化
         initializeRankSystem()
         
-        // コマンド登録
-        val giveCommand = GiveCommand()
-        val ccCommand = CCCommand(giveCommand) { reloadConfiguration() }
-        
-         getCommand("cc-content")?.setExecutor(ccCommand)
-         getCommand("cc-content")?.tabCompleter = ccCommand
-         // 旧エイリアスも対応
-         getCommand("cc")?.setExecutor(ccCommand)
-         getCommand("cc")?.tabCompleter = ccCommand
+         // コマンド登録
+         val giveCommand = GiveCommand()
+         val ccCommand = CCCommand(giveCommand) { reloadConfiguration() }
+         val sukimaDungeonCommand = SukimaDungeonCommand()
+         
+          getCommand("cc-content")?.setExecutor(ccCommand)
+          getCommand("cc-content")?.tabCompleter = ccCommand
+          // 旧エイリアスも対応
+          getCommand("cc")?.setExecutor(ccCommand)
+          getCommand("cc")?.tabCompleter = ccCommand
+          
+          // スキマダンジョンコマンド登録
+          getCommand("sukima_dungeon")?.setExecutor(sukimaDungeonCommand)
+          getCommand("sukima_dungeon")?.tabCompleter = sukimaDungeonCommand
         
         // リスナー登録
         server.pluginManager.registerEvents(GulliverItemListener(this), this)
