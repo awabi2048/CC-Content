@@ -1,8 +1,7 @@
 package jp.awabi2048.cccontent.features.rank.tutorial.task
 
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
-import org.bukkit.entity.Player
-import net.kyori.adventure.text.Component
+import org.bukkit.Material
 
 /**
  * モブやブロックの名前をプレイヤーの言語に翻訳するヘルパークラス
@@ -48,7 +47,13 @@ class EntityBlockTranslator(
      */
     fun translateItem(itemName: String): String {
         val key = itemName.lowercase()
-        // Minecraft公式翻訳キーを返す
+        val material = Material.matchMaterial(itemName.uppercase())
+
+        // ブロックとして配置できるものは block.minecraft.* を優先
+        if (material?.isBlock == true) {
+            return "block.minecraft.$key"
+        }
+
         return "item.minecraft.$key"
     }
     

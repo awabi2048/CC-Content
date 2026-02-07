@@ -276,10 +276,218 @@ sukima_dungeon:
         §7§m――――――――――――――――――――――――――――――
 
 
+  no_permission: "&c権限がありません。"
+  command_player_only: "このコマンドはプレイヤーのみ実行可能です。"
+  command_usage: "&e/sukima_dungeon <bookmark|reload>"
+  command_reload_success: "&a設定とテーマを再読み込みしました。"
+  command_bookmark_received: "&a{tier}しおりを入手しました！"
+  bookmark_cannot_use_here: "&cここではしおりを使用できません。"
+  command_generate_usage: "使用法: /sd generate <width> <length> [theme]"
+  command_generating: "&aダンジョンを強制生成中..."
+  command_unknown: "&c不明なサブコマンドです。"
+  command_restricted: "&cダンジョン内ではこのコマンドを使用できません。"
+  command_generator_failed: "&cダンジョンの生成に失敗しました。"
+  common_bar: "&7&m――――――――――――――――――――――――――――――"
 
+  gui_entrance_title: "&5ポータルをつなげる"
+  gui_entrance_button: "&b&lダンジョンへのポータルを開く"
+  gui_entrance_button_lore:
+    - "&7クリックしてダンジョンへのポータルを開きます！"
+  gui_style_button: "&6プレイスタイルの選択"
+  gui_style_multi: "&f§l| §7現在の設定 §eみんなで"
+  gui_style_single: "&f§l| §7現在の設定 §eひとりで"
+  gui_style_lore: "&7クリックして切り替えます"
+  gui_size_button: "&eサイズの選択"
+  gui_size_small: "&f§l| §7現在の設定 §e小"
+  gui_size_medium: "&f§l| §7現在の設定 §e中"
+  gui_size_large: "&f§l| §7現在の設定 §e大"
+  gui_size_huge: "&f§l| §7現在の設定 §e極大"
+  gui_size_lore: "&7クリックして切り替えます"
+  gui_theme_button: "&dポータルの接続先"
+  gui_theme_current: "&f§l| §7現在の設定 §d{theme}"
+  gui_theme_lore: "&e§nクリックして変更"
+  gui_info_title: "&aInfo"
+  gui_info_theme: "&f§l| §7ポータルの接続先 §d{theme}"
+  gui_info_size: "&f§l| §7サイズ §e{size}"
+  gui_info_description: "&7スキマの世界は非常に不安定です。そのため、ポータルが別の世界に繋がってしまうことがあります。&7より上位のしおりを使用すると、望んだ傾向の世界に行きやすくなります。"
+  gui_theme_error: "&cテーマが見つかりません"
+  gui_theme_random: "???"
+
+
+  item_bookmark_name: "&d{tier}ふしぎなしおり"
+  item_talisman_name: "&6おあげちゃんのお札"
+  item_talisman_lore:
+    - "&7&m――――――――――――――――――――――――――――――"
+    - "&7スキマダンジョンに送り出したクラフターを守り、帰り道を作るために"
+    - "&7おあげちゃんが渡してくれたお札。&7ダンジョン内部で使うと、"
+    - "&b脱出&7することができる。"
+    - "&7&m――――――――――――――――――――――――――――――"
+
+  gui_talisman_confirm_title: "&0&l本当に脱出する？"
+  gui_talisman_confirm_button: "&c&n脱出する"
+  gui_talisman_confirm_button_lore:
+    - "&7&m――――――――――――――――――――――――――――――"
+    - "&7クリックすると、すべてのプレイヤーが"
+    - "&7このダンジョンから離脱し、攻略を終了します。"
+    - "&7&m――――――――――――――――――――――――――――――"
+  gui_talisman_cancel_button: "&aとどまる"
+
+  gui_entrance_confirm_title: "&0&l本当に冒険に出る？"
+  gui_entrance_confirm_button: "&b&n冒険に出る"
+  gui_entrance_confirm_button_lore:
+    - "&7&m――――――――――――――――――――――――――――――"
+    - "&7しおりを消費して、選択した設定で"
+    - "&7ダンジョンへの扉を開きます。"
+    - "&7&m――――――――――――――――――――――――――――――"
+  gui_entrance_cancel_button: "&c戻る"
+
+  gui_join_title: "&5ポータルの先へ"
+  gui_join_button_ready: "&b&n入場する"
+  gui_join_button_wait: "&7生成中..."
+  gui_join_button_lore:
+    - "&7&m――――――――――――――――――――――――――――――"
+    - "&f§l| §7行き先 §d{theme}"
+    - "&f§l| §7サイズ §e{size}"
+    - "&7&m――――――――――――――――――――――――――――――"
+  gui_join_cancel_button: "&c閉じる"
+
+  gui_exit_title: "&0&l本当に帰還する？"
+  gui_exit_button: "&c&n帰還する"
+  gui_exit_button_lore:
+    - "&7&m――――――――――――――――――――――――――――――"
+    - "&7クリックすると、すべてのプレイヤーが"
+    - "&7このダンジョンから離脱し、攻略を終了します。"
+    - "&7&m――――――――――――――――――――――――――――――"
+  gui_exit_cancel_button: "&aとどまる"
+
+  talisman_cannot_use_here: "&cここではお札を使用できません。"
+
+  item_bookmark_lore:
+    - "&7&m――――――――――――――――――――――――――――――"
+    - "§7ワールドのはざまにある§dスキマダンジョン§7への扉を開くためのしおり"
+    - "&7&m――――――――――――――――――――――――――――――"
+
+  scoreboard_title: "§7« §dスキマダンジョン §7»"
+  scoreboard_sprouts: "§f§l| §7回収したワールドの芽 §a{count}§7/{count_remaining}個"
+  scoreboard_remaining: "§f§l| §7帰還まで §b{time_remaining}"
+
+  oage_waiting:
+    - "ただいま接続中やで！しばし待たれよ！"
+    - "えーっと、次はどこに繋げようかな..."
+    - "準備中やで！お茶でも飲んで待っててや！"
+    - "スキマの調整中や！もうちょっとかかるわ！"
+    - "ええ感じの場所を探してるで！"
+  oage_finished:
+    - "ありがと～！！無事に帰ってこれて良かった！"
+    - "おかえりなさい！摘み取りありがとうございました～！"
+    - "おつかれさま！助かりました～！ "
+  oage_collapse_warn:
+    - "時間切れ間近です！いそいでー！"
+    - "崩落が始まりそう！お早く！"
+  oage_collapse:
+    - "もうダメそう！呼び出しますー！！"
+    - "壊れるー！！呼び出します！"
+    - "あー！！呼びます！！"
+  oage_generate:
+    - "では案内しますね！少々お待ちください～"
+  oage_entry:
+    - "こちらです！お気をつけてー！"
+  oage_evacuate:
+    - "見つけました！緊急脱出します！"
+    - "ピンチを感じ取りました！逃げますよー！"
+  oage_redirect:
+    - "あらら、接続が不安定みたい...別の場所に飛ばしますね！"
+    - "うーん、うまく繋がらへんかったわ！こっちの世界に行ってみよか！"
+
+
+  dungeon_closing: "&cこのダンジョンは間もなく消滅します..."
+
+  compass_cannot_use_here: "&cここではワールドの芽の鼓動を感じられないようだ..."
+  compass_detect_start: "&b[Compass] &f探知を開始しました..."
+  compass_detect_fail: "&8&oワールドの芽が見つかりませんでした"
+  compass_detect_stop: "&7探知を終了しました..."
+  compass_detect_interrupted_hunger: "&7お腹が空きすぎているため、使用を中止しました..."
+
+  sizes:
+    small: "小"
+    medium: "中"
+    large: "大"
+    huge: "極大"
+
+  oage_fail:
+    - "あらら...間に合わへんかったみたいやね...お荷物は置いてきちゃったけど、命があってよかったわ！"
+    - "残念...崩落に巻き込まれちゃった！ワールドの芽はスキマに消えちゃったけど、次は頑張りましょう！"
+  oage_result:
+  - "お疲れ様！無事に全部集まったね！崩れる前に早く戻ってきてー！"
+
+  tiers:
+    BROKEN: "ぼろぼろの"
+    WORN: "擦り切れた"
+    FADED: "色褪せた"
+    NEW: "新品の"
+
+  themes:
+  test:
+    name: "test"
+    description: "てすとです"
+    oage_messages:
+      - "これはテストみたいです！"
+  cave:
+    name: "洞窟"
+    description: "暗く湿った岩の洞窟です。"
+    oage_messages:
+      - "暗くてジメジメしてるわ...気をつけて！"
+      - "足元注意してね！"
+  mineshaft:
+    name: "廃坑"
+    description: "かつて掘り進められた古い坑道です。"
+    oage_messages:
+      - "古いレールがいっぱい！迷子にならへんようにね！"
+  library:
+    name: "図書館"
+    description: "膨大な知識が眠る静謐な図書館です。"
+    oage_messages:
+      - "静かにね...本がいっぱいあるわ！"
+  ruin:
+    name: "遺跡"
+    description: "長い年月を経て風化した古代の遺跡です。"
+    oage_messages:
+      - "なんか崩れそう...歴史を感じるわね！"
+  see_of_trees:
+    name: "樹海"
+    description: "視界を遮るほどに木々が鬱蒼と生い茂る森です。"
+    oage_messages:
+      - "木がいっぱいで迷っちゃいそう！"
+  maze:
+    name: "立体迷宮"
+    description: "複雑に組み合わさった迷路のような空間です。"
+    oage_messages:
+      - "うわぁ、目が回っちゃいそう！"
 # GUI ボタンテキスト（共通）
 gui_buttons:
   cancel: "§cキャンセル"
   confirm: "§a確認"
   next: "§a次へ"
   previous: "§c前へ"
+
+rank:
+  tutorial_task_info:
+    usage: "§c使用法: /rank task-info <player>"
+    player_not_found: "§cプレイヤーが見つかりません"
+    system_not_initialized: "§cタスクシステムが初期化されていません"
+    opened_for_player: "§a{player} にタスクGUIを表示しました"
+    title: "§6{player} §7- §e{rank}"
+    complete_title: "§a§lすべてのタスク完了！"
+    complete_lore: "§7現在のランクでは追加要件はありません"
+    category:
+      play_time: "§eプレイ時間"
+      combat: "{status} §b討伐系"
+      mining: "{status} §b採掘"
+      vanilla_exp: "§eバニラEXP"
+      items: "{status} §bアイテム所持"
+    line:
+      progress_time: "{status} §7進捗: {current} / {required}"
+      progress_exp: "{status} §7進捗: {current}/{required}"
+      percent: "§8({percent}%)"
+      target_prefix: "{status} "
+      target_suffix: "§7: {current}/{required}"

@@ -20,12 +20,12 @@ object DungeonManager {
 
     fun createDungeonWorld(themeId: String? = null): World? {
         val uuid = UUID.randomUUID()
-        val worldName = "dungeon_$uuid"
+        val worldName = "sukima_dungeon.$uuid"
         return createOrLoadWorld(worldName, themeId)
     }
 
     fun loadDungeonWorld(worldName: String, themeId: String? = null): World? {
-        if (!worldName.startsWith("dungeon_")) return null
+        if (!worldName.startsWith("sukima_dungeon_")) return null
         return createOrLoadWorld(worldName, themeId)
     }
 
@@ -50,7 +50,7 @@ object DungeonManager {
     }
 
     fun deleteDungeonWorld(world: World) {
-        if (!world.name.startsWith("dungeon_")) return
+        if (!world.name.startsWith("sukima_dungeon_")) return
 
         // Kick any remaining players (just in case)
         for (player in world.players) {
@@ -81,7 +81,7 @@ object DungeonManager {
     }
 
     fun escapeDungeon(world: World, reason: String? = null) {
-        if (!world.name.startsWith("dungeon_")) return
+        if (!world.name.startsWith("sukima_dungeon_")) return
         
         val players = world.players.toList()
         val mainWorld = Bukkit.getWorlds()[0]

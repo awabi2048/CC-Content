@@ -1,6 +1,65 @@
-messages:
-  prefix: "&7[&dSukimaDungeon&7] "
-  no_permission: "&cYou do not have permission."
+# =========================================
+# SukimaDungeon Related
+# =========================================
+
+sukima_dungeon:
+  # SukimaDungeon English Language File
+  # Recreated from original SukimaDungeon plugin
+  
+  # Prefix
+  prefix: "§7[§dSukimaDungeon§7]"
+  
+  # Compass
+  compass:
+    activate: "§bWorld Sprout Compass [Tier %1] activated (§a%2 seconds§b)"
+    deactivate: "§cCompass deactivated"
+    detected: "§aWorld Sprout detected! §7Distance: §e%1m §7Direction: §6%2"
+    cooldown: "§cCooldown: §e%1 seconds remaining"
+    no_sprouts: "§cNo World Sprouts nearby"
+  
+  # Talisman
+  talisman:
+    use: "§6Oage-chan's Talisman§7 used"
+    escape: "§d§lEscape!"
+    cancelled: "§cEscape cancelled"
+  
+  # Sprout
+  sprout:
+    harvest: "§aWorld Sprout harvested"
+  
+  # Error messages
+  error:
+    not_in_dungeon: "§cCan only be used inside SukimaDungeon"
+    no_permission: "§cNo permission"
+    generic: "§cAn error occurred"
+  
+  # GUI messages
+  gui:
+    escape:
+      title: "§8Escape Confirmation"
+      confirm: "§a§lEscape"
+      cancel: "§c§lCancel"
+      lore:
+        - "§7Escape from SukimaDungeon"
+        - "§7Are you sure?"
+  
+  # Item descriptions (separate from item lore)
+  item:
+    sprout:
+      name: "§dWorld Sprout"
+      description: "World Sprout harvested from SukimaDungeon"
+    compass:
+      name: "§bWorld Sprout Compass"
+      description: "Compass that detects World Sprout locations"
+    talisman:
+      name: "§6Oage-chan's Talisman"
+      description: "Talisman to escape from SukimaDungeon"
+  messages:
+
+
+
+  
+  
   command_player_only: "This command can only be executed by players."
   command_usage: "&e/sukima_dungeon <bookmark|reload>"
   command_reload_success: "&aReloaded settings and themes."
@@ -12,7 +71,7 @@ messages:
   command_restricted: "&cThis command cannot be used inside the dungeon."
   command_generator_failed: "&cDungeon generation failed."
   common_bar: "&7&m――――――――――――――――――――――――――――――"
-  
+
   gui_entrance_title: "&5Connect Portals"
   gui_entrance_button: "&b&lOpen Dungeon Portal"
   gui_entrance_button_lore:
@@ -53,7 +112,7 @@ messages:
     - "&7leave the dungeon midway."
     - "&c*Items are not lost, but quest fails."
   gui_talisman_cancel_button: "&a&lStay"
-  
+
   talisman_cannot_use_here: "&cYou cannot use the talisman here."
 
   scoreboard_title: "&eSukima&6Dungeon"
@@ -65,8 +124,14 @@ messages:
   oage_start_multi: "&a[Oage-chan] &f\"Group it is! I'll prepare {theme} ({tier})!\""
   oage_start_single: "&a[Oage-chan] &f\"Solo it is! I'll prepare {theme} ({tier})!\""
   trap_triggered: "&6Oage-chan: &f\"Oops, caught again? You gotta be careful!\""
-  
+
   dungeon_closing: "&cThis dungeon will vanish shortly..."
+
+  tiers:
+    BROKEN: "Tattered"
+    WORN: "Worn-out"
+    FADED: "Faded"
+    NEW: "Brand New"
 
   sizes:
     small: "Small"
@@ -74,43 +139,24 @@ messages:
     large: "Large"
     huge: "Huge"
 
-  sukima_dungeon:
-    theme:
-      test:
-        name: "Test"
-        description: "A test theme."
-        oage_messages:
-          - "This is a test!"
-      cave:
-        name: "Cave"
-        description: "A dark, damp cave made of stone."
-        oage_messages:
-          - "It's dark and damp... be careful!"
-          - "Watch your step!"
-      mineshaft:
-        name: "Mineshaft"
-        description: "An old tunnel that was once excavated."
-        oage_messages:
-          - "Lots of old rails! Don't get lost!"
-      library:
-        name: "Library"
-        description: "A quiet library where vast knowledge sleeps."
-        oage_messages:
-          - "Keep it quiet... there are lots of books!"
-      ruin:
-        name: "Ruin"
-        description: "An ancient ruin that has weathered for a long time."
-        oage_messages:
-          - "It looks like it might collapse... I can feel the history!"
-      see_of_trees:
-        name: "Forest"
-        description: "A dense forest where trees block the view."
-        oage_messages:
-          - "Lots of trees, I might get lost!"
-      maze:
-        name: "Labyrinth"
-        description: "A space like a maze that is intricately combined."
-        oage_messages:
-          - "Wow, my head is spinning!"
-
-
+rank:
+  tutorial_task_info:
+    usage: "§cUsage: /rank task-info <player>"
+    player_not_found: "§cPlayer not found"
+    system_not_initialized: "§cTask system is not initialized"
+    opened_for_player: "§aOpened task GUI for {player}"
+    title: "§6{player} §7- §e{rank}"
+    complete_title: "§a§lAll tasks complete!"
+    complete_lore: "§7There are no additional requirements for this rank"
+    category:
+      play_time: "§ePlay Time"
+      combat: "{status} §bCombat"
+      mining: "{status} §bMining"
+      vanilla_exp: "§eVanilla EXP"
+      items: "{status} §bItems"
+    line:
+      progress_time: "{status} §7Progress: {current} / {required}"
+      progress_exp: "{status} §7Progress: {current}/{required}"
+      percent: "§8({percent}%)"
+      target_prefix: "{status} "
+      target_suffix: "§7: {current}/{required}"
