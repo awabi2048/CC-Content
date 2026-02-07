@@ -1,3 +1,19 @@
 miner:
   diamond_ore: 10
   deepslate_diamond_ore: 20
+
+lumberjack:
+  oak_log: 2
+  birch_log: 2
+  spruce_log: 2
+  jungle_log: 2
+  acacia_log: 2
+  dark_oak_log: 2
+  mangrove_log: 2
+  cherry_log: 2
+  pale_oak_log: 2
+  crimson_stem: 2
+  warped_stem: 2
+
+brewer:
+  mock_exp: 5
