@@ -85,9 +85,7 @@ class CCCommand(
               §f/cc-content reload
               §7  - 設定ファイルをリロードします
               
-              §f/arena §7- アリーナコマンド
               §f/arenaa §7- アリーナ管理コマンド
-              §f/party §7- パーティコマンド
               §f/sukima_dungeon §7- スキマダンジョンコマンド
           """.trimIndent())
       }
@@ -103,7 +101,11 @@ class CCCommand(
           // サブコマンド補完（/cc-content [ここ]）
           if (args.size == 1) {
               val prefix = args[0].lowercase()
-              return listOf("give", "reload", "help").filter { it.startsWith(prefix) }
+              val candidates = mutableListOf("give", "help")
+              if (sender.hasPermission("cc-content.admin")) {
+                  candidates.add("reload")
+              }
+              return candidates.filter { it.startsWith(prefix) }
           }
          
          // サブコマンドの引数補完
