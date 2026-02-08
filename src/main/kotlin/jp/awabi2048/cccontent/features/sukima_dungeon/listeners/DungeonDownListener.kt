@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.sukima_dungeon.listeners
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.DungeonSessionManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.PlayerDataManager
+import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
 import org.bukkit.Bukkit
 import org.bukkit.GameMode
 import org.bukkit.Material
@@ -26,7 +27,7 @@ class DungeonDownListener(private val plugin: JavaPlugin) : Listener {
     fun onPlayerDamage(event: EntityDamageEvent) {
         val player = event.entity as? Player ?: return
         val world = player.world
-        if (!world.name.startsWith("dungeon_")) return
+        if (!isSukimaDungeonWorld(world)) return
 
         val session = DungeonSessionManager.getSession(player) ?: return
         if (!session.isMultiplayer) return
@@ -110,7 +111,7 @@ class DungeonDownListener(private val plugin: JavaPlugin) : Listener {
         }
         
         // Prevent leaving spectator mode or manual teleport
-        if (player.world.name.startsWith("dungeon_")) {
+        if (isSukimaDungeonWorld(player.world)) {
             val survivors = player.world.players.filter { p ->
                 p != player && DungeonSessionManager.getSession(p)?.isDown != true
             }
@@ -128,7 +129,7 @@ class DungeonDownListener(private val plugin: JavaPlugin) : Listener {
         val player = event.player
         val session = DungeonSessionManager.getSession(player) ?: return
         if (!session.isDown) return
-        if (!player.world.name.startsWith("dungeon_")) return
+        if (!isSukimaDungeonWorld(player.world)) return
 
         val survivors = player.world.players.filter { p ->
             p != player && DungeonSessionManager.getSession(p)?.isDown != true
@@ -147,7 +148,7 @@ class DungeonDownListener(private val plugin: JavaPlugin) : Listener {
         val player = event.player
         val session = DungeonSessionManager.getSession(player)
         if (session?.isDown == true) {
-            if (player.world.name.startsWith("dungeon_")) {
+            if (isSukimaDungeonWorld(player.world)) {
                 player.gameMode = GameMode.SPECTATOR
                 // Re-find target in next tick
                 Bukkit.getScheduler().runTaskLater(plugin, Runnable {

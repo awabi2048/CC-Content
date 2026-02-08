@@ -1,0 +1,91 @@
+# CC-Content Root Config
+
+sukima_dungeon:
+  sizes:
+    small:
+      tiles: 3
+      duration: 900
+      npc_base_count: 2
+      sprout_base_count: 1
+    medium:
+      tiles: 5
+      duration: 1800
+      npc_base_count: 5
+      sprout_base_count: 3
+    large:
+      tiles: 7
+      duration: 2700
+      npc_base_count: 8
+      sprout_base_count: 5
+    huge:
+      tiles: 9
+      duration: 3600
+      npc_base_count: 12
+      sprout_base_count: 8
+
+  mob_scaling:
+    amplification_ratio: 0.05
+
+  miniboss_chance: 0.1
+  rest_chance: 0.1
+
+  spawn_rates:
+    MOB: 0.5
+    ITEM: 0.4
+
+  mob_spawn:
+    spawn_range: 24.0
+    despawn_range: 32.0
+
+  mob_detection:
+    normal_range: 16.0
+    sneak_range: 8.0
+
+  npc_count_variation: 0.2
+  sprout_count_variation: 0.2
+
+  marker_search_radius_y: 20.0
+  sprout_per_tile: 0.1
+
+  restricted_commands:
+    - "tp"
+    - "teleport"
+    - "spawn"
+    - "home"
+    - "sethome"
+    - "warp"
+
+  bookmark_blacklist_worlds:
+    - "world_the_end"
+
+  oage_message_sound: "entity.villager.ambient"
+  oage_message_prefix: "§e【おあげちゃん】§r"
+
+  compass:
+    max_radius_particle: "flame"
+    current_radius_particle: "soul_fire_flame"
+    radius: 48.0
+    time:
+      tier1: 30
+      tier2: 20
+      tier3: 10
+    cooldown:
+      tier1: 60
+      tier2: 40
+      tier3: 20
+
+  bgm:
+    default:
+      key: "kota_server:ost_3.sukima_dungeon"
+      duration: 192
+
+  world_settings:
+    view_distance: 6
+    simulation_distance: 4
+    send_view_distance: -1
+
+arena:
+  world_settings:
+    view_distance: 6
+    simulation_distance: 4
+    send_view_distance: -1

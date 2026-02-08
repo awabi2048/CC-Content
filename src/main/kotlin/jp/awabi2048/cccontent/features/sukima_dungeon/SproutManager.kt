@@ -166,7 +166,7 @@ object SproutManager {
             override fun run() {
                 // Iterate all dungeon worlds
                 for (world in org.bukkit.Bukkit.getWorlds()) {
-                    if (!world.name.startsWith("dungeon_")) continue
+                    if (!isSukimaDungeonWorld(world)) continue
                     
                     val sprouts = world.entities.filter { it.scoreboardTags.contains(MARKER_TAG) }
                     

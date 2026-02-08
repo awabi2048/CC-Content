@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.sukima_dungeon
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.CCContent
+import jp.awabi2048.cccontent.world.WorldSettingsHelper
 import org.bukkit.Bukkit
 import org.bukkit.World
 import org.bukkit.WorldCreator
@@ -20,12 +21,12 @@ object DungeonManager {
 
     fun createDungeonWorld(themeId: String? = null): World? {
         val uuid = UUID.randomUUID()
-        val worldName = "sukima_dungeon.$uuid"
+        val worldName = "$SUKIMA_DUNGEON_WORLD_PREFIX$uuid"
         return createOrLoadWorld(worldName, themeId)
     }
 
     fun loadDungeonWorld(worldName: String, themeId: String? = null): World? {
-        if (!worldName.startsWith("sukima_dungeon_")) return null
+        if (!isSukimaDungeonWorldName(worldName)) return null
         return createOrLoadWorld(worldName, themeId)
     }
 
@@ -44,13 +45,14 @@ object DungeonManager {
             it.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, false)
             it.setGameRule(org.bukkit.GameRule.DO_WEATHER_CYCLE, false)
             it.time = 6000
+            WorldSettingsHelper.applyDistanceSettings(CCContent.instance, it, "sukima_dungeon.world_settings")
         }
         
         return world
     }
 
     fun deleteDungeonWorld(world: World) {
-        if (!world.name.startsWith("sukima_dungeon_")) return
+        if (!isSukimaDungeonWorld(world)) return
 
         // Kick any remaining players (just in case)
         for (player in world.players) {
@@ -81,7 +83,7 @@ object DungeonManager {
     }
 
     fun escapeDungeon(world: World, reason: String? = null) {
-        if (!world.name.startsWith("sukima_dungeon_")) return
+        if (!isSukimaDungeonWorld(world)) return
         
         val players = world.players.toList()
         val mainWorld = Bukkit.getWorlds()[0]

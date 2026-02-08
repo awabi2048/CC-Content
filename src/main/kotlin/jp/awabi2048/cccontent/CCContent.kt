@@ -63,6 +63,8 @@ class CCContent : JavaPlugin(), Listener {
      
     override fun onEnable() {
         instance = this
+        saveDefaultConfig()
+        reloadConfig()
         
         // ロガーをCustomItemManagerに設定
         CustomItemManager.setLogger(logger)
@@ -329,13 +331,13 @@ class CCContent : JavaPlugin(), Listener {
 
             // /ccc reload 時に欠損補完する必須リソース
             val requiredResources = listOf(
+                RequiredResource("config.yml"),
                 RequiredResource("tutorial-tasks.yml"),
                 RequiredResource("lang/ja_jp.yml"),
                 RequiredResource("lang/en_us.yml"),
                 RequiredResource("lang/ja_jp.yml", "lang/ja_JP.yml"),
                 RequiredResource("config/gulliverlight.yml"),
                 RequiredResource("config/arena/theme.yml"),
-                RequiredResource("config/sukima/config.yml"),
                 RequiredResource("config/sukima/items.yml"),
                 RequiredResource("config/sukima/mobs.yml"),
                 RequiredResource("config/sukima/mob_spawn.yml"),
@@ -399,6 +401,7 @@ class CCContent : JavaPlugin(), Listener {
             }
             
             // SukimaDungeonの設定をリロード
+            reloadConfig()
             reloadSukimaDungeon()
 
             if (::arenaManager.isInitialized) {
@@ -568,7 +571,7 @@ class CCContent : JavaPlugin(), Listener {
      * SukimaDungeonの設定をリロード
      */
     fun reloadSukimaDungeon() {
-        // SukimaDungeon用config読み込み (config/sukima/config.yml)
+        // SukimaDungeon用config読み込み (root config.yml)
         SukimaConfigHelper.reload(this)
         
         // Load messages
@@ -599,7 +602,7 @@ class CCContent : JavaPlugin(), Listener {
         PlayerDataManager.load(event.player)
         
         // ダンジョン内にいる場合はBGMを再開
-        if (event.player.world.name.startsWith("dungeon_")) {
+        if (isSukimaDungeonWorld(event.player.world)) {
             BGMManager.play(event.player, "default")
         }
     }

@@ -5,19 +5,19 @@ themes:
     void_y_limit: 10.0
   cave:
     icon: COBBLESTONE
-    tileSize: 16
+    tileSize: 32
   mineshaft:
     icon: CHEST_MINECART
-    tileSize: 16
+    tileSize: 48
   library:
     icon: BOOKSHELF
-    tileSize: 16
+    tileSize: 48
   ruin:
     icon: CHISELED_STONE_BRICKS
-    tileSize: 16
+    tileSize: 48
   see_of_trees:
     icon: MOSS_BLOCK
-    tileSize: 16
+    tileSize: 48
   maze:
     icon: COMPASS
-    tileSize: 16
+    tileSize: 48

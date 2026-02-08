@@ -15,6 +15,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.gui.DungeonExitGui
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.PortalManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.PortalSession
+import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
 import org.bukkit.event.player.PlayerInteractEntityEvent
 
 import org.bukkit.ChatColor
@@ -35,7 +36,7 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
             if (CustomItemManager.isBookmarkItem(item)) {
                 // Check world blacklist
                 val blacklist = jp.awabi2048.cccontent.features.sukima_dungeon.SukimaConfigHelper.getConfig(plugin).getStringList("bookmark_blacklist_worlds")
-                if (blacklist.contains(event.player.world.name) || event.player.world.name.startsWith("dungeon_")) {
+                if (blacklist.contains(event.player.world.name) || isSukimaDungeonWorld(event.player.world)) {
                     event.player.sendMessage(MessageManager.getMessage(event.player, "bookmark_cannot_use_here"))
                     event.isCancelled = true
                     return
@@ -221,7 +222,7 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
         // Sound
         player.playSound(player.location, org.bukkit.Sound.BLOCK_PORTAL_TRIGGER, 0.5f, 1.0f)
 
-        val config = plugin.config
+        val config = jp.awabi2048.cccontent.features.sukima_dungeon.SukimaConfigHelper.getConfig(plugin)
         val size = config.getInt("sizes.$sizeKey.tiles", 5)
         val duration = config.getInt("sizes.$sizeKey.duration", 1800)
 
@@ -305,15 +306,18 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
                         val markerResult = StructureBuilder.processMarkers(startLocation, size, size, theme, finalNpcCount, buildResult.minibossMarkers.keys)
                         val spawnLocations = markerResult.playerSpawns
                         
-                        if (spawnLocations.isEmpty()) {
-                             waitingTask.cancel()
-                             plugin.logger.warning("No spawn locations found in the generated dungeon! Maze size: $size, Theme: ${theme.id}")
-
-                             DungeonManager.deleteDungeonWorld(world)
-                             participants.forEach { it.sendMessage(MessageManager.getMessage(it, "command_generator_failed")) }
-                             return@Runnable
-                         }
-                         val teleportLocation = spawnLocations.random()
+                        val teleportLocation = if (spawnLocations.isEmpty()) {
+                            val markerCount = world.entities.count {
+                                (it is org.bukkit.entity.Marker && it.scoreboardTags.contains("sd.marker.spawn")) ||
+                                    (it is org.bukkit.entity.ArmorStand && it.customName == "SPAWN")
+                            }
+                            plugin.logger.warning(
+                                "No spawn locations found in generated dungeon. fallback=origin mazeSize=$size theme=${theme.id} world=${world.name} markerCount=$markerCount"
+                            )
+                            org.bukkit.Location(world, 0.5, 64.0, 0.5)
+                        } else {
+                            spawnLocations.random()
+                        }
                          val sproutCount = jp.awabi2048.cccontent.features.sukima_dungeon.SproutManager.populate(plugin, world, finalSproutCount)
 
                          if (isMultiplayer && portalSession != null) {
@@ -382,10 +386,35 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
         ) {
             player.teleport(teleportLocation)
             player.playSound(player.location, org.bukkit.Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f)
+
+            val inv = player.inventory
+            var replaced = false
+            for (i in 0 until inv.size) {
+                val invItem = inv.getItem(i)
+                if (CustomItemManager.isBookmarkItem(invItem)) {
+                    inv.setItem(i, CustomItemManager.getTalismanItem(player))
+                    replaced = true
+                    break
+                }
+            }
+            if (!replaced) {
+                val talisman = CustomItemManager.getTalismanItem(player)
+                if (inv.firstEmpty() != -1) {
+                    inv.addItem(talisman)
+                } else {
+                    player.world.dropItemNaturally(player.location, talisman)
+                }
+            }
             
             // Task 14: Place return portal if not exists
-            if (PortalManager.getReturnPortal(teleportLocation.world!!) == null) {
-                PortalManager.createReturnPortal(teleportLocation)
+            runCatching {
+                if (PortalManager.getReturnPortal(teleportLocation.world!!) == null) {
+                    PortalManager.createReturnPortal(teleportLocation)
+                }
+            }.onFailure {
+                org.bukkit.plugin.java.JavaPlugin.getProvidingPlugin(EntranceListener::class.java).logger.warning(
+                    "帰還ポータル生成に失敗しました: world=${teleportLocation.world?.name} loc=${teleportLocation.blockX},${teleportLocation.blockY},${teleportLocation.blockZ} error=${it.message}"
+                )
             }
             
             // Send theme specific messages after teleport
@@ -393,16 +422,6 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
                 MessageManager.sendDelayedMessages(player, themeMessages.map { " 「$it」" })
             }
             
-            // Replace Bookmark with Talisman
-            val inv = player.inventory
-            for (i in 0 until inv.size) {
-                val invItem = inv.getItem(i)
-                if (CustomItemManager.isBookmarkItem(invItem)) {
-                    inv.setItem(i, CustomItemManager.getTalismanItem(player))
-                    break
-                }
-            }
-
             // Setup session and scoreboard
             DungeonSessionManager.startSession(
                 player, tier, themeName, duration,
@@ -418,6 +437,7 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
                 isMultiplayer = isMultiplayer
             )
             ScoreboardManager.setupScoreboard(player)
+            jp.awabi2048.cccontent.features.sukima_dungeon.BGMManager.loadConfig()
             jp.awabi2048.cccontent.features.sukima_dungeon.BGMManager.play(player, "default")
         }
     }

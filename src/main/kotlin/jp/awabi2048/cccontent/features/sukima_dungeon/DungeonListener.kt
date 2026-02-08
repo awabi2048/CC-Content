@@ -11,9 +11,10 @@ class DungeonListener : Listener {
     @EventHandler
     fun onPlayerChangedWorld(event: PlayerChangedWorldEvent) {
         val fromWorld = event.from
+        val toWorld = event.player.world
         
         // Check if player left a dungeon world
-        if (fromWorld.name.startsWith("dungeon_")) {
+        if (isSukimaDungeonWorld(fromWorld)) {
             DungeonSessionManager.endSession(event.player)
             ScoreboardManager.removeScoreboard(event.player)
 
@@ -26,6 +27,12 @@ class DungeonListener : Listener {
             }
         }
 
+        if (isSukimaDungeonWorld(toWorld)) {
+            BGMManager.play(event.player, "default")
+        } else {
+            BGMManager.stop(event.player)
+        }
+
     }
 
     @EventHandler
@@ -36,7 +43,7 @@ class DungeonListener : Listener {
         // or immediately. To be safe, we check if the world has 0 players or just this 1 player.
         // Actually, checking if size <= 1 and contains the player is safer.
         
-        if (world.name.startsWith("dungeon_")) {
+        if (isSukimaDungeonWorld(world)) {
             // Do NOT end session here, allow reconnecting
             // Scoreboard will be removed automatically on quit or handled on rejoin
             
@@ -53,7 +60,7 @@ class DungeonListener : Listener {
         val player = event.player
         val world = player.world
         
-        if (world.name.startsWith("dungeon_")) {
+        if (isSukimaDungeonWorld(world)) {
             if (player.gameMode == org.bukkit.GameMode.SURVIVAL) {
                 val blockType = event.block.type
                 // Allow breaking World Sprouts and allowed utility blocks (torches, ladders, etc.)
@@ -79,7 +86,7 @@ class DungeonListener : Listener {
         val player = event.player
         val world = player.world
         
-        if (world.name.startsWith("dungeon_")) {
+        if (isSukimaDungeonWorld(world)) {
             if (player.gameMode == org.bukkit.GameMode.SURVIVAL) {
                 if (!ALLOWED_MATERIALS.contains(event.block.type)) {
                     event.isCancelled = true
@@ -93,7 +100,7 @@ class DungeonListener : Listener {
         val player = event.player
         val world = player.world
 
-        if (world.name.startsWith("dungeon_")) {
+        if (isSukimaDungeonWorld(world)) {
             if (player.isOp) return
 
             val message = event.message.lowercase().removePrefix("/")

@@ -25,7 +25,7 @@ class TalismanListener(private val plugin: JavaPlugin) : Listener {
 
         if (CustomItemManager.isTalismanItem(item)) {
             if (event.action == Action.RIGHT_CLICK_AIR || event.action == Action.RIGHT_CLICK_BLOCK) {
-                if (player.world.name.startsWith("dungeon_")) {
+                if (isSukimaDungeonWorld(player.world)) {
                     TalismanConfirmGui().open(player)
                     player.playSound(player.location, org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f)
                 } else {
