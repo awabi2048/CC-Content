@@ -9,7 +9,10 @@ import jp.awabi2048.cccontent.items.misc.GulliverItemListener
 import jp.awabi2048.cccontent.items.misc.GulliverConfig
 import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
 import jp.awabi2048.cccontent.items.arena.*
+import jp.awabi2048.cccontent.features.arena.ArenaCommand
 import jp.awabi2048.cccontent.features.arena.ArenaItemListener
+import jp.awabi2048.cccontent.features.arena.ArenaListener
+import jp.awabi2048.cccontent.features.arena.ArenaManager
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.impl.RankManagerImpl
 import jp.awabi2048.cccontent.features.rank.impl.YamlRankStorage
@@ -53,6 +56,7 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var mobManager: MobManager
     private lateinit var itemManager: ItemManager
     private lateinit var markerManager: MarkerManager
+    private lateinit var arenaManager: ArenaManager
     
     fun getMarkerManager(): MarkerManager = markerManager
     fun getItemManager(): ItemManager = itemManager
@@ -71,6 +75,10 @@ class CCContent : JavaPlugin(), Listener {
         
         // ランクシステムの初期化
         initializeRankSystem()
+
+        // Arena 初期化
+        arenaManager = ArenaManager(this)
+        arenaManager.initialize()
         
         // コマンド登録
         val giveCommand = GiveCommand()
@@ -81,6 +89,10 @@ class CCContent : JavaPlugin(), Listener {
         // 旧エイリアスも対応
         getCommand("cc")?.setExecutor(ccCommand)
         getCommand("cc")?.tabCompleter = ccCommand
+
+        val arenaCommand = ArenaCommand(arenaManager)
+        getCommand("arenaa")?.setExecutor(arenaCommand)
+        getCommand("arenaa")?.tabCompleter = arenaCommand
         
         // SukimaDungeon 初期化（GitHub版）
         initializeSukimaDungeon()
@@ -88,6 +100,7 @@ class CCContent : JavaPlugin(), Listener {
         // リスナー登録（スキマダンジョン以外）
         server.pluginManager.registerEvents(GulliverItemListener(this), this)
         server.pluginManager.registerEvents(ArenaItemListener(), this)
+        server.pluginManager.registerEvents(ArenaListener(arenaManager), this)
         
         // ScaleManagerタスクの開始（毎tick実行）
         server.scheduler.runTaskTimer(this, GulliverScaleManager(), 0L, 1L)
@@ -321,6 +334,7 @@ class CCContent : JavaPlugin(), Listener {
                 RequiredResource("lang/en_us.yml"),
                 RequiredResource("lang/ja_jp.yml", "lang/ja_JP.yml"),
                 RequiredResource("config/gulliverlight.yml"),
+                RequiredResource("config/arena/theme.yml"),
                 RequiredResource("config/sukima/config.yml"),
                 RequiredResource("config/sukima/items.yml"),
                 RequiredResource("config/sukima/mobs.yml"),
@@ -386,6 +400,10 @@ class CCContent : JavaPlugin(), Listener {
             
             // SukimaDungeonの設定をリロード
             reloadSukimaDungeon()
+
+            if (::arenaManager.isInitialized) {
+                arenaManager.reloadThemes()
+            }
             
             logger.info("CC-Content の設定ファイルをすべてリロードしました")
         } catch (e: Exception) {
@@ -598,6 +616,9 @@ class CCContent : JavaPlugin(), Listener {
         try {
             BGMManager.stopAll()
             DungeonSessionManager.saveSessions(this)
+            if (::arenaManager.isInitialized) {
+                arenaManager.shutdown()
+            }
             for (player in server.onlinePlayers) {
                 PlayerDataManager.unload(player)
                 MenuCooldownManager.clearCooldown(player.uniqueId)

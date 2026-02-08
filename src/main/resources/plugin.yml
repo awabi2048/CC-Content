@@ -19,6 +19,10 @@ commands:
     usage: /sukima_dungeon
     aliases: [sd]
     permission: sukimadungeon.command.base
+  arenaa:
+    description: アリーナ管理コマンド
+    usage: /arenaa <start|stop|theme>
+    permission: cc-content.arena.admin
 
 permissions:
   sukimadungeon.command.base:
@@ -26,4 +30,7 @@ permissions:
     default: true
   sukimadungeon.admin:
     description: Admin permissions
+    default: op
+  cc-content.arena.admin:
+    description: アリーナ管理コマンドを実行できる
     default: op
