@@ -2,11 +2,8 @@ package jp.awabi2048.cccontent.features.sukima_dungeon
 
 import jp.awabi2048.cccontent.CCContent
 import org.bukkit.Bukkit
-import org.bukkit.Sound
-import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.Player
 import org.bukkit.scheduler.BukkitTask
-import java.io.File
 import java.util.UUID
 
 object BGMManager {
@@ -18,22 +15,37 @@ object BGMManager {
     fun loadConfig() {
         bgmConfigs.clear()
         val plugin = CCContent.instance
-        val configFile = File(plugin.dataFolder, "config/sukima/config.yml")
-        if (!configFile.exists()) return
-        val config = YamlConfiguration.loadConfiguration(configFile)
-        val section = config.getConfigurationSection("bgm") ?: return
+        val config = SukimaConfigHelper.getConfig(plugin)
+        val section = config.getConfigurationSection("bgm")
+        if (section == null) {
+            plugin.logger.warning("BGM設定セクション(bgm)が見つかりません")
+            return
+        }
         val keys = section.getKeys(false)
         for (key in keys) {
             val bgmKey = section.getString("$key.key") ?: continue
             val duration = section.getInt("$key.duration", 0)
             bgmConfigs[key] = BGMConfig(bgmKey, duration)
         }
+        plugin.logger.info("BGM設定を読み込みました: ${bgmConfigs.keys}")
     }
 
     fun play(player: Player, bgmId: String) {
         stop(player)
         val plugin = CCContent.instance
-        val config = bgmConfigs[bgmId] ?: return
+        var config = bgmConfigs[bgmId]
+        if (config == null) {
+            loadConfig()
+            config = bgmConfigs[bgmId]
+        }
+        if (config == null) {
+            plugin.logger.warning("BGM設定が見つかりません: id=$bgmId")
+            return
+        }
+        if (config.duration <= 0) {
+            plugin.logger.warning("BGM再生時間が不正です: id=$bgmId duration=${config.duration}")
+            return
+        }
         
         val task = object : org.bukkit.scheduler.BukkitRunnable() {
             override fun run() {

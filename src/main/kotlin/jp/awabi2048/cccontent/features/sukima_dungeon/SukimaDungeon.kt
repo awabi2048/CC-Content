@@ -140,7 +140,7 @@ class SukimaDungeon : JavaPlugin(), Listener {
         PlayerDataManager.load(event.player)
         
         // ダンジョン内にいる場合はBGMを再開
-        if (event.player.world.name.startsWith("dungeon_")) {
+        if (isSukimaDungeonWorld(event.player.world)) {
             BGMManager.play(event.player, "default")
         }
     }

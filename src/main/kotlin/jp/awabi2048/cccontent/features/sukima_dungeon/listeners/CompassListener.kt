@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent.features.sukima_dungeon.listeners
 import jp.awabi2048.cccontent.features.sukima_dungeon.CustomItemManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.SproutManager
+import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
 import org.bukkit.Bukkit
 import org.bukkit.Sound
 import org.bukkit.entity.Player
@@ -85,7 +86,7 @@ class CompassListener(private val plugin: JavaPlugin) : Listener {
                             continue
                         }
 
-                        if (!player.world.name.startsWith("dungeon_")) {
+                        if (!isSukimaDungeonWorld(player.world)) {
                             player.sendMessage(MessageManager.getMessage(player, "compass_cannot_use_here"))
                             player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 0.5f)
                             toRemoveSneak.add(uuid)
@@ -278,7 +279,7 @@ class CompassListener(private val plugin: JavaPlugin) : Listener {
 
     private fun updateMarkers(player: Player, session: CompassSession) {
         val world = player.world
-        if (!world.name.startsWith("dungeon_")) return
+        if (!isSukimaDungeonWorld(world)) return
 
         val sprouts = world.entities.filter { it.scoreboardTags.contains("world_sprout_marker") }
         val returnPortals = world.entities.filter { it.scoreboardTags.contains("sd.return_portal_marker") }

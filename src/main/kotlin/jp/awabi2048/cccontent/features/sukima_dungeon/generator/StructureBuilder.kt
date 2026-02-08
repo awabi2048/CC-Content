@@ -7,6 +7,7 @@ import org.bukkit.scheduler.BukkitRunnable
 import java.util.Random
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.mobs.MobManager
+import jp.awabi2048.cccontent.features.sukima_dungeon.SukimaConfigHelper
 
 object StructureBuilder {
     private var loader: StructureLoader? = null
@@ -221,7 +222,7 @@ object StructureBuilder {
 
         val spawnLocations = mutableListOf<Location>()
         val mobSpawnPoints = mutableListOf<Location>()
-        val config = loader.plugin.config
+        val config = SukimaConfigHelper.getConfig(loader.plugin)
         val searchRadiusY = config.getDouble("marker_search_radius_y", 20.0)
         
         val minX = startX.toDouble() - 1.0

@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon.listeners
 
+import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
+import jp.awabi2048.cccontent.features.sukima_dungeon.SukimaConfigHelper
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -13,12 +15,12 @@ class MobTargetListener(private val plugin: JavaPlugin) : Listener {
         val target = event.target as? Player ?: return
         
         // ターゲットがダンジョン内にいるかチェック
-        if (!target.world.name.startsWith("dungeon_")) return
+        if (!isSukimaDungeonWorld(target.world)) return
 
         val mob = event.entity
         val distance = mob.location.distance(target.location)
 
-        val config = plugin.config
+        val config = SukimaConfigHelper.getConfig(plugin)
         val normalRange = config.getDouble("mob_detection.normal_range", 16.0)
         val sneakRange = config.getDouble("mob_detection.sneak_range", 8.0)
 

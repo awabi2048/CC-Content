@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent.features.arena
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageGenerator
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeLoader
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
+import jp.awabi2048.cccontent.world.WorldSettingsHelper
 import org.bukkit.Bukkit
 import org.bukkit.GameRule
 import org.bukkit.Location
@@ -314,6 +315,7 @@ class ArenaManager(private val plugin: JavaPlugin) {
             setGameRule(GameRule.DO_WEATHER_CYCLE, false)
             setGameRule(GameRule.KEEP_INVENTORY, true)
             time = 6000
+            WorldSettingsHelper.applyDistanceSettings(plugin, this, "arena.world_settings")
         }
         return world
     }

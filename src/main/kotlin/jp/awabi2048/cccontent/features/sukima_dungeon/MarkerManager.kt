@@ -81,7 +81,7 @@ class MarkerManager(private val plugin: JavaPlugin) : Listener {
             return
         }
 
-        if (player.world.name.startsWith("dungeon_")) {
+        if (isSukimaDungeonWorld(player.world)) {
             player.sendMessage("§c[Marker] §fダンジョン内ではマーカー設置ツールを使用できません。")
             return
         }
@@ -132,7 +132,7 @@ class MarkerManager(private val plugin: JavaPlugin) : Listener {
 
         if (!player.isSneaking) return
 
-        if (player.world.name.startsWith("dungeon_")) {
+        if (isSukimaDungeonWorld(player.world)) {
             player.sendMessage("§c[Marker] §fダンジョン内ではマーカー設置ツールを使用できません。")
             return
         }
