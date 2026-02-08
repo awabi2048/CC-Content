@@ -12,10 +12,10 @@ class StructureLoader(val plugin: JavaPlugin) {
     private val themes = mutableMapOf<String, Theme>()
 
     fun loadThemes() {
-        val themeFile = File(plugin.dataFolder, "config/sukima/theme.yml")
+        val themeFile = File(plugin.dataFolder, "sukima/theme.yml")
         if (!themeFile.exists()) {
             themeFile.parentFile.mkdirs()
-            plugin.saveResource("config/sukima/theme.yml", false)
+            plugin.saveResource("sukima/theme.yml", false)
         }
         val config = YamlConfiguration.loadConfiguration(themeFile)
         

@@ -13,14 +13,14 @@ object GulliverConfig {
     private lateinit var configFile: File
     
     fun initialize(plugin: JavaPlugin) {
-        val configDir = File(plugin.dataFolder, "config")
+        val configDir = File(plugin.dataFolder, "gulliverlight")
         if (!configDir.exists()) {
             configDir.mkdirs()
         }
         
         configFile = File(configDir, "gulliverlight.yml")
         if (!configFile.exists()) {
-            plugin.saveResource("config/gulliverlight.yml", false)
+            plugin.saveResource("gulliverlight/gulliverlight.yml", false)
         }
         
         reload()

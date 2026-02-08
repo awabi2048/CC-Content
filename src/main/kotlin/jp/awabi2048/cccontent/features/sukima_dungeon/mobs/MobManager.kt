@@ -43,10 +43,10 @@ class MobManager(private val plugin: JavaPlugin) {
     }
 
     private fun loadMobs() {
-        val file = File(plugin.dataFolder, "config/sukima/mobs.yml")
+        val file = File(plugin.dataFolder, "sukima/mobs.yml")
         if (!file.exists()) {
             file.parentFile.mkdirs()
-            plugin.saveResource("config/sukima/mobs.yml", false)
+            plugin.saveResource("sukima/mobs.yml", false)
         }
         
         val config = YamlConfiguration.loadConfiguration(file)
@@ -84,10 +84,10 @@ class MobManager(private val plugin: JavaPlugin) {
     }
 
     private fun loadSpawnSettings() {
-        val file = File(plugin.dataFolder, "config/sukima/mob_spawn.yml")
+        val file = File(plugin.dataFolder, "sukima/mob_spawn.yml")
         if (!file.exists()) {
             file.parentFile.mkdirs()
-            plugin.saveResource("config/sukima/mob_spawn.yml", false)
+            plugin.saveResource("sukima/mob_spawn.yml", false)
         }
 
         val config = YamlConfiguration.loadConfiguration(file)

@@ -13,6 +13,8 @@ import jp.awabi2048.cccontent.features.arena.ArenaCommand
 import jp.awabi2048.cccontent.features.arena.ArenaItemListener
 import jp.awabi2048.cccontent.features.arena.ArenaListener
 import jp.awabi2048.cccontent.features.arena.ArenaManager
+import jp.awabi2048.cccontent.features.brewery.BreweryFeature
+import jp.awabi2048.cccontent.features.cooking.CookingFeature
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.impl.RankManagerImpl
 import jp.awabi2048.cccontent.features.rank.impl.YamlRankStorage
@@ -57,6 +59,8 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var itemManager: ItemManager
     private lateinit var markerManager: MarkerManager
     private lateinit var arenaManager: ArenaManager
+    private lateinit var breweryFeature: BreweryFeature
+    private lateinit var cookingFeature: CookingFeature
     
     fun getMarkerManager(): MarkerManager = markerManager
     fun getItemManager(): ItemManager = itemManager
@@ -65,6 +69,7 @@ class CCContent : JavaPlugin(), Listener {
         instance = this
         saveDefaultConfig()
         reloadConfig()
+        migrateLegacyConfigLayout()
         
         // ロガーをCustomItemManagerに設定
         CustomItemManager.setLogger(logger)
@@ -81,6 +86,8 @@ class CCContent : JavaPlugin(), Listener {
         // Arena 初期化
         arenaManager = ArenaManager(this)
         arenaManager.initialize()
+
+        initializeBreweryAndCooking()
         
         // コマンド登録
         val giveCommand = GiveCommand()
@@ -336,19 +343,29 @@ class CCContent : JavaPlugin(), Listener {
                 RequiredResource("lang/ja_jp.yml"),
                 RequiredResource("lang/en_us.yml"),
                 RequiredResource("lang/ja_jp.yml", "lang/ja_JP.yml"),
-                RequiredResource("config/gulliverlight.yml"),
-                RequiredResource("config/arena/theme.yml"),
-                RequiredResource("config/sukima/items.yml"),
-                RequiredResource("config/sukima/mobs.yml"),
-                RequiredResource("config/sukima/mob_spawn.yml"),
-                RequiredResource("config/sukima/theme.yml")
+                RequiredResource("gulliverlight/gulliverlight.yml"),
+                RequiredResource("arena/theme.yml"),
+                RequiredResource("sukima/items.yml"),
+                RequiredResource("sukima/mobs.yml"),
+                RequiredResource("sukima/mob_spawn.yml"),
+                RequiredResource("sukima/theme.yml"),
+                RequiredResource("brewery/config.yml"),
+                RequiredResource("cooking/config.yml"),
+                RequiredResource("recipe/ingredient_definition.yml"),
+                RequiredResource("recipe/brewery.yml"),
+                RequiredResource("recipe/cooking.yml")
             )
             
             // 必須ディレクトリのリスト
             val requiredDirs = listOf(
                 "job",
                 "lang",
-                "config",
+                "arena",
+                "sukima",
+                "gulliverlight",
+                "brewery",
+                "cooking",
+                "recipe",
                 "data/cccontent/advancement/tutorial"
             )
             
@@ -402,7 +419,15 @@ class CCContent : JavaPlugin(), Listener {
             
             // SukimaDungeonの設定をリロード
             reloadConfig()
+            migrateLegacyConfigLayout()
             reloadSukimaDungeon()
+
+            if (::breweryFeature.isInitialized) {
+                breweryFeature.reload()
+            }
+            if (::cookingFeature.isInitialized) {
+                cookingFeature.reload()
+            }
 
             if (::arenaManager.isInitialized) {
                 arenaManager.reloadThemes()
@@ -441,6 +466,50 @@ class CCContent : JavaPlugin(), Listener {
             logger.warning("ファイルのコピーに失敗しました ($resourcePath): ${e.message}")
             e.printStackTrace()
         }
+    }
+
+    private fun migrateLegacyConfigLayout() {
+        data class LegacyMapping(val oldPath: String, val newPath: String)
+
+        val mappings = listOf(
+            LegacyMapping("config/gulliverlight.yml", "gulliverlight/gulliverlight.yml"),
+            LegacyMapping("config/arena/theme.yml", "arena/theme.yml"),
+            LegacyMapping("config/sukima/items.yml", "sukima/items.yml"),
+            LegacyMapping("config/sukima/mobs.yml", "sukima/mobs.yml"),
+            LegacyMapping("config/sukima/mob_spawn.yml", "sukima/mob_spawn.yml"),
+            LegacyMapping("config/sukima/theme.yml", "sukima/theme.yml"),
+            LegacyMapping("resources/gulliverlight/gulliverlight.yml", "gulliverlight/gulliverlight.yml"),
+            LegacyMapping("resources/arena/theme.yml", "arena/theme.yml"),
+            LegacyMapping("resources/sukima/items.yml", "sukima/items.yml"),
+            LegacyMapping("resources/sukima/mobs.yml", "sukima/mobs.yml"),
+            LegacyMapping("resources/sukima/mob_spawn.yml", "sukima/mob_spawn.yml"),
+            LegacyMapping("resources/sukima/theme.yml", "sukima/theme.yml"),
+            LegacyMapping("resources/brewery/config.yml", "brewery/config.yml"),
+            LegacyMapping("resources/cooking/config.yml", "cooking/config.yml")
+        )
+
+        for (mapping in mappings) {
+            val oldFile = File(dataFolder, mapping.oldPath)
+            val newFile = File(dataFolder, mapping.newPath)
+
+            if (!oldFile.exists() || newFile.exists()) continue
+
+            try {
+                newFile.parentFile?.mkdirs()
+                oldFile.copyTo(newFile, overwrite = false)
+                logger.info("旧設定ファイルを移行しました: ${mapping.oldPath} -> ${mapping.newPath}")
+            } catch (e: Exception) {
+                logger.warning("旧設定ファイル移行に失敗しました (${mapping.oldPath}): ${e.message}")
+            }
+        }
+    }
+
+    private fun initializeBreweryAndCooking() {
+        breweryFeature = BreweryFeature(this)
+        breweryFeature.initialize()
+
+        cookingFeature = CookingFeature(this)
+        cookingFeature.initialize()
     }
     
     /**

@@ -3,7 +3,7 @@ themes:
     - zombie_lvl1
     - skeleton_lvl1
   test:
-     - zombie_lvl1
+    - zombie_lvl1
   dungeon:
     - zombie_lvl1
     - skeleton_lvl1

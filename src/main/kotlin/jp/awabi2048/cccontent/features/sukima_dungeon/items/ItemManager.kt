@@ -50,10 +50,10 @@ class ItemManager(private val plugin: JavaPlugin) {
     }
 
     fun load() {
-        val file = File(plugin.dataFolder, "config/sukima/items.yml")
+        val file = File(plugin.dataFolder, "sukima/items.yml")
         if (!file.exists()) {
             file.parentFile.mkdirs()
-            plugin.saveResource("config/sukima/items.yml", false)
+            plugin.saveResource("sukima/items.yml", false)
         }
         
         val config = YamlConfiguration.loadConfiguration(file)
@@ -197,7 +197,7 @@ class ItemManager(private val plugin: JavaPlugin) {
     }
 
     fun saveItem(id: String, item: ItemStack, weight: Int) {
-        val file = File(plugin.dataFolder, "config/sukima/items.yml")
+        val file = File(plugin.dataFolder, "sukima/items.yml")
         val config = YamlConfiguration.loadConfiguration(file)
         val section = config.getConfigurationSection("items") ?: config.createSection("items")
         
