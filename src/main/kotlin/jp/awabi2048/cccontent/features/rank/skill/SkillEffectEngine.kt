@@ -7,10 +7,16 @@ import org.bukkit.entity.Player
 import java.util.UUID
 
 data class CompiledEffects(
-    val byType: Map<String, SkillEffectEntry>,
+    val byType: Map<String, List<SkillEffectEntry>>,
+    val targetedByType: Map<String, TargetedEffectCache>,
     val playerUuid: UUID,
     val profession: Profession,
     val timestamp: Long = System.currentTimeMillis()
+)
+
+data class TargetedEffectCache(
+    val byBlockType: Map<String, SkillEffectEntry>,
+    val fallback: SkillEffectEntry?
 )
 
 data class SkillEffectEntry(
@@ -22,10 +28,15 @@ data class SkillEffectEntry(
 
 object SkillEffectEngine {
     private val effectCache: MutableMap<UUID, CompiledEffects> = mutableMapOf()
+    private val blockTargetedEffectTypes = setOf(
+        "collect.break_speed_boost",
+        "collect.drop_bonus",
+        "collect.replace_loot_table"
+    )
 
     fun rebuildCache(playerUuid: UUID, acquiredSkills: Set<String>, profession: Profession) {
         val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return
-        val byType = mutableMapOf<String, SkillEffectEntry>()
+        val mutableByType = mutableMapOf<String, MutableList<SkillEffectEntry>>()
 
         for (skillId in acquiredSkills) {
             val skill = skillTree.getSkill(skillId) ?: continue
@@ -37,13 +48,52 @@ object SkillEffectEngine {
             val depth = SkillDepthCalculator.calculateDepth(skillId, skillTree)
             val strength = handler.calculateStrength(effect)
 
-            val existing = byType[effect.type]
-            if (existing == null || depth > existing.depth) {
-                byType[effect.type] = SkillEffectEntry(skillId, effect, depth, strength)
+            mutableByType
+                .getOrPut(effect.type) { mutableListOf() }
+                .add(SkillEffectEntry(skillId, effect, depth, strength))
+        }
+
+        val sortedByType = mutableByType
+            .mapValues { (_, entries) ->
+                entries.sortedWith(
+                    compareByDescending<SkillEffectEntry> { it.depth }
+                        .thenByDescending { it.strength }
+                        .thenBy { it.skillId }
+                )
+            }
+
+        val targetedByType = mutableMapOf<String, TargetedEffectCache>()
+        for ((effectType, entries) in sortedByType) {
+            if (effectType !in blockTargetedEffectTypes) {
+                continue
+            }
+            targetedByType[effectType] = buildTargetedCache(entries)
+        }
+
+        effectCache[playerUuid] = CompiledEffects(sortedByType, targetedByType.toMap(), playerUuid, profession)
+    }
+
+    private fun buildTargetedCache(entries: List<SkillEffectEntry>): TargetedEffectCache {
+        val byBlockType = mutableMapOf<String, SkillEffectEntry>()
+        var fallback: SkillEffectEntry? = null
+
+        for (entry in entries) {
+            val targetBlocks = entry.effect.getStringListParam("targetBlocks")
+            if (targetBlocks.isEmpty()) {
+                if (fallback == null) {
+                    fallback = entry
+                }
+                continue
+            }
+
+            for (blockType in targetBlocks) {
+                if (!byBlockType.containsKey(blockType)) {
+                    byBlockType[blockType] = entry
+                }
             }
         }
 
-        effectCache[playerUuid] = CompiledEffects(byType.toMap(), playerUuid, profession)
+        return TargetedEffectCache(byBlockType.toMap(), fallback)
     }
 
     fun getCachedEffects(playerUuid: UUID): CompiledEffects? {
@@ -51,7 +101,16 @@ object SkillEffectEngine {
     }
 
     fun getCachedEffect(playerUuid: UUID, effectType: String): SkillEffectEntry? {
-        return effectCache[playerUuid]?.byType?.get(effectType)
+        return effectCache[playerUuid]?.byType?.get(effectType)?.firstOrNull()
+    }
+
+    fun getCachedEffectForBlock(playerUuid: UUID, effectType: String, blockType: String): SkillEffectEntry? {
+        val compiled = effectCache[playerUuid] ?: return null
+        val targeted = compiled.targetedByType[effectType]
+        if (targeted != null) {
+            return targeted.byBlockType[blockType] ?: targeted.fallback
+        }
+        return compiled.byType[effectType]?.firstOrNull()
     }
 
     fun clearCache(playerUuid: UUID) {
@@ -63,7 +122,7 @@ object SkillEffectEngine {
     }
 
     fun hasCachedEffect(playerUuid: UUID, effectType: String): Boolean {
-        return effectCache[playerUuid]?.byType?.containsKey(effectType) == true
+        return effectCache[playerUuid]?.byType?.get(effectType)?.isNotEmpty() == true
     }
 
     fun applyEffect(player: Player, profession: Profession, skillId: String, effect: SkillEffect, event: Any?): Boolean {

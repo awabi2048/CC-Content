@@ -26,6 +26,7 @@ import jp.awabi2048.cccontent.features.rank.job.ProfessionMinerExpListener
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
 import jp.awabi2048.cccontent.features.rank.profession.skilltree.ConfigBasedSkillTree
+import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectRegistry
 import jp.awabi2048.cccontent.features.rank.skill.handlers.*
 import jp.awabi2048.cccontent.features.rank.skill.listeners.*
@@ -65,6 +66,7 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var breweryFeature: BreweryFeature
     private lateinit var cookingFeature: CookingFeature
     private var rankManagerInstance: RankManagerImpl? = null
+    private var ignoreBlockStoreInstance: IgnoreBlockStore? = null
     
     fun getMarkerManager(): MarkerManager = markerManager
     fun getItemManager(): ItemManager = itemManager
@@ -95,7 +97,11 @@ class CCContent : JavaPlugin(), Listener {
         
         // コマンド登録
         val giveCommand = GiveCommand()
-        val ccCommand = CCCommand(giveCommand) { reloadConfiguration() }
+        val ccCommand = CCCommand(
+            giveCommand = giveCommand,
+            onReload = { reloadConfiguration() },
+            onClearBlockPlacementData = { clearBlockPlacementData() }
+        )
         
         getCommand("cc-content")?.setExecutor(ccCommand)
         getCommand("cc-content")?.tabCompleter = ccCommand
@@ -146,9 +152,10 @@ class CCContent : JavaPlugin(), Listener {
             registerSkillTrees()
 
             val ignoreBlockStore = IgnoreBlockStore(File(dataFolder, "job/.ignore_blocks.yml"))
+            ignoreBlockStoreInstance = ignoreBlockStore
 
             // スキル効果システムを初期化
-            initializeSkillEffectSystem(rankManager)
+            initializeSkillEffectSystem(rankManager, ignoreBlockStore)
 
             // チュートリアルランク タスクシステムの初期化
             val (taskLoader, taskChecker) = initializeTutorialTaskSystem(rankManager, storage, ignoreBlockStore)
@@ -184,7 +191,7 @@ class CCContent : JavaPlugin(), Listener {
     /**
      * スキル効果システムの初期化
      */
-    private fun initializeSkillEffectSystem(rankManager: RankManager) {
+    private fun initializeSkillEffectSystem(rankManager: RankManager, ignoreBlockStore: IgnoreBlockStore) {
         try {
             // 収集系ハンドラーを登録
             SkillEffectRegistry.register(BreakSpeedBoostHandler())
@@ -204,7 +211,7 @@ class CCContent : JavaPlugin(), Listener {
 
             // リスナーを登録
             server.pluginManager.registerEvents(SkillEffectCacheListener(rankManager, this), this)
-            server.pluginManager.registerEvents(BlockBreakEffectListener(), this)
+            server.pluginManager.registerEvents(BlockBreakEffectListener(ignoreBlockStore), this)
             server.pluginManager.registerEvents(CraftEffectListener(), this)
 
             logger.info("スキル効果システムが初期化されました（${SkillEffectRegistry.getHandlerCount()}個のハンドラーを登録）")
@@ -450,6 +457,26 @@ class CCContent : JavaPlugin(), Listener {
                         copyResourceFile("job/$jobFile", file)
                     }
                 }
+
+                try {
+                    registerSkillTrees()
+                    logger.info("スキルツリー定義を再読み込みしました")
+                } catch (e: Exception) {
+                    logger.warning("スキルツリー定義の再読み込みに失敗しました: ${e.message}")
+                }
+
+                rankManagerInstance?.let { rankManager ->
+                    SkillEffectEngine.clearAllCache()
+                    server.onlinePlayers.forEach { player ->
+                        val playerProfession = rankManager.getPlayerProfession(player.uniqueId) ?: return@forEach
+                        SkillEffectEngine.rebuildCache(
+                            player.uniqueId,
+                            playerProfession.acquiredSkills,
+                            playerProfession.profession
+                        )
+                    }
+                    logger.info("スキル効果キャッシュを再構築しました（対象: ${server.onlinePlayers.size}人）")
+                }
             }
             
             // チュートリアルランク Advancement ファイルをチェック
@@ -517,6 +544,18 @@ class CCContent : JavaPlugin(), Listener {
             logger.warning("ファイルのコピーに失敗しました ($resourcePath): ${e.message}")
             e.printStackTrace()
         }
+    }
+
+    private fun clearBlockPlacementData() {
+        val store = ignoreBlockStoreInstance
+        if (store == null) {
+            logger.warning("ブロック設置データストアが初期化されていないため削除できません")
+            return
+        }
+
+        val before = store.getTrackedBlockCount()
+        store.clearAll()
+        logger.info("ブロック設置データを削除しました（削除件数: $before）")
     }
 
     private fun migrateLegacyConfigLayout() {

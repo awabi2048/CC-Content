@@ -24,6 +24,18 @@ class IgnoreBlockStore(
         }
     }
 
+    fun clearAll() {
+        if (blocksByWorld.isEmpty()) {
+            return
+        }
+        blocksByWorld.clear()
+        save()
+    }
+
+    fun getTrackedBlockCount(): Int {
+        return blocksByWorld.values.sumOf { it.size }
+    }
+
     private fun load() {
         if (!file.exists()) {
             file.parentFile?.mkdirs()

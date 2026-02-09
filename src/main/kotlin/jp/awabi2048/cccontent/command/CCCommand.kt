@@ -11,7 +11,8 @@ import org.bukkit.command.TabCompleter
  */
 class CCCommand(
     private val giveCommand: GiveCommand,
-    private val onReload: (() -> Unit)? = null
+    private val onReload: (() -> Unit)? = null,
+    private val onClearBlockPlacementData: (() -> Unit)? = null
 ) : CommandExecutor, TabCompleter {
     
     override fun onCommand(
@@ -35,6 +36,9 @@ class CCCommand(
             "reload" -> {
                 handleReload(sender)
             }
+            "clear_block_placement_data" -> {
+                handleClearBlockPlacementData(sender)
+            }
             "help" -> {
                 showHelp(sender)
                 true
@@ -44,6 +48,29 @@ class CCCommand(
                 showHelp(sender)
                 true
             }
+        }
+    }
+
+    private fun handleClearBlockPlacementData(sender: CommandSender): Boolean {
+        if (!sender.hasPermission("cc-content.admin")) {
+            sender.sendMessage("§c権限がありません")
+            return false
+        }
+
+        if (onClearBlockPlacementData == null) {
+            sender.sendMessage("§cブロック設置データ削除機能が利用できません")
+            return false
+        }
+
+        try {
+            sender.sendMessage("§6ブロック設置データを削除中...")
+            onClearBlockPlacementData.invoke()
+            sender.sendMessage("§aブロック設置データを削除しました")
+            return true
+        } catch (e: Exception) {
+            sender.sendMessage("§c削除中にエラーが発生しました: ${e.message}")
+            e.printStackTrace()
+            return false
         }
     }
     
@@ -84,6 +111,9 @@ class CCCommand(
               
               §f/cc-content reload
               §7  - 設定ファイルをリロードします
+
+              §f/ccc clear_block_placement_data
+              §7  - プレイヤー設置ブロック判定データを削除します
               
               §f/arenaa §7- アリーナ管理コマンド
               §f/sukima_dungeon §7- スキマダンジョンコマンド
@@ -101,10 +131,11 @@ class CCCommand(
           // サブコマンド補完（/cc-content [ここ]）
           if (args.size == 1) {
               val prefix = args[0].lowercase()
-              val candidates = mutableListOf("give", "help")
-              if (sender.hasPermission("cc-content.admin")) {
-                  candidates.add("reload")
-              }
+               val candidates = mutableListOf("give", "help")
+               if (sender.hasPermission("cc-content.admin")) {
+                   candidates.add("reload")
+                   candidates.add("clear_block_placement_data")
+               }
               return candidates.filter { it.startsWith(prefix) }
           }
          

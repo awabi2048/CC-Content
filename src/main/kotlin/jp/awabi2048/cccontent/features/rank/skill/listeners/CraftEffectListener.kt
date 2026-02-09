@@ -13,8 +13,9 @@ class CraftEffectListener : Listener {
         val compiledEffects = SkillEffectEngine.getCachedEffects(event.whoClicked.uniqueId) ?: return
         val player = event.whoClicked as? org.bukkit.entity.Player ?: return
 
-        for ((effectType, entry) in compiledEffects.byType) {
+        for ((effectType, entries) in compiledEffects.byType) {
             if (effectType.startsWith("craft.")) {
+                val entry = entries.firstOrNull() ?: continue
                 val skillEffect = entry.effect
                 val profession = compiledEffects.profession
 
@@ -31,8 +32,9 @@ class CraftEffectListener : Listener {
     fun onFurnaceSmelt(event: FurnaceSmeltEvent) {
         val compiledEffects = SkillEffectEngine.getCachedEffects(event.block.world.uid) ?: return
 
-        for ((effectType, entry) in compiledEffects.byType) {
+        for ((effectType, entries) in compiledEffects.byType) {
             if (effectType.startsWith("craft.")) {
+                val entry = entries.firstOrNull() ?: continue
                 val skillEffect = entry.effect
                 val profession = compiledEffects.profession
 
