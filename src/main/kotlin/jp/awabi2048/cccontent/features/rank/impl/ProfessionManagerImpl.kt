@@ -1,240 +1,220 @@
 package jp.awabi2048.cccontent.features.rank.impl
 
 import jp.awabi2048.cccontent.features.rank.RankStorage
-import jp.awabi2048.cccontent.features.rank.profession.Profession
-import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
-import jp.awabi2048.cccontent.features.rank.profession.ProfessionManager
-import jp.awabi2048.cccontent.features.rank.profession.SkillTree
-import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
-import jp.awabi2048.cccontent.features.rank.event.ProfessionSelectedEvent
-import jp.awabi2048.cccontent.features.rank.event.ProfessionChangedEvent
-import jp.awabi2048.cccontent.features.rank.event.SkillAcquiredEvent
 import jp.awabi2048.cccontent.features.rank.event.PlayerExperienceGainEvent
+import jp.awabi2048.cccontent.features.rank.event.ProfessionChangedEvent
+import jp.awabi2048.cccontent.features.rank.event.ProfessionLevelUpEvent
+import jp.awabi2048.cccontent.features.rank.event.ProfessionSelectedEvent
+import jp.awabi2048.cccontent.features.rank.event.SkillAcquiredEvent
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
+import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
+import jp.awabi2048.cccontent.features.rank.profession.Profession
+import jp.awabi2048.cccontent.features.rank.profession.ProfessionManager
+import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import java.util.UUID
 
-/**
- * 職業管理の実装
- */
 class ProfessionManagerImpl(
     private val storage: RankStorage,
     private val messageProvider: MessageProvider
 ) : ProfessionManager {
-    
-    /** メモリ上にキャッシュされた職業情報 */
+
     private val professionCache: MutableMap<UUID, PlayerProfession> = mutableMapOf()
-    
+
     init {
         storage.init()
     }
-    
+
     override fun getPlayerProfession(playerUuid: UUID): PlayerProfession? {
-        // キャッシュに存在する場合はそれを返す
-        if (playerUuid in professionCache) {
-            return professionCache[playerUuid]
-        }
-        
-        // ストレージから読み込む
-        val loaded = storage.loadProfession(playerUuid)
-        
-        // 読み込めた場合のみキャッシュに追加
-        if (loaded != null) {
-            professionCache[playerUuid] = loaded
-        }
-        
+        professionCache[playerUuid]?.let { return it }
+        val loaded = storage.loadProfession(playerUuid) ?: return null
+        professionCache[playerUuid] = loaded
         return loaded
     }
-    
+
     override fun hasProfession(playerUuid: UUID): Boolean {
         return getPlayerProfession(playerUuid) != null
     }
-    
+
     override fun selectProfession(playerUuid: UUID, profession: Profession): Boolean {
-        if (hasProfession(playerUuid)) return false  // 既に選択済み
-        
+        if (hasProfession(playerUuid)) {
+            return false
+        }
+
         val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return false
         val startSkillId = skillTree.getStartSkillId()
-        
+
         val playerProf = PlayerProfession(
-            playerUuid,
-            profession,
-            mutableSetOf(startSkillId)  // 開始スキルを習得済みに
+            playerUuid = playerUuid,
+            profession = profession,
+            acquiredSkills = mutableSetOf(startSkillId),
+            currentLevel = 1,
+            currentExp = 0L
         )
-        
+
         professionCache[playerUuid] = playerProf
         storage.saveProfession(playerProf)
-        
+
         val player = Bukkit.getPlayer(playerUuid)
         if (player != null) {
             val event = ProfessionSelectedEvent(player, profession)
             Bukkit.getPluginManager().callEvent(event)
         }
-        
+
         return true
     }
-    
+
     override fun changeProfession(playerUuid: UUID, profession: Profession): Boolean {
         val oldProf = getPlayerProfession(playerUuid) ?: return false
         val oldProfession = oldProf.profession
-        
-        if (oldProfession == profession) return false  // 同じ職業への変更は無視
-        
+        if (oldProfession == profession) {
+            return false
+        }
+
         val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return false
         val startSkillId = skillTree.getStartSkillId()
-        
+
         val newProf = PlayerProfession(
-            playerUuid,
-            profession,
-            mutableSetOf(startSkillId)
+            playerUuid = playerUuid,
+            profession = profession,
+            acquiredSkills = mutableSetOf(startSkillId),
+            currentLevel = 1,
+            currentExp = 0L
         )
-        
+
         professionCache[playerUuid] = newProf
         storage.saveProfession(newProf)
-        
+
         val player = Bukkit.getPlayer(playerUuid)
         if (player != null) {
             val event = ProfessionChangedEvent(player, oldProfession, profession)
             Bukkit.getPluginManager().callEvent(event)
         }
-        
+
         return true
     }
-    
+
     override fun addExperience(playerUuid: UUID, amount: Long): Boolean {
+        if (amount <= 0L) {
+            return false
+        }
+
         val prof = getPlayerProfession(playerUuid) ?: return false
-        
+        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
+        val oldLevel = prof.currentLevel
+
         prof.addExperience(amount)
+        val newLevel = skillTree.calculateLevelByExp(prof.currentExp)
+        if (newLevel > oldLevel) {
+            prof.currentLevel = newLevel
+        }
+
         storage.saveProfession(prof)
-        
+
         val player = Bukkit.getPlayer(playerUuid)
         if (player != null) {
-            val event = PlayerExperienceGainEvent(player, prof.profession, amount, prof.currentExp)
-            Bukkit.getPluginManager().callEvent(event)
+            val expEvent = PlayerExperienceGainEvent(player, prof.profession, amount, prof.currentExp)
+            Bukkit.getPluginManager().callEvent(expEvent)
+
+            if (newLevel > oldLevel) {
+                val gainedLevel = newLevel - oldLevel
+                player.sendMessage(
+                    messageProvider.getMessage(
+                        "rank.profession.level_up",
+                        "profession" to messageProvider.getProfessionName(prof.profession),
+                        "old" to oldLevel,
+                        "new" to newLevel,
+                        "gained" to gainedLevel
+                    )
+                )
+                player.playSound(player.location, "minecraft:entity.player.levelup", 1.0f, 1.2f)
+
+                val levelUpEvent = ProfessionLevelUpEvent(player, prof.profession, oldLevel, newLevel)
+                Bukkit.getPluginManager().callEvent(levelUpEvent)
+            }
         }
-        
+
         return true
     }
-    
+
     override fun acquireSkill(playerUuid: UUID, skillId: String): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
-        val skill = skillTree.getSkill(skillId) ?: return false
-        
-        // スキル取得可能か確認
-        if (!skill.canAcquire(prof.acquiredSkills, prof.currentExp)) {
-            return false
-        }
-        
-        // スキルを習得
-        if (prof.acquireSkill(skillId, skill.requiredExp)) {
-            storage.saveProfession(prof)
-            
-            val player = Bukkit.getPlayer(playerUuid)
-            if (player != null) {
-                val skillName = messageProvider.getSkillName(prof.profession, skillId)
-                val event = SkillAcquiredEvent(player, prof.profession, skillId, skillName)
-                Bukkit.getPluginManager().callEvent(event)
-                playSkillAcquireSounds(player)
-            }
-            
-            return true
-        }
-        
-        return false
-    }
+        val normalizedSkillId = resolveSkillId(skillTree.getAllSkills().keys, skillId)
+        val skill = skillTree.getSkill(normalizedSkillId) ?: return false
 
-    override fun forceAcquireSkill(playerUuid: UUID, skillId: String): Boolean {
-        val prof = getPlayerProfession(playerUuid) ?: return false
-        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
-
-        val requestedSkillId = skillId.trim()
-        val normalizedSkillId = requestedSkillId.lowercase()
-        val targetSkill = skillTree.getSkill(normalizedSkillId) ?: skillTree.getSkill(requestedSkillId) ?: return false
-
-        val orderedSkillIds = mutableListOf<String>()
-        val visiting = mutableSetOf<String>()
-        val visited = mutableSetOf<String>()
-
-        fun visit(currentSkillId: String): Boolean {
-            if (currentSkillId in visiting) {
-                return false
-            }
-            if (!visited.add(currentSkillId)) {
-                return true
-            }
-
-            val currentSkill = skillTree.getSkill(currentSkillId) ?: return false
-            visiting.add(currentSkillId)
-
-            for (prerequisiteId in currentSkill.prerequisites) {
-                if (!visit(prerequisiteId)) {
-                    return false
-                }
-            }
-
-            visiting.remove(currentSkillId)
-            orderedSkillIds.add(currentSkill.skillId)
-            return true
-        }
-
-        if (!visit(targetSkill.skillId)) {
+        if (!skillTree.canAcquire(skill.skillId, prof.acquiredSkills, prof.currentLevel)) {
             return false
         }
 
-        val newlyAcquiredSkillIds = orderedSkillIds.filterNot { it in prof.acquiredSkills }
-        if (newlyAcquiredSkillIds.isEmpty()) {
-            return true
+        if (!prof.acquireSkill(skill.skillId)) {
+            return false
         }
 
-        prof.acquiredSkills.addAll(newlyAcquiredSkillIds)
-        prof.lastUpdated = System.currentTimeMillis()
         storage.saveProfession(prof)
 
         val player = Bukkit.getPlayer(playerUuid)
         if (player != null) {
-            newlyAcquiredSkillIds.forEach { acquiredSkillId ->
-                val skillName = messageProvider.getSkillName(prof.profession, acquiredSkillId)
-                val event = SkillAcquiredEvent(player, prof.profession, acquiredSkillId, skillName)
-                Bukkit.getPluginManager().callEvent(event)
-            }
+            val skillName = messageProvider.getSkillName(prof.profession, skill.skillId)
+            val event = SkillAcquiredEvent(player, prof.profession, skill.skillId, skillName)
+            Bukkit.getPluginManager().callEvent(event)
             playSkillAcquireSounds(player)
         }
 
         return true
     }
-    
+
     override fun getAvailableSkills(playerUuid: UUID): List<String> {
         val prof = getPlayerProfession(playerUuid) ?: return emptyList()
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return emptyList()
-        
-        return skillTree.getAvailableSkills(prof.acquiredSkills, prof.currentExp)
+        return skillTree.getAvailableSkills(prof.acquiredSkills, prof.currentLevel)
     }
-    
+
     override fun getAcquiredSkills(playerUuid: UUID): Set<String> {
         return getPlayerProfession(playerUuid)?.acquiredSkills?.toSet() ?: emptySet()
     }
-    
+
     override fun getCurrentExp(playerUuid: UUID): Long {
         return getPlayerProfession(playerUuid)?.currentExp ?: 0L
     }
-    
-    override fun resetProfession(playerUuid: UUID): Boolean {
+
+    override fun getCurrentLevel(playerUuid: UUID): Int {
+        return getPlayerProfession(playerUuid)?.currentLevel ?: 1
+    }
+
+    override fun setLevel(playerUuid: UUID, level: Int): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
-        
-        professionCache.remove(playerUuid)
-        storage.deleteProfession(playerUuid)
-        
+        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
+
+        val clampedLevel = level.coerceIn(1, skillTree.getMaxLevel())
+        prof.currentLevel = clampedLevel
+        prof.currentExp = skillTree.getRequiredTotalExpForLevel(clampedLevel)
+        prof.lastUpdated = System.currentTimeMillis()
+        storage.saveProfession(prof)
         return true
     }
-    
+
+    override fun resetProfession(playerUuid: UUID): Boolean {
+        if (getPlayerProfession(playerUuid) == null) {
+            return false
+        }
+        professionCache.remove(playerUuid)
+        storage.deleteProfession(playerUuid)
+        return true
+    }
+
     fun saveData() {
         professionCache.values.forEach { storage.saveProfession(it) }
     }
-    
+
     fun loadData() {
         professionCache.clear()
+    }
+
+    private fun resolveSkillId(knownSkillIds: Set<String>, skillId: String): String {
+        val trimmed = skillId.trim()
+        return knownSkillIds.firstOrNull { it.equals(trimmed, ignoreCase = true) } ?: trimmed
     }
 
     private fun playSkillAcquireSounds(player: Player) {

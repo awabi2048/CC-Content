@@ -118,6 +118,39 @@ skill:
       name: "大地の王"
       description: "採掘技術の最高位に達した者"
 
+  # 料理人のスキルツリー
+  cook:
+    skill0:
+      name: "初心者の料理人"
+      description: "基本的な料理法を学んだ"
+    skill1:
+      name: "修行中の料理人"
+      description: "より高度な調理技術を習得"
+    skill2:
+      name: "熟練の料理人（穀物の達人）"
+      description: "穀物料理の専門家"
+    skill3:
+      name: "穀物の大シェフ"
+      description: "穀物料理を極めた者"
+    skill4:
+      name: "熟練の料理人（スープ職人）"
+      description: "スープ料理の専門家"
+    skill5:
+      name: "スープの名職人"
+      description: "スープ料理を極めた者"
+    skill6:
+      name: "野菜の達人"
+      description: "野菜料理の極意を習得"
+    skill7:
+      name: "シチューの魔術師"
+      description: "シチュー作りの究極形態"
+    skill8:
+      name: "食材の支配者"
+      description: "すべての食材特性を完全理解"
+    skill9:
+      name: "料理神"
+      description: "料理技術の最高位に達した者"
+
 # チュートリアルランク
 tutorial_rank:
   newbie:
@@ -471,8 +504,10 @@ gui_buttons:
   previous: "§c前へ"
 
 rank:
+  profession:
+    level_up: "§a{profession} レベルアップ！ §eLv.{old} → Lv.{new} §7(+{gained})"
   skill:
-    usage: "§c使用法: /rank skill または /rank skill <player> <skillId>"
+    usage: "§c使用法: /rank skill"
     player_only: "§cこのコマンドはプレイヤーのみ実行できます"
     acquired: "§a{player} がスキル {skill} を習得しました"
     acquire_failed: "§cスキル習得に失敗しました"
@@ -486,7 +521,8 @@ rank:
         available: "§e習得可能"
         locked: "§c未開放"
       lore:
-        required_exp: "§7必要EXP: §e{exp}"
+        required_level: "§7必要Lv: §e{level}"
+        current_level: "§7現在Lv: §e{level}"
         status: "§7状態: {status}"
       nav:
         left:
@@ -501,11 +537,17 @@ rank:
       route:
         prev: "前へ戻る"
         next: "次へ進む"
+      dialog:
+        title: "§6スキル解放の確認"
+        body: "§f{skill} を解放しますか？\n§7この選択後、別分岐には進めません。"
+        confirm: "§a解放する"
+        cancel: "§cキャンセル"
       unlock:
         success: "§aスキルを解放しました: {skill}"
         already: "§e既に解放済みです: {skill}"
         missing_prerequisite: "§c前提スキルが不足しています: {skills}"
-        exp_shortage: "§c必要EXPが不足しています（必要: {required}, 現在: {current}）"
+        level_shortage: "§c必要レベルが不足しています（必要: {required}, 現在: {current}）"
+        branch_locked: "§cこの分岐は別の選択肢を解放済みのため進めません"
         failed: "§cスキル解放に失敗しました"
   tutorial_task_info:
     usage: "§c使用法: /rank task-info <player>"

@@ -14,8 +14,11 @@ data class PlayerProfession(
     
     /** プレイヤーが習得済みのスキルID集合 */
     var acquiredSkills: MutableSet<String> = mutableSetOf(),
+
+    /** 現在の職業レベル */
+    var currentLevel: Int = 1,
     
-    /** 次のスキル習得に向けて獲得している経験値 */
+    /** 職業経験値（累積） */
     var currentExp: Long = 0L,
     
     /** 最後の更新日時 */
@@ -31,16 +34,12 @@ data class PlayerProfession(
     }
     
     /**
-     * スキルを習得（経験値を消費）
+     * スキルを習得
      * @param skillId 習得するスキルID
-     * @param requiredExp そのスキルに必要な経験値
      * @return 成功した場合true
      */
-    fun acquireSkill(skillId: String, requiredExp: Long): Boolean {
-        if (currentExp < requiredExp) return false
-        
+    fun acquireSkill(skillId: String): Boolean {
         acquiredSkills.add(skillId)
-        currentExp -= requiredExp
         lastUpdated = System.currentTimeMillis()
         return true
     }
@@ -51,7 +50,7 @@ data class PlayerProfession(
      * @return 次に選択可能なスキルIDのリスト
      */
     fun getNextSkillOptions(skillTree: SkillTree): List<String> {
-        return skillTree.getAvailableSkills(acquiredSkills, currentExp)
+        return skillTree.getAvailableSkills(acquiredSkills, currentLevel)
     }
     
     /**

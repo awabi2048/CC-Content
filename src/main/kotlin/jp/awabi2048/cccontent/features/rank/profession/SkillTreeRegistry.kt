@@ -33,4 +33,8 @@ object SkillTreeRegistry {
     fun getSkillTreeCount(): Int {
         return skillTrees.size
     }
+
+    fun clear() {
+        skillTrees.clear()
+    }
 }

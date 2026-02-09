@@ -1,0 +1,111 @@
+# 料理人のスキルツリー定義
+skills:
+  settings:
+    level:
+      initialExp: 100
+      base: 1.25
+      maxLevel: 50
+
+  skill0:
+    nameKey: "skill.cook.skill0.name"
+    descriptionKey: "skill.cook.skill0.description"
+    requiredLevel: 1
+    icon: "SMOKER"
+    children: ["skill1"]
+
+  skill1:
+    nameKey: "skill.cook.skill1.name"
+    descriptionKey: "skill.cook.skill1.description"
+    requiredLevel: 2
+    icon: "BOWL"
+    effect:
+      type: "craft.unlock_system"
+      params: {}
+      evaluationMode: "CACHED"
+    children: ["skill2", "skill4"]
+
+  skill2:
+    nameKey: "skill.cook.skill2.name"
+    descriptionKey: "skill.cook.skill2.description"
+    requiredLevel: 3
+    icon: "BREAD"
+    effect:
+      type: "craft.unlock_recipe"
+      params:
+        recipes: ["craft_bread", "craft_stick"]
+      evaluationMode: "CACHED"
+    children: ["skill3"]
+
+  skill3:
+    nameKey: "skill.cook.skill3.name"
+    descriptionKey: "skill.cook.skill3.description"
+    requiredLevel: 4
+    icon: "COOKED_BEEF"
+    effect:
+      type: "craft.work_speed_bonus_mock"
+      params:
+        bonus: 0.1
+      evaluationMode: "CACHED"
+    children: ["skill8"]
+
+  skill4:
+    nameKey: "skill.cook.skill4.name"
+    descriptionKey: "skill.cook.skill4.description"
+    requiredLevel: 3
+    icon: "MUSHROOM_STEW"
+    effect:
+      type: "craft.unlock_recipe"
+      params:
+        recipes: ["craft_mushroom_stew", "craft_beetroot_soup"]
+      evaluationMode: "CACHED"
+    children: ["skill5", "skill6"]
+
+  skill5:
+    nameKey: "skill.cook.skill5.name"
+    descriptionKey: "skill.cook.skill5.description"
+    requiredLevel: 4
+    icon: "RABBIT_STEW"
+    effect:
+      type: "craft.success_rate_bonus_mock"
+      params:
+        bonus: 0.15
+      evaluationMode: "CACHED"
+    children: ["skill8"]
+
+  skill6:
+    nameKey: "skill.cook.skill6.name"
+    descriptionKey: "skill.cook.skill6.description"
+    requiredLevel: 4
+    icon: "BEETROOT_SOUP"
+    effect:
+      type: "craft.unlock_recipe"
+      params:
+        recipes: ["craft_rabbit_stew", "craft_suspicious_stew"]
+      evaluationMode: "CACHED"
+    children: ["skill7"]
+
+  skill7:
+    nameKey: "skill.cook.skill7.name"
+    descriptionKey: "skill.cook.skill7.description"
+    requiredLevel: 5
+    icon: "SUSPICIOUS_STEW"
+    children: ["skill9"]
+
+  skill8:
+    nameKey: "skill.cook.skill8.name"
+    descriptionKey: "skill.cook.skill8.description"
+    requiredLevel: 6
+    icon: "GOLDEN_CARROT"
+    children: ["skill9"]
+
+  skill9:
+    nameKey: "skill.cook.skill9.name"
+    descriptionKey: "skill.cook.skill9.description"
+    requiredLevel: 7
+    icon: "ENCHANTED_GOLDEN_APPLE"
+    effect:
+      type: "general.unlock_item_token"
+      params:
+        items: ["cook_token"]
+      evaluationMode: "CACHED"
+    children: []

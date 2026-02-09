@@ -61,6 +61,22 @@ class ProfessionChangedEvent(
     }
 }
 
+class ProfessionLevelUpEvent(
+    val player: Player,
+    val profession: Profession,
+    val oldLevel: Int,
+    val newLevel: Int
+) : Event() {
+    override fun getHandlers(): HandlerList = Companion.getHandlerList()
+
+    companion object {
+        private val handlers = HandlerList()
+
+        @JvmStatic
+        fun getHandlerList(): HandlerList = handlers
+    }
+}
+
 /**
  * スキル習得イベント
  */

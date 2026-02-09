@@ -150,6 +150,7 @@ class YamlRankStorage(
             ?: config.createSection("rank.profession")
         professionSection.set("profession", profession.profession.id)
         professionSection.set("acquiredSkills", profession.acquiredSkills.toList())
+        professionSection.set("currentLevel", profession.currentLevel)
         professionSection.set("currentExp", profession.currentExp)
         professionSection.set("lastUpdated", profession.lastUpdated)
         
@@ -172,6 +173,7 @@ class YamlRankStorage(
             val profession = Profession.fromId(professionId) ?: return null
             
             val acquiredSkills = professionSection.getStringList("acquiredSkills").toMutableSet()
+            val currentLevel = professionSection.getInt("currentLevel", 1)
             val currentExp = professionSection.getLong("currentExp", 0L)
             val lastUpdated = professionSection.getLong("lastUpdated", System.currentTimeMillis())
             
@@ -179,6 +181,7 @@ class YamlRankStorage(
                 playerUuid,
                 profession,
                 acquiredSkills,
+                currentLevel,
                 currentExp,
                 lastUpdated
             )

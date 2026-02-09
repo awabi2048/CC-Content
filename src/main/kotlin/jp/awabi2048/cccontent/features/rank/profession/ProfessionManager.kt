@@ -50,14 +50,6 @@ interface ProfessionManager {
      * @return 成功した場合true
      */
     fun acquireSkill(playerUuid: UUID, skillId: String): Boolean
-
-    /**
-     * デバッグ用: 条件を無視してスキルを習得
-     * @param playerUuid プレイヤーのUUID
-     * @param skillId 習得するスキルID
-     * @return 成功した場合true
-     */
-    fun forceAcquireSkill(playerUuid: UUID, skillId: String): Boolean
     
     /**
      * プレイヤーが習得可能なスキルの一覧を取得
@@ -79,6 +71,16 @@ interface ProfessionManager {
      * @return 現在の経験値
      */
     fun getCurrentExp(playerUuid: UUID): Long
+
+    /**
+     * プレイヤーの現在職業レベルを取得
+     */
+    fun getCurrentLevel(playerUuid: UUID): Int
+
+    /**
+     * デバッグ用: 職業レベルを直接設定
+     */
+    fun setLevel(playerUuid: UUID, level: Int): Boolean
     
     /**
      * 職業をリセット（デバッグ用）

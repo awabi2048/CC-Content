@@ -77,10 +77,6 @@ class RankManagerImpl(
     override fun acquireSkill(playerUuid: UUID, skillId: String): Boolean {
         return getProfessionManager().acquireSkill(playerUuid, skillId)
     }
-
-    override fun forceAcquireSkill(playerUuid: UUID, skillId: String): Boolean {
-        return getProfessionManager().forceAcquireSkill(playerUuid, skillId)
-    }
     
     override fun getAvailableSkills(playerUuid: UUID): List<String> {
         return getProfessionManager().getAvailableSkills(playerUuid)
@@ -92,6 +88,14 @@ class RankManagerImpl(
     
     override fun getCurrentProfessionExp(playerUuid: UUID): Long {
         return getProfessionManager().getCurrentExp(playerUuid)
+    }
+
+    override fun getCurrentProfessionLevel(playerUuid: UUID): Int {
+        return getProfessionManager().getCurrentLevel(playerUuid)
+    }
+
+    override fun setProfessionLevel(playerUuid: UUID, level: Int): Boolean {
+        return getProfessionManager().setLevel(playerUuid, level)
     }
     
     override fun resetProfession(playerUuid: UUID): Boolean {

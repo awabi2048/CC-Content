@@ -66,11 +66,6 @@ interface RankManager {
      * スキルを習得
      */
     fun acquireSkill(playerUuid: UUID, skillId: String): Boolean
-
-    /**
-     * デバッグ用: 条件を無視してスキルを習得
-     */
-    fun forceAcquireSkill(playerUuid: UUID, skillId: String): Boolean
     
     /**
      * 習得可能なスキル一覧を取得
@@ -86,6 +81,16 @@ interface RankManager {
      * 現在の職業経験値を取得
      */
     fun getCurrentProfessionExp(playerUuid: UUID): Long
+
+    /**
+     * 現在の職業レベルを取得
+     */
+    fun getCurrentProfessionLevel(playerUuid: UUID): Int
+
+    /**
+     * デバッグ用: 職業レベルを直接設定
+     */
+    fun setProfessionLevel(playerUuid: UUID, level: Int): Boolean
     
     /**
      * 職業をリセット（デバッグ用）

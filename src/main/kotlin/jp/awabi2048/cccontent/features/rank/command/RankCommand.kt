@@ -59,6 +59,7 @@ class RankCommand(
         
         return when (args[0].lowercase()) {
             "add-exp" -> handleAddExp(sender, args)
+            "set-prof-level" -> handleSetProfLevel(sender, args)
             "rankup" -> handleRankUp(sender, args)
             "profession" -> handleProfession(sender, args)
             "skill" -> handleSkill(sender, args)
@@ -100,6 +101,35 @@ class RankCommand(
             sender.sendMessage("§c${player.name} は職業を選択していません")
         }
         
+        return success
+    }
+
+    private fun handleSetProfLevel(sender: CommandSender, args: Array<out String>): Boolean {
+        if (args.size < 3) {
+            sender.sendMessage("§c使用法: /rank set-prof-level <player> <level>")
+            return false
+        }
+
+        val player = Bukkit.getPlayer(args[1])
+        if (player == null) {
+            sender.sendMessage("§cプレイヤーが見つかりません: ${args[1]}")
+            return false
+        }
+
+        val level = args[2].toIntOrNull()
+        if (level == null || level <= 0) {
+            sender.sendMessage("§cレベルは1以上の整数で指定してください")
+            return false
+        }
+
+        val success = rankManager.setProfessionLevel(player.uniqueId, level)
+        if (success) {
+            val appliedLevel = rankManager.getCurrentProfessionLevel(player.uniqueId)
+            sender.sendMessage("§a${player.name} の職業レベルを ${appliedLevel} に設定しました")
+        } else {
+            sender.sendMessage("§c${player.name} は職業を選択していません")
+        }
+
         return success
     }
     
@@ -174,33 +204,8 @@ class RankCommand(
             return openSkillTreeGui(sender)
         }
 
-        if (args.size < 3) {
-            sender.sendMessage(messageProvider.getMessage("rank.skill.usage"))
-            return false
-        }
-
-        val player = Bukkit.getPlayer(args[1])
-        if (player == null) {
-            sender.sendMessage("§cプレイヤーが見つかりません: ${args[1]}")
-            return false
-        }
-
-        val skillId = args[2]
-        val success = rankManager.forceAcquireSkill(player.uniqueId, skillId)
-
-        if (success) {
-            sender.sendMessage(
-                messageProvider.getMessage(
-                    "rank.skill.acquired",
-                    "player" to player.name,
-                    "skill" to skillId
-                )
-            )
-        } else {
-            sender.sendMessage(messageProvider.getMessage("rank.skill.acquire_failed"))
-        }
-
-        return success
+        sender.sendMessage(messageProvider.getMessage("rank.skill.usage"))
+        return false
     }
     
     private fun handleReset(sender: CommandSender, args: Array<out String>): Boolean {
@@ -250,6 +255,7 @@ class RankCommand(
         val profession = rankManager.getPlayerProfession(uuid)
         if (profession != null) {
             sender.sendMessage("§a職業: ${profession.profession.id}")
+            sender.sendMessage("§a職業レベル: ${profession.currentLevel}")
             sender.sendMessage("§a習得スキル: ${profession.acquiredSkills.joinToString(", ")}")
             sender.sendMessage("§a職業経験値: ${profession.currentExp}")
         } else {
@@ -288,6 +294,7 @@ class RankCommand(
             profession = playerProfession.profession,
             selectedSkillId = selectedSkill.skillId,
             acquiredSkills = playerProfession.acquiredSkills.toSet(),
+            currentLevel = playerProfession.currentLevel,
             currentExp = playerProfession.currentExp
         )
         state.laneBySkillId[selectedSkill.skillId] = SkillTreeLane.CENTER
@@ -316,15 +323,15 @@ class RankCommand(
         val childNodes = skillTree.getChildren(selectedSkill.skillId)
             .mapNotNull { skillTree.getSkill(it) }
             .take(2)
-        val selectedParentSkillId = getPreviousSkillId(selectedSkill)
+        val connectedAcquiredSkills = buildConnectedAcquiredSkills(skillTree, state.acquiredSkills)
+        val selectedParentByChild = buildSelectedParentByChild(skillTree, connectedAcquiredSkills)
+        val selectedParentSkillId = selectedParentByChild[selectedSkill.skillId] ?: getPreviousSkillId(selectedSkill)
 
         val layout = determineSkillTreeLayout(childNodes)
         val headerFooterPane = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
         val basePane = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
         val acquiredRoutePane = createBackgroundItem(Material.LIME_STAINED_GLASS_PANE)
         val lockedRoutePane = createBackgroundItem(Material.ORANGE_STAINED_GLASS_PANE)
-        val connectedAcquiredSkills = buildConnectedAcquiredSkills(skillTree, state.acquiredSkills)
-
         for (slot in 0 until inventory.size) {
             inventory.setItem(slot, basePane)
         }
@@ -379,8 +386,8 @@ class RankCommand(
 
                 val child = childNodes.firstOrNull()
                 if (child != null) {
-                    val routeToChildPane = if (child.skillId in connectedAcquiredSkills) acquiredRoutePane else lockedRoutePane
-                    val routeAfterChildPane = if (hasConnectedAcquiredDescendant(skillTree, child.skillId, connectedAcquiredSkills)) acquiredRoutePane else lockedRoutePane
+                    val routeToChildPane = if (isAcquiredEdge(skillTree, selectedSkill.skillId, child.skillId, connectedAcquiredSkills, selectedParentByChild)) acquiredRoutePane else lockedRoutePane
+                    val routeAfterChildPane = if (hasAcquiredOutgoingEdge(skillTree, child.skillId, connectedAcquiredSkills, selectedParentByChild)) acquiredRoutePane else lockedRoutePane
                     paintRoute(CHILD_ONE_TO_CHILD_SLOTS, routeToChildPane)
                     paintRoute(
                         CHILD_ONE_CHILD_OUTGOING_SLOTS,
@@ -392,8 +399,8 @@ class RankCommand(
                     )
                 }
 
-                setSkillNodeItem(inventory, SELECTED_SLOT_CHILD_ONE, selectedSkill, state)
-                child?.let { setSkillNodeItem(inventory, CHILD_SLOT_CHILD_ONE, it, state) }
+                setSkillNodeItem(inventory, SELECTED_SLOT_CHILD_ONE, selectedSkill, state, skillTree)
+                child?.let { setSkillNodeItem(inventory, CHILD_SLOT_CHILD_ONE, it, state, skillTree) }
             }
 
             SkillTreeLayout.CHILD_TWO -> {
@@ -409,7 +416,7 @@ class RankCommand(
                 )
 
                 val routeFromSelectedToBranchPane = if (
-                    hasConnectedAcquiredDescendant(skillTree, selectedSkill.skillId, connectedAcquiredSkills)
+                    hasAcquiredOutgoingEdge(skillTree, selectedSkill.skillId, connectedAcquiredSkills, selectedParentByChild)
                 ) {
                     acquiredRoutePane
                 } else {
@@ -436,8 +443,8 @@ class RankCommand(
                 }
 
                 if (topChild != null) {
-                    val routeToTopPane = if (topChild.skillId in connectedAcquiredSkills) acquiredRoutePane else lockedRoutePane
-                    val routeAfterTopPane = if (hasConnectedAcquiredDescendant(skillTree, topChild.skillId, connectedAcquiredSkills)) acquiredRoutePane else lockedRoutePane
+                    val routeToTopPane = if (isAcquiredEdge(skillTree, selectedSkill.skillId, topChild.skillId, connectedAcquiredSkills, selectedParentByChild)) acquiredRoutePane else lockedRoutePane
+                    val routeAfterTopPane = if (hasAcquiredOutgoingEdge(skillTree, topChild.skillId, connectedAcquiredSkills, selectedParentByChild)) acquiredRoutePane else lockedRoutePane
                     paintRoute(CHILD_TWO_TO_TOP_CHILD_SLOTS, routeToTopPane)
                     paintRoute(
                         CHILD_TWO_TOP_CHILD_OUTGOING_SLOTS,
@@ -450,8 +457,8 @@ class RankCommand(
                 }
 
                 if (bottomChild != null) {
-                    val routeToBottomPane = if (bottomChild.skillId in connectedAcquiredSkills) acquiredRoutePane else lockedRoutePane
-                    val routeAfterBottomPane = if (hasConnectedAcquiredDescendant(skillTree, bottomChild.skillId, connectedAcquiredSkills)) acquiredRoutePane else lockedRoutePane
+                    val routeToBottomPane = if (isAcquiredEdge(skillTree, selectedSkill.skillId, bottomChild.skillId, connectedAcquiredSkills, selectedParentByChild)) acquiredRoutePane else lockedRoutePane
+                    val routeAfterBottomPane = if (hasAcquiredOutgoingEdge(skillTree, bottomChild.skillId, connectedAcquiredSkills, selectedParentByChild)) acquiredRoutePane else lockedRoutePane
                     paintRoute(CHILD_TWO_TO_BOTTOM_CHILD_SLOTS, routeToBottomPane)
                     paintRoute(
                         CHILD_TWO_BOTTOM_CHILD_OUTGOING_SLOTS,
@@ -463,9 +470,9 @@ class RankCommand(
                     )
                 }
 
-                setSkillNodeItem(inventory, SELECTED_SLOT_CHILD_TWO, selectedSkill, state)
-                topChild?.let { setSkillNodeItem(inventory, CHILD_TOP_SLOT_CHILD_TWO, it, state) }
-                bottomChild?.let { setSkillNodeItem(inventory, CHILD_BOTTOM_SLOT_CHILD_TWO, it, state) }
+                setSkillNodeItem(inventory, SELECTED_SLOT_CHILD_TWO, selectedSkill, state, skillTree)
+                topChild?.let { setSkillNodeItem(inventory, CHILD_TOP_SLOT_CHILD_TWO, it, state, skillTree) }
+                bottomChild?.let { setSkillNodeItem(inventory, CHILD_BOTTOM_SLOT_CHILD_TWO, it, state, skillTree) }
             }
 
             SkillTreeLayout.MERGE -> {
@@ -520,12 +527,13 @@ class RankCommand(
                     visible = !isStartSkill(selectedSkill)
                 )
 
-                setSkillNodeItem(inventory, selectedSlot, selectedSkill, state)
+                setSkillNodeItem(inventory, selectedSlot, selectedSkill, state, skillTree)
                 val child = childNodes.firstOrNull()
                 if (child != null) {
-                    val routeToChildPane = if (child.skillId in connectedAcquiredSkills) acquiredRoutePane else lockedRoutePane
-                    val routeAfterChildPane = if (hasConnectedAcquiredDescendant(skillTree, child.skillId, connectedAcquiredSkills)) acquiredRoutePane else lockedRoutePane
-                    paintRoute(selectedToChildSlots, routeToChildPane)
+                    val selectedEdgeAcquired = isAcquiredEdge(skillTree, selectedSkill.skillId, child.skillId, connectedAcquiredSkills, selectedParentByChild)
+                    val routeFromSelectedToChildPane = if (selectedEdgeAcquired) acquiredRoutePane else lockedRoutePane
+                    val routeAfterChildPane = if (hasAcquiredOutgoingEdge(skillTree, child.skillId, connectedAcquiredSkills, selectedParentByChild)) acquiredRoutePane else lockedRoutePane
+                    paintRoute(selectedToChildSlots, routeFromSelectedToChildPane)
                     paintRoute(
                         MERGE_CHILD_OUTGOING_SLOTS,
                         routeAfterChildPane,
@@ -535,12 +543,15 @@ class RankCommand(
                         visible = !isEndSkill(skillTree, child)
                     )
 
-                    setSkillNodeItem(inventory, CHILD_SLOT_MERGE, child, state)
+                    setSkillNodeItem(inventory, CHILD_SLOT_MERGE, child, state, skillTree)
                     val alternatePrerequisite = child.prerequisites.firstOrNull { it != selectedSkill.skillId }
                         ?.let { skillTree.getSkill(it) }
+                    var alternateEdgeAcquired = false
                     if (alternatePrerequisite != null) {
                         state.laneBySkillId[alternatePrerequisite.skillId] = mergeAlternateLane
-                        val alternateParentSkillId = getPreviousSkillId(alternatePrerequisite)
+                        val alternateParentSkillId = selectedParentByChild[alternatePrerequisite.skillId] ?: getPreviousSkillId(alternatePrerequisite)
+                        alternateEdgeAcquired = isAcquiredEdge(skillTree, alternatePrerequisite.skillId, child.skillId, connectedAcquiredSkills, selectedParentByChild)
+                        val routeFromAlternateToChildPane = if (alternateEdgeAcquired) acquiredRoutePane else lockedRoutePane
                         val routeToAlternatePane = if (alternatePrerequisite.skillId in connectedAcquiredSkills) acquiredRoutePane else lockedRoutePane
                         paintRoute(
                             alternateIncomingSlots,
@@ -550,10 +561,13 @@ class RankCommand(
                             guideKey = "rank.skill.gui.route.prev",
                             visible = !isStartSkill(alternatePrerequisite)
                         )
-                        paintRoute(alternateToChildSlots, routeToChildPane)
+                        paintRoute(alternateToChildSlots, routeFromAlternateToChildPane)
 
-                        setSkillNodeItem(inventory, alternateSlot, alternatePrerequisite, state)
+                        setSkillNodeItem(inventory, alternateSlot, alternatePrerequisite, state, skillTree)
                     }
+
+                    val sharedMergeRoutePane = if (selectedEdgeAcquired || alternateEdgeAcquired) acquiredRoutePane else lockedRoutePane
+                    paintRoute(MERGE_SHARED_TO_CHILD_SLOTS, sharedMergeRoutePane)
                 }
             }
         }
@@ -658,7 +672,7 @@ class RankCommand(
             val localX = point.x - viewportStartX
             val slot = toActiveSlot(localX, point.y)
             val skill = skillTree.getSkill(skillId) ?: return@forEach
-            setSkillNodeItem(inventory, slot, skill, state)
+            setSkillNodeItem(inventory, slot, skill, state, skillTree)
         }
 
         inventory.setItem(NAV_LEFT_SLOT, createNavigationItem(Material.REDSTONE, "rank.skill.gui.nav.left.name", "rank.skill.gui.nav.left.lore"))
@@ -962,6 +976,54 @@ class RankCommand(
         return dfs(rootSkillId)
     }
 
+    private fun buildSelectedParentByChild(
+        skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree,
+        connectedAcquiredSkills: Set<String>
+    ): Map<String, String> {
+        val selected = mutableMapOf<String, String>()
+        skillTree.getAllSkills().keys.sorted().forEach { childId ->
+            if (childId !in connectedAcquiredSkills) {
+                return@forEach
+            }
+            val parent = skillTree.getParents(childId)
+                .filter { it in connectedAcquiredSkills }
+                .sorted()
+                .firstOrNull()
+            if (parent != null) {
+                selected[childId] = parent
+            }
+        }
+        return selected
+    }
+
+    private fun isAcquiredEdge(
+        skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree,
+        fromSkillId: String,
+        toSkillId: String,
+        connectedAcquiredSkills: Set<String>,
+        selectedParentByChild: Map<String, String>
+    ): Boolean {
+        if (fromSkillId !in connectedAcquiredSkills || toSkillId !in connectedAcquiredSkills) {
+            return false
+        }
+        if (!skillTree.getChildren(fromSkillId).contains(toSkillId)) {
+            return false
+        }
+        val selectedParent = selectedParentByChild[toSkillId]
+        return selectedParent == null || selectedParent == fromSkillId
+    }
+
+    private fun hasAcquiredOutgoingEdge(
+        skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree,
+        fromSkillId: String,
+        connectedAcquiredSkills: Set<String>,
+        selectedParentByChild: Map<String, String>
+    ): Boolean {
+        return skillTree.getChildren(fromSkillId).any { childId ->
+            isAcquiredEdge(skillTree, fromSkillId, childId, connectedAcquiredSkills, selectedParentByChild)
+        }
+    }
+
     private fun buildConnectedAcquiredSkills(
         skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree,
         acquiredSkills: Set<String>
@@ -970,7 +1032,7 @@ class RankCommand(
         val queue = ArrayDeque<String>()
 
         skillTree.getAllSkills().values
-            .filter { it.prerequisites.isEmpty() }
+            .filter { skillTree.getParents(it.skillId).isEmpty() }
             .forEach { root ->
                 if (root.skillId in acquiredSkills && connected.add(root.skillId)) {
                     queue.add(root.skillId)
@@ -985,7 +1047,8 @@ class RankCommand(
                 if (child.skillId !in acquiredSkills) {
                     return@forEach
                 }
-                if (!child.prerequisites.all { it in connected }) {
+                val parents = skillTree.getParents(child.skillId)
+                if (parents.isNotEmpty() && parents.none { it in connected }) {
                     return@forEach
                 }
                 if (connected.add(child.skillId)) {
@@ -1003,14 +1066,24 @@ class RankCommand(
         return skillTree.getChildren(skill.skillId).isEmpty()
     }
 
-    private fun setSkillNodeItem(inventory: Inventory, slot: Int, skill: SkillNode, state: SkillTreeGuiState) {
-        inventory.setItem(slot, createSkillNodeItem(skill, state))
+    private fun setSkillNodeItem(
+        inventory: Inventory,
+        slot: Int,
+        skill: SkillNode,
+        state: SkillTreeGuiState,
+        skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree
+    ) {
+        inventory.setItem(slot, createSkillNodeItem(skill, state, skillTree))
         state.slotToSkillId[slot] = skill.skillId
     }
 
-    private fun createSkillNodeItem(skill: SkillNode, state: SkillTreeGuiState): ItemStack {
+    private fun createSkillNodeItem(
+        skill: SkillNode,
+        state: SkillTreeGuiState,
+        skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree
+    ): ItemStack {
         val acquired = skill.skillId in state.acquiredSkills
-        val available = !acquired && skill.canAcquire(state.acquiredSkills, state.currentExp)
+        val available = !acquired && skillTree.canAcquire(skill.skillId, state.acquiredSkills, state.currentLevel)
         val status = when {
             acquired -> messageProvider.getMessage("rank.skill.gui.status.acquired")
             available -> messageProvider.getMessage("rank.skill.gui.status.available")
@@ -1020,7 +1093,8 @@ class RankCommand(
         val material = resolveSkillIconMaterial(skill.icon)
         val lore = listOf(
             toComponent(messageProvider.getSkillDescription(state.profession, skill.skillId)),
-            toComponent(messageProvider.getMessage("rank.skill.gui.lore.required_exp", "exp" to skill.requiredExp)),
+            toComponent(messageProvider.getMessage("rank.skill.gui.lore.required_level", "level" to skill.requiredLevel)),
+            toComponent(messageProvider.getMessage("rank.skill.gui.lore.current_level", "level" to state.currentLevel)),
             toComponent(messageProvider.getMessage("rank.skill.gui.lore.status", "status" to status))
         )
 
@@ -1459,6 +1533,7 @@ class RankCommand(
             return
         }
         holder.state.acquiredSkills = latestProfession.acquiredSkills.toSet()
+        holder.state.currentLevel = latestProfession.currentLevel
         holder.state.currentExp = latestProfession.currentExp
 
         val skillTree = SkillTreeRegistry.getSkillTree(holder.state.profession) ?: return
@@ -1475,9 +1550,11 @@ class RankCommand(
             return
         }
 
-        val missingPrerequisites = skill.prerequisites.filterNot { it in holder.state.acquiredSkills }
-        if (missingPrerequisites.isNotEmpty()) {
-            val prerequisiteNames = missingPrerequisites.joinToString(" / ") {
+        val parents = skillTree.getParents(skill.skillId)
+        val acquiredParents = parents.filter { it in holder.state.acquiredSkills }
+
+        if (parents.isNotEmpty() && acquiredParents.isEmpty()) {
+            val prerequisiteNames = parents.joinToString(" / ") {
                 messageProvider.getSkillName(holder.state.profession, it)
             }
             viewer.sendMessage(
@@ -1490,18 +1567,49 @@ class RankCommand(
             return
         }
 
-        if (holder.state.currentExp < skill.requiredExp) {
+        if (holder.state.currentLevel < skill.requiredLevel) {
             viewer.sendMessage(
                 messageProvider.getMessage(
-                    "rank.skill.gui.unlock.exp_shortage",
-                    "required" to skill.requiredExp,
-                    "current" to holder.state.currentExp
+                    "rank.skill.gui.unlock.level_shortage",
+                    "required" to skill.requiredLevel,
+                    "current" to holder.state.currentLevel
                 )
             )
             viewer.playSound(viewer.location, "minecraft:entity.villager.no", 1.0f, 1.0f)
             return
         }
 
+        val blockedByBranch = acquiredParents.any { parentId ->
+            val siblings = skillTree.getChildren(parentId)
+            if (siblings.size < 2) {
+                return@any false
+            }
+            siblings.any { it in holder.state.acquiredSkills && it != skill.skillId }
+        }
+        if (blockedByBranch) {
+            viewer.sendMessage(messageProvider.getMessage("rank.skill.gui.unlock.branch_locked"))
+            viewer.playSound(viewer.location, "minecraft:entity.villager.no", 1.0f, 1.0f)
+            return
+        }
+
+        val requiresChoiceConfirmation = acquiredParents.any { parentId ->
+            val siblings = skillTree.getChildren(parentId)
+            siblings.size >= 2 && siblings.contains(skill.skillId) && siblings.none { it in holder.state.acquiredSkills }
+        }
+        if (requiresChoiceConfirmation) {
+            openSkillUnlockDialog(viewer, holder, skillTree, skill)
+            return
+        }
+
+        executeSkillUnlock(viewer, holder, skillTree, skill)
+    }
+
+    private fun executeSkillUnlock(
+        viewer: Player,
+        holder: SkillTreeGuiHolder,
+        skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree,
+        skill: SkillNode
+    ) {
         val success = rankManager.acquireSkill(viewer.uniqueId, skill.skillId)
         if (!success) {
             viewer.sendMessage(messageProvider.getMessage("rank.skill.gui.unlock.failed"))
@@ -1512,6 +1620,7 @@ class RankCommand(
         val updatedProfession = rankManager.getPlayerProfession(viewer.uniqueId)
         if (updatedProfession != null) {
             holder.state.acquiredSkills = updatedProfession.acquiredSkills.toSet()
+            holder.state.currentLevel = updatedProfession.currentLevel
             holder.state.currentExp = updatedProfession.currentExp
         }
 
@@ -1522,6 +1631,66 @@ class RankCommand(
             )
         )
         renderSkillTreeGui(holder.backingInventory, skillTree, holder.state)
+    }
+
+    private fun openSkillUnlockDialog(
+        viewer: Player,
+        holder: SkillTreeGuiHolder,
+        skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree,
+        skill: SkillNode
+    ) {
+        val skillName = messageProvider.getSkillName(holder.state.profession, skill.skillId)
+        val yesButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm")))
+        )
+            .width(150)
+            .action(
+                io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
+                    io.papermc.paper.registry.data.dialog.action.DialogActionCallback { _, audience ->
+                        val target = audience as? Player ?: return@DialogActionCallback
+                        executeSkillUnlock(target, holder, skillTree, skill)
+                    },
+                    net.kyori.adventure.text.event.ClickCallback.Options.builder().uses(1).build()
+                )
+            )
+            .build()
+
+        val noButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel")))
+        )
+            .width(150)
+            .build()
+
+        val dialog = io.papermc.paper.dialog.Dialog.create { factory ->
+            factory.empty()
+                .base(
+                    io.papermc.paper.registry.data.dialog.DialogBase.builder(
+                        withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.title")))
+                    )
+                        .body(
+                            listOf(
+                                io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(
+                                    withoutItalic(
+                                        toComponent(
+                                            messageProvider.getMessage(
+                                                "rank.skill.gui.dialog.body",
+                                                "skill" to skillName
+                                            )
+                                        )
+                                    ),
+                                    280
+                                )
+                            )
+                        )
+                        .canCloseWithEscape(true)
+                        .pause(false)
+                        .afterAction(io.papermc.paper.registry.data.dialog.DialogBase.DialogAfterAction.CLOSE)
+                        .build()
+                )
+                .type(io.papermc.paper.registry.data.dialog.type.DialogType.confirmation(yesButton, noButton))
+        }
+
+        viewer.showDialog(dialog)
     }
 
     private fun navigateSkillTreeToSkill(holder: SkillTreeGuiHolder, transition: RouteTransition, viewer: Player?) {
@@ -1589,6 +1758,7 @@ class RankCommand(
         val profession: Profession,
         var selectedSkillId: String,
         var acquiredSkills: Set<String>,
+        var currentLevel: Int,
         var currentExp: Long,
         val slotToSkillId: MutableMap<Int, String> = mutableMapOf(),
         val routeSlotToSkillId: MutableMap<Int, RouteTransition> = mutableMapOf(),
@@ -1677,8 +1847,9 @@ class RankCommand(
 
         private val MERGE_LEFT_TOP_INCOMING_SLOTS = listOf(9, 10)
         private val MERGE_LEFT_BOTTOM_INCOMING_SLOTS = listOf(27, 28)
-        private val MERGE_TOP_TO_CHILD_SLOTS = listOf(12, 13, 22, 23)
-        private val MERGE_BOTTOM_TO_CHILD_SLOTS = listOf(22, 23, 30, 31)
+        private val MERGE_TOP_TO_CHILD_SLOTS = listOf(12, 13)
+        private val MERGE_BOTTOM_TO_CHILD_SLOTS = listOf(30, 31)
+        private val MERGE_SHARED_TO_CHILD_SLOTS = listOf(22, 23)
         private val MERGE_CHILD_OUTGOING_SLOTS = listOf(25, 26)
     }
     
@@ -1759,10 +1930,10 @@ class RankCommand(
     private fun sendUsage(sender: CommandSender) {
         sender.sendMessage("§6=== ランクシステムコマンド ===")
         sender.sendMessage("§a/rank add-exp <player> <amount> §7- 職業経験値を追加")
+        sender.sendMessage("§a/rank set-prof-level <player> <level> §7- 職業レベルを設定")
         sender.sendMessage("§a/rank rankup <player> §7- 次のランクにランクアップ")
         sender.sendMessage("§a/rank profession <player> <id> §7- 職業を選択/変更")
         sender.sendMessage("§a/rank skill §7- スキルツリーGUIを表示")
-        sender.sendMessage("§a/rank skill <player> <skillId> §7- スキルを習得")
         sender.sendMessage("§a/rank reset <player> §7- 職業をリセット")
         sender.sendMessage("§a/rank info [player] §7- ランク情報表示")
         sender.sendMessage("§a/rank task-info <player> §7- タスク進捗を表示")
@@ -1777,18 +1948,10 @@ class RankCommand(
         args: Array<out String>
     ): List<String> {
         return when {
-            args.size == 1 -> listOf("add-exp", "rankup", "profession", "skill", "reset", "info", "task-info", "task-reset", "complete-task")
+            args.size == 1 -> listOf("add-exp", "set-prof-level", "rankup", "profession", "skill", "reset", "info", "task-info", "task-reset", "complete-task")
                 .filter { it.startsWith(args[0].lowercase()) }
             args.size == 2 -> Bukkit.getOnlinePlayers().map { it.name }
                 .filter { it.startsWith(args[1], ignoreCase = true) }
-            args.size == 3 && args[0].equals("skill", ignoreCase = true) -> {
-                val targetPlayer = Bukkit.getPlayer(args[1]) ?: return emptyList()
-                val playerProfession = rankManager.getPlayerProfession(targetPlayer.uniqueId) ?: return emptyList()
-                val skillTree = SkillTreeRegistry.getSkillTree(playerProfession.profession) ?: return emptyList()
-                skillTree.getAllSkills().keys
-                    .sorted()
-                    .filter { it.startsWith(args[2], ignoreCase = true) }
-            }
             args.size == 3 && args[0].equals("profession", ignoreCase = true) -> 
                 listOf("lumberjack", "brewer", "miner")
                     .filter { it.startsWith(args[2].lowercase()) }

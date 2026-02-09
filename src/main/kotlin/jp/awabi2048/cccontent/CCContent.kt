@@ -26,6 +26,9 @@ import jp.awabi2048.cccontent.features.rank.job.ProfessionMinerExpListener
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
 import jp.awabi2048.cccontent.features.rank.profession.skilltree.ConfigBasedSkillTree
+import jp.awabi2048.cccontent.features.rank.skill.SkillEffectRegistry
+import jp.awabi2048.cccontent.features.rank.skill.handlers.*
+import jp.awabi2048.cccontent.features.rank.skill.listeners.*
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskCheckerImpl
 import jp.awabi2048.cccontent.features.rank.listener.*
@@ -61,6 +64,7 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var arenaManager: ArenaManager
     private lateinit var breweryFeature: BreweryFeature
     private lateinit var cookingFeature: CookingFeature
+    private var rankManagerInstance: RankManagerImpl? = null
     
     fun getMarkerManager(): MarkerManager = markerManager
     fun getItemManager(): ItemManager = itemManager
@@ -131,20 +135,24 @@ class CCContent : JavaPlugin(), Listener {
             // ランクストレージとマネージャーを初期化
             val storage = YamlRankStorage(dataFolder)
             val rankManager = RankManagerImpl(storage)
-            
+            rankManagerInstance = rankManager
+
             // 言語ファイルを読み込み
             val languageLoader = LanguageLoader(this, "ja_JP")
             val messageProvider = MessageProviderImpl(languageLoader)
             rankManager.setMessageProvider(messageProvider)
-            
+
             // スキルツリーを登録
             registerSkillTrees()
 
             val ignoreBlockStore = IgnoreBlockStore(File(dataFolder, "job/.ignore_blocks.yml"))
-            
+
+            // スキル効果システムを初期化
+            initializeSkillEffectSystem(rankManager)
+
             // チュートリアルランク タスクシステムの初期化
             val (taskLoader, taskChecker) = initializeTutorialTaskSystem(rankManager, storage, ignoreBlockStore)
-            
+
             // プレイ時間トラッカータスクを起動（1分ごとに更新）
             if (taskLoader != null && taskChecker != null) {
                 val playTimeTracker = jp.awabi2048.cccontent.features.rank.tutorial.task.PlayTimeTrackerTask(
@@ -157,7 +165,7 @@ class CCContent : JavaPlugin(), Listener {
                 playTimeTrackerTaskId = playTimeTracker.start()
                 logger.info("プレイ時間トラッカーが起動しました（1分ごとに更新）")
             }
-            
+
             // /rank コマンドを登録
             val translator = jp.awabi2048.cccontent.features.rank.tutorial.task.EntityBlockTranslator(messageProvider)
             val rankCommand = RankCommand(rankManager, messageProvider, taskLoader, taskChecker, translator)
@@ -165,10 +173,43 @@ class CCContent : JavaPlugin(), Listener {
             getCommand("rank")?.tabCompleter = rankCommand
             server.pluginManager.registerEvents(rankCommand, this)
             server.pluginManager.registerEvents(ProfessionMinerExpListener(this, rankManager, ignoreBlockStore), this)
-            
+
             logger.info("ランクシステムが初期化されました")
         } catch (e: Exception) {
             logger.warning("ランクシステムの初期化に失敗しました: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * スキル効果システムの初期化
+     */
+    private fun initializeSkillEffectSystem(rankManager: RankManager) {
+        try {
+            // 収集系ハンドラーを登録
+            SkillEffectRegistry.register(BreakSpeedBoostHandler())
+            SkillEffectRegistry.register(DropBonusHandler())
+            SkillEffectRegistry.register(DurabilitySaveChanceHandler())
+            SkillEffectRegistry.register(UnlockBatchBreakHandler())
+            SkillEffectRegistry.register(ReplaceLootTableHandler())
+
+            // クラフト系ハンドラー（モック）を登録
+            SkillEffectRegistry.register(UnlockSystemHandler())
+            SkillEffectRegistry.register(UnlockRecipeHandler())
+            SkillEffectRegistry.register(WorkSpeedBonusMockHandler())
+            SkillEffectRegistry.register(SuccessRateBonusMockHandler())
+
+            // 一般ハンドラーを登録
+            SkillEffectRegistry.register(UnlockItemTokenHandler())
+
+            // リスナーを登録
+            server.pluginManager.registerEvents(SkillEffectCacheListener(rankManager, this), this)
+            server.pluginManager.registerEvents(BlockBreakEffectListener(), this)
+            server.pluginManager.registerEvents(CraftEffectListener(), this)
+
+            logger.info("スキル効果システムが初期化されました（${SkillEffectRegistry.getHandlerCount()}個のハンドラーを登録）")
+        } catch (e: Exception) {
+            logger.warning("スキル効果システムの初期化に失敗しました: ${e.message}")
             e.printStackTrace()
         }
     }
@@ -261,8 +302,10 @@ class CCContent : JavaPlugin(), Listener {
      * 各職業のスキルツリーを登録
      */
     private fun registerSkillTrees() {
+        SkillTreeRegistry.clear()
         val jobDir = File(dataFolder, "job").apply { mkdirs() }
         val expFile = File(jobDir, "exp.yml")
+        val errors = mutableListOf<String>()
 
         if (!expFile.exists()) {
             try {
@@ -282,7 +325,9 @@ class CCContent : JavaPlugin(), Listener {
                     extractJobFile("${profession.id}.yml", ymlFile)
                     logger.info("スキルツリーファイルを作成しました: ${profession.id}.yml")
                 } catch (e: Exception) {
-                    logger.warning("スキルツリーファイルのコピーに失敗しました (${profession.id}): ${e.message}")
+                    val error = "スキルツリーファイルのコピーに失敗しました (${profession.id}): ${e.message}"
+                    logger.warning(error)
+                    errors += error
                     continue
                 }
             }
@@ -292,8 +337,14 @@ class CCContent : JavaPlugin(), Listener {
                 SkillTreeRegistry.register(profession, skillTree)
                 logger.info("スキルツリーを登録しました: ${profession.id}")
             } catch (e: Exception) {
-                logger.warning("スキルツリー読み込み失敗 (${profession.id}): ${e.message}")
+                val error = "スキルツリー読み込み失敗 (${profession.id}): ${e.message}"
+                logger.warning(error)
+                errors += error
             }
+        }
+
+        if (errors.isNotEmpty()) {
+            throw IllegalStateException("Rank feature 初期化失敗: ${errors.joinToString(" | ")}")
         }
     }
     
@@ -391,7 +442,7 @@ class CCContent : JavaPlugin(), Listener {
             // スキルツリーファイルをチェック
             val jobDir = File(dataFolder, "job")
             if (jobDir.exists()) {
-                val requiredJobFiles = listOf("brewer.yml", "lumberjack.yml", "miner.yml", "exp.yml")
+                val requiredJobFiles = listOf("brewer.yml", "lumberjack.yml", "miner.yml", "cook.yml", "exp.yml")
                 for (jobFile in requiredJobFiles) {
                     val file = File(jobDir, jobFile)
                     if (!file.exists()) {
@@ -686,6 +737,7 @@ class CCContent : JavaPlugin(), Listener {
     override fun onDisable() {
         // SukimaDungeon クリーンアップ
         try {
+            rankManagerInstance?.saveData()
             BGMManager.stopAll()
             DungeonSessionManager.saveSessions(this)
             if (::arenaManager.isInitialized) {

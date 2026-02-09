@@ -28,34 +28,93 @@ interface SkillTree {
     /**
      * プレイヤーが取得可能なスキルの一覧を取得
      * @param acquiredSkills プレイヤーが習得済みのスキルID集合
-     * @param currentExp プレイヤーの現在の経験値
+     * @param currentLevel プレイヤーの現在の職業レベル
      * @return 取得可能なスキルIDのリスト
      */
-    fun getAvailableSkills(acquiredSkills: Set<String>, currentExp: Long): List<String>
+    fun getAvailableSkills(acquiredSkills: Set<String>, currentLevel: Int): List<String>
+
+    /**
+     * レベル1→2に必要な初期経験値
+     */
+    fun getLevelInitialExp(): Long
+
+    /**
+     * レベルアップ必要経験値の指数係数
+     */
+    fun getLevelBase(): Double
+
+    /**
+     * 職業レベルの上限
+     */
+    fun getMaxLevel(): Int
 
     /**
      * 指定スキルから派生する子スキル一覧を取得
-     * 親子関係は prerequisites のみから導出する
      */
     fun getChildren(skillId: String): List<String> {
-        return getAllSkills().values
-            .filter { skillId in it.prerequisites }
-            .map { it.skillId }
-            .sorted()
+        return getSkill(skillId)?.children ?: emptyList()
+    }
+
+    /**
+     * 指定スキルの親スキル一覧を取得
+     */
+    fun getParents(skillId: String): List<String> {
+        return getSkill(skillId)?.prerequisites ?: emptyList()
     }
     
     /**
      * 指定されたスキルが取得可能かチェック
      */
-    fun canAcquire(skillId: String, acquiredSkills: Set<String>, currentExp: Long): Boolean {
+    fun canAcquire(skillId: String, acquiredSkills: Set<String>, currentLevel: Int): Boolean {
         val skill = getSkill(skillId) ?: return false
-        return skill.canAcquire(acquiredSkills, currentExp)
+        if (skill.skillId in acquiredSkills) {
+            return false
+        }
+        if (!skill.canAcquire(currentLevel)) {
+            return false
+        }
+
+        val parents = getParents(skillId)
+        if (parents.isNotEmpty() && parents.none { it in acquiredSkills }) {
+            return false
+        }
+
+        parents.filter { it in acquiredSkills }.forEach { parentId ->
+            val siblings = getChildren(parentId)
+            if (siblings.size >= 2) {
+                val chosen = siblings.firstOrNull { it in acquiredSkills }
+                if (chosen != null && chosen != skillId) {
+                    return false
+                }
+            }
+        }
+
+        return true
     }
     
     /**
-     * 指定されたスキル取得に必要な経験値を取得
+     * 指定されたスキル取得に必要な職業レベルを取得
      */
-    fun getRequiredExp(skillId: String): Long? {
-        return getSkill(skillId)?.requiredExp
+    fun getRequiredLevel(skillId: String): Int? {
+        return getSkill(skillId)?.requiredLevel
+    }
+
+    /**
+     * 指定レベルに到達する累積経験値を取得
+     */
+    fun getRequiredTotalExpForLevel(level: Int): Long
+
+    /**
+     * 累積経験値から現在レベルを算出
+     */
+    fun calculateLevelByExp(totalExp: Long): Int
+
+    /**
+     * 指定レベルから次レベルに必要な経験値を算出
+     */
+    fun getExpToNextLevel(level: Int): Long {
+        val safeLevel = level.coerceAtLeast(1)
+        val raw = getLevelInitialExp() * Math.pow(getLevelBase(), (safeLevel - 1).toDouble())
+        return Math.round(raw).coerceAtLeast(1L)
     }
 }

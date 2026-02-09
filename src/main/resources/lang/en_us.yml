@@ -140,8 +140,10 @@ sukima_dungeon:
     huge: "Huge"
 
 rank:
+  profession:
+    level_up: "§a{profession} leveled up! §eLv.{old} -> Lv.{new} §7(+{gained})"
   skill:
-    usage: "§cUsage: /rank skill or /rank skill <player> <skillId>"
+    usage: "§cUsage: /rank skill"
     player_only: "§cThis command can only be executed by a player"
     acquired: "§a{player} acquired skill {skill}"
     acquire_failed: "§cFailed to acquire skill"
@@ -155,7 +157,8 @@ rank:
         available: "§eAvailable"
         locked: "§cLocked"
       lore:
-        required_exp: "§7Required EXP: §e{exp}"
+        required_level: "§7Required Lv: §e{level}"
+        current_level: "§7Current Lv: §e{level}"
         status: "§7Status: {status}"
       nav:
         left:
@@ -170,11 +173,17 @@ rank:
       route:
         prev: "Go Back"
         next: "Go Forward"
+      dialog:
+        title: "§6Confirm Skill Unlock"
+        body: "§fUnlock {skill}?\n§7You cannot proceed to the other branch after this choice."
+        confirm: "§aUnlock"
+        cancel: "§cCancel"
       unlock:
         success: "§aUnlocked skill: {skill}"
         already: "§eAlready unlocked: {skill}"
         missing_prerequisite: "§cMissing prerequisite skills: {skills}"
-        exp_shortage: "§cNot enough EXP (required: {required}, current: {current})"
+        level_shortage: "§cLevel requirement not met (required: {required}, current: {current})"
+        branch_locked: "§cThis branch is locked because the other branch was already chosen"
         failed: "§cFailed to unlock skill"
   tutorial_task_info:
     usage: "§cUsage: /rank task-info <player>"
