@@ -12,6 +12,7 @@ import jp.awabi2048.cccontent.features.rank.event.SkillAcquiredEvent
 import jp.awabi2048.cccontent.features.rank.event.PlayerExperienceGainEvent
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
 import org.bukkit.Bukkit
+import org.bukkit.entity.Player
 import java.util.UUID
 
 /**
@@ -135,12 +136,73 @@ class ProfessionManagerImpl(
                 val skillName = messageProvider.getSkillName(prof.profession, skillId)
                 val event = SkillAcquiredEvent(player, prof.profession, skillId, skillName)
                 Bukkit.getPluginManager().callEvent(event)
+                playSkillAcquireSounds(player)
             }
             
             return true
         }
         
         return false
+    }
+
+    override fun forceAcquireSkill(playerUuid: UUID, skillId: String): Boolean {
+        val prof = getPlayerProfession(playerUuid) ?: return false
+        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
+
+        val requestedSkillId = skillId.trim()
+        val normalizedSkillId = requestedSkillId.lowercase()
+        val targetSkill = skillTree.getSkill(normalizedSkillId) ?: skillTree.getSkill(requestedSkillId) ?: return false
+
+        val orderedSkillIds = mutableListOf<String>()
+        val visiting = mutableSetOf<String>()
+        val visited = mutableSetOf<String>()
+
+        fun visit(currentSkillId: String): Boolean {
+            if (currentSkillId in visiting) {
+                return false
+            }
+            if (!visited.add(currentSkillId)) {
+                return true
+            }
+
+            val currentSkill = skillTree.getSkill(currentSkillId) ?: return false
+            visiting.add(currentSkillId)
+
+            for (prerequisiteId in currentSkill.prerequisites) {
+                if (!visit(prerequisiteId)) {
+                    return false
+                }
+            }
+
+            visiting.remove(currentSkillId)
+            orderedSkillIds.add(currentSkill.skillId)
+            return true
+        }
+
+        if (!visit(targetSkill.skillId)) {
+            return false
+        }
+
+        val newlyAcquiredSkillIds = orderedSkillIds.filterNot { it in prof.acquiredSkills }
+        if (newlyAcquiredSkillIds.isEmpty()) {
+            return true
+        }
+
+        prof.acquiredSkills.addAll(newlyAcquiredSkillIds)
+        prof.lastUpdated = System.currentTimeMillis()
+        storage.saveProfession(prof)
+
+        val player = Bukkit.getPlayer(playerUuid)
+        if (player != null) {
+            newlyAcquiredSkillIds.forEach { acquiredSkillId ->
+                val skillName = messageProvider.getSkillName(prof.profession, acquiredSkillId)
+                val event = SkillAcquiredEvent(player, prof.profession, acquiredSkillId, skillName)
+                Bukkit.getPluginManager().callEvent(event)
+            }
+            playSkillAcquireSounds(player)
+        }
+
+        return true
     }
     
     override fun getAvailableSkills(playerUuid: UUID): List<String> {
@@ -173,5 +235,11 @@ class ProfessionManagerImpl(
     
     fun loadData() {
         professionCache.clear()
+    }
+
+    private fun playSkillAcquireSounds(player: Player) {
+        player.playSound(player.location, "minecraft:block.note_block.pling", 1.0f, 2.0f)
+        player.playSound(player.location, "minecraft:ui.button.click", 0.8f, 1.0f)
+        player.playSound(player.location, "minecraft:entity.player.levelup", 1.0f, 2.0f)
     }
 }

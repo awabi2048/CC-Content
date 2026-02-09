@@ -15,12 +15,15 @@ data class SkillNode(
     
     /** このスキルを習得するのに必要な経験値 */
     val requiredExp: Long,
+
+    /** このスキルのアイコン素材（Material名） */
+    val icon: String? = null,
     
-    /** このスキルの前提条件となるスキルIDのリスト */
-    val prerequisites: List<String> = emptyList(),
-    
-    /** このスキルの習得後に選択できるスキルIDのリスト */
-    val children: List<String> = emptyList()
+    /**
+     * このスキルの前提条件となるスキルIDのリスト
+     * 親子関係はこの prerequisites のみから導出する
+     */
+    val prerequisites: List<String> = emptyList()
 ) {
     /**
      * このスキルが取得可能かチェック

@@ -140,6 +140,42 @@ sukima_dungeon:
     huge: "Huge"
 
 rank:
+  skill:
+    usage: "§cUsage: /rank skill or /rank skill <player> <skillId>"
+    player_only: "§cThis command can only be executed by a player"
+    acquired: "§a{player} acquired skill {skill}"
+    acquire_failed: "§cFailed to acquire skill"
+    gui:
+      title: "§8{profession} Skill Tree"
+      no_profession: "§cYou have not selected a profession"
+      tree_not_found: "§cSkill tree for {profession} was not found"
+      start_not_found: "§cStart skill was not found"
+      status:
+        acquired: "§aAcquired"
+        available: "§eAvailable"
+        locked: "§cLocked"
+      lore:
+        required_exp: "§7Required EXP: §e{exp}"
+        status: "§7Status: {status}"
+      nav:
+        left:
+          name: "§c§lBack"
+          lore: "§7Planned for future implementation"
+        center:
+          name: "§e§lOrigin"
+          lore: "§7Planned for future implementation"
+        right:
+          name: "§6§lNext"
+          lore: "§7Planned for future implementation"
+      route:
+        prev: "Go Back"
+        next: "Go Forward"
+      unlock:
+        success: "§aUnlocked skill: {skill}"
+        already: "§eAlready unlocked: {skill}"
+        missing_prerequisite: "§cMissing prerequisite skills: {skills}"
+        exp_shortage: "§cNot enough EXP (required: {required}, current: {current})"
+        failed: "§cFailed to unlock skill"
   tutorial_task_info:
     usage: "§cUsage: /rank task-info <player>"
     player_not_found: "§cPlayer not found"
