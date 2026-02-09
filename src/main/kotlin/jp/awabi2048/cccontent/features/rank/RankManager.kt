@@ -66,6 +66,11 @@ interface RankManager {
      * スキルを習得
      */
     fun acquireSkill(playerUuid: UUID, skillId: String): Boolean
+
+    /**
+     * デバッグ用: 条件を無視してスキルを習得
+     */
+    fun forceAcquireSkill(playerUuid: UUID, skillId: String): Boolean
     
     /**
      * 習得可能なスキル一覧を取得

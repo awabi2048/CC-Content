@@ -77,6 +77,10 @@ class RankManagerImpl(
     override fun acquireSkill(playerUuid: UUID, skillId: String): Boolean {
         return getProfessionManager().acquireSkill(playerUuid, skillId)
     }
+
+    override fun forceAcquireSkill(playerUuid: UUID, skillId: String): Boolean {
+        return getProfessionManager().forceAcquireSkill(playerUuid, skillId)
+    }
     
     override fun getAvailableSkills(playerUuid: UUID): List<String> {
         return getProfessionManager().getAvailableSkills(playerUuid)

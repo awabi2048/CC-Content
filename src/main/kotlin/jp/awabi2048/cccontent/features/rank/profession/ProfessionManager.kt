@@ -50,6 +50,14 @@ interface ProfessionManager {
      * @return 成功した場合true
      */
     fun acquireSkill(playerUuid: UUID, skillId: String): Boolean
+
+    /**
+     * デバッグ用: 条件を無視してスキルを習得
+     * @param playerUuid プレイヤーのUUID
+     * @param skillId 習得するスキルID
+     * @return 成功した場合true
+     */
+    fun forceAcquireSkill(playerUuid: UUID, skillId: String): Boolean
     
     /**
      * プレイヤーが習得可能なスキルの一覧を取得

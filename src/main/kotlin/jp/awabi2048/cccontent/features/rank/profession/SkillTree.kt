@@ -32,6 +32,17 @@ interface SkillTree {
      * @return 取得可能なスキルIDのリスト
      */
     fun getAvailableSkills(acquiredSkills: Set<String>, currentExp: Long): List<String>
+
+    /**
+     * 指定スキルから派生する子スキル一覧を取得
+     * 親子関係は prerequisites のみから導出する
+     */
+    fun getChildren(skillId: String): List<String> {
+        return getAllSkills().values
+            .filter { skillId in it.prerequisites }
+            .map { it.skillId }
+            .sorted()
+    }
     
     /**
      * 指定されたスキルが取得可能かチェック

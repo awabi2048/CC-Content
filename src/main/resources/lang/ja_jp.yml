@@ -471,6 +471,42 @@ gui_buttons:
   previous: "§c前へ"
 
 rank:
+  skill:
+    usage: "§c使用法: /rank skill または /rank skill <player> <skillId>"
+    player_only: "§cこのコマンドはプレイヤーのみ実行できます"
+    acquired: "§a{player} がスキル {skill} を習得しました"
+    acquire_failed: "§cスキル習得に失敗しました"
+    gui:
+      title: "§8{profession} スキルツリー"
+      no_profession: "§c職業を選択していません"
+      tree_not_found: "§c{profession} のスキルツリーが見つかりません"
+      start_not_found: "§c開始スキルが見つかりません"
+      status:
+        acquired: "§a習得済み"
+        available: "§e習得可能"
+        locked: "§c未開放"
+      lore:
+        required_exp: "§7必要EXP: §e{exp}"
+        status: "§7状態: {status}"
+      nav:
+        left:
+          name: "§c§l戻る"
+          lore: "§7将来実装予定"
+        center:
+          name: "§e§l起点"
+          lore: "§7将来実装予定"
+        right:
+          name: "§6§l進む"
+          lore: "§7将来実装予定"
+      route:
+        prev: "前へ戻る"
+        next: "次へ進む"
+      unlock:
+        success: "§aスキルを解放しました: {skill}"
+        already: "§e既に解放済みです: {skill}"
+        missing_prerequisite: "§c前提スキルが不足しています: {skills}"
+        exp_shortage: "§c必要EXPが不足しています（必要: {required}, 現在: {current}）"
+        failed: "§cスキル解放に失敗しました"
   tutorial_task_info:
     usage: "§c使用法: /rank task-info <player>"
     player_not_found: "§cプレイヤーが見つかりません"

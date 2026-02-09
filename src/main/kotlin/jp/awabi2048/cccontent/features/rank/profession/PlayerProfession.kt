@@ -40,7 +40,7 @@ data class PlayerProfession(
         if (currentExp < requiredExp) return false
         
         acquiredSkills.add(skillId)
-        currentExp = 0L  // 経験値をリセット
+        currentExp -= requiredExp
         lastUpdated = System.currentTimeMillis()
         return true
     }
