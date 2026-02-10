@@ -17,7 +17,10 @@ data class ArenaTheme(
 
 enum class ArenaStructureType(val keyword: String) {
     STRAIGHT("straight"),
-    CORNER("corner");
+    CORNER("corner"),
+    CORRIDOR("corridor"),
+    ENTRANCE("entrance"),
+    GOAL("goal");
 
     companion object {
         fun fromFileName(fileName: String): ArenaStructureType? {

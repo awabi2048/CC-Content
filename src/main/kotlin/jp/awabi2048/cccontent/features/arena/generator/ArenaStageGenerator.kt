@@ -27,7 +27,8 @@ private data class TilePlacement(
     val index: Int,
     val point: TilePoint,
     val structureType: ArenaStructureType,
-    val rotationQuarter: Int
+    val rotationQuarter: Int,
+    val isRoom: Boolean
 )
 
 data class ArenaStageBuildResult(
@@ -46,8 +47,8 @@ class ArenaStageGenerator {
         waves: Int,
         random: Random = Random.Default
     ): ArenaStageBuildResult {
-        val path = generatePath(waves * 2, random)
-        val placements = toPlacements(path, random)
+        val roomPath = generatePath(waves, random)
+        val placements = toPlacements(roomPath)
         val tileSize = theme.tileSize
 
         for (placement in placements) {
@@ -57,10 +58,10 @@ class ArenaStageGenerator {
 
         val roomBounds = mutableMapOf<Int, ArenaBounds>()
         val roomMobSpawns = mutableMapOf<Int, List<Location>>()
-        val minTileX = path.minOf { it.x }
-        val maxTileX = path.maxOf { it.x }
-        val minTileZ = path.minOf { it.z }
-        val maxTileZ = path.maxOf { it.z }
+        val minTileX = placements.minOf { it.point.x }
+        val maxTileX = placements.maxOf { it.point.x }
+        val minTileZ = placements.minOf { it.point.z }
+        val maxTileZ = placements.maxOf { it.point.z }
         val stageBounds = ArenaBounds(
             minX = origin.blockX + minTileX * tileSize,
             maxX = origin.blockX + (maxTileX + 1) * tileSize - 1,
@@ -68,8 +69,9 @@ class ArenaStageGenerator {
             maxZ = origin.blockZ + (maxTileZ + 1) * tileSize - 1
         )
 
-        val roomPoints = path.filterIndexed { index, _ -> index % 2 == 0 }
-        roomPoints.forEachIndexed { roomIndex, point ->
+        val roomPlacements = placements.filter { it.isRoom }.sortedBy { it.index }
+        roomPlacements.forEachIndexed { roomIndex, roomPlacement ->
+            val point = roomPlacement.point
             val base = locationForTile(origin, point, tileSize)
             roomBounds[roomIndex] = ArenaBounds(
                 minX = base.blockX,
@@ -88,14 +90,14 @@ class ArenaStageGenerator {
             }
         }
 
-        val finalRoomPoint = roomPoints.last()
+        val finalRoomPoint = roomPlacements.last().point
         val finalRoomBase = locationForTile(origin, finalRoomPoint, tileSize)
         val finalMarkers = findMarkers(world, finalRoomBase, tileSize)
         val barrierLocation = finalMarkers.barrierCore
             ?: finalRoomBase.clone().add(tileSize / 2.0, 1.0, tileSize / 2.0)
         barrierLocation.block.type = org.bukkit.Material.RESPAWN_ANCHOR
 
-        val playerSpawn = locationForTile(origin, roomPoints.first(), tileSize)
+        val playerSpawn = locationForTile(origin, roomPlacements.first().point, tileSize)
             .add(tileSize / 2.0, 1.0, tileSize / 2.0)
 
         return ArenaStageBuildResult(
@@ -154,48 +156,67 @@ class ArenaStageGenerator {
         return fallback
     }
 
-    private fun toPlacements(path: List<TilePoint>, random: Random): List<TilePlacement> {
+    private fun toPlacements(roomPath: List<TilePoint>): List<TilePlacement> {
         val result = mutableListOf<TilePlacement>()
-        for (index in path.indices) {
-            val current = path[index]
-            val previous = if (index > 0) path[index - 1] else null
-            val next = if (index < path.lastIndex) path[index + 1] else null
+        for (index in roomPath.indices) {
+            val currentRoom = roomPath[index]
+            val current = TilePoint(currentRoom.x * 2, currentRoom.z * 2)
+            val previous = if (index > 0) roomPath[index - 1] else null
+            val next = if (index < roomPath.lastIndex) roomPath[index + 1] else null
 
-            val fromDir = previous?.let { directionOf(it, current) }
-            val toDir = next?.let { directionOf(current, it) }
+            val fromDir = previous?.let { directionOf(it, currentRoom) }
+            val toDir = next?.let { directionOf(currentRoom, it) }
 
             val placement = when {
                 fromDir == null && toDir != null -> TilePlacement(
-                    index,
+                    index * 2,
                     current,
-                    ArenaStructureType.STRAIGHT,
-                    straightRotation(toDir)
+                    ArenaStructureType.ENTRANCE,
+                    straightRotation(toDir),
+                    true
                 )
                 fromDir != null && toDir == null -> TilePlacement(
-                    index,
+                    index * 2,
                     current,
-                    ArenaStructureType.STRAIGHT,
-                    straightRotation(fromDir)
+                    ArenaStructureType.GOAL,
+                    straightRotation(fromDir),
+                    true
                 )
-                fromDir != null && toDir != null && fromDir.opposite() == toDir -> TilePlacement(
-                    index,
+                fromDir != null && toDir != null && fromDir == toDir -> TilePlacement(
+                    index * 2,
                     current,
                     ArenaStructureType.STRAIGHT,
-                    straightRotation(toDir)
+                    straightRotation(toDir),
+                    true
                 )
                 fromDir != null && toDir != null -> TilePlacement(
-                    index,
+                    index * 2,
                     current,
                     ArenaStructureType.CORNER,
-                    cornerRotation(fromDir, toDir)
+                    cornerRotation(fromDir, toDir),
+                    true
                 )
-                else -> TilePlacement(index, current, ArenaStructureType.STRAIGHT, random.nextInt(4))
+                else -> TilePlacement(index * 2, current, ArenaStructureType.STRAIGHT, 0, true)
             }
 
             result.add(placement)
+
+            if (next != null) {
+                val corridorDir = directionOf(currentRoom, next)
+                val corridorPoint = TilePoint(currentRoom.x + next.x, currentRoom.z + next.z)
+                result.add(
+                    TilePlacement(
+                        index = index * 2 + 1,
+                        point = corridorPoint,
+                        structureType = ArenaStructureType.CORRIDOR,
+                        rotationQuarter = straightRotation(corridorDir),
+                        isRoom = false
+                    )
+                )
+            }
         }
 
-        return result
+        return result.sortedBy { it.index }
     }
 
     private fun directionOf(from: TilePoint, to: TilePoint): PathDirection {
@@ -212,12 +233,14 @@ class ArenaStageGenerator {
     }
 
     private fun cornerRotation(fromDir: PathDirection, toDir: PathDirection): Int {
-        val pair = setOf(fromDir, toDir)
-        return when {
-            pair == setOf(PathDirection.NORTH, PathDirection.WEST) -> 1
-            pair == setOf(PathDirection.NORTH, PathDirection.EAST) -> 2
-            pair == setOf(PathDirection.SOUTH, PathDirection.EAST) -> 3
-            pair == setOf(PathDirection.SOUTH, PathDirection.WEST) -> 0
+        val opening1 = fromDir.opposite()
+        val opening2 = toDir
+        val openings = setOf(opening1, opening2)
+        return when (openings) {
+            setOf(PathDirection.NORTH, PathDirection.EAST) -> 0
+            setOf(PathDirection.EAST, PathDirection.SOUTH) -> 1
+            setOf(PathDirection.SOUTH, PathDirection.WEST) -> 2
+            setOf(PathDirection.WEST, PathDirection.NORTH) -> 3
             else -> 0
         }
     }

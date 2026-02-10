@@ -7,8 +7,11 @@ import jp.awabi2048.cccontent.world.WorldSettingsHelper
 import org.bukkit.Bukkit
 import org.bukkit.GameRule
 import org.bukkit.Location
+import org.bukkit.Particle
+import org.bukkit.Sound
 import org.bukkit.World
 import org.bukkit.WorldCreator
+import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.Player
 import org.bukkit.entity.Zombie
@@ -28,6 +31,11 @@ private data class PendingWorldDeletion(
     var attempts: Int = 0
 )
 
+private data class PendingBarrierActivation(
+    val effectTask: BukkitTask,
+    val completionTask: BukkitTask
+)
+
 class ArenaManager(private val plugin: JavaPlugin) {
     private val random = kotlin.random.Random.Default
     private val themeLoader = ArenaThemeLoader(plugin)
@@ -36,15 +44,35 @@ class ArenaManager(private val plugin: JavaPlugin) {
     private val playerToSessionWorld = mutableMapOf<UUID, String>()
     private val mobToSessionWorld = mutableMapOf<UUID, String>()
     private val pendingWorldDeletions = mutableMapOf<String, PendingWorldDeletion>()
+    private val pendingBarrierActivations = mutableMapOf<UUID, PendingBarrierActivation>()
     private var maintenanceTask: BukkitTask? = null
 
+    private var clearThreshold: Double = 0.2
+    private var spawnIntervalSeconds: Int = 5
+    private var spawnRandomness: Double = 0.5
+
     fun initialize() {
+        loadConfig()
         themeLoader.load()
         startMaintenanceTask()
     }
 
     fun reloadThemes() {
+        loadConfig()
         themeLoader.load()
+    }
+
+    private fun loadConfig() {
+        val configFile = File(plugin.dataFolder, "arena/config.yml")
+        if (!configFile.exists()) {
+            configFile.parentFile.mkdirs()
+            plugin.saveResource("arena/config.yml", false)
+        }
+
+        val config = YamlConfiguration.loadConfiguration(configFile)
+        clearThreshold = config.getDouble("arena.clear_threshold", 0.2).coerceIn(0.0, 1.0)
+        spawnIntervalSeconds = config.getInt("arena.spawn_interval", 5).coerceIn(1, 60)
+        spawnRandomness = config.getDouble("arena.spawn_randomness", 0.5).coerceIn(0.0, 1.0)
     }
 
     fun startSession(target: Player, waves: Int, requestedTheme: String?): ArenaStartResult {
@@ -111,6 +139,11 @@ class ArenaManager(private val plugin: JavaPlugin) {
         sessionsByWorld.clear()
         playerToSessionWorld.clear()
         mobToSessionWorld.clear()
+        pendingBarrierActivations.values.toList().forEach { pending ->
+            pending.effectTask.cancel()
+            pending.completionTask.cancel()
+        }
+        pendingBarrierActivations.clear()
         processPendingWorldDeletions()
     }
 
@@ -127,6 +160,10 @@ class ArenaManager(private val plugin: JavaPlugin) {
 
     fun handleMove(player: Player, to: Location, from: Location) {
         val session = getSession(player) ?: return
+
+        if (pendingBarrierActivations.containsKey(player.uniqueId)) {
+            return
+        }
 
         if (to.world?.name != session.worldName || !session.stageBounds.contains(to.x, to.z)) {
             leavePlayerFromSession(player.uniqueId, "§cステージ外に出たためアリーナを終了しました")
@@ -149,6 +186,9 @@ class ArenaManager(private val plugin: JavaPlugin) {
 
     fun handleTeleport(player: Player, to: Location?) {
         val session = getSession(player) ?: return
+        if (pendingBarrierActivations.containsKey(player.uniqueId)) {
+            return
+        }
         if (to == null || to.world?.name != session.worldName || !session.stageBounds.contains(to.x, to.z)) {
             leavePlayerFromSession(player.uniqueId, "§cステージ外に出たためアリーナを終了しました")
         }
@@ -173,7 +213,12 @@ class ArenaManager(private val plugin: JavaPlugin) {
             return true
         }
 
-        terminateSession(session, true, "§aアリーナクリア！")
+        if (pendingBarrierActivations.containsKey(player.uniqueId)) {
+            player.sendMessage("§e結界石を再起動中です")
+            return true
+        }
+
+        startBarrierActivation(player, session)
         return true
     }
 
@@ -190,6 +235,8 @@ class ArenaManager(private val plugin: JavaPlugin) {
     private fun leavePlayerFromSession(playerId: UUID, reason: String): Boolean {
         val worldName = playerToSessionWorld[playerId] ?: return false
         val session = sessionsByWorld[worldName] ?: return false
+
+        cancelBarrierActivation(playerId)
 
         playerToSessionWorld.remove(playerId)
         session.participants.remove(playerId)
@@ -214,7 +261,11 @@ class ArenaManager(private val plugin: JavaPlugin) {
     private fun terminateSession(session: ArenaSession, success: Boolean, message: String?) {
         sessionsByWorld.remove(session.worldName)
 
+        session.waveSpawnTasks.values.forEach { it.cancel() }
+        session.waveSpawnTasks.clear()
+
         session.participants.toList().forEach { participantId ->
+            cancelBarrierActivation(participantId)
             playerToSessionWorld.remove(participantId)
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline) {
@@ -259,19 +310,61 @@ class ArenaManager(private val plugin: JavaPlugin) {
         session.startedWaves.add(wave)
 
         val spawns = session.roomMobSpawns[wave].orEmpty()
-        for (spawn in spawns) {
-            val zombie = world.spawnEntity(spawn, EntityType.ZOMBIE) as Zombie
-            zombie.removeWhenFarAway = false
-            session.activeMobs.add(zombie.uniqueId)
-            mobToSessionWorld[zombie.uniqueId] = session.worldName
-        }
-
-        broadcast(session, "§6[Arena] ウェーブ $wave 開始 (${spawns.size}体)")
-
         if (spawns.isEmpty()) {
-            broadcast(session, "§eこのウェーブには敵が配置されていません")
+            broadcastSubtitle(session, "§6Wave $wave", 10, 70, 20)
+            playSound(session, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f)
             onWaveCleared(session)
+            return
         }
+
+        val initialCount = spawns.size
+        session.waveMobCount[wave] = initialCount
+
+        for (spawn in spawns) {
+            spawnMob(world, session, spawn)
+        }
+
+        broadcastSubtitle(session, "§6Wave $wave", 10, 70, 20)
+        playSound(session, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f)
+
+        startSpawnLoop(session, wave, spawns)
+    }
+
+    private fun spawnMob(world: World, session: ArenaSession, spawn: Location) {
+        val zombie = world.spawnEntity(spawn, EntityType.ZOMBIE) as Zombie
+        zombie.removeWhenFarAway = false
+        session.activeMobs.add(zombie.uniqueId)
+        mobToSessionWorld[zombie.uniqueId] = session.worldName
+    }
+
+    private fun startSpawnLoop(session: ArenaSession, wave: Int, spawns: List<Location>) {
+        val baseInterval = spawnIntervalSeconds * 20L
+        val randomRange = spawnRandomness * baseInterval
+
+        fun scheduleNextSpawn() {
+            val delay = baseInterval + (random.nextDouble() * randomRange * 2 - randomRange).toLong()
+            val task = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+                val currentSession = sessionsByWorld[session.worldName] ?: return@Runnable
+                if (currentSession.currentWave != wave) return@Runnable
+                if (!currentSession.startedWaves.contains(wave)) return@Runnable
+
+                val world = Bukkit.getWorld(session.worldName) ?: return@Runnable
+                for (spawn in spawns) {
+                    spawnMob(world, currentSession, spawn)
+                }
+
+                currentSession.waveMobCount[wave] = (currentSession.waveMobCount[wave] ?: 0) + spawns.size
+
+                if (currentSession.startedWaves.contains(wave)) {
+                    scheduleNextSpawn()
+                }
+            }, delay.coerceAtLeast(20L))
+
+            session.waveSpawnTasks[wave]?.cancel()
+            session.waveSpawnTasks[wave] = task
+        }
+
+        scheduleNextSpawn()
     }
 
     private fun locateRoom(session: ArenaSession, location: Location): Int? {
@@ -285,22 +378,71 @@ class ArenaManager(private val plugin: JavaPlugin) {
         if (!removed) return
 
         mobToSessionWorld.remove(mobId)
-        if (session.activeMobs.isNotEmpty()) return
-        onWaveCleared(session)
+
+        val wave = session.currentWave
+        val totalMobs = session.waveMobCount[wave] ?: 0
+        val threshold = (totalMobs * clearThreshold).toInt()
+
+        if (session.activeMobs.size <= threshold) {
+            onWaveCleared(session)
+        }
     }
 
     private fun onWaveCleared(session: ArenaSession) {
+        val wave = session.currentWave
+        session.waveSpawnTasks[wave]?.cancel()
+        session.waveSpawnTasks.remove(wave)
+
+        playSound(session, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f)
         if (session.currentWave >= session.waves) {
             session.barrierActive = true
-            broadcast(session, "§a最終ウェーブクリア！ 結界石を右クリックして再起動してください")
+            broadcastSubtitle(session, "§b結界石を右クリックして再起動", 10, 70, 20)
             return
         }
-        broadcast(session, "§aウェーブ ${session.currentWave} クリア！ 次の部屋へ進んでください")
     }
 
-    private fun broadcast(session: ArenaSession, message: String) {
+    private fun startBarrierActivation(player: Player, session: ArenaSession) {
+        val effectTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+            if (!player.isOnline || player.world.name != session.worldName) return@Runnable
+            val center = session.barrierLocation.clone().add(0.5, 0.8, 0.5)
+            player.world.spawnParticle(Particle.END_ROD, center, 24, 0.35, 0.45, 0.35, 0.01)
+            player.sendTitle("", "§b結界石を再起動中...", 0, 15, 5)
+        }, 0L, 10L)
+
+        val completionTask = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            val pending = pendingBarrierActivations.remove(player.uniqueId) ?: return@Runnable
+            pending.effectTask.cancel()
+
+            val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
+            if (!activeSession.participants.contains(player.uniqueId)) return@Runnable
+            if (!player.isOnline || player.world.name != session.worldName) return@Runnable
+
+            player.sendTitle("", "§a再起動完了", 5, 30, 10)
+            terminateSession(activeSession, true, "§aアリーナクリア！")
+        }, 200L)
+
+        pendingBarrierActivations[player.uniqueId] = PendingBarrierActivation(
+            effectTask = effectTask,
+            completionTask = completionTask
+        )
+    }
+
+    private fun cancelBarrierActivation(playerId: UUID) {
+        val pending = pendingBarrierActivations.remove(playerId) ?: return
+        pending.effectTask.cancel()
+        pending.completionTask.cancel()
+    }
+
+    private fun broadcastSubtitle(session: ArenaSession, subtitle: String, fadeIn: Int, stay: Int, fadeOut: Int) {
         session.participants.forEach { participantId ->
-            Bukkit.getPlayer(participantId)?.sendMessage(message)
+            Bukkit.getPlayer(participantId)?.sendTitle("", subtitle, fadeIn, stay, fadeOut)
+        }
+    }
+
+    private fun playSound(session: ArenaSession, sound: Sound, volume: Float, pitch: Float) {
+        session.participants.forEach { participantId ->
+            val player = Bukkit.getPlayer(participantId) ?: return@forEach
+            player.playSound(player.location, sound, volume, pitch)
         }
     }
 
