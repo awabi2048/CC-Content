@@ -4,6 +4,7 @@ import jp.awabi2048.cccontent.features.rank.job.BlockPositionCodec
 import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
 import jp.awabi2048.cccontent.features.rank.skill.handlers.BreakSpeedBoostHandler
+import jp.awabi2048.cccontent.features.rank.skill.handlers.UnlockBatchBreakHandler
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -50,8 +51,37 @@ class BlockBreakEffectListener(
         SkillEffectEngine.applyEffect(event.player, profession, entry.skillId, skillEffect, event)
     }
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     fun onBlockBreak(event: BlockBreakEvent) {
+        if (!isPlayerPlacedBlock(event.block) && !UnlockBatchBreakHandler.isInternalBreakInProgress(event.player.uniqueId)) {
+            val compiledEffects = SkillEffectEngine.getCachedEffects(event.player.uniqueId)
+            val debugMode = UnlockBatchBreakHandler.BatchBreakMode.fromTool(event.player.inventory.itemInMainHand.type)
+            var debugApplied = false
+
+            if (debugMode != null) {
+                val debugEffect = UnlockBatchBreakHandler.getDebugEffect(event.player.uniqueId, debugMode)
+                if (debugEffect != null) {
+                    val profession = compiledEffects?.profession ?: when (debugMode) {
+                        UnlockBatchBreakHandler.BatchBreakMode.CUT_ALL -> jp.awabi2048.cccontent.features.rank.profession.Profession.LUMBERJACK
+                        UnlockBatchBreakHandler.BatchBreakMode.MINE_ALL -> jp.awabi2048.cccontent.features.rank.profession.Profession.MINER
+                    }
+                    debugApplied = SkillEffectEngine.applyEffect(event.player, profession, "debug.${debugMode.modeKey}", debugEffect, event)
+                }
+            }
+
+            if (!debugApplied && compiledEffects != null) {
+                val entry = SkillEffectEngine.getCachedEffectForBlock(
+                    event.player.uniqueId,
+                    UnlockBatchBreakHandler.EFFECT_TYPE,
+                    event.block.type.name
+                )
+
+                if (entry != null) {
+                    SkillEffectEngine.applyEffect(event.player, compiledEffects.profession, entry.skillId, entry.effect, event)
+                }
+            }
+        }
+
         BreakSpeedBoostHandler.clearBoost(event.player.uniqueId)
         durabilityEligibleUntil.remove(event.player.uniqueId)
     }
@@ -115,5 +145,6 @@ class BlockBreakEffectListener(
     fun onPlayerQuit(event: PlayerQuitEvent) {
         BreakSpeedBoostHandler.clearBoost(event.player.uniqueId)
         durabilityEligibleUntil.remove(event.player.uniqueId)
+        UnlockBatchBreakHandler.stopForPlayer(event.player.uniqueId)
     }
 }

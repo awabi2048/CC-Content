@@ -103,7 +103,16 @@ class CCContent : JavaPlugin(), Listener {
         val ccCommand = CCCommand(
             giveCommand = giveCommand,
             onReload = { reloadConfiguration() },
-            onClearBlockPlacementData = { clearBlockPlacementData() }
+            onClearBlockPlacementData = { clearBlockPlacementData() },
+            onBatchBreakDebug = { player, mode, delay, maxChain, autoCollect ->
+                val batchMode = UnlockBatchBreakHandler.BatchBreakMode.fromRaw(mode)
+                if (batchMode == null) {
+                    false
+                } else {
+                    UnlockBatchBreakHandler.setDebugOverride(player.uniqueId, batchMode, delay, maxChain, autoCollect)
+                    true
+                }
+            }
         )
         
         getCommand("cc-content")?.setExecutor(ccCommand)
@@ -201,7 +210,7 @@ class CCContent : JavaPlugin(), Listener {
             SkillEffectRegistry.register(BreakSpeedBoostHandler())
             SkillEffectRegistry.register(DropBonusHandler())
             SkillEffectRegistry.register(DurabilitySaveChanceHandler())
-            SkillEffectRegistry.register(UnlockBatchBreakHandler())
+            SkillEffectRegistry.register(UnlockBatchBreakHandler(ignoreBlockStore))
             SkillEffectRegistry.register(ReplaceLootTableHandler())
 
             // クラフト系ハンドラー（モック）を登録
@@ -216,6 +225,8 @@ class CCContent : JavaPlugin(), Listener {
             // リスナーを登録
             server.pluginManager.registerEvents(SkillEffectCacheListener(rankManager, this), this)
             server.pluginManager.registerEvents(BlockBreakEffectListener(ignoreBlockStore), this)
+            server.pluginManager.registerEvents(BatchBreakToggleListener(), this)
+            server.pluginManager.registerEvents(BatchBreakPreviewListener(), this)
             server.pluginManager.registerEvents(CraftEffectListener(), this)
 
             logger.info("スキル効果システムが初期化されました（${SkillEffectRegistry.getHandlerCount()}個のハンドラーを登録）")
@@ -785,6 +796,7 @@ class CCContent : JavaPlugin(), Listener {
     override fun onDisable() {
         // SukimaDungeon クリーンアップ
         try {
+            UnlockBatchBreakHandler.stopAll()
             rankManagerInstance?.saveData()
             if (::breweryFeature.isInitialized) {
                 breweryFeature.shutdown()

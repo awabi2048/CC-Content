@@ -85,7 +85,13 @@ skills:
     effect:
       type: "collect.unlock_batch_break"
       params:
-        profile: "vertical"
+        mode: "mine_all"
+        maxChainCount: 24
+        delayTicks: 2
+        instantBreak: false
+        autoCollect: false
+        visualizeTargets: true
+        matchLevel: "FAMILY"
       evaluationMode: "CACHED"
     children: ["skill7"]
 
