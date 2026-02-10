@@ -70,7 +70,13 @@ skills:
     effect:
       type: "collect.unlock_batch_break"
       params:
-        profile: "3x3"
+        mode: "cut_all"
+        maxChainCount: 16
+        delayTicks: 2
+        instantBreak: false
+        autoCollect: false
+        visualizeTargets: true
+        matchLevel: "EXACT"
       evaluationMode: "CACHED"
     children: ["skill8"]
 

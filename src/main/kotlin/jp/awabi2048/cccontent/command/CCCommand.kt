@@ -12,7 +12,8 @@ import org.bukkit.command.TabCompleter
 class CCCommand(
     private val giveCommand: GiveCommand,
     private val onReload: (() -> Unit)? = null,
-    private val onClearBlockPlacementData: (() -> Unit)? = null
+    private val onClearBlockPlacementData: (() -> Unit)? = null,
+    private val onBatchBreakDebug: ((org.bukkit.entity.Player, String, Int, Int, Boolean) -> Boolean)? = null
 ) : CommandExecutor, TabCompleter {
     
     override fun onCommand(
@@ -39,6 +40,9 @@ class CCCommand(
             "clear_block_placement_data" -> {
                 handleClearBlockPlacementData(sender)
             }
+            "debug" -> {
+                handleDebug(sender, args)
+            }
             "help" -> {
                 showHelp(sender)
                 true
@@ -49,6 +53,53 @@ class CCCommand(
                 true
             }
         }
+    }
+
+    private fun handleDebug(sender: CommandSender, args: Array<String>): Boolean {
+        if (!sender.hasPermission("cc-content.admin")) {
+            sender.sendMessage("§c権限がありません")
+            return false
+        }
+
+        if (onBatchBreakDebug == null) {
+            sender.sendMessage("§cデバッグ機能が利用できません")
+            return false
+        }
+
+        val player = sender as? org.bukkit.entity.Player
+        if (player == null) {
+            sender.sendMessage("§cこのコマンドはプレイヤーのみ実行できます")
+            return false
+        }
+
+        if (args.size != 5) {
+            sender.sendMessage("§c使用法: /ccc debug <mine_all|cut_all> <delay> <max_chain> <auto_collect>")
+            return false
+        }
+
+        val mode = args[1].lowercase()
+        if (mode != "mine_all" && mode != "cut_all") {
+            sender.sendMessage("§cmodeは mine_all または cut_all を指定してください")
+            return false
+        }
+
+        val delay = args[2].toIntOrNull()
+        val maxChain = args[3].toIntOrNull()
+        val autoCollect = args[4].toBooleanStrictOrNull()
+        if (delay == null || maxChain == null || autoCollect == null) {
+            sender.sendMessage("§cdelay/max_chain/auto_collect の指定が不正です")
+            sender.sendMessage("§7例: /ccc debug mine_all 0 32 true")
+            return false
+        }
+
+        val result = onBatchBreakDebug.invoke(player, mode, delay, maxChain, autoCollect)
+        if (!result) {
+            sender.sendMessage("§cデバッグ設定の反映に失敗しました")
+            return false
+        }
+
+        sender.sendMessage("§aデバッグ設定を反映しました: mode=$mode, delay=$delay, max_chain=$maxChain, auto_collect=$autoCollect")
+        return true
     }
 
     private fun handleClearBlockPlacementData(sender: CommandSender): Boolean {
@@ -114,6 +165,9 @@ class CCCommand(
 
               §f/ccc clear_block_placement_data
               §7  - プレイヤー設置ブロック判定データを削除します
+
+              §f/ccc debug <mine_all|cut_all> <delay> <max_chain> <auto_collect>
+              §7  - MineAll/CutAll のデバッグ設定を適用します
               
               §f/arenaa §7- アリーナ管理コマンド
               §f/sukima_dungeon §7- スキマダンジョンコマンド
@@ -132,18 +186,28 @@ class CCCommand(
           if (args.size == 1) {
               val prefix = args[0].lowercase()
                val candidates = mutableListOf("give", "help")
-               if (sender.hasPermission("cc-content.admin")) {
-                   candidates.add("reload")
-                   candidates.add("clear_block_placement_data")
-               }
-              return candidates.filter { it.startsWith(prefix) }
-          }
+                if (sender.hasPermission("cc-content.admin")) {
+                    candidates.add("reload")
+                    candidates.add("clear_block_placement_data")
+                    candidates.add("debug")
+                }
+               return candidates.filter { it.startsWith(prefix) }
+           }
          
          // サブコマンドの引数補完
          return when (args[0].lowercase()) {
              "give" -> {
-                 val subArgs = args.drop(1).toTypedArray()
-                 giveCommand.onTabComplete(sender, cmd, "give", subArgs)
+                  val subArgs = args.drop(1).toTypedArray()
+                  giveCommand.onTabComplete(sender, cmd, "give", subArgs)
+              }
+             "debug" -> {
+                 when (args.size) {
+                     2 -> listOf("mine_all", "cut_all").filter { it.startsWith(args[1].lowercase()) }
+                     3 -> listOf("0", "1", "2", "3", "5").filter { it.startsWith(args[2]) }
+                     4 -> listOf("16", "24", "32", "64").filter { it.startsWith(args[3]) }
+                     5 -> listOf("true", "false").filter { it.startsWith(args[4].lowercase()) }
+                     else -> emptyList()
+                 }
              }
              else -> emptyList()
          }
