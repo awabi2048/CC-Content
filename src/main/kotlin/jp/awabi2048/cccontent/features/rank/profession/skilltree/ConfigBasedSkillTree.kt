@@ -55,7 +55,8 @@ class ConfigBasedSkillTree(
                         requiredLevel = skillSection.getInt("requiredLevel", 1).coerceAtLeast(1),
                         icon = skillSection.getString("icon"),
                         children = skillSection.getStringList("children").distinct(),
-                        effect = effect
+                        effect = effect,
+                        exclusiveBranch = skillSection.getBoolean("exclusiveBranch", true)
                     )
 
                     skills[skillId] = skill

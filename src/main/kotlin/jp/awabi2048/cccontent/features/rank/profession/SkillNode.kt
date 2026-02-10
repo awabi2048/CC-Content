@@ -28,7 +28,10 @@ data class SkillNode(
     val prerequisites: List<String> = emptyList(),
 
     /** このスキルの効果定義 */
-    val effect: SkillEffect? = null
+    val effect: SkillEffect? = null,
+
+    /** 分岐が排他的かどうか（true=片方のみ選択可能、false=両方選択可能） */
+    val exclusiveBranch: Boolean = true
 ) {
     /**
      * このスキルが取得可能かチェック
