@@ -8,6 +8,9 @@ import jp.awabi2048.cccontent.items.misc.SmallLight
 import jp.awabi2048.cccontent.items.misc.GulliverItemListener
 import jp.awabi2048.cccontent.items.misc.GulliverConfig
 import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
+import jp.awabi2048.cccontent.items.brewery.BreweryMockClockItem
+import jp.awabi2048.cccontent.items.brewery.BreweryMockYeastItem
+import jp.awabi2048.cccontent.items.brewery.BrewerySampleFilterItem
 import jp.awabi2048.cccontent.items.arena.*
 import jp.awabi2048.cccontent.features.arena.ArenaCommand
 import jp.awabi2048.cccontent.features.arena.ArenaItemListener
@@ -130,6 +133,7 @@ class CCContent : JavaPlugin(), Listener {
         
         // フィーチャー別のアイテム数を表示
         logger.info("  - misc: ${CustomItemManager.getItemCountByFeature("misc")}")
+        logger.info("  - brewery: ${CustomItemManager.getItemCountByFeature("brewery")}")
         logger.info("  - arena: ${CustomItemManager.getItemCountByFeature("arena")}")
     }
     
@@ -373,7 +377,12 @@ class CCContent : JavaPlugin(), Listener {
         // GulliverLight アイテム
         CustomItemManager.register(BigLight())
         CustomItemManager.register(SmallLight())
-        
+
+        // Brewery アイテム
+        CustomItemManager.register(BrewerySampleFilterItem(this))
+        CustomItemManager.register(BreweryMockClockItem(this))
+        CustomItemManager.register(BreweryMockYeastItem(this))
+
         // Arena アイテム
         CustomItemManager.register(ArenaTicketItem())
         CustomItemManager.register(ArenaMedalItem())
@@ -777,6 +786,9 @@ class CCContent : JavaPlugin(), Listener {
         // SukimaDungeon クリーンアップ
         try {
             rankManagerInstance?.saveData()
+            if (::breweryFeature.isInitialized) {
+                breweryFeature.shutdown()
+            }
             BGMManager.stopAll()
             DungeonSessionManager.saveSessions(this)
             if (::arenaManager.isInitialized) {
