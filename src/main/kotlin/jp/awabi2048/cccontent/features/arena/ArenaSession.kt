@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.arena
 
 import org.bukkit.Location
+import org.bukkit.scheduler.BukkitTask
 import java.util.UUID
 
 data class ArenaBounds(
@@ -29,5 +30,7 @@ data class ArenaSession(
     var currentWave: Int = 0,
     var barrierActive: Boolean = false,
     val startedWaves: MutableSet<Int> = mutableSetOf(),
-    val activeMobs: MutableSet<UUID> = mutableSetOf()
+    val activeMobs: MutableSet<UUID> = mutableSetOf(),
+    val waveMobCount: MutableMap<Int, Int> = mutableMapOf(),
+    val waveSpawnTasks: MutableMap<Int, BukkitTask> = mutableMapOf()
 )
