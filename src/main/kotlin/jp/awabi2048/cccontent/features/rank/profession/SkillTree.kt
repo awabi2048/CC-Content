@@ -80,6 +80,8 @@ interface SkillTree {
         }
 
         parents.filter { it in acquiredSkills }.forEach { parentId ->
+            val parentSkill = getSkill(parentId) ?: return@forEach
+            if (!parentSkill.exclusiveBranch) return@forEach
             val siblings = getChildren(parentId)
             if (siblings.size >= 2) {
                 val chosen = siblings.firstOrNull { it in acquiredSkills }

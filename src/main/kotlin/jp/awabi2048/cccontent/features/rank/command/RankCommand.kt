@@ -1580,6 +1580,8 @@ class RankCommand(
         }
 
         val blockedByBranch = acquiredParents.any { parentId ->
+            val parentSkill = skillTree.getSkill(parentId)
+            if (parentSkill?.exclusiveBranch != true) return@any false
             val siblings = skillTree.getChildren(parentId)
             if (siblings.size < 2) {
                 return@any false
@@ -1593,6 +1595,8 @@ class RankCommand(
         }
 
         val requiresChoiceConfirmation = acquiredParents.any { parentId ->
+            val parentSkill = skillTree.getSkill(parentId)
+            if (parentSkill?.exclusiveBranch != true) return@any false
             val siblings = skillTree.getChildren(parentId)
             siblings.size >= 2 && siblings.contains(skill.skillId) && siblings.none { it in holder.state.acquiredSkills }
         }
