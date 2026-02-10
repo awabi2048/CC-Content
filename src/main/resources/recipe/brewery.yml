@@ -1,1 +1,120 @@
-recipes: {}
+sample_ale:
+  name: "サンプルエール"
+  fermentation:
+    ingredients:
+      WHEAT: 3
+      SUGAR: 1
+    time: 180
+    heat: medium
+    particle_color: "#FFAA00"
+  distillation:
+    time: 45
+    filter_consumption: 1
+    runs: 3
+  aging:
+    time: 7
+    barrel_type:
+      - oak
+      - birch
+  output:
+    name:
+      - "濁ったエール"
+      - "エール"
+      - "極上エール"
+    description:
+      - "見た目は少しお粗末だが、味は悪くない"
+      - "バランスの取れた味わい"
+      - "芳醇な香りとまろやかな口当たり"
+    alchol: 5.0
+    color: "#FFA500"
+
+kelp_spirit:
+  name: "昆布スピリッツ"
+  fermentation:
+    ingredients:
+      DRIED_KELP: 2
+      SUGAR: 1
+      SWEET_BERRIES: 2
+    time: 240
+    heat: low
+    particle_color: "#00FF88"
+  distillation:
+    time: 60
+    filter_consumption: 2
+    runs: 4
+  aging:
+    time: 30
+    barrel_type:
+      - dark_oak
+      - spruce
+  output:
+    name:
+      - "粗悪な昆布酒"
+      - "昆布スピリッツ"
+      - "深海の雫"
+    description:
+      - "昆布の風味が強すぎる"
+      - "ほのかな海の香り"
+      - "深い旨味と滑らかな喉越し"
+    alchol: 45.0
+    color: "#8B4513"
+
+honey_mead:
+  name: "蜂蜜酒"
+  fermentation:
+    ingredients:
+      HONEYCOMB: 3
+      SUGAR: 1
+      APPLE: 1
+    time: 300
+    heat: medium
+    particle_color: "#FFD700"
+  distillation:
+    time: 50
+    filter_consumption: 1
+    runs: 2
+  aging:
+    time: 14
+    barrel_type:
+      - any
+  output:
+    name:
+      - "甘すぎる蜂蜜水"
+      - "蜂蜜酒"
+      - "黄金の蜜酒"
+    description:
+      - "甘さが強すぎて酒らしくない"
+      - "甘酸っぱい風味"
+      - "上品な甘さと華やかな香り"
+    alchol: 12.0
+    color: "#FFD700"
+
+blaze_whiskey:
+  name: "ブレイズウイスキー"
+  fermentation:
+    ingredients:
+      WHEAT: 4
+      NETHER_WART: 1
+      BLAZE_POWDER: 1
+    time: 360
+    heat: high
+    particle_color: "#FF4500"
+  distillation:
+    time: 90
+    filter_consumption: 3
+    runs: 5
+  aging:
+    time: 60
+    barrel_type:
+      - dark_oak
+  output:
+    name:
+      - "火傷しそうな酒"
+      - "ブレイズウイスキー"
+      - "業火の雫"
+    description:
+      - "喉が焼けるような刺激"
+      - "スモーキーで力強い味わい"
+      - "燃えるような余韻と深み"
+    alchol: 60.0
+    color: "#8B0000"
