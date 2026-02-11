@@ -285,6 +285,7 @@ class RankCommand(
 
         renderProfessionMainMenu(inventory, viewer, playerProfession)
         viewer.openInventory(inventory)
+        viewer.playSound(viewer.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
         return true
     }
 
@@ -1924,7 +1925,7 @@ class RankCommand(
         when (clickedSlot) {
             MAIN_MENU_SKILL_TREE_SLOT -> {
                 // スキルツリーを開く
-                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.0f)
+                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
                 openSkillTreeGui(player)
             }
             MAIN_MENU_PROFESSION_OVERVIEW_SLOT, MAIN_MENU_SETTINGS_SLOT, MAIN_MENU_PLAYER_INFO_SLOT, MAIN_MENU_HINT_SLOT -> {
