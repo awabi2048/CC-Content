@@ -73,6 +73,7 @@ class CCContent : JavaPlugin(), Listener {
     
     fun getMarkerManager(): MarkerManager = markerManager
     fun getItemManager(): ItemManager = itemManager
+    fun getRankManager(): RankManager? = rankManagerInstance
      
     override fun onEnable() {
         instance = this
