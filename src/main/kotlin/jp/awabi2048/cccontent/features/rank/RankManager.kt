@@ -111,4 +111,12 @@ interface RankManager {
      * タスク完了によるランクアップを実行
      */
     fun rankUpByTask(playerUuid: UUID): Boolean
+
+    fun isProfessionBossBarEnabled(playerUuid: UUID): Boolean
+
+    fun setProfessionBossBarEnabled(playerUuid: UUID, enabled: Boolean)
+
+    fun hideProfessionBossBar(playerUuid: UUID)
+
+    fun hideAllProfessionBossBars()
 }

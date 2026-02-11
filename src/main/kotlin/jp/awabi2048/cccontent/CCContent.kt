@@ -165,6 +165,7 @@ class CCContent : JavaPlugin(), Listener {
             val languageLoader = LanguageLoader(this, "ja_JP")
             val messageProvider = MessageProviderImpl(languageLoader)
             rankManager.setMessageProvider(messageProvider)
+            rankManager.initBossBarManager(this)
 
             // スキルツリーを登録
             registerSkillTrees()
@@ -202,6 +203,12 @@ class CCContent : JavaPlugin(), Listener {
             // /rankmenu コマンドを登録
             val rankMenuCommand = jp.awabi2048.cccontent.features.rank.command.RankMenuCommand(rankCommand)
             getCommand("rankmenu")?.setExecutor(rankMenuCommand)
+
+            // TutorialRankUpListenerを登録（rankCommandが必要なので後で登録）
+            server.pluginManager.registerEvents(
+                jp.awabi2048.cccontent.features.rank.listener.TutorialRankUpListener(rankManager, rankCommand),
+                this
+            )
 
             logger.info("ランクシステムが初期化されました")
         } catch (e: Exception) {
@@ -292,10 +299,6 @@ class CCContent : JavaPlugin(), Listener {
             )
             server.pluginManager.registerEvents(
                 TutorialPlayerExpListener(rankManager, taskChecker, taskLoader, storage),
-                this
-            )
-            server.pluginManager.registerEvents(
-                TutorialRankUpListener(),
                 this
             )
             
@@ -799,6 +802,7 @@ class CCContent : JavaPlugin(), Listener {
         BGMManager.stop(event.player)
         PlayerDataManager.unload(event.player)
         MenuCooldownManager.clearCooldown(event.player.uniqueId)
+        rankManagerInstance?.hideProfessionBossBar(event.player.uniqueId)
     }
     
     override fun onDisable() {
@@ -806,6 +810,7 @@ class CCContent : JavaPlugin(), Listener {
         try {
             UnlockBatchBreakHandler.stopAll()
             BlastMineHandler.stopAll()
+            rankManagerInstance?.hideAllProfessionBossBars()
             rankManagerInstance?.saveData()
             if (::breweryFeature.isInitialized) {
                 breweryFeature.shutdown()

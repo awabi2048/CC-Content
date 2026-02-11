@@ -88,4 +88,8 @@ interface ProfessionManager {
      * @return 成功した場合true
      */
     fun resetProfession(playerUuid: UUID): Boolean
+
+    fun isBossBarEnabled(playerUuid: UUID): Boolean
+
+    fun setBossBarEnabled(playerUuid: UUID, enabled: Boolean)
 }

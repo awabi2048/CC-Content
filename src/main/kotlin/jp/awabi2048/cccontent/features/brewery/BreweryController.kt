@@ -690,7 +690,8 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             return false
         }
 
-        if (profession.currentLevel < recipe.requiredSkillLevel) {
+        val currentLevel = rankManager?.getCurrentProfessionLevel(player.uniqueId) ?: 1
+        if (currentLevel < recipe.requiredSkillLevel) {
             player.sendMessage("§c必要職業レベル不足: Lv${recipe.requiredSkillLevel} が必要です。")
             return false
         }

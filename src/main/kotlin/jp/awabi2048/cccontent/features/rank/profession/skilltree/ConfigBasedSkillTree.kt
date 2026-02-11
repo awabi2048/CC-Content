@@ -23,6 +23,7 @@ class ConfigBasedSkillTree(
     private var maxLevel: Int = 100
     private var requiredTotalExpByLevel: List<Long> = listOf(0L)
     private var overviewIcon: String? = null
+    private var bossBarColor: String = "GREEN"
 
     init {
         loadFromConfig(configFile)
@@ -41,9 +42,10 @@ class ConfigBasedSkillTree(
             levelBase = levelSection.getDouble("base", 1.2).coerceAtLeast(1.0)
             maxLevel = levelSection.getInt("maxLevel", 100).coerceAtLeast(1)
             
-            // overviewIconを読み込み
+            // overviewIconとbossBarColorを読み込み
             val settingsSection = skillsSection.getConfigurationSection("settings")
             overviewIcon = settingsSection?.getString("overviewIcon")
+            bossBarColor = settingsSection?.getString("bossBarColor") ?: "GREEN"
 
             skills.clear()
             skillsSection.getKeys(false)
@@ -213,6 +215,8 @@ class ConfigBasedSkillTree(
     override fun getMaxLevel(): Int = maxLevel
 
     override fun getOverviewIcon(): String? = overviewIcon
+
+    override fun getBossBarColor(): String = bossBarColor
 
     override fun getRequiredTotalExpForLevel(level: Int): Long {
         val safeLevel = level.coerceIn(1, maxLevel)

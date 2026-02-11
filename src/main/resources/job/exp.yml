@@ -1,19 +1,36 @@
 miner:
+  coal_ore: 1
+  deepslate_coal_ore: 2
+  copper_ore: 3
+  deepslate_copper_ore: 5
+  iron_ore: 2
+  deepslate_iron_ore: 4
+  gold_ore: 5
+  deepslate_gold_ore: 10
+  redstone_ore: 4
+  deepslate_redstone_ore: 8
+  lapis_ore: 6
+  deepslate_lapis_ore: 12
   diamond_ore: 10
   deepslate_diamond_ore: 20
+  emerald_ore: 15
+  deepslate_emerald_ore: 30
+  nether_quartz_ore: 2
+  nether_gold_ore: 3
+  ancient_debris: 50
 
 lumberjack:
   oak_log: 2
   birch_log: 2
   spruce_log: 2
-  jungle_log: 2
-  acacia_log: 2
-  dark_oak_log: 2
-  mangrove_log: 2
-  cherry_log: 2
-  pale_oak_log: 2
-  crimson_stem: 2
-  warped_stem: 2
+  jungle_log: 3
+  acacia_log: 3
+  dark_oak_log: 3
+  mangrove_log: 3
+  cherry_log: 4
+  pale_oak_log: 3
+  crimson_stem: 3
+  warped_stem: 3
 
 brewer:
   mock_exp: 5

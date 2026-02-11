@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.rank.command
 
 import jp.awabi2048.cccontent.features.rank.RankManager
+import jp.awabi2048.cccontent.features.rank.listener.ProfessionSelector
 import jp.awabi2048.cccontent.features.rank.listener.TutorialInventoryHelper
 import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TaskProgress
@@ -38,7 +39,7 @@ class RankCommand(
     private val taskLoader: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader? = null,
     private val taskChecker: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskChecker? = null,
     private val translator: jp.awabi2048.cccontent.features.rank.tutorial.task.EntityBlockTranslator? = null
-) : CommandExecutor, TabCompleter, Listener {
+) : CommandExecutor, TabCompleter, Listener, ProfessionSelector {
     
     override fun onCommand(
         sender: CommandSender,
@@ -68,6 +69,7 @@ class RankCommand(
             "task-info" -> handleTaskInfo(sender, args)
             "task-reset" -> handleTaskReset(sender, args)
             "complete-task" -> handleCompleteTask(sender, args)
+            "bossbar" -> handleBossbar(sender, args)
             else -> {
                 sendUsage(sender)
                 false
@@ -229,6 +231,34 @@ class RankCommand(
         
         return success
     }
+
+    private fun handleBossbar(sender: CommandSender, args: Array<out String>): Boolean {
+        if (sender !is Player) {
+            sender.sendMessage("§cこのコマンドはプレイヤーのみ実行できます")
+            return false
+        }
+
+        if (args.size < 2) {
+            val currentState = if (rankManager.isProfessionBossBarEnabled(sender.uniqueId)) "有効" else "無効"
+            sender.sendMessage("§a職業経験値ボスバー: §f$currentState")
+            sender.sendMessage("§7使用法: /rank bossbar <on|off>")
+            return true
+        }
+
+        val enabled = when (args[1].lowercase()) {
+            "on", "true", "enable" -> true
+            "off", "false", "disable" -> false
+            else -> {
+                sender.sendMessage("§c使用法: /rank bossbar <on|off>")
+                return false
+            }
+        }
+
+        rankManager.setProfessionBossBarEnabled(sender.uniqueId, enabled)
+        val stateText = if (enabled) "有効" else "無効"
+        sender.sendMessage("§a職業経験値ボスバーを${stateText}にしました")
+        return true
+    }
     
     private fun handleInfo(sender: CommandSender, args: Array<out String>): Boolean {
         val targetPlayer = if (args.size >= 2) {
@@ -254,8 +284,9 @@ class RankCommand(
         
         val profession = rankManager.getPlayerProfession(uuid)
         if (profession != null) {
+            val currentLevel = rankManager.getCurrentProfessionLevel(uuid)
             sender.sendMessage("§a職業: ${profession.profession.id}")
-            sender.sendMessage("§a職業レベル: ${profession.currentLevel}")
+            sender.sendMessage("§a職業レベル: $currentLevel")
             sender.sendMessage("§a習得スキル: ${profession.acquiredSkills.joinToString(", ")}")
             sender.sendMessage("§a職業経験値: ${profession.currentExp}")
         } else {
@@ -271,8 +302,8 @@ class RankCommand(
     fun openProfessionMainMenu(viewer: Player): Boolean {
         val playerProfession = rankManager.getPlayerProfession(viewer.uniqueId)
         if (playerProfession == null) {
-            viewer.sendMessage(messageProvider.getMessage("rank.skill.gui.no_profession"))
-            return false
+            // 職業未選択の場合は職業選択GUIを開く
+            return openProfessionSelectionGui(viewer)
         }
 
         val holder = ProfessionMainMenuGuiHolder()
@@ -289,6 +320,65 @@ class RankCommand(
         return true
     }
 
+    /**
+     * 職業選択GUIを開く（ATTAINER到達時用）
+     */
+    override fun openProfessionSelectionGui(player: Player): Boolean {
+        if (rankManager.hasProfession(player.uniqueId)) {
+            return false
+        }
+
+        val holder = ProfessionSelectionGuiHolder()
+        val inventory = Bukkit.createInventory(
+            holder,
+            27,
+            "§8職業を選択してください"
+        )
+        holder.backingInventory = inventory
+
+        renderProfessionSelectionGui(inventory, player)
+        player.openInventory(inventory)
+        player.playSound(player.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
+        return true
+    }
+
+    private fun renderProfessionSelectionGui(inventory: Inventory, viewer: Player) {
+        val basePane = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
+        
+        for (slot in 0 until inventory.size) {
+            inventory.setItem(slot, basePane)
+        }
+
+        val professions = Profession.values().filter { it != Profession.COOK }
+        val slots = listOf(11, 13, 15)
+        
+        professions.forEachIndexed { index, profession ->
+            val slot = slots.getOrNull(index) ?: return@forEachIndexed
+            val professionName = messageProvider.getProfessionName(profession)
+            val professionDesc = messageProvider.getProfessionDescription(profession)
+            val skillTree = SkillTreeRegistry.getSkillTree(profession)
+            val startSkill = skillTree?.getStartSkillId()?.let { skillTree.getSkill(it) }
+            
+            val icon = startSkill?.icon?.let { Material.matchMaterial(it.uppercase()) } ?: Material.BOOK
+            
+            val item = createGuiItem(
+                icon,
+                toComponent("§a$professionName"),
+                listOf(
+                    toComponent("§7$professionDesc"),
+                    toComponent(""),
+                    toComponent("§e§nクリックで選択")
+                )
+            )
+            inventory.setItem(slot, item)
+        }
+    }
+
+    private class ProfessionSelectionGuiHolder : InventoryHolder {
+        lateinit var backingInventory: Inventory
+        override fun getInventory(): Inventory = backingInventory
+    }
+
     private fun renderProfessionMainMenu(
         inventory: Inventory,
         viewer: Player,
@@ -297,11 +387,9 @@ class RankCommand(
         val headerFooterPane = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
         val basePane = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
 
-        // 背景を設定
         for (slot in 0 until inventory.size) {
             inventory.setItem(slot, basePane)
         }
-        // ヘッダー（0-8）とフッター（36-44）はBLACK
         for (slot in 0..8) {
             inventory.setItem(slot, headerFooterPane)
         }
@@ -309,7 +397,6 @@ class RankCommand(
             inventory.setItem(slot, headerFooterPane)
         }
 
-        // スキルツリーアイコン (スロット20)
         val skillTreeItem = createGuiItem(
             Material.OAK_SAPLING,
             toComponent("§aスキルツリー"),
@@ -322,10 +409,22 @@ class RankCommand(
         )
         inventory.setItem(MAIN_MENU_SKILL_TREE_SLOT, skillTreeItem)
 
-        // 現在の職業の概要アイコン (スロット22)
+        val currentLevel = rankManager.getCurrentProfessionLevel(viewer.uniqueId)
         val professionName = messageProvider.getProfessionName(playerProfession.profession)
         val professionDescription = messageProvider.getProfessionDescription(playerProfession.profession)
-        val requiredExp = calculateRequiredExp(playerProfession.profession, playerProfession.currentLevel)
+        
+        // ボスバー側と同じ計算方法で経験値を表示
+        val skillTree = SkillTreeRegistry.getSkillTree(playerProfession.profession)
+        val currentExp = playerProfession.currentExp
+        val requiredTotalExp = skillTree?.getRequiredTotalExpForLevel(currentLevel + 1) ?: 0L
+        val previousLevelExp = skillTree?.getRequiredTotalExpForLevel(currentLevel) ?: 0L
+        val currentLevelExp = currentExp - previousLevelExp
+        val levelExp = if (currentLevel >= (skillTree?.getMaxLevel() ?: 50)) {
+            currentLevelExp
+        } else {
+            requiredTotalExp - previousLevelExp
+        }
+        
         val professionIcon = getProfessionOverviewIcon(playerProfession.profession)
         
         val professionOverviewItem = createGuiItem(
@@ -335,14 +434,13 @@ class RankCommand(
                 toComponent(BAR),
                 toComponent("§7$professionDescription"),
                 toComponent(BAR),
-                toComponent("§f§l| §7Lv. §e§l${playerProfession.currentLevel}"),
-                toComponent("§f§l| §7経験値 §a${playerProfession.currentExp}§7/$requiredExp"),
+                toComponent("§f§l| §7Lv. §e§l$currentLevel"),
+                toComponent("§f§l| §7経験値 §a$currentLevelExp§7/$levelExp"),
                 toComponent(BAR)
             )
         )
         inventory.setItem(MAIN_MENU_PROFESSION_OVERVIEW_SLOT, professionOverviewItem)
 
-        // 設定アイコン (スロット24) - モック実装
         val settingsItem = createGuiItem(
             Material.COMPARATOR,
             toComponent("§7設定"),
@@ -443,11 +541,12 @@ class RankCommand(
             return false
         }
 
+        val currentLevel = rankManager.getCurrentProfessionLevel(viewer.uniqueId)
         val state = SkillTreeGuiState(
             profession = playerProfession.profession,
             selectedSkillId = selectedSkill.skillId,
             acquiredSkills = playerProfession.acquiredSkills.toSet(),
-            currentLevel = playerProfession.currentLevel,
+            currentLevel = currentLevel,
             currentExp = playerProfession.currentExp
         )
         state.laneBySkillId[selectedSkill.skillId] = SkillTreeLane.CENTER
@@ -1707,7 +1806,7 @@ class RankCommand(
             return
         }
         holder.state.acquiredSkills = latestProfession.acquiredSkills.toSet()
-        holder.state.currentLevel = latestProfession.currentLevel
+        holder.state.currentLevel = rankManager.getCurrentProfessionLevel(viewer.uniqueId)
         holder.state.currentExp = latestProfession.currentExp
 
         val skillTree = SkillTreeRegistry.getSkillTree(holder.state.profession) ?: return
@@ -1798,7 +1897,7 @@ class RankCommand(
         val updatedProfession = rankManager.getPlayerProfession(viewer.uniqueId)
         if (updatedProfession != null) {
             holder.state.acquiredSkills = updatedProfession.acquiredSkills.toSet()
-            holder.state.currentLevel = updatedProfession.currentLevel
+            holder.state.currentLevel = rankManager.getCurrentProfessionLevel(viewer.uniqueId)
             holder.state.currentExp = updatedProfession.currentExp
         }
 
@@ -1937,6 +2036,42 @@ class RankCommand(
     @EventHandler
     fun onProfessionMainMenuDrag(event: InventoryDragEvent) {
         if (event.view.topInventory.holder !is ProfessionMainMenuGuiHolder) {
+            return
+        }
+        event.isCancelled = true
+    }
+
+    @EventHandler
+    fun onProfessionSelectionGuiClick(event: InventoryClickEvent) {
+        val holder = event.view.topInventory.holder as? ProfessionSelectionGuiHolder ?: return
+        event.isCancelled = true
+
+        val clickedSlot = event.rawSlot
+        if (clickedSlot !in 0 until event.view.topInventory.size) {
+            return
+        }
+
+        val player = event.whoClicked as? Player ?: return
+        
+        val professions = Profession.values().filter { it != Profession.COOK }
+        val slots = listOf(11, 13, 15)
+        
+        val selectedProfession = professions.getOrNull(slots.indexOf(clickedSlot)) ?: return
+        
+        val success = rankManager.selectProfession(player.uniqueId, selectedProfession)
+        if (success) {
+            player.sendMessage("§a${messageProvider.getProfessionName(selectedProfession)} を選択しました！")
+            player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f)
+            player.closeInventory()
+        } else {
+            player.sendMessage("§c職業の選択に失敗しました")
+            player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
+        }
+    }
+
+    @EventHandler
+    fun onProfessionSelectionGuiDrag(event: InventoryDragEvent) {
+        if (event.view.topInventory.holder !is ProfessionSelectionGuiHolder) {
             return
         }
         event.isCancelled = true
@@ -2165,6 +2300,7 @@ class RankCommand(
         sender.sendMessage("§a/rank task-info <player> §7- タスク進捗を表示")
         sender.sendMessage("§a/rank task-reset <player> §7- タスク進捗をリセット")
         sender.sendMessage("§a/rank complete-task <player> §7- タスクをすべて完了扱いに")
+        sender.sendMessage("§a/rank bossbar <on|off> §7- 経験値ボスバーの表示切替")
     }
     
     override fun onTabComplete(
@@ -2174,8 +2310,10 @@ class RankCommand(
         args: Array<out String>
     ): List<String> {
         return when {
-            args.size == 1 -> listOf("add-exp", "set-prof-level", "rankup", "profession", "skill", "reset", "info", "task-info", "task-reset", "complete-task")
+            args.size == 1 -> listOf("add-exp", "set-prof-level", "rankup", "profession", "skill", "reset", "info", "task-info", "task-reset", "complete-task", "bossbar")
                 .filter { it.startsWith(args[0].lowercase()) }
+            args.size == 2 && args[0].equals("bossbar", ignoreCase = true) ->
+                listOf("on", "off").filter { it.startsWith(args[1].lowercase()) }
             args.size == 2 -> Bukkit.getOnlinePlayers().map { it.name }
                 .filter { it.startsWith(args[1], ignoreCase = true) }
             args.size == 3 && args[0].equals("profession", ignoreCase = true) -> 

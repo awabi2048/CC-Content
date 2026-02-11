@@ -49,7 +49,6 @@ class ProfessionManagerImpl(
             playerUuid = playerUuid,
             profession = profession,
             acquiredSkills = mutableSetOf(startSkillId),
-            currentLevel = 1,
             currentExp = 0L
         )
 
@@ -79,7 +78,6 @@ class ProfessionManagerImpl(
             playerUuid = playerUuid,
             profession = profession,
             acquiredSkills = mutableSetOf(startSkillId),
-            currentLevel = 1,
             currentExp = 0L
         )
 
@@ -102,13 +100,10 @@ class ProfessionManagerImpl(
 
         val prof = getPlayerProfession(playerUuid) ?: return false
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
-        val oldLevel = prof.currentLevel
+        val oldLevel = skillTree.calculateLevelByExp(prof.currentExp)
 
         prof.addExperience(amount)
         val newLevel = skillTree.calculateLevelByExp(prof.currentExp)
-        if (newLevel > oldLevel) {
-            prof.currentLevel = newLevel
-        }
 
         storage.saveProfession(prof)
 
@@ -143,8 +138,9 @@ class ProfessionManagerImpl(
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
         val normalizedSkillId = resolveSkillId(skillTree.getAllSkills().keys, skillId)
         val skill = skillTree.getSkill(normalizedSkillId) ?: return false
+        val currentLevel = skillTree.calculateLevelByExp(prof.currentExp)
 
-        if (!skillTree.canAcquire(skill.skillId, prof.acquiredSkills, prof.currentLevel)) {
+        if (!skillTree.canAcquire(skill.skillId, prof.acquiredSkills, currentLevel)) {
             return false
         }
 
@@ -168,7 +164,8 @@ class ProfessionManagerImpl(
     override fun getAvailableSkills(playerUuid: UUID): List<String> {
         val prof = getPlayerProfession(playerUuid) ?: return emptyList()
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return emptyList()
-        return skillTree.getAvailableSkills(prof.acquiredSkills, prof.currentLevel)
+        val currentLevel = skillTree.calculateLevelByExp(prof.currentExp)
+        return skillTree.getAvailableSkills(prof.acquiredSkills, currentLevel)
     }
 
     override fun getAcquiredSkills(playerUuid: UUID): Set<String> {
@@ -180,7 +177,9 @@ class ProfessionManagerImpl(
     }
 
     override fun getCurrentLevel(playerUuid: UUID): Int {
-        return getPlayerProfession(playerUuid)?.currentLevel ?: 1
+        val prof = getPlayerProfession(playerUuid) ?: return 1
+        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return 1
+        return skillTree.calculateLevelByExp(prof.currentExp)
     }
 
     override fun setLevel(playerUuid: UUID, level: Int): Boolean {
@@ -188,7 +187,6 @@ class ProfessionManagerImpl(
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
 
         val clampedLevel = level.coerceIn(1, skillTree.getMaxLevel())
-        prof.currentLevel = clampedLevel
         prof.currentExp = skillTree.getRequiredTotalExpForLevel(clampedLevel)
         prof.lastUpdated = System.currentTimeMillis()
         storage.saveProfession(prof)
@@ -202,6 +200,17 @@ class ProfessionManagerImpl(
         professionCache.remove(playerUuid)
         storage.deleteProfession(playerUuid)
         return true
+    }
+
+    override fun isBossBarEnabled(playerUuid: UUID): Boolean {
+        return getPlayerProfession(playerUuid)?.bossBarEnabled ?: true
+    }
+
+    override fun setBossBarEnabled(playerUuid: UUID, enabled: Boolean) {
+        val prof = getPlayerProfession(playerUuid) ?: return
+        prof.bossBarEnabled = enabled
+        prof.lastUpdated = System.currentTimeMillis()
+        storage.saveProfession(prof)
     }
 
     fun saveData() {

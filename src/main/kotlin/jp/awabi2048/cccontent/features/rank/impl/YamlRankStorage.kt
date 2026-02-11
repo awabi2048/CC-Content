@@ -145,14 +145,13 @@ class YamlRankStorage(
         val file = File(playerdataDirectory, "${profession.playerUuid}.yml")
         val config = if (file.exists()) YamlConfiguration.loadConfiguration(file) else YamlConfiguration()
         
-        // "rank.profession"セクションを作成または更新
         val professionSection = config.getConfigurationSection("rank.profession")
             ?: config.createSection("rank.profession")
         professionSection.set("profession", profession.profession.id)
         professionSection.set("acquiredSkills", profession.acquiredSkills.toList())
-        professionSection.set("currentLevel", profession.currentLevel)
         professionSection.set("currentExp", profession.currentExp)
         professionSection.set("lastUpdated", profession.lastUpdated)
+        professionSection.set("bossBarEnabled", profession.bossBarEnabled)
         
         try {
             config.save(file)
@@ -173,17 +172,17 @@ class YamlRankStorage(
             val profession = Profession.fromId(professionId) ?: return null
             
             val acquiredSkills = professionSection.getStringList("acquiredSkills").toMutableSet()
-            val currentLevel = professionSection.getInt("currentLevel", 1)
             val currentExp = professionSection.getLong("currentExp", 0L)
             val lastUpdated = professionSection.getLong("lastUpdated", System.currentTimeMillis())
+            val bossBarEnabled = professionSection.getBoolean("bossBarEnabled", true)
             
             PlayerProfession(
                 playerUuid,
                 profession,
                 acquiredSkills,
-                currentLevel,
                 currentExp,
-                lastUpdated
+                lastUpdated,
+                bossBarEnabled
             )
         } catch (e: Exception) {
             e.printStackTrace()

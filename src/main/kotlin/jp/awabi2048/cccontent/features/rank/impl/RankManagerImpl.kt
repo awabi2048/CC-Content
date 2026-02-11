@@ -6,11 +6,11 @@ import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
 import jp.awabi2048.cccontent.features.rank.tutorial.PlayerTutorialRank
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
+import jp.awabi2048.cccontent.features.rank.profession.ProfessionBossBarManager
+import org.bukkit.Bukkit
+import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
 
-/**
- * ランクシステムの統合実装
- */
 class RankManagerImpl(
     private val storage: RankStorage,
     private var messageProvider: jp.awabi2048.cccontent.features.rank.localization.MessageProvider? = null
@@ -18,18 +18,19 @@ class RankManagerImpl(
     
     private val tutorialManager = TutorialRankManagerImpl(storage)
     private var professionManager: ProfessionManagerImpl? = null
+    private var bossBarManager: ProfessionBossBarManager? = null
     
-    /**
-     * MessageProviderを設定して、ProfessionManagerを初期化
-     */
     fun setMessageProvider(provider: jp.awabi2048.cccontent.features.rank.localization.MessageProvider) {
         this.messageProvider = provider
         this.professionManager = ProfessionManagerImpl(storage, provider)
     }
     
-    /**
-     * ProfessionManagerを取得（初期化済みか確認）
-     */
+    fun initBossBarManager(plugin: JavaPlugin) {
+        val pm = professionManager ?: return
+        val mp = messageProvider ?: return
+        this.bossBarManager = ProfessionBossBarManager(plugin, pm, mp)
+    }
+    
     private fun getProfessionManager(): ProfessionManagerImpl {
         return professionManager ?: throw IllegalStateException("ProfessionManager is not initialized. Call setMessageProvider first.")
     }
@@ -71,7 +72,14 @@ class RankManagerImpl(
     }
     
     override fun addProfessionExp(playerUuid: UUID, amount: Long): Boolean {
-        return getProfessionManager().addExperience(playerUuid, amount)
+        val result = getProfessionManager().addExperience(playerUuid, amount)
+        if (result) {
+            val player = Bukkit.getPlayer(playerUuid)
+            if (player != null) {
+                bossBarManager?.showExpGain(player, amount)
+            }
+        }
+        return result
     }
     
     override fun acquireSkill(playerUuid: UUID, skillId: String): Boolean {
@@ -114,5 +122,21 @@ class RankManagerImpl(
     
     override fun rankUpByTask(playerUuid: UUID): Boolean {
         return tutorialManager.rankUpByTask(playerUuid)
+    }
+
+    override fun isProfessionBossBarEnabled(playerUuid: UUID): Boolean {
+        return getProfessionManager().isBossBarEnabled(playerUuid)
+    }
+
+    override fun setProfessionBossBarEnabled(playerUuid: UUID, enabled: Boolean) {
+        getProfessionManager().setBossBarEnabled(playerUuid, enabled)
+    }
+
+    override fun hideProfessionBossBar(playerUuid: UUID) {
+        bossBarManager?.hideBossBar(playerUuid)
+    }
+
+    override fun hideAllProfessionBossBars() {
+        bossBarManager?.hideAll()
     }
 }

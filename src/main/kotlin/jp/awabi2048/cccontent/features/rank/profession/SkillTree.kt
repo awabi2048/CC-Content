@@ -54,6 +54,11 @@ interface SkillTree {
     fun getOverviewIcon(): String? = null
 
     /**
+     * ボスバーの色を取得（設定がなければGREEN）
+     */
+    fun getBossBarColor(): String = "GREEN"
+
+    /**
      * 指定レベルでのレベルアップに必要な経験値を取得
      */
     fun getRequiredExpForLevel(level: Int): Long {
