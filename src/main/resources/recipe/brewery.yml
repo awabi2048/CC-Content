@@ -1,9 +1,12 @@
 sample_ale:
   name: "サンプルエール"
+  required_skill_level: 2
+  required_skills:
+    - "skill1"
   fermentation:
     ingredients:
-      WHEAT: 3
-      SUGAR: 1
+      grain_wheat: 3
+      sweetener: 1
     time: 180
     heat: medium
     particle_color: "#FFAA00"
@@ -16,25 +19,32 @@ sample_ale:
     barrel_type:
       - oak
       - birch
-  output:
+  middle_output:
+    name: "若いエール原液"
+    description: "発酵直後の若い原液。蒸留を通すと香りが安定する。"
+    color: "#E3B84B"
+  final_output:
     name:
-      - "濁ったエール"
+      - "荒削りエール"
       - "エール"
       - "極上エール"
     description:
-      - "見た目は少しお粗末だが、味は悪くない"
-      - "バランスの取れた味わい"
-      - "芳醇な香りとまろやかな口当たり"
+      - "雑味がやや残るが飲める品質。"
+      - "香りと甘みのバランスが良い。"
+      - "麦の余韻が長く続く逸品。"
     alchol: 5.0
-    color: "#FFA500"
+    color: "#D98B2B"
 
 kelp_spirit:
   name: "昆布スピリッツ"
+  required_skill_level: 4
+  required_skills:
+    - "skill2"
   fermentation:
     ingredients:
-      DRIED_KELP: 2
-      SUGAR: 1
-      SWEET_BERRIES: 2
+      kelp_base: 2
+      sweetener: 1
+      berry_note: 2
     time: 240
     heat: low
     particle_color: "#00FF88"
@@ -47,25 +57,32 @@ kelp_spirit:
     barrel_type:
       - dark_oak
       - spruce
-  output:
+  middle_output:
+    name: "昆布蒸留前原液"
+    description: "海藻由来の香りが強い。熟成で角が取れる。"
+    color: "#4E9C73"
+  final_output:
     name:
       - "粗悪な昆布酒"
       - "昆布スピリッツ"
       - "深海の雫"
     description:
-      - "昆布の風味が強すぎる"
-      - "ほのかな海の香り"
-      - "深い旨味と滑らかな喉越し"
+      - "塩気が強く荒い口当たり。"
+      - "海の香りと甘みが調和した味。"
+      - "深い旨味と滑らかな余韻を持つ。"
     alchol: 45.0
-    color: "#8B4513"
+    color: "#3D7252"
 
 honey_mead:
   name: "蜂蜜酒"
+  required_skill_level: 3
+  required_skills:
+    - "skill1"
   fermentation:
     ingredients:
-      HONEYCOMB: 3
-      SUGAR: 1
-      APPLE: 1
+      honey_source: 3
+      sweetener: 1
+      fruit_apple: 1
     time: 300
     heat: medium
     particle_color: "#FFD700"
@@ -75,27 +92,34 @@ honey_mead:
     runs: 2
   aging:
     time: 14
-    barrel_type:
-      - any
-  output:
+    barrel_type: any
+  middle_output:
+    name: "ミード原液"
+    description: "蜂蜜香が前面に出た甘い中間生成物。"
+    color: "#F4CA54"
+  final_output:
     name:
       - "甘すぎる蜂蜜水"
       - "蜂蜜酒"
       - "黄金の蜜酒"
     description:
-      - "甘さが強すぎて酒らしくない"
-      - "甘酸っぱい風味"
-      - "上品な甘さと華やかな香り"
+      - "甘みが勝ちすぎて輪郭が弱い。"
+      - "柔らかな甘みと酸味が共存する。"
+      - "華やかな香りと上品な余韻が続く。"
     alchol: 12.0
-    color: "#FFD700"
+    color: "#F2B43A"
 
 blaze_whiskey:
   name: "ブレイズウイスキー"
+  required_skill_level: 6
+  required_skills:
+    - "skill4"
+    - "skill5"
   fermentation:
     ingredients:
-      WHEAT: 4
-      NETHER_WART: 1
-      BLAZE_POWDER: 1
+      grain_wheat: 4
+      wart_herb: 1
+      blaze_essence: 1
     time: 360
     heat: high
     particle_color: "#FF4500"
@@ -107,14 +131,18 @@ blaze_whiskey:
     time: 60
     barrel_type:
       - dark_oak
-  output:
+  middle_output:
+    name: "烈火原酒"
+    description: "刺激が強い危険な中間生成物。"
+    color: "#B24A2A"
+  final_output:
     name:
       - "火傷しそうな酒"
       - "ブレイズウイスキー"
       - "業火の雫"
     description:
-      - "喉が焼けるような刺激"
-      - "スモーキーで力強い味わい"
-      - "燃えるような余韻と深み"
+      - "刺激が強すぎて雑味が目立つ。"
+      - "スモーキーで力強い味わい。"
+      - "深いコクと燃えるような余韻を持つ。"
     alchol: 60.0
-    color: "#8B0000"
+    color: "#8B2E1B"

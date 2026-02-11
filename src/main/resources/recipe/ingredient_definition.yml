@@ -1,1 +1,35 @@
-ingredients: {}
+ingredients:
+  grain_wheat:
+    material: WHEAT
+    item_name_contains: "麦"
+
+  sweetener:
+    materials:
+      - SUGAR
+      - HONEY_BOTTLE
+    item_name_contains: "砂糖"
+
+  kelp_base:
+    materials:
+      - DRIED_KELP
+      - KELP
+
+  berry_note:
+    materials:
+      - SWEET_BERRIES
+
+  honey_source:
+    materials:
+      - HONEYCOMB
+
+  fruit_apple:
+    materials:
+      - APPLE
+
+  wart_herb:
+    materials:
+      - NETHER_WART
+
+  blaze_essence:
+    materials:
+      - BLAZE_POWDER

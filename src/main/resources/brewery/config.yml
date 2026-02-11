@@ -38,3 +38,6 @@ settings:
     real_seconds_per_year: 1200
     angel_share_percent_per_year: 2.0
     small_barrel_speed_multiplier: 1.25
+
+  debug:
+    quality_log: true

@@ -9,9 +9,6 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataContainer
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
-import org.bukkit.potion.PotionEffect
-import org.bukkit.potion.PotionEffectType
-import org.bukkit.potion.PotionType
 import kotlin.math.roundToInt
 
 class BreweryItemCodec(private val plugin: JavaPlugin) {
@@ -47,27 +44,26 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     fun createFermentedBottle(recipeId: String, quality: Double, muddy: Boolean, history: String, recipe: BreweryRecipe?): ItemStack {
         val item = ItemStack(Material.POTION)
         val meta = item.itemMeta ?: return item
-        
+
         val displayName = if (recipe != null) {
-            if (muddy) "§7泥状の${recipe.name}" else "§b${getNameByQuality(recipe, quality)}"
+            if (muddy) "§7泥状の${recipe.name}" else "§b${recipe.middleOutputName}"
         } else {
             if (muddy) "§7泥状の醸造物" else "§b発酵醸造物"
         }
         meta.setDisplayName(displayName)
-        
+
         val loreDesc = if (recipe != null && !muddy) {
-            getDescriptionByQuality(recipe, quality)
+            recipe.middleOutputDescription
         } else ""
-        
+
         meta.lore(
             listOf(
                 net.kyori.adventure.text.Component.text("§7レシピ: ${recipe?.name ?: recipeId}"),
-                net.kyori.adventure.text.Component.text("§7品質: ${"%.1f".format(quality)}"),
                 net.kyori.adventure.text.Component.text("§7段階: 発酵"),
                 net.kyori.adventure.text.Component.text("§f$loreDesc")
             ).filter { it != net.kyori.adventure.text.Component.text("§f") }
         )
-        
+
         val pdc = meta.persistentDataContainer
         pdc.set(stageKey, PersistentDataType.STRING, if (muddy) BrewStage.FAILED.name else BrewStage.FERMENTED.name)
         pdc.set(recipeIdKey, PersistentDataType.STRING, recipeId)
@@ -78,31 +74,31 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         pdc.set(ambiguousKey, PersistentDataType.BYTE, 0)
         pdc.set(historyKey, PersistentDataType.STRING, history)
         pdc.set(finalStarsKey, PersistentDataType.INTEGER, 0)
-        
-        if (recipe != null && recipe.outputColor != null && !muddy) {
-            applyPotionColor(meta, recipe.outputColor)
+
+        if (recipe != null && recipe.middleOutputColor != null && !muddy) {
+            applyPotionColor(meta, recipe.middleOutputColor)
         }
-        
+
         item.itemMeta = meta
         return item
     }
 
-    private fun getNameByQuality(recipe: BreweryRecipe, quality: Double): String {
+    private fun getFinalNameByQuality(recipe: BreweryRecipe, quality: Double): String {
         val index = when {
             quality < 34 -> 0
             quality < 67 -> 1
             else -> 2
         }
-        return recipe.outputNames.getOrElse(index) { recipe.name }
+        return recipe.finalOutputNames.getOrElse(index) { recipe.name }
     }
 
-    private fun getDescriptionByQuality(recipe: BreweryRecipe, quality: Double): String {
+    private fun getFinalDescriptionByQuality(recipe: BreweryRecipe, quality: Double): String {
         val index = when {
             quality < 34 -> 0
             quality < 67 -> 1
             else -> 2
         }
-        return recipe.outputDescriptions.getOrElse(index) { "" }
+        return recipe.finalOutputDescriptions.getOrElse(index) { "" }
     }
 
     private fun applyPotionColor(meta: org.bukkit.inventory.meta.ItemMeta, colorHex: String) {
@@ -159,30 +155,32 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         val over = (state.distillCount - targetDistillCount).coerceAtLeast(0)
         val quality = (state.quality - over * overPenalty).coerceIn(0.0, 100.0)
         val ambiguous = state.distillCount != targetDistillCount
-        pdc.set(stageKey, PersistentDataType.STRING, if (ambiguous) BrewStage.FAILED.name else BrewStage.DISTILLED.name)
+        pdc.set(stageKey, PersistentDataType.STRING, BrewStage.DISTILLED.name)
         pdc.set(qualityKey, PersistentDataType.DOUBLE, quality)
         pdc.set(ambiguousKey, PersistentDataType.BYTE, if (ambiguous) 1 else 0)
-        
+
         val displayName = if (recipe != null) {
-            val name = getNameByQuality(recipe, quality)
-            if (ambiguous) "§8曖昧な$name" else "§e$name"
+            val name = getFinalNameByQuality(recipe, quality)
+            if (ambiguous) "§e$name（品質低下）" else "§e$name"
         } else {
-            if (ambiguous) "§8曖昧な蒸留物" else "§e蒸留済み醸造物"
+            if (ambiguous) "§e蒸留済み醸造物（品質低下）" else "§e蒸留済み醸造物"
         }
         meta.setDisplayName(displayName)
+        val description = if (recipe != null) getFinalDescriptionByQuality(recipe, quality) else ""
         meta.lore(
-            listOf(
+            listOfNotNull(
                 net.kyori.adventure.text.Component.text("§7レシピ: ${recipe?.name ?: state.recipeId}"),
                 net.kyori.adventure.text.Component.text("§7品質: ${"%.1f".format(quality)}"),
                 net.kyori.adventure.text.Component.text("§7蒸留回数: ${state.distillCount}/$targetDistillCount"),
-                net.kyori.adventure.text.Component.text("§7アルコール: ${"%.1f".format(state.alcohol)}%")
+                net.kyori.adventure.text.Component.text("§7アルコール: ${"%.1f".format(state.alcohol)}%"),
+                if (description.isNotBlank()) net.kyori.adventure.text.Component.text("§f$description") else null
             )
         )
-        
-        if (recipe != null && recipe.outputColor != null && !ambiguous) {
-            applyPotionColor(meta, recipe.outputColor)
+
+        if (recipe != null && recipe.finalOutputColor != null) {
+            applyPotionColor(meta, recipe.finalOutputColor)
         }
-        
+
         item.itemMeta = meta
     }
 
@@ -228,15 +226,15 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         pdc.set(finalStarsKey, PersistentDataType.INTEGER, stars)
         
         val displayName = if (recipe != null) {
-            val name = getNameByQuality(recipe, finalQuality)
+            val name = getFinalNameByQuality(recipe, finalQuality)
             "§6$name ${"★".repeat(stars)}"
         } else {
             "§6熟成酒 ${"★".repeat(stars)}"
         }
         meta.setDisplayName(displayName)
-        
+
         val desc = if (recipe != null) {
-            getDescriptionByQuality(recipe, finalQuality)
+            getFinalDescriptionByQuality(recipe, finalQuality)
         } else ""
         
         val loreList = mutableListOf(
@@ -250,8 +248,8 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         }
         meta.lore(loreList)
         
-        if (recipe != null && recipe.outputColor != null) {
-            applyPotionColor(meta, recipe.outputColor)
+        if (recipe != null && recipe.finalOutputColor != null) {
+            applyPotionColor(meta, recipe.finalOutputColor)
         }
         
         item.itemMeta = meta
