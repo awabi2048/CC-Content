@@ -49,6 +49,18 @@ interface SkillTree {
     fun getMaxLevel(): Int
 
     /**
+     * 職業概要アイコンを取得（設定がなければnull）
+     */
+    fun getOverviewIcon(): String? = null
+
+    /**
+     * 指定レベルでのレベルアップに必要な経験値を取得
+     */
+    fun getRequiredExpForLevel(level: Int): Long {
+        return getExpToNextLevel(level)
+    }
+
+    /**
      * 指定スキルから派生する子スキル一覧を取得
      */
     fun getChildren(skillId: String): List<String> {

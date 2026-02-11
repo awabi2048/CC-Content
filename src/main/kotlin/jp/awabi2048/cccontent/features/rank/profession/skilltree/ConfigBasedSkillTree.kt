@@ -22,6 +22,7 @@ class ConfigBasedSkillTree(
     private var levelBase: Double = 1.2
     private var maxLevel: Int = 100
     private var requiredTotalExpByLevel: List<Long> = listOf(0L)
+    private var overviewIcon: String? = null
 
     init {
         loadFromConfig(configFile)
@@ -39,6 +40,10 @@ class ConfigBasedSkillTree(
             levelInitialExp = levelSection.getLong("initialExp", 100L).coerceAtLeast(1L)
             levelBase = levelSection.getDouble("base", 1.2).coerceAtLeast(1.0)
             maxLevel = levelSection.getInt("maxLevel", 100).coerceAtLeast(1)
+            
+            // overviewIconを読み込み
+            val settingsSection = skillsSection.getConfigurationSection("settings")
+            overviewIcon = settingsSection?.getString("overviewIcon")
 
             skills.clear()
             skillsSection.getKeys(false)
@@ -206,6 +211,8 @@ class ConfigBasedSkillTree(
     override fun getLevelBase(): Double = levelBase
 
     override fun getMaxLevel(): Int = maxLevel
+
+    override fun getOverviewIcon(): String? = overviewIcon
 
     override fun getRequiredTotalExpForLevel(level: Int): Long {
         val safeLevel = level.coerceIn(1, maxLevel)

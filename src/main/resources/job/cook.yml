@@ -5,6 +5,7 @@ skills:
       initialExp: 100
       base: 1.25
       maxLevel: 50
+    overviewIcon: "FURNACE"
 
   skill0:
     nameKey: "skill.cook.skill0.name"

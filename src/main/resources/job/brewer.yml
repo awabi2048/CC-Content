@@ -5,6 +5,7 @@ skills:
       initialExp: 100
       base: 1.25
       maxLevel: 50
+    overviewIcon: "BREWING_STAND"
 
   skill0:
     nameKey: "skill.brewer.skill0.name"

@@ -265,6 +265,158 @@ class RankCommand(
         return true
     }
 
+    /**
+     * 職業メインメニューを開く
+     */
+    fun openProfessionMainMenu(viewer: Player): Boolean {
+        val playerProfession = rankManager.getPlayerProfession(viewer.uniqueId)
+        if (playerProfession == null) {
+            viewer.sendMessage(messageProvider.getMessage("rank.skill.gui.no_profession"))
+            return false
+        }
+
+        val holder = ProfessionMainMenuGuiHolder()
+        val inventory = Bukkit.createInventory(
+            holder,
+            45,
+            "§8職業メインメニュー"
+        )
+        holder.backingInventory = inventory
+
+        renderProfessionMainMenu(inventory, viewer, playerProfession)
+        viewer.openInventory(inventory)
+        return true
+    }
+
+    private fun renderProfessionMainMenu(
+        inventory: Inventory,
+        viewer: Player,
+        playerProfession: jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
+    ) {
+        val headerFooterPane = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
+        val basePane = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
+
+        // 背景を設定
+        for (slot in 0 until inventory.size) {
+            inventory.setItem(slot, basePane)
+        }
+        // ヘッダー（0-8）とフッター（36-44）はBLACK
+        for (slot in 0..8) {
+            inventory.setItem(slot, headerFooterPane)
+        }
+        for (slot in 36..44) {
+            inventory.setItem(slot, headerFooterPane)
+        }
+
+        // スキルツリーアイコン (スロット20)
+        val skillTreeItem = createGuiItem(
+            Material.OAK_SAPLING,
+            toComponent("§aスキルツリー"),
+            listOf(
+                toComponent(BAR),
+                toComponent("§7スキルツリーを開きます"),
+                toComponent("§e§nクリックで開く"),
+                toComponent(BAR)
+            )
+        )
+        inventory.setItem(MAIN_MENU_SKILL_TREE_SLOT, skillTreeItem)
+
+        // 現在の職業の概要アイコン (スロット22)
+        val professionName = messageProvider.getProfessionName(playerProfession.profession)
+        val professionDescription = messageProvider.getProfessionDescription(playerProfession.profession)
+        val requiredExp = calculateRequiredExp(playerProfession.profession, playerProfession.currentLevel)
+        val professionIcon = getProfessionOverviewIcon(playerProfession.profession)
+        
+        val professionOverviewItem = createGuiItem(
+            professionIcon,
+            toComponent("§b【$professionName】"),
+            listOf(
+                toComponent(BAR),
+                toComponent("§7$professionDescription"),
+                toComponent(BAR),
+                toComponent("§f§l| §7Lv. §e§l${playerProfession.currentLevel}"),
+                toComponent("§f§l| §7経験値 §a${playerProfession.currentExp}§7/$requiredExp"),
+                toComponent(BAR)
+            )
+        )
+        inventory.setItem(MAIN_MENU_PROFESSION_OVERVIEW_SLOT, professionOverviewItem)
+
+        // 設定アイコン (スロット24) - モック実装
+        val settingsItem = createGuiItem(
+            Material.COMPARATOR,
+            toComponent("§7設定"),
+            listOf(
+                toComponent(BAR),
+                toComponent("§c現在準備中です"),
+                toComponent(BAR)
+            )
+        )
+        inventory.setItem(MAIN_MENU_SETTINGS_SLOT, settingsItem)
+
+        // プレイヤー情報アイコン (スロット40)
+        val playerHead = ItemStack(Material.PLAYER_HEAD)
+        val skullMeta = playerHead.itemMeta as? org.bukkit.inventory.meta.SkullMeta
+        if (skullMeta != null) {
+            skullMeta.owningPlayer = viewer
+            skullMeta.displayName(withoutItalic(toComponent("§e${viewer.name}")))
+            skullMeta.lore(listOf(
+                toComponent(BAR),
+                toComponent("§c現在準備中です"),
+                toComponent(BAR)
+            ).map { withoutItalic(it) })
+            skullMeta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+            playerHead.itemMeta = skullMeta
+        }
+        inventory.setItem(MAIN_MENU_PLAYER_INFO_SLOT, playerHead)
+
+        // 職業のヒントアイコン (スロット42) - モック実装
+        val hintItem = createGuiItem(
+            Material.COMPASS,
+            toComponent("§7職業のヒント"),
+            listOf(
+                toComponent(BAR),
+                toComponent("§c現在準備中です"),
+                toComponent(BAR)
+            )
+        )
+        inventory.setItem(MAIN_MENU_HINT_SLOT, hintItem)
+    }
+
+    /**
+     * 職業の概要アイコンのMaterialを取得
+     */
+    private fun getProfessionOverviewIcon(profession: Profession): Material {
+        val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return Material.BARRIER
+        
+        // settings.overviewIconが設定されていればそれを使用、なければskill0のアイコンを使用
+        val overviewIcon = skillTree.getOverviewIcon()
+        if (overviewIcon != null) {
+            val material = Material.matchMaterial(overviewIcon.uppercase())
+            if (material != null) {
+                return material
+            }
+        }
+        
+        // フォールバック: skill0のアイコンを使用
+        val startSkill = skillTree.getSkill(skillTree.getStartSkillId())
+        if (startSkill?.icon != null) {
+            val material = Material.matchMaterial(startSkill.icon.uppercase())
+            if (material != null) {
+                return material
+            }
+        }
+        
+        return Material.BARRIER
+    }
+
+    /**
+     * 次のレベルに必要な経験値を計算
+     */
+    private fun calculateRequiredExp(profession: Profession, currentLevel: Int): Long {
+        val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return 100L
+        return skillTree.getRequiredExpForLevel(currentLevel)
+    }
+
     private fun openSkillTreeGui(viewer: Player): Boolean {
         val playerProfession = rankManager.getPlayerProfession(viewer.uniqueId)
         if (playerProfession == null) {
@@ -572,9 +724,14 @@ class RankCommand(
             }
         }
 
-        inventory.setItem(NAV_LEFT_SLOT, createNavigationItem(Material.REDSTONE, "rank.skill.gui.nav.left.name", "rank.skill.gui.nav.left.lore"))
-        inventory.setItem(NAV_CENTER_SLOT, createNavigationItem(Material.REDSTONE_TORCH, "rank.skill.gui.nav.center.name", "rank.skill.gui.nav.center.lore"))
-        inventory.setItem(NAV_RIGHT_SLOT, createNavigationItem(Material.BLAZE_ROD, "rank.skill.gui.nav.right.name", "rank.skill.gui.nav.right.lore"))
+        // 戻るボタン（シンプルな形式）- 職業メインメニューに戻る
+        val backButton = createGuiItem(
+            Material.REDSTONE,
+            toComponent("§c戻る"),
+            emptyList()
+        )
+        inventory.setItem(NAV_LEFT_SLOT, backButton)
+        // NAV_CENTER_SLOT, NAV_RIGHT_SLOTはモック削除のため背景のまま（既にheaderFooterPaneが設定済み）
     }
 
     private fun renderSkillTreeGuiViewport(
@@ -675,9 +832,14 @@ class RankCommand(
             setSkillNodeItem(inventory, slot, skill, state, skillTree)
         }
 
-        inventory.setItem(NAV_LEFT_SLOT, createNavigationItem(Material.REDSTONE, "rank.skill.gui.nav.left.name", "rank.skill.gui.nav.left.lore"))
-        inventory.setItem(NAV_CENTER_SLOT, createNavigationItem(Material.REDSTONE_TORCH, "rank.skill.gui.nav.center.name", "rank.skill.gui.nav.center.lore"))
-        inventory.setItem(NAV_RIGHT_SLOT, createNavigationItem(Material.BLAZE_ROD, "rank.skill.gui.nav.right.name", "rank.skill.gui.nav.right.lore"))
+        // 戻るボタン（シンプルな形式）- 職業メインメニューに戻る
+        val backButton = createGuiItem(
+            Material.REDSTONE,
+            toComponent("§c戻る"),
+            emptyList()
+        )
+        inventory.setItem(NAV_LEFT_SLOT, backButton)
+        // NAV_CENTER_SLOT, NAV_RIGHT_SLOTはモック削除のため背景のまま（既にheaderFooterPaneが設定済み）
     }
 
     private fun buildSkillTreeRenderModel(
@@ -1490,13 +1652,19 @@ class RankCommand(
             return
         }
 
+        val player = event.whoClicked as? Player
+
         when (clickedSlot) {
-            NAV_LEFT_SLOT -> onSkillTreeNavLeft(holder)
+            NAV_LEFT_SLOT -> {
+                if (player != null) {
+                    onSkillTreeNavLeft(holder, player)
+                }
+            }
             NAV_CENTER_SLOT -> onSkillTreeNavCenter(holder)
             NAV_RIGHT_SLOT -> onSkillTreeNavRight(holder)
             else -> {
                 val skillId = holder.state.slotToSkillId[clickedSlot] ?: return
-                val player = event.whoClicked as? Player ?: return
+                if (player == null) return
                 onSkillTreeSkillNodeClicked(holder, skillId, player)
             }
         }
@@ -1510,15 +1678,20 @@ class RankCommand(
         event.isCancelled = true
     }
 
-    private fun onSkillTreeNavLeft(holder: SkillTreeGuiHolder) {
+    private fun onSkillTreeNavLeft(holder: SkillTreeGuiHolder, viewer: Player) {
         holder.state.lastAction = "nav_left"
+        // 職業メインメニューに戻る
+        viewer.playSound(viewer.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.0f)
+        openProfessionMainMenu(viewer)
     }
 
     private fun onSkillTreeNavCenter(holder: SkillTreeGuiHolder) {
+        // モック削除のため何もしない
         holder.state.lastAction = "nav_center"
     }
 
     private fun onSkillTreeNavRight(holder: SkillTreeGuiHolder) {
+        // モック削除のため何もしない
         holder.state.lastAction = "nav_right"
     }
 
@@ -1737,6 +1910,38 @@ class RankCommand(
     }
 
     @EventHandler
+    fun onProfessionMainMenuClick(event: InventoryClickEvent) {
+        val holder = event.view.topInventory.holder as? ProfessionMainMenuGuiHolder ?: return
+        event.isCancelled = true
+
+        val clickedSlot = event.rawSlot
+        if (clickedSlot !in 0 until event.view.topInventory.size) {
+            return
+        }
+
+        val player = event.whoClicked as? Player ?: return
+
+        when (clickedSlot) {
+            MAIN_MENU_SKILL_TREE_SLOT -> {
+                // スキルツリーを開く
+                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.0f)
+                openSkillTreeGui(player)
+            }
+            MAIN_MENU_PROFESSION_OVERVIEW_SLOT, MAIN_MENU_SETTINGS_SLOT, MAIN_MENU_PLAYER_INFO_SLOT, MAIN_MENU_HINT_SLOT -> {
+                // モック実装 - クリック不可（何もしない）
+            }
+        }
+    }
+
+    @EventHandler
+    fun onProfessionMainMenuDrag(event: InventoryDragEvent) {
+        if (event.view.topInventory.holder !is ProfessionMainMenuGuiHolder) {
+            return
+        }
+        event.isCancelled = true
+    }
+
+    @EventHandler
     fun onTaskInfoGuiClick(event: InventoryClickEvent) {
         if (event.view.topInventory.holder !is TaskInfoGuiHolder) {
             return
@@ -1806,6 +2011,12 @@ class RankCommand(
         override fun getInventory(): Inventory = backingInventory
     }
 
+    private class ProfessionMainMenuGuiHolder : InventoryHolder {
+        lateinit var backingInventory: Inventory
+
+        override fun getInventory(): Inventory = backingInventory
+    }
+
     private enum class SkillTreeLane {
         TOP,
         CENTER,
@@ -1855,6 +2066,16 @@ class RankCommand(
         private val MERGE_BOTTOM_TO_CHILD_SLOTS = listOf(30, 31)
         private val MERGE_SHARED_TO_CHILD_SLOTS = listOf(22, 23)
         private val MERGE_CHILD_OUTGOING_SLOTS = listOf(25, 26)
+
+        // 職業メインメニュー スロット定数
+        private const val MAIN_MENU_SKILL_TREE_SLOT = 20
+        private const val MAIN_MENU_PROFESSION_OVERVIEW_SLOT = 22
+        private const val MAIN_MENU_SETTINGS_SLOT = 24
+        private const val MAIN_MENU_PLAYER_INFO_SLOT = 40
+        private const val MAIN_MENU_HINT_SLOT = 42
+
+        // 区切り線
+        private const val BAR = "§7§m――――――――――――――――――――――――――――――"
     }
     
     /**

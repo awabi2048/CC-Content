@@ -199,6 +199,10 @@ class CCContent : JavaPlugin(), Listener {
             server.pluginManager.registerEvents(rankCommand, this)
             server.pluginManager.registerEvents(ProfessionMinerExpListener(this, rankManager, ignoreBlockStore), this)
 
+            // /rankmenu コマンドを登録
+            val rankMenuCommand = jp.awabi2048.cccontent.features.rank.command.RankMenuCommand(rankCommand)
+            getCommand("rankmenu")?.setExecutor(rankMenuCommand)
+
             logger.info("ランクシステムが初期化されました")
         } catch (e: Exception) {
             logger.warning("ランクシステムの初期化に失敗しました: ${e.message}")
