@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent.features.rank.skill.listeners
 import jp.awabi2048.cccontent.features.rank.job.BlockPositionCodec
 import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
+import jp.awabi2048.cccontent.features.rank.skill.handlers.BlastMineHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.BreakSpeedBoostHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.UnlockBatchBreakHandler
 import org.bukkit.enchantments.Enchantment
@@ -17,7 +18,8 @@ import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerSwapHandItemsEvent
 
 class BlockBreakEffectListener(
-    private val ignoreBlockStore: IgnoreBlockStore
+    private val ignoreBlockStore: IgnoreBlockStore,
+    private val blastMineHandler: BlastMineHandler? = null
 ) : Listener {
     companion object {
         private const val DURABILITY_EFFECT_WINDOW_MILLIS = 1500L
@@ -53,13 +55,21 @@ class BlockBreakEffectListener(
 
     @EventHandler(ignoreCancelled = true)
     fun onBlockBreak(event: BlockBreakEvent) {
-        if (!isPlayerPlacedBlock(event.block) && !UnlockBatchBreakHandler.isInternalBreakInProgress(event.player.uniqueId)) {
-            val compiledEffects = SkillEffectEngine.getCachedEffects(event.player.uniqueId)
+        val playerUuid = event.player.uniqueId
+
+        if (!isPlayerPlacedBlock(event.block) && !UnlockBatchBreakHandler.isInternalBreakInProgress(playerUuid) && !BlastMineHandler.isInternalBreakInProgress(playerUuid)) {
+            val compiledEffects = SkillEffectEngine.getCachedEffects(playerUuid)
             val debugMode = UnlockBatchBreakHandler.BatchBreakMode.fromTool(event.player.inventory.itemInMainHand.type)
             var debugApplied = false
 
-            if (debugMode != null) {
-                val debugEffect = UnlockBatchBreakHandler.getDebugEffect(event.player.uniqueId, debugMode)
+            val blastMineDebugEffect = BlastMineHandler.getDebugEffect(playerUuid)
+            if (blastMineDebugEffect != null) {
+                val profession = compiledEffects?.profession ?: jp.awabi2048.cccontent.features.rank.profession.Profession.MINER
+                debugApplied = SkillEffectEngine.applyEffect(event.player, profession, "debug.blast_mine", blastMineDebugEffect, event)
+            }
+
+            if (!debugApplied && debugMode != null) {
+                val debugEffect = UnlockBatchBreakHandler.getDebugEffect(playerUuid, debugMode)
                 if (debugEffect != null) {
                     val profession = compiledEffects?.profession ?: when (debugMode) {
                         UnlockBatchBreakHandler.BatchBreakMode.CUT_ALL -> jp.awabi2048.cccontent.features.rank.profession.Profession.LUMBERJACK
@@ -70,20 +80,31 @@ class BlockBreakEffectListener(
             }
 
             if (!debugApplied && compiledEffects != null) {
-                val entry = SkillEffectEngine.getCachedEffectForBlock(
-                    event.player.uniqueId,
-                    UnlockBatchBreakHandler.EFFECT_TYPE,
+                val blastMineEntry = SkillEffectEngine.getCachedEffectForBlock(
+                    playerUuid,
+                    BlastMineHandler.EFFECT_TYPE,
                     event.block.type.name
                 )
+                if (blastMineEntry != null) {
+                    debugApplied = SkillEffectEngine.applyEffect(event.player, compiledEffects.profession, blastMineEntry.skillId, blastMineEntry.effect, event)
+                }
 
-                if (entry != null) {
-                    SkillEffectEngine.applyEffect(event.player, compiledEffects.profession, entry.skillId, entry.effect, event)
+                if (!debugApplied) {
+                    val entry = SkillEffectEngine.getCachedEffectForBlock(
+                        playerUuid,
+                        UnlockBatchBreakHandler.EFFECT_TYPE,
+                        event.block.type.name
+                    )
+
+                    if (entry != null) {
+                        SkillEffectEngine.applyEffect(event.player, compiledEffects.profession, entry.skillId, entry.effect, event)
+                    }
                 }
             }
         }
 
-        BreakSpeedBoostHandler.clearBoost(event.player.uniqueId)
-        durabilityEligibleUntil.remove(event.player.uniqueId)
+        BreakSpeedBoostHandler.clearBoost(playerUuid)
+        durabilityEligibleUntil.remove(playerUuid)
     }
 
     @EventHandler
@@ -91,6 +112,8 @@ class BlockBreakEffectListener(
         if (isPlayerPlacedBlock(event.block)) {
             return
         }
+
+        blastMineHandler?.applyDropModification(event.player, event)
 
         val compiledEffects = SkillEffectEngine.getCachedEffects(event.player.uniqueId) ?: return
 
@@ -143,8 +166,10 @@ class BlockBreakEffectListener(
 
     @EventHandler
     fun onPlayerQuit(event: PlayerQuitEvent) {
-        BreakSpeedBoostHandler.clearBoost(event.player.uniqueId)
-        durabilityEligibleUntil.remove(event.player.uniqueId)
-        UnlockBatchBreakHandler.stopForPlayer(event.player.uniqueId)
+        val playerUuid = event.player.uniqueId
+        BreakSpeedBoostHandler.clearBoost(playerUuid)
+        durabilityEligibleUntil.remove(playerUuid)
+        UnlockBatchBreakHandler.stopForPlayer(playerUuid)
+        BlastMineHandler.stopForPlayer(playerUuid)
     }
 }

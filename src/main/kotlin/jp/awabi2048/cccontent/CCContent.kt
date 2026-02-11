@@ -113,6 +113,10 @@ class CCContent : JavaPlugin(), Listener {
                     UnlockBatchBreakHandler.setDebugOverride(player.uniqueId, batchMode, delay, maxChain, autoCollect)
                     true
                 }
+            },
+            onBlastMineDebug = { player, radius, delayTicksPerLayer, autoCollect, lossRate ->
+                BlastMineHandler.setDebugOverride(player.uniqueId, radius, delayTicksPerLayer, autoCollect, lossRate)
+                true
             }
         )
         
@@ -207,25 +211,24 @@ class CCContent : JavaPlugin(), Listener {
      */
     private fun initializeSkillEffectSystem(rankManager: RankManager, ignoreBlockStore: IgnoreBlockStore) {
         try {
-            // 収集系ハンドラーを登録
+            val blastMineHandler = BlastMineHandler(ignoreBlockStore)
+
             SkillEffectRegistry.register(BreakSpeedBoostHandler())
             SkillEffectRegistry.register(DropBonusHandler())
             SkillEffectRegistry.register(DurabilitySaveChanceHandler())
             SkillEffectRegistry.register(UnlockBatchBreakHandler(ignoreBlockStore))
             SkillEffectRegistry.register(ReplaceLootTableHandler())
+            SkillEffectRegistry.register(blastMineHandler)
 
-            // クラフト系ハンドラー（モック）を登録
             SkillEffectRegistry.register(UnlockSystemHandler())
             SkillEffectRegistry.register(UnlockRecipeHandler())
             SkillEffectRegistry.register(WorkSpeedBonusMockHandler())
             SkillEffectRegistry.register(SuccessRateBonusMockHandler())
 
-            // 一般ハンドラーを登録
             SkillEffectRegistry.register(UnlockItemTokenHandler())
 
-            // リスナーを登録
             server.pluginManager.registerEvents(SkillEffectCacheListener(rankManager, this), this)
-            server.pluginManager.registerEvents(BlockBreakEffectListener(ignoreBlockStore), this)
+            server.pluginManager.registerEvents(BlockBreakEffectListener(ignoreBlockStore, blastMineHandler), this)
             server.pluginManager.registerEvents(BatchBreakToggleListener(), this)
             server.pluginManager.registerEvents(BatchBreakPreviewListener(), this)
             server.pluginManager.registerEvents(CraftEffectListener(), this)
@@ -798,6 +801,7 @@ class CCContent : JavaPlugin(), Listener {
         // SukimaDungeon クリーンアップ
         try {
             UnlockBatchBreakHandler.stopAll()
+            BlastMineHandler.stopAll()
             rankManagerInstance?.saveData()
             if (::breweryFeature.isInitialized) {
                 breweryFeature.shutdown()
