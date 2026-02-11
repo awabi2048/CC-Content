@@ -23,6 +23,9 @@ commands:
     description: アリーナ管理コマンド
     usage: /arenaa <start|stop|theme>
     permission: cc-content.arena.admin
+  rankmenu:
+    description: 職業メインメニューを開く
+    usage: /rankmenu
 
 permissions:
   sukimadungeon.command.base:

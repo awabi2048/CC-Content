@@ -16,6 +16,9 @@ profession:
   miner:
     name: "鉱夫"
     description: "鉱石採掘で経験値を得る職業"
+  cook:
+    name: "料理人"
+    description: "料理を作って経験値を得る職業"
 
 # スキル情報
 skill:

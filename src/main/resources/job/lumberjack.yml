@@ -5,6 +5,7 @@ skills:
       initialExp: 100
       base: 1.25
       maxLevel: 50
+    overviewIcon: "IRON_AXE"
 
   skill0:
     nameKey: "skill.lumberjack.skill0.name"
