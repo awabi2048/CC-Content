@@ -106,10 +106,48 @@ class PlayerExperienceGainEvent(
     val newExp: Long
 ) : Event() {
     override fun getHandlers(): HandlerList = Companion.getHandlerList()
-    
+
     companion object {
         private val handlers = HandlerList()
-        
+
+        @JvmStatic
+        fun getHandlerList(): HandlerList = handlers
+    }
+}
+
+/**
+ * プレステージスキル習得イベント
+ */
+class PrestigeSkillAcquiredEvent(
+    val player: Player,
+    val profession: Profession,
+    val skillId: String,
+    val skillName: String
+) : Event() {
+    override fun getHandlers(): HandlerList = Companion.getHandlerList()
+
+    companion object {
+        private val handlers = HandlerList()
+
+        @JvmStatic
+        fun getHandlerList(): HandlerList = handlers
+    }
+}
+
+/**
+ * プレステージ実行イベント
+ */
+class PrestigeExecutedEvent(
+    val player: Player,
+    val profession: Profession,
+    val prestigeLevel: Int,
+    val isRePrestige: Boolean
+) : Event() {
+    override fun getHandlers(): HandlerList = Companion.getHandlerList()
+
+    companion object {
+        private val handlers = HandlerList()
+
         @JvmStatic
         fun getHandlerList(): HandlerList = handlers
     }

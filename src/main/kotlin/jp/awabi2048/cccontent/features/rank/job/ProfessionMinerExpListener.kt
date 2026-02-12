@@ -116,6 +116,9 @@ class ProfessionMinerExpListener(
             return
         }
 
+        // 経験値付与後、破壊した位置を記録（同じ位置での再破壊による経験値獲得を防止）
+        ignoreBlockStore.add(block.world.uid, packedPosition)
+
         rankManager.addProfessionExp(uuid, expAmount)
     }
 
