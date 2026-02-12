@@ -88,11 +88,9 @@ class LanguageLoader(
 
             if (mergedCount > 0) {
                 config.save(langFile)
-                plugin.logger.info("言語ファイルの欠損キーを補完しました: $mergedCount 件 (${langFile.name})")
             }
 
             flattenConfig(config, "")
-            plugin.logger.info("言語ファイルを読み込みました: ${langFile.absolutePath}")
         } catch (e: Exception) {
             plugin.logger.warning("言語ファイルの読み込みに失敗しました: ${e.message}")
         }

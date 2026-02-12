@@ -12,12 +12,9 @@ object LangManager {
     private var defaultLang = "ja_jp"
 
     fun load(plugin: JavaPlugin) {
-        val logger = plugin.logger
         val langDir = File(plugin.dataFolder, "lang")
-        logger.info("[LangManager] Loading language files from: ${langDir.absolutePath}")
         if (!langDir.exists()) {
             langDir.mkdirs()
-            logger.info("[LangManager] Created lang directory")
         }
 
         // Save default resources
@@ -28,7 +25,6 @@ object LangManager {
          langMap.clear()
          // Load only specific language files
          val langFiles = listOf("ja_jp.yml", "en_us.yml")
-         var loadedCount = 0
          langFiles.forEach { fileName ->
              val file = File(langDir, fileName)
              if (file.exists()) {
@@ -36,16 +32,11 @@ object LangManager {
                      val langName = fileName.removeSuffix(".yml").lowercase()
                      val config = YamlConfiguration.loadConfiguration(file)
                      langMap[langName] = config
-                     loadedCount++
-                     logger.info("[LangManager] Loaded language file: $fileName -> $langName")
                  } catch (e: Exception) {
-                     logger.warning("[LangManager] Failed to load language file $fileName: ${e.message}")
+                     plugin.logger.warning("[LangManager] Failed to load language file $fileName: ${e.message}")
                  }
-             } else {
-                 logger.warning("[LangManager] Language file not found: $file")
              }
          }
-         logger.info("[LangManager] Loaded $loadedCount language files. Available keys: ${langMap.keys}")
     }
 
     private fun saveDefaultLang(plugin: JavaPlugin, fileName: String) {

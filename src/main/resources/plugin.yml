@@ -26,8 +26,12 @@ commands:
   rankmenu:
     description: 職業メインメニューを開く
     usage: /rankmenu
+    permission: cc-content.rank
 
 permissions:
+  cc-content.rank:
+    description: 職業メインメニューを開ける
+    default: true
   sukimadungeon.command.base:
     description: Allows using the base command
     default: true

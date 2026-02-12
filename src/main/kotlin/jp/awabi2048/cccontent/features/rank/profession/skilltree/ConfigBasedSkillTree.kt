@@ -2,8 +2,10 @@ package jp.awabi2048.cccontent.features.rank.profession.skilltree
 
 import jp.awabi2048.cccontent.features.rank.profession.SkillNode
 import jp.awabi2048.cccontent.features.rank.profession.SkillTree
+import jp.awabi2048.cccontent.features.rank.skill.CombineRule
 import jp.awabi2048.cccontent.features.rank.skill.EvaluationMode
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffect
+import jp.awabi2048.cccontent.features.rank.skill.SkillEffectRegistry
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
 import kotlin.math.roundToLong
@@ -53,7 +55,11 @@ class ConfigBasedSkillTree(
                 .forEach { skillId ->
                     val skillSection = skillsSection.getConfigurationSection(skillId) ?: return@forEach
 
-                    val effect = parseEffect(skillSection)
+                    val effect = try {
+                        parseEffect(skillSection, skillId)
+                    } catch (e: IllegalArgumentException) {
+                        throw IllegalArgumentException("$professionId/$skillId: スキルエフェクトの設定が無効です: ${e.message}", e)
+                    }
 
                     val skill = SkillNode(
                         skillId = skillId,
@@ -84,19 +90,32 @@ class ConfigBasedSkillTree(
 
             buildLevelThresholds()
         } catch (e: Exception) {
+            e.printStackTrace()
             throw IllegalStateException("スキルツリー読み込みに失敗しました: $professionId", e)
         }
     }
 
-    private fun parseEffect(skillSection: org.bukkit.configuration.ConfigurationSection): SkillEffect? {
+    private fun parseEffect(skillSection: org.bukkit.configuration.ConfigurationSection, skillId: String): SkillEffect? {
         val effectSection = skillSection.getConfigurationSection("effect") ?: return null
 
-        val type = effectSection.getString("type") ?: return null
+        val type = effectSection.getString("type")
+        if (type != null && SkillEffectRegistry.getHandler(type) == null) {
+            throw IllegalArgumentException("エフェクトタイプ '$type' は登録されていません。利用可能なタイプ: ${SkillEffectRegistry.getAllTypes().sorted().joinToString()}")
+        }
+
         val evaluationModeStr = effectSection.getString("evaluationMode", "CACHED") ?: "CACHED"
         val evaluationMode = try {
             EvaluationMode.valueOf(evaluationModeStr.uppercase())
         } catch (e: IllegalArgumentException) {
             EvaluationMode.CACHED
+        }
+
+        // combineRule を YAML から読み込み、デフォルトは "ADD"
+        val combineRuleStr = effectSection.getString("combineRule", "ADD") ?: "ADD"
+        val combineRule = try {
+            CombineRule.valueOf(combineRuleStr.uppercase())
+        } catch (e: IllegalArgumentException) {
+            CombineRule.ADD
         }
 
         val paramsSection = effectSection.getConfigurationSection("params")
@@ -111,7 +130,7 @@ class ConfigBasedSkillTree(
             }
         }
 
-        return SkillEffect(type, params, evaluationMode)
+        return SkillEffect(type ?: "", params, evaluationMode, combineRule)
     }
 
     private fun rebuildGraphIndexes() {
@@ -147,7 +166,7 @@ class ConfigBasedSkillTree(
     private fun validateSkillGraph() {
         skills.values.forEach { skill ->
             if (skill.children.size > 2) {
-                throw IllegalArgumentException("$professionId/${skill.skillId}: 子スキルは最大2つまでです")
+                throw IllegalArgumentException("$professionId/${skill.skillId}: 子スキルは最大2つまでです（現在: ${skill.children.size}個: ${skill.children.joinToString()}）")
             }
             skill.children.forEach { childId ->
                 if (!skills.containsKey(childId)) {
@@ -158,7 +177,7 @@ class ConfigBasedSkillTree(
 
         parentsByChild.forEach { (skillId, parents) ->
             if (parents.size > 2) {
-                throw IllegalArgumentException("$professionId/$skillId: 親スキルは最大2つまでです")
+                throw IllegalArgumentException("$professionId/$skillId: 親スキルは最大2つまでです（現在: ${parents.size}個: ${parents.joinToString()}）")
             }
         }
 

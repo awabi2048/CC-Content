@@ -8,285 +8,425 @@
 # 職業情報
 profession:
   lumberjack:
-    name: "木こり"
-    description: "木を伐採して経験値を得る職業"
+    name: 木こり
+    description: 木を伐採して経験値を得る職業
   brewer:
-    name: "醸造家"
-    description: "ポーション醸造で経験値を得る職業"
+    name: 醸造家
+    description: ポーション醸造で経験値を得る職業
   miner:
-    name: "鉱夫"
-    description: "鉱石採掘で経験値を得る職業"
+    name: 鉱夫
+    description: 鉱石採掘で経験値を得る職業
   cook:
-    name: "料理人"
-    description: "料理を作って経験値を得る職業"
+    name: 料理人
+    description: 料理を作って経験値を得る職業
+  swordsman:
+    name: 剣士
+    description: モンスター討伐で経験値を得る職業
+  warrior:
+    name: 戦士
+    description: 近接戦闘で経験値を得る職業
+  farmer:
+    name: 農家
+    description: 作物の収穫で経験値を得る職業
+  gardener:
+    name: 庭師
+    description: 装飾的なブロック設置で経験値を得る職業
+  carpenter:
+    name: 大工
+    description: 建築で経験値を得る職業
 
 # スキル情報
 skill:
   # 木こりのスキルツリー
   lumberjack:
     skill0:
-      name: "初心者の木こり"
-      description: "基本的な木の伐採を学んだ"
+      name: 初心者の木こり
+      description: 基本的な木の伐採を学んだ
     skill1:
-      name: "修行中の木こり"
-      description: "より効率的な伐採方法を習得"
+      name: 修行中の木こり
+      description: より効率的な伐採方法を習得
     skill2:
-      name: "熟練の木こり（斧マスター）"
-      description: "斧の扱いに精通した者"
+      name: 熟練の木こり（斧マスター）
+      description: 斧の扱いに精通した者
     skill3:
-      name: "伝説の木こり（斧極人）"
-      description: "斧を極めた者"
+      name: 伝説の木こり（斧極人）
+      description: 斧を極めた者
     skill4:
-      name: "守護者の木こり（盾マスター）"
-      description: "防御を重視した伐採法を習得"
+      name: 守護者の木こり（盾マスター）
+      description: 防御を重視した伐採法を習得
     skill5:
-      name: "鉄壁の木こり（盾極人）"
-      description: "防御を極めた者"
+      name: 鉄壁の木こり（盾極人）
+      description: 防御を極めた者
     skill6:
-      name: "速度の達人（左腕）"
-      description: "片手伐採の極意を習得"
+      name: 速度の達人（左腕）
+      description: 片手伐採の極意を習得
     skill7:
-      name: "伐採の皇帝（両腕）"
-      description: "両手伐採の究極形態"
+      name: 伐採の皇帝（両腕）
+      description: 両手伐採の究極形態
     skill8:
-      name: "自然の化身"
-      description: "自然界との完全な調和を実現"
+      name: 自然の化身
+      description: 自然界との完全な調和を実現
     skill9:
-      name: "伝説を超えし者"
-      description: "すべての伐採技術を極めた最高位の木こり"
+      name: 伝説を超えし者
+      description: すべての伐採技術を極めた最高位の木こり
   
   # 醸造家のスキルツリー
   brewer:
     skill0:
-      name: "初心者の醸造家"
-      description: "基本的なポーション醸造を学んだ"
+      name: 初心者の醸造家
+      description: 基本的なポーション醸造を学んだ
     skill1:
-      name: "修行中の醸造家"
-      description: "複雑なポーション配合を習得"
+      name: 修行中の醸造家
+      description: 複雑なポーション配合を習得
     skill2:
-      name: "熟練の醸造家（火焰の道）"
-      description: "火属性ポーション製造の達人"
+      name: 熟練の醸造家（火焰の道）
+      description: 火属性ポーション製造の達人
     skill3:
-      name: "炎の大魔導師"
-      description: "火焰ポーション製造を極めた者"
+      name: 炎の大魔導師
+      description: 火焰ポーション製造を極めた者
     skill4:
-      name: "熟練の醸造家（氷結の道）"
-      description: "冷気属性ポーション製造の達人"
+      name: 熟練の醸造家（氷結の道）
+      description: 冷気属性ポーション製造の達人
     skill5:
-      name: "氷結の大魔導師"
-      description: "冷気ポーション製造を極めた者"
+      name: 氷結の大魔導師
+      description: 冷気ポーション製造を極めた者
     skill6:
-      name: "闇の錬金術師"
-      description: "禁忌のポーション製造法を習得"
+      name: 闇の錬金術師
+      description: 禁忌のポーション製造法を習得
     skill7:
-      name: "光の調和者"
-      description: "聖なるポーション製造を習得"
+      name: 光の調和者
+      description: 聖なるポーション製造を習得
     skill8:
-      name: "元素の支配者"
-      description: "すべての属性ポーション製造を習得"
+      name: 元素の支配者
+      description: すべての属性ポーション製造を習得
     skill9:
-      name: "ポーション神"
-      description: "ポーション製造の最高位に達した者"
+      name: ポーション神
+      description: ポーション製造の最高位に達した者
   
   # 鉱夫のスキルツリー
   miner:
+    initial:
+      name: 初期解放
+      description: 初期解放
+    speed_1:
+      name: はやさ１
+      description: すこしはやい
+    fortune_1:
+      name: 幸運１
+      description: すこし幸運
+    speed_2:
+      name: はやさ２
+      description: よりはやい
+    fortune_2:
+      name: 幸運２
+      description: より幸運
+    durability_1:
+      name: 耐久１
+      description: 耐久
+    fortune_3:
+      name: 幸運３
+      description: さらに幸運
+    mineall_1:
+      name: 一括破壊
+      description: 一括破壊を解放
+    mineall_2:
+      name: 一括破壊２
+      description: さらに一括破壊
+    mineall_3:
+      name: 一括破壊３
+      description: さらに一括破壊を強化
+    blastmine_1:
+      name: 爆破採掘１
+      description: 爆破採掘を解放
+    blastmine_2:
+      name: 爆破採掘２
+      description: 爆破採掘をさらに強化
     skill0:
-      name: "初心者の鉱夫"
-      description: "基本的な採掘を学んだ"
+      name: 初心者の鉱夫
+      description: 基本的な採掘を学んだ
     skill1:
-      name: "修行中の鉱夫"
-      description: "より効率的な採掘方法を習得"
+      name: 修行中の鉱夫
+      description: より効率的な採掘方法を習得
     skill2:
-      name: "熟練の鉱夫（石職人）"
-      description: "石材採掘の専門家"
+      name: 熟練の鉱夫（石職人）
+      description: 石材採掘の専門家
     skill3:
-      name: "石の大工匠"
-      description: "石材採掘を極めた者"
+      name: 石の大工匠
+      description: 石材採掘を極めた者
     skill4:
-      name: "熟練の鉱夫（金属職人）"
-      description: "鉱石採掘の専門家"
+      name: 熟練の鉱夫（金属職人）
+      description: 鉱石採掘の専門家
     skill5:
-      name: "金属の大工匠"
-      description: "鉱石採掘を極めた者"
+      name: 金属の大工匠
+      description: 鉱石採掘を極めた者
     skill6:
-      name: "深淵の探究者"
-      description: "深層鉱物の採掘法を習得"
+      name: 深淵の探究者
+      description: 深層鉱物の採掘法を習得
     skill7:
-      name: "地脈の読み手"
-      description: "鉱物の位置を感知する能力を習得"
+      name: 地脈の読み手
+      description: 鉱物の位置を感知する能力を習得
     skill8:
-      name: "地殻変動の支配者"
-      description: "採掘の物理学を完全に理解"
+      name: 地殻変動の支配者
+      description: 採掘の物理学を完全に理解
     skill9:
-      name: "大地の王"
-      description: "採掘技術の最高位に達した者"
-
+      name: 大地の王
+      description: 採掘技術の最高位に達した者
+  
   # 料理人のスキルツリー
   cook:
     skill0:
-      name: "初心者の料理人"
-      description: "基本的な料理法を学んだ"
+      name: 初心者の料理人
+      description: 基本的な料理法を学んだ
     skill1:
-      name: "修行中の料理人"
-      description: "より高度な調理技術を習得"
+      name: 修行中の料理人
+      description: より高度な調理技術を習得
     skill2:
-      name: "熟練の料理人（穀物の達人）"
-      description: "穀物料理の専門家"
+      name: 熟練の料理人（穀物の達人）
+      description: 穀物料理の専門家
     skill3:
-      name: "穀物の大シェフ"
-      description: "穀物料理を極めた者"
+      name: 穀物の大シェフ
+      description: 穀物料理を極めた者
     skill4:
-      name: "熟練の料理人（スープ職人）"
-      description: "スープ料理の専門家"
+      name: 熟練の料理人（スープ職人）
+      description: スープ料理の専門家
     skill5:
-      name: "スープの名職人"
-      description: "スープ料理を極めた者"
+      name: スープの名職人
+      description: スープ料理を極めた者
     skill6:
-      name: "野菜の達人"
-      description: "野菜料理の極意を習得"
+      name: 野菜の達人
+      description: 野菜料理の極意を習得
     skill7:
-      name: "シチューの魔術師"
-      description: "シチュー作りの究極形態"
+      name: シチューの魔術師
+      description: シチュー作りの究極形態
     skill8:
-      name: "食材の支配者"
-      description: "すべての食材特性を完全理解"
+      name: 食材の支配者
+      description: すべての食材特性を完全理解
     skill9:
-      name: "料理神"
-      description: "料理技術の最高位に達した者"
+      name: 料理神
+      description: 料理技術の最高位に達した者
+  
+  # 剣士のスキルツリー
+  swordsman:
+    skill0:
+      name: 初心者の剣士
+      description: 基本的な剣術を学んだ
+    skill1:
+      name: 修行中の剣士
+      description: 剣による攻撃力が向上した
+    skill2:
+      name: 一刀の剣士
+      description: 急所を狙う技術を習得した
+    skill3:
+      name: 薙ぎ払いの剣士
+      description: スウィープ攻撃の威力が増した
+    skill4:
+      name: 疾風の剣士
+      description: 素早い連続攻撃を習得した
+    skill5:
+      name: 魔物狩り
+      description: 特定の魔物に対して特化した攻撃技術を習得
+    skill6:
+      name: 受け流し
+      description: 敵の攻撃を受け流す技術を習得
+    skill7:
+      name: 処刑人
+      description: 瀕死の敵に対して致命的な一撃を放つ
+    skill8:
+      name: 鋭き眼
+      description: 防御を無視した精密攻撃を習得
+    skill9:
+      name: 剣聖
+      description: 剣術の最高位に達した者
+    skill10:
+      name: 剣の覇気
+      description: 剣による攻撃ダメージが15%増加する
+    skill11:
+      name: 薙ぎ払いの極意
+      description: スウィープ攻撃のダメージが30%増加する
+    skill12:
+      name: 剣の間合い
+      description: 剣を手に持っている間、攻撃リーチが1.5ブロック増加する
+  
+  # 戦士のスキルツリー
+  warrior:
+    skill0:
+      name: 初心者の戦士
+      description: 基本的な戦闘術を学んだ
+    skill1:
+      name: 修行中の戦士
+      description: 最大体力が向上した
+    skill2:
+      name: 鉄壁の戦士
+      description: 受けるダメージを軽減する術を習得
+    skill3:
+      name: 不屈の戦士
+      description: ノックバック耐性を習得した
+    skill4:
+      name: 斧使い
+      description: 斧による攻撃力が向上した
+    skill5:
+      name: 狂戦士
+      description: 体力が低い時に攻撃・移動速度が上昇する
+    skill6:
+      name: 盾の達人
+      description: 盾でのブロック確率と軽減効果が向上した
+    skill7:
+      name: 二度目の命
+      description: 致命傷を受けた際に体力を回復する
+    skill8:
+      name: 鎧の達人
+      description: 防具の効果が増幅される
+    skill9:
+      name: 武神
+      description: 近接戦闘の最高位に達した者
+    skill10:
+      name: 戦士の覇気
+      description: 斧による攻撃ダメージが15%増加する
+    skill11:
+      name: 薙ぎ払いの剛力
+      description: スウィープ攻撃のダメージが30%増加する
+    skill12:
+      name: 戦士の間合い
+      description: 斧を手に持っている間、攻撃リーチが1.5ブロック増加する
 
 # チュートリアルランク
 tutorial_rank:
   newbie:
-    name: "Newbie"
-    description: "新規プレイヤー"
+    name: Newbie
+    description: 新規プレイヤー
   visitor:
-    name: "Visitor"
-    description: "訪問者"
+    name: Visitor
+    description: 訪問者
   pioneer:
-    name: "Pioneer"
-    description: "開拓者"
+    name: Pioneer
+    description: 開拓者
   adventurer:
-    name: "Adventurer"
-    description: "冒険者"
+    name: Adventurer
+    description: 冒険者
   attainer:
-    name: "Attainer"
-    description: "達成者"
+    name: Attainer
+    description: 達成者
 
 # ランク関連メッセージ
 message:
-  rank_up: "§a§l【ランクアップ！】§r§a{rank} になりました"
-  profession_selected: "§a§l【職業選択】§r§a職業 {profession} を選択しました"
-  profession_changed: "§a§l【職業変更】§r§a職業を {profession} に変更しました"
-  skill_acquired: "§a§l【スキル習得】§r§a{skill} を習得しました"
-  experience_gained: "§b経験値を {experience} 獲得しました"
+  rank_up: §a§l【ランクアップ！】§r§a{rank} になりました
+  profession_selected: §a§l【職業選択】§r§a職業 {profession} を選択しました
+  profession_changed: §a§l【職業変更】§r§a職業を {profession} に変更しました
+  skill_acquired: §a§l【スキル習得】§r§a{skill} を習得しました
+  experience_gained: §b経験値を {experience} 獲得しました
   tutorial_rankup:
-    - "§6§l=========================================="
-    - "§a§lランクアップ！"
-    - "§f{old_rank} → {new_rank}"
-    - "§6§l=========================================="
+  - §6§l==========================================
+  - §a§lランクアップ！
+  - §f{old_rank} → {new_rank}
+  - §6§l==========================================
 
 # Party関連
 party:
   create:
-    success: "{prefix} &aパーティ \"{name}\" を作成しました！"
+    success: '{prefix} &aパーティ "{name}" を作成しました！'
   join:
-    success: "{prefix} &aパーティに参加しました！"
-    broadcast: "{prefix} &7[&bパーティ&7] &6{player} &7がパーティに参加しました。"
+    success: '{prefix} &aパーティに参加しました！'
+    broadcast: '{prefix} &7[&bパーティ&7] &6{player} &7がパーティに参加しました。'
   leave:
-    success: "{prefix} &aパーティを抜けました。"
-    broadcast: "{prefix} &7[&bパーティ&7] &6{player} &7がパーティを抜けました。"
+    success: '{prefix} &aパーティを抜けました。'
+    broadcast: '{prefix} &7[&bパーティ&7] &6{player} &7がパーティを抜けました。'
   disband:
-    leader_left: "{prefix} &cリーダーが抜けたため、パーティは解散されました。"
-    success: "{prefix} &aパーティを解散しました。"
+    leader_left: '{prefix} &cリーダーが抜けたため、パーティは解散されました。'
+    success: '{prefix} &aパーティを解散しました。'
   invite:
-    success: "{prefix} &6{player} &aを招待しました。"
-    received: "{prefix} &6{player} &7からパーティへの招待が届きました！"
-    click_to_join: "&7クリックして参加: &a/party join {party}"
+    success: '{prefix} &6{player} &aを招待しました。'
+    received: '{prefix} &6{player} &7からパーティへの招待が届きました！'
+    click_to_join: '&7クリックして参加: &a/party join {party}'
   kick:
-    success: "{prefix} &6{player} &aを追放しました。"
-    kicked: "{prefix} &cパーティから追放されました。"
+    success: '{prefix} &6{player} &aを追放しました。'
+    kicked: '{prefix} &cパーティから追放されました。'
   list:
-    header: "&6=== パーティメンバー ({count}) ==="
-    leader: "&7リーダー: &e{leader}"
-    member: "&7- {member}"
+    header: '&6=== パーティメンバー ({count}) ==='
+    leader: '&7リーダー: &e{leader}'
+    member: '&7- {member}'
   chat:
-    format: "{prefix} &7[&bパーティ&7] {message}"
+    format: '{prefix} &7[&bパーティ&7] {message}'
   error:
-    already_in_party: "{prefix} &cすでにパーティに入っています。"
-    not_in_party: "{prefix} &cパーティに入っていません。"
-    not_leader: "{prefix} &cリーダーのみが {action} できます。"
-    player_not_found: "{prefix} &cプレイヤーが見つかりません。"
-    not_party_leader: "{prefix} &cそのプレイヤーはパーティリーダーではありません。"
-    not_invited: "{prefix} &c招待されていません。"
-    already_member: "{prefix} &cすでにパーティメンバーです。"
-    not_member: "{prefix} &cそのプレイヤーはパーティメンバーではありません。"
-    cannot_kick_self: "{prefix} &c自分自身を追放することはできません。"
-    specify_name: "{prefix} &c{action} するプレイヤー名を指定してください。"
-    specify_party_name: "{prefix} &c参加するパーティのリーダー名を指定してください。"
+    already_in_party: '{prefix} &cすでにパーティに入っています。'
+    not_in_party: '{prefix} &cパーティに入っていません。'
+    not_leader: '{prefix} &cリーダーのみが {action} できます。'
+    player_not_found: '{prefix} &cプレイヤーが見つかりません。'
+    not_party_leader: '{prefix} &cそのプレイヤーはパーティリーダーではありません。'
+    not_invited: '{prefix} &c招待されていません。'
+    already_member: '{prefix} &cすでにパーティメンバーです。'
+    not_member: '{prefix} &cそのプレイヤーはパーティメンバーではありません。'
+    cannot_kick_self: '{prefix} &c自分自身を追放することはできません。'
+    specify_name: '{prefix} &c{action} するプレイヤー名を指定してください。'
+    specify_party_name: '{prefix} &c参加するパーティのリーダー名を指定してください。'
 
 # Quest関連
 quest:
   accept:
-    success: "&aクエストを受注しました！"
+    success: '&aクエストを受注しました！'
   complete:
-    success: "&a&lクエスト達成！"
+    success: '&a&lクエスト達成！'
 
 # GUI関連
 gui:
   common:
-    close: "§cこのメニューを閉じます"
-    next_page: "§7次のページに進みます"
-    previous_page: "§7前のページに戻ります"
-    confirm: "§7このオプションで確定します"
+    close: §cこのメニューを閉じます
+    next_page: §7次のページに進みます
+    previous_page: §7前のページに戻ります
+    confirm: §7このオプションで確定します
   profession:
     selection:
-      title: "§8職業を選択してください"
-      main_menu_title: "§8職業メインメニュー"
+      title: §8職業を選択してください
+      main_menu_title: §8職業メインメニュー
       hint:
-        title: "§e§lヒント"
+        title: §e§lヒント
         lore:
-          - "§7クリックで職業を選択できます"
-          - "§7一度選択すると変更できません"
-          - ""
-          - "§e§n慎重に選んでください！"
+        - §7クリックで職業を選択できます
+        - §7一度選択すると変更できません
+        - ''
+        - §e§n慎重に選んでください！
       player_head:
         lore:
-          - "§7あなたのプロフィール"
-          - ""
-          - "§e§l職業を選択してください"
+        - §7あなたのプロフィール
+        - ''
+        - §e§l職業を選択してください
       profession_item:
-        selected: "§a§l[選択中]"
-        current_profession: "§a§l現在の職業です"
-        already_selected_title: "§8§m{profession}"
+        selected: §a§l[選択中]
+        current_profession: §a§l現在の職業です
+        already_selected_title: §8§m{profession}
         already_selected_lore:
-          - "§c§l既に職業を選択しています"
-          - "§c変更することはできません"
-        click_to_select: "§e§nクリックで選択"
-        type_label: "§8タイプ: {type}"
+        - §c§l既に職業を選択しています
+        - §c変更することはできません
+        click_to_select: §e§nクリックで選択
+        type_label: '§8タイプ: {type}'
     type:
-      gathering: "§a収集"
-      crafting: "§6クラフト"
-      combat: "§c戦闘"
-      creative: "§dクリエイティブ"
-      general: "§7一般"
+      gathering: §a収集
+      crafting: §6クラフト
+      combat: §c戦闘
+      creative: §dクリエイティブ
+      general: §7一般
     confirm_dialog:
-      title: "§6§l職業選択の確認"
-      body: "§f§l{profession} §7を選択しますか？\n\n§7{description}\n\n§c§l※一度選択すると変更できません"
-      confirm_button: "§a§l選択する"
-      cancel_button: "§c§lキャンセル"
+      title: §6§l職業選択の確認
+      body: |-
+        §f§l{profession} §7を選択しますか？
+
+        §7{description}
+
+        §c§l※一度選択すると変更できません
+      confirm_button: §a§l選択する
+      cancel_button: §c§lキャンセル
     error:
-      already_has_profession: "§c既に職業を選択しています"
+      already_has_profession: §c既に職業を選択しています
   skill:
-    tree_button: "§aスキルツリー"
+    tree_button: §aスキルツリー
     tree_button_lore:
-      - "§7スキルツリーを開きます"
-      - "§e§nクリックで開く"
-    settings_button: "§7設定"
+    - §7スキルツリーを開きます
+    - §e§nクリックで開く
+    settings_button: §7設定
     settings_button_lore:
-      - "§c現在準備中です"
-    hint_button: "§7職業のヒント"
+    - §c現在準備中です
+    hint_button: §7職業のヒント
     hint_button_lore:
-      - "§c現在準備中です"
+    - §c現在準備中です
 # =========================================
 # SukimaDungeon関連
 # =========================================
@@ -294,351 +434,360 @@ gui:
 sukima_dungeon:
   # SukimaDungeon 日本語言語ファイル
   # 元の SukimaDungeon プラグインの言語ファイルを再現
-  
-  # プレフィックス
-  prefix: "§7[§dスキマダンジョン§7]"
+
+    # プレフィックス
+  prefix: §7[§dスキマダンジョン§7]
   
   # コンパス関連
   compass:
-    activate: "§bワールドの芽コンパス [Tier %1] を起動しました (§a%2秒§b)"
-    deactivate: "§cコンパスを停止しました"
-    detected: "§aワールドの芽を検知！ §7距離: §e%1m §7方向: §6%2"
-    cooldown: "§cクールダウン中: あと §e%1秒"
-    no_sprouts: "§c近くにワールドの芽はありません"
+    activate: §bワールドの芽コンパス [Tier %1] を起動しました (§a%2秒§b)
+    deactivate: §cコンパスを停止しました
+    detected: '§aワールドの芽を検知！ §7距離: §e%1m §7方向: §6%2'
+    cooldown: '§cクールダウン中: あと §e%1秒'
+    no_sprouts: §c近くにワールドの芽はありません
   
   # タリスマン関連
   talisman:
-    use: "§6おあげちゃんのお札§7を使用しました"
-    escape: "§d§l脱出！"
-    cancelled: "§c脱出をキャンセルしました"
+    use: §6おあげちゃんのお札§7を使用しました
+    escape: §d§l脱出！
+    cancelled: §c脱出をキャンセルしました
   
   # スプラウト関連
   sprout:
-    harvest: "§aワールドの芽を収穫しました"
+    harvest: §aワールドの芽を収穫しました
   
   # エラーメッセージ
   error:
-    not_in_dungeon: "§cスキマダンジョン内でしか使用できません"
-    no_permission: "§c権限がありません"
-    generic: "§cエラーが発生しました"
-    invalid_bookmark: "§c無効なふしぎなしおりです"
+    not_in_dungeon: §cスキマダンジョン内でしか使用できません
+    no_permission: §c権限がありません
+    generic: §cエラーが発生しました
+    invalid_bookmark: §c無効なふしぎなしおりです
   
   # GUIメッセージ
   gui:
     escape:
-      title: "§8脱出確認"
-      confirm: "§a§l脱出する"
-      cancel: "§c§lキャンセル"
+      title: §8脱出確認
+      confirm: §a§l脱出する
+      cancel: §c§lキャンセル
       lore:
-        - "§7スキマダンジョンから脱出します"
-        - "§7本当に脱出しますか？"
+      - §7スキマダンジョンから脱出します
+      - §7本当に脱出しますか？
   
   # アイテム説明 (アイテムのloreとは別)
   item:
     sprout:
-      name: "§dワールドの芽"
-      description: "スキマダンジョンで刈り取ってきたワールドの芽"
+      name: §dワールドの芽
+      description: スキマダンジョンで刈り取ってきたワールドの芽
     compass:
-      name: "§bワールドの芽コンパス"
-      description: "ワールドの芽の場所を探知するコンパス"
+      name: §bワールドの芽コンパス
+      description: ワールドの芽の場所を探知するコンパス
     talisman:
-      name: "§6おあげちゃんのお札"
-      description: "スキマダンジョンから脱出するためのお札"
+      name: §6おあげちゃんのお札
+      description: スキマダンジョンから脱出するためのお札
     bookmark:
       broken:
-        name: "§5ぼろぼろのふしぎなしおり"
+        name: §5ぼろぼろのふしぎなしおり
       worn:
-        name: "§5擦り切れたふしぎなしおり"
+        name: §5擦り切れたふしぎなしおり
       faded:
-        name: "§5色褪せたふしぎなしおり"
+        name: §5色褪せたふしぎなしおり
       new:
-        name: "§5新品のふしぎなしおり"
+        name: §5新品のふしぎなしおり
       lore: |
         §7§m――――――――――――――――――――――――――――――
         §7スキマダンジョンに進入するための
         §7ふしぎなしおり。
         §7右クリックでダンジョンに入ることができる。
         §7§m――――――――――――――――――――――――――――――
-
-
-  no_permission: "&c権限がありません。"
-  command_player_only: "このコマンドはプレイヤーのみ実行可能です。"
-  command_usage: "&e/sukima_dungeon <bookmark|reload>"
-  command_reload_success: "&a設定とテーマを再読み込みしました。"
-  command_bookmark_received: "&a{tier}しおりを入手しました！"
-  bookmark_cannot_use_here: "&cここではしおりを使用できません。"
-  command_generate_usage: "使用法: /sd generate <width> <length> [theme]"
-  command_generating: "&aダンジョンを強制生成中..."
-  command_unknown: "&c不明なサブコマンドです。"
-  command_restricted: "&cダンジョン内ではこのコマンドを使用できません。"
-  command_generator_failed: "&cダンジョンの生成に失敗しました。"
-  common_bar: "&7&m――――――――――――――――――――――――――――――"
-
-  gui_entrance_title: "&5ポータルをつなげる"
-  gui_entrance_button: "&b&lダンジョンへのポータルを開く"
+  no_permission: '&c権限がありません。'
+  command_player_only: このコマンドはプレイヤーのみ実行可能です。
+  command_usage: '&e/sukima_dungeon <bookmark|reload>'
+  command_reload_success: '&a設定とテーマを再読み込みしました。'
+  command_bookmark_received: '&a{tier}しおりを入手しました！'
+  bookmark_cannot_use_here: '&cここではしおりを使用できません。'
+  command_generate_usage: '使用法: /sd generate <width> <length> [theme]'
+  command_generating: '&aダンジョンを強制生成中...'
+  command_unknown: '&c不明なサブコマンドです。'
+  command_restricted: '&cダンジョン内ではこのコマンドを使用できません。'
+  command_generator_failed: '&cダンジョンの生成に失敗しました。'
+  common_bar: '&7&m――――――――――――――――――――――――――――――'
+  
+  gui_entrance_title: '&5ポータルをつなげる'
+  gui_entrance_button: '&b&lダンジョンへのポータルを開く'
   gui_entrance_button_lore:
-    - "&7クリックしてダンジョンへのポータルを開きます！"
-  gui_style_button: "&6プレイスタイルの選択"
-  gui_style_multi: "&f§l| §7現在の設定 §eみんなで"
-  gui_style_single: "&f§l| §7現在の設定 §eひとりで"
-  gui_style_lore: "&7クリックして切り替えます"
-  gui_size_button: "&eサイズの選択"
-  gui_size_small: "&f§l| §7現在の設定 §e小"
-  gui_size_medium: "&f§l| §7現在の設定 §e中"
-  gui_size_large: "&f§l| §7現在の設定 §e大"
-  gui_size_huge: "&f§l| §7現在の設定 §e極大"
-  gui_size_lore: "&7クリックして切り替えます"
-  gui_theme_button: "&dポータルの接続先"
-  gui_theme_current: "&f§l| §7現在の設定 §d{theme}"
-  gui_theme_lore: "&e§nクリックして変更"
-  gui_info_title: "&aInfo"
-  gui_info_theme: "&f§l| §7ポータルの接続先 §d{theme}"
-  gui_info_size: "&f§l| §7サイズ §e{size}"
-  gui_info_description: "&7スキマの世界は非常に不安定です。そのため、ポータルが別の世界に繋がってしまうことがあります。&7より上位のしおりを使用すると、望んだ傾向の世界に行きやすくなります。"
-  gui_theme_error: "&cテーマが見つかりません"
-  gui_theme_random: "???"
-
-
-  item_bookmark_name: "&d{tier}ふしぎなしおり"
-  item_talisman_name: "&6おあげちゃんのお札"
+  - '&7クリックしてダンジョンへのポータルを開きます！'
+  gui_style_button: '&6プレイスタイルの選択'
+  gui_style_multi: '&f§l| §7現在の設定 §eみんなで'
+  gui_style_single: '&f§l| §7現在の設定 §eひとりで'
+  gui_style_lore: '&7クリックして切り替えます'
+  gui_size_button: '&eサイズの選択'
+  gui_size_small: '&f§l| §7現在の設定 §e小'
+  gui_size_medium: '&f§l| §7現在の設定 §e中'
+  gui_size_large: '&f§l| §7現在の設定 §e大'
+  gui_size_huge: '&f§l| §7現在の設定 §e極大'
+  gui_size_lore: '&7クリックして切り替えます'
+  gui_theme_button: '&dポータルの接続先'
+  gui_theme_current: '&f§l| §7現在の設定 §d{theme}'
+  gui_theme_lore: '&e§nクリックして変更'
+  gui_info_title: '&aInfo'
+  gui_info_theme: '&f§l| §7ポータルの接続先 §d{theme}'
+  gui_info_size: '&f§l| §7サイズ §e{size}'
+  gui_info_description: '&7スキマの世界は非常に不安定です。そのため、ポータルが別の世界に繋がってしまうことがあります。&7より上位のしおりを使用すると、望んだ傾向の世界に行きやすくなります。'
+  gui_theme_error: '&cテーマが見つかりません'
+  gui_theme_random: ???
+  
+  
+  item_bookmark_name: '&d{tier}ふしぎなしおり'
+  item_talisman_name: '&6おあげちゃんのお札'
   item_talisman_lore:
-    - "&7&m――――――――――――――――――――――――――――――"
-    - "&7スキマダンジョンに送り出したクラフターを守り、帰り道を作るために"
-    - "&7おあげちゃんが渡してくれたお札。&7ダンジョン内部で使うと、"
-    - "&b脱出&7することができる。"
-    - "&7&m――――――――――――――――――――――――――――――"
-
-  gui_talisman_confirm_title: "&0&l本当に脱出する？"
-  gui_talisman_confirm_button: "&c&n脱出する"
+  - '&7&m――――――――――――――――――――――――――――――'
+  - '&7スキマダンジョンに送り出したクラフターを守り、帰り道を作るために'
+  - '&7おあげちゃんが渡してくれたお札。&7ダンジョン内部で使うと、'
+  - '&b脱出&7することができる。'
+  - '&7&m――――――――――――――――――――――――――――――'
+  
+  gui_talisman_confirm_title: '&0&l本当に脱出する？'
+  gui_talisman_confirm_button: '&c&n脱出する'
   gui_talisman_confirm_button_lore:
-    - "&7&m――――――――――――――――――――――――――――――"
-    - "&7クリックすると、すべてのプレイヤーが"
-    - "&7このダンジョンから離脱し、攻略を終了します。"
-    - "&7&m――――――――――――――――――――――――――――――"
-  gui_talisman_cancel_button: "&aとどまる"
-
-  gui_entrance_confirm_title: "&0&l本当に冒険に出る？"
-  gui_entrance_confirm_button: "&b&n冒険に出る"
+  - '&7&m――――――――――――――――――――――――――――――'
+  - '&7クリックすると、すべてのプレイヤーが'
+  - '&7このダンジョンから離脱し、攻略を終了します。'
+  - '&7&m――――――――――――――――――――――――――――――'
+  gui_talisman_cancel_button: '&aとどまる'
+  
+  gui_entrance_confirm_title: '&0&l本当に冒険に出る？'
+  gui_entrance_confirm_button: '&b&n冒険に出る'
   gui_entrance_confirm_button_lore:
-    - "&7&m――――――――――――――――――――――――――――――"
-    - "&7しおりを消費して、選択した設定で"
-    - "&7ダンジョンへの扉を開きます。"
-    - "&7&m――――――――――――――――――――――――――――――"
-  gui_entrance_cancel_button: "&c戻る"
-
-  gui_join_title: "&5ポータルの先へ"
-  gui_join_button_ready: "&b&n入場する"
-  gui_join_button_wait: "&7生成中..."
+  - '&7&m――――――――――――――――――――――――――――――'
+  - '&7しおりを消費して、選択した設定で'
+  - '&7ダンジョンへの扉を開きます。'
+  - '&7&m――――――――――――――――――――――――――――――'
+  gui_entrance_cancel_button: '&c戻る'
+  
+  gui_join_title: '&5ポータルの先へ'
+  gui_join_button_ready: '&b&n入場する'
+  gui_join_button_wait: '&7生成中...'
   gui_join_button_lore:
-    - "&7&m――――――――――――――――――――――――――――――"
-    - "&f§l| §7行き先 §d{theme}"
-    - "&f§l| §7サイズ §e{size}"
-    - "&7&m――――――――――――――――――――――――――――――"
-  gui_join_cancel_button: "&c閉じる"
-
-  gui_exit_title: "&0&l本当に帰還する？"
-  gui_exit_button: "&c&n帰還する"
+  - '&7&m――――――――――――――――――――――――――――――'
+  - '&f§l| §7行き先 §d{theme}'
+  - '&f§l| §7サイズ §e{size}'
+  - '&7&m――――――――――――――――――――――――――――――'
+  gui_join_cancel_button: '&c閉じる'
+  
+  gui_exit_title: '&0&l本当に帰還する？'
+  gui_exit_button: '&c&n帰還する'
   gui_exit_button_lore:
-    - "&7&m――――――――――――――――――――――――――――――"
-    - "&7クリックすると、すべてのプレイヤーが"
-    - "&7このダンジョンから離脱し、攻略を終了します。"
-    - "&7&m――――――――――――――――――――――――――――――"
-  gui_exit_cancel_button: "&aとどまる"
-
-  talisman_cannot_use_here: "&cここではお札を使用できません。"
-
+  - '&7&m――――――――――――――――――――――――――――――'
+  - '&7クリックすると、すべてのプレイヤーが'
+  - '&7このダンジョンから離脱し、攻略を終了します。'
+  - '&7&m――――――――――――――――――――――――――――――'
+  gui_exit_cancel_button: '&aとどまる'
+  
+  talisman_cannot_use_here: '&cここではお札を使用できません。'
+  
   item_bookmark_lore:
-    - "&7&m――――――――――――――――――――――――――――――"
-    - "§7ワールドのはざまにある§dスキマダンジョン§7への扉を開くためのしおり"
-    - "&7&m――――――――――――――――――――――――――――――"
-
-  scoreboard_title: "§7« §dスキマダンジョン §7»"
-  scoreboard_sprouts: "§f§l| §7回収したワールドの芽 §a{count}§7/{count_remaining}個"
-  scoreboard_remaining: "§f§l| §7帰還まで §b{time_remaining}"
-
+  - '&7&m――――――――――――――――――――――――――――――'
+  - §7ワールドのはざまにある§dスキマダンジョン§7への扉を開くためのしおり
+  - '&7&m――――――――――――――――――――――――――――――'
+  
+  scoreboard_title: §7« §dスキマダンジョン §7»
+  scoreboard_sprouts: §f§l| §7回収したワールドの芽 §a{count}§7/{count_remaining}個
+  scoreboard_remaining: §f§l| §7帰還まで §b{time_remaining}
+  
   oage_waiting:
-    - "ただいま接続中やで！しばし待たれよ！"
-    - "えーっと、次はどこに繋げようかな..."
-    - "準備中やで！お茶でも飲んで待っててや！"
-    - "スキマの調整中や！もうちょっとかかるわ！"
-    - "ええ感じの場所を探してるで！"
+  - ただいま接続中やで！しばし待たれよ！
+  - えーっと、次はどこに繋げようかな...
+  - 準備中やで！お茶でも飲んで待っててや！
+  - スキマの調整中や！もうちょっとかかるわ！
+  - ええ感じの場所を探してるで！
   oage_finished:
-    - "ありがと～！！無事に帰ってこれて良かった！"
-    - "おかえりなさい！摘み取りありがとうございました～！"
-    - "おつかれさま！助かりました～！ "
+  - ありがと～！！無事に帰ってこれて良かった！
+  - おかえりなさい！摘み取りありがとうございました～！
+  - 'おつかれさま！助かりました～！ '
   oage_collapse_warn:
-    - "時間切れ間近です！いそいでー！"
-    - "崩落が始まりそう！お早く！"
+  - 時間切れ間近です！いそいでー！
+  - 崩落が始まりそう！お早く！
   oage_collapse:
-    - "もうダメそう！呼び出しますー！！"
-    - "壊れるー！！呼び出します！"
-    - "あー！！呼びます！！"
+  - もうダメそう！呼び出しますー！！
+  - 壊れるー！！呼び出します！
+  - あー！！呼びます！！
   oage_generate:
-    - "では案内しますね！少々お待ちください～"
+  - では案内しますね！少々お待ちください～
   oage_entry:
-    - "こちらです！お気をつけてー！"
+  - こちらです！お気をつけてー！
   oage_evacuate:
-    - "見つけました！緊急脱出します！"
-    - "ピンチを感じ取りました！逃げますよー！"
+  - 見つけました！緊急脱出します！
+  - ピンチを感じ取りました！逃げますよー！
   oage_redirect:
-    - "あらら、接続が不安定みたい...別の場所に飛ばしますね！"
-    - "うーん、うまく繋がらへんかったわ！こっちの世界に行ってみよか！"
-
-
-  dungeon_closing: "&cこのダンジョンは間もなく消滅します..."
-
-  compass_cannot_use_here: "&cここではワールドの芽の鼓動を感じられないようだ..."
-  compass_detect_start: "&b[Compass] &f探知を開始しました..."
-  compass_detect_fail: "&8&oワールドの芽が見つかりませんでした"
-  compass_detect_stop: "&7探知を終了しました..."
-  compass_detect_interrupted_hunger: "&7お腹が空きすぎているため、使用を中止しました..."
-
+  - あらら、接続が不安定みたい...別の場所に飛ばしますね！
+  - うーん、うまく繋がらへんかったわ！こっちの世界に行ってみよか！
+  
+  
+  dungeon_closing: '&cこのダンジョンは間もなく消滅します...'
+  
+  compass_cannot_use_here: '&cここではワールドの芽の鼓動を感じられないようだ...'
+  compass_detect_start: '&b[Compass] &f探知を開始しました...'
+  compass_detect_fail: '&8&oワールドの芽が見つかりませんでした'
+  compass_detect_stop: '&7探知を終了しました...'
+  compass_detect_interrupted_hunger: '&7お腹が空きすぎているため、使用を中止しました...'
+  
   sizes:
-    small: "小"
-    medium: "中"
-    large: "大"
-    huge: "極大"
-
+    small: 小
+    medium: 中
+    large: 大
+    huge: 極大
+  
   oage_fail:
-    - "あらら...間に合わへんかったみたいやね...お荷物は置いてきちゃったけど、命があってよかったわ！"
-    - "残念...崩落に巻き込まれちゃった！ワールドの芽はスキマに消えちゃったけど、次は頑張りましょう！"
+  - あらら...間に合わへんかったみたいやね...お荷物は置いてきちゃったけど、命があってよかったわ！
+  - 残念...崩落に巻き込まれちゃった！ワールドの芽はスキマに消えちゃったけど、次は頑張りましょう！
   oage_result:
-  - "お疲れ様！無事に全部集まったね！崩れる前に早く戻ってきてー！"
-
+  - お疲れ様！無事に全部集まったね！崩れる前に早く戻ってきてー！
+  
   tiers:
-    BROKEN: "ぼろぼろの"
-    WORN: "擦り切れた"
-    FADED: "色褪せた"
-    NEW: "新品の"
-
-  themes:
+    BROKEN: ぼろぼろの
+    WORN: 擦り切れた
+    FADED: 色褪せた
+    NEW: 新品の
   test:
-    name: "test"
-    description: "てすとです"
+    name: test
+    description: てすとです
     oage_messages:
-      - "これはテストみたいです！"
+    - これはテストみたいです！
   cave:
-    name: "洞窟"
-    description: "暗く湿った岩の洞窟です。"
+    name: 洞窟
+    description: 暗く湿った岩の洞窟です。
     oage_messages:
-      - "暗くてジメジメしてるわ...気をつけて！"
-      - "足元注意してね！"
+    - 暗くてジメジメしてるわ...気をつけて！
+    - 足元注意してね！
   mineshaft:
-    name: "廃坑"
-    description: "かつて掘り進められた古い坑道です。"
+    name: 廃坑
+    description: かつて掘り進められた古い坑道です。
     oage_messages:
-      - "古いレールがいっぱい！迷子にならへんようにね！"
+    - 古いレールがいっぱい！迷子にならへんようにね！
   library:
-    name: "図書館"
-    description: "膨大な知識が眠る静謐な図書館です。"
+    name: 図書館
+    description: 膨大な知識が眠る静謐な図書館です。
     oage_messages:
-      - "静かにね...本がいっぱいあるわ！"
+    - 静かにね...本がいっぱいあるわ！
   ruin:
-    name: "遺跡"
-    description: "長い年月を経て風化した古代の遺跡です。"
+    name: 遺跡
+    description: 長い年月を経て風化した古代の遺跡です。
     oage_messages:
-      - "なんか崩れそう...歴史を感じるわね！"
+    - なんか崩れそう...歴史を感じるわね！
   see_of_trees:
-    name: "樹海"
-    description: "視界を遮るほどに木々が鬱蒼と生い茂る森です。"
+    name: 樹海
+    description: 視界を遮るほどに木々が鬱蒼と生い茂る森です。
     oage_messages:
-      - "木がいっぱいで迷っちゃいそう！"
+    - 木がいっぱいで迷っちゃいそう！
   maze:
-    name: "立体迷宮"
-    description: "複雑に組み合わさった迷路のような空間です。"
+    name: 立体迷宮
+    description: 複雑に組み合わさった迷路のような空間です。
     oage_messages:
-      - "うわぁ、目が回っちゃいそう！"
+    - うわぁ、目が回っちゃいそう！
 # GUI ボタンテキスト（共通）
 gui_buttons:
-  cancel: "§cキャンセル"
-  confirm: "§a確認"
-  next: "§a次へ"
-  previous: "§c前へ"
+  cancel: §cキャンセル
+  confirm: §a確認
+  next: §a次へ
+  previous: §c前へ
 
 rank:
   profession:
-    level_up: "§a{profession} レベルアップ！ §eLv.{old} → Lv.{new} §7(+{gained})"
+    level_up: §a{profession} レベルアップ！ §eLv.{old} → Lv.{new} §7(+{gained})
     prestige:
-      executed: "§d§l【プレステージ】§r§d{profession} のプレステージレベル {level} を達成しました！"
+      executed: §d§l【プレステージ】§r§d{profession} のプレステージレベル {level} を達成しました！
   skill:
-    usage: "§c使用法: /rank skill"
-    player_only: "§cこのコマンドはプレイヤーのみ実行できます"
-    acquired: "§a{player} がスキル {skill} を習得しました"
-    acquire_failed: "§cスキル習得に失敗しました"
+    usage: '§c使用法: /rank skill'
+    player_only: §cこのコマンドはプレイヤーのみ実行できます
+    acquired: §a{player} がスキル {skill} を習得しました
+    acquire_failed: §cスキル習得に失敗しました
     gui:
-      title: "§8{profession} スキルツリー"
-      no_profession: "§c職業を選択していません"
-      tree_not_found: "§c{profession} のスキルツリーが見つかりません"
-      start_not_found: "§c開始スキルが見つかりません"
+      title: §8{profession} スキルツリー
+      no_profession: §c職業を選択していません
+      tree_not_found: §c{profession} のスキルツリーが見つかりません
+      start_not_found: §c開始スキルが見つかりません
       status:
-        acquired: "§a習得済み"
-        available: "§e習得可能"
-        locked: "§c未開放"
-        prestige_unlocked: "§dプレステージ解放済み"
+        acquired: §a習得済み
+        available: §e習得可能
+        locked: §c未開放
+        prestige_unlocked: §dプレステージ解放済み
       lore:
-        required_level: "§7必要Lv: §e{level}"
-        current_level: "§7現在Lv: §e{level}"
-        status: "§7状態: {status}"
-        prestige_available: "§d§l[プレステージアンロック可能]"
-      nav:
-        left:
-          name: "§c§l戻る"
-          lore: "§7将来実装予定"
-        center:
-          name: "§e§l起点"
-          lore: "§7将来実装予定"
-        right:
-          name: "§6§l進む"
-          lore: "§7将来実装予定"
+        required_level: '§7必要Lv: §e{level}'
+        current_level: '§7現在Lv: §e{level}'
+        status: '§7状態: {status}'
+        prestige_available: §d§lプレステージアンロック可能
       route:
-        prev: "前へ戻る"
-        next: "次へ進む"
+        prev: 前へ戻る
+        next: 次へ進む
       dialog:
-        title: "§6スキル解放の確認"
-        body: "§f{skill} を解放しますか？\n§7この選択後、別分岐には進めません。"
-        confirm: "§a解放する"
-        cancel: "§cキャンセル"
+        title: §6スキル解放の確認
+        body: |-
+          §f{skill} を解放しますか？
+          §7この選択後、別分岐には進めません。
+        confirm: §a解放する
+        cancel: §cキャンセル
       unlock:
-        success: "§aスキルを解放しました: {skill}"
-        already: "§e既に解放済みです: {skill}"
-        missing_prerequisite: "§c前提スキルが不足しています: {skills}"
-        level_shortage: "§c必要レベルが不足しています（必要: {required}, 現在: {current}）"
-        branch_locked: "§cこの分岐は別の選択肢を解放済みのため進めません"
-        failed: "§cスキル解放に失敗しました"
+        success: '§aスキルを解放しました: {skill}'
+        already: '§e既に解放済みです: {skill}'
+        missing_prerequisite: '§c前提スキルが不足しています: {skills}'
+        level_shortage: '§c必要レベルが不足しています（必要: {required}, 現在: {current}）'
+        branch_locked: §cこの分岐は別の選択肢を解放済みのため進めません
+        failed: §cスキル解放に失敗しました
       prestige:
         dialog:
-          title: "§dプレステージスキル解放の確認"
-          body: "§f{skill} をプレステージスキルとして解放しますか？\n§7このスキルは思念アイテムを持っている間、無条件で使用できます。"
+          title: §dプレステージスキル解放の確認
+          body: |-
+            §f{skill} をプレステージスキルとして解放しますか？
+            §7このスキルは思念アイテムを持っている間、無条件で使用できます。
         unlock:
-          success: "§dプレステージスキルを解放しました: {skill}"
-          failed: "§cプレステージスキル解放に失敗しました"
+          success: '§dプレステージスキルを解放しました: {skill}'
+          failed: §cプレステージスキル解放に失敗しました
+      nav:
+        left:
+          name: §c§l戻る
+          lore: §7将来実装予定
+        center:
+          name: §e§l起点
+          lore: §7将来実装予定
+        right:
+          name: §6§l進む
+          lore: §7将来実装予定
   prestige:
-    cannot: "§cプレステージ条件を満たしていません。最大レベルに到達し、プレステージレベルが1以上必要です。"
-    failed: "§cプレステージの実行に失敗しました"
+    cannot: §cプレステージ条件を満たしていません。
+    failed: §cプレステージの実行に失敗しました
     dialog:
       first:
-        title: "§d§lプレステージの確認 (1/2)"
-        body: "§f{profession} のプレステージレベル {level} でプレステージを実行します。\n\n§c§l注意: プレステージを実行すると、通常レベル、スキル、経験値がリセットされます。"
+        title: §d§lプレステージの確認 (1/2)
+        body: |-
+          §f{profession} のプレステージレベル {level} でプレステージを実行します。
+
+          §c§l注意: プレステージを実行すると、通常レベル、スキル、経験値がリセットされます。
       second:
-        title: "§d§lプレステージの最終確認 (2/2)"
-        body: "§c本当にプレステージを実行しますか？\n\n§f職業: {profession}\n§fプレステージレベル: {level}\n\n§7§o※思念アイテムを獲得し、プレステージスキルが使用可能になります"
+        title: §d§lプレステージの最終確認 (2/2)
+        body: |-
+          §c本当にプレステージを実行しますか？
+
+          §f職業: {profession}
+          §fプレステージレベル: {level}
+
+          §7§o※思念アイテムを獲得し、プレステージスキルが使用可能になります
   tutorial_task_info:
-    usage: "§c使用法: /rank task-info <player>"
-    player_not_found: "§cプレイヤーが見つかりません"
-    system_not_initialized: "§cタスクシステムが初期化されていません"
-    opened_for_player: "§a{player} にタスクGUIを表示しました"
-    title: "§6{player} §7- §e{rank}"
-    complete_title: "§a§lすべてのタスク完了！"
-    complete_lore: "§7現在のランクでは追加要件はありません"
+    usage: '§c使用法: /rank task-info <player>'
+    player_not_found: §cプレイヤーが見つかりません
+    system_not_initialized: §cタスクシステムが初期化されていません
+    opened_for_player: §a{player} にタスクGUIを表示しました
+    title: §6{player} §7- §e{rank}
+    complete_title: §a§lすべてのタスク完了！
+    complete_lore: §7現在のランクでは追加要件はありません
     category:
-      play_time: "§eプレイ時間"
-      combat: "{status} §b討伐系"
-      mining: "{status} §b採掘"
-      vanilla_exp: "§eバニラEXP"
-      items: "{status} §bアイテム所持"
+      play_time: §eプレイ時間
+      combat: '{status} §b討伐系'
+      mining: '{status} §b採掘'
+      vanilla_exp: §eバニラEXP
+      items: '{status} §bアイテム所持'
     line:
-      progress_time: "{status} §7進捗: {current} / {required}"
-      progress_exp: "{status} §7進捗: {current}/{required}"
-      percent: "§8({percent}%)"
-      target_prefix: "{status} "
-      target_suffix: "§7: {current}/{required}"
+      progress_time: '{status} §7進捗: {current} / {required}'
+      progress_exp: '{status} §7進捗: {current}/{required}'
+      percent: §8({percent}%)
+      target_prefix: '{status} '
+      target_suffix: '§7: {current}/{required}'

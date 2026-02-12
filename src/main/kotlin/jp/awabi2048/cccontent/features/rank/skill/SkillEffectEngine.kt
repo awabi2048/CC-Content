@@ -209,4 +209,119 @@ object SkillEffectEngine {
     fun getAllCachedEffects(): Map<UUID, CompiledEffects> {
         return effectCache.toMap()
     }
+
+    /**
+     * 複数スキルエフェクトを優先度順に合成する。
+     * 
+     * 基本ルール：
+     * - 最も深いスキル（depth が大きい）から順に適用
+     * - CombineRule に従って合成
+     * 
+     * @param entries 対象エフェクトエントリ（depth降順でソート済み想定）
+     * @param blockType ブロックタイプ（対象フィルタリング用）
+     * @return 合成済みの SkillEffect
+     */
+    fun combineEffects(entries: List<SkillEffectEntry>, blockType: String = ""): SkillEffect? {
+        if (entries.isEmpty()) return null
+
+        // 最初のエントリ（最も深い）を取得
+        val baseEntry = entries.firstOrNull() ?: return null
+        val baseEffect = baseEntry.effect
+        val combineRule = baseEffect.combineRule
+
+        // REPLACE の場合は最深スキルのみを使用
+        if (combineRule == CombineRule.REPLACE) {
+            return baseEffect
+        }
+
+        // 対象ブロック型の場合、フィルタリング
+        val applicableEntries = if (blockType.isNotEmpty()) {
+            entries.filter { entry ->
+                val targetBlocks = entry.effect.getStringListParam("targetBlocks")
+                targetBlocks.isEmpty() || blockType in targetBlocks
+            }
+        } else {
+            entries
+        }
+
+        if (applicableEntries.isEmpty()) return null
+        if (applicableEntries.size == 1) return applicableEntries[0].effect
+
+        // 複数エフェクトを合成
+        return when (combineRule) {
+            CombineRule.ADD -> combineByAdd(applicableEntries, baseEffect)
+            CombineRule.MULTIPLY -> combineByMultiply(applicableEntries, baseEffect)
+            CombineRule.REPLACE -> applicableEntries[0].effect
+            else -> applicableEntries[0].effect
+        }
+    }
+
+    /**
+     * 加算方式で複数エフェクトを合成
+     */
+    private fun combineByAdd(entries: List<SkillEffectEntry>, baseEffect: SkillEffect): SkillEffect {
+        // 数値パラメータを抽出して合算
+        val combinedParams = baseEffect.params.toMutableMap()
+
+        // 数値型パラメータを特定して合算（最初の0以外の値で判定）
+        val numericKeys = mutableSetOf<String>()
+        for (entry in entries) {
+            for ((key, value) in entry.effect.params) {
+                if (value is Number && key !in numericKeys && key !in listOf("targetBlocks", "targetWeapons", "targetTools")) {
+                    numericKeys.add(key)
+                }
+            }
+        }
+
+        var totalValue = 0.0
+        for (key in numericKeys) {
+            totalValue = 0.0
+            for (entry in entries) {
+                val value = entry.effect.getDoubleParam(key, 0.0)
+                totalValue += value
+            }
+            combinedParams[key] = totalValue
+        }
+
+        return SkillEffect(
+            type = baseEffect.type,
+            params = combinedParams,
+            evaluationMode = baseEffect.evaluationMode,
+            combineRule = baseEffect.combineRule
+        )
+    }
+
+    /**
+     * 乗算方式で複数エフェクトを合成
+     */
+    private fun combineByMultiply(entries: List<SkillEffectEntry>, baseEffect: SkillEffect): SkillEffect {
+        // 数値パラメータを抽出して乗算
+        val combinedParams = baseEffect.params.toMutableMap()
+
+        // 数値型パラメータを特定して乗算（最初の0以外の値で判定）
+        val numericKeys = mutableSetOf<String>()
+        for (entry in entries) {
+            for ((key, value) in entry.effect.params) {
+                if (value is Number && key !in numericKeys && key !in listOf("targetBlocks", "targetWeapons", "targetTools")) {
+                    numericKeys.add(key)
+                }
+            }
+        }
+
+        for (key in numericKeys) {
+            var totalValue = 1.0
+            for (entry in entries) {
+                val value = entry.effect.getDoubleParam(key, 1.0)
+                totalValue *= value
+            }
+            combinedParams[key] = totalValue
+        }
+
+        return SkillEffect(
+            type = baseEffect.type,
+            params = combinedParams,
+            evaluationMode = baseEffect.evaluationMode,
+            combineRule = baseEffect.combineRule
+        )
+    }
 }

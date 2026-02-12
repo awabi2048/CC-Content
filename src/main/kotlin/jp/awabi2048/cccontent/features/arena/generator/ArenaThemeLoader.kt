@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.arena.generator
 
+import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import org.bukkit.Bukkit
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
@@ -33,7 +34,7 @@ enum class ArenaStructureType(val keyword: String) {
 class ArenaThemeLoader(private val plugin: JavaPlugin) {
     private val themes = mutableMapOf<String, ArenaTheme>()
 
-    fun load() {
+    fun load(featureInitLogger: FeatureInitializationLogger? = null) {
         val configFile = File(plugin.dataFolder, "arena/theme.yml")
         if (!configFile.exists()) {
             configFile.parentFile.mkdirs()
@@ -43,9 +44,14 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
         val config = YamlConfiguration.loadConfiguration(configFile)
         val themesSection = config.getConfigurationSection("themes")
         themes.clear()
+        val warnings = mutableListOf<String>()
 
         if (themesSection == null) {
             plugin.logger.warning("[Arena] テーマ定義が空です: arena/theme.yml")
+            featureInitLogger?.apply {
+                setStatus("Arena", FeatureInitializationLogger.Status.FAILURE)
+                addDetailMessage("Arena", "[Arena] テーマ定義が空です: arena/theme.yml")
+            }
             return
         }
 
@@ -58,27 +64,43 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             val path = themesSection.getString("$themeId.path") ?: themeId
             val tileSize = themesSection.getInt("$themeId.tileSize", 16)
             if (tileSize <= 0) {
-                plugin.logger.warning("[Arena] tileSize が不正なためスキップします: $themeId")
+                val warning = "[Arena] tileSize が不正なためスキップします: $themeId"
+                plugin.logger.warning(warning)
+                warnings.add(warning)
                 continue
             }
 
             val folder = File(structureRoot, path)
             if (!folder.exists()) {
                 folder.mkdirs()
-                plugin.logger.info("[Arena] テーマ用フォルダを作成しました: ${folder.absolutePath}")
             }
 
             val structures = loadStructures(folder)
             val missing = ArenaStructureType.entries.filter { structures[it].isNullOrEmpty() }
             if (missing.isNotEmpty()) {
-                plugin.logger.warning("[Arena] 必須ストラクチャー不足のためスキップ: $themeId (${missing.joinToString { it.keyword }})")
+                val warning = "[Arena] 必須ストラクチャー不足のためスキップ: $themeId (${missing.joinToString { it.keyword }})"
+                plugin.logger.warning(warning)
+                warnings.add(warning)
                 continue
             }
 
             themes[themeId] = ArenaTheme(themeId, path, tileSize, structures)
         }
 
-        plugin.logger.info("[Arena] 読み込みテーマ数: ${themes.size}")
+        // FeatureInitializationLogger に情報を送信
+        featureInitLogger?.apply {
+            if (themes.isEmpty()) {
+                setStatus("Arena", FeatureInitializationLogger.Status.FAILURE)
+                addDetailMessage("Arena", "[Arena] テーマ読み込み失敗: テーマが0個です")
+            } else if (warnings.isNotEmpty()) {
+                setStatus("Arena", FeatureInitializationLogger.Status.WARNING)
+                addSummaryMessage("Arena", "テーマ${themes.size}種")
+                warnings.forEach { addDetailMessage("Arena", it) }
+            } else {
+                setStatus("Arena", FeatureInitializationLogger.Status.SUCCESS)
+                addSummaryMessage("Arena", "テーマ${themes.size}種")
+            }
+        }
     }
 
     private fun loadStructures(folder: File): Map<ArenaStructureType, List<Structure>> {
@@ -93,9 +115,9 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 val structure = Bukkit.getStructureManager().loadStructure(file)
                 result[type]?.add(structure)
             } catch (e: IOException) {
-                plugin.logger.warning("[Arena] ストラクチャー読み込み失敗: ${file.absolutePath} (${e.message})")
+                // ストラクチャー読み込み失敗時のログは loadStructures の呼び出し元で処理
             } catch (e: Exception) {
-                plugin.logger.warning("[Arena] ストラクチャー読み込み中にエラー: ${file.absolutePath} (${e.message})")
+                // ストラクチャー読み込み中のエラーログは loadStructures の呼び出し元で処理
             }
         }
 

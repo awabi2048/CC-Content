@@ -1,0 +1,214 @@
+================================================================================
+CC-Contentプラグイン - 起動時ログ出力フロー詳細解析 (COMPLETE)
+================================================================================
+
+【ログ出力統計】
+  - logger.info()：36個
+  - logger.warning()：34個  
+  - logger.severe()：6個
+  ─────────────
+  合計：76個
+
+【起動フロー（簡潔版）】
+
+1. 初期化準備
+   ├─ config.yml読み込み
+   └─ 旧レイアウト移行
+
+2. ロガーシステム初期化
+   ├─ FeatureInitializationLogger 登録
+   │  ├─ Rank System
+   │  ├─ Brewery
+   │  ├─ Cooking
+   │  ├─ Arena
+   │  └─ SukimaDungeon
+   └─ CustomItemManager.setLogger()
+
+3. アイテム登録 (9個)
+   ├─ CustomItemManager.register()
+   │  └─ logger.info("Registered: ${id}") ×9回
+   │     [CustomItemManager.kt:25]
+
+4. ランクシステム初期化 ⭐⭐⭐⭐⭐
+   ├─ LanguageLoader
+   │  ├─ logger.info("言語ファイルの欠損キーを補完: N件")
+   │  │  [LanguageLoader.kt:91]
+   │  └─ logger.info("言語ファイルを読み込みました")
+   │     [LanguageLoader.kt:95]
+   │
+   ├─ スキルツリー登録
+   │  └─ logger.warning("スキルツリー読み込み失敗") [エラー時]
+   │     [CCContent.kt:401]
+   │
+   ├─ スキル効果システム
+   │  └─ logger.warning("初期化失敗") [エラー時]
+   │     [CCContent.kt:288]
+   │
+   ├─ チュートリアルランク
+   │  └─ logger.warning("初期化失敗") [エラー時]
+   │     [CCContent.kt:344]
+   │
+   └─ featureInitLogger.setStatus("Rank System", SUCCESS)
+
+5. アリーナ初期化
+   ├─ ArenaThemeLoader.load()
+   │  ├─ logger.warning("[Arena] テーマ定義が空です") [エラー時]
+   │  │  [ArenaThemeLoader.kt:50]
+   │  └─ logger.warning("[Arena] 必須ストラクチャー不足") [エラー時]
+   │     [ArenaThemeLoader.kt:82]
+   │
+   └─ featureInitLogger.setStatus("Arena", SUCCESS|WARNING|FAILURE)
+
+6. 醸造・調理初期化
+   ├─ BreweryFeature.initialize()
+   │  └─ logger.warning("Brewery初期化失敗") [エラー時]
+   │     [BreweryFeature.kt:22]
+   │
+   └─ CookingFeature.initialize()
+      └─ logger.warning("Cooking初期化失敗") [エラー時]
+         [CookingFeature.kt:19]
+
+7. コマンド登録
+   ├─ /cc-content (CCCommand)
+   ├─ /cc (エイリアス)
+   ├─ /rank [logger.severe() 失敗時]
+   ├─ /rankmenu [logger.severe() 失敗時]
+   └─ /arenaa (ArenaCommand)
+
+8. スキマダンジョン初期化 ⭐⭐⭐⭐
+   ├─ StructureLoader.loadThemes()
+   │  └─ logger.severe("ストラクチャー読み込み失敗") [IOException時]
+   │     [StructureLoader.kt:75, 78]
+   │
+   ├─ MobManager.load()
+   │  └─ logger.warning("mob定義読み込み失敗")
+   │     [MobManager.kt:80]
+   │
+   ├─ BGMManager.loadConfig()
+   │  └─ logger.warning("BGM設定エラー")
+   │     [BGMManager.kt:21, 41, 45]
+   │
+   ├─ LangManager.load()
+   │  └─ logger.warning("[LangManager] 読み込み失敗")
+   │     [LangManager.kt:36]
+   │
+   ├─ SproutManager.startParticleTask()
+   │  └─ logger.warning("No SPROUT markers found")
+   │     [SproutManager.kt:24]
+   │
+   ├─ DungeonSessionManager.loadSessions()
+   │  └─ logger.info("Loaded N sessions")
+   │     [DungeonSession.kt:278]
+   │
+   └─ featureInitLogger.setStatus("SukimaDungeon", SUCCESS|FAILURE)
+
+9. 追加リスナー & タスク登録
+   ├─ GulliverItemListener
+   ├─ ArenaItemListener
+   ├─ ArenaListener
+   └─ GulliverScaleManager (1tick毎)
+
+10. サマリー出力 ⭐ (ユーザーが見る最終出力)
+    ├─ logger.info("CC-Content v${version} が有効化されました")
+    │  [CCContent.kt:154]
+    │
+    ├─ logger.info("作成者: ${authors}")
+    │  [CCContent.kt:155]
+    │
+    ├─ logger.info("登録されたアイテム数: ${count}")
+    │  [CCContent.kt:156]
+    │
+    ├─ logger.info("  - misc: N, brewery: N, arena: N")
+    │  [CCContent.kt:159-161]
+    │
+    └─ featureInitLogger.printSummary()
+       ├─ logger.info("==========[CC-Content]===========")
+       │  [FeatureInitializationLogger.kt:82]
+       │
+       ├─ logger.info("✅ Rank System: SUCCESS (スキル7種登録)")
+       ├─ logger.info("✅ Brewery: SUCCESS")
+       ├─ logger.info("✅ Cooking: SUCCESS")
+       ├─ logger.info("⚠️ Arena: WARNING (テーマ2種)")
+       ├─ logger.info("❌ SukimaDungeon: FAILURE")
+       │  [FeatureInitializationLogger.kt:85]
+       │
+       ├─ logger.info("==== 詳細情報 ====") [エラー有時]
+       │  [FeatureInitializationLogger.kt:90]
+       │
+       ├─ logger.info("[Arena] テーマ 'corrupted' 不足: straight")
+       │  [FeatureInitializationLogger.kt:92]
+       │
+       ├─ logger.info("読み込みに一部失敗/成功しました")
+       │  [FeatureInitializationLogger.kt:103|107]
+       │
+       └─ logger.info("==================================")
+          [FeatureInitializationLogger.kt:108]
+
+================================================================================
+【FeatureInitializationLogger の統合度】⭐⭐⭐⭐⭐
+
+✅ 完全統合済み:
+  - 5フィーチャーの一元管理
+  - ステータス管理（SUCCESS/WARNING/FAILURE）
+  - サマリーメッセージ（簡潔情報）
+  - 詳細メッセージ（エラー詳細）
+  - 統一フォーマット出力
+  - 視覚的なアイコン表示（✅⚠️❌）
+
+================================================================================
+【重要な欠損補完ログ】
+
+1. LanguageLoader.kt:91
+   "言語ファイルの欠損キーを補完しました: ${mergedCount} 件"
+   → 既に featureInitLogger に統合可能
+
+2. CCContent.kt:159-161
+   フィーチャー別アイテムカウント
+   → 削除推奨（詳細すぎる）
+
+3. CustomItemManager.kt:25
+   "Registered custom item: ..." (×9)
+   → 削除推奨（起動時に多数出力）
+
+================================================================================
+【削除推奨ログ】
+
+不要なログ:
+  1. CCContent.kt:154 "CC-Contentが有効化されました"
+  2. CCContent.kt:155 "作成者: ${authors}"
+  3. CCContent.kt:156-161 アイテム統計
+  4. CustomItemManager.kt:25 個別アイテム登録
+  5. DungeonSession.kt:178, 278 セッション保存/読み込み
+
+理由: Bukkit標準出力で十分、またはサマリーで管理済み
+
+================================================================================
+【保持必須ログ】(エラー/警告系)
+
+必ず保持:
+  - logger.warning() 言語ファイル読み込み失敗
+  - logger.warning() スキルツリー読み込み失敗
+  - logger.warning() Arena テーマ定義エラー
+  - logger.warning() 構造体読み込み失敗
+  - logger.warning() mob定義読み込み失敗
+  - logger.severe() コマンド登録失敗
+  - logger.severe() ワールド削除失敗
+
+理由: 機能停止に直結する重要な情報
+
+================================================================================
+【起動時ログ数】
+
+エラーなし（正常起動時）:
+  ├─ アイテム登録: 9個
+  ├─ 言語ファイル: 2個
+  ├─ プラグイン情報: 4個
+  ├─ サマリー: 5個
+  └─ その他: 0-5個
+  ─────────────
+  合計: 20-25個
+
+エラーあり（例：Arena テーマ不足）:
+  └─ + 詳細メッセージ × 複数個
+
+================================================================================

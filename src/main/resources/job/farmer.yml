@@ -8,122 +8,51 @@ skills:
     overviewIcon: "IRON_HOE"
 
   skill0:
-    nameKey: "skill.farmer.skill0.name"
-    descriptionKey: "skill.farmer.skill0.description"
     requiredLevel: 1
     icon: "WOODEN_HOE"
     children: ["skill1"]
 
   skill1:
-    nameKey: "skill.farmer.skill1.name"
-    descriptionKey: "skill.farmer.skill1.description"
     requiredLevel: 2
     icon: "STONE_HOE"
-    effect:
-      type: "collect.harvest_bonus"
-      params:
-        chance: 0.2
-        bonusAmount: 1
-        targetCrops: ["WHEAT", "CARROTS", "POTATOES", "BEETROOTS"]
-      evaluationMode: "RUNTIME"
     children: ["skill2", "skill4"]
 
   skill2:
-    nameKey: "skill.farmer.skill2.name"
-    descriptionKey: "skill.farmer.skill2.description"
     requiredLevel: 3
     icon: "IRON_HOE"
-    effect:
-      type: "collect.growth_speed"
-      params:
-        multiplier: 1.3
-        radius: 5
-        targetCrops: ["WHEAT", "CARROTS", "POTATOES", "BEETROOTS", "MELON_STEM", "PUMPKIN_STEM"]
-      evaluationMode: "RUNTIME"
     children: ["skill3"]
 
   skill3:
-    nameKey: "skill.farmer.skill3.name"
-    descriptionKey: "skill.farmer.skill3.description"
     requiredLevel: 4
     icon: "DIAMOND_HOE"
-    effect:
-      type: "collect.auto_replant"
-      params:
-        chance: 0.5
-        targetCrops: ["WHEAT", "CARROTS", "POTATOES", "BEETROOTS", "NETHER_WART"]
-      evaluationMode: "RUNTIME"
     children: ["skill8"]
 
   skill4:
-    nameKey: "skill.farmer.skill4.name"
-    descriptionKey: "skill.farmer.skill4.description"
     requiredLevel: 3
     icon: "GOLDEN_HOE"
-    effect:
-      type: "collect.bone_meal_efficiency"
-      params:
-        chance: 0.3
-        extraGrowthStages: 2
-      evaluationMode: "RUNTIME"
     children: ["skill5", "skill6"]
 
   skill5:
-    nameKey: "skill.farmer.skill5.name"
-    descriptionKey: "skill.farmer.skill5.description"
     requiredLevel: 4
     icon: "NETHERITE_HOE"
-    effect:
-      type: "collect.crop_quality"
-      params:
-        chance: 0.15
-        qualityMultiplier: 1.5
-        targetCrops: ["WHEAT", "CARROTS", "POTATOES", "BEETROOTS", "MELON", "PUMPKIN"]
-      evaluationMode: "RUNTIME"
     children: ["skill8"]
 
   skill6:
-    nameKey: "skill.farmer.skill6.name"
-    descriptionKey: "skill.farmer.skill6.description"
     requiredLevel: 4
     icon: "BONE_MEAL"
-    effect:
-      type: "collect.area_harvest"
-      params:
-        radius: 3
-        maxBlocks: 9
-      evaluationMode: "RUNTIME"
     children: ["skill7"]
 
   skill7:
-    nameKey: "skill.farmer.skill7.name"
-    descriptionKey: "skill.farmer.skill7.description"
     requiredLevel: 5
     icon: "COMPOSTER"
-    effect:
-      type: "collect.compost_bonus"
-      params:
-        bonusChance: 0.25
-        bonusAmount: 1
-      evaluationMode: "RUNTIME"
     children: ["skill9"]
 
   skill8:
-    nameKey: "skill.farmer.skill8.name"
-    descriptionKey: "skill.farmer.skill8.description"
     requiredLevel: 6
     icon: "WATER_BUCKET"
-    effect:
-      type: "collect.hydration_bonus"
-      params:
-        dryCropMultiplier: 1.2
-        autoHydrateRadius: 2
-      evaluationMode: "RUNTIME"
     children: ["skill9"]
 
   skill9:
-    nameKey: "skill.farmer.skill9.name"
-    descriptionKey: "skill.farmer.skill9.description"
     requiredLevel: 7
     icon: "ENCHANTED_BOOK"
     effect:

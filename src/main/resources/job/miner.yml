@@ -2,58 +2,51 @@
 skills:
   settings:
     level:
-      initialExp: 100
-      base: 1.25
+      initialExp: 10
+      base: 1.2
       maxLevel: 50
-    overviewIcon: "IRON_PICKAXE"
+    overviewIcon: "DIAMOND_PICKAXE"
 
   skill0:
-    nameKey: "skill.miner.skill0.name"
-    descriptionKey: "skill.miner.skill0.description"
-    requiredLevel: 1
+    requiredLevel: 0
     icon: "WOODEN_PICKAXE"
-    children: ["skill1"]
+    children: ["speed_1"]
 
-  skill1:
-    nameKey: "skill.miner.skill1.name"
-    descriptionKey: "skill.miner.skill1.description"
-    requiredLevel: 2
-    icon: "STONE_PICKAXE"
+  speed_1:
+    requiredLevel: 5
+    icon: "IRON_PICKAXE"
     effect:
       type: "collect.break_speed_boost"
       params:
-        multiplier: 1.2
-        targetBlocks: ["STONE", "COAL_ORE", "IRON_ORE", "COPPER_ORE"]
+        multiplier: 1.1
         targetTools: ["PICKAXE"]
-        maxMultiplier: 3.0
       evaluationMode: "RUNTIME"
-    children: ["skill2", "skill4"]
+    children: ["fortune_1"]
 
-  skill2:
-    nameKey: "skill.miner.skill2.name"
-    descriptionKey: "skill.miner.skill2.description"
-    requiredLevel: 3
-    icon: "IRON_PICKAXE"
+  fortune_1:
+    requiredLevel: 10
+    icon: "GOLDEN_PICKAXE"
     effect:
       type: "collect.drop_bonus"
+      combineRule: "add"
       params:
-        amount: 1
-        targetBlocks: ["COAL_ORE", "IRON_ORE", "COPPER_ORE"]
-        targetItems: ["COAL", "RAW_IRON", "RAW_COPPER"]
+        fortune_level: 1
       evaluationMode: "RUNTIME"
-    children: ["skill3"]
+    children: ["speed_2", "fortune_2"]
 
-  skill3:
-    nameKey: "skill.miner.skill3.name"
-    descriptionKey: "skill.miner.skill3.description"
-    requiredLevel: 4
-    icon: "DIAMOND_PICKAXE"
-    children: ["skill8"]
+  speed_2:
+    requiredLevel: 15
+    icon: "IRON_PICKAXE"
+    effect:
+      type: "collect.break_speed_boost"
+      combineRule: "add"
+      params:
+        multiplier: 1.2
+      evaluationMode: "RUNTIME"
+    children: ["durability_1"]
 
-  skill4:
-    nameKey: "skill.miner.skill4.name"
-    descriptionKey: "skill.miner.skill4.description"
-    requiredLevel: 3
+  fortune_2:
+    requiredLevel: 15
     icon: "GOLDEN_PICKAXE"
     effect:
       type: "collect.durability_save_chance"
@@ -61,28 +54,23 @@ skills:
         saveChance: 0.15
         targetTools: ["PICKAXE"]
       evaluationMode: "RUNTIME"
-    children: ["skill5", "skill6"]
+    children: ["fortune_3"]
 
-  skill5:
-    nameKey: "skill.miner.skill5.name"
-    descriptionKey: "skill.miner.skill5.description"
+  durability_1:
     requiredLevel: 4
-    icon: "NETHERITE_PICKAXE"
+    icon: "DIAMOND_PICKAXE"
     effect:
       type: "collect.break_speed_boost"
       params:
         multiplier: 1.4
         targetBlocks: ["DIAMOND_ORE", "EMERALD_ORE", "ANCIENT_DEBRIS"]
         targetTools: ["PICKAXE"]
-        maxMultiplier: 3.0
       evaluationMode: "RUNTIME"
-    children: ["skill8"]
+    children: ["mineall_1"]
 
-  skill6:
-    nameKey: "skill.miner.skill6.name"
-    descriptionKey: "skill.miner.skill6.description"
+  fortune_3:
     requiredLevel: 4
-    icon: "TORCH"
+    icon: "GOLDEN_PICKAXE"
     effect:
       type: "collect.unlock_batch_break"
       params:
@@ -94,25 +82,34 @@ skills:
         visualizeTargets: true
         matchLevel: "FAMILY"
       evaluationMode: "CACHED"
-    children: ["skill7"]
+    children: ["mineall_1"]
 
-  skill7:
-    nameKey: "skill.miner.skill7.name"
-    descriptionKey: "skill.miner.skill7.description"
+  mineall_1:
     requiredLevel: 5
     icon: "COMPASS"
-    children: ["skill9"]
+    children: ["mineall_2", "blastmine_1"]
 
-  skill8:
-    nameKey: "skill.miner.skill8.name"
-    descriptionKey: "skill.miner.skill8.description"
+  mineall_2:
     requiredLevel: 6
     icon: "ANVIL"
-    children: ["skill9"]
+    children: ["mineall_3"]
 
-  skill9:
-    nameKey: "skill.miner.skill9.name"
-    descriptionKey: "skill.miner.skill9.description"
+  mineall_3:
+    requiredLevel: 6
+    icon: "ANVIL"
+    children: []
+
+  blastmine_1:
+    requiredLevel: 7
+    icon: "BEACON"
+    effect:
+      type: "general.unlock_item_token"
+      params:
+        items: ["miner_pickaxe_token"]
+      evaluationMode: "CACHED"
+    children: ["blastmine_2"]
+
+  blastmine_2:
     requiredLevel: 7
     icon: "BEACON"
     effect:

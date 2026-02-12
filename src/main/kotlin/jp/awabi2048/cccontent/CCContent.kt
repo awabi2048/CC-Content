@@ -44,6 +44,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.mobs.MobManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.items.ItemManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.listeners.*
 import jp.awabi2048.cccontent.features.sukima_dungeon.tasks.SpecialTileTask
+import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.event.Listener
 import org.bukkit.event.EventHandler
@@ -59,6 +60,7 @@ class CCContent : JavaPlugin(), Listener {
     }
     
     private var playTimeTrackerTaskId: Int = -1
+    private lateinit var featureInitLogger: FeatureInitializationLogger
     
     // SukimaDungeon マネージャー (GitHub版)
     private lateinit var structureLoader: StructureLoader
@@ -81,6 +83,14 @@ class CCContent : JavaPlugin(), Listener {
         reloadConfig()
         migrateLegacyConfigLayout()
         
+        // 初期化ロガーを初期化
+        featureInitLogger = FeatureInitializationLogger(logger)
+        featureInitLogger.registerFeature("Rank System")
+        featureInitLogger.registerFeature("Brewery")
+        featureInitLogger.registerFeature("Cooking")
+        featureInitLogger.registerFeature("Arena")
+        featureInitLogger.registerFeature("SukimaDungeon")
+        
         // ロガーをCustomItemManagerに設定
         CustomItemManager.setLogger(logger)
         
@@ -95,7 +105,7 @@ class CCContent : JavaPlugin(), Listener {
 
         // Arena 初期化
         arenaManager = ArenaManager(this)
-        arenaManager.initialize()
+        arenaManager.initialize(featureInitLogger)
 
         initializeBreweryAndCooking()
         
@@ -141,14 +151,8 @@ class CCContent : JavaPlugin(), Listener {
         // ScaleManagerタスクの開始（毎tick実行）
         server.scheduler.runTaskTimer(this, GulliverScaleManager(), 0L, 1L)
         
-        logger.info("CC-Content v${description.version} が有効化されました")
-        logger.info("作成者: ${description.authors}")
-        logger.info("登録されたアイテム数: ${CustomItemManager.getItemCount()}")
-        
-        // フィーチャー別のアイテム数を表示
-        logger.info("  - misc: ${CustomItemManager.getItemCountByFeature("misc")}")
-        logger.info("  - brewery: ${CustomItemManager.getItemCountByFeature("brewery")}")
-        logger.info("  - arena: ${CustomItemManager.getItemCountByFeature("arena")}")
+        // 初期化結果をまとめて表示
+        featureInitLogger.printSummary()
     }
     
     /**
@@ -167,14 +171,25 @@ class CCContent : JavaPlugin(), Listener {
             rankManager.setMessageProvider(messageProvider)
             rankManager.initBossBarManager(this)
 
-            // スキルツリーを登録
-            registerSkillTrees()
+            // /rank, /rankmenu は早い段階で必ず登録する
+            // （後続の初期化で例外が発生してもコマンド実行自体は生かす）
+            val translator = jp.awabi2048.cccontent.features.rank.tutorial.task.EntityBlockTranslator(messageProvider)
+            val rankCommand = RankCommand(rankManager, messageProvider, null, null, translator)
+            registerRankCommands(rankCommand)
+            server.pluginManager.registerEvents(rankCommand, this)
+            server.pluginManager.registerEvents(
+                jp.awabi2048.cccontent.features.rank.listener.TutorialRankUpListener(rankManager, rankCommand),
+                this
+            )
 
             val ignoreBlockStore = IgnoreBlockStore(File(dataFolder, "job/.ignore_blocks.yml"))
             ignoreBlockStoreInstance = ignoreBlockStore
 
             // スキル効果システムを初期化
             initializeSkillEffectSystem(rankManager, ignoreBlockStore)
+
+            // スキルツリーを登録
+            registerSkillTrees()
 
             // チュートリアルランク タスクシステムの初期化
             val (taskLoader, taskChecker) = initializeTutorialTaskSystem(rankManager, storage, ignoreBlockStore)
@@ -189,31 +204,42 @@ class CCContent : JavaPlugin(), Listener {
                     storage
                 )
                 playTimeTrackerTaskId = playTimeTracker.start()
-                logger.info("プレイ時間トラッカーが起動しました（1分ごとに更新）")
             }
 
-            // /rank コマンドを登録
-            val translator = jp.awabi2048.cccontent.features.rank.tutorial.task.EntityBlockTranslator(messageProvider)
-            val rankCommand = RankCommand(rankManager, messageProvider, taskLoader, taskChecker, translator)
-            getCommand("rank")?.setExecutor(rankCommand)
-            getCommand("rank")?.tabCompleter = rankCommand
-            server.pluginManager.registerEvents(rankCommand, this)
-            server.pluginManager.registerEvents(ProfessionMinerExpListener(this, rankManager, ignoreBlockStore), this)
+            // 追加のランク系リスナー登録
+            val minerListener = ProfessionMinerExpListener(this, rankManager, ignoreBlockStore)
+            server.pluginManager.registerEvents(minerListener, this)
+            
+            // デバッグ用：BlockBreakEvent 汎用リスナー
+            server.pluginManager.registerEvents(jp.awabi2048.cccontent.features.rank.job.BlockBreakEventDebugListener(this), this)
 
-            // /rankmenu コマンドを登録
-            val rankMenuCommand = jp.awabi2048.cccontent.features.rank.command.RankMenuCommand(rankCommand)
-            getCommand("rankmenu")?.setExecutor(rankMenuCommand)
-
-            // TutorialRankUpListenerを登録（rankCommandが必要なので後で登録）
-            server.pluginManager.registerEvents(
-                jp.awabi2048.cccontent.features.rank.listener.TutorialRankUpListener(rankManager, rankCommand),
-                this
-            )
-
-            logger.info("ランクシステムが初期化されました")
+            // 登録されたスキルツリーをカウント
+            val skillTreeCount = Profession.values().count { SkillTreeRegistry.getSkillTree(it) != null }
+            featureInitLogger.addSummaryMessage("Rank System", "スキル${skillTreeCount}種登録")
+            featureInitLogger.setStatus("Rank System", FeatureInitializationLogger.Status.SUCCESS)
         } catch (e: Exception) {
+            featureInitLogger.setStatus("Rank System", FeatureInitializationLogger.Status.FAILURE)
+            featureInitLogger.addDetailMessage("Rank System", "[Rank System] 初期化失敗: ${e.message}")
             logger.warning("ランクシステムの初期化に失敗しました: ${e.message}")
             e.printStackTrace()
+        }
+    }
+
+    private fun registerRankCommands(rankCommand: RankCommand) {
+        val rankPluginCommand = getCommand("rank")
+        if (rankPluginCommand == null) {
+            logger.severe("/rank コマンドの登録に失敗しました（plugin.yml の commands.rank を確認してください）")
+        } else {
+            rankPluginCommand.setExecutor(rankCommand)
+            rankPluginCommand.tabCompleter = rankCommand
+        }
+
+        val rankMenuPluginCommand = getCommand("rankmenu")
+        if (rankMenuPluginCommand == null) {
+            logger.severe("/rankmenu コマンドの登録に失敗しました（plugin.yml の commands.rankmenu を確認してください）")
+        } else {
+            val rankMenuCommand = jp.awabi2048.cccontent.features.rank.command.RankMenuCommand(rankCommand)
+            rankMenuPluginCommand.setExecutor(rankMenuCommand)
         }
     }
 
@@ -238,13 +264,17 @@ class CCContent : JavaPlugin(), Listener {
 
             SkillEffectRegistry.register(UnlockItemTokenHandler())
 
+            // 戦闘系スキルハンドラー
+            SkillEffectRegistry.register(CombatDamageBoostHandler())
+            SkillEffectRegistry.register(SweepAttackDamageBoostHandler())
+            SkillEffectRegistry.register(AttackReachBoostHandler())
+
             server.pluginManager.registerEvents(SkillEffectCacheListener(rankManager, this), this)
             server.pluginManager.registerEvents(BlockBreakEffectListener(ignoreBlockStore, blastMineHandler), this)
             server.pluginManager.registerEvents(BatchBreakToggleListener(), this)
             server.pluginManager.registerEvents(BatchBreakPreviewListener(), this)
             server.pluginManager.registerEvents(CraftEffectListener(), this)
-
-            logger.info("スキル効果システムが初期化されました（${SkillEffectRegistry.getHandlerCount()}個のハンドラーを登録）")
+            server.pluginManager.registerEvents(CombatEffectListener(), this)
         } catch (e: Exception) {
             logger.warning("スキル効果システムの初期化に失敗しました: ${e.message}")
             e.printStackTrace()
@@ -265,13 +295,11 @@ class CCContent : JavaPlugin(), Listener {
             val tutorialTasksFile = File(dataFolder, "tutorial-tasks.yml")
             if (!tutorialTasksFile.exists()) {
                 extractTutorialTasksFile(tutorialTasksFile)
-                logger.info("tutorial-tasks.yml ファイルを作成しました")
             }
             
             // TutorialTaskLoader を初期化
             val taskLoader = TutorialTaskLoader()
             taskLoader.loadRequirements(tutorialTasksFile)
-            logger.info("チュートリアルランク タスク要件を読み込みました")
             
             // TutorialTaskChecker を作成
             val taskChecker = TutorialTaskCheckerImpl()
@@ -301,13 +329,6 @@ class CCContent : JavaPlugin(), Listener {
                 TutorialPlayerExpListener(rankManager, taskChecker, taskLoader, storage),
                 this
             )
-            
-            logger.info("チュートリアルランク タスクシステムが初期化されました")
-            if (resetExistingPlayers) {
-                logger.info("既存プレイヤーをNewbieにリセット: ON")
-            } else {
-                logger.info("既存プレイヤーをNewbieにリセット: OFF")
-            }
             
             return Pair(taskLoader, taskChecker)
         } catch (e: Exception) {
@@ -343,7 +364,6 @@ class CCContent : JavaPlugin(), Listener {
         if (!expFile.exists()) {
             try {
                 extractJobFile("exp.yml", expFile)
-                logger.info("ジョブ経験値設定ファイルを作成しました: exp.yml")
             } catch (e: Exception) {
                 logger.warning("ジョブ経験値設定ファイルのコピーに失敗しました: ${e.message}")
             }
@@ -356,7 +376,6 @@ class CCContent : JavaPlugin(), Listener {
             if (!ymlFile.exists()) {
                 try {
                     extractJobFile("${profession.id}.yml", ymlFile)
-                    logger.info("スキルツリーファイルを作成しました: ${profession.id}.yml")
                 } catch (e: Exception) {
                     val error = "スキルツリーファイルのコピーに失敗しました (${profession.id}): ${e.message}"
                     logger.warning(error)
@@ -368,8 +387,8 @@ class CCContent : JavaPlugin(), Listener {
             try {
                 val skillTree = ConfigBasedSkillTree(profession.id, ymlFile)
                 SkillTreeRegistry.register(profession, skillTree)
-                logger.info("スキルツリーを登録しました: ${profession.id}")
             } catch (e: Exception) {
+                e.printStackTrace()
                 val error = "スキルツリー読み込み失敗 (${profession.id}): ${e.message}"
                 logger.warning(error)
                 errors += error
@@ -418,8 +437,6 @@ class CCContent : JavaPlugin(), Listener {
      */
     private fun reloadConfiguration() {
         try {
-            logger.info("CC-Content の設定ファイルをリロード中...")
-
             data class RequiredResource(
                 val resourcePath: String,
                 val targetPath: String = resourcePath
@@ -462,7 +479,6 @@ class CCContent : JavaPlugin(), Listener {
             for (required in requiredResources) {
                 val file = File(dataFolder, required.targetPath)
                 if (!file.exists()) {
-                    logger.info("欠損しているファイルを検出: ${required.targetPath}")
                     copyResourceFile(required.resourcePath, file)
                 }
             }
@@ -471,9 +487,7 @@ class CCContent : JavaPlugin(), Listener {
             for (dirName in requiredDirs) {
                 val dir = File(dataFolder, dirName)
                 if (!dir.exists()) {
-                    logger.info("欠損しているディレクトリを検出: $dirName")
                     dir.mkdirs()
-                    logger.info("ディレクトリを作成: $dirName")
                 }
             }
             
@@ -484,14 +498,12 @@ class CCContent : JavaPlugin(), Listener {
                 for (jobFile in requiredJobFiles) {
                     val file = File(jobDir, jobFile)
                     if (!file.exists()) {
-                        logger.info("欠損しているジョブファイルを検出: job/$jobFile")
                         copyResourceFile("job/$jobFile", file)
                     }
                 }
 
                 try {
                     registerSkillTrees()
-                    logger.info("スキルツリー定義を再読み込みしました")
                 } catch (e: Exception) {
                     logger.warning("スキルツリー定義の再読み込みに失敗しました: ${e.message}")
                 }
@@ -506,7 +518,6 @@ class CCContent : JavaPlugin(), Listener {
                             playerProfession.profession
                         )
                     }
-                    logger.info("スキル効果キャッシュを再構築しました（対象: ${server.onlinePlayers.size}人）")
                 }
             }
             
@@ -520,7 +531,6 @@ class CCContent : JavaPlugin(), Listener {
                 for (advFile in requiredAdvancementFiles) {
                     val file = File(advancementDir, advFile)
                     if (!file.exists()) {
-                        logger.info("欠損しているAdvancementファイルを検出: data/cccontent/advancement/tutorial/$advFile")
                         copyResourceFile("data/cccontent/advancement/tutorial/$advFile", file)
                     }
                 }
@@ -541,8 +551,6 @@ class CCContent : JavaPlugin(), Listener {
             if (::arenaManager.isInitialized) {
                 arenaManager.reloadThemes()
             }
-            
-            logger.info("CC-Content の設定ファイルをすべてリロードしました")
         } catch (e: Exception) {
             logger.warning("リロード中にエラーが発生しました: ${e.message}")
             e.printStackTrace()
@@ -569,8 +577,6 @@ class CCContent : JavaPlugin(), Listener {
                     input.copyTo(output)
                 }
             }
-            
-            logger.info("ファイルをコピーしました: $resourcePath → ${targetFile.absolutePath}")
         } catch (e: Exception) {
             logger.warning("ファイルのコピーに失敗しました ($resourcePath): ${e.message}")
             e.printStackTrace()
@@ -584,9 +590,7 @@ class CCContent : JavaPlugin(), Listener {
             return
         }
 
-        val before = store.getTrackedBlockCount()
         store.clearAll()
-        logger.info("ブロック設置データを削除しました（削除件数: $before）")
     }
 
     private fun migrateLegacyConfigLayout() {
@@ -627,10 +631,10 @@ class CCContent : JavaPlugin(), Listener {
 
     private fun initializeBreweryAndCooking() {
         breweryFeature = BreweryFeature(this)
-        breweryFeature.initialize()
+        breweryFeature.initialize(featureInitLogger)
 
         cookingFeature = CookingFeature(this)
-        cookingFeature.initialize()
+        cookingFeature.initialize(featureInitLogger)
     }
     
     /**
@@ -638,8 +642,6 @@ class CCContent : JavaPlugin(), Listener {
      */
     private fun initializeSukimaDungeon() {
         try {
-            logger.info("[SukimaDungeon] 初期化を開始しています...")
-            
             // 設定をリロード
             reloadSukimaDungeon()
             BGMManager.loadConfig()
@@ -750,8 +752,10 @@ class CCContent : JavaPlugin(), Listener {
             // Load sessions
             DungeonSessionManager.loadSessions(this)
             
-            logger.info("[SukimaDungeon] 初期化が完了しました")
+            featureInitLogger.setStatus("SukimaDungeon", FeatureInitializationLogger.Status.SUCCESS)
         } catch (e: Exception) {
+            featureInitLogger.setStatus("SukimaDungeon", FeatureInitializationLogger.Status.FAILURE)
+            featureInitLogger.addDetailMessage("SukimaDungeon", "[SukimaDungeon] 初期化失敗: ${e.message}")
             logger.warning("[SukimaDungeon] 初期化に失敗しました: ${e.message}")
             e.printStackTrace()
         }

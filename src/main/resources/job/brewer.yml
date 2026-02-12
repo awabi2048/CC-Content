@@ -8,15 +8,11 @@ skills:
     overviewIcon: "BREWING_STAND"
 
   skill0:
-    nameKey: "skill.brewer.skill0.name"
-    descriptionKey: "skill.brewer.skill0.description"
     requiredLevel: 1
     icon: "BREWING_STAND"
     children: ["skill1"]
 
   skill1:
-    nameKey: "skill.brewer.skill1.name"
-    descriptionKey: "skill.brewer.skill1.description"
     requiredLevel: 2
     icon: "GLASS_BOTTLE"
     effect:
@@ -26,8 +22,6 @@ skills:
     children: ["skill2", "skill4"]
 
   skill2:
-    nameKey: "skill.brewer.skill2.name"
-    descriptionKey: "skill.brewer.skill2.description"
     requiredLevel: 3
     icon: "POTION"
     effect:
@@ -38,8 +32,6 @@ skills:
     children: ["skill3"]
 
   skill3:
-    nameKey: "skill.brewer.skill3.name"
-    descriptionKey: "skill.brewer.skill3.description"
     requiredLevel: 4
     icon: "BLAZE_POWDER"
     effect:
@@ -50,8 +42,6 @@ skills:
     children: ["skill8"]
 
   skill4:
-    nameKey: "skill.brewer.skill4.name"
-    descriptionKey: "skill.brewer.skill4.description"
     requiredLevel: 3
     icon: "SPLASH_POTION"
     effect:
@@ -62,8 +52,6 @@ skills:
     children: ["skill5", "skill6"]
 
   skill5:
-    nameKey: "skill.brewer.skill5.name"
-    descriptionKey: "skill.brewer.skill5.description"
     requiredLevel: 4
     icon: "LINGERING_POTION"
     effect:
@@ -74,29 +62,21 @@ skills:
     children: ["skill8"]
 
   skill6:
-    nameKey: "skill.brewer.skill6.name"
-    descriptionKey: "skill.brewer.skill6.description"
     requiredLevel: 4
     icon: "FERMENTED_SPIDER_EYE"
     children: ["skill7"]
 
   skill7:
-    nameKey: "skill.brewer.skill7.name"
-    descriptionKey: "skill.brewer.skill7.description"
     requiredLevel: 5
     icon: "GHAST_TEAR"
     children: ["skill9"]
 
   skill8:
-    nameKey: "skill.brewer.skill8.name"
-    descriptionKey: "skill.brewer.skill8.description"
     requiredLevel: 6
     icon: "ENCHANTED_GOLDEN_APPLE"
     children: ["skill9"]
 
   skill9:
-    nameKey: "skill.brewer.skill9.name"
-    descriptionKey: "skill.brewer.skill9.description"
     requiredLevel: 7
     icon: "DRAGON_BREATH"
     effect:

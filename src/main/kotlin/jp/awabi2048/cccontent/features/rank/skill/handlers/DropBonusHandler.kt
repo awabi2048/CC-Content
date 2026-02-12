@@ -4,7 +4,23 @@ import jp.awabi2048.cccontent.features.rank.skill.EffectContext
 import jp.awabi2048.cccontent.features.rank.skill.EvaluationMode
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffect
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectHandler
+import org.bukkit.enchantments.Enchantment
+import kotlin.math.floor
+import kotlin.random.Random
 
+/**
+ * ドロップ増加スキルハンドラー
+ *
+ * パラメータ:
+ *   fortune_level: Double - 追加の幸運レベル（小数可）
+ *                         バニラの幸運と合算した値でドロップ数を計算
+ *   targetBlocks: List<String> - 対象ブロック（オプション）
+ *   targetItems: List<String> - 対象アイテム（オプション）
+ *
+ * 計算方式:
+ *   幸運レベル = バニラ Fortune + スキル fortune_level の合算
+ *   ドロップ数 = floor(元のドロップ数 × (1 + 幸運レベル × 0.5)) + 確率による追加ドロップ
+ */
 class DropBonusHandler : SkillEffectHandler {
     companion object {
         const val EFFECT_TYPE = "collect.drop_bonus"
@@ -16,42 +32,38 @@ class DropBonusHandler : SkillEffectHandler {
 
     override fun applyEffect(context: EffectContext): Boolean {
         val event = context.getEvent<org.bukkit.event.block.BlockDropItemEvent>() ?: return false
+        val player = event.player
+        val profession = context.profession
 
-        val amount = context.skillEffect.getIntParam("amount", 0)
-        val chance = context.skillEffect.getDoubleParam("chance", 0.0)
+        val fortuneLevel = context.skillEffect.getDoubleParam("fortune_level", 0.0)
 
-        if (amount <= 0 && chance <= 0.0) {
+        if (fortuneLevel <= 0) {
             return false
         }
 
-        val targetBlocks = context.skillEffect.getStringListParam("targetBlocks")
-        val targetItems = context.skillEffect.getStringListParam("targetItems")
-
-        if (targetBlocks.isNotEmpty()) {
-            val blockType = event.block.type.name
-            if (blockType !in targetBlocks) {
-                return false
-            }
+        // 職業別ブロック判定
+        val blockType = event.block.type.name
+        if (!isApplicableBlock(blockType, profession.id)) {
+            return false
         }
+
+        // プレイヤーが持つ道具のバニラ Fortune レベルを取得
+        val toolInHand = player.inventory.itemInMainHand
+        val vanillaFortuneLevel = toolInHand.getEnchantmentLevel(Enchantment.FORTUNE)
+
+        // 総幸運レベル = バニラ + スキル
+        val totalFortuneLevel = vanillaFortuneLevel + fortuneLevel
 
         val dropsToAdd = mutableListOf<org.bukkit.entity.Item>()
 
         for (drop in event.items) {
-            val itemType = drop.itemStack.type.name
+            val originalAmount = drop.itemStack.amount
+            val increasedAmount = calculateFortuneDrops(originalAmount, totalFortuneLevel)
+            val additionalAmount = increasedAmount - originalAmount
 
-            if (targetItems.isNotEmpty() && itemType !in targetItems) {
-                continue
-            }
-
-            if (amount > 0) {
+            if (additionalAmount > 0) {
                 val newItem = drop.itemStack.clone()
-                newItem.amount = amount
-                dropsToAdd.add(event.block.world.dropItemNaturally(event.block.location.add(0.5, 0.5, 0.5), newItem))
-            }
-
-            if (chance > 0.0 && kotlin.random.Random.nextDouble() < chance) {
-                val newItem = drop.itemStack.clone()
-                newItem.amount = 1
+                newItem.amount = additionalAmount
                 dropsToAdd.add(event.block.world.dropItemNaturally(event.block.location.add(0.5, 0.5, 0.5), newItem))
             }
         }
@@ -59,10 +71,65 @@ class DropBonusHandler : SkillEffectHandler {
         return dropsToAdd.isNotEmpty()
     }
 
+    /**
+     * 職業に応じた適用対象ブロック判定
+     */
+    private fun isApplicableBlock(blockType: String, professionId: String): Boolean {
+        return when (professionId) {
+            "miner" -> isOreBlock(blockType)
+            "lumberjack" -> isLogBlock(blockType)
+            else -> false
+        }
+    }
+
+    /**
+     * 鉱石系ブロック判定
+     * - *_ORE で終わるもの
+     * - ANCIENT_DEBRIS（ネザー鉱石）
+     * - NETHER_GOLD_ORE
+     */
+    private fun isOreBlock(blockType: String): Boolean {
+        return blockType.endsWith("_ORE") || 
+               blockType == "ANCIENT_DEBRIS" || 
+               blockType == "NETHER_GOLD_ORE"
+    }
+
+    /**
+     * 木系ブロック判定
+     * - *_LOG で終わるもの
+     * - *_WOOD で終わるもの
+     * - *_STEM で終わるもの
+     * - *_HYPHAE で終わるもの
+     */
+    private fun isLogBlock(blockType: String): Boolean {
+        return blockType.endsWith("_LOG") ||
+               blockType.endsWith("_WOOD") ||
+               blockType.endsWith("_STEM") ||
+               blockType.endsWith("_HYPHAE")
+    }
+
+    /**
+     * Minecraft の Fortune エンチャント計算に準拠した、ドロップ数計算
+     * 参考: https://minecraft.wiki/wiki/Fortune
+     *
+     * Fortune なし (0): drop_amount = base
+     * Fortune I (1):   drop_amount = base + random(0, 1)
+     * Fortune II (2):  drop_amount = base + random(0, 2)
+     * Fortune III (3): drop_amount = base + random(0, 3)
+     *
+     * @param baseAmount 基本ドロップ数
+     * @param fortuneLevel 総幸運レベル（小数可）
+     * @return 最終ドロップ数
+     */
+    private fun calculateFortuneDrops(baseAmount: Int, fortuneLevel: Double): Int {
+        if (fortuneLevel <= 0) return baseAmount
+
+        val bonusDrops = floor(Random.nextDouble(fortuneLevel + 1.0)).toInt()
+        return baseAmount + bonusDrops
+    }
+
     override fun calculateStrength(skillEffect: SkillEffect): Double {
-        val amount = skillEffect.getIntParam("amount", 0).toDouble()
-        val chance = skillEffect.getDoubleParam("chance", 0.0)
-        return amount + chance
+        return skillEffect.getDoubleParam("fortune_level", 0.0)
     }
 
     override fun supportsProfession(professionId: String): Boolean {
@@ -70,8 +137,7 @@ class DropBonusHandler : SkillEffectHandler {
     }
 
     override fun validateParams(skillEffect: SkillEffect): Boolean {
-        val amount = skillEffect.getIntParam("amount", 0)
-        val chance = skillEffect.getDoubleParam("chance", 0.0)
-        return amount > 0 || chance > 0.0
+        val fortuneLevel = skillEffect.getDoubleParam("fortune_level", 0.0)
+        return fortuneLevel > 0
     }
 }

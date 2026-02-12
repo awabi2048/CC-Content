@@ -48,10 +48,14 @@ class ProfessionManagerImpl(
         val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return false
         val startSkillId = skillTree.getStartSkillId()
 
+        // 開始スキルと requiredLevel = 0 のスキルを自動習得
+        val acquiredSkills = mutableSetOf(startSkillId)
+        acquiredSkills.addAll(collectLevel0Skills(skillTree, acquiredSkills))
+
         val playerProf = PlayerProfession(
             playerUuid = playerUuid,
             profession = profession,
-            acquiredSkills = mutableSetOf(startSkillId),
+            acquiredSkills = acquiredSkills,
             currentExp = 0L
         )
 
@@ -77,10 +81,14 @@ class ProfessionManagerImpl(
         val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return false
         val startSkillId = skillTree.getStartSkillId()
 
+        // 開始スキルと requiredLevel = 0 のスキルを自動習得
+        val acquiredSkills = mutableSetOf(startSkillId)
+        acquiredSkills.addAll(collectLevel0Skills(skillTree, acquiredSkills))
+
         val newProf = PlayerProfession(
             playerUuid = playerUuid,
             profession = profession,
-            acquiredSkills = mutableSetOf(startSkillId),
+            acquiredSkills = acquiredSkills,
             currentExp = 0L
         )
 
@@ -150,6 +158,9 @@ class ProfessionManagerImpl(
         if (!prof.acquireSkill(skill.skillId)) {
             return false
         }
+
+        // スキル習得後、requiredLevel = 0 の子スキルを自動習得
+        prof.acquiredSkills.addAll(collectLevel0Skills(skillTree, prof.acquiredSkills))
 
         storage.saveProfession(prof)
 
@@ -293,7 +304,7 @@ class ProfessionManagerImpl(
             prof.resetForPrestige()
 
             // 新しい思念アイテムを付与
-            val token = PrestigeToken.create(prof.profession, prestigeLevel, player)
+            val token = PrestigeToken.create(prof.profession, prestigeLevel, player, messageProvider)
             val leftover = player.inventory.addItem(token)
             if (leftover.isNotEmpty()) {
                 // インベントリがいっぱいの場合はドロップ
@@ -341,5 +352,53 @@ class ProfessionManagerImpl(
         player.playSound(player.location, "minecraft:block.note_block.pling", 1.0f, 2.0f)
         player.playSound(player.location, "minecraft:ui.button.click", 0.8f, 1.0f)
         player.playSound(player.location, "minecraft:entity.player.levelup", 1.0f, 2.0f)
+    }
+
+    /**
+     * 指定されたスキルツリーから、requiredLevel = 0 のスキルをすべて収集する。
+     * 既に習得済みのスキルは除外される。
+     *
+     * アルゴリズム:
+     * 1. 習得済みスキルから見える子スキルをキュー追加
+     * 2. キューを処理し、requiredLevel = 0 なら習得スキルに追加
+     * 3. 新たに習得したスキルの子スキルもキューに追加（BFS）
+     *
+     * @param skillTree スキルツリー
+     * @param acquiredSkills 現在の習得済みスキル
+     * @return 新規習得可能な requiredLevel = 0 スキルのセット
+     */
+    private fun collectLevel0Skills(
+        skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree,
+        acquiredSkills: Set<String>
+    ): Set<String> {
+        val newAcquired = mutableSetOf<String>()
+        val toCheck = mutableListOf<String>()
+
+        // 初期キューに習得済みスキルの子スキルを追加
+        acquiredSkills.forEach { skillId ->
+            val skill = skillTree.getSkill(skillId) ?: return@forEach
+            toCheck.addAll(skill.children)
+        }
+
+        // BFS で requiredLevel = 0 スキルを探索
+        while (toCheck.isNotEmpty()) {
+            val currentSkillId = toCheck.removeAt(0)
+
+            // 既に習得済みまたは新規習得済みならスキップ
+            if (currentSkillId in acquiredSkills || currentSkillId in newAcquired) {
+                continue
+            }
+
+            val skill = skillTree.getSkill(currentSkillId) ?: continue
+
+            // requiredLevel = 0 なら新規習得対象に追加
+            if (skill.requiredLevel == 0) {
+                newAcquired.add(currentSkillId)
+                // この子スキルもキューに追加（連鎖自動習得対応）
+                toCheck.addAll(skill.children)
+            }
+        }
+
+        return newAcquired
     }
 }

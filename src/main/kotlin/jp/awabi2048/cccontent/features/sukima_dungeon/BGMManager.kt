@@ -27,7 +27,6 @@ object BGMManager {
             val duration = section.getInt("$key.duration", 0)
             bgmConfigs[key] = BGMConfig(bgmKey, duration)
         }
-        plugin.logger.info("BGM設定を読み込みました: ${bgmConfigs.keys}")
     }
 
     fun play(player: Player, bgmId: String) {

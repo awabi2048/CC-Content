@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent.features.arena
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageGenerator
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeLoader
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
+import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import jp.awabi2048.cccontent.world.WorldSettingsHelper
 import org.bukkit.Bukkit
 import org.bukkit.GameRule
@@ -51,15 +52,15 @@ class ArenaManager(private val plugin: JavaPlugin) {
     private var spawnIntervalSeconds: Int = 5
     private var spawnRandomness: Double = 0.5
 
-    fun initialize() {
+    fun initialize(featureInitLogger: FeatureInitializationLogger? = null) {
         loadConfig()
-        themeLoader.load()
+        themeLoader.load(featureInitLogger)
         startMaintenanceTask()
     }
 
-    fun reloadThemes() {
+    fun reloadThemes(featureInitLogger: FeatureInitializationLogger? = null) {
         loadConfig()
-        themeLoader.load()
+        themeLoader.load(featureInitLogger)
     }
 
     private fun loadConfig() {

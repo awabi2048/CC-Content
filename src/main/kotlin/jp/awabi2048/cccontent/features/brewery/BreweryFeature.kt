@@ -1,14 +1,27 @@
 package jp.awabi2048.cccontent.features.brewery
 
+import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 
 class BreweryFeature(private val plugin: JavaPlugin) {
     private var controller: BreweryController? = null
 
-    fun initialize() {
-        ensureResources()
-        controller = BreweryController(plugin).also { it.initialize() }
+    fun initialize(featureInitLogger: FeatureInitializationLogger? = null) {
+        try {
+            ensureResources()
+            controller = BreweryController(plugin).also { it.initialize() }
+            featureInitLogger?.apply {
+                setStatus("Brewery", FeatureInitializationLogger.Status.SUCCESS)
+            }
+        } catch (e: Exception) {
+            featureInitLogger?.apply {
+                setStatus("Brewery", FeatureInitializationLogger.Status.FAILURE)
+                addDetailMessage("Brewery", "[Brewery] 初期化失敗: ${e.message}")
+            }
+            plugin.logger.warning("Brewery初期化失敗: ${e.message}")
+            e.printStackTrace()
+        }
     }
 
     fun reload() {

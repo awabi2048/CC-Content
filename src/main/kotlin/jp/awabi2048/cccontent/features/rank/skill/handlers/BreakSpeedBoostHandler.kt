@@ -12,7 +12,6 @@ import java.util.UUID
 class BreakSpeedBoostHandler : SkillEffectHandler {
     companion object {
         const val EFFECT_TYPE = "collect.break_speed_boost"
-        const val DEFAULT_MAX_MULTIPLIER = 3.0
         const val ATTRIBUTE_NAME = "rank_skill_break_speed_boost"
 
         private val ATTRIBUTE_UUID = UUID.fromString("4d2f0120-f0c4-4b2b-9a2d-0f9c4b0c5d6e")
@@ -53,15 +52,16 @@ class BreakSpeedBoostHandler : SkillEffectHandler {
     override fun applyEffect(context: EffectContext): Boolean {
         val event = context.getEvent<org.bukkit.event.block.BlockDamageEvent>() ?: return false
         val player = event.player
-        val maxMultiplier = context.skillEffect.getDoubleParam("maxMultiplier", DEFAULT_MAX_MULTIPLIER)
-        val multiplier = context.skillEffect.getDoubleParam("multiplier", 1.0).coerceAtMost(maxMultiplier)
+        val multiplier = context.skillEffect.getDoubleParam("multiplier", 1.0)
 
         val targetBlocks = context.skillEffect.getStringListParam("targetBlocks")
         val targetTools = context.skillEffect.getStringListParam("targetTools")
+        val allowAnyOre = targetBlocks.any { it.equals("AnyOre", ignoreCase = true) }
 
         if (targetBlocks.isNotEmpty()) {
             val blockType = event.block.type.name
-            if (blockType !in targetBlocks) {
+            val matchesOre = allowAnyOre && (blockType.endsWith("_ORE") || blockType == "ANCIENT_DEBRIS")
+            if (blockType !in targetBlocks && !matchesOre) {
                 return false
             }
         }
