@@ -108,10 +108,6 @@ class ProfessionBossBarManager(
     }
 
     private fun formatNumber(num: Long): String {
-        return when {
-            num >= 1_000_000 -> String.format("%.1fM", num / 1_000_000.0)
-            num >= 1_000 -> String.format("%.1fK", num / 1_000.0)
-            else -> num.toString()
-        }
+        return String.format("%,d", num)
     }
 }

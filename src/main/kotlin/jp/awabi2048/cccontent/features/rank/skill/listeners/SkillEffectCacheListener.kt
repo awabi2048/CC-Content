@@ -1,6 +1,8 @@
 package jp.awabi2048.cccontent.features.rank.skill.listeners
 
 import jp.awabi2048.cccontent.features.rank.RankManager
+import jp.awabi2048.cccontent.features.rank.event.PrestigeExecutedEvent
+import jp.awabi2048.cccontent.features.rank.event.PrestigeSkillAcquiredEvent
 import jp.awabi2048.cccontent.features.rank.event.ProfessionChangedEvent
 import jp.awabi2048.cccontent.features.rank.event.ProfessionLevelUpEvent
 import jp.awabi2048.cccontent.features.rank.event.SkillAcquiredEvent
@@ -18,20 +20,35 @@ class SkillEffectCacheListener(
 
     @EventHandler
     fun onSkillAcquired(event: SkillAcquiredEvent) {
-        val acquiredSkills = rankManager.getAcquiredSkills(event.player.uniqueId)
-        SkillEffectEngine.rebuildCache(event.player.uniqueId, acquiredSkills, event.profession)
+        val playerProf = rankManager.getPlayerProfession(event.player.uniqueId) ?: return
+        SkillEffectEngine.rebuildCache(
+            event.player.uniqueId,
+            playerProf.acquiredSkills,
+            event.profession,
+            playerProf.prestigeSkills
+        )
     }
 
     @EventHandler
     fun onProfessionChanged(event: ProfessionChangedEvent) {
-        val acquiredSkills = rankManager.getAcquiredSkills(event.player.uniqueId)
-        SkillEffectEngine.rebuildCache(event.player.uniqueId, acquiredSkills, event.newProfession)
+        val playerProf = rankManager.getPlayerProfession(event.player.uniqueId) ?: return
+        SkillEffectEngine.rebuildCache(
+            event.player.uniqueId,
+            playerProf.acquiredSkills,
+            event.newProfession,
+            playerProf.prestigeSkills
+        )
     }
 
     @EventHandler
     fun onProfessionLevelUp(event: ProfessionLevelUpEvent) {
-        val acquiredSkills = rankManager.getAcquiredSkills(event.player.uniqueId)
-        SkillEffectEngine.rebuildCache(event.player.uniqueId, acquiredSkills, event.profession)
+        val playerProf = rankManager.getPlayerProfession(event.player.uniqueId) ?: return
+        SkillEffectEngine.rebuildCache(
+            event.player.uniqueId,
+            playerProf.acquiredSkills,
+            event.profession,
+            playerProf.prestigeSkills
+        )
     }
 
     @EventHandler
@@ -41,7 +58,8 @@ class SkillEffectCacheListener(
             SkillEffectEngine.rebuildCache(
                 event.player.uniqueId,
                 playerProf.acquiredSkills,
-                playerProf.profession
+                playerProf.profession,
+                playerProf.prestigeSkills
             )
         }
     }
@@ -49,5 +67,27 @@ class SkillEffectCacheListener(
     @EventHandler
     fun onPlayerQuit(event: PlayerQuitEvent) {
         SkillEffectEngine.clearCache(event.player.uniqueId)
+    }
+
+    @EventHandler
+    fun onPrestigeSkillAcquired(event: PrestigeSkillAcquiredEvent) {
+        val playerProf = rankManager.getPlayerProfession(event.player.uniqueId) ?: return
+        SkillEffectEngine.rebuildCache(
+            event.player.uniqueId,
+            playerProf.acquiredSkills,
+            event.profession,
+            playerProf.prestigeSkills
+        )
+    }
+
+    @EventHandler
+    fun onPrestigeExecuted(event: PrestigeExecutedEvent) {
+        val playerProf = rankManager.getPlayerProfession(event.player.uniqueId) ?: return
+        SkillEffectEngine.rebuildCache(
+            event.player.uniqueId,
+            playerProf.acquiredSkills,
+            event.profession,
+            playerProf.prestigeSkills
+        )
     }
 }

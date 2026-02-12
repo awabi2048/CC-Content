@@ -92,4 +92,55 @@ interface ProfessionManager {
     fun isBossBarEnabled(playerUuid: UUID): Boolean
 
     fun setBossBarEnabled(playerUuid: UUID, enabled: Boolean)
+
+    /**
+     * プレイヤーの現在のプレステージレベルを取得
+     * @param playerUuid プレイヤーのUUID
+     * @return プレステージレベル（0=未プレステージ）
+     */
+    fun getPrestigeLevel(playerUuid: UUID): Int
+
+    /**
+     * プレイヤーがプレステージ可能かチェック
+     * @param playerUuid プレイヤーのUUID
+     * @return プレステージ可能な場合true
+     */
+    fun canPrestige(playerUuid: UUID): Boolean
+
+    /**
+     * プレイヤーがプレステージスキルを習得
+     * @param playerUuid プレイヤーのUUID
+     * @param skillId 習得するスキルID
+     * @return 成功した場合true
+     */
+    fun acquirePrestigeSkill(playerUuid: UUID, skillId: String): Boolean
+
+    /**
+     * プレイヤーが習得可能なプレステージスキルの一覧を取得
+     * @param playerUuid プレイヤーのUUID
+     * @return 習得可能なプレステージスキルIDのリスト
+     */
+    fun getAvailablePrestigeSkills(playerUuid: UUID): List<String>
+
+    /**
+     * プレイヤーが習得済みのプレステージスキルを取得
+     * @param playerUuid プレイヤーのUUID
+     * @return 習得済みプレステージスキルID集合
+     */
+    fun getAcquiredPrestigeSkills(playerUuid: UUID): Set<String>
+
+    /**
+     * プレイヤーが指定スキルのプレステージ版を習得済みかチェック
+     * @param playerUuid プレイヤーのUUID
+     * @param skillId スキルID
+     * @return 習得済みの場合true
+     */
+    fun hasPrestigeSkill(playerUuid: UUID, skillId: String): Boolean
+
+    /**
+     * プレステージを実行
+     * @param playerUuid プレイヤーのUUID
+     * @return 成功した場合true
+     */
+    fun executePrestige(playerUuid: UUID): Boolean
 }

@@ -119,4 +119,29 @@ interface RankManager {
     fun hideProfessionBossBar(playerUuid: UUID)
 
     fun hideAllProfessionBossBars()
+
+    /**
+     * プレイヤーのプレステージレベルを取得
+     */
+    fun getPrestigeLevel(playerUuid: UUID): Int
+
+    /**
+     * プレイヤーがプレステージ可能かチェック
+     */
+    fun canPrestige(playerUuid: UUID): Boolean
+
+    /**
+     * プレステージスキルを習得
+     */
+    fun acquirePrestigeSkill(playerUuid: UUID, skillId: String): Boolean
+
+    /**
+     * プレステージを実行
+     */
+    fun executePrestige(playerUuid: UUID): Boolean
+
+    /**
+     * プレイヤーが最大職業レベルに達しているかチェック
+     */
+    fun isMaxProfessionLevel(playerUuid: UUID): Boolean
 }

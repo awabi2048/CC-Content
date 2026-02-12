@@ -1,8 +1,10 @@
 package jp.awabi2048.cccontent.features.rank.skill
 
+import jp.awabi2048.cccontent.features.rank.prestige.PrestigeToken
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.SkillTree
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
+import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import java.util.UUID
 
@@ -35,10 +37,11 @@ object SkillEffectEngine {
         "collect.unlock_batch_break"
     )
 
-    fun rebuildCache(playerUuid: UUID, acquiredSkills: Set<String>, profession: Profession) {
+    fun rebuildCache(playerUuid: UUID, acquiredSkills: Set<String>, profession: Profession, prestigeSkills: Set<String> = emptySet()) {
         val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return
         val mutableByType = mutableMapOf<String, MutableList<SkillEffectEntry>>()
 
+        // 通常スキルを追加
         for (skillId in acquiredSkills) {
             val skill = skillTree.getSkill(skillId) ?: continue
             val effect = skill.effect ?: continue
@@ -52,6 +55,27 @@ object SkillEffectEngine {
             mutableByType
                 .getOrPut(effect.type) { mutableListOf() }
                 .add(SkillEffectEntry(skillId, effect, depth, strength))
+        }
+
+        // プレステージスキルを追加（思念アイテムを持っていれば有効）
+        val player = Bukkit.getPlayer(playerUuid)
+        val hasToken = player != null && PrestigeToken.hasTokenInHotbarOrOffhand(player, profession)
+        if (hasToken) {
+            for (skillId in prestigeSkills) {
+                val skill = skillTree.getSkill(skillId) ?: continue
+                val effect = skill.effect ?: continue
+
+                val handler = SkillEffectRegistry.getHandler(effect.type) ?: continue
+                if (!handler.isEnabled() || !handler.supportsProfession(profession.id)) continue
+
+                val depth = SkillDepthCalculator.calculateDepth(skillId, skillTree)
+                // プレステージスキルは通常スキルより強い効果を持つ（depth + 10で区別）
+                val strength = handler.calculateStrength(effect) * 1.5
+
+                mutableByType
+                    .getOrPut(effect.type) { mutableListOf() }
+                    .add(SkillEffectEntry(skillId, effect, depth + 10, strength))
+            }
         }
 
         val sortedByType = mutableByType
