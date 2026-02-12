@@ -42,8 +42,15 @@ class BlockBreakEffectListener(
 
         durabilityEligibleUntil[event.player.uniqueId] = System.currentTimeMillis() + DURABILITY_EFFECT_WINDOW_MILLIS
 
-        val compiledEffects = SkillEffectEngine.getCachedEffects(event.player.uniqueId) ?: return
+        val compiledEffects = SkillEffectEngine.getCachedEffects(event.player.uniqueId)
+        org.bukkit.Bukkit.getLogger().info("[BlockBreakEffectListener] onBlockDamage: ${event.player.name}, effects=${compiledEffects != null}")
+        if (compiledEffects == null) {
+            return
+        }
+
         val profession = compiledEffects.profession
+        val byType = compiledEffects.byType
+        org.bukkit.Bukkit.getLogger().info("[BlockBreakEffectListener] byType=${byType.keys}")
 
         val effectType = "collect.break_speed_boost"
         val blockTypeName = event.block.type.name

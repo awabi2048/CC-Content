@@ -300,9 +300,6 @@ class ProfessionManagerImpl(
                 PrestigeToken.removeToken(player, prof.profession)
             }
 
-            // プレステージ実行：通常レベル・スキル・経験値をリセット
-            prof.resetForPrestige()
-
             // 新しい思念アイテムを付与
             val token = PrestigeToken.create(prof.profession, prestigeLevel, player, messageProvider)
             val leftover = player.inventory.addItem(token)
@@ -313,7 +310,9 @@ class ProfessionManagerImpl(
                 }
             }
 
-            storage.saveProfession(prof)
+            // 職業を削除してリセット（新しい職業を選択できるようにする）
+            professionCache.remove(playerUuid)
+            storage.deleteProfession(playerUuid)
 
             val event = PrestigeExecutedEvent(player, prof.profession, prestigeLevel, isRePrestige)
             Bukkit.getPluginManager().callEvent(event)
@@ -328,8 +327,8 @@ class ProfessionManagerImpl(
             player.playSound(player.location, "minecraft:ui.toast.challenge_complete", 1.0f, 1.0f)
         } else {
             // オフラインの場合はデータのみリセット
-            prof.resetForPrestige()
-            storage.saveProfession(prof)
+            professionCache.remove(playerUuid)
+            storage.deleteProfession(playerUuid)
         }
 
         return true

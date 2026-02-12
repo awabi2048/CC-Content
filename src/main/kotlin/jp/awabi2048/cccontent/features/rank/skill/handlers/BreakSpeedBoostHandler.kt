@@ -52,7 +52,9 @@ class BreakSpeedBoostHandler : SkillEffectHandler {
     override fun applyEffect(context: EffectContext): Boolean {
         val event = context.getEvent<org.bukkit.event.block.BlockDamageEvent>() ?: return false
         val player = event.player
-        val multiplier = context.skillEffect.getDoubleParam("multiplier", 1.0)
+        val multiplier = context.skillEffect.getDoubleParam("multiplier",1.0)
+
+        org.bukkit.Bukkit.getLogger().info("[BreakSpeedBoostHandler] applyEffect called for ${player.name}, skillId=${context.skillId}, multiplier=$multiplier, block=${event.block.type}")
 
         val targetBlocks = context.skillEffect.getStringListParam("targetBlocks")
         val targetTools = context.skillEffect.getStringListParam("targetTools")
@@ -62,6 +64,7 @@ class BreakSpeedBoostHandler : SkillEffectHandler {
             val blockType = event.block.type.name
             val matchesOre = allowAnyOre && (blockType.endsWith("_ORE") || blockType == "ANCIENT_DEBRIS")
             if (blockType !in targetBlocks && !matchesOre) {
+                org.bukkit.Bukkit.getLogger().info("[BreakSpeedBoostHandler] Block $blockType not in targetBlocks: $targetBlocks")
                 return false
             }
         }
@@ -70,6 +73,7 @@ class BreakSpeedBoostHandler : SkillEffectHandler {
             val tool = player.inventory.itemInMainHand
             val toolType = tool.type.name
             if (!targetTools.any { toolType.contains(it) }) {
+                org.bukkit.Bukkit.getLogger().info("[BreakSpeedBoostHandler] Tool $toolType not in targetTools: $targetTools")
                 return false
             }
         }
@@ -89,6 +93,8 @@ class BreakSpeedBoostHandler : SkillEffectHandler {
         blockBreakingSpeed.addModifier(modifier)
 
         BreakSpeedBoostHandler.Companion.addActiveBoost(player.uniqueId, ActiveBoost(modifier, targetBlocks, targetTools))
+
+        org.bukkit.Bukkit.getLogger().info("[BreakSpeedBoostHandler] Applied boost for ${player.name}, amount=$amount, baseValue=${blockBreakingSpeed.baseValue}")
 
         return true
     }

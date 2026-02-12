@@ -40,17 +40,31 @@ object SkillEffectEngine {
     fun rebuildCache(playerUuid: UUID, acquiredSkills: Set<String>, profession: Profession, prestigeSkills: Set<String> = emptySet()) {
         val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return
         val mutableByType = mutableMapOf<String, MutableList<SkillEffectEntry>>()
+        org.bukkit.Bukkit.getLogger().info("[SkillEffectEngine] rebuildCache called for $playerUuid, profession=${profession.id}, skills=$acquiredSkills")
 
         // 通常スキルを追加
         for (skillId in acquiredSkills) {
             val skill = skillTree.getSkill(skillId) ?: continue
-            val effect = skill.effect ?: continue
+            val effect = skill.effect
+            if (effect == null) {
+                org.bukkit.Bukkit.getLogger().info("[SkillEffectEngine] Skill $skillId has no effect")
+                continue
+            }
 
-            val handler = SkillEffectRegistry.getHandler(effect.type) ?: continue
-            if (!handler.isEnabled() || !handler.supportsProfession(profession.id)) continue
+            val handler = SkillEffectRegistry.getHandler(effect.type)
+            if (handler == null) {
+                org.bukkit.Bukkit.getLogger().info("[SkillEffectEngine] No handler for effect type: ${effect.type}")
+                continue
+            }
+            if (!handler.isEnabled() || !handler.supportsProfession(profession.id)) {
+                org.bukkit.Bukkit.getLogger().info("[SkillEffectEngine] Handler disabled or not supported: ${effect.type}")
+                continue
+            }
 
             val depth = SkillDepthCalculator.calculateDepth(skillId, skillTree)
             val strength = handler.calculateStrength(effect)
+
+            org.bukkit.Bukkit.getLogger().info("[SkillEffectEngine] Added skill $skillId with effect ${effect.type}, depth=$depth, strength=$strength")
 
             mutableByType
                 .getOrPut(effect.type) { mutableListOf() }
@@ -96,6 +110,7 @@ object SkillEffectEngine {
         }
 
         effectCache[playerUuid] = CompiledEffects(sortedByType, targetedByType.toMap(), playerUuid, profession)
+        org.bukkit.Bukkit.getLogger().info("[SkillEffectEngine] Cache built for $playerUuid: byType=${sortedByType.keys}, entries=${sortedByType.values.sumOf { it.size }}, targetedByType=${targetedByType.keys}")
     }
 
     private fun buildTargetedCache(entries: List<SkillEffectEntry>): TargetedEffectCache {

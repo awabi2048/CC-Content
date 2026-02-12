@@ -57,7 +57,7 @@ class PrestigeToken {
 
             // PersistentDataContainerにデータを保存
             val container = meta.persistentDataContainer
-            val plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("CCContent")
+            val plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("CC-Content")
             if (plugin == null) {
                 org.bukkit.Bukkit.getLogger().warning("[CCContent] Failed to create PrestigeToken: plugin is null")
                 return item
@@ -85,7 +85,7 @@ class PrestigeToken {
                 return false
             }
             val container = meta.persistentDataContainer
-            val plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("CCContent")
+            val plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("CC-Content")
             if (plugin == null) {
                 org.bukkit.Bukkit.getLogger().warning("[CCContent] isPrestigeToken: plugin is null")
                 return false
@@ -106,7 +106,7 @@ class PrestigeToken {
                 return null
             }
             val container = meta.persistentDataContainer
-            val plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("CCContent")
+            val plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("CC-Content")
             if (plugin == null) {
                 org.bukkit.Bukkit.getLogger().warning("[CCContent] getProfession: plugin is null")
                 return null
@@ -130,7 +130,7 @@ class PrestigeToken {
                 return 0
             }
             val container = meta.persistentDataContainer
-            val plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("CCContent")
+            val plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("CC-Content")
             if (plugin == null) {
                 org.bukkit.Bukkit.getLogger().warning("[CCContent] getPrestigeLevel: plugin is null")
                 return 0
@@ -154,7 +154,7 @@ class PrestigeToken {
                 return null
             }
             val container = meta.persistentDataContainer
-            val plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("CCContent")
+            val plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("CC-Content")
             if (plugin == null) {
                 org.bukkit.Bukkit.getLogger().warning("[CCContent] getOwnerUuid: plugin is null")
                 return null
@@ -183,7 +183,7 @@ class PrestigeToken {
                 return null
             }
             val container = meta.persistentDataContainer
-            val plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("CCContent")
+            val plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("CC-Content")
             if (plugin == null) {
                 org.bukkit.Bukkit.getLogger().warning("[CCContent] getOwnerName: plugin is null")
                 return null
