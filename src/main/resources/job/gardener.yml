@@ -15,89 +15,41 @@ skills:
   skill1:
     requiredLevel: 2
     icon: "BONE_MEAL"
-    effect:
-      type: "creative.instant_grow"
-      params:
-        chance: 0.3
-        targetBlocks: ["OAK_SAPLING", "BIRCH_SAPLING", "SPRUCE_SAPLING", "JUNGLE_SAPLING", "ACACIA_SAPLING", "DARK_OAK_SAPLING"]
-      evaluationMode: "RUNTIME"
     children: ["skill2", "skill4"]
 
   skill2:
     requiredLevel: 3
     icon: "FLOWER_POT"
-    effect:
-      type: "creative.flower_placement_bonus"
-      params:
-        bonusXP: 2
-        targetBlocks: ["POPPY", "DANDELION", "BLUE_ORCHID", "ALLIUM", "AZURE_BLUET", "RED_TULIP", "ORANGE_TULIP", "WHITE_TULIP", "PINK_TULIP", "OXEYE_DAISY", "CORNFLOWER", "LILY_OF_THE_VALLEY", "SUNFLOWER", "LILAC", "ROSE_BUSH", "PEONY"]
-      evaluationMode: "RUNTIME"
     children: ["skill3"]
 
   skill3:
     requiredLevel: 4
     icon: "AZURE_BLUET"
-    effect:
-      type: "creative.decorative_block_bonus"
-      params:
-        bonusXP: 3
-        targetBlocks: ["GRASS", "FERN", "DEAD_BUSH", "SEAGRASS", "SEA_PICKLE", "KELP", "BAMBOO", "SUGAR_CANE", "CACTUS", "VINE", "LILY_PAD"]
-      evaluationMode: "RUNTIME"
     children: ["skill8"]
 
   skill4:
     requiredLevel: 3
     icon: "SHEARS"
-    effect:
-      type: "creative.leaf_decay_boost"
-      params:
-        chance: 0.4
-        bonusDrops: 1
-      evaluationMode: "RUNTIME"
     children: ["skill5", "skill6"]
 
   skill5:
     requiredLevel: 4
     icon: "MOSS_BLOCK"
-    effect:
-      type: "creative.moss_spread_bonus"
-      params:
-        spreadChance: 0.5
-        spreadRadius: 2
-      evaluationMode: "RUNTIME"
     children: ["skill8"]
 
   skill6:
     requiredLevel: 4
     icon: "PINK_TULIP"
-    effect:
-      type: "creative.flower_variety_bonus"
-      params:
-        varietyBonus: 1.5
-        maxVarieties: 10
-      evaluationMode: "CACHED"
     children: ["skill7"]
 
   skill7:
     requiredLevel: 5
     icon: "GLOW_BERRIES"
-    effect:
-      type: "creative.cave_plant_bonus"
-      params:
-        bonusXP: 5
-        targetBlocks: ["GLOW_LICHEN", "SPORE_BLOSSOM", "DRIPSTONE_BLOCK", "POINTED_DRIPSTONE", "SCULK_VEIN", "SCULK"]
-      evaluationMode: "RUNTIME"
     children: ["skill9"]
 
   skill8:
     requiredLevel: 6
     icon: "BIG_DRIPLEAF"
-    effect:
-      type: "creative.water_plant_bonus"
-      params:
-        bonusXP: 4
-        targetBlocks: ["LILY_PAD", "SEAGRASS", "SEA_PICKLE", "KELP", "KELP_PLANT", "TALL_SEAGRASS"]
-      evaluationMode: "RUNTIME"
     children: ["skill9"]
 
   skill9:

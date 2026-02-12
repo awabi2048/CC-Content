@@ -15,90 +15,41 @@ skills:
   skill1:
     requiredLevel: 2
     icon: "OAK_STAIRS"
-    effect:
-      type: "creative.building_xp_bonus"
-      params:
-        bonusMultiplier: 1.2
-        targetBlocks: ["OAK_PLANKS", "BIRCH_PLANKS", "SPRUCE_PLANKS", "JUNGLE_PLANKS", "ACACIA_PLANKS", "DARK_OAK_PLANKS", "MANGROVE_PLANKS", "CHERRY_PLANKS", "BAMBOO_PLANKS"]
-      evaluationMode: "RUNTIME"
     children: ["skill2", "skill4"]
 
   skill2:
     requiredLevel: 3
     icon: "OAK_FENCE"
-    effect:
-      type: "creative.woodwork_craft_bonus"
-      params:
-        bonusOutput: 1
-        targetItems: ["OAK_PLANKS", "OAK_STAIRS", "OAK_SLAB", "OAK_FENCE", "OAK_FENCE_GATE", "OAK_DOOR", "OAK_TRAPDOOR", "OAK_PRESSURE_PLATE", "OAK_BUTTON", "SIGN", "ITEM_FRAME", "LADDER", "CRAFTING_TABLE", "CHEST", "BARREL", "COMPOSTER", "BOOKSHELF"]
-      evaluationMode: "RUNTIME"
     children: ["skill3"]
 
   skill3:
     requiredLevel: 4
     icon: "ITEM_FRAME"
-    effect:
-      type: "creative.structure_bonus"
-      params:
-        minBlockCount: 20
-        xpPerBlock: 0.5
-        cooldown: 60
-      evaluationMode: "RUNTIME"
     children: ["skill8"]
 
   skill4:
     requiredLevel: 3
     icon: "STONE_BRICKS"
-    effect:
-      type: "creative.stone_work_bonus"
-      params:
-        bonusMultiplier: 1.15
-        targetBlocks: ["STONE_BRICKS", "STONE_BRICK_STAIRS", "STONE_BRICK_SLAB", "STONE_BRICK_WALL", "COBBLESTONE", "COBBLESTONE_STAIRS", "COBBLESTONE_SLAB", "COBBLESTONE_WALL"]
-      evaluationMode: "RUNTIME"
     children: ["skill5", "skill6"]
 
   skill5:
     requiredLevel: 4
     icon: "BRICKS"
-    effect:
-      type: "creative.brick_work_bonus"
-      params:
-        bonusMultiplier: 1.2
-        targetBlocks: ["BRICKS", "BRICK_STAIRS", "BRICK_SLAB", "BRICK_WALL", "STONE_BRICKS", "MOSSY_STONE_BRICKS", "CRACKED_STONE_BRICKS", "CHISELED_STONE_BRICKS"]
-      evaluationMode: "RUNTIME"
     children: ["skill8"]
 
   skill6:
     requiredLevel: 4
     icon: "SCAFFOLDING"
-    effect:
-      type: "creative.scaffold_efficiency"
-      params:
-        placementSpeed: 1.3
-        maxReach: 1
-      evaluationMode: "RUNTIME"
     children: ["skill7"]
 
   skill7:
     requiredLevel: 5
     icon: "PAINTING"
-    effect:
-      type: "creative.decoration_bonus"
-      params:
-        bonusXP: 5
-        targetItems: ["PAINTING", "ITEM_FRAME", "GLOW_ITEM_FRAME", "ARMOR_STAND", "FLOWER_POT"]
-      evaluationMode: "RUNTIME"
     children: ["skill9"]
 
   skill8:
     requiredLevel: 6
     icon: "RED_BED"
-    effect:
-      type: "creative.furniture_bonus"
-      params:
-        bonusXP: 3
-        targetItems: ["BED", "CHEST", "BARREL", "LECTERN", "COMPOSTER", "CAULDRON", "BREWING_STAND", "FURNACE", "BLAST_FURNACE", "SMOKER"]
-      evaluationMode: "RUNTIME"
     children: ["skill9"]
 
   skill9:
