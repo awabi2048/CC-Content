@@ -182,14 +182,14 @@ class CCContent : JavaPlugin(), Listener {
                 this
             )
 
-            // スキルツリーを登録
-            registerSkillTrees()
-
             val ignoreBlockStore = IgnoreBlockStore(File(dataFolder, "job/.ignore_blocks.yml"))
             ignoreBlockStoreInstance = ignoreBlockStore
 
             // スキル効果システムを初期化
             initializeSkillEffectSystem(rankManager, ignoreBlockStore)
+
+            // スキルツリーを登録
+            registerSkillTrees()
 
             // チュートリアルランク タスクシステムの初期化
             val (taskLoader, taskChecker) = initializeTutorialTaskSystem(rankManager, storage, ignoreBlockStore)
