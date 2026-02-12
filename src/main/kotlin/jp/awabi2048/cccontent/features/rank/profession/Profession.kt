@@ -3,7 +3,9 @@ package jp.awabi2048.cccontent.features.rank.profession
 enum class ProfessionType {
     GENERAL,
     GATHERING,
-    CRAFTING
+    CRAFTING,
+    COMBAT,
+    CREATIVE
 }
 
 /**
@@ -32,7 +34,32 @@ enum class Profession(
     /**
      * 料理人 - 料理で経験値を獲得
      */
-    COOK("cook", "§6", ProfessionType.CRAFTING);
+    COOK("cook", "§6", ProfessionType.CRAFTING),
+
+    /**
+     * 剣士 - モンスター討伐で経験値を獲得
+     */
+    SWORDSMAN("swordsman", "§c", ProfessionType.COMBAT),
+
+    /**
+     * 戦士 - 近接戦闘で経験値を獲得
+     */
+    WARRIOR("warrior", "§4", ProfessionType.COMBAT),
+
+    /**
+     * 農家 - 作物の収穫で経験値を獲得
+     */
+    FARMER("farmer", "§a", ProfessionType.GATHERING),
+
+    /**
+     * 庭師 - 装飾的なブロック設置で経験値を獲得
+     */
+    GARDENER("gardener", "§2", ProfessionType.CREATIVE),
+
+    /**
+     * 大工 - 建築で経験値を獲得
+     */
+    CARPENTER("carpenter", "§6", ProfessionType.CREATIVE);
     
     companion object {
         /**

@@ -34,3 +34,108 @@ lumberjack:
 
 brewer:
   mock_exp: 5
+
+swordsman:
+  zombie: 3
+  skeleton: 4
+  spider: 3
+  cave_spider: 5
+  creeper: 5
+  enderman: 8
+  witch: 10
+  blaze: 8
+  ghast: 12
+  slime: 2
+  magma_cube: 4
+  phantom: 6
+  drowned: 4
+  husk: 4
+  stray: 5
+
+warrior:
+  zombie: 4
+  skeleton: 3
+  spider: 4
+  cave_spider: 6
+  creeper: 4
+  enderman: 6
+  witch: 8
+  blaze: 10
+  ghast: 10
+  slime: 3
+  magma_cube: 5
+  phantom: 5
+  drowned: 5
+  husk: 5
+  stray: 4
+  pillager: 8
+  vindicator: 10
+  evoker: 15
+
+farmer:
+  wheat: 2
+  carrots: 2
+  potatoes: 2
+  beetroots: 2
+  melon: 5
+  pumpkin: 5
+  cocoa: 3
+  nether_wart: 4
+  sugar_cane: 2
+  cactus: 2
+  bamboo: 1
+  kelp: 1
+  sweet_berry_bush: 3
+
+gardener:
+  oak_sapling: 2
+  birch_sapling: 2
+  spruce_sapling: 2
+  jungle_sapling: 3
+  acacia_sapling: 3
+  dark_oak_sapling: 3
+  mangrove_propagule: 3
+  cherry_sapling: 4
+  poppy: 1
+  dandelion: 1
+  blue_orchid: 2
+  allium: 2
+  azure_bluet: 2
+  red_tulip: 1
+  orange_tulip: 1
+  white_tulip: 1
+  pink_tulip: 1
+  oxeye_daisy: 1
+  cornflower: 2
+  lily_of_the_valley: 2
+  sunflower: 3
+  lilac: 3
+  rose_bush: 3
+  peony: 3
+  glow_lichen: 4
+  spore_blossom: 5
+  big_dripleaf: 3
+  small_dripleaf: 2
+
+carpenter:
+  oak_planks: 1
+  birch_planks: 1
+  spruce_planks: 1
+  jungle_planks: 1
+  acacia_planks: 1
+  dark_oak_planks: 1
+  mangrove_planks: 1
+  cherry_planks: 1
+  bamboo_planks: 1
+  oak_stairs: 1
+  oak_slab: 1
+  oak_fence: 1
+  oak_fence_gate: 1
+  oak_door: 2
+  oak_trapdoor: 1
+  stone_bricks: 1
+  bricks: 1
+  crafting_table: 3
+  chest: 2
+  barrel: 2
+  bookshelf: 3

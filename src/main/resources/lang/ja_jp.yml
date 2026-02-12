@@ -238,6 +238,55 @@ gui:
     next_page: "§7次のページに進みます"
     previous_page: "§7前のページに戻ります"
     confirm: "§7このオプションで確定します"
+  profession:
+    selection:
+      title: "§8職業を選択してください"
+      main_menu_title: "§8職業メインメニュー"
+      hint:
+        title: "§e§lヒント"
+        lore:
+          - "§7クリックで職業を選択できます"
+          - "§7一度選択すると変更できません"
+          - ""
+          - "§e§n慎重に選んでください！"
+      player_head:
+        lore:
+          - "§7あなたのプロフィール"
+          - ""
+          - "§e§l職業を選択してください"
+      profession_item:
+        selected: "§a§l[選択中]"
+        current_profession: "§a§l現在の職業です"
+        already_selected_title: "§8§m{profession}"
+        already_selected_lore:
+          - "§c§l既に職業を選択しています"
+          - "§c変更することはできません"
+        click_to_select: "§e§nクリックで選択"
+        type_label: "§8タイプ: {type}"
+    type:
+      gathering: "§a収集"
+      crafting: "§6クラフト"
+      combat: "§c戦闘"
+      creative: "§dクリエイティブ"
+      general: "§7一般"
+    confirm_dialog:
+      title: "§6§l職業選択の確認"
+      body: "§f§l{profession} §7を選択しますか？\n\n§7{description}\n\n§c§l※一度選択すると変更できません"
+      confirm_button: "§a§l選択する"
+      cancel_button: "§c§lキャンセル"
+    error:
+      already_has_profession: "§c既に職業を選択しています"
+  skill:
+    tree_button: "§aスキルツリー"
+    tree_button_lore:
+      - "§7スキルツリーを開きます"
+      - "§e§nクリックで開く"
+    settings_button: "§7設定"
+    settings_button_lore:
+      - "§c現在準備中です"
+    hint_button: "§7職業のヒント"
+    hint_button_lore:
+      - "§c現在準備中です"
 # =========================================
 # SukimaDungeon関連
 # =========================================

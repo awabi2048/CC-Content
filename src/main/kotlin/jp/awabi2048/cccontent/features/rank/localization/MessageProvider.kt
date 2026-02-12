@@ -43,4 +43,11 @@ interface MessageProvider {
      * @return 翻訳された説明文
      */
     fun getSkillDescription(profession: Profession, skillId: String): String
+
+    /**
+     * リスト形式のメッセージを取得
+     * @param key 翻訳キー
+     * @return 翻訳されたメッセージリスト
+     */
+    fun getMessageList(key: String): List<String>
 }

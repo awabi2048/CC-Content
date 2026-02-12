@@ -1,0 +1,130 @@
+# 剣士のスキルツリー定義
+skills:
+  settings:
+    level:
+      initialExp: 100
+      base: 1.25
+      maxLevel: 50
+    overviewIcon: "DIAMOND_SWORD"
+
+  skill0:
+    nameKey: "skill.swordsman.skill0.name"
+    descriptionKey: "skill.swordsman.skill0.description"
+    requiredLevel: 1
+    icon: "WOODEN_SWORD"
+    children: ["skill1"]
+
+  skill1:
+    nameKey: "skill.swordsman.skill1.name"
+    descriptionKey: "skill.swordsman.skill1.description"
+    requiredLevel: 2
+    icon: "STONE_SWORD"
+    effect:
+      type: "combat.damage_boost"
+      params:
+        multiplier: 1.1
+        targetWeapons: ["SWORD"]
+      evaluationMode: "RUNTIME"
+    children: ["skill2", "skill4"]
+
+  skill2:
+    nameKey: "skill.swordsman.skill2.name"
+    descriptionKey: "skill.swordsman.skill2.description"
+    requiredLevel: 3
+    icon: "IRON_SWORD"
+    effect:
+      type: "combat.critical_chance"
+      params:
+        chance: 0.1
+        targetWeapons: ["SWORD"]
+      evaluationMode: "RUNTIME"
+    children: ["skill3"]
+
+  skill3:
+    nameKey: "skill.swordsman.skill3.name"
+    descriptionKey: "skill.swordsman.skill3.description"
+    requiredLevel: 4
+    icon: "DIAMOND_SWORD"
+    effect:
+      type: "combat.sweep_damage"
+      params:
+        multiplier: 1.2
+        radius: 3
+      evaluationMode: "RUNTIME"
+    children: ["skill8"]
+
+  skill4:
+    nameKey: "skill.swordsman.skill4.name"
+    descriptionKey: "skill.swordsman.skill4.description"
+    requiredLevel: 3
+    icon: "GOLDEN_SWORD"
+    effect:
+      type: "combat.attack_speed"
+      params:
+        multiplier: 1.15
+        targetWeapons: ["SWORD"]
+      evaluationMode: "RUNTIME"
+    children: ["skill5", "skill6"]
+
+  skill5:
+    nameKey: "skill.swordsman.skill5.name"
+    descriptionKey: "skill.swordsman.skill5.description"
+    requiredLevel: 4
+    icon: "NETHERITE_SWORD"
+    effect:
+      type: "combat.mob_damage_bonus"
+      params:
+        multiplier: 1.25
+        targetMobs: ["ZOMBIE", "SKELETON", "SPIDER", "CREEPER"]
+      evaluationMode: "RUNTIME"
+    children: ["skill8"]
+
+  skill6:
+    nameKey: "skill.swordsman.skill6.name"
+    descriptionKey: "skill.swordsman.skill6.description"
+    requiredLevel: 4
+    icon: "SHIELD"
+    effect:
+      type: "combat.parry_chance"
+      params:
+        chance: 0.2
+        damageReduction: 0.5
+      evaluationMode: "RUNTIME"
+    children: ["skill7"]
+
+  skill7:
+    nameKey: "skill.swordsman.skill7.name"
+    descriptionKey: "skill.swordsman.skill7.description"
+    requiredLevel: 5
+    icon: "TOTEM_OF_UNDYING"
+    effect:
+      type: "combat.execute_threshold"
+      params:
+        threshold: 0.2
+        damageMultiplier: 2.0
+      evaluationMode: "RUNTIME"
+    children: ["skill9"]
+
+  skill8:
+    nameKey: "skill.swordsman.skill8.name"
+    descriptionKey: "skill.swordsman.skill8.description"
+    requiredLevel: 6
+    icon: "TARGET"
+    effect:
+      type: "combat.accuracy"
+      params:
+        ignoreArmorChance: 0.15
+      evaluationMode: "RUNTIME"
+    children: ["skill9"]
+
+  skill9:
+    nameKey: "skill.swordsman.skill9.name"
+    descriptionKey: "skill.swordsman.skill9.description"
+    requiredLevel: 7
+    icon: "ENCHANTED_BOOK"
+    effect:
+      type: "general.unlock_item_token"
+      params:
+        items: ["swordsman_blade_token"]
+      evaluationMode: "CACHED"
+    children: []

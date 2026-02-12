@@ -7,9 +7,11 @@ import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TaskProgress
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TaskRequirement
 import jp.awabi2048.cccontent.features.rank.profession.Profession
+import jp.awabi2048.cccontent.features.rank.profession.ProfessionType
 import jp.awabi2048.cccontent.features.rank.profession.SkillNode
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
+import jp.awabi2048.cccontent.features.rank.gui.ConfirmationDialog
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.Sound
@@ -310,7 +312,7 @@ class RankCommand(
         val inventory = Bukkit.createInventory(
             holder,
             45,
-            "§8職業メインメニュー"
+            messageProvider.getMessage("gui.profession.selection.main_menu_title")
         )
         holder.backingInventory = inventory
 
@@ -321,18 +323,14 @@ class RankCommand(
     }
 
     /**
-     * 職業選択GUIを開く（ATTAINER到達時用）
+     * 職業選択GUIを開く
      */
     override fun openProfessionSelectionGui(player: Player): Boolean {
-        if (rankManager.hasProfession(player.uniqueId)) {
-            return false
-        }
-
         val holder = ProfessionSelectionGuiHolder()
         val inventory = Bukkit.createInventory(
             holder,
-            27,
-            "§8職業を選択してください"
+            54,
+            messageProvider.getMessage("gui.profession.selection.title")
         )
         holder.backingInventory = inventory
 
@@ -343,35 +341,169 @@ class RankCommand(
     }
 
     private fun renderProfessionSelectionGui(inventory: Inventory, viewer: Player) {
+        val headerFooterPane = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
         val basePane = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
         
+        // ベース埋め
         for (slot in 0 until inventory.size) {
             inventory.setItem(slot, basePane)
         }
-
-        val professions = Profession.values().filter { it != Profession.COOK }
-        val slots = listOf(11, 13, 15)
         
-        professions.forEachIndexed { index, profession ->
-            val slot = slots.getOrNull(index) ?: return@forEachIndexed
-            val professionName = messageProvider.getProfessionName(profession)
-            val professionDesc = messageProvider.getProfessionDescription(profession)
-            val skillTree = SkillTreeRegistry.getSkillTree(profession)
-            val startSkill = skillTree?.getStartSkillId()?.let { skillTree.getSkill(it) }
-            
-            val icon = startSkill?.icon?.let { Material.matchMaterial(it.uppercase()) } ?: Material.BOOK
-            
-            val item = createGuiItem(
+        // ヘッダーとフッター（黒）
+        for (slot in 0..8) {
+            inventory.setItem(slot, headerFooterPane)
+        }
+        for (slot in 45..53) {
+            inventory.setItem(slot, headerFooterPane)
+        }
+        
+        // プレイヤーアイコン（Row1, Column5 = slot 4）
+        val playerHead = createPlayerHeadItem(viewer)
+        inventory.setItem(4, playerHead)
+        
+        // ヒントアイコン（Row6, Column5 = slot 49）
+        val hintLore = messageProvider.getMessageList("gui.profession.selection.hint.lore")
+        val hintItem = createGuiItem(
+            Material.BOOK,
+            toComponent(messageProvider.getMessage("gui.profession.selection.hint.title")),
+            hintLore.map { toComponent(it) }
+        )
+        inventory.setItem(49, hintItem)
+        
+        // 現在の職業を取得
+        val currentProfession = rankManager.getPlayerProfession(viewer.uniqueId)?.profession
+        
+        // 職業をタイプ別に分類
+        val professionsByType = Profession.values().groupBy { it.type }
+        
+        // Row3 (slots 20-24): GATHERING + CRAFTING
+        val row3Professions = mutableListOf<Profession>()
+        professionsByType[ProfessionType.GATHERING]?.let { row3Professions.addAll(it) }
+        professionsByType[ProfessionType.CRAFTING]?.let { row3Professions.addAll(it) }
+        
+        val row3Slots = listOf(20, 21, 22, 23, 24)
+        row3Professions.take(5).forEachIndexed { index, profession ->
+            val slot = row3Slots.getOrNull(index) ?: return@forEachIndexed
+            val isCurrent = profession == currentProfession
+            val item = createProfessionItem(profession, isCurrent, currentProfession != null)
+            inventory.setItem(slot, item)
+        }
+        
+        // Row4 (slots 29-33): COMBAT + CREATIVE
+        val row4Professions = mutableListOf<Profession>()
+        professionsByType[ProfessionType.COMBAT]?.let { row4Professions.addAll(it) }
+        professionsByType[ProfessionType.CREATIVE]?.let { row4Professions.addAll(it) }
+        
+        val row4Slots = listOf(29, 30, 31, 32, 33)
+        row4Professions.take(5).forEachIndexed { index, profession ->
+            val slot = row4Slots.getOrNull(index) ?: return@forEachIndexed
+            val isCurrent = profession == currentProfession
+            val item = createProfessionItem(profession, isCurrent, currentProfession != null)
+            inventory.setItem(slot, item)
+        }
+    }
+    
+    private fun createPlayerHeadItem(player: Player): ItemStack {
+        val head = ItemStack(Material.PLAYER_HEAD)
+        val meta = head.itemMeta as? org.bukkit.inventory.meta.SkullMeta
+        meta?.let {
+            it.owningPlayer = player
+            it.displayName(toComponent("§a§l${player.name}"))
+            val playerHeadLore = messageProvider.getMessageList("gui.profession.selection.player_head.lore")
+            it.lore(playerHeadLore.map { lore -> toComponent(lore) })
+            head.itemMeta = it
+        }
+        return head
+    }
+    
+    private fun createProfessionItem(profession: Profession, isCurrent: Boolean, hasProfession: Boolean): ItemStack {
+        val skillTree = SkillTreeRegistry.getSkillTree(profession)
+        val startSkill = skillTree?.getStartSkillId()?.let { skillTree.getSkill(it) }
+        val icon = startSkill?.icon?.let { Material.matchMaterial(it.uppercase()) } ?: Material.BOOK
+        
+        val professionName = messageProvider.getProfessionName(profession)
+        val professionDesc = messageProvider.getProfessionDescription(profession)
+        val typeName = when (profession.type) {
+            ProfessionType.GATHERING -> messageProvider.getMessage("gui.profession.type.gathering")
+            ProfessionType.CRAFTING -> messageProvider.getMessage("gui.profession.type.crafting")
+            ProfessionType.COMBAT -> messageProvider.getMessage("gui.profession.type.combat")
+            ProfessionType.CREATIVE -> messageProvider.getMessage("gui.profession.type.creative")
+            ProfessionType.GENERAL -> messageProvider.getMessage("gui.profession.type.general")
+        }
+        
+        return if (isCurrent) {
+            // 現在の職業（選択済み）
+            createGuiItem(
                 icon,
-                toComponent("§a$professionName"),
+                toComponent("${profession.displayColorCode}§l$professionName ${messageProvider.getMessage("gui.profession.selection.profession_item.selected")}"),
                 listOf(
                     toComponent("§7$professionDesc"),
                     toComponent(""),
-                    toComponent("§e§nクリックで選択")
+                    toComponent(messageProvider.getMessage("gui.profession.selection.profession_item.type_label", "type" to typeName)),
+                    toComponent(""),
+                    toComponent(messageProvider.getMessage("gui.profession.selection.profession_item.current_profession"))
                 )
             )
-            inventory.setItem(slot, item)
+        } else if (hasProfession) {
+            // 他の職業（既に職業を持っている場合は選択不可）
+            val alreadySelectedLore = messageProvider.getMessageList("gui.profession.selection.profession_item.already_selected_lore")
+            val loreList = mutableListOf<Component>()
+            loreList.add(toComponent("§7$professionDesc"))
+            loreList.add(toComponent(""))
+            loreList.add(toComponent(messageProvider.getMessage("gui.profession.selection.profession_item.type_label", "type" to typeName)))
+            loreList.add(toComponent(""))
+            alreadySelectedLore.forEach { lore ->
+                loreList.add(toComponent(lore))
+            }
+            createGuiItem(
+                Material.BARRIER,
+                toComponent(messageProvider.getMessage("gui.profession.selection.profession_item.already_selected_title", "profession" to professionName)),
+                loreList
+            )
+        } else {
+            // 選択可能
+            createGuiItem(
+                icon,
+                toComponent("${profession.displayColorCode}§l$professionName"),
+                listOf(
+                    toComponent("§7$professionDesc"),
+                    toComponent(""),
+                    toComponent(messageProvider.getMessage("gui.profession.selection.profession_item.type_label", "type" to typeName)),
+                    toComponent(""),
+                    toComponent(messageProvider.getMessage("gui.profession.selection.profession_item.click_to_select"))
+                )
+            )
         }
+    }
+    
+    private fun showProfessionConfirmDialog(player: Player, profession: Profession) {
+        val professionName = messageProvider.getProfessionName(profession)
+        val professionDesc = messageProvider.getProfessionDescription(profession)
+        
+        ConfirmationDialog.show(
+            player = player,
+            title = withoutItalic(toComponent(messageProvider.getMessage("gui.profession.confirm_dialog.title"))),
+            bodyMessage = withoutItalic(toComponent(messageProvider.getMessage("gui.profession.confirm_dialog.body", "profession" to professionName, "description" to professionDesc))),
+            confirmText = withoutItalic(toComponent(messageProvider.getMessage("gui.profession.confirm_dialog.confirm_button"))),
+            cancelText = withoutItalic(toComponent(messageProvider.getMessage("gui.profession.confirm_dialog.cancel_button"))),
+            onConfirm = { target ->
+                executeProfessionSelect(target, profession)
+            }
+        )
+    }
+    
+    private fun executeProfessionSelect(player: Player, profession: Profession) {
+        if (rankManager.hasProfession(player.uniqueId)) {
+            player.sendMessage(messageProvider.getMessage("gui.profession.error.already_has_profession"))
+            return
+        }
+        
+        rankManager.selectProfession(player.uniqueId, profession)
+        player.sendMessage(messageProvider.getMessage("message.profession_selected", "profession" to messageProvider.getProfessionName(profession)))
+        player.playSound(player.location, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f)
+        
+        // GUIを閉じる
+        player.closeInventory()
     }
 
     private class ProfessionSelectionGuiHolder : InventoryHolder {
@@ -397,15 +529,11 @@ class RankCommand(
             inventory.setItem(slot, headerFooterPane)
         }
 
+        val skillTreeLore = messageProvider.getMessageList("gui.skill.tree_button_lore")
         val skillTreeItem = createGuiItem(
             Material.OAK_SAPLING,
-            toComponent("§aスキルツリー"),
-            listOf(
-                toComponent(BAR),
-                toComponent("§7スキルツリーを開きます"),
-                toComponent("§e§nクリックで開く"),
-                toComponent(BAR)
-            )
+            toComponent(messageProvider.getMessage("gui.skill.tree_button")),
+            listOf(toComponent(BAR)) + skillTreeLore.map { toComponent(it) } + listOf(toComponent(BAR))
         )
         inventory.setItem(MAIN_MENU_SKILL_TREE_SLOT, skillTreeItem)
 
@@ -441,14 +569,11 @@ class RankCommand(
         )
         inventory.setItem(MAIN_MENU_PROFESSION_OVERVIEW_SLOT, professionOverviewItem)
 
+        val settingsLore = messageProvider.getMessageList("gui.skill.settings_button_lore")
         val settingsItem = createGuiItem(
             Material.COMPARATOR,
-            toComponent("§7設定"),
-            listOf(
-                toComponent(BAR),
-                toComponent("§c現在準備中です"),
-                toComponent(BAR)
-            )
+            toComponent(messageProvider.getMessage("gui.skill.settings_button")),
+            listOf(toComponent(BAR)) + settingsLore.map { toComponent(it) } + listOf(toComponent(BAR))
         )
         inventory.setItem(MAIN_MENU_SETTINGS_SLOT, settingsItem)
 
@@ -458,25 +583,18 @@ class RankCommand(
         if (skullMeta != null) {
             skullMeta.owningPlayer = viewer
             skullMeta.displayName(withoutItalic(toComponent("§e${viewer.name}")))
-            skullMeta.lore(listOf(
-                toComponent(BAR),
-                toComponent("§c現在準備中です"),
-                toComponent(BAR)
-            ).map { withoutItalic(it) })
+            skullMeta.lore((listOf(toComponent(BAR)) + settingsLore.map { toComponent(it) } + listOf(toComponent(BAR))).map { withoutItalic(it) })
             skullMeta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
             playerHead.itemMeta = skullMeta
         }
         inventory.setItem(MAIN_MENU_PLAYER_INFO_SLOT, playerHead)
 
         // 職業のヒントアイコン (スロット42) - モック実装
+        val hintLoreMain = messageProvider.getMessageList("gui.skill.hint_button_lore")
         val hintItem = createGuiItem(
             Material.COMPASS,
-            toComponent("§7職業のヒント"),
-            listOf(
-                toComponent(BAR),
-                toComponent("§c現在準備中です"),
-                toComponent(BAR)
-            )
+            toComponent(messageProvider.getMessage("gui.skill.hint_button")),
+            listOf(toComponent(BAR)) + hintLoreMain.map { toComponent(it) } + listOf(toComponent(BAR))
         )
         inventory.setItem(MAIN_MENU_HINT_SLOT, hintItem)
     }
@@ -2053,20 +2171,31 @@ class RankCommand(
 
         val player = event.whoClicked as? Player ?: return
         
-        val professions = Profession.values().filter { it != Profession.COOK }
-        val slots = listOf(11, 13, 15)
-        
-        val selectedProfession = professions.getOrNull(slots.indexOf(clickedSlot)) ?: return
-        
-        val success = rankManager.selectProfession(player.uniqueId, selectedProfession)
-        if (success) {
-            player.sendMessage("§a${messageProvider.getProfessionName(selectedProfession)} を選択しました！")
-            player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f)
-            player.closeInventory()
-        } else {
-            player.sendMessage("§c職業の選択に失敗しました")
+        // 既に職業を持っている場合は何もしない
+        if (rankManager.hasProfession(player.uniqueId)) {
             player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
+            return
         }
+        
+        // 職業スロットの定義
+        val professionSlots = mapOf(
+            // Row3: GATHERING + CRAFTING
+            20 to Profession.LUMBERJACK,
+            21 to Profession.MINER,
+            22 to Profession.FARMER,
+            23 to Profession.BREWER,
+            24 to Profession.COOK,
+            // Row4: COMBAT + CREATIVE
+            29 to Profession.SWORDSMAN,
+            30 to Profession.WARRIOR,
+            31 to Profession.GARDENER,
+            32 to Profession.CARPENTER
+        )
+        
+        val selectedProfession = professionSlots[clickedSlot] ?: return
+        
+        // 確認ダイアログを表示
+        showProfessionConfirmDialog(player, selectedProfession)
     }
 
     @EventHandler
@@ -2317,7 +2446,7 @@ class RankCommand(
             args.size == 2 -> Bukkit.getOnlinePlayers().map { it.name }
                 .filter { it.startsWith(args[1], ignoreCase = true) }
             args.size == 3 && args[0].equals("profession", ignoreCase = true) -> 
-                listOf("lumberjack", "brewer", "miner")
+                Profession.values().map { it.id }
                     .filter { it.startsWith(args[2].lowercase()) }
             else -> emptyList()
         }

@@ -1,0 +1,128 @@
+# 戦士のスキルツリー定義
+skills:
+  settings:
+    level:
+      initialExp: 100
+      base: 1.25
+      maxLevel: 50
+    overviewIcon: "NETHERITE_AXE"
+
+  skill0:
+    nameKey: "skill.warrior.skill0.name"
+    descriptionKey: "skill.warrior.skill0.description"
+    requiredLevel: 1
+    icon: "WOODEN_AXE"
+    children: ["skill1"]
+
+  skill1:
+    nameKey: "skill.warrior.skill1.name"
+    descriptionKey: "skill.warrior.skill1.description"
+    requiredLevel: 2
+    icon: "STONE_AXE"
+    effect:
+      type: "combat.max_health_boost"
+      params:
+        amount: 4
+      evaluationMode: "CACHED"
+    children: ["skill2", "skill4"]
+
+  skill2:
+    nameKey: "skill.warrior.skill2.name"
+    descriptionKey: "skill.warrior.skill2.description"
+    requiredLevel: 3
+    icon: "IRON_AXE"
+    effect:
+      type: "combat.damage_reduction"
+      params:
+        reduction: 0.1
+      evaluationMode: "RUNTIME"
+    children: ["skill3"]
+
+  skill3:
+    nameKey: "skill.warrior.skill3.name"
+    descriptionKey: "skill.warrior.skill3.description"
+    requiredLevel: 4
+    icon: "DIAMOND_AXE"
+    effect:
+      type: "combat.knockback_resistance"
+      params:
+        multiplier: 1.5
+      evaluationMode: "RUNTIME"
+    children: ["skill8"]
+
+  skill4:
+    nameKey: "skill.warrior.skill4.name"
+    descriptionKey: "skill.warrior.skill4.description"
+    requiredLevel: 3
+    icon: "GOLDEN_AXE"
+    effect:
+      type: "combat.axe_damage_boost"
+      params:
+        multiplier: 1.2
+        targetWeapons: ["AXE"]
+      evaluationMode: "RUNTIME"
+    children: ["skill5", "skill6"]
+
+  skill5:
+    nameKey: "skill.warrior.skill5.name"
+    descriptionKey: "skill.warrior.skill5.description"
+    requiredLevel: 4
+    icon: "NETHERITE_AXE"
+    effect:
+      type: "combat.berserk_mode"
+      params:
+        healthThreshold: 0.3
+        damageMultiplier: 1.5
+        speedMultiplier: 1.2
+      evaluationMode: "RUNTIME"
+    children: ["skill8"]
+
+  skill6:
+    nameKey: "skill.warrior.skill6.name"
+    descriptionKey: "skill.warrior.skill6.description"
+    requiredLevel: 4
+    icon: "SHIELD"
+    effect:
+      type: "combat.shield_block"
+      params:
+        blockChance: 0.25
+        damageReduction: 0.7
+      evaluationMode: "RUNTIME"
+    children: ["skill7"]
+
+  skill7:
+    nameKey: "skill.warrior.skill7.name"
+    descriptionKey: "skill.warrior.skill7.description"
+    requiredLevel: 5
+    icon: "TOTEM_OF_UNDYING"
+    effect:
+      type: "combat.second_wind"
+      params:
+        cooldown: 300
+        healAmount: 0.3
+      evaluationMode: "RUNTIME"
+    children: ["skill9"]
+
+  skill8:
+    nameKey: "skill.warrior.skill8.name"
+    descriptionKey: "skill.warrior.skill8.description"
+    requiredLevel: 6
+    icon: "IRON_CHESTPLATE"
+    effect:
+      type: "combat.armor_effectiveness"
+      params:
+        multiplier: 1.2
+      evaluationMode: "RUNTIME"
+    children: ["skill9"]
+
+  skill9:
+    nameKey: "skill.warrior.skill9.name"
+    descriptionKey: "skill.warrior.skill9.description"
+    requiredLevel: 7
+    icon: "ENCHANTED_BOOK"
+    effect:
+      type: "general.unlock_item_token"
+      params:
+        items: ["warrior_axe_token"]
+      evaluationMode: "CACHED"
+    children: []

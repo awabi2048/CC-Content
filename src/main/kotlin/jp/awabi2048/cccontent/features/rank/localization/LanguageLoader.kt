@@ -167,4 +167,25 @@ class LanguageLoader(
     fun getRawMessage(key: String): String {
         return languageData[key] ?: "§c[Missing: $key]"
     }
+
+    /**
+     * リスト形式のメッセージを取得
+     */
+    fun getStringList(key: String): List<String> {
+        val config = YamlConfiguration.loadConfiguration(langFile)
+        val list = config.getStringList(key)
+        if (list.isEmpty()) {
+            // バンドルされたリソースから取得
+            val bundledConfig = resourcePathCandidates().firstNotNullOfOrNull { candidate ->
+                val stream = plugin.getResource(candidate) ?: return@firstNotNullOfOrNull null
+                stream.use { input ->
+                    InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
+                        YamlConfiguration.loadConfiguration(reader)
+                    }
+                }
+            }
+            return bundledConfig?.getStringList(key)?.map { it.replace('&', '§') } ?: emptyList()
+        }
+        return list.map { it.replace('&', '§') }
+    }
 }

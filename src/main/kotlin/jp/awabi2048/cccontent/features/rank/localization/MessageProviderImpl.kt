@@ -32,4 +32,8 @@ class MessageProviderImpl(
     override fun getSkillDescription(profession: Profession, skillId: String): String {
         return getMessage("skill.${profession.id}.$skillId.description")
     }
+
+    override fun getMessageList(key: String): List<String> {
+        return languageLoader.getStringList(key)
+    }
 }
