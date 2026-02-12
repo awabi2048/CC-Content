@@ -21,9 +21,6 @@ object CustomItemManager {
      */
     fun register(item: CustomItem) {
         items[item.fullId] = item
-        if (::logger.isInitialized) {
-            logger.info("Registered custom item: ${item.fullId}")
-        }
     }
     
     /**

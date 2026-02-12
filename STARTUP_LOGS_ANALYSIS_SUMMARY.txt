@@ -1,0 +1,232 @@
+================================================================================
+CC-Contentプラグイン - 起動時ログ出力フロー解析 (要約版)
+================================================================================
+
+【1. ログ出力統計】
+
+logger.info()：     36個 (情報・成功ログ)
+logger.warning()：  34個 (警告・エラーログ)
+logger.severe()：    6個 (致命的エラー)
+────────────────────────
+合計：             76個
+
+起動時の標準ログ数：   15-20個（正常起動時）
+エラー有り時の追加数： 最大+20個
+
+================================================================================
+【2. 起動フロー（Phase別）】
+
+Phase 1: 初期化準備（設定読み込み）
+Phase 2: ロガーシステム初期化
+Phase 3: アイテム登録 (9個) → logger.info × 9
+Phase 4: ランクシステム初期化 ★複雑
+         ├─ LanguageLoader → logger.info × 2 (補完・読み込み)
+         ├─ スキルツリー登録 → logger.warning [エラー時]
+         ├─ スキル効果システム → logger.warning [エラー時]
+         └─ チュートリアルランク → logger.warning [エラー時]
+
+Phase 5: アリーナ初期化 → logger.warning [エラー時]
+Phase 6: 醸造・調理初期化 → logger.warning [エラー時]
+Phase 7: コマンド登録 → logger.severe [失敗時]
+Phase 8: スキマダンジョン初期化 ★複雑
+         ├─ StructureLoader → logger.severe [構造体読み込み失敗]
+         ├─ MobManager → logger.warning [定義読み込み失敗]
+         ├─ BGMManager → logger.warning [設定エラー]
+         └─ LangManager → logger.warning [言語ファイルエラー]
+
+Phase 9: 追加リスナー&タスク登録
+Phase 10: サマリー出力 ★ユーザーが見る最終出力
+          ├─ プラグイン情報 → logger.info × 4
+          └─ FeatureInitializationLogger.printSummary()
+             → logger.info × 8-12
+
+================================================================================
+【3. 各フィーチャーの初期化ログ】
+
+■ Rank System
+  - 言語ファイル欠損補完：logger.info (LanguageLoader.kt:91)
+  - 言語ファイル読み込み：logger.info (LanguageLoader.kt:95)
+  - スキルツリー読み込み失敗：logger.warning (CCContent.kt:401)
+  - 初期化失敗時：logger.warning (CCContent.kt:232)
+  - ステータス更新：featureInitLogger.setStatus()
+
+■ Brewery / Cooking
+  - 初期化失敗時：logger.warning (BreweryFeature.kt:22, CookingFeature.kt:19)
+  - ステータス更新：featureInitLogger.setStatus()
+
+■ Arena
+  - テーマ定義が空：logger.warning (ArenaThemeLoader.kt:50)
+  - ストラクチャー不足：logger.warning (ArenaThemeLoader.kt:82)
+  - ステータス更新：featureInitLogger.setStatus()
+
+■ SukimaDungeon
+  - ストラクチャー読み込み失敗：logger.severe (StructureLoader.kt:75, 78)
+  - mob定義読み込み失敗：logger.warning (MobManager.kt:80)
+  - BGM設定エラー：logger.warning (BGMManager.kt:21, 41, 45)
+  - 言語ファイルエラー：logger.warning (LangManager.kt:36)
+  - スポーン地点不足：logger.warning (SproutManager.kt:24)
+  - セッション読み込み：logger.info (DungeonSession.kt:278)
+  - 初期化失敗時：logger.warning (CCContent.kt:782)
+  - ステータス更新：featureInitLogger.setStatus()
+
+================================================================================
+【4. 言語ファイル欠損補完ログ】 ★重要
+
+ログ出力場所：
+  1. LanguageLoader.kt:91
+     メッセージ: "言語ファイルの欠損キーを補完しました: ${mergedCount} 件 (${langFile.name})"
+     出力条件: mergedCount > 0
+     分類: info
+
+  2. LanguageLoader.kt:95
+     メッセージ: "言語ファイルを読み込みました: ${langFile.absolutePath}"
+     出力条件: 常時
+     分類: info
+
+  3. LanguageLoader.kt:97 [エラー時]
+     メッセージ: "言語ファイルの読み込みに失敗しました: ${e.message}"
+     分類: warning
+
+  4. LanguageLoader.kt:152 [ランタイムエラー時]
+     メッセージ: "翻訳キーが見つかりません: $key"
+     分類: warning
+
+推奨: featureInitLogger に統合可能
+
+================================================================================
+【5. 統合ロガーの状態】 ⭐⭐⭐⭐⭐
+
+FeatureInitializationLogger：完全に統合済み
+
+登録フィーチャー：
+  - Rank System
+  - Brewery
+  - Cooking
+  - Arena
+  - SukimaDungeon
+
+ステータス管理：
+  - SUCCESS（成功）→ アイコン: [OK]
+  - WARNING（警告）→ アイコン: [WARN]
+  - FAILURE（失敗）→ アイコン: [NG]
+
+出力フォーマット：
+  [OK] Rank System: SUCCESS (スキル7種登録)
+  [WARN] Arena: WARNING (テーマ2種)
+  [NG] SukimaDungeon: FAILURE
+
+================================================================================
+【6. 削除推奨ログ】 ❌
+
+以下は削除推奨（冗長または不要）：
+
+1. CCContent.kt:154
+   "CC-Content v${version} が有効化されました"
+   理由: Bukkit/Spigotがプラグイン有効化時に既に出力
+
+2. CCContent.kt:155
+   "作成者: ${authors}"
+   理由: plugin.yml から自動取得される
+
+3. CCContent.kt:156
+   "登録されたアイテム数: ${count}"
+   理由: サマリーで十分
+
+4. CCContent.kt:159-161
+   フィーチャー別アイテムカウント
+   理由: 詳細すぎる。総数で十分
+
+5. CustomItemManager.kt:25
+   "Registered custom item: ..." (×9回)
+   理由: 起動時に多数出力。サマリーで統計化推奨
+
+6. DungeonSession.kt:178, 278
+   "Saved/Loaded sessions"
+   理由: デバッグ向け。本番起動に不要
+
+合計削除推奨: 12個
+
+================================================================================
+【7. 保持必須ログ】 (エラー・警告・致命的)
+
+必ず保持すべき：
+
+- LanguageLoader 言語ファイル読み込み失敗
+- ConfigBasedSkillTree スキルツリー読み込み失敗
+- ArenaThemeLoader テーマ定義エラー
+- StructureLoader 構造体読み込み失敗 (logger.severe)
+- MobManager mob定義読み込み失敗
+- ProfessionMinerExpListener exp.yml 不足
+- CCContent コマンド登録失敗 (logger.severe)
+
+理由: 機能の停止に直結。ユーザーの問題解決に必須
+
+保持推奨: 64個
+
+================================================================================
+【8. リロード時ログ】 (/cc reload コマンド)
+
+リロード時のみ出力（起動時は不出力）：
+
+- CCContent.kt:448  "リロード中..."
+- CCContent.kt:492  "欠損ファイル検出"
+- CCContent.kt:501  "欠損ディレクトリ検出"
+- CCContent.kt:503  "ディレクトリ作成"
+- CCContent.kt:514  "欠損ジョブファイル検出"
+- CCContent.kt:521  "スキルツリー再読み込み成功"
+- CCContent.kt:536  "スキル効果キャッシュ再構築"
+- CCContent.kt:550  "欠損Advancementファイル検出"
+- CCContent.kt:572  "リロード完了"
+- CCContent.kt:600  "ファイルコピー成功"
+
+これらは /cc reload 時のユーザーフィードバックとして有用
+
+================================================================================
+【9. ログ出力フロー図】
+
+onEnable()
+  ├─ 初期化準備 (config, logger)
+  │  └─ ❌: logger.info ×0
+  │
+  ├─ アイテム登録 (9個)
+  │  └─ INFO: logger.info("Registered: ...") ×9
+  │
+  ├─ ランクシステム初期化
+  │  ├─ INFO: logger.info (言語ファイル) ×2
+  │  ├─ WARN: logger.warning [エラー時] ×複数
+  │  └─ STATUS: featureInitLogger.setStatus()
+  │
+  ├─ アリーナ初期化
+  │  ├─ WARN: logger.warning [エラー時] ×複数
+  │  └─ STATUS: featureInitLogger.setStatus()
+  │
+  ├─ 醸造・調理初期化
+  │  ├─ WARN: logger.warning [エラー時] ×2
+  │  └─ STATUS: featureInitLogger.setStatus() ×2
+  │
+  ├─ コマンド登録
+  │  └─ SEVERE: logger.severe [失敗時] ×最大2
+  │
+  ├─ スキマダンジョン初期化
+  │  ├─ SEVERE: logger.severe (構造体) [エラー時]
+  │  ├─ WARN: logger.warning ×複数 [エラー時]
+  │  ├─ INFO: logger.info (セッション) ×1
+  │  └─ STATUS: featureInitLogger.setStatus()
+  │
+  └─ サマリー出力
+     ├─ INFO: logger.info (プラグイン情報) ×4
+     └─ INFO: featureInitLogger.printSummary() ×8-12
+        └─ 各フィーチャーのステータス + 詳細情報
+
+================================================================================
+【10. 結論】
+
+✓ 現在：FeatureInitializationLogger は完全に統合
+✓ アイテム登録は9回のログ出力がある（削除推奨）
+✓ 言語ファイル補完ログは既に適切に出力されている
+✓ エラー・警告ログは保持必須
+✓ 削除推奨：12個（主に冗長なinfo系）
+✓ 保持必須：64個（warning・severe系）
+✓ 起動時のユーザー向けログ出力は良好
+
+================================================================================

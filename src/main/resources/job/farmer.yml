@@ -8,15 +8,11 @@ skills:
     overviewIcon: "IRON_HOE"
 
   skill0:
-    nameKey: "skill.farmer.skill0.name"
-    descriptionKey: "skill.farmer.skill0.description"
     requiredLevel: 1
     icon: "WOODEN_HOE"
     children: ["skill1"]
 
   skill1:
-    nameKey: "skill.farmer.skill1.name"
-    descriptionKey: "skill.farmer.skill1.description"
     requiredLevel: 2
     icon: "STONE_HOE"
     effect:
@@ -29,8 +25,6 @@ skills:
     children: ["skill2", "skill4"]
 
   skill2:
-    nameKey: "skill.farmer.skill2.name"
-    descriptionKey: "skill.farmer.skill2.description"
     requiredLevel: 3
     icon: "IRON_HOE"
     effect:
@@ -43,8 +37,6 @@ skills:
     children: ["skill3"]
 
   skill3:
-    nameKey: "skill.farmer.skill3.name"
-    descriptionKey: "skill.farmer.skill3.description"
     requiredLevel: 4
     icon: "DIAMOND_HOE"
     effect:
@@ -56,8 +48,6 @@ skills:
     children: ["skill8"]
 
   skill4:
-    nameKey: "skill.farmer.skill4.name"
-    descriptionKey: "skill.farmer.skill4.description"
     requiredLevel: 3
     icon: "GOLDEN_HOE"
     effect:
@@ -69,8 +59,6 @@ skills:
     children: ["skill5", "skill6"]
 
   skill5:
-    nameKey: "skill.farmer.skill5.name"
-    descriptionKey: "skill.farmer.skill5.description"
     requiredLevel: 4
     icon: "NETHERITE_HOE"
     effect:
@@ -83,8 +71,6 @@ skills:
     children: ["skill8"]
 
   skill6:
-    nameKey: "skill.farmer.skill6.name"
-    descriptionKey: "skill.farmer.skill6.description"
     requiredLevel: 4
     icon: "BONE_MEAL"
     effect:
@@ -96,8 +82,6 @@ skills:
     children: ["skill7"]
 
   skill7:
-    nameKey: "skill.farmer.skill7.name"
-    descriptionKey: "skill.farmer.skill7.description"
     requiredLevel: 5
     icon: "COMPOSTER"
     effect:
@@ -109,8 +93,6 @@ skills:
     children: ["skill9"]
 
   skill8:
-    nameKey: "skill.farmer.skill8.name"
-    descriptionKey: "skill.farmer.skill8.description"
     requiredLevel: 6
     icon: "WATER_BUCKET"
     effect:
@@ -122,8 +104,6 @@ skills:
     children: ["skill9"]
 
   skill9:
-    nameKey: "skill.farmer.skill9.name"
-    descriptionKey: "skill.farmer.skill9.description"
     requiredLevel: 7
     icon: "ENCHANTED_BOOK"
     effect:

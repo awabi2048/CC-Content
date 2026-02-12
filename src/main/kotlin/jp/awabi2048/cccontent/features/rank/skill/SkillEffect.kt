@@ -3,7 +3,8 @@ package jp.awabi2048.cccontent.features.rank.skill
 data class SkillEffect(
     val type: String,
     val params: Map<String, Any>,
-    val evaluationMode: EvaluationMode = EvaluationMode.CACHED
+    val evaluationMode: EvaluationMode = EvaluationMode.CACHED,
+    val combineRule: CombineRule = CombineRule.ADD
 ) {
     fun getParam(key: String, defaultValue: Any? = null): Any? {
         return params[key] ?: defaultValue

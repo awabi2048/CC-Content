@@ -26,6 +26,10 @@ object SkillEffectRegistry {
         return handlers.size
     }
 
+    fun getAllTypes(): Set<String> {
+        return handlers.keys
+    }
+
     fun clear() {
         handlers.clear()
     }

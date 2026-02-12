@@ -1,0 +1,226 @@
+================================================================================
+CC-Contentプラグイン - 起動時ログ出力フロー詳細解析
+================================================================================
+
+【目次】
+1. 起動時ログ出力フロー
+2. 全ログ出力一覧 (各出力ポイントの詳細)
+3. ログの分類と整理
+4. 統合ロガー（FeatureInitializationLogger）への推奨
+
+================================================================================
+1. 起動時ログ出力フロー
+================================================================================
+
+[PHASE 1] 初期化準備
+  - config.yml をリロード
+  - 旧レイアウトの移行処理 (migrateLegacyConfigLayout)
+  
+[PHASE 2] ロガーシステム初期化
+  - FeatureInitializationLogger を初期化
+    → registerFeature("Rank System")
+    → registerFeature("Brewery")
+    → registerFeature("Cooking")
+    → registerFeature("Arena")
+    → registerFeature("SukimaDungeon")
+  - CustomItemManager.setLogger(logger)
+  - GulliverConfig.initialize()
+
+[PHASE 3] アイテムシステム初期化
+  - registerCustomItems()
+    → BigLight/SmallLight (misc.biglight, misc.smalllight)
+       └─ logger.info("Registered custom item: misc.biglight") [CustomItemManager.kt:25]
+    → Brewery items x3 (BrewerySampleFilterItem, BreweryMockClockItem, etc.)
+       └─ logger.info("Registered custom item: brewery.*") [CustomItemManager.kt:25]
+    → Arena items x3 (ArenaTicketItem, ArenaMedalItem, ArenaPrizeItem)
+       └─ logger.info("Registered custom item: arena.*") [CustomItemManager.kt:25]
+
+[PHASE 4] ランクシステム初期化 (複雑度: ⭐⭐⭐⭐⭐)
+  initializeRankSystem()
+    ├─ RankStorage & RankManager 初期化
+    │
+    ├─ LanguageLoader 初期化
+    │   ├─ リソースから言語ファイル抽出 (存在しない場合)
+    │   ├─ logger.info("言語ファイルの欠損キーを補完しました: N件 (ja_jp.yml)")
+    │   │   [LanguageLoader.kt:91] - 欠損キー補完時に出力
+    │   │
+    │   ├─ logger.info("言語ファイルを読み込みました: /path/to/ja_jp.yml")
+    │   │   [LanguageLoader.kt:95] - 常時出力
+    │   │
+    │   └─ logger.warning("言語ファイルの読み込みに失敗: ${e.message}")
+    │       [LanguageLoader.kt:97] - エラー時のみ出力
+    │
+    ├─ MessageProvider 設定
+    │
+    ├─ ランクコマンド登録
+    │   ├─ logger.severe("/rank コマンドの登録に失敗しました...")
+    │   │   [CCContent.kt:240] - コマンド登録失敗時
+    │   │
+    │   └─ logger.severe("/rankmenu コマンドの登録に失敗しました...")
+    │       [CCContent.kt:248] - コマンド登録失敗時
+    │
+    ├─ registerSkillTrees()
+    │   ├─ exp.yml ファイル抽出 (存在しない場合)
+    │   ├─ 各職業スキルツリー (brewer.yml, lumberjack.yml, miner.yml, cook.yml)
+    │   │   ├─ logger.warning("スキルツリーファイルのコピーに失敗: ${profession.id}")
+    │   │   │   [CCContent.kt:389] - ファイル抽出失敗時
+    │   │   │
+    │   │   └─ logger.warning("スキルツリー読み込み失敗 (${profession.id}): ${e.message}")
+    │   │       [CCContent.kt:401] - 読み込み失敗時
+    │   └─ 全職業読み込み成功時は例外を投げない
+    │
+    ├─ initializeSkillEffectSystem()
+    │   ├─ BreakSpeedBoostHandler登録
+    │   ├─ DropBonusHandler登録
+    │   ├─ DurabilitySaveChanceHandler登録
+    │   ├─ UnlockBatchBreakHandler登録
+    │   ├─ ReplaceLootTableHandler登録
+    │   ├─ BlastMineHandler登録
+    │   ├─ UnlockSystemHandler登録
+    │   ├─ UnlockRecipeHandler登録
+    │   ├─ WorkSpeedBonusMockHandler登録
+    │   ├─ SuccessRateBonusMockHandler登録
+    │   ├─ UnlockItemTokenHandler登録
+    │   ├─ CombatDamageBoostHandler登録
+    │   ├─ SweepAttackDamageBoostHandler登録
+    │   ├─ AttackReachBoostHandler登録
+    │   ├─ 複数イベントリスナー登録
+    │   │
+    │   └─ logger.warning("スキル効果システムの初期化に失敗しました: ${e.message}")
+    │       [CCContent.kt:288] - エラー時のみ出力
+    │
+    ├─ initializeTutorialTaskSystem()
+    │   ├─ tutorial-tasks.yml ファイル抽出 (存在しない場合)
+    │   ├─ TutorialTaskLoader 初期化
+    │   ├─ 7つのイベントリスナー登録
+    │   │   - TutorialPlayerJoinListener
+    │   │   - TutorialPlayerQuitListener
+    │   │   - TutorialEntityDeathListener
+    │   │   - TutorialBlockBreakListener
+    │   │   - TutorialPlayerExpListener
+    │   │   (+ TutorialRankUpListener)
+    │   │
+    │   └─ logger.warning("チュートリアルランク タスクシステムの初期化に失敗しました")
+    │       [CCContent.kt:344] - エラー時のみ出力
+    │
+    ├─ PlayTimeTrackerTask 起動 (1分周期)
+    │
+    ├─ IgnoreBlockStore 初期化
+    │
+    ├─ ProfessionMinerExpListener 登録
+    │   └─ logger.warning("job/exp.yml が見つからないため、職業経験値付与を無効化します")
+    │       [ProfessionMinerExpListener.kt:36] - ファイル不足時
+    │
+    ├─ BlockBreakEventDebugListener 登録
+    │
+    ├─ featureInitLogger.setStatus("Rank System", SUCCESS)
+    │   [CCContent.kt:228]
+    │
+    ├─ featureInitLogger.addSummaryMessage("Rank System", "スキル${skillTreeCount}種登録")
+    │   [CCContent.kt:227]
+    │
+    └─ [エラー処理]
+        ├─ logger.warning("ランクシステムの初期化に失敗しました: ${e.message}")
+        │   [CCContent.kt:232] - 例外発生時
+        │
+        ├─ featureInitLogger.setStatus("Rank System", FAILURE)
+        │   [CCContent.kt:230]
+        │
+        └─ featureInitLogger.addDetailMessage("Rank System", "[Rank System] 初期化失敗: ${e.message}")
+            [CCContent.kt:231]
+
+[PHASE 5] アリーナシステム初期化
+  arenaManager = ArenaManager(this)
+  arenaManager.initialize(featureInitLogger)
+    ├─ loadConfig()
+    │   └─ arena/config.yml ロード (存在しない場合は自動作成)
+    │
+    ├─ themeLoader.load(featureInitLogger)
+    │   ├─ arena/theme.yml ロード
+    │   │
+    │   ├─ logger.warning("[Arena] テーマ定義が空です: arena/theme.yml")
+    │   │   [ArenaThemeLoader.kt:50] - themesSection == null時
+    │   │
+    │   ├─ [各テーマの検証]
+    │   │   ├─ logger.warning("[Arena] tileSize が不正なためスキップ: ${themeId}")
+    │   │   │   [ArenaThemeLoader.kt:68] - tileSize <= 0 時
+    │   │   │
+    │   │   └─ logger.warning("[Arena] 必須ストラクチャー不足のためスキップ: ${themeId}")
+    │   │       [ArenaThemeLoader.kt:82] - 構造体不足時
+    │   │
+    │   └─ [ステータス更新]
+    │       ├─ featureInitLogger.setStatus("Arena", SUCCESS) [成功時]
+    │       ├─ featureInitLogger.addSummaryMessage("Arena", "テーマ${themes.size}種")
+    │       ├─ featureInitLogger.setStatus("Arena", WARNING) [警告あり時]
+    │       └─ featureInitLogger.setStatus("Arena", FAILURE) [0個時]
+    │
+    └─ startMaintenanceTask() - 20tick毎のメンテナンス開始
+
+[PHASE 6] 醸造・調理フィーチャー初期化
+  initializeBreweryAndCooking()
+    ├─ BreweryFeature.initialize(featureInitLogger)
+    │   ├─ 必須リソース保証
+    │   │   ├─ brewery/config.yml
+    │   │   ├─ recipe/brewery.yml
+    │   │   └─ recipe/ingredient_definition.yml
+    │   │
+    │   ├─ BreweryController 初期化
+    │   ├─ featureInitLogger.setStatus("Brewery", SUCCESS)
+    │   │
+    │   └─ [エラー処理]
+    │       ├─ logger.warning("Brewery初期化失敗: ${e.message}")
+    │       │   [BreweryFeature.kt:22]
+    │       │
+    │       ├─ featureInitLogger.setStatus("Brewery", FAILURE)
+    │       └─ featureInitLogger.addDetailMessage("Brewery", "[Brewery] 初期化失敗: ...")
+    │
+    └─ CookingFeature.initialize(featureInitLogger)
+        ├─ 必須リソース保証
+        │   ├─ cooking/config.yml
+        │   ├─ recipe/cooking.yml
+        │   └─ recipe/ingredient_definition.yml
+        │
+        ├─ featureInitLogger.setStatus("Cooking", SUCCESS)
+        │
+        └─ [エラー処理]
+            ├─ logger.warning("Cooking初期化失敗: ${e.message}")
+            │   [CookingFeature.kt:19]
+            │
+            ├─ featureInitLogger.setStatus("Cooking", FAILURE)
+            └─ featureInitLogger.addDetailMessage("Cooking", "[Cooking] 初期化失敗: ...")
+
+[PHASE 7] コマンド登録
+  getCommand("cc-content").setExecutor(CCCommand)
+  getCommand("cc").setExecutor(CCCommand) [エイリアス]
+  getCommand("arenaa").setExecutor(ArenaCommand)
+
+[PHASE 8] スキマダンジョン初期化 (複雑度: ⭐⭐⭐⭐)
+  initializeSukimaDungeon()
+    ├─ reloadSukimaDungeon()
+    │   ├─ SukimaConfigHelper.reload()
+    │   │   └─ logger.warning("config.yml に sukima_dungeon セクションが見つかりません")
+    │   │       [SukimaConfigHelper.kt:25]
+    │   │
+    │   ├─ MessageManager.load()
+    │   │
+    │   ├─ StructureLoader.loadThemes()
+    │   │   ├─ sukima/theme.yml ロード
+    │   │   ├─ 各テーマの構造体読み込み
+    │   │   │   ├─ logger.severe("ストラクチャーの読み込みに失敗: ${file.name}")
+    │   │   │   │   [StructureLoader.kt:75] - IOException時
+    │   │   │   │
+    │   │   │   └─ logger.severe("ストラクチャー読み込み中に予期しないエラー: ${file.name}")
+    │   │   │       [StructureLoader.kt:78] - その他の例外時
+    │   │   │
+    │   │   └─ validateThemes()
+    │   │
+    │   ├─ MobManager.load()
+    │   │   └─ logger.warning("Failed to load mob definition: ${key}")
+    │   │       [MobManager.kt:80] - 定義読み込み失敗時
+    │   │
+    │   ├─ ItemManager.load()
+    │   │
+    │   ├─ BGMManager.loadConfig()
+    │   │   ├─ logger.warning("BGM設定セクション(bgm)が見つかりません")
+    │   │   │   [BGMManager.kt:21] - bgmセクション欠落時
+    │   │   │

@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.rank.prestige
 
+import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -23,8 +24,12 @@ class PrestigeToken {
 
         /**
          * 思念アイテムを作成
+         * @param profession 職業
+         * @param prestigeLevel プレステージレベル
+         * @param owner アイテムの所有者（プレイヤー）
+         * @param messageProvider メッセージプロバイダー（職業名取得用）
          */
-        fun create(profession: Profession, prestigeLevel: Int, owner: Player): ItemStack {
+        fun create(profession: Profession, prestigeLevel: Int, owner: Player, messageProvider: MessageProvider): ItemStack {
             val item = ItemStack(Material.PAPER)
             val meta = item.itemMeta
             if (meta == null) {
@@ -32,14 +37,17 @@ class PrestigeToken {
                 return item
             }
 
+            // 職業名を翻訳ファイルから取得
+            val professionName = messageProvider.getProfessionName(profession)
+
             // 表示名設定
-            meta.setDisplayName("§d§l${profession.name}の思念")
+            meta.setDisplayName("§d§l${professionName}の思念")
 
             // Lore設定
             val bar = "§8§m                        "
             val lore = mutableListOf(
                 bar,
-                "§6${profession.name}の職を極めた証",
+                "§6${professionName}の職を極めた証",
                 bar,
                 "§f§l| §7プレステージレベル §b$prestigeLevel",
                 "§f§l| §7保有者 §6${owner.name}",

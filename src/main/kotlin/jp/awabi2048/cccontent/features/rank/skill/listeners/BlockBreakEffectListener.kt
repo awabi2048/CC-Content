@@ -43,14 +43,22 @@ class BlockBreakEffectListener(
         durabilityEligibleUntil[event.player.uniqueId] = System.currentTimeMillis() + DURABILITY_EFFECT_WINDOW_MILLIS
 
         val compiledEffects = SkillEffectEngine.getCachedEffects(event.player.uniqueId) ?: return
-
-        val effectType = "collect.break_speed_boost"
-        val entry = SkillEffectEngine.getCachedEffectForBlock(event.player.uniqueId, effectType, event.block.type.name) ?: return
-
-        val skillEffect = entry.effect
         val profession = compiledEffects.profession
 
-        SkillEffectEngine.applyEffect(event.player, profession, entry.skillId, skillEffect, event)
+        val effectType = "collect.break_speed_boost"
+        val blockTypeName = event.block.type.name
+
+        // 対象ブロックに有効な全エントリを取得
+        val allEntries = compiledEffects.byType[effectType]
+        if (allEntries.isNullOrEmpty()) return
+
+        // 優先度順に合成されたエフェクトを取得
+        val combinedEffect = SkillEffectEngine.combineEffects(allEntries, blockTypeName) ?: return
+
+        // 最深スキルを特定（合成後も適用対象情報が必要）
+        val deepestEntry = allEntries.firstOrNull() ?: return
+
+        SkillEffectEngine.applyEffect(event.player, profession, deepestEntry.skillId, combinedEffect, event)
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -127,9 +135,15 @@ class BlockBreakEffectListener(
         }
 
         if (!hasSilkTouch) {
-            val dropBonusEntry = SkillEffectEngine.getCachedEffectForBlock(event.player.uniqueId, "collect.drop_bonus", blockType)
-            if (dropBonusEntry != null) {
-                SkillEffectEngine.applyEffect(event.player, profession, dropBonusEntry.skillId, dropBonusEntry.effect, event)
+            // 複数の drop_bonus スキルを加算対応
+            val dropBonusEntries = compiledEffects.byType["collect.drop_bonus"] ?: emptyList()
+            if (dropBonusEntries.isNotEmpty()) {
+                val combinedEffect = SkillEffectEngine.combineEffects(dropBonusEntries)
+                if (combinedEffect != null) {
+                    // 代表スキル ID は最深のものを使用
+                    val representativeSkillId = dropBonusEntries.firstOrNull()?.skillId ?: "unknown"
+                    SkillEffectEngine.applyEffect(event.player, profession, representativeSkillId, combinedEffect, event)
+                }
             }
         }
     }

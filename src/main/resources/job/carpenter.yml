@@ -8,15 +8,11 @@ skills:
     overviewIcon: "CRAFTING_TABLE"
 
   skill0:
-    nameKey: "skill.carpenter.skill0.name"
-    descriptionKey: "skill.carpenter.skill0.description"
     requiredLevel: 1
     icon: "OAK_PLANKS"
     children: ["skill1"]
 
   skill1:
-    nameKey: "skill.carpenter.skill1.name"
-    descriptionKey: "skill.carpenter.skill1.description"
     requiredLevel: 2
     icon: "OAK_STAIRS"
     effect:
@@ -28,8 +24,6 @@ skills:
     children: ["skill2", "skill4"]
 
   skill2:
-    nameKey: "skill.carpenter.skill2.name"
-    descriptionKey: "skill.carpenter.skill2.description"
     requiredLevel: 3
     icon: "OAK_FENCE"
     effect:
@@ -41,8 +35,6 @@ skills:
     children: ["skill3"]
 
   skill3:
-    nameKey: "skill.carpenter.skill3.name"
-    descriptionKey: "skill.carpenter.skill3.description"
     requiredLevel: 4
     icon: "ITEM_FRAME"
     effect:
@@ -55,8 +47,6 @@ skills:
     children: ["skill8"]
 
   skill4:
-    nameKey: "skill.carpenter.skill4.name"
-    descriptionKey: "skill.carpenter.skill4.description"
     requiredLevel: 3
     icon: "STONE_BRICKS"
     effect:
@@ -68,8 +58,6 @@ skills:
     children: ["skill5", "skill6"]
 
   skill5:
-    nameKey: "skill.carpenter.skill5.name"
-    descriptionKey: "skill.carpenter.skill5.description"
     requiredLevel: 4
     icon: "BRICKS"
     effect:
@@ -81,8 +69,6 @@ skills:
     children: ["skill8"]
 
   skill6:
-    nameKey: "skill.carpenter.skill6.name"
-    descriptionKey: "skill.carpenter.skill6.description"
     requiredLevel: 4
     icon: "SCAFFOLDING"
     effect:
@@ -94,8 +80,6 @@ skills:
     children: ["skill7"]
 
   skill7:
-    nameKey: "skill.carpenter.skill7.name"
-    descriptionKey: "skill.carpenter.skill7.description"
     requiredLevel: 5
     icon: "PAINTING"
     effect:
@@ -107,8 +91,6 @@ skills:
     children: ["skill9"]
 
   skill8:
-    nameKey: "skill.carpenter.skill8.name"
-    descriptionKey: "skill.carpenter.skill8.description"
     requiredLevel: 6
     icon: "RED_BED"
     effect:
@@ -120,8 +102,6 @@ skills:
     children: ["skill9"]
 
   skill9:
-    nameKey: "skill.carpenter.skill9.name"
-    descriptionKey: "skill.carpenter.skill9.description"
     requiredLevel: 7
     icon: "ENCHANTED_BOOK"
     effect:

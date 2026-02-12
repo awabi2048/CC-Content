@@ -8,15 +8,11 @@ skills:
     overviewIcon: "FLOWER_POT"
 
   skill0:
-    nameKey: "skill.gardener.skill0.name"
-    descriptionKey: "skill.gardener.skill0.description"
     requiredLevel: 1
     icon: "OAK_SAPLING"
     children: ["skill1"]
 
   skill1:
-    nameKey: "skill.gardener.skill1.name"
-    descriptionKey: "skill.gardener.skill1.description"
     requiredLevel: 2
     icon: "BONE_MEAL"
     effect:
@@ -28,8 +24,6 @@ skills:
     children: ["skill2", "skill4"]
 
   skill2:
-    nameKey: "skill.gardener.skill2.name"
-    descriptionKey: "skill.gardener.skill2.description"
     requiredLevel: 3
     icon: "FLOWER_POT"
     effect:
@@ -41,8 +35,6 @@ skills:
     children: ["skill3"]
 
   skill3:
-    nameKey: "skill.gardener.skill3.name"
-    descriptionKey: "skill.gardener.skill3.description"
     requiredLevel: 4
     icon: "AZURE_BLUET"
     effect:
@@ -54,8 +46,6 @@ skills:
     children: ["skill8"]
 
   skill4:
-    nameKey: "skill.gardener.skill4.name"
-    descriptionKey: "skill.gardener.skill4.description"
     requiredLevel: 3
     icon: "SHEARS"
     effect:
@@ -67,8 +57,6 @@ skills:
     children: ["skill5", "skill6"]
 
   skill5:
-    nameKey: "skill.gardener.skill5.name"
-    descriptionKey: "skill.gardener.skill5.description"
     requiredLevel: 4
     icon: "MOSS_BLOCK"
     effect:
@@ -80,8 +68,6 @@ skills:
     children: ["skill8"]
 
   skill6:
-    nameKey: "skill.gardener.skill6.name"
-    descriptionKey: "skill.gardener.skill6.description"
     requiredLevel: 4
     icon: "PINK_TULIP"
     effect:
@@ -93,8 +79,6 @@ skills:
     children: ["skill7"]
 
   skill7:
-    nameKey: "skill.gardener.skill7.name"
-    descriptionKey: "skill.gardener.skill7.description"
     requiredLevel: 5
     icon: "GLOW_BERRIES"
     effect:
@@ -106,8 +90,6 @@ skills:
     children: ["skill9"]
 
   skill8:
-    nameKey: "skill.gardener.skill8.name"
-    descriptionKey: "skill.gardener.skill8.description"
     requiredLevel: 6
     icon: "BIG_DRIPLEAF"
     effect:
@@ -119,8 +101,6 @@ skills:
     children: ["skill9"]
 
   skill9:
-    nameKey: "skill.gardener.skill9.name"
-    descriptionKey: "skill.gardener.skill9.description"
     requiredLevel: 7
     icon: "ENCHANTED_BOOK"
     effect:

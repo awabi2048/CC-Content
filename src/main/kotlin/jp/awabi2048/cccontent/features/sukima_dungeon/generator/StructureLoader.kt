@@ -42,13 +42,11 @@ class StructureLoader(val plugin: JavaPlugin) {
             val themeFolder = File(baseStructureFolder, path)
             if (!themeFolder.exists()) {
                 themeFolder.mkdirs()
-                plugin.logger.info("Created theme directory: ${themeFolder.absolutePath}")
             }
 
             val structures = loadStructuresForTheme(themeFolder)
             val theme = Theme(key, icon, tileSize, time, gravity, voidYLimit, requiredTier, structures)
             themes[key] = theme
-            plugin.logger.info("Loaded theme: $key with ${structures.values.sumOf { it.size }} structures")
         }
         
         validateThemes()
@@ -123,12 +121,7 @@ class StructureLoader(val plugin: JavaPlugin) {
         }
 
         if (errorThemes.isNotEmpty()) {
-            plugin.logger.severe("--- ストラクチャー読み込みエラー ---")
-            for ((themeName, missing) in errorThemes) {
-                val missingStr = missing.joinToString(", ") { it.keyword }
-                plugin.logger.severe("テーマ '${themeName}' は以下のストラクチャーが不足しているため、読み込まれませんでした: $missingStr")
-            }
-            plugin.logger.severe("--------------------------------")
+            // エラー情報はSukimaDungeon統合ロガーで処理される
         }
     }
 }
