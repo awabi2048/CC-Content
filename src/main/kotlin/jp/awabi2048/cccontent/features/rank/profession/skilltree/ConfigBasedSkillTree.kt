@@ -90,6 +90,7 @@ class ConfigBasedSkillTree(
 
             buildLevelThresholds()
         } catch (e: Exception) {
+            e.printStackTrace()
             throw IllegalStateException("スキルツリー読み込みに失敗しました: $professionId", e)
         }
     }

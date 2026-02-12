@@ -388,6 +388,7 @@ class CCContent : JavaPlugin(), Listener {
                 val skillTree = ConfigBasedSkillTree(profession.id, ymlFile)
                 SkillTreeRegistry.register(profession, skillTree)
             } catch (e: Exception) {
+                e.printStackTrace()
                 val error = "スキルツリー読み込み失敗 (${profession.id}): ${e.message}"
                 logger.warning(error)
                 errors += error
