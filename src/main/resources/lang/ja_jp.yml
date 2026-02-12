@@ -558,6 +558,8 @@ gui_buttons:
 rank:
   profession:
     level_up: "§a{profession} レベルアップ！ §eLv.{old} → Lv.{new} §7(+{gained})"
+    prestige:
+      executed: "§d§l【プレステージ】§r§d{profession} のプレステージレベル {level} を達成しました！"
   skill:
     usage: "§c使用法: /rank skill"
     player_only: "§cこのコマンドはプレイヤーのみ実行できます"
@@ -572,10 +574,12 @@ rank:
         acquired: "§a習得済み"
         available: "§e習得可能"
         locked: "§c未開放"
+        prestige_unlocked: "§dプレステージ解放済み"
       lore:
         required_level: "§7必要Lv: §e{level}"
         current_level: "§7現在Lv: §e{level}"
         status: "§7状態: {status}"
+        prestige_available: "§d§l[プレステージアンロック可能]"
       nav:
         left:
           name: "§c§l戻る"
@@ -601,6 +605,23 @@ rank:
         level_shortage: "§c必要レベルが不足しています（必要: {required}, 現在: {current}）"
         branch_locked: "§cこの分岐は別の選択肢を解放済みのため進めません"
         failed: "§cスキル解放に失敗しました"
+      prestige:
+        dialog:
+          title: "§dプレステージスキル解放の確認"
+          body: "§f{skill} をプレステージスキルとして解放しますか？\n§7このスキルは思念アイテムを持っている間、無条件で使用できます。"
+        unlock:
+          success: "§dプレステージスキルを解放しました: {skill}"
+          failed: "§cプレステージスキル解放に失敗しました"
+  prestige:
+    cannot: "§cプレステージ条件を満たしていません。最大レベルに到達し、プレステージレベルが1以上必要です。"
+    failed: "§cプレステージの実行に失敗しました"
+    dialog:
+      first:
+        title: "§d§lプレステージの確認 (1/2)"
+        body: "§f{profession} のプレステージレベル {level} でプレステージを実行します。\n\n§c§l注意: プレステージを実行すると、通常レベル、スキル、経験値がリセットされます。"
+      second:
+        title: "§d§lプレステージの最終確認 (2/2)"
+        body: "§c本当にプレステージを実行しますか？\n\n§f職業: {profession}\n§fプレステージレベル: {level}\n\n§7§o※思念アイテムを獲得し、プレステージスキルが使用可能になります"
   tutorial_task_info:
     usage: "§c使用法: /rank task-info <player>"
     player_not_found: "§cプレイヤーが見つかりません"

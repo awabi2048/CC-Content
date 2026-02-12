@@ -563,7 +563,7 @@ class RankCommand(
                 toComponent("§7$professionDescription"),
                 toComponent(BAR),
                 toComponent("§f§l| §7Lv. §e§l$currentLevel"),
-                toComponent("§f§l| §7経験値 §a$currentLevelExp§7/$levelExp"),
+                toComponent("§f§l| §7経験値 §a${String.format("%,d", currentLevelExp)}§7/${String.format("%,d", levelExp)}"),
                 toComponent(BAR)
             )
         )
@@ -660,12 +660,17 @@ class RankCommand(
         }
 
         val currentLevel = rankManager.getCurrentProfessionLevel(viewer.uniqueId)
+        val prestigeLevel = rankManager.getPrestigeLevel(viewer.uniqueId)
+        val isMaxLevel = rankManager.isMaxProfessionLevel(viewer.uniqueId)
         val state = SkillTreeGuiState(
             profession = playerProfession.profession,
             selectedSkillId = selectedSkill.skillId,
             acquiredSkills = playerProfession.acquiredSkills.toSet(),
             currentLevel = currentLevel,
-            currentExp = playerProfession.currentExp
+            currentExp = playerProfession.currentExp,
+            prestigeSkills = playerProfession.prestigeSkills.toSet(),
+            prestigeLevel = prestigeLevel,
+            isMaxLevel = isMaxLevel
         )
         state.laneBySkillId[selectedSkill.skillId] = SkillTreeLane.CENTER
         val holder = SkillTreeGuiHolder(state)
@@ -1464,19 +1469,32 @@ class RankCommand(
     ): ItemStack {
         val acquired = skill.skillId in state.acquiredSkills
         val available = !acquired && skillTree.canAcquire(skill.skillId, state.acquiredSkills, state.currentLevel)
+        val prestigeUnlocked = skill.skillId in state.prestigeSkills && acquired
+        val prestigeAvailable = state.isMaxLevel &&
+                                skill.skillId !in state.prestigeSkills &&
+                                acquired &&
+                                state.prestigeLevel >= skill.requiredLevel
+
         val status = when {
+            prestigeUnlocked -> messageProvider.getMessage("rank.skill.gui.status.prestige_unlocked")
             acquired -> messageProvider.getMessage("rank.skill.gui.status.acquired")
             available -> messageProvider.getMessage("rank.skill.gui.status.available")
             else -> messageProvider.getMessage("rank.skill.gui.status.locked")
         }
 
         val material = resolveSkillIconMaterial(skill.icon)
-        val lore = listOf(
+        val lore = mutableListOf(
             toComponent(messageProvider.getSkillDescription(state.profession, skill.skillId)),
             toComponent(messageProvider.getMessage("rank.skill.gui.lore.required_level", "level" to skill.requiredLevel)),
             toComponent(messageProvider.getMessage("rank.skill.gui.lore.current_level", "level" to state.currentLevel)),
             toComponent(messageProvider.getMessage("rank.skill.gui.lore.status", "status" to status))
         )
+
+        // プレステージアンロック可能な場合、Loreに追加情報を表示
+        if (prestigeAvailable) {
+            lore.add(toComponent(""))
+            lore.add(toComponent(messageProvider.getMessage("rank.skill.gui.lore.prestige_available")))
+        }
 
         return createGuiItem(
             material,
@@ -1930,7 +1948,19 @@ class RankCommand(
         val skillTree = SkillTreeRegistry.getSkillTree(holder.state.profession) ?: return
         val skill = skillTree.getSkill(skillId) ?: return
 
+        // プレステージスキルのアンロック可能チェック
+        val prestigeAvailable = holder.state.isMaxLevel &&
+                                skill.skillId !in holder.state.prestigeSkills &&
+                                skill.skillId in holder.state.acquiredSkills &&
+                                holder.state.prestigeLevel >= skill.requiredLevel
+
         if (skill.skillId in holder.state.acquiredSkills) {
+            // プレステージスキルとしてアンロック可能な場合
+            if (prestigeAvailable) {
+                openPrestigeSkillUnlockDialog(viewer, holder, skillTree, skill)
+                return
+            }
+
             viewer.sendMessage(
                 messageProvider.getMessage(
                     "rank.skill.gui.unlock.already",
@@ -2088,6 +2118,93 @@ class RankCommand(
         viewer.showDialog(dialog)
     }
 
+    private fun openPrestigeSkillUnlockDialog(
+        viewer: Player,
+        holder: SkillTreeGuiHolder,
+        skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree,
+        skill: SkillNode
+    ) {
+        val skillName = messageProvider.getSkillName(holder.state.profession, skill.skillId)
+        val yesButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm")))
+        )
+            .width(150)
+            .action(
+                io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
+                    io.papermc.paper.registry.data.dialog.action.DialogActionCallback { _, audience ->
+                        val target = audience as? Player ?: return@DialogActionCallback
+                        executePrestigeSkillUnlock(target, holder, skillTree, skill)
+                    },
+                    net.kyori.adventure.text.event.ClickCallback.Options.builder().uses(1).build()
+                )
+            )
+            .build()
+
+        val noButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel")))
+        )
+            .width(150)
+            .build()
+
+        val dialog = io.papermc.paper.dialog.Dialog.create { factory ->
+            factory.empty()
+                .base(
+                    io.papermc.paper.registry.data.dialog.DialogBase.builder(
+                        withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.prestige.dialog.title")))
+                    )
+                        .body(
+                            listOf(
+                                io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(
+                                    withoutItalic(
+                                        toComponent(
+                                            messageProvider.getMessage(
+                                                "rank.skill.gui.prestige.dialog.body",
+                                                "skill" to skillName
+                                            )
+                                        )
+                                    ),
+                                    280
+                                )
+                            )
+                        )
+                        .canCloseWithEscape(true)
+                        .pause(false)
+                        .afterAction(io.papermc.paper.registry.data.dialog.DialogBase.DialogAfterAction.CLOSE)
+                        .build()
+                )
+                .type(io.papermc.paper.registry.data.dialog.type.DialogType.confirmation(yesButton, noButton))
+        }
+
+        viewer.showDialog(dialog)
+    }
+
+    private fun executePrestigeSkillUnlock(
+        viewer: Player,
+        holder: SkillTreeGuiHolder,
+        skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree,
+        skill: SkillNode
+    ) {
+        val success = rankManager.acquirePrestigeSkill(viewer.uniqueId, skill.skillId)
+        if (!success) {
+            viewer.sendMessage(messageProvider.getMessage("rank.skill.gui.prestige.unlock.failed"))
+            viewer.playSound(viewer.location, "minecraft:entity.villager.no", 1.0f, 1.0f)
+            return
+        }
+
+        val updatedProfession = rankManager.getPlayerProfession(viewer.uniqueId)
+        if (updatedProfession != null) {
+            holder.state.prestigeSkills = updatedProfession.prestigeSkills.toSet()
+        }
+
+        viewer.sendMessage(
+            messageProvider.getMessage(
+                "rank.skill.gui.prestige.unlock.success",
+                "skill" to messageProvider.getSkillName(holder.state.profession, skill.skillId)
+            )
+        )
+        renderSkillTreeGui(holder.backingInventory, skillTree, holder.state)
+    }
+
     private fun navigateSkillTreeToSkill(holder: SkillTreeGuiHolder, transition: RouteTransition, viewer: Player?) {
         val skillTree = SkillTreeRegistry.getSkillTree(holder.state.profession) ?: return
         transition.lane?.let { holder.state.preferredLane = it }
@@ -2145,10 +2262,152 @@ class RankCommand(
                 player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
                 openSkillTreeGui(player)
             }
-            MAIN_MENU_PROFESSION_OVERVIEW_SLOT, MAIN_MENU_SETTINGS_SLOT, MAIN_MENU_PLAYER_INFO_SLOT, MAIN_MENU_HINT_SLOT -> {
+            MAIN_MENU_PROFESSION_OVERVIEW_SLOT -> {
+                // Shift右クリックでプレステージ確認ダイアログを表示
+                if (event.isShiftClick && event.isRightClick) {
+                    openPrestigeConfirmDialogFirst(player)
+                }
+            }
+            MAIN_MENU_SETTINGS_SLOT, MAIN_MENU_PLAYER_INFO_SLOT, MAIN_MENU_HINT_SLOT -> {
                 // モック実装 - クリック不可（何もしない）
             }
         }
+    }
+
+    private fun openPrestigeConfirmDialogFirst(player: Player) {
+        if (!rankManager.canPrestige(player.uniqueId)) {
+            player.sendMessage(messageProvider.getMessage("rank.prestige.cannot"))
+            player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
+            return
+        }
+
+        val profession = rankManager.getPlayerProfession(player.uniqueId)?.profession ?: return
+        val professionName = messageProvider.getProfessionName(profession)
+        val prestigeLevel = rankManager.getPrestigeLevel(player.uniqueId)
+
+        val yesButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm")))
+        )
+            .width(150)
+            .action(
+                io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
+                    io.papermc.paper.registry.data.dialog.action.DialogActionCallback { _, audience ->
+                        val target = audience as? Player ?: return@DialogActionCallback
+                        openPrestigeConfirmDialogSecond(target)
+                    },
+                    net.kyori.adventure.text.event.ClickCallback.Options.builder().uses(1).build()
+                )
+            )
+            .build()
+
+        val noButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel")))
+        )
+            .width(150)
+            .build()
+
+        val dialog = io.papermc.paper.dialog.Dialog.create { factory ->
+            factory.empty()
+                .base(
+                    io.papermc.paper.registry.data.dialog.DialogBase.builder(
+                        withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.first.title")))
+                    )
+                        .body(
+                            listOf(
+                                io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(
+                                    withoutItalic(
+                                        toComponent(
+                                            messageProvider.getMessage(
+                                                "rank.prestige.dialog.first.body",
+                                                "profession" to professionName,
+                                                "level" to prestigeLevel
+                                            )
+                                        )
+                                    ),
+                                    280
+                                )
+                            )
+                        )
+                        .canCloseWithEscape(true)
+                        .pause(false)
+                        .afterAction(io.papermc.paper.registry.data.dialog.DialogBase.DialogAfterAction.CLOSE)
+                        .build()
+                )
+                .type(io.papermc.paper.registry.data.dialog.type.DialogType.confirmation(yesButton, noButton))
+        }
+
+        player.showDialog(dialog)
+    }
+
+    private fun openPrestigeConfirmDialogSecond(player: Player) {
+        val profession = rankManager.getPlayerProfession(player.uniqueId)?.profession ?: return
+        val professionName = messageProvider.getProfessionName(profession)
+        val prestigeLevel = rankManager.getPrestigeLevel(player.uniqueId)
+
+        val yesButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm")))
+        )
+            .width(150)
+            .action(
+                io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
+                    io.papermc.paper.registry.data.dialog.action.DialogActionCallback { _, audience ->
+                        val target = audience as? Player ?: return@DialogActionCallback
+                        executePrestige(target)
+                    },
+                    net.kyori.adventure.text.event.ClickCallback.Options.builder().uses(1).build()
+                )
+            )
+            .build()
+
+        val noButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel")))
+        )
+            .width(150)
+            .build()
+
+        val dialog = io.papermc.paper.dialog.Dialog.create { factory ->
+            factory.empty()
+                .base(
+                    io.papermc.paper.registry.data.dialog.DialogBase.builder(
+                        withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.second.title")))
+                    )
+                        .body(
+                            listOf(
+                                io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(
+                                    withoutItalic(
+                                        toComponent(
+                                            messageProvider.getMessage(
+                                                "rank.prestige.dialog.second.body",
+                                                "profession" to professionName,
+                                                "level" to prestigeLevel
+                                            )
+                                        )
+                                    ),
+                                    280
+                                )
+                            )
+                        )
+                        .canCloseWithEscape(true)
+                        .pause(false)
+                        .afterAction(io.papermc.paper.registry.data.dialog.DialogBase.DialogAfterAction.CLOSE)
+                        .build()
+                )
+                .type(io.papermc.paper.registry.data.dialog.type.DialogType.confirmation(yesButton, noButton))
+        }
+
+        player.showDialog(dialog)
+    }
+
+    private fun executePrestige(player: Player) {
+        val success = rankManager.executePrestige(player.uniqueId)
+        if (!success) {
+            player.sendMessage(messageProvider.getMessage("rank.prestige.failed"))
+            player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
+            return
+        }
+
+        player.closeInventory()
+        openProfessionMainMenu(player)
     }
 
     @EventHandler
@@ -2240,7 +2499,10 @@ class RankCommand(
         var viewportStartX: Int? = null,
         var preferredLane: SkillTreeLane? = null,
         var currentSelectedLane: SkillTreeLane = SkillTreeLane.CENTER,
-        var lastAction: String? = null
+        var lastAction: String? = null,
+        var prestigeSkills: Set<String> = emptySet(),
+        var prestigeLevel: Int = 0,
+        var isMaxLevel: Boolean = false
     )
 
     private data class RouteTransition(

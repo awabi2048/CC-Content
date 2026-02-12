@@ -136,4 +136,58 @@ interface SkillTree {
         val raw = getLevelInitialExp() * Math.pow(getLevelBase(), (safeLevel - 1).toDouble())
         return Math.round(raw).coerceAtLeast(1L)
     }
+
+    /**
+     * 累積経験値からプレステージレベルを算出
+     * 通常レベル最大到達後の超過経験値から計算（必要経験値2倍）
+     */
+    fun calculatePrestigeLevelByExp(totalExp: Long): Int {
+        val maxLevelExp = getRequiredTotalExpForLevel(getMaxLevel())
+        if (totalExp <= maxLevelExp) {
+            return 0
+        }
+
+        val overflowExp = totalExp - maxLevelExp
+        var level = 1
+        var cumulativeExp = 0L
+
+        while (level <= getMaxLevel()) {
+            val requiredForNext = getPrestigeExpToNextLevel(level)
+            if (cumulativeExp + requiredForNext > overflowExp) {
+                break
+            }
+            cumulativeExp += requiredForNext
+            level++
+        }
+
+        return (level - 1).coerceAtLeast(0)
+    }
+
+    /**
+     * プレステージレベルアップに必要な経験値を算出（通常レベルの2倍）
+     */
+    fun getPrestigeExpToNextLevel(prestigeLevel: Int): Long {
+        val safeLevel = prestigeLevel.coerceAtLeast(1)
+        val raw = getLevelInitialExp() * 2 * Math.pow(getLevelBase(), (safeLevel - 1).toDouble())
+        return Math.round(raw).coerceAtLeast(1L)
+    }
+
+    /**
+     * 指定プレステージレベルに到達する累積経験値を取得
+     */
+    fun getRequiredTotalPrestigeExpForLevel(prestigeLevel: Int): Long {
+        if (prestigeLevel <= 0) return 0L
+        var cumulative = 0L
+        for (level in 1 until prestigeLevel) {
+            cumulative += getPrestigeExpToNextLevel(level)
+        }
+        return cumulative
+    }
+
+    /**
+     * 最大レベル到達に必要な累積経験値を取得
+     */
+    fun getMaxLevelRequiredExp(): Long {
+        return getRequiredTotalExpForLevel(getMaxLevel())
+    }
 }

@@ -144,15 +144,16 @@ class YamlRankStorage(
     override fun saveProfession(profession: PlayerProfession) {
         val file = File(playerdataDirectory, "${profession.playerUuid}.yml")
         val config = if (file.exists()) YamlConfiguration.loadConfiguration(file) else YamlConfiguration()
-        
+
         val professionSection = config.getConfigurationSection("rank.profession")
             ?: config.createSection("rank.profession")
         professionSection.set("profession", profession.profession.id)
         professionSection.set("acquiredSkills", profession.acquiredSkills.toList())
+        professionSection.set("prestigeSkills", profession.prestigeSkills.toList())
         professionSection.set("currentExp", profession.currentExp)
         professionSection.set("lastUpdated", profession.lastUpdated)
         professionSection.set("bossBarEnabled", profession.bossBarEnabled)
-        
+
         try {
             config.save(file)
         } catch (e: Exception) {
@@ -163,26 +164,28 @@ class YamlRankStorage(
     override fun loadProfession(playerUuid: UUID): PlayerProfession? {
         val file = File(playerdataDirectory, "$playerUuid.yml")
         if (!file.exists()) return null
-        
+
         return try {
             val config = YamlConfiguration.loadConfiguration(file)
             val professionSection = config.getConfigurationSection("rank.profession") ?: return null
-            
+
             val professionId = professionSection.getString("profession") ?: return null
             val profession = Profession.fromId(professionId) ?: return null
-            
+
             val acquiredSkills = professionSection.getStringList("acquiredSkills").toMutableSet()
+            val prestigeSkills = professionSection.getStringList("prestigeSkills").toMutableSet()
             val currentExp = professionSection.getLong("currentExp", 0L)
             val lastUpdated = professionSection.getLong("lastUpdated", System.currentTimeMillis())
             val bossBarEnabled = professionSection.getBoolean("bossBarEnabled", true)
-            
+
             PlayerProfession(
                 playerUuid,
                 profession,
                 acquiredSkills,
                 currentExp,
                 lastUpdated,
-                bossBarEnabled
+                bossBarEnabled,
+                prestigeSkills
             )
         } catch (e: Exception) {
             e.printStackTrace()

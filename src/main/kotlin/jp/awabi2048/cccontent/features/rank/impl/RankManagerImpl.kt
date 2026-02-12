@@ -139,4 +139,26 @@ class RankManagerImpl(
     override fun hideAllProfessionBossBars() {
         bossBarManager?.hideAll()
     }
+
+    override fun getPrestigeLevel(playerUuid: UUID): Int {
+        return getProfessionManager().getPrestigeLevel(playerUuid)
+    }
+
+    override fun canPrestige(playerUuid: UUID): Boolean {
+        return getProfessionManager().canPrestige(playerUuid)
+    }
+
+    override fun acquirePrestigeSkill(playerUuid: UUID, skillId: String): Boolean {
+        return getProfessionManager().acquirePrestigeSkill(playerUuid, skillId)
+    }
+
+    override fun executePrestige(playerUuid: UUID): Boolean {
+        return getProfessionManager().executePrestige(playerUuid)
+    }
+
+    override fun isMaxProfessionLevel(playerUuid: UUID): Boolean {
+        val playerProf = getProfessionManager().getPlayerProfession(playerUuid) ?: return false
+        val skillTree = jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry.getSkillTree(playerProf.profession) ?: return false
+        return playerProf.isMaxLevel(skillTree)
+    }
 }

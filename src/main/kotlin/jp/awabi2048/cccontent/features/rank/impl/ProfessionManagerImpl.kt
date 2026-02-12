@@ -2,11 +2,14 @@ package jp.awabi2048.cccontent.features.rank.impl
 
 import jp.awabi2048.cccontent.features.rank.RankStorage
 import jp.awabi2048.cccontent.features.rank.event.PlayerExperienceGainEvent
+import jp.awabi2048.cccontent.features.rank.event.PrestigeExecutedEvent
+import jp.awabi2048.cccontent.features.rank.event.PrestigeSkillAcquiredEvent
 import jp.awabi2048.cccontent.features.rank.event.ProfessionChangedEvent
 import jp.awabi2048.cccontent.features.rank.event.ProfessionLevelUpEvent
 import jp.awabi2048.cccontent.features.rank.event.ProfessionSelectedEvent
 import jp.awabi2048.cccontent.features.rank.event.SkillAcquiredEvent
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
+import jp.awabi2048.cccontent.features.rank.prestige.PrestigeToken
 import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.ProfessionManager
@@ -211,6 +214,114 @@ class ProfessionManagerImpl(
         prof.bossBarEnabled = enabled
         prof.lastUpdated = System.currentTimeMillis()
         storage.saveProfession(prof)
+    }
+
+    override fun getPrestigeLevel(playerUuid: UUID): Int {
+        val prof = getPlayerProfession(playerUuid) ?: return 0
+        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return 0
+        return prof.getPrestigeLevel(skillTree)
+    }
+
+    override fun canPrestige(playerUuid: UUID): Boolean {
+        val prof = getPlayerProfession(playerUuid) ?: return false
+        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
+        return prof.canPrestige(skillTree)
+    }
+
+    override fun acquirePrestigeSkill(playerUuid: UUID, skillId: String): Boolean {
+        val prof = getPlayerProfession(playerUuid) ?: return false
+        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
+        val normalizedSkillId = resolveSkillId(skillTree.getAllSkills().keys, skillId)
+        val skill = skillTree.getSkill(normalizedSkillId) ?: return false
+
+        if (!prof.canUnlockPrestigeSkill(skillTree, skill.skillId)) {
+            return false
+        }
+
+        if (!prof.acquirePrestigeSkill(skill.skillId)) {
+            return false
+        }
+
+        storage.saveProfession(prof)
+
+        val player = Bukkit.getPlayer(playerUuid)
+        if (player != null) {
+            val skillName = messageProvider.getSkillName(prof.profession, skill.skillId)
+            val event = PrestigeSkillAcquiredEvent(player, prof.profession, skill.skillId, skillName)
+            Bukkit.getPluginManager().callEvent(event)
+            playSkillAcquireSounds(player)
+        }
+
+        return true
+    }
+
+    override fun getAvailablePrestigeSkills(playerUuid: UUID): List<String> {
+        val prof = getPlayerProfession(playerUuid) ?: return emptyList()
+        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return emptyList()
+        return prof.getNextPrestigeSkillOptions(skillTree)
+    }
+
+    override fun getAcquiredPrestigeSkills(playerUuid: UUID): Set<String> {
+        return getPlayerProfession(playerUuid)?.prestigeSkills?.toSet() ?: emptySet()
+    }
+
+    override fun hasPrestigeSkill(playerUuid: UUID, skillId: String): Boolean {
+        return getPlayerProfession(playerUuid)?.hasPrestigeSkillUnlocked(skillId) ?: false
+    }
+
+    override fun executePrestige(playerUuid: UUID): Boolean {
+        val prof = getPlayerProfession(playerUuid) ?: return false
+        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
+
+        if (!prof.canPrestige(skillTree)) {
+            return false
+        }
+
+        val player = Bukkit.getPlayer(playerUuid)
+        val prestigeLevel = prof.getPrestigeLevel(skillTree)
+
+        // プレイヤーがオンラインの場合のみアイテム処理を実行
+        if (player != null) {
+            // 再プレステージの場合、古い思念アイテムを削除
+            val existingToken = PrestigeToken.findToken(player, prof.profession)
+            val isRePrestige = existingToken != null
+            if (isRePrestige) {
+                PrestigeToken.removeToken(player, prof.profession)
+            }
+
+            // プレステージ実行：通常レベル・スキル・経験値をリセット
+            prof.resetForPrestige()
+
+            // 新しい思念アイテムを付与
+            val token = PrestigeToken.create(prof.profession, prestigeLevel, player)
+            val leftover = player.inventory.addItem(token)
+            if (leftover.isNotEmpty()) {
+                // インベントリがいっぱいの場合はドロップ
+                leftover.values.forEach { item ->
+                    player.world.dropItem(player.location, item)
+                }
+            }
+
+            storage.saveProfession(prof)
+
+            val event = PrestigeExecutedEvent(player, prof.profession, prestigeLevel, isRePrestige)
+            Bukkit.getPluginManager().callEvent(event)
+
+            player.sendMessage(
+                messageProvider.getMessage(
+                    "rank.profession.prestige.executed",
+                    "profession" to messageProvider.getProfessionName(prof.profession),
+                    "level" to prestigeLevel
+                )
+            )
+            player.playSound(player.location, "minecraft:ui.toast.challenge_complete", 1.0f, 1.0f)
+        } else {
+            // オフラインの場合はデータのみリセット
+            prof.resetForPrestige()
+            storage.saveProfession(prof)
+        }
+
+        return true
     }
 
     fun saveData() {
