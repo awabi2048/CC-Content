@@ -64,7 +64,7 @@ class ProfessionMinerExpListener(
             plugin.logger.fine("[ProfessionMinerExpListener] ${player.name} has no profession")
             return
         }
-        
+
         plugin.logger.fine("[ProfessionMinerExpListener] ${player.name} profession: ${playerProfession.profession}")
         
         when (playerProfession.profession) {
@@ -126,7 +126,7 @@ class ProfessionMinerExpListener(
     private fun addBreakExpIfEligible(uuid: UUID, block: org.bukkit.block.Block, expMap: Map<Material, Long>) {
         val expAmount = expMap[block.type]
         plugin.logger.fine("[ProfessionMinerExpListener] Block ${block.type} exp amount: $expAmount (map size: ${expMap.size})")
-        
+
         if (expAmount == null || expAmount <= 0L) {
             plugin.logger.fine("[ProfessionMinerExpListener] No exp mapped for ${block.type} or exp <= 0")
             return
