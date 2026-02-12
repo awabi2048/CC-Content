@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.rank.profession.skilltree
 
 import jp.awabi2048.cccontent.features.rank.profession.SkillNode
 import jp.awabi2048.cccontent.features.rank.profession.SkillTree
+import jp.awabi2048.cccontent.features.rank.skill.CombineRule
 import jp.awabi2048.cccontent.features.rank.skill.EvaluationMode
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffect
 import org.bukkit.configuration.file.YamlConfiguration
@@ -99,6 +100,14 @@ class ConfigBasedSkillTree(
             EvaluationMode.CACHED
         }
 
+        // combineRule を YAML から読み込み、デフォルトは "ADD"
+        val combineRuleStr = effectSection.getString("combineRule", "ADD") ?: "ADD"
+        val combineRule = try {
+            CombineRule.valueOf(combineRuleStr.uppercase())
+        } catch (e: IllegalArgumentException) {
+            CombineRule.ADD
+        }
+
         val paramsSection = effectSection.getConfigurationSection("params")
         val params = mutableMapOf<String, Any>()
 
@@ -111,7 +120,7 @@ class ConfigBasedSkillTree(
             }
         }
 
-        return SkillEffect(type, params, evaluationMode)
+        return SkillEffect(type, params, evaluationMode, combineRule)
     }
 
     private fun rebuildGraphIndexes() {
@@ -146,8 +155,8 @@ class ConfigBasedSkillTree(
 
     private fun validateSkillGraph() {
         skills.values.forEach { skill ->
-            if (skill.children.size > 2) {
-                throw IllegalArgumentException("$professionId/${skill.skillId}: 子スキルは最大2つまでです")
+            if (skill.children.size > 4) {
+                throw IllegalArgumentException("$professionId/${skill.skillId}: 子スキルは最大4つまでです")
             }
             skill.children.forEach { childId ->
                 if (!skills.containsKey(childId)) {
