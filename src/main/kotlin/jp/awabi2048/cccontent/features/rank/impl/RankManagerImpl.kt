@@ -44,7 +44,15 @@ class RankManagerImpl(
     }
     
     override fun isAttainer(playerUuid: UUID): Boolean {
-        return tutorialManager.isAttainer(playerUuid)
+        return tutorialManager.isAttainer(playerUuid) && !getProfessionManager().hasProfession(playerUuid)
+    }
+    
+    override fun getPlayerRank(playerUuid: UUID): String {
+        if (!tutorialManager.isAttainer(playerUuid)) {
+            return tutorialManager.getRank(playerUuid).name
+        }
+        val prof = getProfessionManager().getPlayerProfession(playerUuid)
+        return if (prof != null) prof.profession.id else "ATTAINER"
     }
     
     override fun addTutorialExp(playerUuid: UUID, amount: Long): Boolean {
@@ -107,7 +115,11 @@ class RankManagerImpl(
     }
     
     override fun resetProfession(playerUuid: UUID): Boolean {
-        return getProfessionManager().resetProfession(playerUuid)
+        val result = getProfessionManager().resetProfession(playerUuid)
+        if (result) {
+            tutorialManager.setRank(playerUuid, jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank.VISITOR)
+        }
+        return result
     }
     
     override fun saveData() {
@@ -153,7 +165,11 @@ class RankManagerImpl(
     }
 
     override fun executePrestige(playerUuid: UUID): Boolean {
-        return getProfessionManager().executePrestige(playerUuid)
+        val result = getProfessionManager().executePrestige(playerUuid)
+        if (result) {
+            tutorialManager.setRank(playerUuid, jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank.ATTAINER)
+        }
+        return result
     }
 
     override fun isMaxProfessionLevel(playerUuid: UUID): Boolean {

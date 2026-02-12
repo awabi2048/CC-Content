@@ -63,13 +63,14 @@ class PrestigeToken {
                 return item
             }
 
-            container.set(NamespacedKey(plugin, PRESTIGE_TOKEN_KEY), PersistentDataType.BYTE, 1)
+             container.set(NamespacedKey(plugin, PRESTIGE_TOKEN_KEY), PersistentDataType.BYTE, 1)
             container.set(NamespacedKey(plugin, PROFESSION_KEY), PersistentDataType.STRING, profession.id)
             container.set(NamespacedKey(plugin, PRESTIGE_LEVEL_KEY), PersistentDataType.INTEGER, prestigeLevel)
             container.set(NamespacedKey(plugin, OWNER_KEY), PersistentDataType.STRING, owner.uniqueId.toString())
             container.set(NamespacedKey(plugin, OWNER_NAME_KEY), PersistentDataType.STRING, owner.name)
 
             item.itemMeta = meta
+            org.bukkit.Bukkit.getLogger().info("[CCContent] PrestigeToken created: ${owner.name}, ${profession.id}, Lvl$prestigeLevel")
             return item
         }
 

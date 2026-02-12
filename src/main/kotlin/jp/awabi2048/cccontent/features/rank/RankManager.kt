@@ -24,8 +24,15 @@ interface RankManager {
     
     /**
      * プレイヤーがATTAINERに達しているか確認
+     * ATTAINERかつ職業未選択の場合のみtrueを返す
      */
     fun isAttainer(playerUuid: UUID): Boolean
+    
+    /**
+     * プレイヤーの現在のランクを取得
+     * 職業未選択の場合はチュートリアルランク、職業選択済みの場合は職業IDを返す
+     */
+    fun getPlayerRank(playerUuid: UUID): String
     
     /**
      * チュートリアルランクに経験値を追加

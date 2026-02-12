@@ -701,6 +701,14 @@ rank:
     player_only: §cこのコマンドはプレイヤーのみ実行できます
     acquired: §a{player} がスキル {skill} を習得しました
     acquire_failed: §cスキル習得に失敗しました
+    info:
+      title: '§6=== {player} のランク情報 ==='
+      current_rank: '§a現在のランク: §e{rank}'
+      no_profession: §7職業を選択してください
+      profession_level: '§a職業レベル: {level}'
+      acquired_skills: '§a習得スキル: {skills}'
+      profession_exp: '§a職業経験値: {exp}'
+      next_rank: '§7次のランク: §f{rank}'
     gui:
       title: §8{profession} スキルツリー
       no_profession: §c職業を選択していません

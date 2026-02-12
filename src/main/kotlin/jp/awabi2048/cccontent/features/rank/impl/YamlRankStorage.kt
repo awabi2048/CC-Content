@@ -21,6 +21,64 @@ class YamlRankStorage(
     
     override fun init() {
         playerdataDirectory.mkdirs()
+        migrateOldProfessionData()
+    }
+    
+    /**
+     * 旧形式の職業データを移行
+     * profession/<profession>/<uuid>.yml から playerdata/<uuid>.yml へ
+     */
+    private fun migrateOldProfessionData() {
+        val professionDir = File(dataDirectory, "profession")
+        if (!professionDir.exists()) return
+        
+        val migratedCount = mutableListOf<String>()
+        
+        for (professionFile in professionDir.listFiles() ?: emptyArray()) {
+            if (!professionFile.isDirectory) continue
+            
+            val professionId = professionFile.name
+            for (playerFile in professionDir.listFiles() ?: emptyArray()) {
+                if (playerFile.extension != "yml") continue
+                
+                val uuidString = playerFile.nameWithoutExtension
+                val uuid = try {
+                    UUID.fromString(uuidString)
+                } catch (e: IllegalArgumentException) {
+                    continue
+                }
+                
+                val targetFile = File(playerdataDirectory, "$uuidString.yml")
+                if (targetFile.exists()) continue
+                
+                try {
+                    val oldConfig = YamlConfiguration.loadConfiguration(playerFile)
+                    val newConfig = if (targetFile.exists()) YamlConfiguration.loadConfiguration(targetFile) else YamlConfiguration()
+                    
+                    val professionSection = newConfig.createSection("rank.profession")
+                    professionSection.set("profession", professionId)
+                    professionSection.set("acquiredSkills", oldConfig.getStringList("acquiredSkills"))
+                    professionSection.set("prestigeSkills", oldConfig.getStringList("prestigeSkills"))
+                    professionSection.set("currentExp", oldConfig.getLong("currentExp", 0L))
+                    professionSection.set("lastUpdated", oldConfig.getLong("lastUpdated", System.currentTimeMillis()))
+                    professionSection.set("bossBarEnabled", oldConfig.getBoolean("bossBarEnabled", true))
+                    
+                    newConfig.save(targetFile)
+                    playerFile.delete()
+                    migratedCount += "$uuidString"
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+            
+            if (professionFile.listFiles()?.isEmpty() == true) {
+                professionFile.delete()
+            }
+        }
+        
+        if (migratedCount.isNotEmpty()) {
+            java.util.logging.Logger.getLogger("CC-Content").info("[YamlRankStorage] 旧職業データを ${migratedCount.size} 件移行しました")
+        }
     }
     
     override fun cleanup() {

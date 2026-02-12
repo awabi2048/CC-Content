@@ -271,30 +271,34 @@ class RankCommand(
             sender.sendMessage("§cプレイヤーを指定してください")
             return false
         }
-        
+
         if (targetPlayer == null) {
             sender.sendMessage("§cプレイヤーが見つかりません")
             return false
         }
-        
+
         val uuid = targetPlayer.uniqueId
         val tutorial = rankManager.getPlayerTutorial(uuid)
-        
+        val currentRank = rankManager.getPlayerRank(uuid)
+
         sender.sendMessage("§6=== ${targetPlayer.name} のランク情報 ===")
-        sender.sendMessage("§aチュートリアルランク: ${tutorial.currentRank.name}")
-        sender.sendMessage("§aランクレベル: ${tutorial.currentRank.level}")
-        
-        val profession = rankManager.getPlayerProfession(uuid)
-        if (profession != null) {
+        sender.sendMessage("§a現在のランク: §e$currentRank")
+
+        if (currentRank == "ATTAINER") {
+            sender.sendMessage("§7職業を選択してください")
+        } else if (rankManager.getPlayerProfession(uuid) != null) {
+            val profession = rankManager.getPlayerProfession(uuid)
             val currentLevel = rankManager.getCurrentProfessionLevel(uuid)
-            sender.sendMessage("§a職業: ${profession.profession.id}")
             sender.sendMessage("§a職業レベル: $currentLevel")
-            sender.sendMessage("§a習得スキル: ${profession.acquiredSkills.joinToString(", ")}")
-            sender.sendMessage("§a職業経験値: ${profession.currentExp}")
+            sender.sendMessage("§a習得スキル: ${profession?.acquiredSkills?.joinToString(", ") ?: "なし"}")
+            sender.sendMessage("§a職業経験値: ${profession?.currentExp ?: 0}")
         } else {
-            sender.sendMessage("§c職業: 未選択")
+            val nextRank = tutorial.getNextRank()
+            if (nextRank != null) {
+                sender.sendMessage("§7次のランク: §f${nextRank.name}")
+            }
         }
-        
+
         return true
     }
 
