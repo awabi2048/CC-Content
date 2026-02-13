@@ -126,7 +126,6 @@ skills:
       type: "collect.blast_mine"
       params:
         radius: 2
-        delayTicksPerLayer: 3
         autoCollect: false
         lossRate: 0.5
         targetTools: ["PICKAXE"]
@@ -139,7 +138,6 @@ skills:
       type: "collect.blast_mine"
       params:
         radius: 3
-        delayTicksPerLayer: 2
         autoCollect: true
         lossRate: 0.3
         targetTools: ["PICKAXE"]

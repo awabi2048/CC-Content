@@ -2,37 +2,37 @@
 skills:
   settings:
     level:
-      initialExp: 100
-      base: 1.25
+      initialExp: 10
+      base: 1.2
       maxLevel: 50
-    overviewIcon: "IRON_HOE"
+    overviewIcon: "DIAMOND_HOE"
 
-  skill0:
-    requiredLevel: 1
+  initial:
+    requiredLevel: 0
     icon: "WOODEN_HOE"
-    children: ["skill1"]
+    children: ["harvest_1"]
 
-  skill1:
-    requiredLevel: 2
+  harvest_1:
+    requiredLevel: 5
     icon: "STONE_HOE"
-    children: ["skill2", "skill4"]
+    children: ["area_tilling"]
 
-  skill2:
-    requiredLevel: 3
-    icon: "IRON_HOE"
-    children: ["skill3"]
+  area_tilling:
+    requiredLevel: 10
+    icon: "FARMLAND"
+    children: ["area_harvesting", "auto_replanting"]
 
-  skill3:
-    requiredLevel: 4
+  area_harvesting:
+    requiredLevel: 20
     icon: "DIAMOND_HOE"
     children: ["skill8"]
 
-  skill4:
+  auto_replanting:
     requiredLevel: 3
     icon: "GOLDEN_HOE"
     children: ["skill5", "skill6"]
 
-  skill5:
+  harvest_2:
     requiredLevel: 4
     icon: "NETHERITE_HOE"
     children: ["skill8"]

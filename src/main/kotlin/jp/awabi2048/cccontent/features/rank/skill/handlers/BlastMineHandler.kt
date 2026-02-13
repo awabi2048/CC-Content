@@ -30,12 +30,10 @@ class BlastMineHandler(
         const val EFFECT_TYPE = "collect.blast_mine"
 
         private const val DEFAULT_RADIUS = 3.0
-        private const val DEFAULT_DELAY_TICKS_PER_LAYER = 2
         private const val DEFAULT_AUTO_COLLECT = false
         private const val DEFAULT_LOSS_RATE = 0.0
         private const val MAX_RADIUS = 10.0
-        private const val MAX_DELAY_TICKS = 40L
-        private const val MIN_DELAY_TICKS = 0L
+        private const val MIN_RADIUS = 1.0
 
         @Volatile
         private var activeInstance: BlastMineHandler? = null
@@ -67,12 +65,11 @@ class BlastMineHandler(
 
         fun setDebugOverride(playerUuid: UUID, radius: Double, delayTicksPerLayer: Int, autoCollect: Boolean, lossRate: Double) {
             val normalizedRadius = radius.coerceIn(0.5, MAX_RADIUS)
-            val normalizedDelay = delayTicksPerLayer.coerceIn(MIN_DELAY_TICKS.toInt(), MAX_DELAY_TICKS.toInt())
             val normalizedLossRate = lossRate.coerceIn(0.0, 1.0)
 
             debugOverrides[playerUuid] = DebugOverride(
                 radius = normalizedRadius,
-                delayTicksPerLayer = normalizedDelay,
+                delayTicksPerLayer = 0,
                 autoCollect = autoCollect,
                 lossRate = normalizedLossRate
             )
@@ -130,7 +127,6 @@ class BlastMineHandler(
 
     private data class BlastMineRuntimeOptions(
         val radius: Double,
-        val delayTicksPerLayer: Long,
         val autoCollect: Boolean,
         val lossRate: Double
     )
@@ -169,18 +165,18 @@ class BlastMineHandler(
         stopForPlayer(playerUuid)
 
         val centerBlock = event.block
-        val blocksByDistance = collectSphericalBlocks(centerBlock, options.radius)
+        val blocks = collectCuboidBlocks(centerBlock, options.radius)
 
-        if (blocksByDistance.isEmpty()) {
+        if (blocks.isEmpty()) {
             return false
         }
 
         val originHeldSlot = player.inventory.heldItemSlot
         val originTool = player.inventory.itemInMainHand.clone()
 
-        registerDropModifiers(playerUuid, blocksByDistance, options, originTool)
+        registerDropModifiers(playerUuid, blocks, options, originTool)
 
-        scheduleBlastBreak(player, playerUuid, options, blocksByDistance, originHeldSlot, originTool)
+        scheduleBlastBreak(player, playerUuid, options, blocks, originHeldSlot, originTool)
 
         return true
     }
@@ -195,18 +191,45 @@ class BlastMineHandler(
     }
 
     private fun resolveRuntimeOptions(skillEffect: SkillEffect): BlastMineRuntimeOptions {
-        val radius = skillEffect.getDoubleParam("radius", DEFAULT_RADIUS).coerceIn(0.5, MAX_RADIUS)
-        val delayTicksPerLayer = skillEffect.getIntParam("delayTicksPerLayer", DEFAULT_DELAY_TICKS_PER_LAYER).toLong()
-            .coerceIn(MIN_DELAY_TICKS, MAX_DELAY_TICKS)
+        val radius = skillEffect.getDoubleParam("radius", DEFAULT_RADIUS).coerceIn(MIN_RADIUS, MAX_RADIUS)
         val autoCollect = skillEffect.getBooleanParam("autoCollect", DEFAULT_AUTO_COLLECT)
         val lossRate = skillEffect.getDoubleParam("lossRate", DEFAULT_LOSS_RATE).coerceIn(0.0, 1.0)
 
         return BlastMineRuntimeOptions(
             radius = radius,
-            delayTicksPerLayer = delayTicksPerLayer,
             autoCollect = autoCollect,
             lossRate = lossRate
         )
+    }
+
+    private fun collectCuboidBlocks(center: Block, radius: Double): List<Block> {
+        val world = center.world
+        val centerX = center.x
+        val centerY = center.y
+        val centerZ = center.z
+        val radiusInt = kotlin.math.ceil(radius).toInt()
+
+        val blocks = mutableListOf<Block>()
+
+        for (dx in -radiusInt..radiusInt) {
+            for (dy in -radiusInt..radiusInt) {
+                for (dz in -radiusInt..radiusInt) {
+                    if (dx == 0 && dy == 0 && dz == 0) continue
+
+                    val block = world.getBlockAt(centerX + dx, centerY + dy, centerZ + dz)
+
+                    if (block.type.isAir) continue
+                    if (block.type == Material.WATER || block.type == Material.LAVA) continue
+
+                    if (shouldSkipBlock(block)) continue
+                    if (isPlayerPlacedBlock(block)) continue
+
+                    blocks.add(block)
+                }
+            }
+        }
+
+        return blocks
     }
 
     private fun collectSphericalBlocks(center: Block, radius: Double): Map<Int, MutableList<Block>> {
@@ -272,22 +295,20 @@ class BlastMineHandler(
 
     private fun registerDropModifiers(
         playerUuid: UUID,
-        blocksByDistance: Map<Int, MutableList<Block>>,
+        blocks: List<Block>,
         options: BlastMineRuntimeOptions,
         originTool: ItemStack
     ) {
         val modifiers = mutableListOf<DropModifier>()
-        for ((_, blocks) in blocksByDistance) {
-            for (block in blocks) {
-                modifiers.add(DropModifier(
-                    blockX = block.x,
-                    blockY = block.y,
-                    blockZ = block.z,
-                    lossRate = options.lossRate,
-                    autoCollect = options.autoCollect,
-                    originTool = originTool.clone()
-                ))
-            }
+        for (block in blocks) {
+            modifiers.add(DropModifier(
+                blockX = block.x,
+                blockY = block.y,
+                blockZ = block.z,
+                lossRate = options.lossRate,
+                autoCollect = options.autoCollect,
+                originTool = originTool.clone()
+            ))
         }
         pendingDropModifiers[playerUuid] = modifiers
     }
@@ -296,66 +317,27 @@ class BlastMineHandler(
         player: Player,
         playerUuid: UUID,
         options: BlastMineRuntimeOptions,
-        blocksByDistance: Map<Int, MutableList<Block>>,
+        blocks: List<Block>,
         originHeldSlot: Int,
         originTool: ItemStack
     ) {
-        val totalBlocks = blocksByDistance.values.sumOf { it.size }
-        player.sendActionBar(net.kyori.adventure.text.Component.text("BlastMine: $totalBlocks blocks"))
-
-        val sortedDistances = blocksByDistance.keys.sorted()
+        val totalBlocks = blocks.size
+        player.sendActionBar(net.kyori.adventure.text.Component.text("BlastMine: $totalBlocks ブロック"))
         val plugin = CCContent.instance
 
-        if (options.delayTicksPerLayer <= 0) {
-            val allBlocks = sortedDistances.flatMap { blocksByDistance[it] ?: emptyList() }
-            val task = plugin.server.scheduler.runTask(plugin, Runnable {
-                internalBreakPlayers.add(playerUuid)
-                try {
-                    for (target in allBlocks) {
-                        if (!player.isOnline || target.type.isAir || isPlayerPlacedBlock(target)) continue
-                        val soundGroup = target.blockSoundGroup
-                        val success = breakWithOriginalContext(player, originHeldSlot, target, preserveDurability = true)
-                        if (success) {
-                            playBreakSound(target, soundGroup)
-                        }
-                    }
-                } finally {
-                    internalBreakPlayers.remove(playerUuid)
-                    stopForPlayer(playerUuid)
-                }
-            })
-            activeTasks[playerUuid] = task
-            return
-        }
-
-        val layersIterator = sortedDistances.iterator()
-        var finalized = false
-
-        val finalizeBlast = {
-            if (!finalized) {
-                finalized = true
-                stopForPlayer(playerUuid)
-            }
-        }
-
-        val task = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
-            if (!player.isOnline) {
-                finalizeBlast()
-                return@Runnable
-            }
-
-            if (!layersIterator.hasNext()) {
-                finalizeBlast()
-                return@Runnable
-            }
-
-            val currentDistance = layersIterator.next()
-            val currentLayerBlocks = blocksByDistance[currentDistance] ?: emptyList()
+        val task = plugin.server.scheduler.runTask(plugin, Runnable {
+            // 爆発音を再生
+            player.world.playSound(
+                player.location,
+                org.bukkit.Sound.ENTITY_GENERIC_EXPLODE,
+                1.0f,
+                1.0f
+            )
 
             internalBreakPlayers.add(playerUuid)
             try {
-                for (target in currentLayerBlocks) {
-                    if (target.type.isAir || isPlayerPlacedBlock(target)) continue
+                for (target in blocks) {
+                    if (!player.isOnline || target.type.isAir || isPlayerPlacedBlock(target)) continue
                     val soundGroup = target.blockSoundGroup
                     val success = breakWithOriginalContext(player, originHeldSlot, target, preserveDurability = true)
                     if (success) {
@@ -364,12 +346,9 @@ class BlastMineHandler(
                 }
             } finally {
                 internalBreakPlayers.remove(playerUuid)
+                stopForPlayer(playerUuid)
             }
-
-            if (!layersIterator.hasNext()) {
-                finalizeBlast()
-            }
-        }, 0L, options.delayTicksPerLayer)
+        })
 
         activeTasks[playerUuid] = task
     }
@@ -452,9 +431,10 @@ class BlastMineHandler(
 
     override fun calculateStrength(skillEffect: SkillEffect): Double {
         val radius = skillEffect.getDoubleParam("radius", DEFAULT_RADIUS)
-        val volume = (4.0 / 3.0) * kotlin.math.PI * radius * radius * radius
-        val delay = maxOf(1.0, skillEffect.getIntParam("delayTicksPerLayer", DEFAULT_DELAY_TICKS_PER_LAYER).toDouble())
-        return volume / delay
+        val size = kotlin.math.ceil(radius).toInt()
+        val oneSide = size * 2 + 1
+        val volume = (oneSide * oneSide * oneSide).toDouble()
+        return volume
     }
 
     override fun supportsProfession(professionId: String): Boolean {
@@ -463,7 +443,6 @@ class BlastMineHandler(
 
     override fun validateParams(skillEffect: SkillEffect): Boolean {
         val radius = skillEffect.getDoubleParam("radius", DEFAULT_RADIUS)
-        val delayTicks = skillEffect.getIntParam("delayTicksPerLayer", DEFAULT_DELAY_TICKS_PER_LAYER)
-        return radius > 0 && delayTicks >= 0
+        return radius > 0
     }
 }
