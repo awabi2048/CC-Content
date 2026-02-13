@@ -1,8 +1,6 @@
 package jp.awabi2048.cccontent.features.rank.skill.handlers
 
 import jp.awabi2048.cccontent.CCContent
-import jp.awabi2048.cccontent.features.rank.job.BlockPositionCodec
-import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillManager
 import jp.awabi2048.cccontent.features.rank.skill.EffectContext
@@ -13,19 +11,15 @@ import jp.awabi2048.cccontent.features.rank.skill.SkillEffectHandler
 import org.bukkit.Material
 import org.bukkit.block.Block
 import org.bukkit.block.Container
-import org.bukkit.entity.ExperienceOrb
 import org.bukkit.entity.Player
 import org.bukkit.event.block.BlockBreakEvent
-import org.bukkit.event.block.BlockDropItemEvent
 import org.bukkit.inventory.ItemStack
-import org.bukkit.inventory.meta.Damageable
 import org.bukkit.scheduler.BukkitTask
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.random.Random
 
-class BlastMineHandler(
-    private val ignoreBlockStore: IgnoreBlockStore
-) : SkillEffectHandler {
+class BlastMineHandler : SkillEffectHandler {
     companion object {
         const val EFFECT_TYPE = "collect.blast_mine"
 
@@ -34,6 +28,7 @@ class BlastMineHandler(
         private const val DEFAULT_LOSS_RATE = 0.0
         private const val MAX_RADIUS = 10.0
         private const val MIN_RADIUS = 1.0
+        private const val BREAK_SOUND_INTERVAL = 4
 
         @Volatile
         private var activeInstance: BlastMineHandler? = null
@@ -41,35 +36,23 @@ class BlastMineHandler(
         private val activeTasks: MutableMap<UUID, BukkitTask> = ConcurrentHashMap()
         private val internalBreakPlayers: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
         private val debugOverrides: MutableMap<UUID, DebugOverride> = ConcurrentHashMap()
-        private val pendingDropModifiers: MutableMap<UUID, MutableList<DropModifier>> = ConcurrentHashMap()
 
         data class DebugOverride(
             val radius: Double,
-            val delayTicksPerLayer: Int,
             val autoCollect: Boolean,
             val lossRate: Double
-        )
-
-        data class DropModifier(
-            val blockX: Int,
-            val blockY: Int,
-            val blockZ: Int,
-            val lossRate: Double,
-            val autoCollect: Boolean,
-            val originTool: ItemStack?
         )
 
         fun isInternalBreakInProgress(playerUuid: UUID): Boolean {
             return internalBreakPlayers.contains(playerUuid)
         }
 
-        fun setDebugOverride(playerUuid: UUID, radius: Double, delayTicksPerLayer: Int, autoCollect: Boolean, lossRate: Double) {
+        fun setDebugOverride(playerUuid: UUID, radius: Double, autoCollect: Boolean, lossRate: Double) {
             val normalizedRadius = radius.coerceIn(0.5, MAX_RADIUS)
             val normalizedLossRate = lossRate.coerceIn(0.0, 1.0)
 
             debugOverrides[playerUuid] = DebugOverride(
                 radius = normalizedRadius,
-                delayTicksPerLayer = 0,
                 autoCollect = autoCollect,
                 lossRate = normalizedLossRate
             )
@@ -83,7 +66,6 @@ class BlastMineHandler(
             val override = debugOverrides[playerUuid] ?: return null
             val params = mapOf<String, Any>(
                 "radius" to override.radius,
-                "delayTicksPerLayer" to override.delayTicksPerLayer,
                 "autoCollect" to override.autoCollect,
                 "lossRate" to override.lossRate
             )
@@ -95,23 +77,9 @@ class BlastMineHandler(
             )
         }
 
-        fun getDropModifier(playerUuid: UUID, block: Block): DropModifier? {
-            val modifiers = pendingDropModifiers[playerUuid] ?: return null
-            return modifiers.find { it.blockX == block.x && it.blockY == block.y && it.blockZ == block.z }
-        }
-
-        fun removeDropModifier(playerUuid: UUID, block: Block) {
-            val modifiers = pendingDropModifiers[playerUuid] ?: return
-            modifiers.removeAll { it.blockX == block.x && it.blockY == block.y && it.blockZ == block.z }
-            if (modifiers.isEmpty()) {
-                pendingDropModifiers.remove(playerUuid)
-            }
-        }
-
         fun stopForPlayer(playerUuid: UUID) {
             activeTasks.remove(playerUuid)?.cancel()
             internalBreakPlayers.remove(playerUuid)
-            pendingDropModifiers.remove(playerUuid)
         }
 
         fun stopAll() {
@@ -120,7 +88,6 @@ class BlastMineHandler(
                 activeTasks.remove(playerUuid)
                 internalBreakPlayers.remove(playerUuid)
             }
-            pendingDropModifiers.clear()
             debugOverrides.clear()
         }
     }
@@ -153,10 +120,6 @@ class BlastMineHandler(
             return false
         }
 
-        if (isPlayerPlacedBlock(event.block)) {
-            return false
-        }
-
         if (!isPickaxe(player.inventory.itemInMainHand.type)) {
             return false
         }
@@ -171,23 +134,15 @@ class BlastMineHandler(
             return false
         }
 
-        val originHeldSlot = player.inventory.heldItemSlot
         val originTool = player.inventory.itemInMainHand.clone()
 
-        registerDropModifiers(playerUuid, blocks, options, originTool)
-
-        scheduleBlastBreak(player, playerUuid, options, blocks, originHeldSlot, originTool)
+        scheduleBlastBreak(player, playerUuid, options, blocks, originTool)
 
         return true
     }
 
     private fun isPickaxe(material: Material): Boolean {
         return material.name.endsWith("_PICKAXE")
-    }
-
-    private fun isPlayerPlacedBlock(block: Block): Boolean {
-        val packedPosition = BlockPositionCodec.pack(block.x, block.y, block.z)
-        return ignoreBlockStore.contains(block.world.uid, packedPosition)
     }
 
     private fun resolveRuntimeOptions(skillEffect: SkillEffect): BlastMineRuntimeOptions {
@@ -222,7 +177,6 @@ class BlastMineHandler(
                     if (block.type == Material.WATER || block.type == Material.LAVA) continue
 
                     if (shouldSkipBlock(block)) continue
-                    if (isPlayerPlacedBlock(block)) continue
 
                     blocks.add(block)
                 }
@@ -230,44 +184,6 @@ class BlastMineHandler(
         }
 
         return blocks
-    }
-
-    private fun collectSphericalBlocks(center: Block, radius: Double): Map<Int, MutableList<Block>> {
-        val world = center.world
-        val centerX = center.x
-        val centerY = center.y
-        val centerZ = center.z
-        val radiusSquared = radius * radius
-        val radiusInt = kotlin.math.ceil(radius).toInt()
-
-        val blocksByDistance = mutableMapOf<Int, MutableList<Block>>()
-
-        for (dx in -radiusInt..radiusInt) {
-            for (dy in -radiusInt..radiusInt) {
-                for (dz in -radiusInt..radiusInt) {
-                    if (dx == 0 && dy == 0 && dz == 0) continue
-
-                    val distanceSquared = dx * dx + dy * dy + dz * dz
-                    if (distanceSquared > radiusSquared) continue
-
-                    val distance = kotlin.math.sqrt(distanceSquared.toDouble()).toInt()
-                    if (distance == 0) continue
-
-                    val block = world.getBlockAt(centerX + dx, centerY + dy, centerZ + dz)
-
-                    if (block.type.isAir) continue
-                    if (block.type == Material.WATER || block.type == Material.LAVA) continue
-
-                    if (shouldSkipBlock(block)) continue
-
-                    if (isPlayerPlacedBlock(block)) continue
-
-                    blocksByDistance.getOrPut(distance) { mutableListOf() }.add(block)
-                }
-            }
-        }
-
-        return blocksByDistance.toSortedMap()
     }
 
     private fun shouldSkipBlock(block: Block): Boolean {
@@ -293,32 +209,11 @@ class BlastMineHandler(
         return false
     }
 
-    private fun registerDropModifiers(
-        playerUuid: UUID,
-        blocks: List<Block>,
-        options: BlastMineRuntimeOptions,
-        originTool: ItemStack
-    ) {
-        val modifiers = mutableListOf<DropModifier>()
-        for (block in blocks) {
-            modifiers.add(DropModifier(
-                blockX = block.x,
-                blockY = block.y,
-                blockZ = block.z,
-                lossRate = options.lossRate,
-                autoCollect = options.autoCollect,
-                originTool = originTool.clone()
-            ))
-        }
-        pendingDropModifiers[playerUuid] = modifiers
-    }
-
     private fun scheduleBlastBreak(
         player: Player,
         playerUuid: UUID,
         options: BlastMineRuntimeOptions,
         blocks: List<Block>,
-        originHeldSlot: Int,
         originTool: ItemStack
     ) {
         val totalBlocks = blocks.size
@@ -336,12 +231,18 @@ class BlastMineHandler(
 
             internalBreakPlayers.add(playerUuid)
             try {
+                var successCount = 0
                 for (target in blocks) {
-                    if (!player.isOnline || target.type.isAir || isPlayerPlacedBlock(target)) continue
+                    if (!player.isOnline || target.type.isAir) continue
                     val soundGroup = target.blockSoundGroup
-                    val success = breakWithOriginalContext(player, originHeldSlot, target, preserveDurability = true)
+                    val simulatedDrops = simulateDrops(target, originTool, player)
+                    val success = breakDirectly(target)
                     if (success) {
-                        playBreakSound(target, soundGroup)
+                        grantSimulatedDrops(player, target, simulatedDrops, options)
+                        successCount += 1
+                        if (successCount % BREAK_SOUND_INTERVAL == 0) {
+                            playBreakSound(target, soundGroup)
+                        }
                     }
                 }
             } finally {
@@ -353,76 +254,45 @@ class BlastMineHandler(
         activeTasks[playerUuid] = task
     }
 
-    private fun breakWithOriginalContext(player: Player, originHeldSlot: Int, target: Block, preserveDurability: Boolean): Boolean {
-        val inventory = player.inventory
-        val previousSlot = inventory.heldItemSlot
-        val beforeTool = if (preserveDurability && originHeldSlot in 0..8) inventory.getItem(originHeldSlot)?.clone() else null
-        if (originHeldSlot in 0..8 && previousSlot != originHeldSlot) {
-            inventory.heldItemSlot = originHeldSlot
+    private fun breakDirectly(target: Block): Boolean {
+        if (target.type.isAir) {
+            return false
         }
-
-        return try {
-            player.breakBlock(target)
-        } finally {
-            if (beforeTool != null && originHeldSlot in 0..8) {
-                inventory.setItem(originHeldSlot, beforeTool)
-            }
-            if (inventory.heldItemSlot != previousSlot) {
-                inventory.heldItemSlot = previousSlot
-            }
-        }
+        target.type = Material.AIR
+        return true
     }
 
-    fun applyDropModification(player: Player, event: BlockDropItemEvent) {
-        val modifier = getDropModifier(player.uniqueId, event.block) ?: return
+    private fun simulateDrops(target: Block, tool: ItemStack, player: Player): List<ItemStack> {
+        return target.getDrops(tool, player).map { it.clone() }
+    }
 
-        if (modifier.lossRate > 0.0) {
-            val iterator = event.items.iterator()
-            while (iterator.hasNext()) {
-                val itemEntity = iterator.next()
-                if (kotlin.random.Random.nextDouble() < modifier.lossRate) {
-                    iterator.remove()
-                    itemEntity.remove()
-                }
-            }
+    private fun grantSimulatedDrops(player: Player, block: Block, drops: List<ItemStack>, options: BlastMineRuntimeOptions) {
+        if (drops.isEmpty()) {
+            return
         }
 
-        if (modifier.autoCollect && event.items.isNotEmpty()) {
-            for (itemEntity in event.items.toList()) {
-                val stack = itemEntity.itemStack.clone()
-                itemEntity.remove()
-                val leftovers = player.inventory.addItem(stack)
+        val world = block.world
+        val dropLocation = block.location.clone().add(0.5, 0.5, 0.5)
+
+        for (stack in drops) {
+            if (options.lossRate > 0.0 && Random.nextDouble() < options.lossRate) {
+                continue
+            }
+
+            if (options.autoCollect) {
+                val leftovers = player.inventory.addItem(stack.clone())
                 for (leftover in leftovers.values) {
-                    event.block.world.dropItem(
-                        event.block.location.clone().add(0.5, 0.5, 0.5),
-                        leftover
-                    ).apply {
+                    world.dropItem(dropLocation, leftover).apply {
                         pickupDelay = 0
                         owner = player.uniqueId
                     }
                 }
+            } else {
+                world.dropItem(dropLocation, stack.clone())
             }
-            event.items.clear()
-        }
-
-        removeDropModifier(player.uniqueId, event.block)
-    }
-
-    fun applyExpCollection(player: Player, block: Block) {
-        val modifier = getDropModifier(player.uniqueId, block) ?: return
-        if (!modifier.autoCollect) return
-
-        val center = block.location.clone().add(0.5, 0.5, 0.5)
-        val entities = block.world.getNearbyEntities(center, 1.5, 1.5, 1.5) { entity ->
-            entity is ExperienceOrb
-        }
-
-        for (entity in entities) {
-            val expOrb = entity as? ExperienceOrb ?: continue
-            player.giveExp(expOrb.experience)
-            expOrb.remove()
         }
     }
+
 
     private fun playBreakSound(block: Block, soundGroup: org.bukkit.SoundGroup) {
         val location = block.location.clone().add(0.5, 0.5, 0.5)

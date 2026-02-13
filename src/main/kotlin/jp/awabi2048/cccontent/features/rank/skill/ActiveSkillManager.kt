@@ -115,7 +115,21 @@ object ActiveSkillManager {
         val profession = CCContent.rankManager.getPlayerProfession(playerUuid)
             ?: return false
 
-        return profession.activeSkillId == skillId
+        val currentActive = profession.activeSkillId
+        if (currentActive != null) {
+            return currentActive == skillId
+        }
+
+        val activeSkills = ActiveSkillIdentifier.getPlayerActiveSkills(profession)
+        if (activeSkills.isEmpty()) {
+            return false
+        }
+
+        val autoSelected = activeSkills.first()
+        profession.activeSkillId = autoSelected
+        CCContent.rankManager.savePlayerProfession(playerUuid)
+
+        return autoSelected == skillId
     }
 
     /**

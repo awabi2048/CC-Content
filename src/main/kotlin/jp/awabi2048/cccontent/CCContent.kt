@@ -132,7 +132,7 @@ class CCContent : JavaPlugin(), Listener {
                 }
             },
             onBlastMineDebug = { player, radius, delayTicksPerLayer, autoCollect, lossRate ->
-                BlastMineHandler.setDebugOverride(player.uniqueId, radius, delayTicksPerLayer, autoCollect, lossRate)
+                BlastMineHandler.setDebugOverride(player.uniqueId, radius, autoCollect, lossRate)
                 true
             }
         )
@@ -218,9 +218,6 @@ class CCContent : JavaPlugin(), Listener {
             val minerListener = ProfessionMinerExpListener(this, rankManager, ignoreBlockStore)
             server.pluginManager.registerEvents(minerListener, this)
             
-            // デバッグ用：BlockBreakEvent 汎用リスナー
-            server.pluginManager.registerEvents(jp.awabi2048.cccontent.features.rank.job.BlockBreakEventDebugListener(this), this)
-
             // 登録されたスキルツリーをカウント
             val skillTreeCount = Profession.values().count { SkillTreeRegistry.getSkillTree(it) != null }
             featureInitLogger.addSummaryMessage("Rank System", "スキル${skillTreeCount}種登録")
@@ -253,10 +250,10 @@ class CCContent : JavaPlugin(), Listener {
 
     /**
      * スキル効果システムの初期化
-     */
+      */
     private fun initializeSkillEffectSystem(rankManager: RankManager, ignoreBlockStore: IgnoreBlockStore) {
         try {
-            val blastMineHandler = BlastMineHandler(ignoreBlockStore)
+            val blastMineHandler = BlastMineHandler()
 
             SkillEffectRegistry.register(BreakSpeedBoostHandler())
             SkillEffectRegistry.register(DropBonusHandler())
@@ -278,7 +275,7 @@ class CCContent : JavaPlugin(), Listener {
             SkillEffectRegistry.register(AttackReachBoostHandler())
 
             server.pluginManager.registerEvents(SkillEffectCacheListener(rankManager, this), this)
-            server.pluginManager.registerEvents(BlockBreakEffectListener(ignoreBlockStore, blastMineHandler), this)
+            server.pluginManager.registerEvents(BlockBreakEffectListener(ignoreBlockStore), this)
             server.pluginManager.registerEvents(BatchBreakPreviewListener(), this)
             server.pluginManager.registerEvents(ActiveSkillKeyListener(), this)
             server.pluginManager.registerEvents(CraftEffectListener(), this)
@@ -825,6 +822,7 @@ class CCContent : JavaPlugin(), Listener {
             BlastMineHandler.stopAll()
             rankManagerInstance?.hideAllProfessionBossBars()
             rankManagerInstance?.saveData()
+            ignoreBlockStoreInstance?.flush()
             if (::breweryFeature.isInitialized) {
                 breweryFeature.shutdown()
             }

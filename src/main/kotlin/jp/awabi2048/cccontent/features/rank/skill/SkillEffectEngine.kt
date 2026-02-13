@@ -46,24 +46,19 @@ object SkillEffectEngine {
             val skill = skillTree.getSkill(skillId) ?: continue
             val effect = skill.effect
             if (effect == null) {
-                org.bukkit.Bukkit.getLogger().info("[SkillEffectEngine] Skill $skillId has no effect")
                 continue
             }
 
             val handler = SkillEffectRegistry.getHandler(effect.type)
             if (handler == null) {
-                org.bukkit.Bukkit.getLogger().info("[SkillEffectEngine] No handler for effect type: ${effect.type}")
                 continue
             }
             if (!handler.isEnabled() || !handler.supportsProfession(profession.id)) {
-                org.bukkit.Bukkit.getLogger().info("[SkillEffectEngine] Handler disabled or not supported: ${effect.type}")
                 continue
             }
 
             val depth = SkillDepthCalculator.calculateDepth(skillId, skillTree)
             val strength = handler.calculateStrength(effect)
-
-            org.bukkit.Bukkit.getLogger().info("[SkillEffectEngine] Added skill $skillId with effect ${effect.type}, depth=$depth, strength=$strength")
 
             mutableByType
                 .getOrPut(effect.type) { mutableListOf() }

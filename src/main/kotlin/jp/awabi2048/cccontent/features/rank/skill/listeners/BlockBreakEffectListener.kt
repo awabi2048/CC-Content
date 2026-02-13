@@ -18,25 +18,21 @@ import org.bukkit.event.player.PlayerSwapHandItemsEvent
 import java.util.UUID
 
 class BlockBreakEffectListener(
-    private val ignoreBlockStore: IgnoreBlockStore,
-    private val blastMineHandler: BlastMineHandler? = null
+    private val ignoreBlockStore: IgnoreBlockStore
 ) : Listener {
     companion object {
 
-        
         // BlockBreakEventで保存したブロックタイプをBlockDropItemEventで参照するためのマップ
         private val blockTypeCache: MutableMap<java.util.UUID, String> = mutableMapOf()
-        
+
         fun setBlockTypeForPlayer(playerUuid: UUID, blockType: String) {
             blockTypeCache[playerUuid] = blockType
         }
-        
+
         fun getCachedBlockTypeForPlayer(playerUuid: UUID): String? {
             return blockTypeCache.remove(playerUuid)
         }
     }
-
-
 
     private fun isPlayerPlacedBlock(block: org.bukkit.block.Block): Boolean {
         val packedPosition = BlockPositionCodec.pack(block.x, block.y, block.z)
@@ -48,11 +44,12 @@ class BlockBreakEffectListener(
     @EventHandler(ignoreCancelled = true)
     fun onBlockBreak(event: BlockBreakEvent) {
         val playerUuid = event.player.uniqueId
+        val isPlacedBlock = isPlayerPlacedBlock(event.block)
         
         // ブロックタイプをキャッシュ（BlockDropItemEventで参照用）
         BlockBreakEffectListener.setBlockTypeForPlayer(playerUuid, event.block.type.name)
 
-        if (!isPlayerPlacedBlock(event.block) && !UnlockBatchBreakHandler.isInternalBreakInProgress(playerUuid) && !BlastMineHandler.isInternalBreakInProgress(playerUuid)) {
+        if (!UnlockBatchBreakHandler.isInternalBreakInProgress(playerUuid) && !BlastMineHandler.isInternalBreakInProgress(playerUuid)) {
             val compiledEffects = SkillEffectEngine.getCachedEffects(playerUuid)
             val debugMode = UnlockBatchBreakHandler.BatchBreakMode.fromTool(event.player.inventory.itemInMainHand.type)
             var debugApplied = false
@@ -84,7 +81,7 @@ class BlockBreakEffectListener(
                     debugApplied = SkillEffectEngine.applyEffect(event.player, compiledEffects.profession, blastMineEntry.skillId, blastMineEntry.effect, event)
                 }
 
-                if (!debugApplied) {
+                if (!debugApplied && !isPlacedBlock) {
                     val entry = SkillEffectEngine.getCachedEffectForBlock(
                         playerUuid,
                         UnlockBatchBreakHandler.EFFECT_TYPE,
@@ -104,8 +101,6 @@ class BlockBreakEffectListener(
     fun onBlockDropItem(event: BlockDropItemEvent) {
         // キャッシュからブロックタイプを取得（BlockDropItemEventではブロックが既に削除されてAIRになっているため）
         val blockType = BlockBreakEffectListener.getCachedBlockTypeForPlayer(event.player.uniqueId) ?: event.block.type.name
-
-        blastMineHandler?.applyDropModification(event.player, event)
 
         val compiledEffects = SkillEffectEngine.getCachedEffects(event.player.uniqueId) ?: return
 

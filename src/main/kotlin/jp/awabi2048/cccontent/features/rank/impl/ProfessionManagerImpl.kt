@@ -22,8 +22,14 @@ class ProfessionManagerImpl(
     private val storage: RankStorage,
     private val messageProvider: MessageProvider
 ) : ProfessionManager {
+    companion object {
+        private const val EXP_SAVE_INTERVAL_MS = 5_000L
+        private const val EXP_SAVE_EVENT_THRESHOLD = 32
+    }
 
     private val professionCache: MutableMap<UUID, PlayerProfession> = mutableMapOf()
+    private val pendingExpSaveCounts: MutableMap<UUID, Int> = mutableMapOf()
+    private val lastExpSaveAt: MutableMap<UUID, Long> = mutableMapOf()
 
     init {
         storage.init()
@@ -115,15 +121,15 @@ class ProfessionManagerImpl(
 
         prof.addExperience(amount)
         val newLevel = skillTree.calculateLevelByExp(prof.currentExp)
-
-        storage.saveProfession(prof)
+        val levelUp = newLevel > oldLevel
+        saveProfessionByExpPolicy(playerUuid, prof, force = levelUp)
 
         val player = Bukkit.getPlayer(playerUuid)
         if (player != null) {
             val expEvent = PlayerExperienceGainEvent(player, prof.profession, amount, prof.currentExp)
             Bukkit.getPluginManager().callEvent(expEvent)
 
-            if (newLevel > oldLevel) {
+            if (levelUp) {
                 val gainedLevel = newLevel - oldLevel
                 player.sendMessage(
                     messageProvider.getMessage(
@@ -214,6 +220,8 @@ class ProfessionManagerImpl(
             return false
         }
         professionCache.remove(playerUuid)
+        pendingExpSaveCounts.remove(playerUuid)
+        lastExpSaveAt.remove(playerUuid)
         storage.deleteProfession(playerUuid)
         return true
     }
@@ -338,6 +346,8 @@ class ProfessionManagerImpl(
 
     fun saveData() {
         professionCache.values.forEach { storage.saveProfession(it) }
+        pendingExpSaveCounts.clear()
+        lastExpSaveAt.clear()
     }
 
     fun loadData() {
@@ -353,6 +363,22 @@ class ProfessionManagerImpl(
         player.playSound(player.location, "minecraft:block.note_block.pling", 1.0f, 2.0f)
         player.playSound(player.location, "minecraft:ui.button.click", 0.8f, 1.0f)
         player.playSound(player.location, "minecraft:entity.player.levelup", 1.0f, 2.0f)
+    }
+
+    private fun saveProfessionByExpPolicy(playerUuid: UUID, profession: PlayerProfession, force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        val nextCount = (pendingExpSaveCounts[playerUuid] ?: 0) + 1
+        pendingExpSaveCounts[playerUuid] = nextCount
+
+        val elapsed = now - (lastExpSaveAt[playerUuid] ?: 0L)
+        val intervalReached = elapsed >= EXP_SAVE_INTERVAL_MS
+        val thresholdReached = nextCount >= EXP_SAVE_EVENT_THRESHOLD
+
+        if (force || intervalReached || thresholdReached) {
+            storage.saveProfession(profession)
+            pendingExpSaveCounts[playerUuid] = 0
+            lastExpSaveAt[playerUuid] = now
+        }
     }
 
     /**

@@ -125,7 +125,7 @@ skills:
     effect:
       type: "collect.blast_mine"
       params:
-        radius: 2
+        radius: 1
         autoCollect: false
         lossRate: 0.5
         targetTools: ["PICKAXE"]
@@ -137,7 +137,7 @@ skills:
     effect:
       type: "collect.blast_mine"
       params:
-        radius: 3
+        radius: 2
         autoCollect: true
         lossRate: 0.3
         targetTools: ["PICKAXE"]

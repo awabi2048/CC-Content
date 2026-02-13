@@ -25,36 +25,36 @@ skills:
   area_harvesting:
     requiredLevel: 20
     icon: "DIAMOND_HOE"
-    children: ["skill8"]
+    children: ["harvest_2"]
 
   auto_replanting:
-    requiredLevel: 3
+    requiredLevel: 20
     icon: "GOLDEN_HOE"
-    children: ["skill5", "skill6"]
+    children: ["harvest_2"]
 
   harvest_2:
-    requiredLevel: 4
-    icon: "NETHERITE_HOE"
-    children: ["skill8"]
+    requiredLevel: 30
+    icon: "WHEAT"
+    children: ["tool", "harvest_3"]
 
-  skill6:
-    requiredLevel: 4
-    icon: "BONE_MEAL"
-    children: ["skill7"]
+  tool:
+    requiredLevel: 35
+    icon: "WILD_ARMOR_TRIM_SMITHING_TEMPLATE"
+    children: ["special_loot_table_1"]
 
-  skill7:
-    requiredLevel: 5
+  harvest_3:
+    requiredLevel: 35
     icon: "COMPOSTER"
-    children: ["skill9"]
+    children: ["special_loot_table_1"]
 
-  skill8:
-    requiredLevel: 6
-    icon: "WATER_BUCKET"
-    children: ["skill9"]
+  special_loot_table_1:
+    requiredLevel: 40
+    icon: "PRISMARINE_CRYSTALS"
+    children: ["special_loot_table_2"]
 
-  skill9:
-    requiredLevel: 7
-    icon: "ENCHANTED_BOOK"
+  special_loot_table_2:
+    requiredLevel: 50
+    icon: "RESIN_CLUMP"
     effect:
       type: "general.unlock_item_token"
       params:
