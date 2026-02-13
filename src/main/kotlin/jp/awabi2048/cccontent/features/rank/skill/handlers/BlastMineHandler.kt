@@ -472,19 +472,36 @@ class BlastMineHandler(
     private fun calculateDeferredDurabilityDamage(playerUuid: UUID, toolItem: ItemStack, plannedBreaks: Int): Int {
         if (plannedBreaks <= 0) return 0
 
-        val unbreakingLevel = toolItem.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.UNBREAKING).coerceAtLeast(0)
-        val saveChance = resolveDurabilitySaveChance(playerUuid, toolItem.type)
+        // バニラの耐久エンチャントレベルを取得
+        val vanillaUnbreakingLevel = toolItem.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.UNBREAKING).coerceAtLeast(0)
+        
+        // スキルによる耐久レベルを取得
+        val compiledEffects = SkillEffectEngine.getCachedEffects(playerUuid)
+        val skillUnbreakingLevel = if (compiledEffects != null) {
+            val entries = compiledEffects.byType["collect.durability_save_chance"] ?: emptyList()
+            if (entries.isNotEmpty()) {
+                val combinedEffect = SkillEffectEngine.combineEffects(entries, "")
+                combinedEffect?.getDoubleParam("unbreaking_level", 0.0)?.toInt() ?: 0
+            } else {
+                0
+            }
+        } else {
+            0
+        }
+        
+        // 新しい耐久エンチャントレベル（バニラ + スキル）
+        val totalUnbreakingLevel = vanillaUnbreakingLevel + skillUnbreakingLevel
 
         var damage = 0
         repeat(plannedBreaks) {
             var consume = true
 
-            if (unbreakingLevel > 0) {
-                consume = kotlin.random.Random.nextInt(unbreakingLevel + 1) == 0
-            }
-
-            if (consume && saveChance > 0.0 && kotlin.random.Random.nextDouble() < saveChance) {
-                consume = false
+            if (totalUnbreakingLevel > 0) {
+                // バニラの耐久エンチャント計算式: レベルnでn/(n+1)の確率で減少しない
+                val chanceToSkipDamage = totalUnbreakingLevel.toDouble() / (totalUnbreakingLevel + 1)
+                if (kotlin.random.Random.nextDouble() < chanceToSkipDamage) {
+                    consume = false
+                }
             }
 
             if (consume) {
@@ -493,21 +510,6 @@ class BlastMineHandler(
         }
 
         return damage
-    }
-
-    private fun resolveDurabilitySaveChance(playerUuid: UUID, toolType: Material): Double {
-        val entry = SkillEffectEngine.getCachedEffect(playerUuid, DurabilitySaveChanceHandler.EFFECT_TYPE) ?: return 0.0
-        val effect = entry.effect
-
-        val targetTools = effect.getStringListParam("targetTools")
-        if (targetTools.isNotEmpty()) {
-            val toolName = toolType.name
-            if (!targetTools.any { toolName.contains(it) }) {
-                return 0.0
-            }
-        }
-
-        return effect.getDoubleParam("saveChance", 0.0).coerceIn(0.0, 1.0)
     }
 
     override fun calculateStrength(skillEffect: SkillEffect): Double {

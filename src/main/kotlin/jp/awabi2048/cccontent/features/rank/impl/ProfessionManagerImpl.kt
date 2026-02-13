@@ -163,6 +163,8 @@ class ProfessionManagerImpl(
         prof.acquiredSkills.addAll(collectLevel0Skills(skillTree, prof.acquiredSkills))
 
         storage.saveProfession(prof)
+        // professionCache を明示的に更新（リスナーが最新情報を取得するため）
+        professionCache[playerUuid] = prof
 
         val player = Bukkit.getPlayer(playerUuid)
         if (player != null) {

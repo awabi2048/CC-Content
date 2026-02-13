@@ -17,10 +17,10 @@ skills:
     icon: "IRON_PICKAXE"
     effect:
       type: "collect.break_speed_boost"
+      combineRule: "add"
       params:
-        multiplier: 1.1
+        efficiency_level: 1
         targetTools: ["PICKAXE"]
-      evaluationMode: "RUNTIME"
     children: ["fortune_1"]
 
   fortune_1:
@@ -31,7 +31,6 @@ skills:
       combineRule: "add"
       params:
         fortune_level: 1
-      evaluationMode: "RUNTIME"
     children: ["speed_2", "fortune_2"]
 
   speed_2:
@@ -41,8 +40,7 @@ skills:
       type: "collect.break_speed_boost"
       combineRule: "add"
       params:
-        multiplier: 1.2
-      evaluationMode: "RUNTIME"
+        efficiency_level: 2
     children: ["durability_1"]
 
   fortune_2:
@@ -53,7 +51,6 @@ skills:
       params:
         saveChance: 0.15
         targetTools: ["PICKAXE"]
-      evaluationMode: "RUNTIME"
     children: ["fortune_3"]
 
   durability_1:
@@ -61,11 +58,11 @@ skills:
     icon: "DIAMOND_PICKAXE"
     effect:
       type: "collect.break_speed_boost"
+      combineRule: "add"
       params:
-        multiplier: 1.4
+        efficiency_level: 2
         targetBlocks: ["DIAMOND_ORE", "EMERALD_ORE", "ANCIENT_DEBRIS"]
         targetTools: ["PICKAXE"]
-      evaluationMode: "RUNTIME"
     children: ["mineall_1"]
 
   fortune_3:
@@ -81,7 +78,6 @@ skills:
         autoCollect: false
         visualizeTargets: true
         matchLevel: "FAMILY"
-      evaluationMode: "CACHED"
     children: ["mineall_1"]
 
   mineall_1:
@@ -106,7 +102,6 @@ skills:
       type: "general.unlock_item_token"
       params:
         items: ["miner_pickaxe_token"]
-      evaluationMode: "CACHED"
     children: ["blastmine_2"]
 
   blastmine_2:
@@ -116,5 +111,4 @@ skills:
       type: "general.unlock_item_token"
       params:
         items: ["miner_pickaxe_token"]
-      evaluationMode: "CACHED"
     children: []

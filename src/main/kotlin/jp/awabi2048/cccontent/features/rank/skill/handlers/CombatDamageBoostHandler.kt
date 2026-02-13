@@ -78,7 +78,7 @@ class CombatDamageBoostHandler : SkillEffectHandler {
 
     override fun getEffectType(): String = EFFECT_TYPE
 
-    override fun getDefaultEvaluationMode(): EvaluationMode = EvaluationMode.RUNTIME
+    override fun getDefaultEvaluationMode(): EvaluationMode = EvaluationMode.CACHED
 
     /**
      * このハンドラーは CombatEffectListener から直接呼ばれないが、

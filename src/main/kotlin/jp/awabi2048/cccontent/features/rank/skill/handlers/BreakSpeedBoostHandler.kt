@@ -5,102 +5,72 @@ import jp.awabi2048.cccontent.features.rank.skill.EvaluationMode
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffect
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectHandler
 import org.bukkit.attribute.Attribute
-import org.bukkit.attribute.AttributeModifier
-import org.bukkit.inventory.EquipmentSlot
 import java.util.UUID
 
 class BreakSpeedBoostHandler : SkillEffectHandler {
     companion object {
         const val EFFECT_TYPE = "collect.break_speed_boost"
-        const val ATTRIBUTE_NAME = "rank_skill_break_speed_boost"
 
-        private val ATTRIBUTE_UUID = UUID.fromString("4d2f0120-f0c4-4b2b-9a2d-0f9c4b0c5d6e")
-        private val activeBoosts = mutableMapOf<UUID, ActiveBoost>()
+        private val boostedPlayers = mutableSetOf<UUID>()
 
         fun clearBoost(playerUuid: UUID) {
-            val boost = activeBoosts.remove(playerUuid) ?: return
+            if (!boostedPlayers.remove(playerUuid)) return
             val plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(jp.awabi2048.cccontent.CCContent::class.java)
             val player = plugin.server.getPlayer(playerUuid) ?: return
+            val miningEfficiency = player.getAttribute(Attribute.MINING_EFFICIENCY) ?: return
+            // base値をデフォルト値に戻す
+            miningEfficiency.baseValue = miningEfficiency.defaultValue
 
-            val blockBreakingSpeed = player.getAttribute(Attribute.BLOCK_BREAK_SPEED) ?: return
-            blockBreakingSpeed.removeModifier(boost.modifier)
         }
 
         fun clearAllBoosts() {
             val plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(jp.awabi2048.cccontent.CCContent::class.java)
-            for ((playerUuid, _) in activeBoosts.toMap()) {
-                clearBoost(playerUuid)
+            for (playerUuid in boostedPlayers.toSet()) {
+                val player = plugin.server.getPlayer(playerUuid) ?: continue
+                val miningEfficiency = player.getAttribute(Attribute.MINING_EFFICIENCY) ?: continue
+                miningEfficiency.baseValue = miningEfficiency.defaultValue
             }
-            activeBoosts.clear()
+            boostedPlayers.clear()
         }
 
-        fun addActiveBoost(playerUuid: UUID, boost: ActiveBoost) {
-            activeBoosts[playerUuid] = boost
+        /**
+         * バニラとスキルの効率レベル差分をbase値に加算する
+         */
+        fun applySpeedBoost(player: org.bukkit.entity.Player, vanillaEfficiencyLevel: Int, skillEfficiencyLevel: Double) {
+            val miningEfficiency = player.getAttribute(Attribute.MINING_EFFICIENCY) ?: run {
+    
+                return
+            }
+
+            // base値をデフォルト値にリセット
+            miningEfficiency.baseValue = miningEfficiency.defaultValue
+
+            // バニラの効率レベルによる速度値: n^2 + 1
+            val vanillaSpeed = (vanillaEfficiencyLevel.toDouble() * vanillaEfficiencyLevel.toDouble()) + 1.0
+            // スキル込みの合計効率レベルによる速度値: (n+m)^2 + 1
+            val totalEfficiency = vanillaEfficiencyLevel + skillEfficiencyLevel.toInt()
+            val totalSpeed = (totalEfficiency.toDouble() * totalEfficiency.toDouble()) + 1.0
+            // 差分をbase値に加算
+            val diff = totalSpeed - vanillaSpeed
+            miningEfficiency.baseValue = miningEfficiency.defaultValue + diff
+
+            boostedPlayers.add(player.uniqueId)
+
+
         }
     }
-
-    data class ActiveBoost(
-        val modifier: AttributeModifier,
-        val targetBlocks: List<String>,
-        val targetTools: List<String>
-    )
 
     override fun getEffectType(): String = EFFECT_TYPE
 
-    override fun getDefaultEvaluationMode(): EvaluationMode = EvaluationMode.RUNTIME
+    override fun getDefaultEvaluationMode(): EvaluationMode = EvaluationMode.CACHED
 
     override fun applyEffect(context: EffectContext): Boolean {
-        val event = context.getEvent<org.bukkit.event.block.BlockDamageEvent>() ?: return false
-        val player = event.player
-        val multiplier = context.skillEffect.getDoubleParam("multiplier",1.0)
-
-        org.bukkit.Bukkit.getLogger().info("[BreakSpeedBoostHandler] applyEffect called for ${player.name}, skillId=${context.skillId}, multiplier=$multiplier, block=${event.block.type}")
-
-        val targetBlocks = context.skillEffect.getStringListParam("targetBlocks")
-        val targetTools = context.skillEffect.getStringListParam("targetTools")
-        val allowAnyOre = targetBlocks.any { it.equals("AnyOre", ignoreCase = true) }
-
-        if (targetBlocks.isNotEmpty()) {
-            val blockType = event.block.type.name
-            val matchesOre = allowAnyOre && (blockType.endsWith("_ORE") || blockType == "ANCIENT_DEBRIS")
-            if (blockType !in targetBlocks && !matchesOre) {
-                org.bukkit.Bukkit.getLogger().info("[BreakSpeedBoostHandler] Block $blockType not in targetBlocks: $targetBlocks")
-                return false
-            }
-        }
-
-        if (targetTools.isNotEmpty()) {
-            val tool = player.inventory.itemInMainHand
-            val toolType = tool.type.name
-            if (!targetTools.any { toolType.contains(it) }) {
-                org.bukkit.Bukkit.getLogger().info("[BreakSpeedBoostHandler] Tool $toolType not in targetTools: $targetTools")
-                return false
-            }
-        }
-
-        BreakSpeedBoostHandler.Companion.clearBoost(player.uniqueId)
-
-        val blockBreakingSpeed = player.getAttribute(Attribute.BLOCK_BREAK_SPEED) ?: return false
-        val amount = (multiplier - 1.0) * blockBreakingSpeed.baseValue
-
-        val modifier = AttributeModifier(
-            BreakSpeedBoostHandler.Companion.ATTRIBUTE_UUID,
-            BreakSpeedBoostHandler.Companion.ATTRIBUTE_NAME,
-            amount,
-            AttributeModifier.Operation.MULTIPLY_SCALAR_1
-        )
-
-        blockBreakingSpeed.addModifier(modifier)
-
-        BreakSpeedBoostHandler.Companion.addActiveBoost(player.uniqueId, ActiveBoost(modifier, targetBlocks, targetTools))
-
-        org.bukkit.Bukkit.getLogger().info("[BreakSpeedBoostHandler] Applied boost for ${player.name}, amount=$amount, baseValue=${blockBreakingSpeed.baseValue}")
-
-        return true
+        // このハンドラーはListener経由で適用されるため、ここでは処理しない
+        return false
     }
 
     override fun calculateStrength(skillEffect: SkillEffect): Double {
-        return skillEffect.getDoubleParam("multiplier", 1.0)
+        return skillEffect.getDoubleParam("efficiency_level", 0.0)
     }
 
     override fun supportsProfession(professionId: String): Boolean {
@@ -108,7 +78,7 @@ class BreakSpeedBoostHandler : SkillEffectHandler {
     }
 
     override fun validateParams(skillEffect: SkillEffect): Boolean {
-        val multiplier = skillEffect.getDoubleParam("multiplier", 0.0)
-        return multiplier > 0.0
+        val efficiencyLevel = skillEffect.getDoubleParam("efficiency_level", 0.0)
+        return efficiencyLevel >= 0.0
     }
 }

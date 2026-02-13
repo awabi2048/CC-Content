@@ -40,7 +40,6 @@ object SkillEffectEngine {
     fun rebuildCache(playerUuid: UUID, acquiredSkills: Set<String>, profession: Profession, prestigeSkills: Set<String> = emptySet()) {
         val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return
         val mutableByType = mutableMapOf<String, MutableList<SkillEffectEntry>>()
-        org.bukkit.Bukkit.getLogger().info("[SkillEffectEngine] rebuildCache called for $playerUuid, profession=${profession.id}, skills=$acquiredSkills")
 
         // 通常スキルを追加
         for (skillId in acquiredSkills) {
@@ -110,7 +109,6 @@ object SkillEffectEngine {
         }
 
         effectCache[playerUuid] = CompiledEffects(sortedByType, targetedByType.toMap(), playerUuid, profession)
-        org.bukkit.Bukkit.getLogger().info("[SkillEffectEngine] Cache built for $playerUuid: byType=${sortedByType.keys}, entries=${sortedByType.values.sumOf { it.size }}, targetedByType=${targetedByType.keys}")
     }
 
     private fun buildTargetedCache(entries: List<SkillEffectEntry>): TargetedEffectCache {

@@ -53,26 +53,16 @@ class ProfessionMinerExpListener(
         val player = event.player
         val uuid = player.uniqueId
 
-        plugin.logger.info("[ProfessionMinerExpListener] onBlockBreak: ${player.name} broke ${event.block.type}, cancelled=${event.isCancelled}")
-
-        val playerProfession = rankManager.getPlayerProfession(uuid) ?: run {
-            plugin.logger.info("[ProfessionMinerExpListener] ${player.name} has no profession")
-            return
-        }
-
-        plugin.logger.info("[ProfessionMinerExpListener] ${player.name} profession: ${playerProfession.profession}, exp=${playerProfession.currentExp}")
+        val playerProfession = rankManager.getPlayerProfession(uuid) ?: return
 
         when (playerProfession.profession) {
             Profession.MINER -> {
-                plugin.logger.info("[ProfessionMinerExpListener] Processing MINER: ${event.block.type}")
                 addBreakExpIfEligible(uuid, event.block, minerExpMap)
             }
             Profession.LUMBERJACK -> {
-                plugin.logger.info("[ProfessionMinerExpListener] Processing LUMBERJACK: ${event.block.type}")
                 addBreakExpIfEligible(uuid, event.block, lumberjackExpMap)
             }
             else -> {
-                plugin.logger.info("[ProfessionMinerExpListener] Profession ${playerProfession.profession} is not miner/lumberjack")
                 return
             }
         }
@@ -116,24 +106,19 @@ class ProfessionMinerExpListener(
     }
 
     private fun addBreakExpIfEligible(uuid: UUID, block: org.bukkit.block.Block, expMap: Map<Material, Long>) {
-        val expAmount = expMap[block.type]
-        plugin.logger.info("[ProfessionMinerExpListener] Block ${block.type} exp amount: $expAmount (map size: ${expMap.size})")
-
-        if (expAmount == null || expAmount <= 0L) {
-            plugin.logger.info("[ProfessionMinerExpListener] No exp mapped for ${block.type} or exp <= 0")
+        val expAmount = expMap[block.type] ?: return
+        
+        if (expAmount <= 0L) {
             return
         }
-
+        
         val packedPosition = BlockPositionCodec.pack(block.x, block.y, block.z)
         if (ignoreBlockStore.contains(block.world.uid, packedPosition)) {
-            plugin.logger.info("[ProfessionMinerExpListener] Block position already broken (in ignore store)")
             return
         }
-
+        
         // 経験値付与後、破壊した位置を記録（同じ位置での再破壊による経験値獲得を防止）
         ignoreBlockStore.add(block.world.uid, packedPosition)
-
-        plugin.logger.info("[ProfessionMinerExpListener] Adding $expAmount exp to player $uuid for ${block.type}")
         rankManager.addProfessionExp(uuid, expAmount)
     }
 

@@ -250,9 +250,8 @@ class CCContent : JavaPlugin(), Listener {
         try {
             val blastMineHandler = BlastMineHandler(ignoreBlockStore)
 
-            SkillEffectRegistry.register(BreakSpeedBoostHandler())
+SkillEffectRegistry.register(BreakSpeedBoostHandler())
             SkillEffectRegistry.register(DropBonusHandler())
-            SkillEffectRegistry.register(DurabilitySaveChanceHandler())
             SkillEffectRegistry.register(UnlockBatchBreakHandler(ignoreBlockStore))
             SkillEffectRegistry.register(ReplaceLootTableHandler())
             SkillEffectRegistry.register(blastMineHandler)
@@ -515,7 +514,8 @@ class CCContent : JavaPlugin(), Listener {
                         SkillEffectEngine.rebuildCache(
                             player.uniqueId,
                             playerProfession.acquiredSkills,
-                            playerProfession.profession
+                            playerProfession.profession,
+                            playerProfession.prestigeSkills
                         )
                     }
                 }

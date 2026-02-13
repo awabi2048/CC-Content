@@ -4,6 +4,7 @@ import jp.awabi2048.cccontent.features.rank.skill.EffectContext
 import jp.awabi2048.cccontent.features.rank.skill.EvaluationMode
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffect
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectHandler
+import jp.awabi2048.cccontent.features.rank.skill.listeners.BlockBreakEffectListener
 import org.bukkit.enchantments.Enchantment
 import kotlin.math.floor
 import kotlin.random.Random
@@ -34,40 +35,50 @@ class DropBonusHandler : SkillEffectHandler {
         val event = context.getEvent<org.bukkit.event.block.BlockDropItemEvent>() ?: return false
         val player = event.player
         val profession = context.profession
-
+        
         val fortuneLevel = context.skillEffect.getDoubleParam("fortune_level", 0.0)
-
+        
         if (fortuneLevel <= 0) {
             return false
         }
-
+        
+        // ブロックタイプを取得（event.block.type.nameはAIRになっているため、キャッシュから取得）
+        val eventBlockType = event.block.type.name
+        val blockType = if (eventBlockType == "AIR") {
+            BlockBreakEffectListener.getCachedBlockTypeForPlayer(player.uniqueId) ?: eventBlockType
+        } else {
+            eventBlockType
+        }
+        
         // 職業別ブロック判定
-        val blockType = event.block.type.name
         if (!isApplicableBlock(blockType, profession.id)) {
             return false
         }
-
+        
         // プレイヤーが持つ道具のバニラ Fortune レベルを取得
         val toolInHand = player.inventory.itemInMainHand
         val vanillaFortuneLevel = toolInHand.getEnchantmentLevel(Enchantment.FORTUNE)
-
+        
         // 総幸運レベル = バニラ + スキル
         val totalFortuneLevel = vanillaFortuneLevel + fortuneLevel
-
+        
         val dropsToAdd = mutableListOf<org.bukkit.entity.Item>()
-
+        
         for (drop in event.items) {
             val originalAmount = drop.itemStack.amount
             val increasedAmount = calculateFortuneDrops(originalAmount, totalFortuneLevel)
             val additionalAmount = increasedAmount - originalAmount
-
+            
             if (additionalAmount > 0) {
                 val newItem = drop.itemStack.clone()
                 newItem.amount = additionalAmount
                 dropsToAdd.add(event.block.world.dropItemNaturally(event.block.location.add(0.5, 0.5, 0.5), newItem))
             }
         }
-
+        
+        if (dropsToAdd.isNotEmpty()) {
+            org.bukkit.Bukkit.getLogger().info("[DropBonusHandler] ${player.name}: $blockType fortune=$totalFortuneLevel (vanilla=$vanillaFortuneLevel + skill=$fortuneLevel) => +${dropsToAdd.size} items")
+        }
         return dropsToAdd.isNotEmpty()
     }
 

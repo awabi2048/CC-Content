@@ -10,67 +10,48 @@ import org.bukkit.enchantments.Enchantment
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockBreakEvent
-import org.bukkit.event.block.BlockDamageEvent
+
 import org.bukkit.event.block.BlockDropItemEvent
 import org.bukkit.event.player.PlayerItemDamageEvent
 import org.bukkit.event.player.PlayerItemHeldEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerSwapHandItemsEvent
+import java.util.UUID
 
 class BlockBreakEffectListener(
     private val ignoreBlockStore: IgnoreBlockStore,
     private val blastMineHandler: BlastMineHandler? = null
 ) : Listener {
     companion object {
-        private const val DURABILITY_EFFECT_WINDOW_MILLIS = 1500L
+
+        
+        // BlockBreakEventで保存したブロックタイプをBlockDropItemEventで参照するためのマップ
+        private val blockTypeCache: MutableMap<java.util.UUID, String> = mutableMapOf()
+        
+        fun setBlockTypeForPlayer(playerUuid: UUID, blockType: String) {
+            blockTypeCache[playerUuid] = blockType
+        }
+        
+        fun getCachedBlockTypeForPlayer(playerUuid: UUID): String? {
+            return blockTypeCache.remove(playerUuid)
+        }
     }
 
-    private val durabilityEligibleUntil: MutableMap<java.util.UUID, Long> = mutableMapOf()
+
 
     private fun isPlayerPlacedBlock(block: org.bukkit.block.Block): Boolean {
         val packedPosition = BlockPositionCodec.pack(block.x, block.y, block.z)
         return ignoreBlockStore.contains(block.world.uid, packedPosition)
     }
 
-    @EventHandler
-    fun onBlockDamage(event: BlockDamageEvent) {
-        if (isPlayerPlacedBlock(event.block)) {
-            BreakSpeedBoostHandler.clearBoost(event.player.uniqueId)
-            durabilityEligibleUntil.remove(event.player.uniqueId)
-            return
-        }
 
-        durabilityEligibleUntil[event.player.uniqueId] = System.currentTimeMillis() + DURABILITY_EFFECT_WINDOW_MILLIS
-
-        val compiledEffects = SkillEffectEngine.getCachedEffects(event.player.uniqueId)
-        org.bukkit.Bukkit.getLogger().info("[BlockBreakEffectListener] onBlockDamage: ${event.player.name}, effects=${compiledEffects != null}")
-        if (compiledEffects == null) {
-            return
-        }
-
-        val profession = compiledEffects.profession
-        val byType = compiledEffects.byType
-        org.bukkit.Bukkit.getLogger().info("[BlockBreakEffectListener] byType=${byType.keys}")
-
-        val effectType = "collect.break_speed_boost"
-        val blockTypeName = event.block.type.name
-
-        // 対象ブロックに有効な全エントリを取得
-        val allEntries = compiledEffects.byType[effectType]
-        if (allEntries.isNullOrEmpty()) return
-
-        // 優先度順に合成されたエフェクトを取得
-        val combinedEffect = SkillEffectEngine.combineEffects(allEntries, blockTypeName) ?: return
-
-        // 最深スキルを特定（合成後も適用対象情報が必要）
-        val deepestEntry = allEntries.firstOrNull() ?: return
-
-        SkillEffectEngine.applyEffect(event.player, profession, deepestEntry.skillId, combinedEffect, event)
-    }
 
     @EventHandler(ignoreCancelled = true)
     fun onBlockBreak(event: BlockBreakEvent) {
         val playerUuid = event.player.uniqueId
+        
+        // ブロックタイプをキャッシュ（BlockDropItemEventで参照用）
+        BlockBreakEffectListener.setBlockTypeForPlayer(playerUuid, event.block.type.name)
 
         if (!isPlayerPlacedBlock(event.block) && !UnlockBatchBreakHandler.isInternalBreakInProgress(playerUuid) && !BlastMineHandler.isInternalBreakInProgress(playerUuid)) {
             val compiledEffects = SkillEffectEngine.getCachedEffects(playerUuid)
@@ -118,15 +99,12 @@ class BlockBreakEffectListener(
             }
         }
 
-        BreakSpeedBoostHandler.clearBoost(playerUuid)
-        durabilityEligibleUntil.remove(playerUuid)
     }
 
     @EventHandler
     fun onBlockDropItem(event: BlockDropItemEvent) {
-        if (isPlayerPlacedBlock(event.block)) {
-            return
-        }
+        // キャッシュからブロックタイプを取得（BlockDropItemEventではブロックが既に削除されてAIRになっているため）
+        val blockType = BlockBreakEffectListener.getCachedBlockTypeForPlayer(event.player.uniqueId) ?: event.block.type.name
 
         blastMineHandler?.applyDropModification(event.player, event)
 
@@ -134,62 +112,159 @@ class BlockBreakEffectListener(
 
         val hasSilkTouch = event.player.inventory.itemInMainHand.containsEnchantment(Enchantment.SILK_TOUCH)
         val profession = compiledEffects.profession
-        val blockType = event.block.type.name
-
-        val replaceLootEntry = SkillEffectEngine.getCachedEffectForBlock(event.player.uniqueId, "collect.replace_loot_table", blockType)
-        if (replaceLootEntry != null) {
-            SkillEffectEngine.applyEffect(event.player, profession, replaceLootEntry.skillId, replaceLootEntry.effect, event)
-        }
 
         if (!hasSilkTouch) {
-            // 複数の drop_bonus スキルを加算対応
             val dropBonusEntries = compiledEffects.byType["collect.drop_bonus"] ?: emptyList()
+
             if (dropBonusEntries.isNotEmpty()) {
-                val combinedEffect = SkillEffectEngine.combineEffects(dropBonusEntries)
+                val combinedEffect = SkillEffectEngine.combineEffects(dropBonusEntries, blockType)
+
                 if (combinedEffect != null) {
-                    // 代表スキル ID は最深のものを使用
                     val representativeSkillId = dropBonusEntries.firstOrNull()?.skillId ?: "unknown"
                     SkillEffectEngine.applyEffect(event.player, profession, representativeSkillId, combinedEffect, event)
                 }
             }
         }
+
+        val replaceLootEntry = SkillEffectEngine.getCachedEffectForBlock(event.player.uniqueId, "collect.replace_loot_table", blockType)
+        if (replaceLootEntry != null) {
+            SkillEffectEngine.applyEffect(event.player, profession, replaceLootEntry.skillId, replaceLootEntry.effect, event)
+        }
     }
 
     @EventHandler
     fun onPlayerItemDamage(event: PlayerItemDamageEvent) {
-        val expiresAt = durabilityEligibleUntil[event.player.uniqueId] ?: return
-        if (System.currentTimeMillis() > expiresAt) {
-            durabilityEligibleUntil.remove(event.player.uniqueId)
+        val player = event.player
+        val mainHandItem = player.inventory.itemInMainHand
+        
+        // バニラの耐久エンチャントレベルを取得
+        val vanillaUnbreakingLevel = mainHandItem.getEnchantmentLevel(Enchantment.UNBREAKING)
+        
+        // スキル効果の累計値を取得
+        val compiledEffects = SkillEffectEngine.getCachedEffects(player.uniqueId) ?: return
+        val effectType = "collect.durability_save_chance"
+        val breakSpeedEntries = compiledEffects.byType[effectType] ?: emptyList()
+        if (breakSpeedEntries.isEmpty()) {
             return
         }
-
-        val compiledEffects = SkillEffectEngine.getCachedEffects(event.player.uniqueId) ?: return
-
-        val effectType = "collect.durability_save_chance"
-        val entry = SkillEffectEngine.getCachedEffect(event.player.uniqueId, effectType) ?: return
-
-        val skillEffect = entry.effect
-        val profession = compiledEffects.profession
-        SkillEffectEngine.applyEffect(event.player, profession, entry.skillId, skillEffect, event)
+        
+        // 複数の効果を合成して累計値を計算
+        val combinedEffect = SkillEffectEngine.combineEffects(breakSpeedEntries, "")
+        val skillUnbreakingLevel = combinedEffect?.getDoubleParam("unbreaking_level", 0.0)?.toInt() ?: 0
+        
+        // 新しい耐久エンチャントレベルを計算（バニラ + スキル）
+        val totalUnbreakingLevel = vanillaUnbreakingLevel + skillUnbreakingLevel
+        
+        if (totalUnbreakingLevel <= 0) {
+            return
+        }
+        
+        // バニラの耐久エンチャントの計算式に基づいて確率計算
+        // レベル n の場合、n/(n+1) の確率で耐久値が減らない
+        val chanceToSkipDamage = totalUnbreakingLevel.toDouble() / (totalUnbreakingLevel + 1)
+        
+        if (kotlin.random.Random.nextDouble() < chanceToSkipDamage) {
+            event.damage = 0
+        }
+        // 減少する場合は元のdamage値を維持（バニラの処理を上書き）
     }
 
     @EventHandler
     fun onPlayerItemHeld(event: PlayerItemHeldEvent) {
-        BreakSpeedBoostHandler.clearBoost(event.player.uniqueId)
-        durabilityEligibleUntil.remove(event.player.uniqueId)
+        val playerUuid = event.player.uniqueId
+        val player = event.player
+        
+
+        
+        // 古い速度ブーストを削除
+        BreakSpeedBoostHandler.clearBoost(playerUuid)
+
+        
+        // 次のティックで新しいアイテム情報を取得して速度ブーストを適用
+        val plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(jp.awabi2048.cccontent.CCContent::class.java)
+        org.bukkit.Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, {
+            // プレイヤーがオンラインか確認
+            val currentPlayer = org.bukkit.Bukkit.getPlayer(playerUuid) ?: return@scheduleSyncDelayedTask
+            
+            // 新しいメインハンドアイテムに対して速度ブーストを適用
+            val compiledEffects = SkillEffectEngine.getCachedEffects(playerUuid)
+            if (compiledEffects == null) {
+                return@scheduleSyncDelayedTask
+            }
+            
+            val profession = compiledEffects.profession
+            val breakSpeedEntries = compiledEffects.byType["collect.break_speed_boost"] ?: emptyList()
+            if (breakSpeedEntries.isEmpty()) {
+                return@scheduleSyncDelayedTask
+            }
+            
+            // 新しいメインハンドアイテムを取得
+            val newMainHandItem = currentPlayer.inventory.itemInMainHand
+            val toolType = newMainHandItem.type.name
+            val vanillaEfficiencyLevel = newMainHandItem.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.EFFICIENCY)
+            
+            // 複数の速度ブーストエフェクトを合成
+            val combinedEffect = SkillEffectEngine.combineEffects(breakSpeedEntries, "")
+            if (combinedEffect == null) {
+                return@scheduleSyncDelayedTask
+            }
+            
+            // 合成したエフェクトの効率強化レベル情報を取得
+            val skillEfficiencyLevel = combinedEffect?.getDoubleParam("efficiency_level", 0.0) ?: 0.0
+            
+            BreakSpeedBoostHandler.applySpeedBoost(currentPlayer, vanillaEfficiencyLevel, skillEfficiencyLevel)
+        }, 1L) // 1ティック遅延
     }
 
     @EventHandler
     fun onPlayerSwapHandItems(event: PlayerSwapHandItemsEvent) {
-        BreakSpeedBoostHandler.clearBoost(event.player.uniqueId)
-        durabilityEligibleUntil.remove(event.player.uniqueId)
+        val playerUuid = event.player.uniqueId
+        val player = event.player
+        
+
+        
+        BreakSpeedBoostHandler.clearBoost(playerUuid)
+
+        
+        // 次のティックで新しいアイテム情報を取得して速度ブーストを再適用
+        val plugin = org.bukkit.plugin.java.JavaPlugin.getPlugin(jp.awabi2048.cccontent.CCContent::class.java)
+        org.bukkit.Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, {
+            // プレイヤーがオンラインか確認
+            val currentPlayer = org.bukkit.Bukkit.getPlayer(playerUuid) ?: return@scheduleSyncDelayedTask
+            
+            val compiledEffects = SkillEffectEngine.getCachedEffects(playerUuid)
+            if (compiledEffects == null) {
+                return@scheduleSyncDelayedTask
+            }
+            
+            val profession = compiledEffects.profession
+            val breakSpeedEntries = compiledEffects.byType["collect.break_speed_boost"] ?: emptyList()
+            if (breakSpeedEntries.isEmpty()) {
+                return@scheduleSyncDelayedTask
+            }
+            
+            // 新しいメインハンドアイテムを取得
+            val newMainHandItem = currentPlayer.inventory.itemInMainHand
+            val toolType = newMainHandItem.type.name
+            val vanillaEfficiencyLevel = newMainHandItem.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.EFFICIENCY)
+            
+            val combinedEffect = SkillEffectEngine.combineEffects(breakSpeedEntries, "")
+            if (combinedEffect == null) {
+                return@scheduleSyncDelayedTask
+            }
+            
+            // 合成したエフェクトの効率強化レベル情報を取得
+            val skillEfficiencyLevel = combinedEffect?.getDoubleParam("efficiency_level", 0.0) ?: 0.0
+            
+            BreakSpeedBoostHandler.applySpeedBoost(currentPlayer, vanillaEfficiencyLevel, skillEfficiencyLevel)
+        }, 1L) // 1ティック遅延
     }
 
     @EventHandler
     fun onPlayerQuit(event: PlayerQuitEvent) {
         val playerUuid = event.player.uniqueId
         BreakSpeedBoostHandler.clearBoost(playerUuid)
-        durabilityEligibleUntil.remove(playerUuid)
+
         UnlockBatchBreakHandler.stopForPlayer(playerUuid)
         BlastMineHandler.stopForPlayer(playerUuid)
     }

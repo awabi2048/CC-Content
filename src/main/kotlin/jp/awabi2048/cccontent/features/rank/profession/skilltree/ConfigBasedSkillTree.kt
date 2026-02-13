@@ -103,11 +103,22 @@ class ConfigBasedSkillTree(
             throw IllegalArgumentException("エフェクトタイプ '$type' は登録されていません。利用可能なタイプ: ${SkillEffectRegistry.getAllTypes().sorted().joinToString()}")
         }
 
-        val evaluationModeStr = effectSection.getString("evaluationMode", "CACHED") ?: "CACHED"
-        val evaluationMode = try {
-            EvaluationMode.valueOf(evaluationModeStr.uppercase())
-        } catch (e: IllegalArgumentException) {
-            EvaluationMode.CACHED
+        // evaluationMode: 設定ファイルに指定がない場合、ハンドラーのデフォルト値を使用
+        val evaluationMode = if (effectSection.contains("evaluationMode")) {
+            val evaluationModeStr = effectSection.getString("evaluationMode") ?: "CACHED"
+            try {
+                EvaluationMode.valueOf(evaluationModeStr.uppercase())
+            } catch (e: IllegalArgumentException) {
+                EvaluationMode.CACHED
+            }
+        } else {
+            // ハンドラーのデフォルト値を使用
+            if (type != null) {
+                val handler = SkillEffectRegistry.getHandler(type)
+                handler?.getDefaultEvaluationMode() ?: EvaluationMode.CACHED
+            } else {
+                EvaluationMode.CACHED
+            }
         }
 
         // combineRule を YAML から読み込み、デフォルトは "ADD"

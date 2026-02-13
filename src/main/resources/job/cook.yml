@@ -18,7 +18,6 @@ skills:
     effect:
       type: "craft.unlock_system"
       params: {}
-      evaluationMode: "CACHED"
     children: ["skill2", "skill4"]
 
   skill2:
@@ -28,7 +27,6 @@ skills:
       type: "craft.unlock_recipe"
       params:
         recipes: ["craft_bread", "craft_stick"]
-      evaluationMode: "CACHED"
     children: ["skill3"]
 
   skill3:
@@ -38,7 +36,6 @@ skills:
       type: "craft.work_speed_bonus_mock"
       params:
         bonus: 0.1
-      evaluationMode: "CACHED"
     children: ["skill8"]
 
   skill4:
@@ -48,7 +45,6 @@ skills:
       type: "craft.unlock_recipe"
       params:
         recipes: ["craft_mushroom_stew", "craft_beetroot_soup"]
-      evaluationMode: "CACHED"
     children: ["skill5", "skill6"]
 
   skill5:
@@ -58,7 +54,6 @@ skills:
       type: "craft.success_rate_bonus_mock"
       params:
         bonus: 0.15
-      evaluationMode: "CACHED"
     children: ["skill8"]
 
   skill6:
@@ -68,7 +63,6 @@ skills:
       type: "craft.unlock_recipe"
       params:
         recipes: ["craft_rabbit_stew", "craft_suspicious_stew"]
-      evaluationMode: "CACHED"
     children: ["skill7"]
 
   skill7:
@@ -88,5 +82,4 @@ skills:
       type: "general.unlock_item_token"
       params:
         items: ["cook_token"]
-      evaluationMode: "CACHED"
     children: []

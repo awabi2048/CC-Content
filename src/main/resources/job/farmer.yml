@@ -59,5 +59,4 @@ skills:
       type: "general.unlock_item_token"
       params:
         items: ["farmer_scythe_token"]
-      evaluationMode: "CACHED"
     children: []
