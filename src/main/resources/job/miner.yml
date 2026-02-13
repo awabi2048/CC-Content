@@ -40,75 +40,107 @@ skills:
       type: "collect.break_speed_boost"
       combineRule: "add"
       params:
-        efficiency_level: 2
+        efficiency_level: 1
+        targetBlocks: ["STONE", "COBBLESTONE", "DEEPSLATE"]
+        targetTools: ["PICKAXE"]
     children: ["durability_1"]
 
   fortune_2:
     requiredLevel: 15
     icon: "GOLDEN_PICKAXE"
     effect:
-      type: "collect.durability_save_chance"
+      type: "collect.drop_bonus"
+      combineRule: "add"
       params:
-        saveChance: 0.15
-        targetTools: ["PICKAXE"]
+        fortune_level: 1
     children: ["fortune_3"]
 
   durability_1:
-    requiredLevel: 4
+    requiredLevel: 20
     icon: "DIAMOND_PICKAXE"
     effect:
-      type: "collect.break_speed_boost"
-      combineRule: "add"
+      type: "collect.durability_save_chance"
       params:
-        efficiency_level: 2
-        targetBlocks: ["DIAMOND_ORE", "EMERALD_ORE", "ANCIENT_DEBRIS"]
-        targetTools: ["PICKAXE"]
+        unbreaking_level: 1
     children: ["mineall_1"]
 
   fortune_3:
-    requiredLevel: 4
+    requiredLevel: 20
     icon: "GOLDEN_PICKAXE"
+    effect:
+      type: "collect.drop_bonus"
+      combineRule: "add"
+      params:
+        fortune_level: 1
+    children: ["mineall_1"]
+
+  mineall_1:
+    requiredLevel: 30
+    icon: "TEST_BLOCK"
+    effect:
+      type: "collect.unlock_batch_break"
+      params:
+        mode: "mine_all"
+        maxChainCount: 8
+        delayTicks: 3
+        instantBreak: false
+        autoCollect: false
+        visualizeTargets: true
+        matchLevel: "FAMILY"
+    children: ["mineall_2", "blastmine_1"]
+
+  mineall_2:
+    requiredLevel: 40
+    icon: "TEST_BLOCK"
+    effect:
+      type: "collect.unlock_batch_break"
+      params:
+        mode: "mine_all"
+        maxChainCount: 16
+        delayTicks: 2
+        instantBreak: false
+        autoCollect: true
+        visualizeTargets: true
+        matchLevel: "FAMILY"
+    children: ["mineall_3"]
+
+  mineall_3:
+    requiredLevel: 50
+    icon: "TEST_BLOCK"
     effect:
       type: "collect.unlock_batch_break"
       params:
         mode: "mine_all"
         maxChainCount: 24
-        delayTicks: 2
-        instantBreak: false
-        autoCollect: false
+        delayTicks: 3
+        instantBreak: true
+        autoCollect: true
         visualizeTargets: true
         matchLevel: "FAMILY"
-    children: ["mineall_1"]
-
-  mineall_1:
-    requiredLevel: 5
-    icon: "COMPASS"
-    children: ["mineall_2", "blastmine_1"]
-
-  mineall_2:
-    requiredLevel: 6
-    icon: "ANVIL"
-    children: ["mineall_3"]
-
-  mineall_3:
-    requiredLevel: 6
-    icon: "ANVIL"
     children: []
 
   blastmine_1:
-    requiredLevel: 7
-    icon: "BEACON"
+    requiredLevel: 40
+    icon: "TNT"
     effect:
-      type: "general.unlock_item_token"
+      type: "collect.blast_mine"
       params:
-        items: ["miner_pickaxe_token"]
+        radius: 2
+        delayTicksPerLayer: 3
+        autoCollect: false
+        lossRate: 0.5
+        targetTools: ["PICKAXE"]
     children: ["blastmine_2"]
 
   blastmine_2:
-    requiredLevel: 7
-    icon: "BEACON"
+    requiredLevel: 50
+    icon: "TNT_MINECART"
     effect:
-      type: "general.unlock_item_token"
+      type: "collect.blast_mine"
       params:
-        items: ["miner_pickaxe_token"]
+        radius: 3
+        delayTicksPerLayer: 2
+        autoCollect: true
+        lossRate: 0.3
+        targetTools: ["PICKAXE"]
     children: []

@@ -4,6 +4,7 @@ import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.rank.job.BlockPositionCodec
 import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
 import jp.awabi2048.cccontent.features.rank.profession.Profession
+import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillManager
 import jp.awabi2048.cccontent.features.rank.skill.EffectContext
 import jp.awabi2048.cccontent.features.rank.skill.EvaluationMode
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffect
@@ -383,7 +384,9 @@ class UnlockBatchBreakHandler(
         }
 
         val options = resolveRuntimeOptions(context.skillEffect, context.profession) ?: return false
-        if (!canUseMode(playerUuid, options.mode) || !isModeEnabled(playerUuid, options.mode)) {
+
+        // アクティブスキルチェック：このスキルが現在アクティブでなければ処理しない
+        if (!ActiveSkillManager.isActiveSkillById(playerUuid, context.skillId)) {
             return false
         }
 
@@ -415,7 +418,6 @@ class UnlockBatchBreakHandler(
             clearIndicators(playerUuid)
         })
 
-        applyDeferredDurabilityAtStart(player, playerUuid, player.inventory.heldItemSlot, connectedTargets.size)
         scheduleBatchBreak(player, playerUuid, options, connectedTargets, player.inventory.heldItemSlot)
         return true
     }
@@ -701,79 +703,6 @@ class UnlockBatchBreakHandler(
     private fun playBreakSound(block: Block, soundGroup: org.bukkit.SoundGroup) {
         val location = block.location.clone().add(0.5, 0.5, 0.5)
         block.world.playSound(location, soundGroup.breakSound, soundGroup.volume, soundGroup.pitch)
-    }
-
-    private fun applyDeferredDurabilityAtStart(player: Player, playerUuid: UUID, originHeldSlot: Int, plannedChainBreaks: Int) {
-        if (plannedChainBreaks <= 0 || originHeldSlot !in 0..8) {
-            return
-        }
-
-        val item = player.inventory.getItem(originHeldSlot) ?: return
-        if (item.type.maxDurability <= 0 || item.type.isAir) {
-            return
-        }
-
-        val additionalDamage = calculateDeferredDurabilityDamage(playerUuid, item, plannedChainBreaks)
-        if (additionalDamage <= 0) {
-            return
-        }
-
-        val meta = item.itemMeta as? Damageable ?: return
-        val maxDurability = item.type.maxDurability.toInt()
-        val nextDamage = meta.damage + additionalDamage
-        if (nextDamage >= maxDurability) {
-            player.inventory.setItem(originHeldSlot, null)
-            player.world.playSound(player.location, org.bukkit.Sound.ENTITY_ITEM_BREAK, 1.0f, 1.0f)
-            return
-        }
-
-        meta.damage = nextDamage
-        item.itemMeta = meta
-    }
-
-    private fun calculateDeferredDurabilityDamage(playerUuid: UUID, toolItem: ItemStack, plannedChainBreaks: Int): Int {
-        if (plannedChainBreaks <= 0) {
-            return 0
-        }
-
-        // バニラの耐久エンチャントレベルを取得
-        val vanillaUnbreakingLevel = toolItem.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.UNBREAKING).coerceAtLeast(0)
-        
-        // スキルによる耐久レベルを取得
-        val compiledEffects = SkillEffectEngine.getCachedEffects(playerUuid)
-        val skillUnbreakingLevel = if (compiledEffects != null) {
-            val entries = compiledEffects.byType["collect.durability_save_chance"] ?: emptyList()
-            if (entries.isNotEmpty()) {
-                val combinedEffect = SkillEffectEngine.combineEffects(entries, "")
-                combinedEffect?.getDoubleParam("unbreaking_level", 0.0)?.toInt() ?: 0
-            } else {
-                0
-            }
-        } else {
-            0
-        }
-        
-        // 新しい耐久エンチャントレベル（バニラ + スキル）
-        val totalUnbreakingLevel = vanillaUnbreakingLevel + skillUnbreakingLevel
-
-        var damage = 0
-        repeat(plannedChainBreaks) {
-            var consume = true
-
-            if (totalUnbreakingLevel > 0) {
-                // バニラの耐久エンチャント計算式: レベルnでn/(n+1)の確率で減少しない
-                val chanceToSkipDamage = totalUnbreakingLevel.toDouble() / (totalUnbreakingLevel + 1)
-                if (kotlin.random.Random.nextDouble() < chanceToSkipDamage) {
-                    consume = false
-                }
-            }
-
-            if (consume) {
-                damage++
-            }
-        }
-
-        return damage
     }
 
     override fun calculateStrength(skillEffect: SkillEffect): Double {

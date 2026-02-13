@@ -5,6 +5,7 @@ import jp.awabi2048.cccontent.features.rank.tutorial.PlayerTutorialRank
 import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
 import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
 import jp.awabi2048.cccontent.features.rank.profession.Profession
+import jp.awabi2048.cccontent.features.rank.skill.SkillSwitchMode
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
 import java.util.UUID
@@ -211,6 +212,8 @@ class YamlRankStorage(
         professionSection.set("currentExp", profession.currentExp)
         professionSection.set("lastUpdated", profession.lastUpdated)
         professionSection.set("bossBarEnabled", profession.bossBarEnabled)
+        professionSection.set("activeSkillId", profession.activeSkillId)
+        professionSection.set("skillSwitchMode", profession.skillSwitchMode.id)
 
         try {
             config.save(file)
@@ -236,6 +239,11 @@ class YamlRankStorage(
             val lastUpdated = professionSection.getLong("lastUpdated", System.currentTimeMillis())
             val bossBarEnabled = professionSection.getBoolean("bossBarEnabled", true)
 
+            // 後方互換性：既存データにフィールドがない場合はデフォルト値を使用
+            val activeSkillId = professionSection.getString("activeSkillId")
+            val skillSwitchModeId = professionSection.getString("skillSwitchMode") ?: SkillSwitchMode.MENU_ONLY.id
+            val skillSwitchMode = SkillSwitchMode.fromId(skillSwitchModeId) ?: SkillSwitchMode.MENU_ONLY
+
             PlayerProfession(
                 playerUuid,
                 profession,
@@ -243,8 +251,10 @@ class YamlRankStorage(
                 currentExp,
                 lastUpdated,
                 bossBarEnabled,
-                prestigeSkills
-            )
+                prestigeSkills,
+                activeSkillId,
+                skillSwitchMode
+            ) as PlayerProfession
         } catch (e: Exception) {
             e.printStackTrace()
             null

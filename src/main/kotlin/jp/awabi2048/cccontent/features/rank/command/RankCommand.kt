@@ -12,6 +12,8 @@ import jp.awabi2048.cccontent.features.rank.profession.SkillNode
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
 import jp.awabi2048.cccontent.features.rank.gui.ConfirmationDialog
+import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillManager
+import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillIdentifier
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.Sound
@@ -601,6 +603,10 @@ class RankCommand(
             listOf(toComponent(BAR)) + hintLoreMain.map { toComponent(it) } + listOf(toComponent(BAR))
         )
         inventory.setItem(MAIN_MENU_HINT_SLOT, hintItem)
+
+        // モード切替ボタン (スロット38)
+        val modeSwitchItem = ActiveSkillManager.createModeSwitchButton(viewer)
+        inventory.setItem(MAIN_MENU_MODE_SWITCH_SLOT, modeSwitchItem)
     }
 
     /**
@@ -2272,6 +2278,31 @@ class RankCommand(
                     openPrestigeConfirmDialogFirst(player)
                 }
             }
+            MAIN_MENU_MODE_SWITCH_SLOT -> {
+                // 能動スキルがない場合は処理しない
+                if (!ActiveSkillIdentifier.hasAnyActiveSkill(player)) {
+                    player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
+                    return
+                }
+
+                if (event.isLeftClick) {
+                    // 左クリック: スキル切替
+                    player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                    ActiveSkillManager.rotateActiveSkill(player)
+                    // メニューを更新
+                    val profession = rankManager.getPlayerProfession(player.uniqueId) ?: return
+                    val holder = event.view.topInventory.holder as? ProfessionMainMenuGuiHolder ?: return
+                    renderProfessionMainMenu(holder.backingInventory, player, profession)
+                } else if (event.isRightClick) {
+                    // 右クリック: 切替様式変更
+                    player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.5f)
+                    ActiveSkillManager.rotateSwitchMode(player)
+                    // メニューを更新
+                    val profession = rankManager.getPlayerProfession(player.uniqueId) ?: return
+                    val holder = event.view.topInventory.holder as? ProfessionMainMenuGuiHolder ?: return
+                    renderProfessionMainMenu(holder.backingInventory, player, profession)
+                }
+            }
             MAIN_MENU_SETTINGS_SLOT, MAIN_MENU_PLAYER_INFO_SLOT, MAIN_MENU_HINT_SLOT -> {
                 // モック実装 - クリック不可（何もしない）
             }
@@ -2603,6 +2634,7 @@ class RankCommand(
         private const val MAIN_MENU_PROFESSION_OVERVIEW_SLOT = 22
         private const val MAIN_MENU_SETTINGS_SLOT = 24
         private const val MAIN_MENU_PLAYER_INFO_SLOT = 40
+        private const val MAIN_MENU_MODE_SWITCH_SLOT = 38
         private const val MAIN_MENU_HINT_SLOT = 42
 
         // 区切り線

@@ -12,7 +12,6 @@ import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockBreakEvent
 
 import org.bukkit.event.block.BlockDropItemEvent
-import org.bukkit.event.player.PlayerItemDamageEvent
 import org.bukkit.event.player.PlayerItemHeldEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerSwapHandItemsEvent
@@ -130,43 +129,6 @@ class BlockBreakEffectListener(
         if (replaceLootEntry != null) {
             SkillEffectEngine.applyEffect(event.player, profession, replaceLootEntry.skillId, replaceLootEntry.effect, event)
         }
-    }
-
-    @EventHandler
-    fun onPlayerItemDamage(event: PlayerItemDamageEvent) {
-        val player = event.player
-        val mainHandItem = player.inventory.itemInMainHand
-        
-        // バニラの耐久エンチャントレベルを取得
-        val vanillaUnbreakingLevel = mainHandItem.getEnchantmentLevel(Enchantment.UNBREAKING)
-        
-        // スキル効果の累計値を取得
-        val compiledEffects = SkillEffectEngine.getCachedEffects(player.uniqueId) ?: return
-        val effectType = "collect.durability_save_chance"
-        val breakSpeedEntries = compiledEffects.byType[effectType] ?: emptyList()
-        if (breakSpeedEntries.isEmpty()) {
-            return
-        }
-        
-        // 複数の効果を合成して累計値を計算
-        val combinedEffect = SkillEffectEngine.combineEffects(breakSpeedEntries, "")
-        val skillUnbreakingLevel = combinedEffect?.getDoubleParam("unbreaking_level", 0.0)?.toInt() ?: 0
-        
-        // 新しい耐久エンチャントレベルを計算（バニラ + スキル）
-        val totalUnbreakingLevel = vanillaUnbreakingLevel + skillUnbreakingLevel
-        
-        if (totalUnbreakingLevel <= 0) {
-            return
-        }
-        
-        // バニラの耐久エンチャントの計算式に基づいて確率計算
-        // レベル n の場合、n/(n+1) の確率で耐久値が減らない
-        val chanceToSkipDamage = totalUnbreakingLevel.toDouble() / (totalUnbreakingLevel + 1)
-        
-        if (kotlin.random.Random.nextDouble() < chanceToSkipDamage) {
-            event.damage = 0
-        }
-        // 減少する場合は元のdamage値を維持（バニラの処理を上書き）
     }
 
     @EventHandler

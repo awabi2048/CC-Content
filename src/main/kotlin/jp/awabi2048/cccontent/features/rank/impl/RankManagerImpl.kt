@@ -180,4 +180,9 @@ class RankManagerImpl(
         val skillTree = jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry.getSkillTree(playerProf.profession) ?: return false
         return playerProf.isMaxLevel(skillTree)
     }
+
+    override fun savePlayerProfession(playerUuid: UUID) {
+        val playerProf = getProfessionManager().getPlayerProfession(playerUuid) ?: return
+        storage.saveProfession(playerProf)
+    }
 }

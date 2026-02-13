@@ -12,69 +12,69 @@ skills:
     icon: "WOODEN_AXE"
     children: ["skill1"]
 
-   skill1:
-      requiredLevel: 2
-      icon: "STONE_AXE"
-      effect:
-        type: "collect.break_speed_boost"
-        combineRule: "add"
-        params:
-          efficiency_level: 1
-          targetBlocks: ["OAK_LOG", "BIRCH_LOG", "SPRUCE_LOG", "JUNGLE_LOG", "ACACIA_LOG", "DARK_OAK_LOG"]
-          targetTools: ["AXE"]
-      children: ["skill2", "skill4"]
+  skill1:
+    requiredLevel: 2
+    icon: "STONE_AXE"
+    effect:
+      type: "collect.break_speed_boost"
+      combineRule: "add"
+      params:
+        efficiency_level: 1
+        targetBlocks: ["OAK_LOG", "BIRCH_LOG", "SPRUCE_LOG", "JUNGLE_LOG", "ACACIA_LOG", "DARK_OAK_LOG"]
+        targetTools: ["AXE"]
+    children: ["skill2", "skill4"]
 
-   skill2:
-     requiredLevel: 3
-     icon: "IRON_AXE"
-     effect:
-       type: "collect.drop_bonus"
-       combineRule: "add"
-       params:
-         fortune_level: 1
-     children: ["skill3"]
+  skill2:
+    requiredLevel: 3
+    icon: "IRON_AXE"
+    effect:
+      type: "collect.drop_bonus"
+      combineRule: "add"
+      params:
+        fortune_level: 1
+    children: ["skill3"]
 
   skill3:
     requiredLevel: 4
     icon: "DIAMOND_AXE"
     children: ["skill8"]
 
-   skill4:
-     requiredLevel: 3
-     icon: "SHIELD"
-     effect:
-       type: "collect.durability_save_chance"
-       params:
-         saveChance: 0.2
-         targetTools: ["AXE"]
-     children: ["skill5", "skill6"]
+  skill4:
+    requiredLevel: 3
+    icon: "SHIELD"
+    effect:
+      type: "collect.durability_save_chance"
+      params:
+        unbreaking_level: 0.2
+    children: ["skill5", "skill6"]
 
-   skill5:
-     requiredLevel: 4
-     icon: "TOTEM_OF_UNDYING"
-     effect:
-       type: "collect.unlock_batch_break"
-       params:
-         mode: "cut_all"
-         maxChainCount: 16
-         delayTicks: 2
-         instantBreak: false
-         autoCollect: false
-         visualizeTargets: true
-         matchLevel: "EXACT"
-     children: ["skill8"]
+  skill5:
+    requiredLevel: 4
+    icon: "TOTEM_OF_UNDYING"
+    effect:
+      type: "collect.unlock_batch_break"
+      params:
+        mode: "cut_all"
+        maxChainCount: 16
+        delayTicks: 2
+        instantBreak: false
+        autoCollect: false
+        visualizeTargets: true
+        matchLevel: "EXACT"
+        targetTools: ["AXE"]
+    children: ["skill8"]
 
-   skill6:
-      requiredLevel: 4
-      icon: "LEATHER_BOOTS"
-      effect:
-        type: "collect.break_speed_boost"
-        combineRule: "add"
-        params:
-          efficiency_level: 2
-          targetBlocks: ["OAK_LOG", "BIRCH_LOG", "SPRUCE_LOG", "JUNGLE_LOG", "ACACIA_LOG", "DARK_OAK_LOG"]
-          targetTools: ["AXE"]
-      children: ["skill7"]
+  skill6:
+    requiredLevel: 4
+    icon: "LEATHER_BOOTS"
+    effect:
+      type: "collect.break_speed_boost"
+      combineRule: "add"
+      params:
+        efficiency_level: 2
+        targetBlocks: ["OAK_LOG", "BIRCH_LOG", "SPRUCE_LOG", "JUNGLE_LOG", "ACACIA_LOG", "DARK_OAK_LOG"]
+        targetTools: ["AXE"]
+    children: ["skill7"]
 
   skill7:
     requiredLevel: 5
@@ -86,11 +86,11 @@ skills:
     icon: "OAK_SAPLING"
     children: ["skill9"]
 
-   skill9:
-     requiredLevel: 7
-     icon: "NETHER_STAR"
-     effect:
-       type: "general.unlock_item_token"
-       params:
-         items: ["lumberjack_axe_token"]
-     children: []
+  skill9:
+    requiredLevel: 7
+    icon: "NETHER_STAR"
+    effect:
+      type: "general.unlock_item_token"
+      params:
+        items: ["lumberjack_axe_token"]
+    children: []

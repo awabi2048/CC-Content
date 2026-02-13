@@ -151,4 +151,9 @@ interface RankManager {
      * プレイヤーが最大職業レベルに達しているかチェック
      */
     fun isMaxProfessionLevel(playerUuid: UUID): Boolean
+
+    /**
+     * プレイヤーの職業データを保存
+     */
+    fun savePlayerProfession(playerUuid: UUID)
 }

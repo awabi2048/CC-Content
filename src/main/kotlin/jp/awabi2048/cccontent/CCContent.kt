@@ -57,6 +57,13 @@ class CCContent : JavaPlugin(), Listener {
     companion object {
         lateinit var instance: CCContent
             private set
+        
+        val rankManager: RankManager
+            get() = instance.rankManagerInstance 
+                ?: throw IllegalStateException("RankManager is not initialized")
+        
+        lateinit var languageManager: LanguageLoader
+            private set
     }
     
     private var playTimeTrackerTaskId: Int = -1
@@ -167,6 +174,7 @@ class CCContent : JavaPlugin(), Listener {
 
             // 言語ファイルを読み込み
             val languageLoader = LanguageLoader(this, "ja_JP")
+            languageManager = languageLoader
             val messageProvider = MessageProviderImpl(languageLoader)
             rankManager.setMessageProvider(messageProvider)
             rankManager.initBossBarManager(this)
@@ -250,8 +258,9 @@ class CCContent : JavaPlugin(), Listener {
         try {
             val blastMineHandler = BlastMineHandler(ignoreBlockStore)
 
-SkillEffectRegistry.register(BreakSpeedBoostHandler())
+            SkillEffectRegistry.register(BreakSpeedBoostHandler())
             SkillEffectRegistry.register(DropBonusHandler())
+            SkillEffectRegistry.register(DurabilitySaveChanceHandler())
             SkillEffectRegistry.register(UnlockBatchBreakHandler(ignoreBlockStore))
             SkillEffectRegistry.register(ReplaceLootTableHandler())
             SkillEffectRegistry.register(blastMineHandler)
@@ -270,8 +279,8 @@ SkillEffectRegistry.register(BreakSpeedBoostHandler())
 
             server.pluginManager.registerEvents(SkillEffectCacheListener(rankManager, this), this)
             server.pluginManager.registerEvents(BlockBreakEffectListener(ignoreBlockStore, blastMineHandler), this)
-            server.pluginManager.registerEvents(BatchBreakToggleListener(), this)
             server.pluginManager.registerEvents(BatchBreakPreviewListener(), this)
+            server.pluginManager.registerEvents(ActiveSkillKeyListener(), this)
             server.pluginManager.registerEvents(CraftEffectListener(), this)
             server.pluginManager.registerEvents(CombatEffectListener(), this)
         } catch (e: Exception) {

@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.rank.profession
 
+import jp.awabi2048.cccontent.features.rank.skill.SkillSwitchMode
 import java.util.UUID
 
 /**
@@ -18,7 +19,17 @@ data class PlayerProfession(
 
     var bossBarEnabled: Boolean = true,
 
-    var prestigeSkills: MutableSet<String> = mutableSetOf()
+    var prestigeSkills: MutableSet<String> = mutableSetOf(),
+
+    /**
+     * 現在アクティブな能動スキルID
+     */
+    var activeSkillId: String? = null,
+
+    /**
+     * 能動スキルの切替様式
+     */
+    var skillSwitchMode: SkillSwitchMode = SkillSwitchMode.MENU_ONLY
 ) {
     fun getCurrentLevel(skillTree: SkillTree): Int {
         return skillTree.calculateLevelByExp(currentExp)
