@@ -5,6 +5,7 @@ import jp.awabi2048.cccontent.features.rank.job.BlockPositionCodec
 import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillManager
+import jp.awabi2048.cccontent.features.rank.skill.ActiveTriggerType
 import jp.awabi2048.cccontent.features.rank.skill.EffectContext
 import jp.awabi2048.cccontent.features.rank.skill.EvaluationMode
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffect
@@ -371,6 +372,10 @@ class UnlockBatchBreakHandler(
     }
 
     override fun getEffectType(): String = EFFECT_TYPE
+
+    override fun isActiveSkill(): Boolean = true
+
+    override fun getTriggerType(): ActiveTriggerType = ActiveTriggerType.AUTO_BREAK
 
     override fun getDefaultEvaluationMode(): EvaluationMode = EvaluationMode.RUNTIME
 

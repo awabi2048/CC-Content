@@ -2,7 +2,9 @@ package jp.awabi2048.cccontent.features.rank.skill.listeners
 
 import jp.awabi2048.cccontent.features.rank.job.BlockPositionCodec
 import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
+import jp.awabi2048.cccontent.features.rank.skill.ActiveTriggerType
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
+import jp.awabi2048.cccontent.features.rank.skill.SkillEffectRegistry
 import jp.awabi2048.cccontent.features.rank.skill.handlers.BlastMineHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.BreakSpeedBoostHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.UnlockBatchBreakHandler
@@ -77,7 +79,7 @@ class BlockBreakEffectListener(
                     BlastMineHandler.EFFECT_TYPE,
                     event.block.type.name
                 )
-                if (blastMineEntry != null) {
+                if (blastMineEntry != null && canTriggerOnAutoBreak(blastMineEntry.effect.type)) {
                     debugApplied = SkillEffectEngine.applyEffect(event.player, compiledEffects.profession, blastMineEntry.skillId, blastMineEntry.effect, event)
                 }
 
@@ -88,13 +90,22 @@ class BlockBreakEffectListener(
                         event.block.type.name
                     )
 
-                    if (entry != null) {
+                    if (entry != null && canTriggerOnAutoBreak(entry.effect.type)) {
                         SkillEffectEngine.applyEffect(event.player, compiledEffects.profession, entry.skillId, entry.effect, event)
                     }
                 }
             }
         }
 
+    }
+
+    private fun canTriggerOnAutoBreak(effectType: String): Boolean {
+        val handler = SkillEffectRegistry.getHandler(effectType) ?: return false
+        if (!handler.isActiveSkill()) {
+            return true
+        }
+
+        return handler.getTriggerType() == ActiveTriggerType.AUTO_BREAK
     }
 
     @EventHandler

@@ -5,6 +5,10 @@ import jp.awabi2048.cccontent.features.rank.profession.SkillTree
 interface SkillEffectHandler {
     fun getEffectType(): String
 
+    fun isActiveSkill(): Boolean = false
+
+    fun getTriggerType(): ActiveTriggerType = ActiveTriggerType.AUTO_BREAK
+
     fun getDefaultEvaluationMode(): EvaluationMode = EvaluationMode.CACHED
 
     fun applyEffect(context: EffectContext): Boolean

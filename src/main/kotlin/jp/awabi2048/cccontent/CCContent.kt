@@ -261,6 +261,7 @@ class CCContent : JavaPlugin(), Listener {
             SkillEffectRegistry.register(UnlockBatchBreakHandler(ignoreBlockStore))
             SkillEffectRegistry.register(ReplaceLootTableHandler())
             SkillEffectRegistry.register(blastMineHandler)
+            SkillEffectRegistry.register(WindGustHandler())
 
             SkillEffectRegistry.register(UnlockSystemHandler())
             SkillEffectRegistry.register(UnlockRecipeHandler())
@@ -277,6 +278,7 @@ class CCContent : JavaPlugin(), Listener {
             server.pluginManager.registerEvents(SkillEffectCacheListener(rankManager, this), this)
             server.pluginManager.registerEvents(BlockBreakEffectListener(ignoreBlockStore), this)
             server.pluginManager.registerEvents(BatchBreakPreviewListener(), this)
+            server.pluginManager.registerEvents(ActiveSkillTriggerListener(), this)
             server.pluginManager.registerEvents(ActiveSkillKeyListener(), this)
             server.pluginManager.registerEvents(CraftEffectListener(), this)
             server.pluginManager.registerEvents(CombatEffectListener(), this)

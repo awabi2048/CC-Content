@@ -93,4 +93,12 @@ skills:
       type: "general.unlock_item_token"
       params:
         items: ["lumberjack_axe_token"]
+    children: ["skill10"]
+
+  skill10:
+    requiredLevel: 8
+    icon: "WIND_CHARGE"
+    effect:
+      type: "collect.wind_gust_mock"
+      params: {}
     children: []

@@ -12,18 +12,11 @@ import org.bukkit.entity.Player
 object ActiveSkillIdentifier {
 
     /**
-     * 能動スキルのエフェクトタイプ
-     */
-    private val ACTIVE_SKILL_EFFECT_TYPES = setOf(
-        "collect.blast_mine",
-        "collect.unlock_batch_break"
-    )
-
-    /**
      * スキルエフェクトが能動スキルかどうか判定
      */
     fun isActiveSkillEffect(effectType: String): Boolean {
-        return effectType in ACTIVE_SKILL_EFFECT_TYPES
+        val handler = SkillEffectRegistry.getHandler(effectType) ?: return false
+        return handler.isActiveSkill()
     }
 
     /**

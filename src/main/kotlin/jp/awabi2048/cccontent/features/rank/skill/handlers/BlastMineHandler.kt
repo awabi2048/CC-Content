@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent.features.rank.skill.handlers
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillManager
+import jp.awabi2048.cccontent.features.rank.skill.ActiveTriggerType
 import jp.awabi2048.cccontent.features.rank.skill.EffectContext
 import jp.awabi2048.cccontent.features.rank.skill.EvaluationMode
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffect
@@ -13,6 +14,7 @@ import org.bukkit.block.Block
 import org.bukkit.block.Container
 import org.bukkit.entity.Player
 import org.bukkit.event.block.BlockBreakEvent
+import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.inventory.ItemStack
 import org.bukkit.scheduler.BukkitTask
 import java.util.UUID
@@ -104,11 +106,14 @@ class BlastMineHandler : SkillEffectHandler {
 
     override fun getEffectType(): String = EFFECT_TYPE
 
+    override fun isActiveSkill(): Boolean = true
+
+    override fun getTriggerType(): ActiveTriggerType = ActiveTriggerType.MANUAL_SHIFT_RIGHT_CLICK
+
     override fun getDefaultEvaluationMode(): EvaluationMode = EvaluationMode.RUNTIME
 
     override fun applyEffect(context: EffectContext): Boolean {
-        val event = context.getEvent<BlockBreakEvent>() ?: return false
-        val player = event.player
+        val player = context.player
         val playerUuid = player.uniqueId
 
         if (isInternalBreakInProgress(playerUuid)) {
@@ -127,7 +132,7 @@ class BlastMineHandler : SkillEffectHandler {
         val options = resolveRuntimeOptions(context.skillEffect)
         stopForPlayer(playerUuid)
 
-        val centerBlock = event.block
+        val centerBlock = resolveCenterBlock(context) ?: return false
         val blocks = collectCuboidBlocks(centerBlock, options.radius)
 
         if (blocks.isEmpty()) {
@@ -139,6 +144,16 @@ class BlastMineHandler : SkillEffectHandler {
         scheduleBlastBreak(player, playerUuid, options, blocks, originTool)
 
         return true
+    }
+
+    private fun resolveCenterBlock(context: EffectContext): Block? {
+        val breakEvent = context.getEvent<BlockBreakEvent>()
+        if (breakEvent != null) {
+            return breakEvent.block
+        }
+
+        val interactEvent = context.getEvent<PlayerInteractEvent>() ?: return null
+        return interactEvent.clickedBlock ?: context.player.getTargetBlockExact(8)
     }
 
     private fun isPickaxe(material: Material): Boolean {

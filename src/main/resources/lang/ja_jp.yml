@@ -69,6 +69,9 @@ skill:
     skill9:
       name: 伝説を超えし者
       description: すべての伐採技術を極めた最高位の木こり
+    skill10:
+      name: 突風
+      description: Shift+右クリックで突風を発動（モック）
   
   # 醸造家のスキルツリー
   brewer:
