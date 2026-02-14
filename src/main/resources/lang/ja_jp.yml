@@ -72,6 +72,39 @@ skill:
     cut_all_3:
       name: 一括破壊３
       description: さらに一括破壊を強化
+
+  # 農家のスキルツリー
+  farmer:
+    initial:
+      name: 初期解放
+      description: 農家の基本スキルを解放
+    harvest_1:
+      name: 収穫量増加１
+      description: 作物の収穫量が少し増える
+    area_tilling:
+      name: 耕地作業
+      description: 周辺の畑作業に関する技術を習得
+    area_harvesting:
+      name: 範囲収穫
+      description: 周囲の作物を効率的に収穫する技術を習得
+    auto_replanting:
+      name: 自動植え直し
+      description: 収穫後に作物を自動で植え直す技術を習得
+    harvest_2:
+      name: 収穫量増加２
+      description: 作物の収穫量がさらに増える
+    tool:
+      name: 農具熟練
+      description: 専用農具の取り扱いに熟練する
+    harvest_3:
+      name: 収穫量増加３
+      description: 作物の収穫量が大きく増える
+    special_loot_table_1:
+      name: 特殊収穫Ⅰ
+      description: 特殊報酬に繋がる収穫知識を習得
+    special_loot_table_2:
+      name: 特殊収穫Ⅱ
+      description: 農家専用トークンを解放する
   
   # 醸造家のスキルツリー
   brewer:
@@ -144,37 +177,7 @@ skill:
     blastmine_2:
       name: 爆破採掘２
       description: 爆破採掘をさらに強化
-    skill0:
-      name: 初心者の鉱夫
-      description: 基本的な採掘を学んだ
-    skill1:
-      name: 修行中の鉱夫
-      description: より効率的な採掘方法を習得
-    skill2:
-      name: 熟練の鉱夫（石職人）
-      description: 石材採掘の専門家
-    skill3:
-      name: 石の大工匠
-      description: 石材採掘を極めた者
-    skill4:
-      name: 熟練の鉱夫（金属職人）
-      description: 鉱石採掘の専門家
-    skill5:
-      name: 金属の大工匠
-      description: 鉱石採掘を極めた者
-    skill6:
-      name: 深淵の探究者
-      description: 深層鉱物の採掘法を習得
-    skill7:
-      name: 地脈の読み手
-      description: 鉱物の位置を感知する能力を習得
-    skill8:
-      name: 地殻変動の支配者
-      description: 採掘の物理学を完全に理解
-    skill9:
-      name: 大地の王
-      description: 採掘技術の最高位に達した者
-  
+      
   # 料理人のスキルツリー
   cook:
     skill0:

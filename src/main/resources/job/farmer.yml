@@ -15,6 +15,11 @@ skills:
   harvest_1:
     requiredLevel: 5
     icon: "STONE_HOE"
+    effect:
+      type: "collect.drop_bonus"
+      combineRule: "add"
+      params:
+        fortune_level: 1
     children: ["area_tilling"]
 
   area_tilling:
@@ -35,6 +40,11 @@ skills:
   harvest_2:
     requiredLevel: 30
     icon: "WHEAT"
+    effect:
+      type: "collect.drop_bonus"
+      combineRule: "add"
+      params:
+        fortune_level: 1
     children: ["tool", "harvest_3"]
 
   tool:
@@ -45,6 +55,11 @@ skills:
   harvest_3:
     requiredLevel: 35
     icon: "COMPOSTER"
+    effect:
+      type: "collect.drop_bonus"
+      combineRule: "add"
+      params:
+        fortune_level: 1
     children: ["special_loot_table_1"]
 
   special_loot_table_1:

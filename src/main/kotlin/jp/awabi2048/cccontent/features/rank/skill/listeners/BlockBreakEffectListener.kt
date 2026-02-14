@@ -142,7 +142,7 @@ class BlockBreakEffectListener(
             }
         }
 
-        val replaceLootEntry = SkillEffectEngine.getCachedEffectForBlock(event.player.uniqueId, "collect.replace_loot_table", blockType)
+        val replaceLootEntry = SkillEffectEngine.getCachedEffectForBlock(event.player.uniqueId, "general.replace_loot_table", blockType)
         if (replaceLootEntry != null) {
             SkillEffectEngine.applyEffect(event.player, profession, replaceLootEntry.skillId, replaceLootEntry.effect, event)
         }

@@ -5,7 +5,9 @@ import jp.awabi2048.cccontent.features.rank.skill.EvaluationMode
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffect
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectHandler
 import jp.awabi2048.cccontent.features.rank.skill.listeners.BlockBreakEffectListener
+import org.bukkit.Material
 import org.bukkit.enchantments.Enchantment
+import java.util.UUID
 import kotlin.math.floor
 import kotlin.random.Random
 
@@ -25,6 +27,38 @@ import kotlin.random.Random
 class DropBonusHandler : SkillEffectHandler {
     companion object {
         const val EFFECT_TYPE = "collect.drop_bonus"
+
+        private val FARMER_TARGET_BLOCKS = setOf(
+            "WHEAT",
+            "CARROTS",
+            "POTATOES",
+            "BEETROOTS",
+            "MELON",
+            "PUMPKIN",
+            "COCOA",
+            "NETHER_WART",
+            "SUGAR_CANE",
+            "CACTUS",
+            "BAMBOO",
+            "KELP",
+            "SWEET_BERRY_BUSH"
+        )
+
+        private val FARMER_HARVEST_ITEMS = setOf(
+            Material.WHEAT,
+            Material.CARROT,
+            Material.POTATO,
+            Material.BEETROOT,
+            Material.MELON_SLICE,
+            Material.PUMPKIN,
+            Material.COCOA_BEANS,
+            Material.NETHER_WART,
+            Material.SUGAR_CANE,
+            Material.CACTUS,
+            Material.BAMBOO,
+            Material.KELP,
+            Material.SWEET_BERRIES
+        )
     }
 
     override fun getEffectType(): String = EFFECT_TYPE
@@ -42,13 +76,7 @@ class DropBonusHandler : SkillEffectHandler {
             return false
         }
         
-        // ブロックタイプを取得（event.block.type.nameはAIRになっているため、キャッシュから取得）
-        val eventBlockType = event.block.type.name
-        val blockType = if (eventBlockType == "AIR") {
-            BlockBreakEffectListener.getCachedBlockTypeForPlayer(player.uniqueId) ?: eventBlockType
-        } else {
-            eventBlockType
-        }
+        val blockType = resolveBlockType(event, player.uniqueId)
         
         // 職業別ブロック判定
         if (!isApplicableBlock(blockType, profession.id)) {
@@ -63,8 +91,13 @@ class DropBonusHandler : SkillEffectHandler {
         val totalFortuneLevel = vanillaFortuneLevel + fortuneLevel
         
         val dropsToAdd = mutableListOf<org.bukkit.entity.Item>()
-        
+        val isFarmer = profession.id == "farmer"
+
         for (drop in event.items) {
+            if (isFarmer && !isFarmerHarvestItem(drop.itemStack.type)) {
+                continue
+            }
+
             val originalAmount = drop.itemStack.amount
             val increasedAmount = calculateFortuneDrops(originalAmount, totalFortuneLevel)
             val additionalAmount = increasedAmount - originalAmount
@@ -75,9 +108,9 @@ class DropBonusHandler : SkillEffectHandler {
                 dropsToAdd.add(event.block.world.dropItemNaturally(event.block.location.add(0.5, 0.5, 0.5), newItem))
             }
         }
-        
+
         if (dropsToAdd.isNotEmpty()) {
-            org.bukkit.Bukkit.getLogger().info("[DropBonusHandler] ${player.name}: $blockType fortune=$totalFortuneLevel (vanilla=$vanillaFortuneLevel + skill=$fortuneLevel) => +${dropsToAdd.size} items")
+            org.bukkit.Bukkit.getLogger().info("[DropBonusHandler] ${player.name}: block=$blockType fortune=$totalFortuneLevel (vanilla=$vanillaFortuneLevel + skill=$fortuneLevel) -> added=${dropsToAdd.sumOf { it.itemStack.amount }}")
         }
         return dropsToAdd.isNotEmpty()
     }
@@ -89,8 +122,31 @@ class DropBonusHandler : SkillEffectHandler {
         return when (professionId) {
             "miner" -> isOreBlock(blockType)
             "lumberjack" -> isLogBlock(blockType)
+            "farmer" -> isFarmerCropBlock(blockType)
             else -> false
         }
+    }
+
+    private fun isFarmerCropBlock(blockType: String): Boolean {
+        return blockType in FARMER_TARGET_BLOCKS
+    }
+
+    private fun isFarmerHarvestItem(itemType: Material): Boolean {
+        return itemType in FARMER_HARVEST_ITEMS
+    }
+
+    private fun resolveBlockType(event: org.bukkit.event.block.BlockDropItemEvent, playerUuid: UUID): String {
+        val blockStateType = event.blockState.type.name
+        if (blockStateType != "AIR") {
+            return blockStateType
+        }
+
+        val eventBlockType = event.block.type.name
+        if (eventBlockType != "AIR") {
+            return eventBlockType
+        }
+
+        return BlockBreakEffectListener.getCachedBlockTypeForPlayer(playerUuid) ?: "AIR"
     }
 
     /**
@@ -144,7 +200,7 @@ class DropBonusHandler : SkillEffectHandler {
     }
 
     override fun supportsProfession(professionId: String): Boolean {
-        return professionId in listOf("lumberjack", "miner")
+        return professionId in listOf("lumberjack", "miner", "farmer")
     }
 
     override fun validateParams(skillEffect: SkillEffect): Boolean {

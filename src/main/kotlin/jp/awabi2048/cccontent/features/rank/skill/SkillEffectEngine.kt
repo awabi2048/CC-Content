@@ -33,7 +33,7 @@ object SkillEffectEngine {
     private val blockTargetedEffectTypes = setOf(
         "collect.break_speed_boost",
         "collect.drop_bonus",
-        "collect.replace_loot_table",
+        "general.replace_loot_table",
         "collect.unlock_batch_break",
         "lumberjack.replant"
     )
