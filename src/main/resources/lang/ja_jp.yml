@@ -298,20 +298,33 @@ skill:
 # チュートリアルランク
 tutorial_rank:
   newbie:
-    name: Newbie
-    description: 新規プレイヤー
+    name: ニュービー
+    description: ワールドに降り立ったばかりの新人
   visitor:
-    name: Visitor
-    description: 訪問者
+    name: ビジター
+    description: 拠点を探索し始めた訪問者
   pioneer:
-    name: Pioneer
-    description: 開拓者
+    name: パイオニア
+    description: 資源収集と戦闘に慣れてきた開拓者
   adventurer:
-    name: Adventurer
-    description: 冒険者
+    name: アドベンチャラー
+    description: 強敵討伐に挑む冒険者
   attainer:
-    name: Attainer
-    description: 達成者
+    name: アテイナー
+    description: すべてを乗り越えた達成者
+  task:
+    no_requirement: このランクの到達条件はありません
+    system_not_initialized: タスク設定が未初期化です
+    page_hint: ページ移動は経路の左右端をクリック
+    label:
+      play_time: サーバーで遊ぶ
+      exp: 経験値を集める
+    suffix:
+      defeat: を討伐
+      collect: を集める
+    status:
+      completed: 達成済み
+      future: 未到達
 
 # ランク関連メッセージ
 message:

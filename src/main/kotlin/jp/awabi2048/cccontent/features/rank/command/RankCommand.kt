@@ -31,6 +31,7 @@ import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.kyori.adventure.text.format.TextDecoration
 
@@ -40,10 +41,27 @@ import net.kyori.adventure.text.format.TextDecoration
 class RankCommand(
     private val rankManager: RankManager,
     private val messageProvider: MessageProvider,
-    private val taskLoader: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader? = null,
-    private val taskChecker: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskChecker? = null,
+    private var taskLoader: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader? = null,
+    private var taskChecker: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskChecker? = null,
     private val translator: jp.awabi2048.cccontent.features.rank.tutorial.task.EntityBlockTranslator? = null
 ) : CommandExecutor, TabCompleter, Listener, ProfessionSelector {
+
+    fun setTutorialTaskSystem(
+        loader: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader?,
+        checker: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskChecker?
+    ) {
+        taskLoader = loader
+        taskChecker = checker
+    }
+
+    fun openRankMenu(viewer: Player): Boolean {
+        val tutorialRank = rankManager.getTutorialRank(viewer.uniqueId)
+        return if (tutorialRank == TutorialRank.ATTAINER) {
+            openProfessionMainMenu(viewer)
+        } else {
+            openTutorialRankMenu(viewer)
+        }
+    }
     
     override fun onCommand(
         sender: CommandSender,
@@ -326,6 +344,309 @@ class RankCommand(
         viewer.openInventory(inventory)
         viewer.playSound(viewer.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
         return true
+    }
+
+    private fun openTutorialRankMenu(viewer: Player): Boolean {
+        val holder = TutorialRankMenuGuiHolder(TUTORIAL_MENU_PAGE_FIRST)
+        val inventory = Bukkit.createInventory(holder, 45, "§8チュートリアルランク")
+        holder.backingInventory = inventory
+
+        renderTutorialRankMenu(inventory, viewer, holder.page)
+        viewer.openInventory(inventory)
+        viewer.playSound(viewer.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
+        return true
+    }
+
+    private fun renderTutorialRankMenu(inventory: Inventory, viewer: Player, page: Int) {
+        val headerFooterPane = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
+        val basePane = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
+        val acquiredRoutePane = createBackgroundItem(Material.LIME_STAINED_GLASS_PANE)
+        val lockedRoutePane = createBackgroundItem(Material.ORANGE_STAINED_GLASS_PANE)
+
+        for (slot in 0 until inventory.size) {
+            inventory.setItem(slot, basePane)
+        }
+        for (slot in 0..8) {
+            inventory.setItem(slot, headerFooterPane)
+        }
+        for (slot in 36..44) {
+            inventory.setItem(slot, headerFooterPane)
+        }
+        val tutorial = rankManager.getPlayerTutorial(viewer.uniqueId)
+        val currentRank = tutorial.currentRank
+        val routeSlots = if (page == TUTORIAL_MENU_PAGE_SECOND) {
+            TUTORIAL_MENU_ROUTE_SLOTS_PAGE2
+        } else {
+            TUTORIAL_MENU_ROUTE_SLOTS_PAGE1
+        }
+        val routeLeadingRank = if (page == TUTORIAL_MENU_PAGE_SECOND) {
+            TUTORIAL_MENU_ROUTE_LEADING_RANK_PAGE2
+        } else {
+            TUTORIAL_MENU_ROUTE_LEADING_RANK_PAGE1
+        }
+        routeSlots.forEach { slot ->
+            val leadingRank = routeLeadingRank[slot]
+            val routeItem = if (leadingRank != null && leadingRank.level <= currentRank.level) {
+                acquiredRoutePane
+            } else {
+                lockedRoutePane
+            }
+            inventory.setItem(slot, routeItem)
+        }
+
+        val entries = when (page) {
+            TUTORIAL_MENU_PAGE_FIRST -> listOf(
+                TutorialRank.NEWBIE to 19,
+                TutorialRank.VISITOR to 22,
+                TutorialRank.PIONEER to 25
+            )
+            TUTORIAL_MENU_PAGE_SECOND -> listOf(
+                TutorialRank.ADVENTURER to 19,
+                TutorialRank.ATTAINER to 22
+            )
+            else -> emptyList()
+        }
+
+        entries.forEach { (rank, slot) ->
+            inventory.setItem(slot, createTutorialRankItem(viewer, tutorial, rank, currentRank))
+        }
+
+        inventory.setItem(TUTORIAL_MENU_PLAYER_SLOT, createTutorialPlayerInfoItem(viewer))
+    }
+
+    private fun createTutorialRankItem(
+        viewer: Player,
+        tutorial: jp.awabi2048.cccontent.features.rank.tutorial.PlayerTutorialRank,
+        rank: TutorialRank,
+        currentRank: TutorialRank
+    ): ItemStack {
+        val loader = taskLoader
+        val requirementRank = TutorialRank.values().getOrNull(rank.ordinal - 1)
+        val requirement = requirementRank?.let { reqRank -> loader?.getRequirement(reqRank.name) } ?: TaskRequirement()
+        val mode = when {
+            requirementRank == null -> TutorialRankTaskDisplayMode.NONE
+            requirementRank.level < currentRank.level -> TutorialRankTaskDisplayMode.COMPLETED
+            requirementRank == currentRank -> TutorialRankTaskDisplayMode.CURRENT
+            else -> TutorialRankTaskDisplayMode.FUTURE
+        }
+
+        val description = messageProvider.getMessage("tutorial_rank.${rank.name.lowercase()}.description")
+
+        val lore = mutableListOf<Component>()
+        lore += toComponent(BAR)
+        lore += toComponent("§f§l| §7$description")
+        lore += toComponent(BAR)
+        if (loader == null) {
+            lore += toComponent("§f§l| §c${messageProvider.getMessage("tutorial_rank.task.system_not_initialized")}")
+        } else {
+            lore += buildTutorialRankTaskLore(viewer, tutorial.taskProgress, requirement, mode)
+        }
+        lore += toComponent(BAR)
+
+        val icon = resolveTutorialRankIcon(loader?.getRankIcon(rank.name), rank)
+        val name = messageProvider.getMessage("tutorial_rank.${rank.name.lowercase()}.name")
+        return createGuiItem(icon, toComponent("§6§l$name"), lore)
+    }
+
+    private fun buildTutorialRankTaskLore(
+        viewer: Player,
+        progress: TaskProgress,
+        requirement: TaskRequirement,
+        mode: TutorialRankTaskDisplayMode
+    ): List<Component> {
+        if (mode == TutorialRankTaskDisplayMode.NONE) {
+            return listOf(toComponent("§f§l| §a${messageProvider.getMessage("tutorial_rank.task.no_requirement")}"))
+        }
+
+        if (requirement.isEmpty()) {
+            return listOf(toComponent("§f§l| §a${messageProvider.getMessage("tutorial_rank.task.no_requirement")}"))
+        }
+
+        val lore = mutableListOf<Component>()
+        val statusLine = when (mode) {
+            TutorialRankTaskDisplayMode.COMPLETED -> "§a§n${messageProvider.getMessage("tutorial_rank.task.status.completed")}"
+            TutorialRankTaskDisplayMode.CURRENT -> null
+            TutorialRankTaskDisplayMode.FUTURE -> "§c§n${messageProvider.getMessage("tutorial_rank.task.status.future")}"
+            TutorialRankTaskDisplayMode.NONE -> null
+        }
+        statusLine?.let { lore += toComponent(it) }
+
+        val defeatSuffix = messageProvider.getMessage("tutorial_rank.task.suffix.defeat")
+        val collectSuffix = messageProvider.getMessage("tutorial_rank.task.suffix.collect")
+        val playTimeLabel = messageProvider.getMessage("tutorial_rank.task.label.play_time")
+        val expLabel = messageProvider.getMessage("tutorial_rank.task.label.exp")
+
+        if (requirement.playTimeMin > 0) {
+            val required = requirement.playTimeMin.toLong()
+            val current = when (mode) {
+                TutorialRankTaskDisplayMode.COMPLETED -> required
+                TutorialRankTaskDisplayMode.CURRENT -> minOf(progress.playTime, required)
+                TutorialRankTaskDisplayMode.FUTURE -> 0L
+                TutorialRankTaskDisplayMode.NONE -> 0L
+            }
+            val done = current >= required
+            val lineColor = if (done) "§a" else "§c"
+            val numberColor = progressColorCode(current, required)
+            lore += toComponent("${lineColor}§l| §7${playTimeLabel} (§r${numberColor}${formatPlayTime(current)}§7/${formatPlayTime(required)}§7)")
+        }
+
+        requirement.mobKills.forEach { (mobType, required) ->
+            val current = when (mode) {
+                TutorialRankTaskDisplayMode.COMPLETED -> required
+                TutorialRankTaskDisplayMode.CURRENT -> minOf(progress.getMobKillCount(mobType), required)
+                TutorialRankTaskDisplayMode.FUTURE -> 0
+                TutorialRankTaskDisplayMode.NONE -> 0
+            }
+            val done = current >= required
+            val targetName = resolveEntityNameComponent(mobType)
+            lore += buildTutorialTargetLine(targetName, done, current, required, defeatSuffix)
+        }
+
+        requirement.bossKills.forEach { (bossType, required) ->
+            val current = when (mode) {
+                TutorialRankTaskDisplayMode.COMPLETED -> required
+                TutorialRankTaskDisplayMode.CURRENT -> minOf(progress.getBossKillCount(bossType), required)
+                TutorialRankTaskDisplayMode.FUTURE -> 0
+                TutorialRankTaskDisplayMode.NONE -> 0
+            }
+            val done = current >= required
+            val targetName = resolveBossNameComponent(bossType)
+            lore += buildTutorialTargetLine(targetName, done, current, required, defeatSuffix)
+        }
+
+        requirement.blockMines.forEach { (blockType, required) ->
+            val current = when (mode) {
+                TutorialRankTaskDisplayMode.COMPLETED -> required
+                TutorialRankTaskDisplayMode.CURRENT -> minOf(progress.getBlockMineCount(blockType), required)
+                TutorialRankTaskDisplayMode.FUTURE -> 0
+                TutorialRankTaskDisplayMode.NONE -> 0
+            }
+            val done = current >= required
+            val targetName = resolveBlockNameComponent(blockType)
+            lore += buildTutorialTargetLine(targetName, done, current, required, collectSuffix)
+        }
+
+        if (requirement.vanillaExp > 0) {
+            val required = requirement.vanillaExp
+            val current = when (mode) {
+                TutorialRankTaskDisplayMode.COMPLETED -> required
+                TutorialRankTaskDisplayMode.CURRENT -> minOf(progress.vanillaExp, required)
+                TutorialRankTaskDisplayMode.FUTURE -> 0L
+                TutorialRankTaskDisplayMode.NONE -> 0L
+            }
+            val done = current >= required
+            val lineColor = if (done) "§a" else "§c"
+            val numberColor = progressColorCode(current, required)
+            lore += toComponent("${lineColor}§l| §7${expLabel} (§r${numberColor}${current}§7/${required}§7)")
+        }
+
+        requirement.itemsRequired.forEach { (material, required) ->
+            val current = when (mode) {
+                TutorialRankTaskDisplayMode.COMPLETED -> required
+                TutorialRankTaskDisplayMode.CURRENT -> minOf(
+                    TutorialInventoryHelper.countItemInInventory(viewer, material.uppercase()),
+                    required
+                )
+                TutorialRankTaskDisplayMode.FUTURE -> 0
+                TutorialRankTaskDisplayMode.NONE -> 0
+            }
+            val done = current >= required
+            val targetName = resolveItemNameComponent(material)
+            lore += buildTutorialTargetLine(targetName, done, current, required, collectSuffix)
+        }
+
+        return lore.take(TUTORIAL_RANK_TASK_LORE_LIMIT)
+    }
+
+    private fun buildTutorialTargetLine(
+        nameComponent: Component,
+        done: Boolean,
+        current: Int,
+        required: Int,
+        suffix: String = ""
+    ): Component {
+        val contentColorCode = if (done) "§a" else "§c"
+        val numberColor = progressColorCode(current.toLong(), required.toLong())
+        return toComponent("${contentColorCode}§l| §r")
+            .append(nameComponent.color(NamedTextColor.GRAY))
+            .append(toComponent("§7${suffix} (§r${numberColor}${current}§7/${required}§7)"))
+    }
+
+    private fun resolveEntityNameComponent(entityType: String): Component {
+        val translatorInstance = translator ?: return Component.text("???")
+        return if (runCatching { org.bukkit.entity.EntityType.valueOf(entityType.uppercase()) }.isSuccess) {
+            Component.translatable(translatorInstance.translateEntity(entityType))
+        } else {
+            Component.text("???")
+        }
+    }
+
+    private fun resolveBossNameComponent(bossType: String): Component {
+        val translatorInstance = translator ?: return Component.text("???")
+        return if (runCatching { org.bukkit.entity.EntityType.valueOf(bossType.uppercase()) }.isSuccess) {
+            Component.translatable(translatorInstance.translateBoss(bossType))
+        } else {
+            Component.text("???")
+        }
+    }
+
+    private fun resolveBlockNameComponent(blockType: String): Component {
+        val translatorInstance = translator ?: return Component.text("???")
+        val material = Material.matchMaterial(blockType.uppercase())
+        return if (material != null) {
+            Component.translatable(translatorInstance.translateBlock(blockType))
+        } else {
+            Component.text("???")
+        }
+    }
+
+    private fun resolveItemNameComponent(itemName: String): Component {
+        val translatorInstance = translator ?: return Component.text("???")
+        val material = Material.matchMaterial(itemName.uppercase())
+        return if (material != null) {
+            Component.translatable(translatorInstance.translateItem(itemName))
+        } else {
+            Component.text("???")
+        }
+    }
+
+    private fun progressColorCode(current: Long, required: Long): String {
+        if (required <= 0L) {
+            return "§a"
+        }
+        val percent = ((current.toDouble() / required.toDouble()) * 100.0).toInt().coerceIn(0, 100)
+        return when {
+            percent >= 100 -> "§a"
+            percent >= 50 -> "§e"
+            else -> "§c"
+        }
+    }
+
+    private fun resolveTutorialRankIcon(iconName: String?, rank: TutorialRank): Material {
+        val configured = iconName?.trim()?.uppercase()?.let { Material.matchMaterial(it) }
+        if (configured != null) {
+            return configured
+        }
+        return if (rank == TutorialRank.ATTAINER) Material.JACK_O_LANTERN else Material.CARVED_PUMPKIN
+    }
+
+    private fun createTutorialPlayerInfoItem(viewer: Player): ItemStack {
+        val item = ItemStack(Material.PLAYER_HEAD)
+        val meta = item.itemMeta as? org.bukkit.inventory.meta.SkullMeta
+        if (meta != null) {
+            meta.owningPlayer = viewer
+            meta.displayName(withoutItalic(toComponent("§e${viewer.name}")))
+            meta.lore(
+                listOf(
+                    withoutItalic(toComponent(BAR)),
+                    withoutItalic(toComponent("§f§l| §7${messageProvider.getMessage("tutorial_rank.task.page_hint")}")),
+                    withoutItalic(toComponent(BAR))
+                )
+            )
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+            item.itemMeta = meta
+        }
+        return item
     }
 
     /**
@@ -1553,7 +1874,9 @@ class RankCommand(
             return false
         }
         
-        if (taskLoader == null || taskChecker == null) {
+        val loader = taskLoader
+        val checker = taskChecker
+        if (loader == null || checker == null) {
             sender.sendMessage(messageProvider.getMessage("rank.tutorial_task_info.system_not_initialized"))
             return false
         }
@@ -1561,7 +1884,7 @@ class RankCommand(
         val uuid = targetPlayer.uniqueId
         val tutorial = rankManager.getPlayerTutorial(uuid)
         val progress = tutorial.taskProgress
-        val requirement = taskLoader.getRequirement(tutorial.currentRank.name)
+        val requirement = loader.getRequirement(tutorial.currentRank.name)
         val viewer = if (sender is Player) sender else targetPlayer
 
         openTaskInfoGui(viewer, targetPlayer, tutorial.currentRank.name, progress, requirement)
@@ -1674,7 +1997,13 @@ class RankCommand(
                 } else {
                     Component.text(mobType)
                 }
-                details += buildTranslatedTargetLine(nameComponent, done, minOf(current, required), required)
+                details += buildTranslatedTargetLine(
+                    nameComponent,
+                    done,
+                    minOf(current, required),
+                    required,
+                    messageProvider.getMessage("tutorial_rank.task.suffix.defeat")
+                )
             }
             requirement.bossKills.forEach { (bossType, required) ->
                 val current = progress.getBossKillCount(bossType)
@@ -1688,7 +2017,13 @@ class RankCommand(
                 } else {
                     Component.text(bossType)
                 }
-                details += buildTranslatedTargetLine(nameComponent, done, minOf(current, required), required)
+                details += buildTranslatedTargetLine(
+                    nameComponent,
+                    done,
+                    minOf(current, required),
+                    required,
+                    messageProvider.getMessage("tutorial_rank.task.suffix.defeat")
+                )
             }
 
             items += createGuiItem(
@@ -1718,7 +2053,13 @@ class RankCommand(
                 } else {
                     Component.text(blockType)
                 }
-                details += buildTranslatedTargetLine(nameComponent, done, minOf(current, required), required)
+                details += buildTranslatedTargetLine(
+                    nameComponent,
+                    done,
+                    minOf(current, required),
+                    required,
+                    messageProvider.getMessage("tutorial_rank.task.suffix.collect")
+                )
             }
 
             items += createGuiItem(
@@ -1775,7 +2116,13 @@ class RankCommand(
                 } else {
                     Component.text(material)
                 }
-                details += buildTranslatedTargetLine(nameComponent, done, minOf(current, required), required)
+                details += buildTranslatedTargetLine(
+                    nameComponent,
+                    done,
+                    minOf(current, required),
+                    required,
+                    messageProvider.getMessage("tutorial_rank.task.suffix.collect")
+                )
             }
 
             items += createGuiItem(
@@ -1859,21 +2206,17 @@ class RankCommand(
         return item
     }
 
-    private fun buildTranslatedTargetLine(nameComponent: Component, done: Boolean, current: Int, required: Int): Component {
-        val prefix = toComponent(
-            messageProvider.getMessage(
-                "rank.tutorial_task_info.line.target_prefix",
-                "status" to statusIcon(done)
-            )
-        )
-        val suffix = toComponent(
-            messageProvider.getMessage(
-                "rank.tutorial_task_info.line.target_suffix",
-                "current" to current,
-                "required" to required
-            )
-        )
-        return prefix.append(nameComponent).append(suffix)
+    private fun buildTranslatedTargetLine(
+        nameComponent: Component,
+        done: Boolean,
+        current: Int,
+        required: Int,
+        actionSuffix: String
+    ): Component {
+        val numberColor = progressColorCode(current.toLong(), required.toLong())
+        return toComponent("${statusIcon(done)} ")
+            .append(nameComponent.color(NamedTextColor.GRAY))
+            .append(toComponent("§7${actionSuffix} (§r${numberColor}${current}§7/${required}§7)"))
     }
 
     private fun toComponent(text: String): Component = LEGACY_SERIALIZER.deserialize(text)
@@ -2501,6 +2844,44 @@ class RankCommand(
     }
 
     @EventHandler
+    fun onTutorialRankMenuClick(event: InventoryClickEvent) {
+        val holder = event.view.topInventory.holder as? TutorialRankMenuGuiHolder ?: return
+        event.isCancelled = true
+
+        val clickedSlot = event.rawSlot
+        if (clickedSlot !in 0 until event.view.topInventory.size) {
+            return
+        }
+
+        val player = event.whoClicked as? Player ?: return
+        when (clickedSlot) {
+            TUTORIAL_MENU_ROUTE_LEFT_SLOT -> {
+                if (holder.page > TUTORIAL_MENU_PAGE_FIRST) {
+                    holder.page -= 1
+                    renderTutorialRankMenu(holder.backingInventory, player, holder.page)
+                    player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.2f)
+                }
+            }
+
+            TUTORIAL_MENU_ROUTE_RIGHT_SLOT -> {
+                if (holder.page < TUTORIAL_MENU_PAGE_SECOND) {
+                    holder.page += 1
+                    renderTutorialRankMenu(holder.backingInventory, player, holder.page)
+                    player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.2f)
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    fun onTutorialRankMenuDrag(event: InventoryDragEvent) {
+        if (event.view.topInventory.holder !is TutorialRankMenuGuiHolder) {
+            return
+        }
+        event.isCancelled = true
+    }
+
+    @EventHandler
     fun onTaskInfoGuiClick(event: InventoryClickEvent) {
         if (event.view.topInventory.holder !is TaskInfoGuiHolder) {
             return
@@ -2516,10 +2897,25 @@ class RankCommand(
         event.isCancelled = true
     }
 
+    private class TutorialRankMenuGuiHolder(
+        var page: Int
+    ) : InventoryHolder {
+        lateinit var backingInventory: Inventory
+
+        override fun getInventory(): Inventory = backingInventory
+    }
+
     private class TaskInfoGuiHolder : InventoryHolder {
         lateinit var backingInventory: Inventory
 
         override fun getInventory(): Inventory = backingInventory
+    }
+
+    private enum class TutorialRankTaskDisplayMode {
+        COMPLETED,
+        CURRENT,
+        FUTURE,
+        NONE
     }
 
     private data class SkillTreeGuiState(
@@ -2637,6 +3033,30 @@ class RankCommand(
         private const val MAIN_MENU_MODE_SWITCH_SLOT = 38
         private const val MAIN_MENU_HINT_SLOT = 42
 
+        private const val TUTORIAL_MENU_PAGE_FIRST = 1
+        private const val TUTORIAL_MENU_PAGE_SECOND = 2
+        private const val TUTORIAL_MENU_ROUTE_LEFT_SLOT = 18
+        private const val TUTORIAL_MENU_ROUTE_RIGHT_SLOT = 26
+        private const val TUTORIAL_MENU_PLAYER_SLOT = 40
+        private const val TUTORIAL_RANK_TASK_LORE_LIMIT = 10
+        private val TUTORIAL_MENU_ROUTE_SLOTS_PAGE1 = listOf(20, 21, 23, 24, 26)
+        private val TUTORIAL_MENU_ROUTE_SLOTS_PAGE2 = listOf(18, 20, 21, 23, 24, 25, 26)
+        private val TUTORIAL_MENU_ROUTE_LEADING_RANK_PAGE1 = mapOf(
+            20 to TutorialRank.NEWBIE,
+            21 to TutorialRank.NEWBIE,
+            23 to TutorialRank.VISITOR,
+            24 to TutorialRank.VISITOR,
+            26 to TutorialRank.PIONEER
+        )
+        private val TUTORIAL_MENU_ROUTE_LEADING_RANK_PAGE2 = mapOf(
+            20 to TutorialRank.ADVENTURER,
+            21 to TutorialRank.ADVENTURER,
+            23 to TutorialRank.ATTAINER,
+            24 to TutorialRank.ATTAINER,
+            25 to TutorialRank.ATTAINER,
+            26 to TutorialRank.ATTAINER
+        )
+
         // 区切り線
         private const val BAR = "§7§m――――――――――――――――――――――――――――――"
     }
@@ -2709,7 +3129,11 @@ class RankCommand(
         return if (minutes >= 60) {
             val hours = minutes / 60
             val mins = minutes % 60
-            "${hours}時間${mins}分"
+            if (mins == 0L) {
+                "${hours}時間"
+            } else {
+                "${hours}時間${mins}分"
+            }
         } else {
             "${minutes}分"
         }

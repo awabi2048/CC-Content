@@ -7,12 +7,14 @@ settings:
 tutorial_ranks:
   newbie:
     displayName: "§eNewbie"
+    icon: CARVED_PUMPKIN
     level: 0
     requirements:
       play_time_min: 3
   
   visitor:
     displayName: "§eVisitor"
+    icon: CARVED_PUMPKIN
     level: 1
     requirements:
       play_time_min: 120
@@ -26,6 +28,7 @@ tutorial_ranks:
   
   pioneer:
     displayName: "§aPioneer"
+    icon: CARVED_PUMPKIN
     level: 2
     requirements:
       play_time_min: 1440
@@ -40,6 +43,7 @@ tutorial_ranks:
   
   adventurer:
     displayName: "§bAdventurer"
+    icon: CARVED_PUMPKIN
     level: 3
     requirements:
       kill_boss:
@@ -47,5 +51,6 @@ tutorial_ranks:
   
   attainer:
     displayName: "§dAttainer"
+    icon: JACK_O_LANTERN
     level: 4
     requirements: {}

@@ -6,7 +6,7 @@ import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 
 /**
- * /rankmenu コマンド - 職業メインメニューを開く
+ * /rankmenu コマンド - ランクに応じたメニューを開く
  */
 class RankMenuCommand(
     private val rankCommand: RankCommand
@@ -23,6 +23,6 @@ class RankMenuCommand(
             return false
         }
 
-        return rankCommand.openProfessionMainMenu(sender)
+        return rankCommand.openRankMenu(sender)
     }
 }
