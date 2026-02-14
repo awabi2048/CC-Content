@@ -1,9 +1,5 @@
 # チュートリアルランク タスク要件設定ファイル
 
-settings:
-  # 既存プレイヤーを Newbie にリセットするか
-  reset_existing_players: false
-
 tutorial_ranks:
   newbie:
     displayName: "§eNewbie"

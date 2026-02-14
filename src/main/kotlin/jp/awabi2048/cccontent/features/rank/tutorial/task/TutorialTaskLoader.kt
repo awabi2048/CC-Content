@@ -11,6 +11,7 @@ class TutorialTaskLoader {
     /** ロードされた要件キャッシュ */
     private val requirementCache: MutableMap<String, TaskRequirement> = mutableMapOf()
     private val iconCache: MutableMap<String, String> = mutableMapOf()
+    private val rankLevelCache: MutableMap<String, Int> = mutableMapOf()
     
     /**
      * YAML ファイルからタスク要件を読み込む
@@ -30,6 +31,7 @@ class TutorialTaskLoader {
                 val rankSection = tutorialRanksSection.getConfigurationSection(rankId) ?: continue
                 val requirementsSection = rankSection.getConfigurationSection("requirements")
                 val iconName = rankSection.getString("icon")
+                val level = rankSection.getInt("level", Int.MAX_VALUE)
                 
                 val requirement = TaskRequirement(
                     playTimeMin = requirementsSection?.getInt("play_time_min", 0) ?: 0,
@@ -49,6 +51,7 @@ class TutorialTaskLoader {
                 )
                 
                 requirementCache[rankId.uppercase()] = requirement
+                rankLevelCache[rankId.uppercase()] = level
                 if (!iconName.isNullOrBlank()) {
                     iconCache[rankId.uppercase()] = iconName.trim()
                 }
@@ -70,6 +73,10 @@ class TutorialTaskLoader {
     fun getRankIcon(rankId: String): String? {
         return iconCache[rankId.uppercase()]
     }
+
+    fun getLowestDefinedRankId(): String? {
+        return rankLevelCache.minByOrNull { it.value }?.key
+    }
     
     /**
      * すべてのキャッシュをクリア
@@ -77,5 +84,6 @@ class TutorialTaskLoader {
     fun clearCache() {
         requirementCache.clear()
         iconCache.clear()
+        rankLevelCache.clear()
     }
 }

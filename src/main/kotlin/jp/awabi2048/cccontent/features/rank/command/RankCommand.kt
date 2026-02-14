@@ -244,14 +244,19 @@ class RankCommand(
             return false
         }
         
-        val success = rankManager.resetProfession(player.uniqueId)
-        if (success) {
-            sender.sendMessage("§a${player.name} の職業をリセットしました")
-        } else {
-            sender.sendMessage("§c${player.name} は職業を選択していません")
-        }
-        
-        return success
+        val uuid = player.uniqueId
+        rankManager.resetProfession(uuid)
+
+        val resetRank = resolveLowestDefinedTutorialRank()
+        val tutorial = rankManager.getPlayerTutorial(uuid)
+        tutorial.currentRank = resetRank
+        tutorial.taskProgress = TaskProgress(uuid, tutorial.currentRank.name)
+        tutorial.lastPlayTime = System.currentTimeMillis()
+        tutorial.lastUpdated = System.currentTimeMillis()
+        rankManager.saveData()
+
+        sender.sendMessage("§a${player.name} を ${resetRank.name} にリセットしました")
+        return true
     }
 
     private fun handleBossbar(sender: CommandSender, args: Array<out String>): Boolean {
@@ -3138,6 +3143,12 @@ class RankCommand(
             "${minutes}分"
         }
     }
+
+    private fun resolveLowestDefinedTutorialRank(): TutorialRank {
+        val lowestRankId = taskLoader?.getLowestDefinedRankId() ?: return TutorialRank.NEWBIE
+        return TutorialRank.entries.firstOrNull { it.name.equals(lowestRankId, ignoreCase = true) }
+            ?: TutorialRank.NEWBIE
+    }
     
     private fun sendUsage(sender: CommandSender) {
         sender.sendMessage("§6=== ランクシステムコマンド ===")
@@ -3146,7 +3157,7 @@ class RankCommand(
         sender.sendMessage("§a/rank rankup <player> §7- 次のランクにランクアップ")
         sender.sendMessage("§a/rank profession <player> <id> §7- 職業を選択/変更")
         sender.sendMessage("§a/rank skill §7- スキルツリーGUIを表示")
-        sender.sendMessage("§a/rank reset <player> §7- 職業をリセット")
+        sender.sendMessage("§a/rank reset <player> §7- 最低ランクにリセット")
         sender.sendMessage("§a/rank info [player] §7- ランク情報表示")
         sender.sendMessage("§a/rank task-info <player> §7- タスク進捗を表示")
         sender.sendMessage("§a/rank task-reset <player> §7- タスク進捗をリセット")
