@@ -14,6 +14,11 @@ import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.ProfessionManager
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
+import jp.awabi2048.cccontent.features.rank.profession.BossBarDisplayMode
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.event.ClickEvent
+import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import java.util.UUID
@@ -131,16 +136,39 @@ class ProfessionManagerImpl(
 
             if (levelUp) {
                 val gainedLevel = newLevel - oldLevel
-                player.sendMessage(
-                    messageProvider.getMessage(
-                        "rank.profession.level_up",
-                        "profession" to messageProvider.getProfessionName(prof.profession),
-                        "old" to oldLevel,
-                        "new" to newLevel,
-                        "gained" to gainedLevel
+                val availableBefore = skillTree.getAvailableSkills(prof.acquiredSkills, oldLevel).toSet()
+                val availableAfter = skillTree.getAvailableSkills(prof.acquiredSkills, newLevel).toSet()
+                val newlyUnlockedSkills = (availableAfter - availableBefore).mapNotNull { skillTree.getSkill(it) }
+
+                if (prof.levelUpNotificationEnabled) {
+                    player.sendMessage(
+                        messageProvider.getMessage(
+                            "rank.profession.level_up",
+                            "profession" to messageProvider.getProfessionName(prof.profession),
+                            "old" to oldLevel,
+                            "new" to newLevel,
+                            "gained" to gainedLevel
+                        )
                     )
-                )
-                player.playSound(player.location, "minecraft:entity.player.levelup", 1.0f, 1.2f)
+                    player.playSound(player.location, "minecraft:entity.player.levelup", 1.0f, 1.2f)
+
+                    if (newlyUnlockedSkills.isNotEmpty()) {
+                        val unlockedNames = newlyUnlockedSkills.joinToString("、") {
+                            messageProvider.getSkillName(prof.profession, it.skillId)
+                        }
+                        val message = Component.text(
+                            messageProvider.getMessage(
+                                "rank.profession.new_unlock",
+                                "count" to newlyUnlockedSkills.size,
+                                "skills" to unlockedNames
+                            )
+                        )
+                            .color(NamedTextColor.LIGHT_PURPLE)
+                            .decoration(TextDecoration.ITALIC, false)
+                            .clickEvent(ClickEvent.runCommand("/rankmenu skill"))
+                        player.sendMessage(message)
+                    }
+                }
 
                 val levelUpEvent = ProfessionLevelUpEvent(player, prof.profession, oldLevel, newLevel)
                 Bukkit.getPluginManager().callEvent(levelUpEvent)
@@ -227,12 +255,41 @@ class ProfessionManagerImpl(
     }
 
     override fun isBossBarEnabled(playerUuid: UUID): Boolean {
-        return getPlayerProfession(playerUuid)?.bossBarEnabled ?: true
+        return getPlayerProfession(playerUuid)?.bossBarDisplayMode?.visible ?: true
     }
 
     override fun setBossBarEnabled(playerUuid: UUID, enabled: Boolean) {
         val prof = getPlayerProfession(playerUuid) ?: return
-        prof.bossBarEnabled = enabled
+        prof.bossBarDisplayMode = if (enabled) {
+            if (prof.bossBarDisplayMode == BossBarDisplayMode.HIDDEN) BossBarDisplayMode.SHORT else prof.bossBarDisplayMode
+        } else {
+            BossBarDisplayMode.HIDDEN
+        }
+        prof.bossBarEnabled = prof.bossBarDisplayMode.visible
+        prof.lastUpdated = System.currentTimeMillis()
+        storage.saveProfession(prof)
+    }
+
+    override fun getBossBarDisplayMode(playerUuid: UUID): BossBarDisplayMode {
+        val prof = getPlayerProfession(playerUuid) ?: return BossBarDisplayMode.SHORT
+        return prof.bossBarDisplayMode
+    }
+
+    override fun setBossBarDisplayMode(playerUuid: UUID, mode: BossBarDisplayMode) {
+        val prof = getPlayerProfession(playerUuid) ?: return
+        prof.bossBarDisplayMode = mode
+        prof.bossBarEnabled = mode.visible
+        prof.lastUpdated = System.currentTimeMillis()
+        storage.saveProfession(prof)
+    }
+
+    override fun isLevelUpNotificationEnabled(playerUuid: UUID): Boolean {
+        return getPlayerProfession(playerUuid)?.levelUpNotificationEnabled ?: true
+    }
+
+    override fun setLevelUpNotificationEnabled(playerUuid: UUID, enabled: Boolean) {
+        val prof = getPlayerProfession(playerUuid) ?: return
+        prof.levelUpNotificationEnabled = enabled
         prof.lastUpdated = System.currentTimeMillis()
         storage.saveProfession(prof)
     }

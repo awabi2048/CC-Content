@@ -4,6 +4,7 @@ import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
 import jp.awabi2048.cccontent.features.rank.tutorial.PlayerTutorialRank
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
+import jp.awabi2048.cccontent.features.rank.profession.BossBarDisplayMode
 import java.util.UUID
 
 /**
@@ -122,6 +123,14 @@ interface RankManager {
     fun isProfessionBossBarEnabled(playerUuid: UUID): Boolean
 
     fun setProfessionBossBarEnabled(playerUuid: UUID, enabled: Boolean)
+
+    fun getProfessionBossBarDisplayMode(playerUuid: UUID): BossBarDisplayMode
+
+    fun setProfessionBossBarDisplayMode(playerUuid: UUID, mode: BossBarDisplayMode)
+
+    fun isLevelUpNotificationEnabled(playerUuid: UUID): Boolean
+
+    fun setLevelUpNotificationEnabled(playerUuid: UUID, enabled: Boolean)
 
     fun hideProfessionBossBar(playerUuid: UUID)
 

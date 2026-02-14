@@ -19,6 +19,10 @@ data class PlayerProfession(
 
     var bossBarEnabled: Boolean = true,
 
+    var bossBarDisplayMode: BossBarDisplayMode = BossBarDisplayMode.SHORT,
+
+    var levelUpNotificationEnabled: Boolean = true,
+
     var prestigeSkills: MutableSet<String> = mutableSetOf(),
 
     /**

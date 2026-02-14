@@ -23,6 +23,10 @@ class RankMenuCommand(
             return false
         }
 
+        if (args.isNotEmpty() && args[0].equals("skill", ignoreCase = true)) {
+            return rankCommand.openSkillTreeDirect(sender)
+        }
+
         return rankCommand.openRankMenu(sender)
     }
 }
