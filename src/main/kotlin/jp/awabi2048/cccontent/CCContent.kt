@@ -201,6 +201,7 @@ class CCContent : JavaPlugin(), Listener {
 
             // チュートリアルランク タスクシステムの初期化
             val (taskLoader, taskChecker) = initializeTutorialTaskSystem(rankManager, storage, ignoreBlockStore)
+            rankCommand.setTutorialTaskSystem(taskLoader, taskChecker)
 
             // プレイ時間トラッカータスクを起動（1分ごとに更新）
             if (taskLoader != null && taskChecker != null) {

@@ -10,6 +10,7 @@ class TutorialTaskLoader {
     
     /** ロードされた要件キャッシュ */
     private val requirementCache: MutableMap<String, TaskRequirement> = mutableMapOf()
+    private val iconCache: MutableMap<String, String> = mutableMapOf()
     
     /**
      * YAML ファイルからタスク要件を読み込む
@@ -21,31 +22,36 @@ class TutorialTaskLoader {
         }
         
         try {
+            clearCache()
             val config = YamlConfiguration.loadConfiguration(file)
             val tutorialRanksSection = config.getConfigurationSection("tutorial_ranks") ?: return
             
             for (rankId in tutorialRanksSection.getKeys(false)) {
                 val rankSection = tutorialRanksSection.getConfigurationSection(rankId) ?: continue
-                val requirementsSection = rankSection.getConfigurationSection("requirements") ?: continue
+                val requirementsSection = rankSection.getConfigurationSection("requirements")
+                val iconName = rankSection.getString("icon")
                 
                 val requirement = TaskRequirement(
-                    playTimeMin = requirementsSection.getInt("play_time_min", 0),
-                    mobKills = requirementsSection.getConfigurationSection("kill_mobs")?.let { section ->
+                    playTimeMin = requirementsSection?.getInt("play_time_min", 0) ?: 0,
+                    mobKills = requirementsSection?.getConfigurationSection("kill_mobs")?.let { section ->
                         section.getKeys(false).associateWith { section.getInt(it, 0) }
                     } ?: emptyMap(),
-                    blockMines = requirementsSection.getConfigurationSection("mine_blocks")?.let { section ->
+                    blockMines = requirementsSection?.getConfigurationSection("mine_blocks")?.let { section ->
                         section.getKeys(false).associateWith { section.getInt(it, 0) }
                     } ?: emptyMap(),
-                    vanillaExp = requirementsSection.getLong("vanilla_exp", 0L),
-                    itemsRequired = requirementsSection.getConfigurationSection("items")?.let { section ->
+                    vanillaExp = requirementsSection?.getLong("vanilla_exp", 0L) ?: 0L,
+                    itemsRequired = requirementsSection?.getConfigurationSection("items")?.let { section ->
                         section.getKeys(false).associateWith { section.getInt(it, 0) }
                     } ?: emptyMap(),
-                    bossKills = requirementsSection.getConfigurationSection("kill_boss")?.let { section ->
+                    bossKills = requirementsSection?.getConfigurationSection("kill_boss")?.let { section ->
                         section.getKeys(false).associateWith { section.getInt(it, 0) }
                     } ?: emptyMap()
                 )
                 
                 requirementCache[rankId.uppercase()] = requirement
+                if (!iconName.isNullOrBlank()) {
+                    iconCache[rankId.uppercase()] = iconName.trim()
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -60,11 +66,16 @@ class TutorialTaskLoader {
     fun getRequirement(rankId: String): TaskRequirement {
         return requirementCache[rankId.uppercase()] ?: TaskRequirement()
     }
+
+    fun getRankIcon(rankId: String): String? {
+        return iconCache[rankId.uppercase()]
+    }
     
     /**
      * すべてのキャッシュをクリア
      */
     fun clearCache() {
         requirementCache.clear()
+        iconCache.clear()
     }
 }
