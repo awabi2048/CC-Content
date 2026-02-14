@@ -25,6 +25,7 @@ import jp.awabi2048.cccontent.features.rank.localization.LanguageLoader
 import jp.awabi2048.cccontent.features.rank.localization.MessageProviderImpl
 import jp.awabi2048.cccontent.features.rank.command.RankCommand
 import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
+import jp.awabi2048.cccontent.features.rank.job.ProfessionCombatExpListener
 import jp.awabi2048.cccontent.features.rank.job.ProfessionMinerExpListener
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
@@ -217,7 +218,9 @@ class CCContent : JavaPlugin(), Listener {
 
             // 追加のランク系リスナー登録
             val minerListener = ProfessionMinerExpListener(this, rankManager, ignoreBlockStore)
+            val combatExpListener = ProfessionCombatExpListener(rankManager, config)
             server.pluginManager.registerEvents(minerListener, this)
+            server.pluginManager.registerEvents(combatExpListener, this)
             
             // 登録されたスキルツリーをカウント
             val skillTreeCount = Profession.values().count { SkillTreeRegistry.getSkillTree(it) != null }
