@@ -142,7 +142,26 @@ sukima_dungeon:
 rank:
   profession:
     level_up: "§a{profession} leveled up! §eLv.{old} -> Lv.{new} §7(+{gained})"
+    new_unlock: "New unlockable skills available ({count}): {skills} [Click to open skill tree]"
   skill:
+    settings_title: "§8Profession Settings"
+    settings:
+      back: "§c§lBack"
+      back_lore: "§7Return to profession main menu"
+      bossbar:
+        title: "§6Boss bar on EXP gain"
+        current: "§f§l| §7Current {value}"
+        action: "§f§l| §7Click to switch"
+        mode:
+          short: "Show (short)"
+          long: "Show (long)"
+          hidden: "Hidden"
+      level_up:
+        title: "§bLevel-up notification"
+        current: "§f§l| §7Current {value}"
+        action: "§f§l| §7Click to switch"
+        enabled: "Enabled"
+        disabled: "Disabled"
     usage: "§cUsage: /rank skill"
     player_only: "§cThis command can only be executed by a player"
     acquired: "§a{player} acquired skill {skill}"

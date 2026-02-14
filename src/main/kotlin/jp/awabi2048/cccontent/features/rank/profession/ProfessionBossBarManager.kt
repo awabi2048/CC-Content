@@ -16,7 +16,6 @@ class ProfessionBossBarManager(
 ) {
     private val activeBossBars = ConcurrentHashMap<UUID, BossBarData>()
     private val lastExpAmounts = ConcurrentHashMap<UUID, Long>()
-    private val displayDurationTicks = 100L
 
     private data class BossBarData(
         val bossBar: BossBar,
@@ -31,6 +30,10 @@ class ProfessionBossBarManager(
         }
 
         val prof = professionManager.getPlayerProfession(uuid) ?: return
+        val displayMode = prof.bossBarDisplayMode
+        if (!displayMode.visible) {
+            return
+        }
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return
         
         val currentLevel = skillTree.calculateLevelByExp(prof.currentExp)
@@ -86,7 +89,7 @@ class ProfessionBossBarManager(
 
         val taskId = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             hideBossBar(uuid)
-        }, displayDurationTicks).taskId
+        }, displayMode.durationTicks).taskId
 
         activeBossBars[uuid] = BossBarData(bossBar, taskId)
         lastExpAmounts[uuid] = currentExp

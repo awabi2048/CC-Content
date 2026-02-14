@@ -93,6 +93,14 @@ interface ProfessionManager {
 
     fun setBossBarEnabled(playerUuid: UUID, enabled: Boolean)
 
+    fun getBossBarDisplayMode(playerUuid: UUID): BossBarDisplayMode
+
+    fun setBossBarDisplayMode(playerUuid: UUID, mode: BossBarDisplayMode)
+
+    fun isLevelUpNotificationEnabled(playerUuid: UUID): Boolean
+
+    fun setLevelUpNotificationEnabled(playerUuid: UUID, enabled: Boolean)
+
     /**
      * プレイヤーの現在のプレステージレベルを取得
      * @param playerUuid プレイヤーのUUID

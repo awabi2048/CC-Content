@@ -442,7 +442,26 @@ gui:
     - §e§nクリックで開く
     settings_button: §7設定
     settings_button_lore:
-    - §c現在準備中です
+    - §7各種オプションを変更します
+    - §e§nクリックで開く
+    settings_title: §8職業設定
+    settings:
+      back: §c§l戻る
+      back_lore: §7職業メインメニューに戻ります
+      bossbar:
+        title: §6経験値獲得時のボスバー表示
+        current: '§f§l| §7現在 {value}'
+        action: §f§l| §7クリックで切り替え
+        mode:
+          short: 表示する（短め）
+          long: 表示する（長め）
+          hidden: 表示しない
+      level_up:
+        title: §bレベルアップ通知
+        current: '§f§l| §7現在 {value}'
+        action: §f§l| §7クリックで切り替え
+        enabled: 送信する
+        disabled: 送信しない
     hint_button: §7職業のヒント
     hint_button_lore:
     - §c現在準備中です
@@ -713,6 +732,7 @@ gui_buttons:
 rank:
   profession:
     level_up: §a{profession} レベルアップ！ §eLv.{old} → Lv.{new} §7(+{gained})
+    new_unlock: '新しく解放可能なスキルがあります（{count}件）: {skills} [クリックでスキルツリーへ]'
     prestige:
       executed: §d§l【プレステージ】§r§d{profession} のプレステージレベル {level} を達成しました！
   skill:

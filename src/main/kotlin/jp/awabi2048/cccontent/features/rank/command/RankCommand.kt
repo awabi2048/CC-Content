@@ -10,6 +10,7 @@ import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.ProfessionType
 import jp.awabi2048.cccontent.features.rank.profession.SkillNode
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
+import jp.awabi2048.cccontent.features.rank.profession.BossBarDisplayMode
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
 import jp.awabi2048.cccontent.features.rank.gui.ConfirmationDialog
 import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillManager
@@ -931,8 +932,12 @@ class RankCommand(
         inventory.setItem(MAIN_MENU_HINT_SLOT, hintItem)
 
         // モード切替ボタン (スロット38)
-        val modeSwitchItem = ActiveSkillManager.createModeSwitchButton(viewer)
-        inventory.setItem(MAIN_MENU_MODE_SWITCH_SLOT, modeSwitchItem)
+        if (ActiveSkillIdentifier.hasAnyToggleableSkill(viewer)) {
+            val modeSwitchItem = ActiveSkillManager.createModeSwitchButton(viewer)
+            inventory.setItem(MAIN_MENU_MODE_SWITCH_SLOT, modeSwitchItem)
+        } else {
+            inventory.setItem(MAIN_MENU_MODE_SWITCH_SLOT, basePane)
+        }
     }
 
     /**
@@ -968,6 +973,10 @@ class RankCommand(
     private fun calculateRequiredExp(profession: Profession, currentLevel: Int): Long {
         val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return 100L
         return skillTree.getRequiredExpForLevel(currentLevel)
+    }
+
+    fun openSkillTreeDirect(viewer: Player): Boolean {
+        return openSkillTreeGui(viewer)
     }
 
     private fun openSkillTreeGui(viewer: Player): Boolean {
@@ -1023,6 +1032,82 @@ class RankCommand(
         renderSkillTreeGui(inventory, skillTree, state)
         viewer.openInventory(inventory)
         return true
+    }
+
+    private fun openProfessionSettingsMenu(viewer: Player): Boolean {
+        val playerProfession = rankManager.getPlayerProfession(viewer.uniqueId) ?: return false
+        val holder = ProfessionSettingsGuiHolder()
+        val inventory = Bukkit.createInventory(
+            holder,
+            27,
+            messageProvider.getMessage("gui.skill.settings_title")
+        )
+        holder.backingInventory = inventory
+        renderProfessionSettingsMenu(inventory, playerProfession)
+        viewer.openInventory(inventory)
+        viewer.playSound(viewer.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
+        return true
+    }
+
+    private fun renderProfessionSettingsMenu(
+        inventory: Inventory,
+        playerProfession: jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
+    ) {
+        val headerFooterPane = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
+        val basePane = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
+
+        for (slot in 0 until inventory.size) {
+            inventory.setItem(slot, basePane)
+        }
+        for (slot in 0..8) {
+            inventory.setItem(slot, headerFooterPane)
+        }
+        for (slot in 18..26) {
+            inventory.setItem(slot, headerFooterPane)
+        }
+
+        val bossBarMode = rankManager.getProfessionBossBarDisplayMode(playerProfession.playerUuid)
+        val bossBarValueColor = when (bossBarMode) {
+            BossBarDisplayMode.LONG -> "§a"
+            BossBarDisplayMode.SHORT -> "§e"
+            BossBarDisplayMode.HIDDEN -> "§c"
+        }
+        val bossBarItem = createGuiItem(
+            Material.CLOCK,
+            toComponent(messageProvider.getMessage("gui.skill.settings.bossbar.title")),
+            listOf(
+                toComponent(BAR),
+                toComponent("§f§l| §7現在 $bossBarValueColor${bossBarMode.displayName}"),
+                toComponent(messageProvider.getMessage("gui.skill.settings.bossbar.action")),
+                toComponent(BAR)
+            )
+        )
+        inventory.setItem(SETTINGS_MENU_BOSSBAR_SLOT, bossBarItem)
+
+        val levelUpEnabled = rankManager.isLevelUpNotificationEnabled(playerProfession.playerUuid)
+        val levelUpValue = if (levelUpEnabled) {
+            "§a${messageProvider.getMessage("gui.skill.settings.level_up.enabled")}"
+        } else {
+            "§c${messageProvider.getMessage("gui.skill.settings.level_up.disabled")}"
+        }
+        val levelUpItem = createGuiItem(
+            Material.BELL,
+            toComponent(messageProvider.getMessage("gui.skill.settings.level_up.title")),
+            listOf(
+                toComponent(BAR),
+                toComponent("§f§l| §7現在 $levelUpValue"),
+                toComponent(messageProvider.getMessage("gui.skill.settings.level_up.action")),
+                toComponent(BAR)
+            )
+        )
+        inventory.setItem(SETTINGS_MENU_LEVELUP_NOTIFY_SLOT, levelUpItem)
+
+        val backItem = createGuiItem(
+            Material.REDSTONE,
+            toComponent("§c戻る"),
+            emptyList()
+        )
+        inventory.setItem(SETTINGS_MENU_BACK_SLOT, backItem)
     }
 
     private fun renderSkillTreeGui(inventory: Inventory, skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree, state: SkillTreeGuiState) {
@@ -2628,7 +2713,7 @@ class RankCommand(
             }
             MAIN_MENU_MODE_SWITCH_SLOT -> {
                 // 能動スキルがない場合は処理しない
-                if (!ActiveSkillIdentifier.hasAnyActiveSkill(player)) {
+                if (!ActiveSkillIdentifier.hasAnyToggleableSkill(player)) {
                     player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
                     return
                 }
@@ -2651,10 +2736,57 @@ class RankCommand(
                     renderProfessionMainMenu(holder.backingInventory, player, profession)
                 }
             }
-            MAIN_MENU_SETTINGS_SLOT, MAIN_MENU_PLAYER_INFO_SLOT, MAIN_MENU_HINT_SLOT -> {
-                // モック実装 - クリック不可（何もしない）
+            MAIN_MENU_SETTINGS_SLOT -> {
+                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                openProfessionSettingsMenu(player)
+            }
+            MAIN_MENU_PLAYER_INFO_SLOT, MAIN_MENU_HINT_SLOT -> {
             }
         }
+    }
+
+    @EventHandler
+    fun onProfessionSettingsMenuClick(event: InventoryClickEvent) {
+        val holder = event.view.topInventory.holder as? ProfessionSettingsGuiHolder ?: return
+        event.isCancelled = true
+
+        val clickedSlot = event.rawSlot
+        if (clickedSlot !in 0 until event.view.topInventory.size) {
+            return
+        }
+
+        val player = event.whoClicked as? Player ?: return
+        val playerProfession = rankManager.getPlayerProfession(player.uniqueId) ?: return
+
+        when (clickedSlot) {
+            SETTINGS_MENU_BOSSBAR_SLOT -> {
+                val currentMode = rankManager.getProfessionBossBarDisplayMode(player.uniqueId)
+                val nextMode = currentMode.next()
+                rankManager.setProfessionBossBarDisplayMode(player.uniqueId, nextMode)
+                rankManager.savePlayerProfession(player.uniqueId)
+                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                renderProfessionSettingsMenu(holder.backingInventory, playerProfession)
+            }
+            SETTINGS_MENU_LEVELUP_NOTIFY_SLOT -> {
+                val current = rankManager.isLevelUpNotificationEnabled(player.uniqueId)
+                rankManager.setLevelUpNotificationEnabled(player.uniqueId, !current)
+                rankManager.savePlayerProfession(player.uniqueId)
+                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                renderProfessionSettingsMenu(holder.backingInventory, playerProfession)
+            }
+            SETTINGS_MENU_BACK_SLOT -> {
+                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.0f)
+                openProfessionMainMenu(player)
+            }
+        }
+    }
+
+    @EventHandler
+    fun onProfessionSettingsMenuDrag(event: InventoryDragEvent) {
+        if (event.view.topInventory.holder !is ProfessionSettingsGuiHolder) {
+            return
+        }
+        event.isCancelled = true
     }
 
     private fun openPrestigeConfirmDialogFirst(player: Player) {
@@ -2980,6 +3112,12 @@ class RankCommand(
         override fun getInventory(): Inventory = backingInventory
     }
 
+    private class ProfessionSettingsGuiHolder : InventoryHolder {
+        lateinit var backingInventory: Inventory
+
+        override fun getInventory(): Inventory = backingInventory
+    }
+
     private enum class SkillTreeLane {
         TOP,
         CENTER,
@@ -3037,6 +3175,10 @@ class RankCommand(
         private const val MAIN_MENU_PLAYER_INFO_SLOT = 40
         private const val MAIN_MENU_MODE_SWITCH_SLOT = 38
         private const val MAIN_MENU_HINT_SLOT = 42
+
+        private const val SETTINGS_MENU_BOSSBAR_SLOT = 10
+        private const val SETTINGS_MENU_LEVELUP_NOTIFY_SLOT = 11
+        private const val SETTINGS_MENU_BACK_SLOT = 18
 
         private const val TUTORIAL_MENU_PAGE_FIRST = 1
         private const val TUTORIAL_MENU_PAGE_SECOND = 2

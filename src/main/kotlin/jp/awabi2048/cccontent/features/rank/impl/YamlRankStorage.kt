@@ -5,6 +5,7 @@ import jp.awabi2048.cccontent.features.rank.tutorial.PlayerTutorialRank
 import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
 import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
 import jp.awabi2048.cccontent.features.rank.profession.Profession
+import jp.awabi2048.cccontent.features.rank.profession.BossBarDisplayMode
 import jp.awabi2048.cccontent.features.rank.skill.SkillSwitchMode
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
@@ -215,6 +216,8 @@ class YamlRankStorage(
         professionSection.set("currentExp", profession.currentExp)
         professionSection.set("lastUpdated", profession.lastUpdated)
         professionSection.set("bossBarEnabled", profession.bossBarEnabled)
+        professionSection.set("bossBarDisplayMode", profession.bossBarDisplayMode.id)
+        professionSection.set("levelUpNotificationEnabled", profession.levelUpNotificationEnabled)
         professionSection.set("activeSkillId", profession.activeSkillId)
         professionSection.set("skillSwitchMode", profession.skillSwitchMode.id)
 
@@ -247,6 +250,14 @@ class YamlRankStorage(
             val currentExp = professionSection.getLong("currentExp", 0L)
             val lastUpdated = professionSection.getLong("lastUpdated", System.currentTimeMillis())
             val bossBarEnabled = professionSection.getBoolean("bossBarEnabled", true)
+            val bossBarDisplayModeId = professionSection.getString("bossBarDisplayMode")
+            val bossBarDisplayMode = when {
+                bossBarDisplayModeId != null -> BossBarDisplayMode.fromId(bossBarDisplayModeId) ?: BossBarDisplayMode.SHORT
+                bossBarEnabled -> BossBarDisplayMode.SHORT
+                else -> BossBarDisplayMode.HIDDEN
+            }
+            val levelUpNotificationEnabled = professionSection.getBoolean("levelUpNotificationEnabled", true)
+            val effectiveBossBarEnabled = bossBarDisplayMode.visible
 
             // 後方互換性：既存データにフィールドがない場合はデフォルト値を使用
             val activeSkillId = professionSection.getString("activeSkillId")
@@ -265,7 +276,9 @@ class YamlRankStorage(
                 acquiredSkills,
                 currentExp,
                 lastUpdated,
-                bossBarEnabled,
+                effectiveBossBarEnabled,
+                bossBarDisplayMode,
+                levelUpNotificationEnabled,
                 prestigeSkills,
                 activeSkillId,
                 skillSwitchMode,

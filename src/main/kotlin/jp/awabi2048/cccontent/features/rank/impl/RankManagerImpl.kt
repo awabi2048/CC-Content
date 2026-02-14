@@ -7,6 +7,7 @@ import jp.awabi2048.cccontent.features.rank.tutorial.PlayerTutorialRank
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
 import jp.awabi2048.cccontent.features.rank.profession.ProfessionBossBarManager
+import jp.awabi2048.cccontent.features.rank.profession.BossBarDisplayMode
 import org.bukkit.Bukkit
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
@@ -138,6 +139,22 @@ class RankManagerImpl(
 
     override fun setProfessionBossBarEnabled(playerUuid: UUID, enabled: Boolean) {
         getProfessionManager().setBossBarEnabled(playerUuid, enabled)
+    }
+
+    override fun getProfessionBossBarDisplayMode(playerUuid: UUID): BossBarDisplayMode {
+        return getProfessionManager().getBossBarDisplayMode(playerUuid)
+    }
+
+    override fun setProfessionBossBarDisplayMode(playerUuid: UUID, mode: BossBarDisplayMode) {
+        getProfessionManager().setBossBarDisplayMode(playerUuid, mode)
+    }
+
+    override fun isLevelUpNotificationEnabled(playerUuid: UUID): Boolean {
+        return getProfessionManager().isLevelUpNotificationEnabled(playerUuid)
+    }
+
+    override fun setLevelUpNotificationEnabled(playerUuid: UUID, enabled: Boolean) {
+        getProfessionManager().setLevelUpNotificationEnabled(playerUuid, enabled)
     }
 
     override fun hideProfessionBossBar(playerUuid: UUID) {
