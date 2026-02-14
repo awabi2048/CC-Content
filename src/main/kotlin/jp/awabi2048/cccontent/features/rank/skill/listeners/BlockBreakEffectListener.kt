@@ -8,6 +8,9 @@ import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectRegistry
 import jp.awabi2048.cccontent.features.rank.skill.handlers.BlastMineHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.BreakSpeedBoostHandler
+import jp.awabi2048.cccontent.features.rank.skill.handlers.FarmerAreaHarvestingHandler
+import jp.awabi2048.cccontent.features.rank.skill.handlers.FarmerAutoReplantingHandler
+import jp.awabi2048.cccontent.features.rank.skill.handlers.FarmerCropSupport
 import jp.awabi2048.cccontent.features.rank.skill.handlers.UnlockBatchBreakHandler
 import jp.awabi2048.cccontent.CCContent
 import org.bukkit.enchantments.Enchantment
@@ -85,6 +88,25 @@ class BlockBreakEffectListener(
             }
 
             if (!debugApplied && compiledEffects != null) {
+                if (compiledEffects.profession == jp.awabi2048.cccontent.features.rank.profession.Profession.FARMER
+                    && FarmerCropSupport.isHoe(event.player.inventory.itemInMainHand.type)
+                ) {
+                    val areaHarvestEntry = SkillEffectEngine.getCachedEffectForBlock(
+                        playerUuid,
+                        FarmerAreaHarvestingHandler.EFFECT_TYPE,
+                        event.block.type.name
+                    )
+                    if (areaHarvestEntry != null && canTriggerOnAutoBreak(areaHarvestEntry.effect.type)) {
+                        SkillEffectEngine.applyEffect(
+                            event.player,
+                            compiledEffects.profession,
+                            areaHarvestEntry.skillId,
+                            areaHarvestEntry.effect,
+                            event
+                        )
+                    }
+                }
+
                 val blastMineEntry = SkillEffectEngine.getCachedEffectForBlock(
                     playerUuid,
                     BlastMineHandler.EFFECT_TYPE,
@@ -142,9 +164,18 @@ class BlockBreakEffectListener(
             }
         }
 
-        val replaceLootEntry = SkillEffectEngine.getCachedEffectForBlock(event.player.uniqueId, "collect.replace_loot_table", blockType)
+        val replaceLootEntry = SkillEffectEngine.getCachedEffectForBlock(event.player.uniqueId, "general.replace_loot_table", blockType)
         if (replaceLootEntry != null) {
             SkillEffectEngine.applyEffect(event.player, profession, replaceLootEntry.skillId, replaceLootEntry.effect, event)
+        }
+
+        val farmerReplantEntry = SkillEffectEngine.getCachedEffectForBlock(
+            event.player.uniqueId,
+            FarmerAutoReplantingHandler.EFFECT_TYPE,
+            blockType
+        )
+        if (farmerReplantEntry != null) {
+            SkillEffectEngine.applyEffect(event.player, profession, farmerReplantEntry.skillId, farmerReplantEntry.effect, event)
         }
 
         val replantEntry = SkillEffectEngine.getCachedEffectForBlock(event.player.uniqueId, "lumberjack.replant", blockType)

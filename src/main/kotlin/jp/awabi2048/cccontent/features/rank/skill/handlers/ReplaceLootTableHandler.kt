@@ -7,7 +7,7 @@ import jp.awabi2048.cccontent.features.rank.skill.SkillEffectHandler
 
 class ReplaceLootTableHandler : SkillEffectHandler {
     companion object {
-        const val EFFECT_TYPE = "collect.replace_loot_table"
+        const val EFFECT_TYPE = "general.replace_loot_table"
     }
 
     override fun getEffectType(): String = EFFECT_TYPE
@@ -61,7 +61,7 @@ class ReplaceLootTableHandler : SkillEffectHandler {
     }
 
     override fun supportsProfession(professionId: String): Boolean {
-        return professionId in listOf("lumberjack", "miner")
+        return true
     }
 
     override fun validateParams(skillEffect: SkillEffect): Boolean {

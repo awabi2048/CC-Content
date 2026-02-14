@@ -263,6 +263,9 @@ class CCContent : JavaPlugin(), Listener {
             SkillEffectRegistry.register(blastMineHandler)
             SkillEffectRegistry.register(WindGustHandler())
             SkillEffectRegistry.register(ReplantHandler())
+            SkillEffectRegistry.register(FarmerAreaTillingHandler())
+            SkillEffectRegistry.register(FarmerAreaHarvestingHandler(this, rankManager, ignoreBlockStore))
+            SkillEffectRegistry.register(FarmerAutoReplantingHandler())
 
             SkillEffectRegistry.register(UnlockSystemHandler())
             SkillEffectRegistry.register(UnlockRecipeHandler())
@@ -278,6 +281,7 @@ class CCContent : JavaPlugin(), Listener {
 
             server.pluginManager.registerEvents(SkillEffectCacheListener(rankManager, this), this)
             server.pluginManager.registerEvents(BlockBreakEffectListener(ignoreBlockStore), this)
+            server.pluginManager.registerEvents(FarmerInteractEffectListener(), this)
             server.pluginManager.registerEvents(BatchBreakPreviewListener(), this)
             server.pluginManager.registerEvents(ActiveSkillTriggerListener(), this)
             server.pluginManager.registerEvents(ActiveSkillKeyListener(), this)

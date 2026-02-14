@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 class WindGustHandler : SkillEffectHandler {
     companion object {
-        const val EFFECT_TYPE = "collect.wind_gust"
+        const val EFFECT_TYPE = "lumberjack.wind_gust"
         
         private const val MAX_ANGLE_DEGREES = 30.0
         

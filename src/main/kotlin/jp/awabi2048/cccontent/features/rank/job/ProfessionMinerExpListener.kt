@@ -4,6 +4,8 @@ import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import org.bukkit.Material.BREWING_STAND
 import org.bukkit.Material
+import org.bukkit.block.Block
+import org.bukkit.block.data.Ageable
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.event.block.Action
 import org.bukkit.event.EventHandler
@@ -21,8 +23,21 @@ class ProfessionMinerExpListener(
     private val rankManager: RankManager,
     private val ignoreBlockStore: IgnoreBlockStore
 ) : Listener {
+    companion object {
+        private val FARMER_PLACED_CHECK_MATERIALS: Set<Material> = setOf(
+            Material.MELON,
+            Material.PUMPKIN,
+            Material.SUGAR_CANE,
+            Material.CACTUS,
+            Material.BAMBOO,
+            Material.KELP,
+            Material.KELP_PLANT
+        )
+    }
+
     private val minerExpMap: Map<Material, Long>
     private val lumberjackExpMap: Map<Material, Long>
+    private val farmerExpMap: Map<Material, Long>
     private val brewerMockExp: Long
     private val brewerCooldownMillis = 1000L
     private val brewerLastGainAt: MutableMap<UUID, Long> = mutableMapOf()
@@ -35,9 +50,10 @@ class ProfessionMinerExpListener(
         if (!expFile.exists()) {
             plugin.logger.warning("job/exp.yml が見つからないため、職業経験値付与を無効化します")
         }
-
+        
         minerExpMap = loadBlockExpMap(config, "miner")
         lumberjackExpMap = loadBlockExpMap(config, "lumberjack")
+        farmerExpMap = loadBlockExpMap(config, "farmer")
         brewerMockExp = config.getLong("brewer.mock_exp", 0L)
     }
 
@@ -61,6 +77,9 @@ class ProfessionMinerExpListener(
             }
             Profession.LUMBERJACK -> {
                 addBreakExpIfEligible(uuid, event.block, lumberjackExpMap)
+            }
+            Profession.FARMER -> {
+                addFarmerBreakExpIfEligible(uuid, event.block)
             }
             else -> {
                 return
@@ -120,6 +139,38 @@ class ProfessionMinerExpListener(
         // 経験値付与後、破壊した位置を記録（同じ位置での再破壊による経験値獲得を防止）
         ignoreBlockStore.add(block.world.uid, packedPosition)
         rankManager.addProfessionExp(uuid, expAmount)
+    }
+
+    private fun addFarmerBreakExpIfEligible(uuid: UUID, block: Block) {
+        val expAmount = farmerExpMap[block.type] ?: return
+
+        if (expAmount <= 0L) {
+            return
+        }
+
+        if (requiresPlacedCheckForFarmer(block.type)) {
+            val packedPosition = BlockPositionCodec.pack(block.x, block.y, block.z)
+            if (ignoreBlockStore.contains(block.world.uid, packedPosition)) {
+                return
+            }
+            rankManager.addProfessionExp(uuid, expAmount)
+            return
+        }
+
+        if (!isFullyGrownAgeable(block)) {
+            return
+        }
+
+        rankManager.addProfessionExp(uuid, expAmount)
+    }
+
+    private fun requiresPlacedCheckForFarmer(type: Material): Boolean {
+        return type in FARMER_PLACED_CHECK_MATERIALS
+    }
+
+    private fun isFullyGrownAgeable(block: Block): Boolean {
+        val ageable = block.blockData as? Ageable ?: return false
+        return ageable.age >= ageable.maximumAge
     }
 
     private fun loadBlockExpMap(config: YamlConfiguration, path: String): Map<Material, Long> {

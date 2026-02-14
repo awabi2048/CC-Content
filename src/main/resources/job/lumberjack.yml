@@ -83,9 +83,8 @@ skills:
   wind_gust:
     requiredLevel: 40
     icon: "WIND_CHARGE"
-    activationToggleable: false  # 手動発動スキルのため常時ON
     effect:
-      type: "collect.wind_gust"
+      type: "lumberjack.wind_gust"
       params:
         max_distance: 12
         delay_per_block: 1
@@ -109,7 +108,7 @@ skills:
     children: ["cut_all_3"]
 
   cut_all_3:
-    requiredLevel: 7
+    requiredLevel: 50
     icon: "NETHER_STAR"
     effect:
       type: "collect.unlock_batch_break"

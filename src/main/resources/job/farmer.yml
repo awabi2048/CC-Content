@@ -15,26 +15,46 @@ skills:
   harvest_1:
     requiredLevel: 5
     icon: "STONE_HOE"
+    effect:
+      type: "collect.drop_bonus"
+      combineRule: "add"
+      params:
+        fortune_level: 1
     children: ["area_tilling"]
 
   area_tilling:
     requiredLevel: 10
     icon: "FARMLAND"
+    effect:
+      type: "farmer.area_tilling"
+      params:
+        radius: 2
     children: ["area_harvesting", "auto_replanting"]
 
   area_harvesting:
     requiredLevel: 20
     icon: "DIAMOND_HOE"
+    effect:
+      type: "farmer.area_harvesting"
+      params:
+        radius: 2
     children: ["harvest_2"]
 
   auto_replanting:
     requiredLevel: 20
     icon: "GOLDEN_HOE"
+    effect:
+      type: "farmer.auto_replanting"
     children: ["harvest_2"]
 
   harvest_2:
     requiredLevel: 30
     icon: "WHEAT"
+    effect:
+      type: "collect.drop_bonus"
+      combineRule: "add"
+      params:
+        fortune_level: 1
     children: ["tool", "harvest_3"]
 
   tool:
@@ -45,6 +65,11 @@ skills:
   harvest_3:
     requiredLevel: 35
     icon: "COMPOSTER"
+    effect:
+      type: "collect.drop_bonus"
+      combineRule: "add"
+      params:
+        fortune_level: 1
     children: ["special_loot_table_1"]
 
   special_loot_table_1:
