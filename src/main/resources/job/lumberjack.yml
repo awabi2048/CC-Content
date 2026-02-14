@@ -83,6 +83,7 @@ skills:
   wind_gust:
     requiredLevel: 40
     icon: "WIND_CHARGE"
+    activationToggleable: false  # 手動発動スキルのため常時ON
     effect:
       type: "collect.wind_gust"
       params:

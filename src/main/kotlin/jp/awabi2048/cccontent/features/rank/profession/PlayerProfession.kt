@@ -29,7 +29,13 @@ data class PlayerProfession(
     /**
      * 能動スキルの切替様式
      */
-    var skillSwitchMode: SkillSwitchMode = SkillSwitchMode.MENU_ONLY
+    var skillSwitchMode: SkillSwitchMode = SkillSwitchMode.MENU_ONLY,
+
+    /**
+     * スキルごとの発動ON/OFF状態（skillId -> enabled）
+     * 未設定のスキルはON扱い
+     */
+    var skillActivationStates: MutableMap<String, Boolean> = mutableMapOf()
 ) {
     fun getCurrentLevel(skillTree: SkillTree): Int {
         return skillTree.calculateLevelByExp(currentExp)
@@ -104,5 +110,30 @@ data class PlayerProfession(
         acquiredSkills.clear()
         currentExp = 0L
         lastUpdated = System.currentTimeMillis()
+    }
+
+    /**
+     * スキルの発動状態を取得（未設定はON扱い）
+     */
+    fun isSkillActivationEnabled(skillId: String): Boolean {
+        return skillActivationStates[skillId] ?: true
+    }
+
+    /**
+     * スキルの発動状態を設定
+     */
+    fun setSkillActivationEnabled(skillId: String, enabled: Boolean) {
+        skillActivationStates[skillId] = enabled
+        lastUpdated = System.currentTimeMillis()
+    }
+
+    /**
+     * スキルの発動状態をトグル（反転）して新しい状態を返す
+     */
+    fun toggleSkillActivation(skillId: String): Boolean {
+        val currentState = isSkillActivationEnabled(skillId)
+        val newState = !currentState
+        setSkillActivationEnabled(skillId, newState)
+        return newState
     }
 }

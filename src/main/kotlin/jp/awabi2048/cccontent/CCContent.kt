@@ -524,7 +524,8 @@ class CCContent : JavaPlugin(), Listener {
                             player.uniqueId,
                             playerProfession.acquiredSkills,
                             playerProfession.profession,
-                            playerProfession.prestigeSkills
+                            playerProfession.prestigeSkills,
+                            playerProfession.skillActivationStates
                         )
                     }
                 }

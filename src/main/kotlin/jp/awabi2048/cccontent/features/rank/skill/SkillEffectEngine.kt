@@ -38,7 +38,13 @@ object SkillEffectEngine {
         "lumberjack.replant"
     )
 
-    fun rebuildCache(playerUuid: UUID, acquiredSkills: Set<String>, profession: Profession, prestigeSkills: Set<String> = emptySet()) {
+    fun rebuildCache(
+        playerUuid: UUID,
+        acquiredSkills: Set<String>,
+        profession: Profession,
+        prestigeSkills: Set<String> = emptySet(),
+        skillActivationStates: Map<String, Boolean> = emptyMap()
+    ) {
         val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return
         val mutableByType = mutableMapOf<String, MutableList<SkillEffectEntry>>()
 
@@ -56,6 +62,20 @@ object SkillEffectEngine {
             }
             if (!handler.isEnabled() || !handler.supportsProfession(profession.id)) {
                 continue
+            }
+
+            // スキル発動状態をチェック（OFFの場合はキャッシュに含めない）
+            // ただし、手動発動スキル（MANUAL_SHIFT_RIGHT_CLICK）または切替不可スキルは常にON扱い
+            val isManualTrigger = handler.isActiveSkill() && handler.getTriggerType() == ActiveTriggerType.MANUAL_SHIFT_RIGHT_CLICK
+            val isToggleable = skill.activationToggleable && !ActiveSkillManager.isSkillForceAlwaysOn(skillId)
+            val isEnabled = when {
+                isManualTrigger -> true // 手動発動スキルは常にON
+                !isToggleable -> true // 切替不可スキルは常にON
+                else -> skillActivationStates[skillId] ?: true // 未設定はON扱い
+            }
+
+            if (!isEnabled) {
+                continue // OFFのスキルはキャッシュに含めない
             }
 
             val depth = SkillDepthCalculator.calculateDepth(skillId, skillTree)
@@ -76,6 +96,19 @@ object SkillEffectEngine {
 
                 val handler = SkillEffectRegistry.getHandler(effect.type) ?: continue
                 if (!handler.isEnabled() || !handler.supportsProfession(profession.id)) continue
+
+                // プレステージスキルも発動状態をチェック
+                val isManualTrigger = handler.isActiveSkill() && handler.getTriggerType() == ActiveTriggerType.MANUAL_SHIFT_RIGHT_CLICK
+                val isToggleable = skill.activationToggleable && !ActiveSkillManager.isSkillForceAlwaysOn(skillId)
+                val isEnabled = when {
+                    isManualTrigger -> true
+                    !isToggleable -> true
+                    else -> skillActivationStates[skillId] ?: true
+                }
+
+                if (!isEnabled) {
+                    continue
+                }
 
                 val depth = SkillDepthCalculator.calculateDepth(skillId, skillTree)
                 // プレステージスキルは通常スキルより強い効果を持つ（depth + 10で区別）

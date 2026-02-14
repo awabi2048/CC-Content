@@ -31,7 +31,10 @@ data class SkillNode(
     val effect: SkillEffect? = null,
 
     /** 分岐が排他的かどうか（true=片方のみ選択可能、false=両方選択可能） */
-    val exclusiveBranch: Boolean = true
+    val exclusiveBranch: Boolean = true,
+
+    /** 発動切替が可能かどうか（true=Shift右クリックでON/OFF切替可能、false=常時ON） */
+    val activationToggleable: Boolean = true
 ) {
     /**
      * このスキルが取得可能かチェック

@@ -71,7 +71,6 @@ class UnlockBatchBreakHandler(
         private const val MIN_DELAY_TICKS = 0L
         private const val MAX_DELAY_TICKS = 40L
         private const val MAX_VISUALIZE_BLOCKS = 128
-        private const val DEFAULT_DOUBLE_CLICK_WINDOW_MILLIS = 350L
         private const val DEFAULT_PREVIEW_TTL_TICKS = 12L
         private const val PREVIEW_COOLDOWN_MILLIS = 120L
 
@@ -82,8 +81,6 @@ class UnlockBatchBreakHandler(
         private val activeIndicators: MutableMap<UUID, MutableList<BlockDisplay>> = ConcurrentHashMap()
         private val previewClearTasks: MutableMap<UUID, BukkitTask> = ConcurrentHashMap()
         private val internalBreakPlayers: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
-        private val modeToggles: MutableMap<UUID, PlayerModeToggleState> = ConcurrentHashMap()
-        private val lastSneakClicks: MutableMap<UUID, Long> = ConcurrentHashMap()
         private val lastPreviewAt: MutableMap<UUID, Long> = ConcurrentHashMap()
         private val debugOverrides: MutableMap<UUID, MutableMap<BatchBreakMode, DebugOverride>> = ConcurrentHashMap()
         private val lowestBreakPositions: MutableMap<UUID, Block?> = ConcurrentHashMap()
@@ -91,11 +88,6 @@ class UnlockBatchBreakHandler(
         fun previewForPlayer(player: Player, block: Block) {
             activeInstance?.previewOnLeftClick(player, block)
         }
-
-        data class PlayerModeToggleState(
-            var cutAllEnabled: Boolean = true,
-            var mineAllEnabled: Boolean = true
-        )
 
         data class DebugOverride(
             val delayTicks: Int,
@@ -105,39 +97,6 @@ class UnlockBatchBreakHandler(
 
         fun isInternalBreakInProgress(playerUuid: UUID): Boolean {
             return internalBreakPlayers.contains(playerUuid)
-        }
-
-        fun isModeEnabled(playerUuid: UUID, mode: BatchBreakMode): Boolean {
-            val state = modeToggles[playerUuid] ?: PlayerModeToggleState()
-            return when (mode) {
-                BatchBreakMode.CUT_ALL -> state.cutAllEnabled
-                BatchBreakMode.MINE_ALL -> state.mineAllEnabled
-            }
-        }
-
-        fun toggleMode(playerUuid: UUID, mode: BatchBreakMode): Boolean {
-            val state = modeToggles.getOrPut(playerUuid) { PlayerModeToggleState() }
-            return when (mode) {
-                BatchBreakMode.CUT_ALL -> {
-                    state.cutAllEnabled = !state.cutAllEnabled
-                    state.cutAllEnabled
-                }
-                BatchBreakMode.MINE_ALL -> {
-                    state.mineAllEnabled = !state.mineAllEnabled
-                    state.mineAllEnabled
-                }
-            }
-        }
-
-        fun markSneakClickAndCheckDoubleClick(playerUuid: UUID, nowMillis: Long = System.currentTimeMillis()): Boolean {
-            val last = lastSneakClicks[playerUuid]
-            if (last == null || nowMillis - last > DEFAULT_DOUBLE_CLICK_WINDOW_MILLIS) {
-                lastSneakClicks[playerUuid] = nowMillis
-                return false
-            }
-
-            lastSneakClicks.remove(playerUuid)
-            return true
         }
 
         fun canUseMode(playerUuid: UUID, mode: BatchBreakMode): Boolean {
@@ -218,8 +177,6 @@ class UnlockBatchBreakHandler(
                 lowestBreakPositions.remove(playerUuid)
                 ReplantHandler.clearProcessed(playerUuid)
             }
-            modeToggles.clear()
-            lastSneakClicks.clear()
             lastPreviewAt.clear()
             debugOverrides.clear()
         }
@@ -484,9 +441,19 @@ class UnlockBatchBreakHandler(
             return
         }
 
-        if (!canUseMode(playerUuid, options.mode) || !isModeEnabled(playerUuid, options.mode)) {
+        if (!canUseMode(playerUuid, options.mode)) {
             clearIndicators(playerUuid)
             return
+        }
+
+        // skillActivationStates での発動確認（該当effect.typeを持つスキルがOFFの場合はプレビュー非表示）
+        val profession = CCContent.rankManager.getPlayerProfession(playerUuid)
+        if (profession != null) {
+            val activeSkillId = profession.activeSkillId
+            if (activeSkillId != null && !profession.isSkillActivationEnabled(activeSkillId)) {
+                clearIndicators(playerUuid)
+                return
+            }
         }
 
         if (heldMode != options.mode || !isModeTargetMaterial(options.mode, block.type)) {
