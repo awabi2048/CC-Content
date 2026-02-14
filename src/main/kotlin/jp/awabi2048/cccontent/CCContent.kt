@@ -316,14 +316,10 @@ class CCContent : JavaPlugin(), Listener {
             
             // TutorialTaskChecker を作成
             val taskChecker = TutorialTaskCheckerImpl()
-            
-            // タスク設定から reset_existing_players を読み込み
-            val config = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(tutorialTasksFile)
-            val resetExistingPlayers = config.getBoolean("settings.reset_existing_players", false)
-            
+
             // 7つのイベントリスナーを登録
             server.pluginManager.registerEvents(
-                TutorialPlayerJoinListener(rankManager, resetExistingPlayers),
+                TutorialPlayerJoinListener(rankManager),
                 this
             )
             server.pluginManager.registerEvents(

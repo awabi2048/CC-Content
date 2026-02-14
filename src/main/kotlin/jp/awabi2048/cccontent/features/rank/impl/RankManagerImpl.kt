@@ -115,14 +115,7 @@ class RankManagerImpl(
     }
     
     override fun resetProfession(playerUuid: UUID): Boolean {
-        val result = getProfessionManager().resetProfession(playerUuid)
-        if (result) {
-            val tutorial = tutorialManager.getPlayerTutorial(playerUuid)
-            tutorial.currentRank = jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank.VISITOR
-            tutorial.lastUpdated = System.currentTimeMillis()
-            storage.saveTutorialRank(tutorial)
-        }
-        return result
+        return getProfessionManager().resetProfession(playerUuid)
     }
     
     override fun saveData() {

@@ -30,6 +30,7 @@ class PlayTimeTrackerTask(
                 
                 // プレイ時間を1分加算
                 tutorial.taskProgress.playTime += 1
+                tutorial.lastPlayTime = System.currentTimeMillis()
                 
                 // タスク完了判定
                 val requirement = taskLoader.getRequirement(tutorial.currentRank.name)
@@ -57,7 +58,7 @@ class PlayTimeTrackerTask(
         return plugin.server.scheduler.scheduleSyncRepeatingTask(
             plugin,
             this,
-            0L,      // 初回実行までの遅延（tick）
+            1200L,   // 初回実行までの遅延（1分）
             1200L    // 繰り返し間隔（1分 = 1200 tick）
         )
     }

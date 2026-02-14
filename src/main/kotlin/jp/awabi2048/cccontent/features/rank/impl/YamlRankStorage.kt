@@ -9,6 +9,7 @@ import jp.awabi2048.cccontent.features.rank.skill.SkillSwitchMode
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
 import java.util.UUID
+import java.util.logging.Logger
 
 /**
  * YAML形式でランクデータを保存するストレージの実装
@@ -17,6 +18,8 @@ import java.util.UUID
 class YamlRankStorage(
     private val dataDirectory: File
 ) : RankStorage {
+
+    private val logger = Logger.getLogger("CC-Content")
     
     private val playerdataDirectory = File(dataDirectory, "playerdata").apply { mkdirs() }
     
@@ -141,12 +144,12 @@ class YamlRankStorage(
             val config = YamlConfiguration.loadConfiguration(file)
             val tutorialSection = config.getConfigurationSection("rank.tutorial") ?: return null
             
-            val rankName = tutorialSection.getString("currentRank", "NEWBIE") ?: "NEWBIE"
-            val rank = try {
-                TutorialRank.valueOf(rankName)
-            } catch (e: IllegalArgumentException) {
-                TutorialRank.NEWBIE
-            }
+            val rawRankName = tutorialSection.getString("currentRank", "NEWBIE") ?: "NEWBIE"
+            val rank = TutorialRank.entries.firstOrNull { it.name.equals(rawRankName, ignoreCase = true) }
+                ?: run {
+                    logger.warning("[YamlRankStorage] 無効な currentRank '${rawRankName}' を検出したため NEWBIE を使用します: ${playerUuid}")
+                    TutorialRank.NEWBIE
+                }
             
             val lastUpdated = tutorialSection.getLong("lastUpdated", System.currentTimeMillis())
             val lastPlayTime = tutorialSection.getLong("lastPlayTime", System.currentTimeMillis())
