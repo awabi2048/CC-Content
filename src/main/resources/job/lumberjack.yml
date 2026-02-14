@@ -99,6 +99,8 @@ skills:
     requiredLevel: 8
     icon: "WIND_CHARGE"
     effect:
-      type: "collect.wind_gust_mock"
-      params: {}
+      type: "collect.wind_gust"
+      params:
+        max_distance: 8
+        delay_per_block: 2
     children: []
