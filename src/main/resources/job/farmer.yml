@@ -25,16 +25,26 @@ skills:
   area_tilling:
     requiredLevel: 10
     icon: "FARMLAND"
+    effect:
+      type: "farmer.area_tilling"
+      params:
+        radius: 2
     children: ["area_harvesting", "auto_replanting"]
 
   area_harvesting:
     requiredLevel: 20
     icon: "DIAMOND_HOE"
+    effect:
+      type: "farmer.area_harvesting"
+      params:
+        radius: 2
     children: ["harvest_2"]
 
   auto_replanting:
     requiredLevel: 20
     icon: "GOLDEN_HOE"
+    effect:
+      type: "farmer.auto_replanting"
     children: ["harvest_2"]
 
   harvest_2:

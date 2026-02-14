@@ -35,7 +35,10 @@ object SkillEffectEngine {
         "collect.drop_bonus",
         "general.replace_loot_table",
         "collect.unlock_batch_break",
-        "lumberjack.replant"
+        "lumberjack.replant",
+        "farmer.area_tilling",
+        "farmer.area_harvesting",
+        "farmer.auto_replanting"
     )
 
     fun rebuildCache(
