@@ -99,7 +99,8 @@ class PrestigeTokenListener(
                 player.uniqueId,
                 playerProf.acquiredSkills,
                 profession,
-                playerProf.prestigeSkills
+                playerProf.prestigeSkills,
+                playerProf.skillActivationStates
             )
         }
     }

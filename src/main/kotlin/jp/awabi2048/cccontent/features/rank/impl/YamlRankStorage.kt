@@ -215,6 +215,12 @@ class YamlRankStorage(
         professionSection.set("activeSkillId", profession.activeSkillId)
         professionSection.set("skillSwitchMode", profession.skillSwitchMode.id)
 
+        // スキル発動状態を保存
+        professionSection.set("skillActivationStates", null) // 古いデータをクリア
+        profession.skillActivationStates.forEach { (skillId, enabled) ->
+            professionSection.set("skillActivationStates.$skillId", enabled)
+        }
+
         try {
             config.save(file)
         } catch (e: Exception) {
@@ -244,6 +250,12 @@ class YamlRankStorage(
             val skillSwitchModeId = professionSection.getString("skillSwitchMode") ?: SkillSwitchMode.MENU_ONLY.id
             val skillSwitchMode = SkillSwitchMode.fromId(skillSwitchModeId) ?: SkillSwitchMode.MENU_ONLY
 
+            // スキル発動状態を読み込み（未設定時は空Map）
+            val skillActivationStates = mutableMapOf<String, Boolean>()
+            professionSection.getConfigurationSection("skillActivationStates")?.getKeys(false)?.forEach { skillId ->
+                skillActivationStates[skillId] = professionSection.getBoolean("skillActivationStates.$skillId", true)
+            }
+
             PlayerProfession(
                 playerUuid,
                 profession,
@@ -253,8 +265,9 @@ class YamlRankStorage(
                 bossBarEnabled,
                 prestigeSkills,
                 activeSkillId,
-                skillSwitchMode
-            ) as PlayerProfession
+                skillSwitchMode,
+                skillActivationStates
+            )
         } catch (e: Exception) {
             e.printStackTrace()
             null

@@ -25,7 +25,8 @@ class SkillEffectCacheListener(
             event.player.uniqueId,
             playerProf.acquiredSkills,
             event.profession,
-            playerProf.prestigeSkills
+            playerProf.prestigeSkills,
+            playerProf.skillActivationStates
         )
     }
 
@@ -36,7 +37,8 @@ class SkillEffectCacheListener(
             event.player.uniqueId,
             playerProf.acquiredSkills,
             event.newProfession,
-            playerProf.prestigeSkills
+            playerProf.prestigeSkills,
+            playerProf.skillActivationStates
         )
     }
 
@@ -47,7 +49,8 @@ class SkillEffectCacheListener(
             event.player.uniqueId,
             playerProf.acquiredSkills,
             event.profession,
-            playerProf.prestigeSkills
+            playerProf.prestigeSkills,
+            playerProf.skillActivationStates
         )
     }
 
@@ -59,7 +62,8 @@ class SkillEffectCacheListener(
                 event.player.uniqueId,
                 playerProf.acquiredSkills,
                 playerProf.profession,
-                playerProf.prestigeSkills
+                playerProf.prestigeSkills,
+                playerProf.skillActivationStates
             )
         }
     }
@@ -76,7 +80,8 @@ class SkillEffectCacheListener(
             event.player.uniqueId,
             playerProf.acquiredSkills,
             event.profession,
-            playerProf.prestigeSkills
+            playerProf.prestigeSkills,
+            playerProf.skillActivationStates
         )
     }
 
@@ -87,7 +92,8 @@ class SkillEffectCacheListener(
             event.player.uniqueId,
             playerProf.acquiredSkills,
             event.profession,
-            playerProf.prestigeSkills
+            playerProf.prestigeSkills,
+            playerProf.skillActivationStates
         )
     }
 }

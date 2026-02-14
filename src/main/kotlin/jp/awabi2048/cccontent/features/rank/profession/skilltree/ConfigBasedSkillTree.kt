@@ -69,7 +69,8 @@ class ConfigBasedSkillTree(
                         icon = skillSection.getString("icon"),
                         children = skillSection.getStringList("children").distinct(),
                         effect = effect,
-                        exclusiveBranch = skillSection.getBoolean("exclusiveBranch", true)
+                        exclusiveBranch = skillSection.getBoolean("exclusiveBranch", true),
+                        activationToggleable = skillSection.getBoolean("activationToggleable", true)
                     )
 
                     skills[skillId] = skill

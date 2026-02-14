@@ -20,8 +20,8 @@ class ActiveSkillKeyListener : Listener {
         val profession = CCContent.rankManager.getPlayerProfession(player.uniqueId)
             ?: return
 
-        // 能動スキルが1つもない場合は何もしない
-        if (!ActiveSkillIdentifier.hasAnyActiveSkill(player)) {
+        // 切替対象スキルが1つもない場合は何もしない
+        if (!ActiveSkillIdentifier.hasAnyToggleableSkill(player)) {
             return
         }
 

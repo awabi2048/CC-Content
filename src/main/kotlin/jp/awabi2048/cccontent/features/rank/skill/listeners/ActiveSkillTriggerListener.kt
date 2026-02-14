@@ -11,6 +11,7 @@ import jp.awabi2048.cccontent.features.rank.skill.ToolType
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
 import org.bukkit.Material
+import org.bukkit.Sound
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
@@ -38,46 +39,67 @@ class ActiveSkillTriggerListener : Listener {
         val mainHandMaterial = player.inventory.itemInMainHand.type
 
         val playerProfession = CCContent.rankManager.getPlayerProfession(player.uniqueId) ?: return
-        val activeSkills = ActiveSkillIdentifier.getPlayerActiveSkills(playerProfession)
-        if (activeSkills.isEmpty()) {
+
+        // 職業ツールを持っているかチェック
+        if (!isAllowedProfessionTool(mainHandMaterial, playerProfession.profession)) {
             return
         }
 
-        val activeSkillId = ActiveSkillManager.getCurrentActiveSkillId(player) ?: run {
-            val fallbackSkillId = activeSkills.first()
+        // Fキー対象スキルを取得
+        val toggleableSkills = ActiveSkillIdentifier.getToggleableSkillsForFKey(playerProfession)
+        if (toggleableSkills.isEmpty()) {
+            return
+        }
+
+        // 現在選択中のスキルを取得
+        val currentSkillId = ActiveSkillManager.getCurrentActiveSkillId(player) ?: run {
+            val fallbackSkillId = toggleableSkills.first()
             playerProfession.activeSkillId = fallbackSkillId
             CCContent.rankManager.savePlayerProfession(player.uniqueId)
             fallbackSkillId
         }
 
-        if (!isAllowedProfessionTool(mainHandMaterial, playerProfession.profession)) {
-            return
-        }
-
         val skillTree = SkillTreeRegistry.getSkillTree(playerProfession.profession) ?: return
-        val skillEffect = skillTree.getSkill(activeSkillId)?.effect ?: return
+        val skillNode = skillTree.getSkill(currentSkillId) ?: return
+        val skillEffect = skillNode.effect ?: return
+
+        // 対象ツールチェック
         if (!isAllowedBySkillTargetTools(mainHandMaterial, skillEffect)) {
             return
         }
 
         val handler = SkillEffectRegistry.getHandler(skillEffect.type) ?: return
-        if (!handler.isActiveSkill()) {
+
+        // 手動発動スキル（MANUAL_SHIFT_RIGHT_CLICK）の場合は発動処理
+        if (handler.isActiveSkill() && handler.getTriggerType() == ActiveTriggerType.MANUAL_SHIFT_RIGHT_CLICK) {
+            val applied = SkillEffectEngine.applyEffect(
+                player,
+                playerProfession.profession,
+                currentSkillId,
+                skillEffect,
+                event
+            )
+            if (applied) {
+                event.isCancelled = true
+            }
             return
         }
 
-        if (handler.getTriggerType() != ActiveTriggerType.MANUAL_SHIFT_RIGHT_CLICK) {
+        // それ以外のスキルはON/OFF切替
+        if (!ActiveSkillManager.isSkillToggleable(player, currentSkillId)) {
             return
         }
 
-        val applied = SkillEffectEngine.applyEffect(
-            player,
-            playerProfession.profession,
-            activeSkillId,
-            skillEffect,
-            event
-        )
-        if (applied) {
+        val newState = ActiveSkillManager.toggleCurrentSkillActivation(player)
+        if (newState != null) {
             event.isCancelled = true
+            // 効果音を再生
+            player.playSound(
+                player.location,
+                Sound.UI_BUTTON_CLICK,
+                0.8f,
+                if (newState) 1.2f else 0.8f
+            )
         }
     }
 
