@@ -262,6 +262,7 @@ class CCContent : JavaPlugin(), Listener {
             SkillEffectRegistry.register(ReplaceLootTableHandler())
             SkillEffectRegistry.register(blastMineHandler)
             SkillEffectRegistry.register(WindGustHandler())
+            SkillEffectRegistry.register(ReplantHandler())
 
             SkillEffectRegistry.register(UnlockSystemHandler())
             SkillEffectRegistry.register(UnlockRecipeHandler())

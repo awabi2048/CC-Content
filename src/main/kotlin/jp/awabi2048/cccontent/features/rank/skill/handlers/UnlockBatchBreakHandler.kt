@@ -86,6 +86,7 @@ class UnlockBatchBreakHandler(
         private val lastSneakClicks: MutableMap<UUID, Long> = ConcurrentHashMap()
         private val lastPreviewAt: MutableMap<UUID, Long> = ConcurrentHashMap()
         private val debugOverrides: MutableMap<UUID, MutableMap<BatchBreakMode, DebugOverride>> = ConcurrentHashMap()
+        private val lowestBreakPositions: MutableMap<UUID, Block?> = ConcurrentHashMap()
 
         fun previewForPlayer(player: Player, block: Block) {
             activeInstance?.previewOnLeftClick(player, block)
@@ -199,6 +200,12 @@ class UnlockBatchBreakHandler(
             clearIndicators(playerUuid)
             previewClearTasks.remove(playerUuid)?.cancel()
             internalBreakPlayers.remove(playerUuid)
+            lowestBreakPositions.remove(playerUuid)
+            ReplantHandler.clearProcessed(playerUuid)
+        }
+
+        fun getLowestBreakPosition(playerUuid: UUID): Block? {
+            return lowestBreakPositions[playerUuid]
         }
 
         fun stopAll() {
@@ -208,6 +215,8 @@ class UnlockBatchBreakHandler(
                 clearIndicators(playerUuid)
                 previewClearTasks.remove(playerUuid)?.cancel()
                 internalBreakPlayers.remove(playerUuid)
+                lowestBreakPositions.remove(playerUuid)
+                ReplantHandler.clearProcessed(playerUuid)
             }
             modeToggles.clear()
             lastSneakClicks.clear()
@@ -330,7 +339,10 @@ class UnlockBatchBreakHandler(
         private fun isModeTargetMaterial(mode: BatchBreakMode, material: Material): Boolean {
             return when (mode) {
                 BatchBreakMode.MINE_ALL -> material.name.endsWith("_ORE")
-                BatchBreakMode.CUT_ALL -> material.name.endsWith("_LOG")
+                BatchBreakMode.CUT_ALL -> {
+                    val name = material.name
+                    name.endsWith("_LOG") || name.endsWith("_STEM") || name.endsWith("_HYPHAE")
+                }
             }
         }
 
@@ -383,29 +395,26 @@ class UnlockBatchBreakHandler(
         val event = context.getEvent<BlockBreakEvent>() ?: return false
         val player = event.player
         val playerUuid = player.uniqueId
-
+ 
         if (isInternalBreakInProgress(playerUuid)) {
             return false
         }
-
+ 
         val options = resolveRuntimeOptions(context.skillEffect, context.profession) ?: return false
-
-        // アクティブスキルチェック：このスキルが現在アクティブでなければ処理しない
-        if (!ActiveSkillManager.isActiveSkillById(playerUuid, context.skillId)) {
-            return false
-        }
-
+ 
+        // AUTO_BREAK系は常時発動対象として扱う（手動発動スキルとの競合回避）
+ 
         val heldMode = BatchBreakMode.fromTool(player.inventory.itemInMainHand.type) ?: return false
         if (heldMode != options.mode) {
             return false
         }
-
+ 
         if (!isModeTargetMaterial(options.mode, event.block.type)) {
             return false
         }
-
+ 
         stopForPlayer(playerUuid)
-
+ 
         val connectedTargets = collectConnectedBlocks(
             event.block,
             options.maxChainCount,
@@ -417,11 +426,17 @@ class UnlockBatchBreakHandler(
         if (connectedTargets.isEmpty()) {
             return false
         }
-
+ 
         showTargetVisuals(player, options, listOf(event.block) + connectedTargets)
         CCContent.instance.server.scheduler.runTask(CCContent.instance, Runnable {
             clearIndicators(playerUuid)
         })
+
+        val allBlocks = listOf(event.block) + connectedTargets
+        val lowestBlock = allBlocks.minByOrNull { it.y }
+        if (lowestBlock != null && options.mode == BatchBreakMode.CUT_ALL) {
+            lowestBreakPositions[playerUuid] = lowestBlock
+        }
 
         scheduleBatchBreak(player, playerUuid, options, connectedTargets, player.inventory.heldItemSlot)
         return true

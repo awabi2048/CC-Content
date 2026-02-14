@@ -2,12 +2,14 @@ package jp.awabi2048.cccontent.features.rank.skill.listeners
 
 import jp.awabi2048.cccontent.features.rank.job.BlockPositionCodec
 import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
+import jp.awabi2048.cccontent.features.rank.skill.CompiledEffects
 import jp.awabi2048.cccontent.features.rank.skill.ActiveTriggerType
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectRegistry
 import jp.awabi2048.cccontent.features.rank.skill.handlers.BlastMineHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.BreakSpeedBoostHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.UnlockBatchBreakHandler
+import jp.awabi2048.cccontent.CCContent
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -41,6 +43,15 @@ class BlockBreakEffectListener(
         return ignoreBlockStore.contains(block.world.uid, packedPosition)
     }
 
+    private fun getOrRebuildCompiledEffects(player: org.bukkit.entity.Player): CompiledEffects? {
+        val playerUuid = player.uniqueId
+        SkillEffectEngine.getCachedEffects(playerUuid)?.let { return it }
+
+        val playerProf = CCContent.rankManager.getPlayerProfession(playerUuid) ?: return null
+        SkillEffectEngine.rebuildCache(playerUuid, playerProf.acquiredSkills, playerProf.profession, playerProf.prestigeSkills)
+        return SkillEffectEngine.getCachedEffects(playerUuid)
+    }
+
 
 
     @EventHandler(ignoreCancelled = true)
@@ -52,7 +63,7 @@ class BlockBreakEffectListener(
         BlockBreakEffectListener.setBlockTypeForPlayer(playerUuid, event.block.type.name)
 
         if (!UnlockBatchBreakHandler.isInternalBreakInProgress(playerUuid) && !BlastMineHandler.isInternalBreakInProgress(playerUuid)) {
-            val compiledEffects = SkillEffectEngine.getCachedEffects(playerUuid)
+            val compiledEffects = getOrRebuildCompiledEffects(event.player)
             val debugMode = UnlockBatchBreakHandler.BatchBreakMode.fromTool(event.player.inventory.itemInMainHand.type)
             var debugApplied = false
 
@@ -89,7 +100,7 @@ class BlockBreakEffectListener(
                         UnlockBatchBreakHandler.EFFECT_TYPE,
                         event.block.type.name
                     )
-
+ 
                     if (entry != null && canTriggerOnAutoBreak(entry.effect.type)) {
                         SkillEffectEngine.applyEffect(event.player, compiledEffects.profession, entry.skillId, entry.effect, event)
                     }
@@ -113,7 +124,7 @@ class BlockBreakEffectListener(
         // キャッシュからブロックタイプを取得（BlockDropItemEventではブロックが既に削除されてAIRになっているため）
         val blockType = BlockBreakEffectListener.getCachedBlockTypeForPlayer(event.player.uniqueId) ?: event.block.type.name
 
-        val compiledEffects = SkillEffectEngine.getCachedEffects(event.player.uniqueId) ?: return
+        val compiledEffects = getOrRebuildCompiledEffects(event.player) ?: return
 
         val hasSilkTouch = event.player.inventory.itemInMainHand.containsEnchantment(Enchantment.SILK_TOUCH)
         val profession = compiledEffects.profession
@@ -134,6 +145,12 @@ class BlockBreakEffectListener(
         val replaceLootEntry = SkillEffectEngine.getCachedEffectForBlock(event.player.uniqueId, "collect.replace_loot_table", blockType)
         if (replaceLootEntry != null) {
             SkillEffectEngine.applyEffect(event.player, profession, replaceLootEntry.skillId, replaceLootEntry.effect, event)
+        }
+
+        val replantEntry = SkillEffectEngine.getCachedEffectForBlock(event.player.uniqueId, "lumberjack.replant", blockType)
+        if (replantEntry != null) {
+            BlockBreakEffectListener.setBlockTypeForPlayer(event.player.uniqueId, blockType)
+            SkillEffectEngine.applyEffect(event.player, profession, replantEntry.skillId, replantEntry.effect, event)
         }
     }
 

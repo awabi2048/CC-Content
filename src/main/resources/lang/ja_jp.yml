@@ -39,39 +39,39 @@ profession:
 skill:
   # 木こりのスキルツリー
   lumberjack:
-    skill0:
-      name: 初心者の木こり
-      description: 基本的な木の伐採を学んだ
-    skill1:
-      name: 修行中の木こり
-      description: より効率的な伐採方法を習得
-    skill2:
-      name: 熟練の木こり（斧マスター）
-      description: 斧の扱いに精通した者
-    skill3:
-      name: 伝説の木こり（斧極人）
-      description: 斧を極めた者
-    skill4:
-      name: 守護者の木こり（盾マスター）
-      description: 防御を重視した伐採法を習得
-    skill5:
-      name: 鉄壁の木こり（盾極人）
-      description: 防御を極めた者
-    skill6:
-      name: 速度の達人（左腕）
-      description: 片手伐採の極意を習得
-    skill7:
-      name: 伐採の皇帝（両腕）
-      description: 両手伐採の究極形態
-    skill8:
-      name: 自然の化身
-      description: 自然界との完全な調和を実現
-    skill9:
-      name: 伝説を超えし者
-      description: すべての伐採技術を極めた最高位の木こり
-    skill10:
+    initial:
+      name: 初期解放
+      description: 初期解放
+    speed_1:
+      name: はやい１
+      description: すこしはやい
+    harvest_1:
+      name: おおい１
+      description: すこしおおい
+    speed_2:
+      name: はやさ２
+      description: よりはやい
+    harvest_2:
+      name: おおい２
+      description: よりおおい
+    cut_all_1:
+      name: 一括破壊
+      description: 一括破壊を習得
+    cut_all_2:
+      name: 一括破壊２
+      description: 一括破壊を強化
+    wind_gust:
       name: 突風
-      description: Shift+右クリックで突風を発動（モック）
+      description: Shift+右クリックで突風を発動
+    replant:
+      name: 植え直し
+      description: 原木を破壊すると自動で苗木を植える
+    harvest_3:
+      name: おおい３
+      description: かなりおおい
+    cut_all_3:
+      name: 一括破壊３
+      description: さらに一括破壊を強化
   
   # 醸造家のスキルツリー
   brewer:
@@ -705,7 +705,7 @@ rank:
     acquired: §a{player} がスキル {skill} を習得しました
     acquire_failed: §cスキル習得に失敗しました
     info:
-      title: '§6=== {player} のランク情報 ==='
+      title: §6=== {player} のランク情報 ===
       current_rank: '§a現在のランク: §e{rank}'
       no_profession: §7職業を選択してください
       profession_level: '§a職業レベル: {level}'

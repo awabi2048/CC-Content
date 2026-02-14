@@ -2,105 +2,123 @@
 skills:
   settings:
     level:
-      initialExp: 100
+      initialExp: 10
       base: 1.25
       maxLevel: 50
-    overviewIcon: "IRON_AXE"
+    overviewIcon: "DIAMOND_AXE"
 
-  skill0:
-    requiredLevel: 1
+  initial:
+    requiredLevel: 0
     icon: "WOODEN_AXE"
-    children: ["skill1"]
+    children: ["speed_1"]
 
-  skill1:
-    requiredLevel: 2
+  speed_1:
+    requiredLevel: 5
     icon: "STONE_AXE"
     effect:
       type: "collect.break_speed_boost"
       combineRule: "add"
       params:
         efficiency_level: 1
-        targetBlocks: ["OAK_LOG", "BIRCH_LOG", "SPRUCE_LOG", "JUNGLE_LOG", "ACACIA_LOG", "DARK_OAK_LOG"]
-        targetTools: ["AXE"]
-    children: ["skill2", "skill4"]
+        targetBlocks: ["AnyLog"]
+    children: ["harvest_1"]
 
-  skill2:
-    requiredLevel: 3
-    icon: "IRON_AXE"
+  harvest_1:
+    requiredLevel: 10
+    icon: "GOLDEN_AXE"
     effect:
       type: "collect.drop_bonus"
       combineRule: "add"
       params:
         fortune_level: 1
-    children: ["skill3"]
+    children: ["speed_2", "harvest_2"]
 
-  skill3:
-    requiredLevel: 4
+  speed_2:
+    requiredLevel: 15
     icon: "DIAMOND_AXE"
-    children: ["skill8"]
+    children: ["cut_all_1"]
 
-  skill4:
-    requiredLevel: 3
-    icon: "SHIELD"
+  harvest_2:
+    requiredLevel: 15
+    icon: "GOLDEN_AXE"
     effect:
-      type: "collect.durability_save_chance"
+      type: "collect.drop_bonus"
+      combineRule: "add"
       params:
-        unbreaking_level: 0.2
-    children: ["skill5", "skill6"]
+        fortune_level: 1
+    children: ["cut_all_1"]
 
-  skill5:
-    requiredLevel: 4
-    icon: "TOTEM_OF_UNDYING"
+  cut_all_1:
+    requiredLevel: 25
+    icon: "INK_SAC"
     effect:
       type: "collect.unlock_batch_break"
       params:
         mode: "cut_all"
-        maxChainCount: 16
+        maxChainCount: 8
         delayTicks: 2
         instantBreak: false
         autoCollect: false
         visualizeTargets: true
         matchLevel: "EXACT"
         targetTools: ["AXE"]
-    children: ["skill8"]
+    children: ["cut_all_2"]
 
-  skill6:
-    requiredLevel: 4
+  cut_all_2:
+    requiredLevel: 30
     icon: "LEATHER_BOOTS"
     effect:
-      type: "collect.break_speed_boost"
-      combineRule: "add"
+      type: "collect.unlock_batch_break"
       params:
-        efficiency_level: 2
-        targetBlocks: ["OAK_LOG", "BIRCH_LOG", "SPRUCE_LOG", "JUNGLE_LOG", "ACACIA_LOG", "DARK_OAK_LOG"]
+        mode: "cut_all"
+        maxChainCount: 16
+        delayTicks: 0
+        instantBreak: true
+        autoCollect: false
+        visualizeTargets: true
+        matchLevel: "EXACT"
         targetTools: ["AXE"]
-    children: ["skill7"]
+    children: ["wind_gust", "harvest_3"]
 
-  skill7:
-    requiredLevel: 5
-    icon: "NETHERITE_AXE"
-    children: ["skill9"]
-
-  skill8:
-    requiredLevel: 6
-    icon: "OAK_SAPLING"
-    children: ["skill9"]
-
-  skill9:
-    requiredLevel: 7
-    icon: "NETHER_STAR"
-    effect:
-      type: "general.unlock_item_token"
-      params:
-        items: ["lumberjack_axe_token"]
-    children: ["skill10"]
-
-  skill10:
-    requiredLevel: 8
+  wind_gust:
+    requiredLevel: 40
     icon: "WIND_CHARGE"
     effect:
       type: "collect.wind_gust"
       params:
-        max_distance: 8
-        delay_per_block: 2
+        max_distance: 12
+        delay_per_block: 1
+    children: ["replant"]
+
+  replant:
+    requiredLevel: 45
+    icon: "OAK_SAPLING"
+    effect:
+      type: "lumberjack.replant"
+    children: ["cut_all_3"]
+
+  harvest_3:
+    requiredLevel: 40
+    icon: "GOLDEN_AXE"
+    effect:
+      type: "collect.drop_bonus"
+      combineRule: "add"
+      params:
+        fortune_level: 1
+    children: ["cut_all_3"]
+
+  cut_all_3:
+    requiredLevel: 7
+    icon: "NETHER_STAR"
+    effect:
+      type: "collect.unlock_batch_break"
+      params:
+        mode: "cut_all"
+        maxChainCount: 24
+        delayTicks: 0
+        instantBreak: true
+        autoCollect: true
+        visualizeTargets: true
+        matchLevel: "EXACT"
+        targetTools: ["AXE"]
     children: []
