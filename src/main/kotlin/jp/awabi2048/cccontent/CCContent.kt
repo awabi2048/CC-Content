@@ -283,6 +283,7 @@ class CCContent : JavaPlugin(), Listener {
             SkillEffectRegistry.register(WarriorAxeDamageBoostHandler())
             SkillEffectRegistry.register(WarriorBowPowerBoostHandler())
             SkillEffectRegistry.register(SweepAttackDamageBoostHandler())
+            SkillEffectRegistry.register(SwordsmanDrainHandler())
             SkillEffectRegistry.register(AttackReachBoostHandler())
             SkillEffectRegistry.register(SwordsmanUnderdogBuffHandler())
 
@@ -295,6 +296,7 @@ class CCContent : JavaPlugin(), Listener {
             server.pluginManager.registerEvents(CraftEffectListener(), this)
             server.pluginManager.registerEvents(CombatEffectListener(), this)
             server.pluginManager.registerEvents(WarriorBowEffectListener(), this)
+            server.pluginManager.registerEvents(SwordsmanDrainListener(), this)
             server.pluginManager.registerEvents(SwordsmanUnderdogBuffListener(this), this)
         } catch (e: Exception) {
             logger.warning("スキル効果システムの初期化に失敗しました: ${e.message}")

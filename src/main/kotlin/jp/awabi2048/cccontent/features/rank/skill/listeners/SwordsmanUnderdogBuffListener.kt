@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent.features.rank.skill.listeners
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
 import jp.awabi2048.cccontent.features.rank.skill.handlers.SwordsmanUnderdogBuffHandler
+import org.bukkit.entity.Enemy
 import org.bukkit.entity.Monster
 import org.bukkit.entity.Player
 import org.bukkit.event.Listener
@@ -92,7 +93,7 @@ class SwordsmanUnderdogBuffListener(
                     }
                 }
 
-                is Monster -> {
+                is Monster, is Enemy -> {
                     if (!entity.isDead && entity.isValid) {
                         hostiles++
                     }
