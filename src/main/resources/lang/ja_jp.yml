@@ -232,8 +232,8 @@ skill:
       name: 刃研ぎ II
       description: "swordsman.sword_damage_boost: sharpness +1.0"
     drain_1:
-      name: 刃研ぎ III
-      description: "swordsman.sword_damage_boost: sharpness +1.0"
+      name: 吸命 I
+      description: "swordsman.drain: 25%で与ダメージの30%を回復（最大4.0）"
     power_3:
       name: 刃研ぎ IV
       description: "swordsman.sword_damage_boost: sharpness +1.0"

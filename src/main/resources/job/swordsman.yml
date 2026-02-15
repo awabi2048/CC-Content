@@ -63,9 +63,11 @@ skills:
     requiredLevel: 30
     icon: "SHIELD"
     effect:
-      type: "swordsman.sword_damage_boost"
+      type: "swordsman.drain"
       params:
-        sharpness: 1
+        ratio: 0.3
+        max_heal: 4.0
+        chance: 0.25
     children: ["buff_2"]
 
   power_3:
