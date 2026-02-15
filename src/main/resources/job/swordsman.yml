@@ -43,9 +43,11 @@ skills:
     requiredLevel: 20
     icon: "GOLDEN_SWORD"
     effect:
-      type: "combat.attack_reach_boost"
+      type: "swordsman.underdog_buff"
       params:
-        reach_blocks: 0.5
+        radius: 12
+        ratio: 2.0
+        buff: "REGENERATION_1"
     children: ["sweep_boost_2", "drain_1"]
 
   sweep_boost_2:
@@ -79,9 +81,11 @@ skills:
     requiredLevel: 40
     icon: "TARGET"
     effect:
-      type: "swordsman.sword_damage_boost"
+      type: "swordsman.underdog_buff"
       params:
-        sharpness: 1
+        radius: 16
+        ratio: 3.0
+        buff: "REGENERATION_2"
     children: ["reach_1"]
 
   reach_1:

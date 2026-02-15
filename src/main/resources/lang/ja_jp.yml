@@ -226,8 +226,8 @@ skill:
       name: 薙ぎ払い強化 II
       description: "swordsman.sword_damage_boost: sharpness +1.0"
     buff_1:
-      name: 間合い強化 I
-      description: "combat.attack_reach_boost: reach_blocks +0.5（SWORD）"
+      name: 劣勢バフ I
+      description: "swordsman.underdog_buff: H/P>=2.0 で REGENERATION_1（半径12）"
     sweep_boost_2:
       name: 刃研ぎ II
       description: "swordsman.sword_damage_boost: sharpness +1.0"
@@ -238,8 +238,8 @@ skill:
       name: 刃研ぎ IV
       description: "swordsman.sword_damage_boost: sharpness +1.0"
     buff_2:
-      name: 刃研ぎ V
-      description: "swordsman.sword_damage_boost: sharpness +1.0"
+      name: 劣勢バフ II
+      description: "swordsman.underdog_buff: H/P>=3.0 で REGENERATION_2（半径16）"
     reach_1:
       name: 間合い強化 II
       description: "combat.attack_reach_boost: reach_blocks +1.5（SWORD）"
