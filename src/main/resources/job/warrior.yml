@@ -2,121 +2,184 @@
 skills:
   settings:
     level:
-      initialExp: 100
-      base: 1.25
+      initialExp: 10
+      base: 1.2
       maxLevel: 50
     overviewIcon: "NETHERITE_AXE"
 
-  skill0:
-    requiredLevel: 1
+  initial:
+    requiredLevel: 0
     icon: "WOODEN_AXE"
-    children: ["skill1"]
+    children: ["power_1"]
 
-  skill1:
-    requiredLevel: 2
+  power_1:
+    requiredLevel: 5
     icon: "STONE_AXE"
     effect:
-      type: "combat.profession_damage_boost"
+      type: "warrior.axe_damage_boost"
       params:
-        multiplier: 1.1
-        targetWeapons: ["AXE"]
-    children: ["skill2", "skill4"]
+        sharpness: 1
+    children: ["axe_power_1", "bow_power_1"]
 
-  skill2:
-    requiredLevel: 3
+  axe_power_1:
+    requiredLevel: 10
     icon: "IRON_AXE"
     effect:
-      type: "combat.profession_damage_boost"
+      type: "warrior.axe_damage_boost"
       params:
-        multiplier: 1.15
-        targetWeapons: ["AXE"]
-    children: ["skill3"]
+        sharpness: 0.5
+    children: ["shock_wave_1", "self_buff_1"]
 
-  skill3:
-    requiredLevel: 4
-    icon: "DIAMOND_AXE"
+  shock_wave_1:
+    requiredLevel: 20
+    icon: "IRON_AXE"
     effect:
-      type: "combat.profession_damage_boost"
+      type: "warrior.axe_damage_boost"
       params:
-        multiplier: 1.2
-        targetWeapons: ["AXE"]
-    children: ["skill8"]
+        sharpness: 0.5
+    children: ["shock_wave_2"]
 
-  skill4:
-    requiredLevel: 3
-    icon: "GOLDEN_AXE"
-    effect:
-      type: "combat.profession_damage_boost"
-      params:
-        multiplier: 1.25
-        targetWeapons: ["AXE"]
-    children: ["skill5", "skill6"]
-
-  skill5:
-    requiredLevel: 4
-    icon: "NETHERITE_AXE"
-    effect:
-      type: "combat.profession_damage_boost"
-      params:
-        multiplier: 1.35
-        targetWeapons: ["AXE"]
-    children: ["skill8"]
-
-  skill6:
-    requiredLevel: 4
+  self_buff_1:
+    requiredLevel: 20
     icon: "SHIELD"
     effect:
       type: "combat.attack_reach_boost"
       params:
         reach_blocks: 0.5
-        targetWeapons: ["AXE"]
-    children: ["skill7"]
+    children: ["attack_speed_1"]
 
-  skill7:
-    requiredLevel: 5
-    icon: "TOTEM_OF_UNDYING"
+  shock_wave_2:
+    requiredLevel: 30
+    icon: "DIAMOND_AXE"
     effect:
-      type: "combat.profession_damage_boost"
+      type: "warrior.axe_damage_boost"
       params:
-        multiplier: 1.4
-        targetWeapons: ["AXE"]
-    children: ["skill9"]
+        sharpness: 1.0
+    children: ["axe_power_2"]
 
-  skill8:
-    requiredLevel: 6
-    icon: "IRON_CHESTPLATE"
-    effect:
-      type: "combat.sweep_damage_boost"
-      params:
-        sweep_multiplier: 1.25
-    children: ["skill9"]
-
-  skill9:
-    requiredLevel: 7
-    icon: "ENCHANTED_BOOK"
-    effect:
-      type: "general.unlock_item_token"
-      params:
-        items: ["warrior_axe_token"]
-    children: ["skill10", "skill12"]
-
-  # 戦闘系共通スキルモジュール
-  skill10:
-    requiredLevel: 8
+  attack_speed_1:
+    requiredLevel: 30
     icon: "GOLDEN_AXE"
     effect:
-      type: "combat.profession_damage_boost"
+      type: "warrior.axe_damage_boost"
       params:
-        multiplier: 1.15
-        targetWeapons: ["AXE"]
-    children: []
+        sharpness: 0.5
+    children: ["axe_power_2"]
 
-  skill12:
-    requiredLevel: 8
-    icon: "BLAZE_ROD"
+  axe_power_2:
+    requiredLevel: 35
+    icon: "NETHERITE_AXE"
+    effect:
+      type: "warrior.axe_damage_boost"
+      params:
+        sharpness: 1.0
+    children: ["magnet_1", "critical_1"]
+
+  magnet_1:
+    requiredLevel: 40
+    icon: "SHIELD"
     effect:
       type: "combat.attack_reach_boost"
       params:
-        reach_blocks: 1.5
-        targetWeapons: ["AXE"]
+        reach_blocks: 1.0
+    children: ["axe_power_3"]
+
+  critical_1:
+    requiredLevel: 40
+    icon: "TOTEM_OF_UNDYING"
+    effect:
+      type: "warrior.axe_damage_boost"
+      params:
+        sharpness: 1.0
+    children: ["axe_power_3"]
+
+  axe_power_3:
+    requiredLevel: 50
+    icon: "IRON_CHESTPLATE"
+    effect:
+      type: "warrior.axe_damage_boost"
+      params:
+        sharpness: 1.5
     children: []
+
+  bow_power_1:
+    requiredLevel: 10
+    icon: "BOW"
+    effect:
+      type: "warrior.bow_power_boost"
+      params:
+        power: 0.5
+    children: ["snipe_1", "3way_1"]
+
+  snipe_1:
+    requiredLevel: 20
+    icon: "BOW"
+    effect:
+      type: "warrior.bow_power_boost"
+      params:
+        power: 0.5
+    children: ["piercing_1"]
+
+  3way_1:
+    requiredLevel: 20
+    icon: "BOW"
+    effect:
+      type: "warrior.bow_power_boost"
+      params:
+        power: 0.25
+    children: ["3way_2"]
+
+  piercing_1:
+    requiredLevel: 25
+    icon: "BOW"
+    effect:
+      type: "warrior.bow_power_boost"
+      params:
+        power: 0.75
+    children: ["bow_power_2"]
+
+  3way_2:
+    requiredLevel: 25
+    icon: "BOW"
+    effect:
+      type: "warrior.bow_power_boost"
+      params:
+        power: 0.5
+    children: ["bow_power_2"]
+
+  bow_power_2:
+    requiredLevel: 30
+    icon: "BOW"
+    effect:
+      type: "warrior.bow_power_boost"
+      params:
+        power: 1.0
+    children: ["arrow_saving_1", "range_1"]
+
+  arrow_saving_1:
+    requiredLevel: 40
+    icon: "BOW"
+    effect:
+      type: "warrior.bow_power_boost"
+      params:
+        power: 0.5
+    children: ["aiming_1"]
+
+  range_1:
+    requiredLevel: 40
+    icon: "BOW"
+    effect:
+      type: "warrior.bow_power_boost"
+      params:
+        power: 0.5
+    children: ["aiming_1"]
+
+  aiming_1:
+    requiredLevel: 50
+    icon: "BOW"
+    effect:
+      type: "warrior.bow_power_boost"
+      params:
+        power: 1.0
+    children: []
+

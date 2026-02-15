@@ -6,8 +6,12 @@ import jp.awabi2048.cccontent.features.rank.skill.ToolType
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.attribute.Attribute
 import org.bukkit.entity.Enemy
+import org.bukkit.entity.Monster
+import org.bukkit.entity.Player
+import org.bukkit.entity.Projectile
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
+import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityDeathEvent
 import kotlin.math.ceil
 
@@ -22,10 +26,10 @@ class ProfessionCombatExpListener(
 
     @EventHandler(ignoreCancelled = true)
     fun onEntityDeath(event: EntityDeathEvent) {
-        val killer = event.entity.killer ?: return
+        val killer = resolveKiller(event) ?: return
         val entity = event.entity
 
-        if (entity !is Enemy) {
+        if (!isHostileEntity(entity)) {
             return
         }
 
@@ -49,5 +53,20 @@ class ProfessionCombatExpListener(
         val maxHealth = entity.getAttribute(Attribute.MAX_HEALTH)?.value ?: entity.health
         val expAmount = ceil(maxHealth * expMultiplier).toLong().coerceAtLeast(1L)
         rankManager.addProfessionExp(killer.uniqueId, expAmount)
+    }
+
+    private fun resolveKiller(event: EntityDeathEvent): Player? {
+        event.entity.killer?.let { return it }
+
+        val damageEvent = event.entity.lastDamageCause as? EntityDamageByEntityEvent ?: return null
+        return when (val damager = damageEvent.damager) {
+            is Player -> damager
+            is Projectile -> damager.shooter as? Player
+            else -> null
+        }
+    }
+
+    private fun isHostileEntity(entity: org.bukkit.entity.LivingEntity): Boolean {
+        return entity is Enemy || entity is Monster
     }
 }

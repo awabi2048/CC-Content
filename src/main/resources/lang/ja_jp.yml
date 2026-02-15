@@ -213,87 +213,99 @@ skill:
   
   # 剣士のスキルツリー
   swordsman:
-    skill0:
-      name: 初心者の剣士
-      description: 基本的な剣術を学んだ
-    skill1:
-      name: 修行中の剣士
-      description: 剣による攻撃力が向上した
-    skill2:
-      name: 一刀の剣士
-      description: 急所を狙う技術を習得した
-    skill3:
-      name: 薙ぎ払いの剣士
-      description: スウィープ攻撃の威力が増した
-    skill4:
-      name: 疾風の剣士
-      description: 素早い連続攻撃を習得した
-    skill5:
-      name: 魔物狩り
-      description: 特定の魔物に対して特化した攻撃技術を習得
-    skill6:
-      name: 受け流し
-      description: 敵の攻撃を受け流す技術を習得
-    skill7:
-      name: 処刑人
-      description: 瀕死の敵に対して致命的な一撃を放つ
-    skill8:
-      name: 鋭き眼
-      description: 防御を無視した精密攻撃を習得
-    skill9:
-      name: 剣聖
-      description: 剣術の最高位に達した者
-    skill10:
-      name: 剣の覇気
-      description: 剣による攻撃ダメージが15%増加する
-    skill11:
-      name: 薙ぎ払いの極意
-      description: スウィープ攻撃のダメージが30%増加する
-    skill12:
-      name: 剣の間合い
-      description: 剣を手に持っている間、攻撃リーチが1.5ブロック増加する
+    initial:
+      name: 剣士の基礎
+      description: スキルツリーの起点
+    power_1:
+      name: 刃研ぎ I
+      description: "swordsman.sword_damage_boost: sharpness +1.0"
+    sweep_boost_1:
+      name: 薙ぎ払い強化 I
+      description: "swordsman.sweep_damage_boost: sweeping_edge +1（SWORD）"
+    power_2:
+      name: 薙ぎ払い強化 II
+      description: "swordsman.sword_damage_boost: sharpness +1.0"
+    buff_1:
+      name: 間合い強化 I
+      description: "combat.attack_reach_boost: reach_blocks +0.5（SWORD）"
+    sweep_boost_2:
+      name: 刃研ぎ II
+      description: "swordsman.sword_damage_boost: sharpness +1.0"
+    drain_1:
+      name: 刃研ぎ III
+      description: "swordsman.sword_damage_boost: sharpness +1.0"
+    power_3:
+      name: 刃研ぎ IV
+      description: "swordsman.sword_damage_boost: sharpness +1.0"
+    buff_2:
+      name: 刃研ぎ V
+      description: "swordsman.sword_damage_boost: sharpness +1.0"
+    reach_1:
+      name: 間合い強化 II
+      description: "combat.attack_reach_boost: reach_blocks +1.5（SWORD）"
   
   # 戦士のスキルツリー
   warrior:
-    skill0:
-      name: 初心者の戦士
-      description: 基本的な戦闘術を学んだ
-    skill1:
-      name: 修行中の戦士
-      description: 最大体力が向上した
-    skill2:
-      name: 鉄壁の戦士
-      description: 受けるダメージを軽減する術を習得
-    skill3:
-      name: 不屈の戦士
-      description: ノックバック耐性を習得した
-    skill4:
-      name: 斧使い
-      description: 斧による攻撃力が向上した
-    skill5:
-      name: 狂戦士
-      description: 体力が低い時に攻撃・移動速度が上昇する
-    skill6:
-      name: 盾の達人
-      description: 盾でのブロック確率と軽減効果が向上した
-    skill7:
-      name: 二度目の命
-      description: 致命傷を受けた際に体力を回復する
-    skill8:
-      name: 鎧の達人
-      description: 防具の効果が増幅される
-    skill9:
-      name: 武神
-      description: 近接戦闘の最高位に達した者
-    skill10:
-      name: 戦士の覇気
-      description: 斧による攻撃ダメージが15%増加する
-    skill11:
-      name: 薙ぎ払いの剛力
-      description: スウィープ攻撃のダメージが30%増加する
-    skill12:
-      name: 戦士の間合い
-      description: 斧を手に持っている間、攻撃リーチが1.5ブロック増加する
+    initial:
+      name: 戦士の基礎
+      description: スキルツリーの起点
+    power_1:
+      name: 戦斧鍛錬 I
+      description: "warrior.axe_damage_boost: sharpness +1.0"
+    axe_power_1:
+      name: 斧ルート開放 I
+      description: "warrior.axe_damage_boost: sharpness +0.5"
+    shock_wave_1:
+      name: 衝撃波 I
+      description: "warrior.axe_damage_boost: sharpness +0.5"
+    self_buff_1:
+      name: 自己強化 I
+      description: "combat.attack_reach_boost: reach_blocks +0.5（AXE）"
+    shock_wave_2:
+      name: 衝撃波 II
+      description: "warrior.axe_damage_boost: sharpness +1.0"
+    attack_speed_1:
+      name: 攻撃速度強化 I
+      description: "warrior.axe_damage_boost: sharpness +0.5"
+    axe_power_2:
+      name: 斧ルート開放 II
+      description: "warrior.axe_damage_boost: sharpness +1.0"
+    magnet_1:
+      name: 引き寄せ I
+      description: "combat.attack_reach_boost: reach_blocks +1.0（AXE）"
+    critical_1:
+      name: クリティカル I
+      description: "warrior.axe_damage_boost: sharpness +1.0"
+    axe_power_3:
+      name: 斧ルート到達
+      description: "warrior.axe_damage_boost: sharpness +1.5"
+    bow_power_1:
+      name: 弓ルート開放 I
+      description: "warrior.bow_power_boost: power +0.5"
+    snipe_1:
+      name: 狙撃 I
+      description: "warrior.bow_power_boost: power +0.5"
+    3way_1:
+      name: 三連射 I
+      description: "warrior.bow_power_boost: power +0.25"
+    piercing_1:
+      name: 貫通 I
+      description: "warrior.bow_power_boost: power +0.75"
+    3way_2:
+      name: 三連射 II
+      description: "warrior.bow_power_boost: power +0.5"
+    bow_power_2:
+      name: 弓ルート開放 II
+      description: "warrior.bow_power_boost: power +1.0"
+    arrow_saving_1:
+      name: 矢節約 I
+      description: "warrior.bow_power_boost: power +0.5"
+    range_1:
+      name: 射程強化 I
+      description: "warrior.bow_power_boost: power +0.5"
+    aiming_1:
+      name: 照準強化 I
+      description: "warrior.bow_power_boost: power +1.0"
 
 # チュートリアルランク
 tutorial_rank:

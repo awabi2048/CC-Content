@@ -4,6 +4,10 @@ import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
 import jp.awabi2048.cccontent.features.rank.skill.handlers.AttackReachBoostHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.CombatDamageBoostHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.SweepAttackDamageBoostHandler
+import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorAxeDamageBoostHandler
+import jp.awabi2048.cccontent.features.rank.profession.Profession
+import org.bukkit.attribute.Attribute
+import org.bukkit.enchantments.Enchantment
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
@@ -17,9 +21,10 @@ import org.bukkit.event.player.PlayerQuitEvent
 /**
  * 戦闘系スキル効果のイベントリスナー
  *
- * 以下の3つのスキル効果を統括して管理する:
- * - combat.profession_damage_boost : 職業ツールによる攻撃ダメージ強化
- * - combat.sweep_damage_boost      : スウィープ攻撃ダメージ強化
+ * 以下のスキル効果を統括して管理する:
+ * - swordsman.sword_damage_boost   : Sharpness追加レベルによる剣ダメージ強化
+ * - warrior.axe_damage_boost       : Sharpness追加レベルによる斧ダメージ強化
+ * - swordsman.sweep_damage_boost   : Sweeping Edge追加レベルによるスウィープ強化
  * - combat.attack_reach_boost      : 攻撃リーチ拡張
  */
 class CombatEffectListener : Listener {
@@ -30,49 +35,77 @@ class CombatEffectListener : Listener {
      * プレイヤーがエンティティを攻撃した際に呼ばれる。
      * 職業ツールによる攻撃かどうかを判定し、スキル効果を適用する。
      *
-     * - combat.profession_damage_boost: 攻撃力モディファイアは常時更新済みのため直接判定のみ
-     * - combat.sweep_damage_boost     : スウィープ攻撃時にダメージを乗算
+     * - swordsman.sword_damage_boost  : Sharpness追加レベル分の差分ダメージを加算
+     * - warrior.axe_damage_boost      : Sharpness追加レベル分の差分ダメージを加算
+     * - swordsman.sweep_damage_boost  : Sweeping Edge追加レベル分の差分ダメージを加算
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     fun onEntityDamage(event: EntityDamageByEntityEvent) {
         val attacker = event.damager as? Player ?: return
-        val playerUuid = attacker.uniqueId
-        val compiledEffects = SkillEffectEngine.getCachedEffects(playerUuid) ?: return
+        val compiledEffects = SkillEffectEngine.getCachedEffects(attacker.uniqueId) ?: return
         val profession = compiledEffects.profession
+        val mainHand = attacker.inventory.itemInMainHand
+        val heldItemTypeName = mainHand.type.name
 
         // ─── 職業ツールによる攻撃ダメージ強化 ──────────────────────────────
-        val damageEntries = compiledEffects.byType[CombatDamageBoostHandler.EFFECT_TYPE]
-        if (!damageEntries.isNullOrEmpty()) {
-            val heldItem = attacker.inventory.itemInMainHand.type.name
+        when (profession) {
+            Profession.SWORDSMAN -> {
+                if (heldItemTypeName.contains("SWORD")) {
+                    val bonusSharpness = compiledEffects.byType[CombatDamageBoostHandler.EFFECT_TYPE]
+                        ?.sumOf { entry ->
+                            entry.effect.getDoubleParam("sharpness", 0.0).coerceAtLeast(0.0)
+                        }
+                        ?: 0.0
 
-            // 有効なスキルエフェクトを対象ウェポンでフィルタリングし、乗算係数を計算
-            val totalMultiplier = damageEntries
-                .filter { entry ->
-                    val targetWeapons = entry.effect.getStringListParam("targetWeapons")
-                    targetWeapons.isEmpty() || targetWeapons.any { heldItem.contains(it) }
+                    if (bonusSharpness > 0.0) {
+                        val actualSharpness = mainHand.getEnchantmentLevel(Enchantment.SHARPNESS).toDouble().coerceAtLeast(0.0)
+                        val effectiveSharpness = actualSharpness + bonusSharpness
+                        val deltaDamage = sharpnessBonusDamage(effectiveSharpness) - sharpnessBonusDamage(actualSharpness)
+                        if (deltaDamage > 0.0) {
+                            event.damage += deltaDamage
+                        }
+                    }
                 }
-                .fold(1.0) { acc, entry ->
-                    acc * entry.effect.getDoubleParam("multiplier", 1.0)
-                }
-
-            if (totalMultiplier > 1.0) {
-                // MULTIPLY_SCALAR_1 モディファイアは既に適用済みなので、
-                // ここでは追加でイベントダメージを直接変更しない。
-                // （常時適用型のモディファイアで処理）
-                CombatDamageBoostHandler.applyModifier(playerUuid, totalMultiplier)
             }
+            Profession.WARRIOR -> {
+                if (heldItemTypeName.contains("AXE")) {
+                    val bonusSharpness = compiledEffects.byType[WarriorAxeDamageBoostHandler.EFFECT_TYPE]
+                        ?.sumOf { entry ->
+                            entry.effect.getDoubleParam("sharpness", 0.0).coerceAtLeast(0.0)
+                        }
+                        ?: 0.0
+
+                    if (bonusSharpness > 0.0) {
+                        val actualSharpness = mainHand.getEnchantmentLevel(Enchantment.SHARPNESS).toDouble().coerceAtLeast(0.0)
+                        val effectiveSharpness = actualSharpness + bonusSharpness
+                        val deltaDamage = sharpnessBonusDamage(effectiveSharpness) - sharpnessBonusDamage(actualSharpness)
+                        if (deltaDamage > 0.0) {
+                            event.damage += deltaDamage
+                        }
+                    }
+                }
+            }
+            else -> {}
         }
 
         // ─── スウィープ攻撃ダメージ強化 ──────────────────────────────────
-        if (event.cause == EntityDamageEvent.DamageCause.ENTITY_SWEEP_ATTACK) {
+        if (profession == Profession.SWORDSMAN && event.cause == EntityDamageEvent.DamageCause.ENTITY_SWEEP_ATTACK && heldItemTypeName.contains("SWORD")) {
             val sweepEntries = compiledEffects.byType[SweepAttackDamageBoostHandler.EFFECT_TYPE]
             if (!sweepEntries.isNullOrEmpty()) {
-                // 複数スキルの sweep_multiplier を乗算
-                val totalSweepMultiplier = sweepEntries.fold(1.0) { acc, entry ->
-                    acc * entry.effect.getDoubleParam("sweep_multiplier", 1.0)
-                }
-                if (totalSweepMultiplier > 1.0) {
-                    event.damage = event.damage * totalSweepMultiplier
+                val bonusSweepingEdge = sweepEntries
+                    .sumOf { entry ->
+                        entry.effect.getDoubleParam("sweeping_edge", 0.0).coerceAtLeast(0.0)
+                    }
+
+                if (bonusSweepingEdge > 0.0) {
+                    val actualSweepingEdge = mainHand.getEnchantmentLevel(Enchantment.SWEEPING_EDGE).toDouble().coerceAtLeast(0.0)
+                    val effectiveSweepingEdge = actualSweepingEdge + bonusSweepingEdge
+                    val deltaRatio = sweepingEdgeRatio(effectiveSweepingEdge) - sweepingEdgeRatio(actualSweepingEdge)
+                    val attackDamage = attacker.getAttribute(Attribute.ATTACK_DAMAGE)?.value ?: 0.0
+                    val deltaDamage = attackDamage * deltaRatio
+                    if (deltaDamage > 0.0) {
+                        event.damage += deltaDamage
+                    }
                 }
             }
         }
@@ -115,7 +148,6 @@ class CombatEffectListener : Listener {
     fun onPlayerQuit(event: PlayerQuitEvent) {
         val playerUuid = event.player.uniqueId
         AttackReachBoostHandler.removeModifier(playerUuid)
-        CombatDamageBoostHandler.removeModifier(playerUuid)
     }
 
     // ─── ユーティリティ ────────────────────────────────────────────────────
@@ -136,9 +168,30 @@ class CombatEffectListener : Listener {
 
         // 全スキルの reach_blocks を合算
         val totalReach = reachEntries.sumOf { it.effect.getDoubleParam("reach_blocks", 0.0) }
-        // targetWeapons は最後のエフェクトのものを使用（通常は1スキル想定）
-        val targetWeapons = reachEntries.last().effect.getStringListParam("targetWeapons")
+        val targetWeapons = getHardcodedReachWeapons(compiledEffects.profession)
 
         AttackReachBoostHandler.reevaluateReach(playerUuid, targetWeapons, totalReach)
+    }
+
+    private fun sharpnessBonusDamage(level: Double): Double {
+        if (level <= 0) {
+            return 0.0
+        }
+        return level * 0.5 + 0.5
+    }
+
+    private fun sweepingEdgeRatio(level: Double): Double {
+        if (level <= 0) {
+            return 0.0
+        }
+        return level / (level + 1.0)
+    }
+
+    private fun getHardcodedReachWeapons(profession: Profession): List<String> {
+        return when (profession) {
+            Profession.SWORDSMAN -> listOf("SWORD")
+            Profession.WARRIOR -> listOf("AXE")
+            else -> emptyList()
+        }
     }
 }
