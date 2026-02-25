@@ -306,6 +306,9 @@ skill:
     aiming_1:
       name: 照準強化 I
       description: "warrior.bow_power_boost: power +1.0"
+    snipe_2:
+      name: 狙撃 II
+      description: "warrior.snipe: 追加チャージ比率に応じて弓ダメージ/射程を強化"
 
 # チュートリアルランク
 tutorial_rank:

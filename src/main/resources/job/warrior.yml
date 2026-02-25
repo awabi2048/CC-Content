@@ -181,5 +181,16 @@ skills:
       type: "warrior.bow_power_boost"
       params:
         power: 1.0
+    children: ["snipe_2"]
+
+  snipe_2:
+    requiredLevel: 50
+    icon: "BOW"
+    effect:
+      type: "warrior.snipe"
+      params:
+        max_charge_time: 20.0
+        damage_multiplier: 1.5
+        range_multiplier: 1.5
     children: []
 
