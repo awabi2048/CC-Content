@@ -89,3 +89,7 @@ arena:
     view_distance: 6
     simulation_distance: 4
     send_view_distance: -1
+
+rank:
+  combat_exp:
+    health_multiplier: 0.1

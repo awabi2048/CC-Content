@@ -936,7 +936,7 @@ class RankCommand(
             val modeSwitchItem = ActiveSkillManager.createModeSwitchButton(viewer)
             inventory.setItem(MAIN_MENU_MODE_SWITCH_SLOT, modeSwitchItem)
         } else {
-            inventory.setItem(MAIN_MENU_MODE_SWITCH_SLOT, basePane)
+            inventory.setItem(MAIN_MENU_MODE_SWITCH_SLOT, headerFooterPane)
         }
     }
 
@@ -2714,7 +2714,6 @@ class RankCommand(
             MAIN_MENU_MODE_SWITCH_SLOT -> {
                 // 能動スキルがない場合は処理しない
                 if (!ActiveSkillIdentifier.hasAnyToggleableSkill(player)) {
-                    player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
                     return
                 }
 

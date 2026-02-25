@@ -6,18 +6,14 @@ import jp.awabi2048.cccontent.features.rank.skill.SkillEffect
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectHandler
 
 /**
- * 剣士スキルモジュール：剣攻撃ダメージ強化
- *
- * 職業ツール（剣/斧など）を手に持って攻撃した際に、
- * Sharpnessの仮想レベルを加算してダメージを強化する。
- * 複数スキルが有効な場合は加算で計算する。
+ * 戦士スキルモジュール：弓攻撃ダメージ強化（Power相当）
  *
  * パラメータ:
- *   sharpness: Double - Sharpnessの追加レベル（小数可）
+ *   power: Double - Powerの追加レベル（小数可）
  */
-class CombatDamageBoostHandler : SkillEffectHandler {
+class WarriorBowPowerBoostHandler : SkillEffectHandler {
     companion object {
-        const val EFFECT_TYPE = "swordsman.sword_damage_boost"
+        const val EFFECT_TYPE = "warrior.bow_power_boost"
     }
 
     override fun getEffectType(): String = EFFECT_TYPE
@@ -29,15 +25,15 @@ class CombatDamageBoostHandler : SkillEffectHandler {
     }
 
     override fun calculateStrength(skillEffect: SkillEffect): Double {
-        return skillEffect.getDoubleParam("sharpness", 0.0)
+        return skillEffect.getDoubleParam("power", 0.0)
     }
 
     override fun supportsProfession(professionId: String): Boolean {
-        return professionId == "swordsman"
+        return professionId == "warrior"
     }
 
     override fun validateParams(skillEffect: SkillEffect): Boolean {
-        val sharpness = skillEffect.getDoubleParam("sharpness", 0.0)
-        return sharpness > 0
+        val power = skillEffect.getDoubleParam("power", 0.0)
+        return power > 0.0
     }
 }

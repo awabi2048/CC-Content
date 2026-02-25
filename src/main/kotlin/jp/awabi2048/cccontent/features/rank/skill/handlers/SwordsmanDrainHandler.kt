@@ -5,19 +5,9 @@ import jp.awabi2048.cccontent.features.rank.skill.EvaluationMode
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffect
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectHandler
 
-/**
- * 剣士スキルモジュール：剣攻撃ダメージ強化
- *
- * 職業ツール（剣/斧など）を手に持って攻撃した際に、
- * Sharpnessの仮想レベルを加算してダメージを強化する。
- * 複数スキルが有効な場合は加算で計算する。
- *
- * パラメータ:
- *   sharpness: Double - Sharpnessの追加レベル（小数可）
- */
-class CombatDamageBoostHandler : SkillEffectHandler {
+class SwordsmanDrainHandler : SkillEffectHandler {
     companion object {
-        const val EFFECT_TYPE = "swordsman.sword_damage_boost"
+        const val EFFECT_TYPE = "swordsman.drain"
     }
 
     override fun getEffectType(): String = EFFECT_TYPE
@@ -29,7 +19,10 @@ class CombatDamageBoostHandler : SkillEffectHandler {
     }
 
     override fun calculateStrength(skillEffect: SkillEffect): Double {
-        return skillEffect.getDoubleParam("sharpness", 0.0)
+        val ratio = skillEffect.getDoubleParam("ratio", 0.0).coerceAtLeast(0.0)
+        val maxHeal = skillEffect.getDoubleParam("max_heal", 0.0).coerceAtLeast(0.0)
+        val chance = skillEffect.getDoubleParam("chance", 0.0).coerceIn(0.0, 1.0)
+        return ratio * chance + maxHeal
     }
 
     override fun supportsProfession(professionId: String): Boolean {
@@ -37,7 +30,17 @@ class CombatDamageBoostHandler : SkillEffectHandler {
     }
 
     override fun validateParams(skillEffect: SkillEffect): Boolean {
-        val sharpness = skillEffect.getDoubleParam("sharpness", 0.0)
-        return sharpness > 0
+        val ratio = skillEffect.getDoubleParam("ratio", -1.0)
+        if (ratio <= 0.0) {
+            return false
+        }
+
+        val maxHeal = skillEffect.getDoubleParam("max_heal", -1.0)
+        if (maxHeal < 0.0) {
+            return false
+        }
+
+        val chance = skillEffect.getDoubleParam("chance", -1.0)
+        return chance in 0.0..1.0
     }
 }

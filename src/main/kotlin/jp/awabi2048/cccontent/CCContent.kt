@@ -25,6 +25,7 @@ import jp.awabi2048.cccontent.features.rank.localization.LanguageLoader
 import jp.awabi2048.cccontent.features.rank.localization.MessageProviderImpl
 import jp.awabi2048.cccontent.features.rank.command.RankCommand
 import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
+import jp.awabi2048.cccontent.features.rank.job.ProfessionCombatExpListener
 import jp.awabi2048.cccontent.features.rank.job.ProfessionMinerExpListener
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
@@ -217,7 +218,9 @@ class CCContent : JavaPlugin(), Listener {
 
             // 追加のランク系リスナー登録
             val minerListener = ProfessionMinerExpListener(this, rankManager, ignoreBlockStore)
+            val combatExpListener = ProfessionCombatExpListener(rankManager, config)
             server.pluginManager.registerEvents(minerListener, this)
+            server.pluginManager.registerEvents(combatExpListener, this)
             
             // 登録されたスキルツリーをカウント
             val skillTreeCount = Profession.values().count { SkillTreeRegistry.getSkillTree(it) != null }
@@ -277,8 +280,13 @@ class CCContent : JavaPlugin(), Listener {
 
             // 戦闘系スキルハンドラー
             SkillEffectRegistry.register(CombatDamageBoostHandler())
+            SkillEffectRegistry.register(WarriorAxeDamageBoostHandler())
+            SkillEffectRegistry.register(WarriorBowPowerBoostHandler())
+            SkillEffectRegistry.register(WarriorSnipeHandler())
             SkillEffectRegistry.register(SweepAttackDamageBoostHandler())
+            SkillEffectRegistry.register(SwordsmanDrainHandler())
             SkillEffectRegistry.register(AttackReachBoostHandler())
+            SkillEffectRegistry.register(SwordsmanUnderdogBuffHandler())
 
             server.pluginManager.registerEvents(SkillEffectCacheListener(rankManager, this), this)
             server.pluginManager.registerEvents(BlockBreakEffectListener(ignoreBlockStore), this)
@@ -288,6 +296,9 @@ class CCContent : JavaPlugin(), Listener {
             server.pluginManager.registerEvents(ActiveSkillKeyListener(), this)
             server.pluginManager.registerEvents(CraftEffectListener(), this)
             server.pluginManager.registerEvents(CombatEffectListener(), this)
+            server.pluginManager.registerEvents(WarriorBowEffectListener(), this)
+            server.pluginManager.registerEvents(SwordsmanDrainListener(), this)
+            server.pluginManager.registerEvents(SwordsmanUnderdogBuffListener(this), this)
         } catch (e: Exception) {
             logger.warning("スキル効果システムの初期化に失敗しました: ${e.message}")
             e.printStackTrace()
