@@ -80,6 +80,15 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var cookingFeature: CookingFeature
     private var rankManagerInstance: RankManagerImpl? = null
     private var ignoreBlockStoreInstance: IgnoreBlockStore? = null
+    private lateinit var contentEnabledAtStartup: ContentEnabledSettings
+
+    private data class ContentEnabledSettings(
+        val arena: Boolean,
+        val rank: Boolean,
+        val brewery: Boolean,
+        val cooking: Boolean,
+        val sukimaDungeon: Boolean
+    )
     
     fun getMarkerManager(): MarkerManager = markerManager
     fun getItemManager(): ItemManager = itemManager
@@ -90,6 +99,7 @@ class CCContent : JavaPlugin(), Listener {
         saveDefaultConfig()
         reloadConfig()
         migrateLegacyConfigLayout()
+        contentEnabledAtStartup = loadContentEnabledSettings()
         
         // 初期化ロガーを初期化
         featureInitLogger = FeatureInitializationLogger(logger)
@@ -107,15 +117,23 @@ class CCContent : JavaPlugin(), Listener {
         
         // アイテム登録（スキマダンジョン以外）
         registerCustomItems()
-        
-        // ランクシステムの初期化
-        initializeRankSystem()
 
-        // Arena 初期化
-        arenaManager = ArenaManager(this)
-        arenaManager.initialize(featureInitLogger)
+        initializeFeatureIfEnabled("Rank System", "rank") {
+            initializeRankSystem()
+        }
 
-        initializeBreweryAndCooking()
+        initializeFeatureIfEnabled("Arena", "arena") {
+            arenaManager = ArenaManager(this)
+            arenaManager.initialize(featureInitLogger)
+        }
+
+        initializeFeatureIfEnabled("Brewery", "brewery") {
+            initializeBrewery()
+        }
+
+        initializeFeatureIfEnabled("Cooking", "cooking") {
+            initializeCooking()
+        }
         
         // コマンド登録
         val giveCommand = GiveCommand()
@@ -144,23 +162,78 @@ class CCContent : JavaPlugin(), Listener {
         getCommand("cc")?.setExecutor(ccCommand)
         getCommand("cc")?.tabCompleter = ccCommand
 
-        val arenaCommand = ArenaCommand(arenaManager)
-        getCommand("arenaa")?.setExecutor(arenaCommand)
-        getCommand("arenaa")?.tabCompleter = arenaCommand
-        
-        // SukimaDungeon 初期化（GitHub版）
-        initializeSukimaDungeon()
+        if (isContentEnabledAtStartup("arena") && ::arenaManager.isInitialized) {
+            val arenaCommand = ArenaCommand(arenaManager)
+            getCommand("arenaa")?.setExecutor(arenaCommand)
+            getCommand("arenaa")?.tabCompleter = arenaCommand
+        }
+
+        initializeFeatureIfEnabled("SukimaDungeon", "sukima_dungeon") {
+            initializeSukimaDungeon()
+        }
         
         // リスナー登録（スキマダンジョン以外）
         server.pluginManager.registerEvents(GulliverItemListener(this), this)
-        server.pluginManager.registerEvents(ArenaItemListener(), this)
-        server.pluginManager.registerEvents(ArenaListener(arenaManager), this)
+        if (isContentEnabledAtStartup("arena") && ::arenaManager.isInitialized) {
+            server.pluginManager.registerEvents(ArenaItemListener(), this)
+            server.pluginManager.registerEvents(ArenaListener(arenaManager), this)
+        }
         
         // ScaleManagerタスクの開始（毎tick実行）
         server.scheduler.runTaskTimer(this, GulliverScaleManager(), 0L, 1L)
         
         // 初期化結果をまとめて表示
         featureInitLogger.printSummary()
+    }
+
+    private fun loadContentEnabledSettings(): ContentEnabledSettings {
+        return ContentEnabledSettings(
+            arena = config.getBoolean("content_enabled.arena", true),
+            rank = config.getBoolean("content_enabled.rank", true),
+            brewery = config.getBoolean("content_enabled.brewery", true),
+            cooking = config.getBoolean("content_enabled.cooking", true),
+            sukimaDungeon = config.getBoolean("content_enabled.sukima_dungeon", true)
+        )
+    }
+
+    private fun isContentEnabledAtStartup(contentKey: String): Boolean {
+        return when (contentKey) {
+            "arena" -> contentEnabledAtStartup.arena
+            "rank" -> contentEnabledAtStartup.rank
+            "brewery" -> contentEnabledAtStartup.brewery
+            "cooking" -> contentEnabledAtStartup.cooking
+            "sukima_dungeon" -> contentEnabledAtStartup.sukimaDungeon
+            else -> true
+        }
+    }
+
+    private fun initializeFeatureIfEnabled(featureName: String, contentKey: String, initialize: () -> Unit) {
+        if (!isContentEnabledAtStartup(contentKey)) {
+            featureInitLogger.setStatus(featureName, FeatureInitializationLogger.Status.WARNING)
+            featureInitLogger.addSummaryMessage(featureName, "configで無効化(content_enabled.$contentKey=false)")
+            logger.info("[$featureName] content_enabled.$contentKey=false のため無効化されています")
+            return
+        }
+
+        try {
+            initialize()
+        } catch (e: Exception) {
+            featureInitLogger.setStatus(featureName, FeatureInitializationLogger.Status.FAILURE)
+            featureInitLogger.addDetailMessage(featureName, "[$featureName] 初期化失敗: ${e.message}")
+            logger.warning("[$featureName] 初期化に失敗しました: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
+    private fun logContentEnabledChangeIfNeeded(reloaded: ContentEnabledSettings) {
+        if (reloaded == contentEnabledAtStartup) {
+            return
+        }
+
+        logger.warning(
+            "content_enabled の変更は再起動後に反映されます: " +
+                "startup=$contentEnabledAtStartup, reloaded=$reloaded"
+        )
     }
     
     /**
@@ -443,15 +516,17 @@ class CCContent : JavaPlugin(), Listener {
         CustomItemManager.register(BigLight())
         CustomItemManager.register(SmallLight())
 
-        // Brewery アイテム
-        CustomItemManager.register(BrewerySampleFilterItem(this))
-        CustomItemManager.register(BreweryMockClockItem(this))
-        CustomItemManager.register(BreweryMockYeastItem(this))
+        if (isContentEnabledAtStartup("brewery")) {
+            CustomItemManager.register(BrewerySampleFilterItem(this))
+            CustomItemManager.register(BreweryMockClockItem(this))
+            CustomItemManager.register(BreweryMockYeastItem(this))
+        }
 
-        // Arena アイテム
-        CustomItemManager.register(ArenaTicketItem())
-        CustomItemManager.register(ArenaMedalItem())
-        CustomItemManager.register(ArenaPrizeItem())
+        if (isContentEnabledAtStartup("arena")) {
+            CustomItemManager.register(ArenaTicketItem())
+            CustomItemManager.register(ArenaMedalItem())
+            CustomItemManager.register(ArenaPrizeItem())
+        }
         
         // SukimaDungeon アイテムはGitHub版で管理
     }
@@ -515,66 +590,71 @@ class CCContent : JavaPlugin(), Listener {
                 }
             }
             
-            // スキルツリーファイルをチェック
-            val jobDir = File(dataFolder, "job")
-            if (jobDir.exists()) {
-                val requiredJobFiles = listOf("brewer.yml", "lumberjack.yml", "miner.yml", "cook.yml", "exp.yml")
-                for (jobFile in requiredJobFiles) {
-                    val file = File(jobDir, jobFile)
-                    if (!file.exists()) {
-                        copyResourceFile("job/$jobFile", file)
-                    }
-                }
-
-                try {
-                    registerSkillTrees()
-                } catch (e: Exception) {
-                    logger.warning("スキルツリー定義の再読み込みに失敗しました: ${e.message}")
-                }
-
-                rankManagerInstance?.let { rankManager ->
-                    SkillEffectEngine.clearAllCache()
-                    server.onlinePlayers.forEach { player ->
-                        val playerProfession = rankManager.getPlayerProfession(player.uniqueId) ?: return@forEach
-                        SkillEffectEngine.rebuildCache(
-                            player.uniqueId,
-                            playerProfession.acquiredSkills,
-                            playerProfession.profession,
-                            playerProfession.prestigeSkills,
-                            playerProfession.skillActivationStates
-                        )
-                    }
-                }
-            }
-            
-            // チュートリアルランク Advancement ファイルをチェック
-            val advancementDir = File(dataFolder, "data/cccontent/advancement/tutorial")
-            if (advancementDir.exists()) {
-                val requiredAdvancementFiles = listOf(
-                    "newbie.json", "visitor.json", "pioneer.json", 
-                    "adventurer.json", "attainer.json"
-                )
-                for (advFile in requiredAdvancementFiles) {
-                    val file = File(advancementDir, advFile)
-                    if (!file.exists()) {
-                        copyResourceFile("data/cccontent/advancement/tutorial/$advFile", file)
-                    }
-                }
-            }
-            
-            // SukimaDungeonの設定をリロード
             reloadConfig()
             migrateLegacyConfigLayout()
-            reloadSukimaDungeon()
 
-            if (::breweryFeature.isInitialized) {
+            val reloadedContentEnabled = loadContentEnabledSettings()
+            logContentEnabledChangeIfNeeded(reloadedContentEnabled)
+
+            if (isContentEnabledAtStartup("rank")) {
+                val jobDir = File(dataFolder, "job")
+                if (jobDir.exists()) {
+                    val requiredJobFiles = listOf("brewer.yml", "lumberjack.yml", "miner.yml", "cook.yml", "exp.yml")
+                    for (jobFile in requiredJobFiles) {
+                        val file = File(jobDir, jobFile)
+                        if (!file.exists()) {
+                            copyResourceFile("job/$jobFile", file)
+                        }
+                    }
+
+                    try {
+                        registerSkillTrees()
+                    } catch (e: Exception) {
+                        logger.warning("スキルツリー定義の再読み込みに失敗しました: ${e.message}")
+                    }
+
+                    rankManagerInstance?.let { rankManager ->
+                        SkillEffectEngine.clearAllCache()
+                        server.onlinePlayers.forEach { player ->
+                            val playerProfession = rankManager.getPlayerProfession(player.uniqueId) ?: return@forEach
+                            SkillEffectEngine.rebuildCache(
+                                player.uniqueId,
+                                playerProfession.acquiredSkills,
+                                playerProfession.profession,
+                                playerProfession.prestigeSkills,
+                                playerProfession.skillActivationStates
+                            )
+                        }
+                    }
+                }
+
+                val advancementDir = File(dataFolder, "data/cccontent/advancement/tutorial")
+                if (advancementDir.exists()) {
+                    val requiredAdvancementFiles = listOf(
+                        "newbie.json", "visitor.json", "pioneer.json",
+                        "adventurer.json", "attainer.json"
+                    )
+                    for (advFile in requiredAdvancementFiles) {
+                        val file = File(advancementDir, advFile)
+                        if (!file.exists()) {
+                            copyResourceFile("data/cccontent/advancement/tutorial/$advFile", file)
+                        }
+                    }
+                }
+            }
+
+            if (isContentEnabledAtStartup("sukima_dungeon")) {
+                reloadSukimaDungeon()
+            }
+
+            if (isContentEnabledAtStartup("brewery") && ::breweryFeature.isInitialized) {
                 breweryFeature.reload()
             }
-            if (::cookingFeature.isInitialized) {
+            if (isContentEnabledAtStartup("cooking") && ::cookingFeature.isInitialized) {
                 cookingFeature.reload()
             }
 
-            if (::arenaManager.isInitialized) {
+            if (isContentEnabledAtStartup("arena") && ::arenaManager.isInitialized) {
                 arenaManager.reloadThemes()
             }
         } catch (e: Exception) {
@@ -655,10 +735,12 @@ class CCContent : JavaPlugin(), Listener {
         }
     }
 
-    private fun initializeBreweryAndCooking() {
+    private fun initializeBrewery() {
         breweryFeature = BreweryFeature(this)
         breweryFeature.initialize(featureInitLogger)
+    }
 
+    private fun initializeCooking() {
         cookingFeature = CookingFeature(this)
         cookingFeature.initialize(featureInitLogger)
     }

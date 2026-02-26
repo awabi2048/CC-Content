@@ -1,5 +1,12 @@
 # CC-Content Root Config
 
+content_enabled:
+  arena: true
+  rank: true
+  brewery: true
+  cooking: true
+  sukima_dungeon: true
+
 sukima_dungeon:
   sizes:
     small:
