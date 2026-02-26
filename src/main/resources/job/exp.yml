@@ -35,7 +35,7 @@ lumberjack:
 brewer:
   mock_exp: 5
 
-swordsman:
+combat_shared:
   zombie: 3
   skeleton: 4
   spider: 3
@@ -52,25 +52,7 @@ swordsman:
   husk: 4
   stray: 5
 
-warrior:
-  zombie: 4
-  skeleton: 3
-  spider: 4
-  cave_spider: 6
-  creeper: 4
-  enderman: 6
-  witch: 8
-  blaze: 10
-  ghast: 10
-  slime: 3
-  magma_cube: 5
-  phantom: 5
-  drowned: 5
-  husk: 5
-  stray: 4
-  pillager: 8
-  vindicator: 10
-  evoker: 15
+# 剣士 / 戦士の共有モブ経験値テーブル
 
 farmer:
   wheat: 2

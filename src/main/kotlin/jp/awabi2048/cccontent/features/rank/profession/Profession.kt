@@ -42,7 +42,7 @@ enum class Profession(
     SWORDSMAN("swordsman", "§c", ProfessionType.COMBAT),
 
     /**
-     * 戦士 - 近接戦闘で経験値を獲得
+     * 戦士 - 斧/弓でのモンスター討伐で経験値を獲得
      */
     WARRIOR("warrior", "§4", ProfessionType.COMBAT),
 
