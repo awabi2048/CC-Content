@@ -35,7 +35,9 @@ import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import java.util.UUID
+import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -51,17 +53,17 @@ class WarriorBowEffectListener : Listener {
         }
         private const val FULL_BOW_CHARGE_TICKS = 20.0
         private const val TICKS_PER_MILLISECOND = 1.0 / 50.0
-        private const val ARROW_GRAVITY_PER_TICK = 0.05
-        private const val MAX_GRAVITY_COMPENSATION_PER_TICK = 0.049
-        private const val MAX_RANGE_COMPENSATION_TICKS = 100
+        private const val BASE_RANGE_FLIGHT_TICKS = 100
+        private const val MAX_RANGE_FLIGHT_TICKS = 300
+        private const val RANGE_EXPIRE_PARTICLE_COUNT = 8
         private const val CHARGE_BAR_SEGMENTS = 15
         private const val EXTRA_CHARGE_RELEASE_GRACE_MILLIS = 750L
         private const val THREE_WAY_ANGLE_DEGREES = 5.0
+        private const val THREE_WAY_SPAWN_FORWARD_OFFSET = 0.35
     }
 
     private data class SnipeFlightState(
         val arrow: AbstractArrow,
-        val compensationPerTick: Double,
         var remainingTicks: Int
     )
 
@@ -120,32 +122,27 @@ class WarriorBowEffectListener : Listener {
                 while (iterator.hasNext()) {
                     val state = iterator.next().value
                     val arrow = state.arrow
-                    if (!arrow.isValid || arrow.isDead || arrow.isOnGround || state.remainingTicks <= 0) {
+                    if (!arrow.isValid || arrow.isDead || arrow.isOnGround) {
                         iterator.remove()
                         continue
                     }
 
-                    val velocity = arrow.velocity
-                    if (velocity.lengthSquared() <= 1.0E-8) {
-                        iterator.remove()
+                    state.remainingTicks -= 1
+                    if (state.remainingTicks > 0) {
                         continue
                     }
 
                     arrow.world.spawnParticle(
-                        Particle.ENCHANTED_HIT,
+                        Particle.END_ROD,
                         arrow.location,
-                        1,
-                        0.0,
-                        0.0,
-                        0.0,
-                        0.0
+                        RANGE_EXPIRE_PARTICLE_COUNT,
+                        0.15,
+                        0.15,
+                        0.15,
+                        0.02
                     )
-
-                    if (state.compensationPerTick > 0.0) {
-                        velocity.y += state.compensationPerTick
-                        arrow.velocity = velocity
-                    }
-                    state.remainingTicks -= 1
+                    arrow.remove()
+                    iterator.remove()
                 }
             }
         }.runTaskTimer(plugin, 1L, 1L)
@@ -219,13 +216,14 @@ class WarriorBowEffectListener : Listener {
         return 1.0 + (clampedBase - 1.0) * clampedRatio
     }
 
-    private fun calculateGravityCompensationPerTick(rangeMultiplier: Double): Double {
+    private fun calculateFlightLifetimeTicks(rangeMultiplier: Double): Int {
         if (rangeMultiplier <= 1.0) {
-            return 0.0
+            return BASE_RANGE_FLIGHT_TICKS
         }
 
-        val compensation = ARROW_GRAVITY_PER_TICK * (1.0 - 1.0 / rangeMultiplier)
-        return compensation.coerceIn(0.0, MAX_GRAVITY_COMPENSATION_PER_TICK)
+        return (BASE_RANGE_FLIGHT_TICKS * rangeMultiplier)
+            .roundToInt()
+            .coerceIn(BASE_RANGE_FLIGHT_TICKS, MAX_RANGE_FLIGHT_TICKS)
     }
 
     private fun isThreeWayArrow(arrow: AbstractArrow): Boolean {
@@ -244,17 +242,58 @@ class WarriorBowEffectListener : Listener {
         return arrow.persistentDataContainer.get(threeWaySideDamageMultiplierKey, PersistentDataType.DOUBLE)
     }
 
-    private fun rotateAroundYAxis(velocity: org.bukkit.util.Vector, angleDegrees: Double): org.bukkit.util.Vector {
+    private fun rotateAroundAxis(
+        velocity: org.bukkit.util.Vector,
+        axis: org.bukkit.util.Vector,
+        angleDegrees: Double
+    ): org.bukkit.util.Vector {
+        if (axis.lengthSquared() <= 1.0E-8) {
+            return velocity.clone()
+        }
+
+        val normalizedAxis = axis.clone().normalize()
         val radians = Math.toRadians(angleDegrees)
         val cosValue = cos(radians)
         val sinValue = sin(radians)
-        val x = velocity.x * cosValue - velocity.z * sinValue
-        val z = velocity.x * sinValue + velocity.z * cosValue
-        return org.bukkit.util.Vector(x, velocity.y, z)
+
+        val term1 = velocity.clone().multiply(cosValue)
+        val term2 = normalizedAxis.clone().crossProduct(velocity).multiply(sinValue)
+        val term3 = normalizedAxis.clone().multiply(normalizedAxis.dot(velocity) * (1.0 - cosValue))
+        return term1.add(term2).add(term3)
     }
 
-    private fun spawnThreeWayArrowCopy(sourceArrow: AbstractArrow, velocity: org.bukkit.util.Vector): AbstractArrow? {
-        val copiedArrow = sourceArrow.copy(sourceArrow.location) as? AbstractArrow ?: return null
+    private fun resolveShooterUpVector(shooter: Player, forwardVelocity: org.bukkit.util.Vector): org.bukkit.util.Vector {
+        val forward = forwardVelocity.clone()
+        if (forward.lengthSquared() <= 1.0E-8) {
+            return org.bukkit.util.Vector(0.0, 1.0, 0.0)
+        }
+        forward.normalize()
+
+        val worldUp = org.bukkit.util.Vector(0.0, 1.0, 0.0)
+        val pitch = shooter.location.pitch.toDouble()
+        val isVerticalPitch = abs(abs(pitch) - 90.0) <= 0.01
+        val horizontalLengthSquared = forward.x * forward.x + forward.z * forward.z
+        val right = if (isVerticalPitch || horizontalLengthSquared <= 1.0E-4) {
+            val yawRad = Math.toRadians(shooter.location.yaw.toDouble())
+            org.bukkit.util.Vector(cos(yawRad), 0.0, -sin(yawRad))
+        } else {
+            worldUp.clone().crossProduct(forward).normalize()
+        }
+
+        if (right.lengthSquared() <= 1.0E-8) {
+            return worldUp
+        }
+
+        val up = forward.clone().crossProduct(right)
+        return if (up.lengthSquared() <= 1.0E-8) worldUp else up.normalize()
+    }
+
+    private fun spawnThreeWayArrowCopy(
+        sourceArrow: AbstractArrow,
+        spawnLocation: org.bukkit.Location,
+        velocity: org.bukkit.util.Vector
+    ): AbstractArrow? {
+        val copiedArrow = sourceArrow.copy(spawnLocation) as? AbstractArrow ?: return null
         copiedArrow.velocity = velocity
         return copiedArrow
     }
@@ -736,13 +775,14 @@ class WarriorBowEffectListener : Listener {
                         arrow.persistentDataContainer.set(snipeDamageFactorKey, PersistentDataType.DOUBLE, damageFactor)
                     }
 
-                    val effectiveRangeMultiplier = calculateEffectiveRangeMultiplier(rangeMultiplier, ratio)
-                    val compensationPerTick = calculateGravityCompensationPerTick(effectiveRangeMultiplier)
-                    snipeFlightStates[arrow.uniqueId] = SnipeFlightState(
-                        arrow = arrow,
-                        compensationPerTick = compensationPerTick,
-                        remainingTicks = MAX_RANGE_COMPENSATION_TICKS
-                    )
+                    val snipeRangeMultiplier = calculateEffectiveRangeMultiplier(rangeMultiplier, ratio)
+                    if (ratio >= 1.0 && snipeRangeMultiplier > 1.0) {
+                        arrow.setGravity(false)
+                        snipeFlightStates[arrow.uniqueId] = SnipeFlightState(
+                            arrow = arrow,
+                            remainingTicks = calculateFlightLifetimeTicks(snipeRangeMultiplier)
+                        )
+                    }
 
                     shooter.playSound(shooter.location, Sound.ENTITY_FIREWORK_ROCKET_BLAST, 0.8f, 1.5f)
                 }
@@ -819,11 +859,15 @@ class WarriorBowEffectListener : Listener {
             return
         }
 
-        val leftVelocity = rotateAroundYAxis(mainVelocity, -THREE_WAY_ANGLE_DEGREES)
-        val rightVelocity = rotateAroundYAxis(mainVelocity, THREE_WAY_ANGLE_DEGREES)
+        val spawnLocation = arrow.location.clone().add(
+            mainVelocity.clone().normalize().multiply(THREE_WAY_SPAWN_FORWARD_OFFSET)
+        )
+        val launchUp = resolveShooterUpVector(shooter, mainVelocity)
+        val leftVelocity = rotateAroundAxis(mainVelocity, launchUp, -THREE_WAY_ANGLE_DEGREES)
+        val rightVelocity = rotateAroundAxis(mainVelocity, launchUp, THREE_WAY_ANGLE_DEGREES)
 
-        val leftArrow = spawnThreeWayArrowCopy(arrow, leftVelocity) ?: return
-        val rightArrow = spawnThreeWayArrowCopy(arrow, rightVelocity) ?: run {
+        val leftArrow = spawnThreeWayArrowCopy(arrow, spawnLocation.clone(), leftVelocity) ?: return
+        val rightArrow = spawnThreeWayArrowCopy(arrow, spawnLocation.clone(), rightVelocity) ?: run {
             leftArrow.remove()
             return
         }
@@ -866,6 +910,8 @@ class WarriorBowEffectListener : Listener {
 
         val mainSnipeState = snipeFlightStates[arrow.uniqueId]
         if (mainSnipeState != null) {
+            leftArrow.setGravity(false)
+            rightArrow.setGravity(false)
             snipeFlightStates[leftArrow.uniqueId] = mainSnipeState.copy(arrow = leftArrow)
             snipeFlightStates[rightArrow.uniqueId] = mainSnipeState.copy(arrow = rightArrow)
         }
