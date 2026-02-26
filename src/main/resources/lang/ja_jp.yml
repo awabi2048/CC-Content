@@ -299,7 +299,7 @@ skill:
       description: "warrior.bow_power_boost: power +1.0"
     arrow_saving_1:
       name: 矢節約 I
-      description: "warrior.bow_power_boost: power +0.5"
+      description: "warrior.arrow_saving: chance 25%"
     range_1:
       name: 射程強化 I
       description: "warrior.bow_power_boost: power +0.5"
