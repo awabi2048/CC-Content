@@ -124,9 +124,11 @@ skills:
     requiredLevel: 20
     icon: "BOW"
     effect:
-      type: "warrior.bow_power_boost"
+      type: "warrior.3way"
+      combineRule: "REPLACE"
       params:
-        power: 0.25
+        arrow_consumption: 3
+        side_damage_multiplier: 1.0
     children: ["3way_2"]
 
   piercing_1:
@@ -142,9 +144,11 @@ skills:
     requiredLevel: 25
     icon: "BOW"
     effect:
-      type: "warrior.bow_power_boost"
+      type: "warrior.3way"
+      combineRule: "REPLACE"
       params:
-        power: 0.5
+        arrow_consumption: 2
+        side_damage_multiplier: 1.0
     children: ["bow_power_2"]
 
   bow_power_2:
