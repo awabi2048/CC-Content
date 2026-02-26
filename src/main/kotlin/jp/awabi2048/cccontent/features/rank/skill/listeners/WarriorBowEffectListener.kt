@@ -2,8 +2,10 @@ package jp.awabi2048.cccontent.features.rank.skill.listeners
 
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.rank.profession.Profession
+import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorBowPowerBoostHandler
+import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorArrowSavingHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorPiercingHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorSnipeHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorThreeWayHandler
@@ -35,6 +37,7 @@ import org.bukkit.scheduler.BukkitRunnable
 import java.util.UUID
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.random.Random
 
 class WarriorBowEffectListener : Listener {
 
@@ -80,7 +83,24 @@ class WarriorBowEffectListener : Listener {
         val sideDamageMultiplier: Double
     )
 
+    private data class ArrowSavingResolution(
+        val finalChance: Double,
+        val cachedChance: Double,
+        val treeChance: Double?,
+        val enabledSkillIds: List<String>,
+        val disabledSkillIds: List<String>,
+        val reason: String
+    )
+
+    private data class ArrowAmmoSnapshot(
+        val template: ItemStack?,
+        val matchingCount: Int,
+        val typeCount: Int,
+        val anyCount: Int
+    )
+
     private val bowDrawStartedAtMillis = mutableMapOf<UUID, Long>()
+    private val bowDrawAmmoCounts = mutableMapOf<UUID, Int>()
     private val extraChargeStates = mutableMapOf<UUID, ExtraChargeState>()
     private val snipeFlightStates = mutableMapOf<UUID, SnipeFlightState>()
 
@@ -375,6 +395,52 @@ class WarriorBowEffectListener : Listener {
         return false
     }
 
+    private fun captureArrowAmmoSnapshot(player: Player, consumableTemplate: ItemStack?): ArrowAmmoSnapshot {
+        val template = consumableTemplate?.clone()?.takeUnless { it.type.isAir }
+        val matchingCount = if (template != null) countMatchingConsumables(player, template) else 0
+        val typeCount = if (template != null) countConsumablesByType(player, template.type) else 0
+        val anyCount = countAnyBowAmmo(player)
+        return ArrowAmmoSnapshot(
+            template = template,
+            matchingCount = matchingCount,
+            typeCount = typeCount,
+            anyCount = anyCount
+        )
+    }
+
+    private fun giveOneAmmo(player: Player, baseItem: ItemStack?) {
+        val giveItem = (baseItem?.clone() ?: ItemStack(Material.ARROW)).apply { amount = 1 }
+        val leftovers = player.inventory.addItem(giveItem)
+        for (leftover in leftovers.values) {
+            player.world.dropItemNaturally(player.location, leftover)
+        }
+    }
+
+    private fun scheduleArrowSavingCorrection(player: Player, snapshot: ArrowAmmoSnapshot, expectedAnyAmmo: Int) {
+        fun runSingleCorrection(delayTicks: Long) {
+            plugin.server.scheduler.runTaskLater(plugin, Runnable {
+                if (!player.isOnline) {
+                    return@Runnable
+                }
+
+                val currentAny = countAnyBowAmmo(player)
+                if (currentAny >= expectedAnyAmmo) {
+                    return@Runnable
+                }
+
+                val shortage = (expectedAnyAmmo - currentAny).coerceAtLeast(1)
+                val refundAmount = shortage.coerceAtMost(3)
+                repeat(refundAmount) {
+                    giveOneAmmo(player, snapshot.template ?: ItemStack(Material.ARROW))
+                }
+            }, delayTicks)
+        }
+
+        runSingleCorrection(1L)
+        runSingleCorrection(2L)
+        runSingleCorrection(5L)
+    }
+
     private fun getAmmoCandidateSlots(inventory: PlayerInventory): IntArray {
         val slots = ArrayList<Int>(40)
         val storageSize = inventory.storageContents.size
@@ -446,6 +512,87 @@ class WarriorBowEffectListener : Listener {
         return null
     }
 
+    private fun resolveArrowSavingChance(
+        compiledEffects: jp.awabi2048.cccontent.features.rank.skill.CompiledEffects?,
+        shooterUuid: UUID
+    ): ArrowSavingResolution {
+        val cachedChance = compiledEffects
+            ?.byType
+            ?.get(WarriorArrowSavingHandler.EFFECT_TYPE)
+            ?.sumOf { it.effect.getDoubleParam("chance", 0.0).coerceAtLeast(0.0) }
+            ?.coerceIn(0.0, 1.0)
+            ?: 0.0
+
+        val playerProfession = runCatching { CCContent.rankManager.getPlayerProfession(shooterUuid) }.getOrNull()
+            ?: return ArrowSavingResolution(
+                finalChance = cachedChance,
+                cachedChance = cachedChance,
+                treeChance = null,
+                enabledSkillIds = emptyList(),
+                disabledSkillIds = emptyList(),
+                reason = "player_profession_not_found"
+            )
+        if (playerProfession.profession != Profession.WARRIOR) {
+            return ArrowSavingResolution(
+                finalChance = cachedChance,
+                cachedChance = cachedChance,
+                treeChance = null,
+                enabledSkillIds = emptyList(),
+                disabledSkillIds = emptyList(),
+                reason = "not_warrior"
+            )
+        }
+
+        val skillTree = SkillTreeRegistry.getSkillTree(Profession.WARRIOR)
+            ?: return ArrowSavingResolution(
+                finalChance = cachedChance,
+                cachedChance = cachedChance,
+                treeChance = null,
+                enabledSkillIds = emptyList(),
+                disabledSkillIds = emptyList(),
+                reason = "warrior_skilltree_not_found"
+            )
+
+        val activationStates = playerProfession.skillActivationStates
+        val enabledSkillIds = mutableListOf<String>()
+        val disabledSkillIds = mutableListOf<String>()
+        val totalChance = playerProfession.acquiredSkills.sumOf { skillId ->
+            val effect = skillTree.getSkill(skillId)?.effect ?: return@sumOf 0.0
+            if (effect.type != WarriorArrowSavingHandler.EFFECT_TYPE) {
+                return@sumOf 0.0
+            }
+
+            if (!(activationStates[skillId] ?: true)) {
+                disabledSkillIds += skillId
+                return@sumOf 0.0
+            }
+
+            enabledSkillIds += skillId
+            effect.getDoubleParam("chance", 0.0).coerceAtLeast(0.0)
+        }
+
+        return if (enabledSkillIds.isNotEmpty()) {
+            val treeChance = totalChance.coerceIn(0.0, 1.0)
+            ArrowSavingResolution(
+                finalChance = treeChance,
+                cachedChance = cachedChance,
+                treeChance = treeChance,
+                enabledSkillIds = enabledSkillIds.toList(),
+                disabledSkillIds = disabledSkillIds.toList(),
+                reason = "tree"
+            )
+        } else {
+            ArrowSavingResolution(
+                finalChance = cachedChance,
+                cachedChance = cachedChance,
+                treeChance = 0.0,
+                enabledSkillIds = emptyList(),
+                disabledSkillIds = disabledSkillIds.toList(),
+                reason = if (disabledSkillIds.isNotEmpty()) "all_arrow_saving_disabled" else "arrow_saving_not_acquired"
+            )
+        }
+    }
+
     @Suppress("UNUSED_PARAMETER")
     private fun applyArrowConsumptionModifiers(baseConsumption: Int, shooter: Player): Int {
         return baseConsumption.coerceAtLeast(1)
@@ -467,6 +614,7 @@ class WarriorBowEffectListener : Listener {
 
         if (!itemInUsedHand.type.name.endsWith("BOW")) {
             bowDrawStartedAtMillis.remove(player.uniqueId)
+            bowDrawAmmoCounts.remove(player.uniqueId)
             if (extraChargeStates.remove(player.uniqueId) != null) {
                 clearChargeSubtitle(player)
             }
@@ -474,6 +622,7 @@ class WarriorBowEffectListener : Listener {
         }
 
         bowDrawStartedAtMillis[player.uniqueId] = System.currentTimeMillis()
+        bowDrawAmmoCounts[player.uniqueId] = countAnyBowAmmo(player)
         if (extraChargeStates.remove(player.uniqueId) != null) {
             clearChargeSubtitle(player)
         }
@@ -523,7 +672,7 @@ class WarriorBowEffectListener : Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     fun onShootBow(event: EntityShootBowEvent) {
         val shooter = event.entity as? Player ?: return
         val arrow = event.projectile as? AbstractArrow ?: return
@@ -539,8 +688,30 @@ class WarriorBowEffectListener : Listener {
             return
         }
 
+        val arrowSavingResolution = resolveArrowSavingChance(compiledEffects, shooter.uniqueId)
+        val arrowSavingChance = arrowSavingResolution.finalChance
+        val shouldConsumeBefore = event.shouldConsumeItem()
+        val arrowAmmoSnapshot = if (shouldConsumeBefore) {
+            captureArrowAmmoSnapshot(shooter, event.consumable)
+        } else {
+            null
+        }
+
+        if (shouldConsumeBefore && shooter.gameMode != GameMode.CREATIVE && arrowSavingChance > 0.0) {
+            val roll = Random.nextDouble()
+            val activated = roll < arrowSavingChance
+            if (activated) {
+                event.setConsumeItem(false)
+                if (arrowAmmoSnapshot != null) {
+                    val expectedAmmoCount = bowDrawAmmoCounts[shooter.uniqueId] ?: arrowAmmoSnapshot.anyCount
+                    scheduleArrowSavingCorrection(shooter, arrowAmmoSnapshot, expectedAmmoCount)
+                }
+            }
+        }
+
         val shooterUuid = shooter.uniqueId
         bowDrawStartedAtMillis.remove(shooterUuid)
+        bowDrawAmmoCounts.remove(shooterUuid)
 
         val fullChargeReached = event.force >= 1.0f
         val extraChargeState = extraChargeStates.remove(shooterUuid)
@@ -745,6 +916,7 @@ class WarriorBowEffectListener : Listener {
     fun onQuit(event: PlayerQuitEvent) {
         val playerUuid = event.player.uniqueId
         bowDrawStartedAtMillis.remove(playerUuid)
+        bowDrawAmmoCounts.remove(playerUuid)
         extraChargeStates.remove(playerUuid)
     }
 
