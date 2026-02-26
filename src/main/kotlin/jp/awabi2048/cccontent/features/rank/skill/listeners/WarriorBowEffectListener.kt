@@ -6,6 +6,7 @@ import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorBowPowerBoostHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorArrowSavingHandler
+import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorAimingHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorPiercingHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorSnipeHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorThreeWayHandler
@@ -16,7 +17,9 @@ import org.bukkit.Material
 import org.bukkit.GameMode
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.entity.AbstractArrow
+import org.bukkit.entity.Enemy
 import org.bukkit.entity.LivingEntity
+import org.bukkit.entity.Monster
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
@@ -60,6 +63,7 @@ class WarriorBowEffectListener : Listener {
         private const val EXTRA_CHARGE_RELEASE_GRACE_MILLIS = 750L
         private const val THREE_WAY_ANGLE_DEGREES = 5.0
         private const val THREE_WAY_SPAWN_FORWARD_OFFSET = 0.35
+        private const val HOMING_TARGET_SEARCH_RADIUS = 12.0
     }
 
     private data class SnipeFlightState(
@@ -85,6 +89,11 @@ class WarriorBowEffectListener : Listener {
         val sideDamageMultiplier: Double
     )
 
+    private data class AimingSettings(
+        val homingStrengthDegrees: Double,
+        val durationTicks: Int
+    )
+
     private data class ArrowSavingResolution(
         val finalChance: Double,
         val cachedChance: Double,
@@ -101,13 +110,23 @@ class WarriorBowEffectListener : Listener {
         val anyCount: Int
     )
 
+    private data class HomingArrowState(
+        val arrow: AbstractArrow,
+        val shooterUuid: UUID,
+        val homingStrengthDegrees: Double,
+        var remainingTicks: Int,
+        var targetUuid: UUID? = null
+    )
+
     private val bowDrawStartedAtMillis = mutableMapOf<UUID, Long>()
     private val bowDrawAmmoCounts = mutableMapOf<UUID, Int>()
     private val extraChargeStates = mutableMapOf<UUID, ExtraChargeState>()
     private val snipeFlightStates = mutableMapOf<UUID, SnipeFlightState>()
+    private val homingArrowStates = mutableMapOf<UUID, HomingArrowState>()
 
     init {
         startSnipeFlightTask()
+        startHomingTask()
         startExtraChargeHudTask()
     }
 
@@ -146,6 +165,155 @@ class WarriorBowEffectListener : Listener {
                 }
             }
         }.runTaskTimer(plugin, 1L, 1L)
+    }
+
+    private fun startHomingTask() {
+        object : BukkitRunnable() {
+            override fun run() {
+                if (homingArrowStates.isEmpty()) {
+                    return
+                }
+
+                val iterator = homingArrowStates.entries.iterator()
+                while (iterator.hasNext()) {
+                    val state = iterator.next().value
+                    val arrow = state.arrow
+                    if (!arrow.isValid || arrow.isDead || arrow.isOnGround || state.remainingTicks <= 0) {
+                        iterator.remove()
+                        continue
+                    }
+
+                    val target = resolveCurrentHomingTarget(state)
+                    if (target != null) {
+                        updateArrowHomingVelocity(arrow, target, state.homingStrengthDegrees)
+                    }
+
+                    state.remainingTicks -= 1
+                    if (state.remainingTicks <= 0) {
+                        iterator.remove()
+                    }
+                }
+            }
+        }.runTaskTimer(plugin, 1L, 1L)
+    }
+
+    private fun resolveCurrentHomingTarget(state: HomingArrowState): LivingEntity? {
+        val arrowLocation = state.arrow.location
+        val maxDistanceSquared = HOMING_TARGET_SEARCH_RADIUS * HOMING_TARGET_SEARCH_RADIUS
+
+        val currentTarget = state.targetUuid
+            ?.let { plugin.server.getEntity(it) as? LivingEntity }
+            ?.takeIf { isValidHomingTarget(it, arrowLocation, maxDistanceSquared) }
+        if (currentTarget != null) {
+            return currentTarget
+        }
+
+        val nearestTarget = findNearestHostileTarget(state.arrow, maxDistanceSquared)
+        state.targetUuid = nearestTarget?.uniqueId
+        return nearestTarget
+    }
+
+    private fun findNearestHostileTarget(arrow: AbstractArrow, maxDistanceSquared: Double): LivingEntity? {
+        val arrowLocation = arrow.location
+        val searchRadius = HOMING_TARGET_SEARCH_RADIUS
+        var nearestTarget: LivingEntity? = null
+        var nearestDistanceSquared = Double.MAX_VALUE
+
+        for (entity in arrow.world.getNearbyEntities(arrowLocation, searchRadius, searchRadius, searchRadius)) {
+            val livingEntity = entity as? LivingEntity ?: continue
+            if (!isValidHomingTarget(livingEntity, arrowLocation, maxDistanceSquared)) {
+                continue
+            }
+
+            val distanceSquared = livingEntity.location.distanceSquared(arrowLocation)
+            if (distanceSquared < nearestDistanceSquared) {
+                nearestDistanceSquared = distanceSquared
+                nearestTarget = livingEntity
+            }
+        }
+
+        return nearestTarget
+    }
+
+    private fun isValidHomingTarget(entity: LivingEntity, arrowLocation: org.bukkit.Location, maxDistanceSquared: Double): Boolean {
+        if (entity.isDead || !entity.isValid || !isHostileMob(entity)) {
+            return false
+        }
+        if (entity.world.uid != arrowLocation.world.uid) {
+            return false
+        }
+        return entity.location.distanceSquared(arrowLocation) <= maxDistanceSquared
+    }
+
+    private fun isHostileMob(entity: LivingEntity): Boolean {
+        return entity is Enemy || entity is Monster
+    }
+
+    private fun updateArrowHomingVelocity(arrow: AbstractArrow, target: LivingEntity, maxTurnDegrees: Double) {
+        val velocity = arrow.velocity
+        val speed = velocity.length()
+        if (speed <= 1.0E-8) {
+            return
+        }
+
+        val targetPoint = target.location.toVector().add(
+            org.bukkit.util.Vector(0.0, target.height * 0.5, 0.0)
+        )
+        val toTarget = targetPoint.subtract(arrow.location.toVector())
+        if (toTarget.lengthSquared() <= 1.0E-8) {
+            return
+        }
+
+        val nextDirection = rotateTowardsTargetDirection(
+            currentDirection = velocity.clone().normalize(),
+            targetDirection = toTarget.normalize(),
+            maxTurnDegrees = maxTurnDegrees
+        )
+        arrow.velocity = nextDirection.multiply(speed)
+    }
+
+    private fun rotateTowardsTargetDirection(
+        currentDirection: org.bukkit.util.Vector,
+        targetDirection: org.bukkit.util.Vector,
+        maxTurnDegrees: Double
+    ): org.bukkit.util.Vector {
+        val maxTurn = maxTurnDegrees.coerceAtLeast(0.0)
+        if (maxTurn <= 0.0) {
+            return currentDirection.clone().normalize()
+        }
+
+        val current = currentDirection.clone().normalize()
+        val target = targetDirection.clone().normalize()
+        val dot = current.dot(target).coerceIn(-1.0, 1.0)
+        val angleDegrees = Math.toDegrees(Math.acos(dot))
+        if (angleDegrees <= 1.0E-4) {
+            return target
+        }
+
+        val turnDegrees = minOf(maxTurn, angleDegrees)
+        if (turnDegrees >= angleDegrees) {
+            return target
+        }
+
+        val axis = current.clone().crossProduct(target)
+        val rotated = if (axis.lengthSquared() <= 1.0E-8) {
+            rotateAroundAxis(current, resolvePerpendicularAxis(current), turnDegrees)
+        } else {
+            rotateAroundAxis(current, axis, turnDegrees)
+        }
+
+        return if (rotated.lengthSquared() <= 1.0E-8) target else rotated.normalize()
+    }
+
+    private fun resolvePerpendicularAxis(direction: org.bukkit.util.Vector): org.bukkit.util.Vector {
+        var axis = direction.clone().crossProduct(org.bukkit.util.Vector(0.0, 1.0, 0.0))
+        if (axis.lengthSquared() <= 1.0E-8) {
+            axis = direction.clone().crossProduct(org.bukkit.util.Vector(1.0, 0.0, 0.0))
+        }
+        if (axis.lengthSquared() <= 1.0E-8) {
+            axis = org.bukkit.util.Vector(0.0, 0.0, 1.0)
+        }
+        return axis.normalize()
     }
 
     private fun startExtraChargeHudTask() {
@@ -296,6 +464,28 @@ class WarriorBowEffectListener : Listener {
         val copiedArrow = sourceArrow.copy(spawnLocation) as? AbstractArrow ?: return null
         copiedArrow.velocity = velocity
         return copiedArrow
+    }
+
+    private fun registerHomingState(arrow: AbstractArrow, shooterUuid: UUID, settings: AimingSettings) {
+        if (settings.homingStrengthDegrees <= 0.0 || settings.durationTicks <= 0) {
+            homingArrowStates.remove(arrow.uniqueId)
+            return
+        }
+
+        homingArrowStates[arrow.uniqueId] = HomingArrowState(
+            arrow = arrow,
+            shooterUuid = shooterUuid,
+            homingStrengthDegrees = settings.homingStrengthDegrees,
+            remainingTicks = settings.durationTicks
+        )
+    }
+
+    private fun cloneHomingState(sourceArrow: AbstractArrow, targetArrow: AbstractArrow) {
+        val sourceState = homingArrowStates[sourceArrow.uniqueId] ?: return
+        homingArrowStates[targetArrow.uniqueId] = sourceState.copy(
+            arrow = targetArrow,
+            targetUuid = null
+        )
     }
 
     private fun countMatchingConsumables(player: Player, template: ItemStack): Int {
@@ -632,6 +822,51 @@ class WarriorBowEffectListener : Listener {
         }
     }
 
+    private fun resolveAimingSettings(
+        compiledEffects: jp.awabi2048.cccontent.features.rank.skill.CompiledEffects?,
+        shooterUuid: UUID
+    ): AimingSettings? {
+        val cachedEntries = compiledEffects?.byType?.get(WarriorAimingHandler.EFFECT_TYPE)
+        if (!cachedEntries.isNullOrEmpty()) {
+            val homingStrength = cachedEntries
+                .sumOf { it.effect.getDoubleParam("homing_strength", 0.0).coerceAtLeast(0.0) }
+            val durationTicks = cachedEntries
+                .sumOf { it.effect.getIntParam("duration", 0).coerceAtLeast(0) }
+            if (homingStrength > 0.0 && durationTicks > 0) {
+                return AimingSettings(homingStrength, durationTicks)
+            }
+        }
+
+        val playerProfession = runCatching { CCContent.rankManager.getPlayerProfession(shooterUuid) }.getOrNull()
+            ?: return null
+        if (playerProfession.profession != Profession.WARRIOR) {
+            return null
+        }
+
+        val skillTree = SkillTreeRegistry.getSkillTree(Profession.WARRIOR) ?: return null
+        val activationStates = playerProfession.skillActivationStates
+
+        var homingStrength = 0.0
+        var durationTicks = 0
+        for (skillId in playerProfession.acquiredSkills) {
+            val effect = skillTree.getSkill(skillId)?.effect ?: continue
+            if (effect.type != WarriorAimingHandler.EFFECT_TYPE) {
+                continue
+            }
+            if (!(activationStates[skillId] ?: true)) {
+                continue
+            }
+
+            homingStrength += effect.getDoubleParam("homing_strength", 0.0).coerceAtLeast(0.0)
+            durationTicks += effect.getIntParam("duration", 0).coerceAtLeast(0)
+        }
+
+        if (homingStrength <= 0.0 || durationTicks <= 0) {
+            return null
+        }
+        return AimingSettings(homingStrength, durationTicks)
+    }
+
     @Suppress("UNUSED_PARAMETER")
     private fun applyArrowConsumptionModifiers(baseConsumption: Int, shooter: Player): Int {
         return baseConsumption.coerceAtLeast(1)
@@ -806,6 +1041,15 @@ class WarriorBowEffectListener : Listener {
             arrow.pierceLevel = piercingLevel
         }
 
+        val aimingSettings = resolveAimingSettings(compiledEffects, shooter.uniqueId)
+        if (aimingSettings != null) {
+            registerHomingState(arrow, shooter.uniqueId, aimingSettings)
+        }
+
+        if (shooter.isSneaking) {
+            return
+        }
+
         val threeWaySettings = resolveThreeWaySettings(compiledEffects, shooter.uniqueId)
             ?: return
         val baseArrowConsumption = threeWaySettings.arrowConsumption
@@ -862,6 +1106,8 @@ class WarriorBowEffectListener : Listener {
         val spawnLocation = arrow.location.clone().add(
             mainVelocity.clone().normalize().multiply(THREE_WAY_SPAWN_FORWARD_OFFSET)
         )
+        arrow.teleport(spawnLocation)
+
         val launchUp = resolveShooterUpVector(shooter, mainVelocity)
         val leftVelocity = rotateAroundAxis(mainVelocity, launchUp, -THREE_WAY_ANGLE_DEGREES)
         val rightVelocity = rotateAroundAxis(mainVelocity, launchUp, THREE_WAY_ANGLE_DEGREES)
@@ -915,6 +1161,9 @@ class WarriorBowEffectListener : Listener {
             snipeFlightStates[leftArrow.uniqueId] = mainSnipeState.copy(arrow = leftArrow)
             snipeFlightStates[rightArrow.uniqueId] = mainSnipeState.copy(arrow = rightArrow)
         }
+
+        cloneHomingState(arrow, leftArrow)
+        cloneHomingState(arrow, rightArrow)
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -945,6 +1194,7 @@ class WarriorBowEffectListener : Listener {
     fun onProjectileHit(event: ProjectileHitEvent) {
         val arrow = event.entity as? AbstractArrow ?: return
         snipeFlightStates.remove(arrow.uniqueId)
+        homingArrowStates.remove(arrow.uniqueId)
 
         if (!isThreeWayArrow(arrow)) {
             return
@@ -964,6 +1214,13 @@ class WarriorBowEffectListener : Listener {
         bowDrawStartedAtMillis.remove(playerUuid)
         bowDrawAmmoCounts.remove(playerUuid)
         extraChargeStates.remove(playerUuid)
+
+        val iterator = homingArrowStates.entries.iterator()
+        while (iterator.hasNext()) {
+            if (iterator.next().value.shooterUuid == playerUuid) {
+                iterator.remove()
+            }
+        }
     }
 
     private fun enchantLevelBonusDamage(level: Double): Double {
