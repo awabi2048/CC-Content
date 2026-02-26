@@ -135,9 +135,9 @@ skills:
     requiredLevel: 25
     icon: "BOW"
     effect:
-      type: "warrior.bow_power_boost"
+      type: "warrior.piercing"
       params:
-        power: 0.75
+        max_pierce_count: 1
     children: ["bow_power_2"]
 
   3way_2:

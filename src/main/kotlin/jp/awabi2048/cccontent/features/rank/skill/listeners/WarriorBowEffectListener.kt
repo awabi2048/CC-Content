@@ -4,6 +4,7 @@ import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorBowPowerBoostHandler
+import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorPiercingHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorSnipeHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorThreeWayHandler
 import org.bukkit.NamespacedKey
@@ -389,6 +390,30 @@ class WarriorBowEffectListener : Listener {
         return slots.toIntArray()
     }
 
+    private fun resolvePiercingLevel(
+        compiledEffects: jp.awabi2048.cccontent.features.rank.skill.CompiledEffects?,
+        shooterUuid: UUID
+    ): Int? {
+        val piercingEntry = compiledEffects?.byType?.get(WarriorPiercingHandler.EFFECT_TYPE)?.firstOrNull()
+        if (piercingEntry != null) {
+            return piercingEntry.effect.getIntParam("max_pierce_count", 1).coerceIn(1, 127)
+        }
+
+        val playerProfession = runCatching { CCContent.rankManager.getPlayerProfession(shooterUuid) }.getOrNull()
+            ?: return null
+        if (playerProfession.profession != Profession.WARRIOR) {
+            return null
+        }
+
+        val activationStates = playerProfession.skillActivationStates
+        val piercingEnabled = activationStates["piercing_1"] ?: true
+        if ("piercing_1" in playerProfession.acquiredSkills && piercingEnabled) {
+            return 1
+        }
+
+        return null
+    }
+
     private fun resolveThreeWaySettings(
         compiledEffects: jp.awabi2048.cccontent.features.rank.skill.CompiledEffects?,
         shooterUuid: UUID
@@ -565,6 +590,11 @@ class WarriorBowEffectListener : Listener {
             }
         }
 
+        val piercingLevel = resolvePiercingLevel(compiledEffects, shooter.uniqueId)
+        if (piercingLevel != null && piercingLevel > 0) {
+            arrow.pierceLevel = piercingLevel
+        }
+
         val threeWaySettings = resolveThreeWaySettings(compiledEffects, shooter.uniqueId)
             ?: return
         val baseArrowConsumption = threeWaySettings.arrowConsumption
@@ -650,6 +680,11 @@ class WarriorBowEffectListener : Listener {
                 rightArrow.remove()
                 return
             }
+        }
+
+        if (piercingLevel != null && piercingLevel > 0) {
+            leftArrow.pierceLevel = piercingLevel
+            rightArrow.pierceLevel = piercingLevel
         }
 
         markAsThreeWayArrow(arrow)

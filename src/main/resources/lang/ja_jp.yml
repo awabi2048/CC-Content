@@ -290,7 +290,7 @@ skill:
       description: "warrior.3way: 左右15度に追加射出（矢消費3本）"
     piercing_1:
       name: 貫通 I
-      description: "warrior.bow_power_boost: power +0.75"
+      description: "warrior.piercing: max_pierce_count 1"
     3way_2:
       name: 三連射 II
       description: "warrior.3way: 左右15度に追加射出（矢消費2本）"
