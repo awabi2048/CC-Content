@@ -173,9 +173,9 @@ skills:
     requiredLevel: 40
     icon: "BOW"
     effect:
-      type: "warrior.bow_power_boost"
+      type: "warrior.quick_charge"
       params:
-        power: 0.5
+        speed_multiplier: 1.5
     children: ["aiming_1"]
 
   aiming_1:

@@ -8,6 +8,7 @@ import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorBowPowerBoostH
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorArrowSavingHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorAimingHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorPiercingHandler
+import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorQuickChargeHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorSnipeHandler
 import jp.awabi2048.cccontent.features.rank.skill.handlers.WarriorThreeWayHandler
 import org.bukkit.NamespacedKey
@@ -42,6 +43,7 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 
 class WarriorBowEffectListener : Listener {
@@ -867,6 +869,82 @@ class WarriorBowEffectListener : Listener {
         return AimingSettings(homingStrength, durationTicks)
     }
 
+    private fun resolveQuickChargeMultiplier(
+        compiledEffects: jp.awabi2048.cccontent.features.rank.skill.CompiledEffects?,
+        shooterUuid: UUID
+    ): Double {
+        val cachedMultiplier = compiledEffects
+            ?.byType
+            ?.get(WarriorQuickChargeHandler.EFFECT_TYPE)
+            ?.sumOf { it.effect.getDoubleParam("speed_multiplier", 0.0).coerceAtLeast(0.0) }
+            ?: 0.0
+        if (cachedMultiplier > 0.0) {
+            return cachedMultiplier
+        }
+
+        val playerProfession = runCatching { CCContent.rankManager.getPlayerProfession(shooterUuid) }.getOrNull()
+            ?: return cachedMultiplier
+        if (playerProfession.profession != Profession.WARRIOR) {
+            return cachedMultiplier
+        }
+
+        val skillTree = SkillTreeRegistry.getSkillTree(Profession.WARRIOR) ?: return cachedMultiplier
+        val activationStates = playerProfession.skillActivationStates
+
+        val treeMultiplier = playerProfession.acquiredSkills.sumOf { skillId ->
+            val effect = skillTree.getSkill(skillId)?.effect ?: return@sumOf 0.0
+            if (effect.type != WarriorQuickChargeHandler.EFFECT_TYPE) {
+                return@sumOf 0.0
+            }
+            if (!(activationStates[skillId] ?: true)) {
+                return@sumOf 0.0
+            }
+            effect.getDoubleParam("speed_multiplier", 0.0).coerceAtLeast(0.0)
+        }
+
+        return if (treeMultiplier > 0.0) treeMultiplier else cachedMultiplier
+    }
+
+    private fun estimateChargeTicksFromBowForce(force: Double): Double {
+        val clampedForce = force.coerceIn(0.0, 1.0)
+        if (clampedForce >= 1.0) {
+            return FULL_BOW_CHARGE_TICKS
+        }
+
+        val normalizedDraw = (sqrt(1.0 + 3.0 * clampedForce) - 1.0).coerceAtLeast(0.0)
+        return (normalizedDraw * FULL_BOW_CHARGE_TICKS).coerceAtLeast(0.0)
+    }
+
+    private fun calculateBowForceFromChargeTicks(chargeTicks: Double): Double {
+        val normalizedDraw = (chargeTicks / FULL_BOW_CHARGE_TICKS).coerceAtLeast(0.0)
+        val force = (normalizedDraw * normalizedDraw + normalizedDraw * 2.0) / 3.0
+        return force.coerceIn(0.0, 1.0)
+    }
+
+    private fun applyQuickChargeVelocityMultiplier(arrow: AbstractArrow, eventForce: Float, speedMultiplier: Double) {
+        if (speedMultiplier <= 0.0 || abs(speedMultiplier - 1.0) <= 1.0E-6) {
+            return
+        }
+
+        val originalForce = eventForce.toDouble().coerceIn(0.0, 1.0)
+        if (originalForce <= 1.0E-8) {
+            return
+        }
+
+        val originalChargeTicks = estimateChargeTicksFromBowForce(originalForce)
+        val effectiveChargeTicks = (originalChargeTicks * speedMultiplier).coerceAtLeast(0.0)
+        val effectiveForce = calculateBowForceFromChargeTicks(effectiveChargeTicks)
+        val scale = effectiveForce / originalForce
+        if (scale <= 1.0E-8) {
+            return
+        }
+
+        arrow.velocity = arrow.velocity.multiply(scale)
+        if (effectiveForce >= 1.0 - 1.0E-6) {
+            arrow.isCritical = true
+        }
+    }
+
     @Suppress("UNUSED_PARAMETER")
     private fun applyArrowConsumptionModifiers(baseConsumption: Int, shooter: Player): Int {
         return baseConsumption.coerceAtLeast(1)
@@ -960,6 +1038,11 @@ class WarriorBowEffectListener : Listener {
         }
         if (!bow.type.name.contains("BOW")) {
             return
+        }
+
+        val quickChargeMultiplier = resolveQuickChargeMultiplier(compiledEffects, shooter.uniqueId)
+        if (quickChargeMultiplier > 0.0) {
+            applyQuickChargeVelocityMultiplier(arrow, event.force, quickChargeMultiplier)
         }
 
         val arrowSavingResolution = resolveArrowSavingChance(compiledEffects, shooter.uniqueId)

@@ -301,8 +301,8 @@ skill:
       name: 矢節約 I
       description: "warrior.arrow_saving: chance 25%"
     range_1:
-      name: 射程強化 I
-      description: "warrior.bow_power_boost: power +0.5"
+      name: 速射強化 I
+      description: "warrior.quick_charge: speed_multiplier x1.5"
     aiming_1:
       name: 照準強化 I
       description: "warrior.aiming: homing_strength 6.0/tick, duration 40tick"
