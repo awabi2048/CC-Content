@@ -15,6 +15,8 @@ import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
 import jp.awabi2048.cccontent.features.rank.gui.ConfirmationDialog
 import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillManager
 import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillIdentifier
+import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
+import jp.awabi2048.cccontent.features.rank.skill.handlers.AttackReachBoostHandler
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.Sound
@@ -84,15 +86,8 @@ class RankCommand(
         return when (args[0].lowercase()) {
             "add-exp" -> handleAddExp(sender, args)
             "set-prof-level" -> handleSetProfLevel(sender, args)
-            "rankup" -> handleRankUp(sender, args)
-            "profession" -> handleProfession(sender, args)
-            "skill" -> handleSkill(sender, args)
+            "set" -> handleSet(sender, args)
             "reset" -> handleReset(sender, args)
-            "info" -> handleInfo(sender, args)
-            "task-info" -> handleTaskInfo(sender, args)
-            "task-reset" -> handleTaskReset(sender, args)
-            "complete-task" -> handleCompleteTask(sender, args)
-            "bossbar" -> handleBossbar(sender, args)
             else -> {
                 sendUsage(sender)
                 false
@@ -156,6 +151,89 @@ class RankCommand(
         }
 
         return success
+    }
+
+    private fun handleSet(sender: CommandSender, args: Array<out String>): Boolean {
+        if (sender !is Player) {
+            sender.sendMessage("§cこのコマンドはプレイヤーのみ実行できます")
+            return false
+        }
+
+        if (args.size < 2) {
+            sender.sendMessage("§c使用法: /rank set <ランク名>")
+            return false
+        }
+
+        val targetName = args[1]
+        val uuid = sender.uniqueId
+
+        val tutorialRank = TutorialRank.entries.firstOrNull { it.name.equals(targetName, ignoreCase = true) }
+        if (tutorialRank != null) {
+            rankManager.resetProfession(uuid)
+            rankManager.setTutorialRank(uuid, tutorialRank)
+
+            val tutorial = rankManager.getPlayerTutorial(uuid)
+            tutorial.taskProgress = TaskProgress(uuid, tutorialRank.name)
+            tutorial.lastUpdated = System.currentTimeMillis()
+            tutorial.lastPlayTime = System.currentTimeMillis()
+            rankManager.saveData()
+            refreshSkillEffectCache(sender)
+
+            sender.sendMessage("§aランクを ${tutorialRank.name} に設定しました")
+            return true
+        }
+
+        val profession = Profession.entries.firstOrNull {
+            it.id.equals(targetName, ignoreCase = true) || it.name.equals(targetName, ignoreCase = true)
+        }
+        if (profession != null) {
+            rankManager.setTutorialRank(uuid, TutorialRank.ATTAINER)
+            val success = if (rankManager.hasProfession(uuid)) {
+                val current = rankManager.getPlayerProfession(uuid)?.profession
+                if (current == profession) {
+                    true
+                } else {
+                    rankManager.changeProfession(uuid, profession)
+                }
+            } else {
+                rankManager.selectProfession(uuid, profession)
+            }
+
+            if (!success) {
+                sender.sendMessage("§c職業の設定に失敗しました")
+                return false
+            }
+
+            refreshSkillEffectCache(sender)
+
+            sender.sendMessage("§aランクを職業 ${profession.id} に設定しました")
+            return true
+        }
+
+        sender.sendMessage("§c無効なランク名です: $targetName")
+        sender.sendMessage(
+            "§7使用可能: ${TutorialRank.entries.joinToString(", ") { it.name }} / ${Profession.entries.joinToString(", ") { it.id }}"
+        )
+        return false
+    }
+
+    private fun refreshSkillEffectCache(player: Player) {
+        val uuid = player.uniqueId
+        val playerProf = rankManager.getPlayerProfession(uuid)
+
+        if (playerProf == null) {
+            SkillEffectEngine.clearCache(uuid)
+            AttackReachBoostHandler.removeModifier(uuid)
+            return
+        }
+
+        SkillEffectEngine.rebuildCache(
+            uuid,
+            playerProf.acquiredSkills,
+            playerProf.profession,
+            playerProf.prestigeSkills,
+            playerProf.skillActivationStates
+        )
     }
     
     private fun handleRankUp(sender: CommandSender, args: Array<out String>): Boolean {
@@ -3295,15 +3373,8 @@ class RankCommand(
         sender.sendMessage("§6=== ランクシステムコマンド ===")
         sender.sendMessage("§a/rank add-exp <player> <amount> §7- 職業経験値を追加")
         sender.sendMessage("§a/rank set-prof-level <player> <level> §7- 職業レベルを設定")
-        sender.sendMessage("§a/rank rankup <player> §7- 次のランクにランクアップ")
-        sender.sendMessage("§a/rank profession <player> <id> §7- 職業を選択/変更")
-        sender.sendMessage("§a/rank skill §7- スキルツリーGUIを表示")
+        sender.sendMessage("§a/rank set <ランク名> §7- 自分のランクを設定")
         sender.sendMessage("§a/rank reset <player> §7- 最低ランクにリセット")
-        sender.sendMessage("§a/rank info [player] §7- ランク情報表示")
-        sender.sendMessage("§a/rank task-info <player> §7- タスク進捗を表示")
-        sender.sendMessage("§a/rank task-reset <player> §7- タスク進捗をリセット")
-        sender.sendMessage("§a/rank complete-task <player> §7- タスクをすべて完了扱いに")
-        sender.sendMessage("§a/rank bossbar <on|off> §7- 経験値ボスバーの表示切替")
     }
     
     override fun onTabComplete(
@@ -3313,15 +3384,13 @@ class RankCommand(
         args: Array<out String>
     ): List<String> {
         return when {
-            args.size == 1 -> listOf("add-exp", "set-prof-level", "rankup", "profession", "skill", "reset", "info", "task-info", "task-reset", "complete-task", "bossbar")
+            args.size == 1 -> listOf("add-exp", "set-prof-level", "set", "reset")
                 .filter { it.startsWith(args[0].lowercase()) }
-            args.size == 2 && args[0].equals("bossbar", ignoreCase = true) ->
-                listOf("on", "off").filter { it.startsWith(args[1].lowercase()) }
+            args.size == 2 && args[0].equals("set", ignoreCase = true) ->
+                (TutorialRank.entries.map { it.name.lowercase() } + Profession.entries.map { it.id })
+                    .filter { it.startsWith(args[1].lowercase()) }
             args.size == 2 -> Bukkit.getOnlinePlayers().map { it.name }
                 .filter { it.startsWith(args[1], ignoreCase = true) }
-            args.size == 3 && args[0].equals("profession", ignoreCase = true) -> 
-                Profession.values().map { it.id }
-                    .filter { it.startsWith(args[2].lowercase()) }
             else -> emptyList()
         }
     }
