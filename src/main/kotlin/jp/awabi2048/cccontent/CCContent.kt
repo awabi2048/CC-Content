@@ -355,6 +355,7 @@ class CCContent : JavaPlugin(), Listener {
             SkillEffectRegistry.register(CombatDamageBoostHandler())
             SkillEffectRegistry.register(WarriorAxeDamageBoostHandler())
             SkillEffectRegistry.register(WarriorBowPowerBoostHandler())
+            SkillEffectRegistry.register(WarriorQuickChargeHandler())
             SkillEffectRegistry.register(WarriorArrowSavingHandler())
             SkillEffectRegistry.register(WarriorPiercingHandler())
             SkillEffectRegistry.register(WarriorThreeWayHandler())
