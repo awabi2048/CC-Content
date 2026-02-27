@@ -33,6 +33,12 @@ interface CustomItem {
      * @return 生成されたItemStack
      */
     fun createItem(amount: Int = 1): ItemStack
+
+    /**
+     * プレイヤー文脈付きでアイテムを生成
+     * デフォルトではcreateItem(amount)を使用
+     */
+    fun createItemForPlayer(player: Player?, amount: Int = 1): ItemStack = createItem(amount)
     
     /**
      * ItemStackがこのカスタムアイテムと一致するか判定
@@ -40,6 +46,16 @@ interface CustomItem {
      * @return 一致する場合true
      */
     fun matches(item: ItemStack): Boolean
+
+    /**
+     * 既存アイテムの表示テキストをプレイヤー言語に合わせて更新
+     * 将来的な言語再適用機能で利用する
+     */
+    fun updateLocalization(item: ItemStack, player: Player?) {
+        val localized = createItemForPlayer(player, item.amount.coerceAtLeast(1))
+        val localizedMeta = localized.itemMeta ?: return
+        item.itemMeta = localizedMeta
+    }
     
     /**
      * 右クリック時の処理（オプション）

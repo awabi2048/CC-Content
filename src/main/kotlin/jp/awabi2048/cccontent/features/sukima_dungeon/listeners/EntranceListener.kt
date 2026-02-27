@@ -22,33 +22,10 @@ import org.bukkit.ChatColor
 import org.bukkit.Material
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
-import org.bukkit.event.block.Action
 import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.plugin.java.JavaPlugin
 
 class EntranceListener(private val plugin: JavaPlugin, private val loader: StructureLoader) : Listener {
-
-    @EventHandler
-    fun onPlayerInteract(event: PlayerInteractEvent) {
-        if (event.action == Action.RIGHT_CLICK_AIR || event.action == Action.RIGHT_CLICK_BLOCK) {
-            val item = event.item
-            if (CustomItemManager.isBookmarkItem(item)) {
-                // Check world blacklist
-                val blacklist = jp.awabi2048.cccontent.features.sukima_dungeon.SukimaConfigHelper.getConfig(plugin).getStringList("bookmark_blacklist_worlds")
-                if (blacklist.contains(event.player.world.name) || isSukimaDungeonWorld(event.player.world)) {
-                    event.player.sendMessage(MessageManager.getMessage(event.player, "bookmark_cannot_use_here"))
-                    event.isCancelled = true
-                    return
-                }
-
-                val tier = CustomItemManager.getTier(item!!) ?: DungeonTier.BROKEN
-                DungeonEntranceGui(loader, tier).open(event.player)
-                event.player.playSound(event.player.location, org.bukkit.Sound.ITEM_BOOK_PAGE_TURN, 1.0f, 1.0f)
-                event.isCancelled = true
-            }
-        }
-    }
 
     @EventHandler
     fun onInventoryClick(event: InventoryClickEvent) {

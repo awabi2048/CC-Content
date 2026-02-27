@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.items.misc
 
 import jp.awabi2048.cccontent.items.CustomItem
+import jp.awabi2048.cccontent.items.CustomItemI18n
 import io.papermc.paper.datacomponent.DataComponentTypes
 import io.papermc.paper.datacomponent.item.Consumable
 import io.papermc.paper.datacomponent.item.Tool
@@ -8,6 +9,7 @@ import io.papermc.paper.datacomponent.item.ItemAttributeModifiers
 import io.papermc.paper.datacomponent.item.consumable.ItemUseAnimation
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
+import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataType
 import net.kyori.adventure.text.Component
@@ -26,12 +28,17 @@ class BigLight : CustomItem {
         "§e§nShift + 右クリック§7で元の大きさに戻ることができます。"
     )
     
-    override fun createItem(amount: Int): ItemStack {
+    override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
+
+    override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
         val item = ItemStack(Material.POISONOUS_POTATO, amount)
         val meta = item.itemMeta ?: return item
 
-        meta.displayName(Component.text(displayName))
-        meta.lore(lore.map { Component.text(it) })
+        val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
+        val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
+
+        meta.displayName(Component.text(name))
+        meta.lore(localizedLore.map { Component.text(it) })
 
         // Set item model to spyglass
         meta.setItemModel(NamespacedKey.minecraft("spyglass"))
@@ -71,12 +78,17 @@ class SmallLight : CustomItem {
         "§e§nShift + 右クリック§7で元の大きさに戻ることができます。"
     )
     
-    override fun createItem(amount: Int): ItemStack {
+    override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
+
+    override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
         val item = ItemStack(Material.POISONOUS_POTATO, amount)
         val meta = item.itemMeta ?: return item
-        
-        meta.displayName(Component.text(displayName))
-        meta.lore(lore.map { Component.text(it) })
+
+        val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
+        val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
+
+        meta.displayName(Component.text(name))
+        meta.lore(localizedLore.map { Component.text(it) })
 
         // Set item model to spyglass
         meta.setItemModel(NamespacedKey.minecraft("spyglass"))

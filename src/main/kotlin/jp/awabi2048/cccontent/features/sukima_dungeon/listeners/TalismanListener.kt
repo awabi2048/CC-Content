@@ -2,39 +2,14 @@ package jp.awabi2048.cccontent.features.sukima_dungeon.listeners
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.*
 import jp.awabi2048.cccontent.features.sukima_dungeon.gui.TalismanConfirmGui
-import org.bukkit.Bukkit
-import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
-import org.bukkit.event.block.Action
-import org.bukkit.event.inventory.ClickType
-import org.bukkit.event.inventory.InventoryAction
 import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.event.inventory.InventoryType
 import org.bukkit.event.player.PlayerDropItemEvent
-import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.plugin.java.JavaPlugin
 
 class TalismanListener(private val plugin: JavaPlugin) : Listener {
-
-    @EventHandler
-    fun onPlayerInteract(event: PlayerInteractEvent) {
-        val player = event.player
-        val item = event.item ?: return
-
-        if (CustomItemManager.isTalismanItem(item)) {
-            if (event.action == Action.RIGHT_CLICK_AIR || event.action == Action.RIGHT_CLICK_BLOCK) {
-                if (isSukimaDungeonWorld(player.world)) {
-                    TalismanConfirmGui().open(player)
-                    player.playSound(player.location, org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f)
-                } else {
-                    player.sendMessage(MessageManager.getMessage(player, "talisman_cannot_use_here"))
-                }
-                event.isCancelled = true
-            }
-        }
-    }
 
     @EventHandler
     fun onInventoryClick(event: InventoryClickEvent) {
@@ -93,49 +68,6 @@ class TalismanListener(private val plugin: JavaPlugin) : Listener {
                 }
             }
             return
-        }
-
-        // Inventory restrictions
-        val currentItem = event.currentItem
-        val cursorItem = event.cursor
-        val action = event.action
-        
-        val isTalismanInSlot = CustomItemManager.isTalismanItem(currentItem)
-        val isTalismanOnCursor = CustomItemManager.isTalismanItem(cursorItem)
-        val isTalismanInHotbar = event.click == ClickType.NUMBER_KEY && CustomItemManager.isTalismanItem(player.inventory.getItem(event.hotbarButton))
-
-        if (isTalismanInSlot || isTalismanOnCursor || isTalismanInHotbar) {
-            // Block dropping via Q or clicking outside
-            if (action == InventoryAction.DROP_ALL_CURSOR || action == InventoryAction.DROP_ALL_SLOT ||
-                action == InventoryAction.DROP_ONE_CURSOR || action == InventoryAction.DROP_ONE_SLOT ||
-                event.click == ClickType.WINDOW_BORDER_LEFT || event.click == ClickType.WINDOW_BORDER_RIGHT) {
-                event.isCancelled = true
-                return
-            }
-
-            // Block moving to other inventory (Chest, etc.)
-            val clickedInventory = event.clickedInventory ?: return
-            val topInventory = event.view.topInventory
-            
-            if (action == InventoryAction.MOVE_TO_OTHER_INVENTORY) {
-                // Shift-click: block if moving from player inventory TO external inventory
-                if (clickedInventory == event.view.bottomInventory && topInventory.type != InventoryType.CRAFTING && topInventory.type != InventoryType.PLAYER) {
-                    event.isCancelled = true
-                    return
-                }
-            }
-            
-            // Clicking/Placing into top inventory
-            if (clickedInventory == topInventory && topInventory.type != InventoryType.CRAFTING && topInventory.type != InventoryType.PLAYER) {
-                 event.isCancelled = true
-                 return
-            }
-            
-            // Number key swap to top inventory
-            if (event.click == ClickType.NUMBER_KEY && clickedInventory == topInventory && topInventory.type != InventoryType.CRAFTING && topInventory.type != InventoryType.PLAYER) {
-                event.isCancelled = true
-                return
-            }
         }
     }
 
