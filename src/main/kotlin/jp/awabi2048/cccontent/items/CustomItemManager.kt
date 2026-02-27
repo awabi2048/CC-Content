@@ -26,6 +26,17 @@ object CustomItemManager {
     fun register(item: CustomItem) {
         items[item.fullId] = item
     }
+
+    fun unregisterByPrefix(prefix: String): Int {
+        val before = items.size
+        val iterator = items.keys.iterator()
+        while (iterator.hasNext()) {
+            if (iterator.next().startsWith(prefix)) {
+                iterator.remove()
+            }
+        }
+        return before - items.size
+    }
     
     /**
      * アイテムIDでアイテムを取得

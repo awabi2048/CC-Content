@@ -1,0 +1,52 @@
+variant_id: halloween
+
+item:
+  material: NAME_TAG
+  name: "&6&lカスタムヘッド券 - ハロウィン"
+  lore:
+    - "&7右クリックでハロウィンテーマのヘッド一覧を開く"
+    - "&7ヘッド選択後、確認ダイアログで交換"
+  custom_model_data: 5102
+
+gui:
+  title: "&0&lハロウィンヘッドセレクター"
+  theme_icon_material: JACK_O_LANTERN
+  theme_icon_name: "&6&lハロウィンテーマ"
+
+heads:
+  - hdb_id: "2487"
+    name: "&6ジャックオランタン"
+    lore:
+      - "&7HeadDatabase ID: 2487"
+  - hdb_id: "2514"
+    name: "&6パンプキンキャンディ"
+    lore:
+      - "&7HeadDatabase ID: 2514"
+  - hdb_id: "10520"
+    name: "&6おばけキャンドル"
+    lore:
+      - "&7HeadDatabase ID: 10520"
+  - hdb_id: "2487"
+    name: "&6ハロウィンランプ"
+    lore:
+      - "&7夜用装飾サンプル"
+  - hdb_id: "2514"
+    name: "&6トリックキャンディ"
+    lore:
+      - "&7イベント屋台向け"
+  - hdb_id: "10520"
+    name: "&6ゴーストライト"
+    lore:
+      - "&7雰囲気演出用"
+  - hdb_id: "2487"
+    name: "&6パンプキンゲート"
+    lore:
+      - "&7入口装飾向け"
+  - hdb_id: "2514"
+    name: "&6ミニキャンディ"
+    lore:
+      - "&7小物装飾向け"
+  - hdb_id: "10520"
+    name: "&6おばけミニランタン"
+    lore:
+      - "&7小物装飾向け"
