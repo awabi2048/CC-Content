@@ -6,10 +6,14 @@ import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemInteractionListener
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.misc.BigLight
+import jp.awabi2048.cccontent.items.misc.CustomHeadConfigRegistry
+import jp.awabi2048.cccontent.items.misc.CustomHeadGuiListener
+import jp.awabi2048.cccontent.items.misc.CustomHeadItem
 import jp.awabi2048.cccontent.items.misc.SmallLight
 import jp.awabi2048.cccontent.items.misc.GulliverItemListener
 import jp.awabi2048.cccontent.items.misc.GulliverConfig
 import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
+import jp.awabi2048.cccontent.items.misc.HeadDatabaseBridge
 import jp.awabi2048.cccontent.items.sukima.*
 import jp.awabi2048.cccontent.items.brewery.BreweryMockClockItem
 import jp.awabi2048.cccontent.items.brewery.BreweryMockYeastItem
@@ -119,6 +123,7 @@ class CCContent : JavaPlugin(), Listener {
         
         // GulliverLight設定の初期化
         GulliverConfig.initialize(this)
+        CustomHeadConfigRegistry.initialize(this)
         
         // アイテム登録
         registerCustomItems()
@@ -183,6 +188,7 @@ class CCContent : JavaPlugin(), Listener {
             server.pluginManager.registerEvents(ArenaItemListener(), this)
             server.pluginManager.registerEvents(ArenaListener(arenaManager), this)
         }
+        server.pluginManager.registerEvents(CustomHeadGuiListener(this), this)
         server.pluginManager.registerEvents(CustomItemInteractionListener(), this)
         
         // ScaleManagerタスクの開始（毎tick実行）
@@ -522,6 +528,7 @@ class CCContent : JavaPlugin(), Listener {
         // GulliverLight アイテム
         CustomItemManager.register(BigLight())
         CustomItemManager.register(SmallLight())
+        registerCustomHeadItems()
 
         if (isContentEnabledAtStartup("brewery")) {
             CustomItemManager.register(BrewerySampleFilterItem(this))
@@ -548,6 +555,15 @@ class CCContent : JavaPlugin(), Listener {
             CustomItemManager.register(SukimaWorldSproutItem())
         }
     }
+
+    private fun registerCustomHeadItems() {
+        CustomItemManager.unregisterByPrefix("misc.custom_head.")
+        val variants = CustomHeadConfigRegistry.getAllVariants()
+        for (variant in variants) {
+            CustomItemManager.register(CustomHeadItem(this, variant))
+        }
+        logger.info("[CustomHead] カスタムヘッド券を登録しました: ${variants.size}件")
+    }
     
     /**
      * 設定ファイルをリロード
@@ -567,6 +583,8 @@ class CCContent : JavaPlugin(), Listener {
                 RequiredResource("lang/en_us.yml"),
                 RequiredResource("lang/ja_jp.yml", "lang/ja_JP.yml"),
                 RequiredResource("gulliverlight/gulliverlight.yml"),
+                RequiredResource("misc/custom_heads/sakura.yml"),
+                RequiredResource("misc/custom_heads/halloween.yml"),
                 RequiredResource("arena/theme.yml"),
                 RequiredResource("sukima/items.yml"),
                 RequiredResource("sukima/mobs.yml"),
@@ -583,6 +601,8 @@ class CCContent : JavaPlugin(), Listener {
             val requiredDirs = listOf(
                 "job",
                 "lang",
+                "misc",
+                "misc/custom_heads",
                 "arena",
                 "sukima",
                 "gulliverlight",
@@ -611,6 +631,9 @@ class CCContent : JavaPlugin(), Listener {
             reloadConfig()
             CustomItemI18n.initialize(this)
             migrateLegacyConfigLayout()
+            HeadDatabaseBridge.reset()
+            CustomHeadConfigRegistry.reload(this)
+            registerCustomHeadItems()
 
             val reloadedContentEnabled = loadContentEnabledSettings()
             logContentEnabledChangeIfNeeded(reloadedContentEnabled)

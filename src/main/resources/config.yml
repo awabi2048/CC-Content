@@ -7,6 +7,10 @@ content_enabled:
   cooking: true
   sukima_dungeon: true
 
+misc:
+  custom_head:
+    test_mode_without_hdb: false
+
 sukima_dungeon:
   sizes:
     small:

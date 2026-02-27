@@ -1,0 +1,52 @@
+variant_id: sakura
+
+item:
+  material: NAME_TAG
+  name: "&d&lカスタムヘッド券 - 桜"
+  lore:
+    - "&7右クリックで桜テーマのヘッド一覧を開く"
+    - "&7ヘッド選択後、確認ダイアログで交換"
+  custom_model_data: 5101
+
+gui:
+  title: "&0&l桜ヘッドセレクター"
+  theme_icon_material: CHERRY_SAPLING
+  theme_icon_name: "&d&l桜テーマ"
+
+heads:
+  - hdb_id: "2936"
+    name: "&d桜の花"
+    lore:
+      - "&7HeadDatabase ID: 2936"
+  - hdb_id: "7332"
+    name: "&d桜ランタン"
+    lore:
+      - "&7HeadDatabase ID: 7332"
+  - hdb_id: "22797"
+    name: "&d桜スイーツ"
+    lore:
+      - "&7HeadDatabase ID: 22797"
+  - hdb_id: "2936"
+    name: "&d夜桜ライト"
+    lore:
+      - "&7夜の庭向けサンプル"
+  - hdb_id: "7332"
+    name: "&d桜ぼんぼり"
+    lore:
+      - "&7和風エリア向けサンプル"
+  - hdb_id: "22797"
+    name: "&d花見だんご"
+    lore:
+      - "&7屋台装飾向けサンプル"
+  - hdb_id: "2936"
+    name: "&d花びらオブジェ"
+    lore:
+      - "&7装飾ヘッドの雛形"
+  - hdb_id: "7332"
+    name: "&d桜和傘"
+    lore:
+      - "&7装飾ヘッドの雛形"
+  - hdb_id: "22797"
+    name: "&d春の和菓子"
+    lore:
+      - "&7装飾ヘッドの雛形"

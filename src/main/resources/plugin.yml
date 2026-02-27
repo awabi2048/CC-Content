@@ -4,6 +4,7 @@ main: jp.awabi2048.cccontent.CCContent
 api-version: '1.21'
 author: awabi2048
 description: Paper 1.21.8用統合コンテンツプラグイン
+softdepend: [HeadDatabase]
 
 commands:
   cc-content:
