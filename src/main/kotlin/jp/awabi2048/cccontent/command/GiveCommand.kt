@@ -61,16 +61,17 @@ class GiveCommand : CommandExecutor, TabCompleter {
             return true
         }
         
-        // アイテム生成
-        val item = CustomItemManager.createItem(fullId, amount)
-        if (item == null) {
+        if (CustomItemManager.getItem(fullId) == null) {
             sender.sendMessage("§cアイテムID '§f$fullId§c' が見つかりません")
             return true
         }
         
         // プレイヤーに配布
         targetPlayers.forEach { player ->
-            player.inventory.addItem(item.clone())
+            val item = CustomItemManager.createItemForPlayer(fullId, player, amount)
+            if (item != null) {
+                player.inventory.addItem(item)
+            }
         }
         
         // 通知

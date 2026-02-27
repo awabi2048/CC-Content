@@ -554,7 +554,7 @@ sukima_dungeon:
         §7§m――――――――――――――――――――――――――――――
   no_permission: '&c権限がありません。'
   command_player_only: このコマンドはプレイヤーのみ実行可能です。
-  command_usage: '&e/sukima_dungeon <bookmark|reload>'
+  command_usage: '&e/sukima_dungeon <reload|add_item>'
   command_reload_success: '&a設定とテーマを再読み込みしました。'
   command_bookmark_received: '&a{tier}しおりを入手しました！'
   bookmark_cannot_use_here: '&cここではしおりを使用できません。'
@@ -853,3 +853,43 @@ rank:
       percent: §8({percent}%)
       target_prefix: '{status} '
       target_suffix: '§7: {current}/{required}'
+
+custom_items:
+  misc:
+    big_light:
+      name: '§dビッグライト'
+      lore:
+        - '§e§n右クリックを長押し§7して、体を大きくすることができます！'
+        - '§e§nShift + 右クリック§7で元の大きさに戻ることができます。'
+    small_light:
+      name: '§dスモールライト'
+      lore:
+        - '§e§n右クリックを長押し§7して、体を縮ませることができます！'
+        - '§e§nShift + 右クリック§7で元の大きさに戻ることができます。'
+  arena:
+    ticket:
+      name: '§6アリーナチケット'
+      lore:
+        - '§7アリーナへの参加チケット'
+    medal:
+      name: '§6アリーナメダル'
+      lore:
+        - '§7アリーナでの戦いの証'
+    prize:
+      name: '§6アリーナ報酬箱'
+      lore:
+        - '§7アリーナでの勝利報酬'
+  brewery:
+    sample_filter:
+      name: '§e蒸留フィルター（試作）'
+      lore:
+        - '§7蒸留時間 -15%'
+        - '§71蒸留ごとに耐久を1消費'
+    mock_clock:
+      name: '§bふしぎな時計（モック）'
+      lore:
+        - '§7熟成GUIの時計スロット用（効果なし）'
+    mock_yeast:
+      name: '§a培養済み酵母（モック）'
+      lore:
+        - '§7発酵GUIの酵母スロット用（効果なし）'

@@ -44,6 +44,12 @@ class MarkerManager(private val plugin: JavaPlugin) : Listener {
         return item
     }
 
+    fun isMarkerTool(item: ItemStack?): Boolean {
+        if (item == null) return false
+        val meta = item.itemMeta ?: return false
+        return meta.persistentDataContainer.has(TOOL_KEY, PersistentDataType.BYTE)
+    }
+
     private fun getMode(item: ItemStack): MarkerMode {
         val meta = item.itemMeta ?: return MarkerMode.MOB
         val modeName = meta.persistentDataContainer.get(MODE_KEY, PersistentDataType.STRING)

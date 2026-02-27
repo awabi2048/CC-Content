@@ -1,6 +1,9 @@
 package jp.awabi2048.cccontent.items
 
+import org.bukkit.NamespacedKey
+import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
+import org.bukkit.persistence.PersistentDataType
 import java.util.logging.Logger
 
 /**
@@ -9,6 +12,7 @@ import java.util.logging.Logger
  */
 object CustomItemManager {
     private val items = mutableMapOf<String, CustomItem>()
+    private val customItemIdKey = NamespacedKey("cccontent", "custom_item_id")
     private lateinit var logger: Logger
     
     fun setLogger(logger: Logger) {
@@ -37,7 +41,14 @@ object CustomItemManager {
      * @return 生成されたItemStack、見つからない場合はnull
      */
     fun createItem(fullId: String, amount: Int = 1): ItemStack? {
-        return items[fullId]?.createItem(amount)
+        return createItemForPlayer(fullId, null, amount)
+    }
+
+    fun createItemForPlayer(fullId: String, player: Player?, amount: Int = 1): ItemStack? {
+        val customItem = items[fullId] ?: return null
+        val created = customItem.createItemForPlayer(player, amount)
+        markCustomItemId(created, customItem.fullId)
+        return created
     }
     
     /**
@@ -46,7 +57,30 @@ object CustomItemManager {
      * @return 一致したCustomItem、見つからない場合はnull
      */
     fun identify(item: ItemStack): CustomItem? {
-        return items.values.find { it.matches(item) }
+        val meta = item.itemMeta
+        if (meta != null) {
+            val fullId = meta.persistentDataContainer.get(customItemIdKey, PersistentDataType.STRING)
+            if (fullId != null) {
+                items[fullId]?.let { return it }
+            }
+        }
+
+        val matched = items.values.find { it.matches(item) } ?: return null
+        markCustomItemId(item, matched.fullId)
+        return matched
+    }
+
+    fun updateItemLocalization(item: ItemStack, player: Player?): Boolean {
+        val customItem = identify(item) ?: return false
+        customItem.updateLocalization(item, player)
+        markCustomItemId(item, customItem.fullId)
+        return true
+    }
+
+    private fun markCustomItemId(item: ItemStack, fullId: String) {
+        val meta = item.itemMeta ?: return
+        meta.persistentDataContainer.set(customItemIdKey, PersistentDataType.STRING, fullId)
+        item.itemMeta = meta
     }
     
     /**

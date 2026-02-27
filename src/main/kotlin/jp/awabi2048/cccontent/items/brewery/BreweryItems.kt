@@ -1,9 +1,11 @@
 package jp.awabi2048.cccontent.items.brewery
 
 import jp.awabi2048.cccontent.items.CustomItem
+import jp.awabi2048.cccontent.items.CustomItemI18n
 import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
+import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
@@ -19,11 +21,15 @@ class BrewerySampleFilterItem(private val plugin: JavaPlugin) : CustomItem {
 
     private val key = NamespacedKey(plugin, "brewery_filter_sample")
 
-    override fun createItem(amount: Int): ItemStack {
+    override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
+
+    override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
         val item = ItemStack(Material.SHEARS, amount)
         val meta = item.itemMeta ?: return item
-        meta.displayName(Component.text(displayName))
-        meta.lore(lore.map { Component.text(it) })
+        val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
+        val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
+        meta.displayName(Component.text(name))
+        meta.lore(localizedLore.map { Component.text(it) })
         meta.persistentDataContainer.set(key, PersistentDataType.BYTE, 1)
         item.itemMeta = meta
         return item
@@ -44,11 +50,15 @@ class BreweryMockClockItem(private val plugin: JavaPlugin) : CustomItem {
 
     private val key = NamespacedKey(plugin, "brewery_mock_clock")
 
-    override fun createItem(amount: Int): ItemStack {
+    override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
+
+    override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
         val item = ItemStack(Material.CLOCK, amount)
         val meta = item.itemMeta ?: return item
-        meta.displayName(Component.text(displayName))
-        meta.lore(lore.map { Component.text(it) })
+        val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
+        val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
+        meta.displayName(Component.text(name))
+        meta.lore(localizedLore.map { Component.text(it) })
         meta.persistentDataContainer.set(key, PersistentDataType.BYTE, 1)
         item.itemMeta = meta
         return item
@@ -69,11 +79,15 @@ class BreweryMockYeastItem(private val plugin: JavaPlugin) : CustomItem {
 
     private val key = NamespacedKey(plugin, "brewery_mock_yeast")
 
-    override fun createItem(amount: Int): ItemStack {
+    override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
+
+    override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
         val item = ItemStack(Material.HONEY_BOTTLE, amount)
         val meta = item.itemMeta ?: return item
-        meta.displayName(Component.text(displayName))
-        meta.lore(lore.map { Component.text(it) })
+        val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
+        val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
+        meta.displayName(Component.text(name))
+        meta.lore(localizedLore.map { Component.text(it) })
         meta.persistentDataContainer.set(key, PersistentDataType.BYTE, 1)
         item.itemMeta = meta
         return item

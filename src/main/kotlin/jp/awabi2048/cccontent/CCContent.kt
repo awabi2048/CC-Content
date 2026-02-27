@@ -2,12 +2,15 @@ package jp.awabi2048.cccontent
 
 import jp.awabi2048.cccontent.command.CCCommand
 import jp.awabi2048.cccontent.command.GiveCommand
+import jp.awabi2048.cccontent.items.CustomItemI18n
+import jp.awabi2048.cccontent.items.CustomItemInteractionListener
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.misc.BigLight
 import jp.awabi2048.cccontent.items.misc.SmallLight
 import jp.awabi2048.cccontent.items.misc.GulliverItemListener
 import jp.awabi2048.cccontent.items.misc.GulliverConfig
 import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
+import jp.awabi2048.cccontent.items.sukima.*
 import jp.awabi2048.cccontent.items.brewery.BreweryMockClockItem
 import jp.awabi2048.cccontent.items.brewery.BreweryMockYeastItem
 import jp.awabi2048.cccontent.items.brewery.BrewerySampleFilterItem
@@ -92,6 +95,7 @@ class CCContent : JavaPlugin(), Listener {
     
     fun getMarkerManager(): MarkerManager = markerManager
     fun getItemManager(): ItemManager = itemManager
+    fun getStructureLoader(): StructureLoader = structureLoader
     fun getRankManager(): RankManager? = rankManagerInstance
      
     override fun onEnable() {
@@ -111,11 +115,12 @@ class CCContent : JavaPlugin(), Listener {
         
         // ロガーをCustomItemManagerに設定
         CustomItemManager.setLogger(logger)
+        CustomItemI18n.initialize(this)
         
         // GulliverLight設定の初期化
         GulliverConfig.initialize(this)
         
-        // アイテム登録（スキマダンジョン以外）
+        // アイテム登録
         registerCustomItems()
 
         initializeFeatureIfEnabled("Rank System", "rank") {
@@ -178,6 +183,7 @@ class CCContent : JavaPlugin(), Listener {
             server.pluginManager.registerEvents(ArenaItemListener(), this)
             server.pluginManager.registerEvents(ArenaListener(arenaManager), this)
         }
+        server.pluginManager.registerEvents(CustomItemInteractionListener(), this)
         
         // ScaleManagerタスクの開始（毎tick実行）
         server.scheduler.runTaskTimer(this, GulliverScaleManager(), 0L, 1L)
@@ -528,8 +534,19 @@ class CCContent : JavaPlugin(), Listener {
             CustomItemManager.register(ArenaMedalItem())
             CustomItemManager.register(ArenaPrizeItem())
         }
-        
-        // SukimaDungeon アイテムはGitHub版で管理
+
+        if (isContentEnabledAtStartup("sukima_dungeon")) {
+            CustomItemManager.register(SukimaCompassTier1Item())
+            CustomItemManager.register(SukimaCompassTier2Item())
+            CustomItemManager.register(SukimaCompassTier3Item())
+            CustomItemManager.register(SukimaMarkerToolItem())
+            CustomItemManager.register(SukimaBookmarkBrokenItem())
+            CustomItemManager.register(SukimaBookmarkWornItem())
+            CustomItemManager.register(SukimaBookmarkFadedItem())
+            CustomItemManager.register(SukimaBookmarkNewItem())
+            CustomItemManager.register(SukimaTalismanItem())
+            CustomItemManager.register(SukimaWorldSproutItem())
+        }
     }
     
     /**
@@ -592,6 +609,7 @@ class CCContent : JavaPlugin(), Listener {
             }
             
             reloadConfig()
+            CustomItemI18n.initialize(this)
             migrateLegacyConfigLayout()
 
             val reloadedContentEnabled = loadContentEnabledSettings()
