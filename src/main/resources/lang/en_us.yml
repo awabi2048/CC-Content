@@ -243,6 +243,12 @@ custom_items:
         - "§7Activate with §eShift§7 while equipped on feet."
         - "§7While gliding, consumes 1 rocket and boosts forward."
         - "§7While not gliding, converts equal speed into §aupward§7 boost."
+    air_cannon:
+      name: "§bAir Cannon"
+      lore:
+        - "§7Right click to compress and release the air ahead."
+        - "§7Launches targets in front toward §fforward + upward§7."
+        - "§7The user also receives a small §fback-upward§7 recoil."
   arena:
     ticket:
       name: "§6Arena Ticket"

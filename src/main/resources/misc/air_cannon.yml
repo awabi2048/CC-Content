@@ -1,0 +1,28 @@
+cooldown_ticks: 20
+
+# 円柱判定（視線方向に寝た円柱）
+range: 12.0
+radius: 5.0
+
+# 距離減衰の下限スケール（0.0-1.0）
+min_falloff_scale: 0.25
+
+target:
+  # 対象を押し出す基本ベクトル（視線方向 + 上方向）
+  horizontal_power: 2.0
+  upward_power: 0.8
+  # 全体倍率
+  scale: 1.0
+
+recoil:
+  # 使用者の反動（後方 + 上方向）
+  horizontal_power: 0.35
+  upward_power: 0.2
+  # 全体倍率
+  scale: 1.0
+
+sound:
+  use:
+    key: "minecraft:entity.breeze.shoot"
+    volume: 1.0
+    pitch: 1.1
