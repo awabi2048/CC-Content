@@ -1,0 +1,14 @@
+# 自動点火ブースター設定
+
+glide:
+  # 滑空中ブーストの速度係数
+  boost_power: 1.0
+  # Shift長押し時の再発動間隔 (tick)
+  hold_interval_ticks: 10
+
+upward:
+  # 非滑空時の上方向ブースト速度
+  # 未設定時は glide.boost_power と同値
+  boost_power: 1.0
+  # 非滑空時のY速度上限
+  velocity_cap: 1.8
