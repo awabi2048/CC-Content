@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.items
 
+import io.papermc.paper.datacomponent.DataComponentTypes
+import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
@@ -58,6 +60,7 @@ object CustomItemManager {
     fun createItemForPlayer(fullId: String, player: Player?, amount: Int = 1): ItemStack? {
         val customItem = items[fullId] ?: return null
         val created = customItem.createItemForPlayer(player, amount)
+        applyCommonDataComponents(customItem, created)
         markCustomItemId(created, customItem.fullId)
         return created
     }
@@ -92,6 +95,17 @@ object CustomItemManager {
         val meta = item.itemMeta ?: return
         meta.persistentDataContainer.set(customItemIdKey, PersistentDataType.STRING, fullId)
         item.itemMeta = meta
+    }
+
+    private fun applyCommonDataComponents(customItem: CustomItem, item: ItemStack) {
+        val meta = item.itemMeta ?: return
+        val model = customItem.itemModel ?: meta.itemModel ?: NamespacedKey.minecraft(item.type.key.key)
+        meta.setItemModel(model)
+        item.itemMeta = meta
+
+        if (item.type == Material.POISONOUS_POTATO && !customItem.keepConsumableComponent) {
+            item.unsetData(DataComponentTypes.CONSUMABLE)
+        }
     }
     
     /**

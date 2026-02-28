@@ -23,6 +23,7 @@ class BigLight : CustomItem {
     override val feature = "misc"
     override val id = "big_light"
     override val displayName = "§dビッグライト"
+    override val keepConsumableComponent = true
     override val lore = listOf(
         "§e§n右クリックを長押し§7して、体を大きくすることができます！",
         "§e§nShift + 右クリック§7で元の大きさに戻ることができます。"
@@ -73,6 +74,7 @@ class SmallLight : CustomItem {
     override val feature = "misc"
     override val id = "small_light"
     override val displayName = "§dスモールライト"
+    override val keepConsumableComponent = true
     override val lore = listOf(
         "§e§n右クリックを長押し§7して、体を縮ませることができます！",
         "§e§nShift + 右クリック§7で元の大きさに戻ることができます。"

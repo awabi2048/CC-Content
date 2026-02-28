@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.items
 
+import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.player.PlayerInteractEvent
@@ -26,6 +27,17 @@ interface CustomItem {
     /** 説明文（複数行対応） */
     val lore: List<String>
         get() = emptyList()
+
+    /**
+     * 共通仕様で付与する `!consumable` を保持するか
+     * false の場合、POISONOUS_POTATO の consumable コンポーネントを除去する
+     */
+    val keepConsumableComponent: Boolean
+        get() = false
+
+    /** 共通仕様の item_model（null の場合は素材に応じた既定モデルを使用） */
+    val itemModel: NamespacedKey?
+        get() = null
     
     /**
      * アイテムを生成
