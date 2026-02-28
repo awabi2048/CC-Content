@@ -237,6 +237,12 @@ custom_items:
       lore:
         - "§e§nHold right click§7 to shrink your body!"
         - "§e§nShift + right click§7 to reset to normal size."
+    auto_ignition_booster:
+      name: "§6Auto Ignition Booster"
+      lore:
+        - "§7Activate with §eShift§7 while equipped on feet."
+        - "§7While gliding, consumes 1 rocket and boosts forward."
+        - "§7While not gliding, converts equal speed into §aupward§7 boost."
   arena:
     ticket:
       name: "§6Arena Ticket"

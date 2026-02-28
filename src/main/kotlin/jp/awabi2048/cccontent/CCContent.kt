@@ -6,6 +6,9 @@ import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemInteractionListener
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.misc.BigLight
+import jp.awabi2048.cccontent.items.misc.AutoIgnitionBoosterConfig
+import jp.awabi2048.cccontent.items.misc.AutoIgnitionBoosterItem
+import jp.awabi2048.cccontent.items.misc.AutoIgnitionBoosterListener
 import jp.awabi2048.cccontent.items.misc.CustomHeadConfigRegistry
 import jp.awabi2048.cccontent.items.misc.CustomHeadGuiListener
 import jp.awabi2048.cccontent.items.misc.CustomHeadItem
@@ -123,6 +126,7 @@ class CCContent : JavaPlugin(), Listener {
         
         // GulliverLight設定の初期化
         GulliverConfig.initialize(this)
+        AutoIgnitionBoosterConfig.initialize(this)
         CustomHeadConfigRegistry.initialize(this)
         
         // アイテム登録
@@ -184,6 +188,7 @@ class CCContent : JavaPlugin(), Listener {
         
         // リスナー登録（スキマダンジョン以外）
         server.pluginManager.registerEvents(GulliverItemListener(this), this)
+        server.pluginManager.registerEvents(AutoIgnitionBoosterListener(this), this)
         if (isContentEnabledAtStartup("arena") && ::arenaManager.isInitialized) {
             server.pluginManager.registerEvents(ArenaItemListener(), this)
             server.pluginManager.registerEvents(ArenaListener(arenaManager), this)
@@ -528,6 +533,7 @@ class CCContent : JavaPlugin(), Listener {
         // GulliverLight アイテム
         CustomItemManager.register(BigLight())
         CustomItemManager.register(SmallLight())
+        CustomItemManager.register(AutoIgnitionBoosterItem())
         registerCustomHeadItems()
 
         if (isContentEnabledAtStartup("brewery")) {
@@ -583,6 +589,7 @@ class CCContent : JavaPlugin(), Listener {
                 RequiredResource("lang/en_us.yml"),
                 RequiredResource("lang/ja_jp.yml", "lang/ja_JP.yml"),
                 RequiredResource("gulliverlight/gulliverlight.yml"),
+                RequiredResource("misc/auto_ignition_booster.yml"),
                 RequiredResource("misc/custom_heads/sakura.yml"),
                 RequiredResource("misc/custom_heads/halloween.yml"),
                 RequiredResource("arena/theme.yml"),
@@ -630,6 +637,7 @@ class CCContent : JavaPlugin(), Listener {
             
             reloadConfig()
             CustomItemI18n.initialize(this)
+            AutoIgnitionBoosterConfig.reload()
             migrateLegacyConfigLayout()
             HeadDatabaseBridge.reset()
             CustomHeadConfigRegistry.reload(this)
