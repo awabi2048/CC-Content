@@ -11,6 +11,7 @@ import jp.awabi2048.cccontent.items.misc.AutoIgnitionBoosterItem
 import jp.awabi2048.cccontent.items.misc.AutoIgnitionBoosterListener
 import jp.awabi2048.cccontent.items.misc.AirCannonConfig
 import jp.awabi2048.cccontent.items.misc.AirCannonItem
+import jp.awabi2048.cccontent.items.misc.CassetteTapeItem
 import jp.awabi2048.cccontent.items.misc.CustomHeadConfigRegistry
 import jp.awabi2048.cccontent.items.misc.CustomHeadGuiListener
 import jp.awabi2048.cccontent.items.misc.CustomHeadItem
@@ -19,6 +20,10 @@ import jp.awabi2048.cccontent.items.misc.GulliverItemListener
 import jp.awabi2048.cccontent.items.misc.GulliverConfig
 import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
 import jp.awabi2048.cccontent.items.misc.HeadDatabaseBridge
+import jp.awabi2048.cccontent.items.misc.RadioCassetteConfig
+import jp.awabi2048.cccontent.items.misc.RadioCassetteGuiListener
+import jp.awabi2048.cccontent.items.misc.RadioCassettePlaybackManager
+import jp.awabi2048.cccontent.items.misc.RadioCassettePlayerItem
 import jp.awabi2048.cccontent.items.sukima.*
 import jp.awabi2048.cccontent.items.brewery.BreweryMockClockItem
 import jp.awabi2048.cccontent.items.brewery.BreweryMockYeastItem
@@ -131,6 +136,8 @@ class CCContent : JavaPlugin(), Listener {
         AutoIgnitionBoosterConfig.initialize(this)
         AirCannonConfig.initialize(this)
         CustomHeadConfigRegistry.initialize(this)
+        RadioCassetteConfig.initialize(this)
+        RadioCassettePlaybackManager.initialize(this)
         
         // アイテム登録
         registerCustomItems()
@@ -198,6 +205,7 @@ class CCContent : JavaPlugin(), Listener {
         }
         server.pluginManager.registerEvents(CustomHeadGuiListener(this), this)
         server.pluginManager.registerEvents(CustomItemInteractionListener(), this)
+        server.pluginManager.registerEvents(RadioCassetteGuiListener(), this)
         
         // ScaleManagerタスクの開始（毎tick実行）
         server.scheduler.runTaskTimer(this, GulliverScaleManager(), 0L, 1L)
@@ -538,6 +546,7 @@ class CCContent : JavaPlugin(), Listener {
         CustomItemManager.register(SmallLight())
         CustomItemManager.register(AutoIgnitionBoosterItem())
         CustomItemManager.register(AirCannonItem())
+        registerRadioCassetteItems()
         registerCustomHeadItems()
 
         if (isContentEnabledAtStartup("brewery")) {
@@ -574,6 +583,18 @@ class CCContent : JavaPlugin(), Listener {
         }
         logger.info("[CustomHead] カスタムヘッド券を登録しました: ${variants.size}件")
     }
+
+    private fun registerRadioCassetteItems() {
+        CustomItemManager.unregisterByPrefix("misc.cassette_")
+        CustomItemManager.register(RadioCassettePlayerItem())
+
+        val cassetteDefinitions = RadioCassetteConfig.getAll()
+        cassetteDefinitions.forEach { definition ->
+            CustomItemManager.register(CassetteTapeItem(definition))
+        }
+
+        logger.info("[RadioCassette] カセットテープを登録しました: ${cassetteDefinitions.size}件")
+    }
     
     /**
      * 設定ファイルをリロード
@@ -595,6 +616,7 @@ class CCContent : JavaPlugin(), Listener {
                 RequiredResource("gulliverlight/gulliverlight.yml"),
                 RequiredResource("misc/auto_ignition_booster.yml"),
                 RequiredResource("misc/air_cannon.yml"),
+                RequiredResource("misc/radio_cassette.yml"),
                 RequiredResource("misc/custom_heads/sakura.yml"),
                 RequiredResource("misc/custom_heads/halloween.yml"),
                 RequiredResource("arena/theme.yml"),
@@ -644,9 +666,11 @@ class CCContent : JavaPlugin(), Listener {
             CustomItemI18n.initialize(this)
             AutoIgnitionBoosterConfig.reload()
             AirCannonConfig.reload()
+            RadioCassetteConfig.reload()
             migrateLegacyConfigLayout()
             HeadDatabaseBridge.reset()
             CustomHeadConfigRegistry.reload(this)
+            registerRadioCassetteItems()
             registerCustomHeadItems()
 
             val reloadedContentEnabled = loadContentEnabledSettings()
@@ -984,6 +1008,7 @@ class CCContent : JavaPlugin(), Listener {
             if (::breweryFeature.isInitialized) {
                 breweryFeature.shutdown()
             }
+            RadioCassettePlaybackManager.shutdown()
             BGMManager.stopAll()
             DungeonSessionManager.saveSessions(this)
             if (::arenaManager.isInitialized) {

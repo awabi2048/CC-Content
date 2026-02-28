@@ -2,11 +2,7 @@ package jp.awabi2048.cccontent.items.misc
 
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.CustomItemI18n
-import io.papermc.paper.datacomponent.DataComponentTypes
-import io.papermc.paper.datacomponent.item.Consumable
-import io.papermc.paper.datacomponent.item.Tool
-import io.papermc.paper.datacomponent.item.ItemAttributeModifiers
-import io.papermc.paper.datacomponent.item.consumable.ItemUseAnimation
+import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
@@ -48,17 +44,7 @@ class BigLight : CustomItem {
         meta.persistentDataContainer.set(GulliverItems.BIG_LIGHT_KEY, PersistentDataType.BYTE, 1)
         item.itemMeta = meta
         
-        // Remove tool and attribute modifiers
-        item.setData(DataComponentTypes.TOOL, Tool.tool().build())
-        item.setData(DataComponentTypes.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.itemAttributes().build())
-        
-        // Make it consumable to allow "holding right click"
-        val consumable = Consumable.consumable()
-            .consumeSeconds(1000000f)
-            .animation(ItemUseAnimation.NONE)
-            .hasConsumeParticles(false)
-            .build()
-        item.setData(DataComponentTypes.CONSUMABLE, consumable)
+        PoisonousPotatoComponentPack.applyHoldConsumable(item)
 
         return item
     }
@@ -100,17 +86,7 @@ class SmallLight : CustomItem {
 
         item.itemMeta = meta
         
-        // Remove tool and attribute modifiers
-        item.setData(DataComponentTypes.TOOL, Tool.tool().build())
-        item.setData(DataComponentTypes.ATTRIBUTE_MODIFIERS, ItemAttributeModifiers.itemAttributes().build())
-        
-        // Make it consumable
-        val consumable = Consumable.consumable()
-            .consumeSeconds(1000000f)
-            .animation(ItemUseAnimation.NONE)
-            .hasConsumeParticles(false)
-            .build()
-        item.setData(DataComponentTypes.CONSUMABLE, consumable)
+        PoisonousPotatoComponentPack.applyHoldConsumable(item)
         
         return item
     }

@@ -1,6 +1,5 @@
 package jp.awabi2048.cccontent.items
 
-import io.papermc.paper.datacomponent.DataComponentTypes
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
@@ -104,7 +103,9 @@ object CustomItemManager {
         item.itemMeta = meta
 
         if (item.type == Material.POISONOUS_POTATO && !customItem.keepConsumableComponent) {
-            item.unsetData(DataComponentTypes.CONSUMABLE)
+            PoisonousPotatoComponentPack.applyNonConsumable(item)
+        } else if (item.type == Material.POISONOUS_POTATO) {
+            PoisonousPotatoComponentPack.applyShared(item)
         }
     }
     
