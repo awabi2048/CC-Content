@@ -249,6 +249,12 @@ custom_items:
         - "§7Right click to compress and release the air ahead."
         - "§7Launches targets in front toward §fforward + upward§7."
         - "§7The user also receives a small §fback-upward§7 recoil."
+    radio_cassette_player:
+      name: "§6Radio Cassette"
+      lore:
+        - "§7Right click to open the radio menu."
+        - "§7Insert a cassette and start playback"
+        - "§7to loop until you stop it from the menu."
   arena:
     ticket:
       name: "§6Arena Ticket"

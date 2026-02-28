@@ -1,0 +1,138 @@
+# ラジカセ用カセット定義
+# cassettes.<id> に対して「再生キー」「再生時間」を設定すると追加できます
+# 「曲名」「説明」は省略可能です（未設定時は id / 空欄）
+# 互換のため sound / サウンド も読み込み可能です
+
+cassettes:
+  "13":
+    曲名: "13"
+    説明:
+      - "不穏な環境音が続くクラシックな1枚"
+    再生時間: 178
+    sound: "minecraft:music_disc.13"
+
+  cat:
+    曲名: "cat"
+    説明:
+      - "明るく軽快なメロディ"
+    再生時間: 185
+    sound: "minecraft:music_disc.cat"
+
+  blocks:
+    曲名: "blocks"
+    説明:
+      - "ゆったりとした独特のグルーヴ"
+    再生時間: 345
+    sound: "minecraft:music_disc.blocks"
+
+  chirp:
+    曲名: "chirp"
+    説明:
+      - "レトロ感のある軽いビート"
+    再生時間: 185
+    sound: "minecraft:music_disc.chirp"
+
+  far:
+    曲名: "far"
+    説明:
+      - "静かで遠くを感じる音像"
+    再生時間: 174
+    sound: "minecraft:music_disc.far"
+
+  mall:
+    曲名: "mall"
+    説明:
+      - "穏やかなピアノ主体の曲"
+    再生時間: 197
+    sound: "minecraft:music_disc.mall"
+
+  mellohi:
+    曲名: "mellohi"
+    説明:
+      - "途中で雰囲気が変化する印象的な曲"
+    再生時間: 96
+    sound: "minecraft:music_disc.mellohi"
+
+  stal:
+    曲名: "stal"
+    説明:
+      - "ジャジーで落ち着いたトラック"
+    再生時間: 150
+    sound: "minecraft:music_disc.stal"
+
+  strad:
+    曲名: "strad"
+    説明:
+      - "弦の響きが心地よい1曲"
+    再生時間: 188
+    sound: "minecraft:music_disc.strad"
+
+  ward:
+    曲名: "ward"
+    説明:
+      - "壮大さを感じる構成"
+    再生時間: 251
+    sound: "minecraft:music_disc.ward"
+
+  "11":
+    曲名: "11"
+    説明:
+      - "緊張感の高い演出向けトラック"
+    再生時間: 71
+    sound: "minecraft:music_disc.11"
+
+  wait:
+    曲名: "wait"
+    説明:
+      - "穏やかで少し懐かしい雰囲気"
+    再生時間: 238
+    sound: "minecraft:music_disc.wait"
+
+  pigstep:
+    曲名: "pigstep"
+    説明:
+      - "力強いビートが特徴"
+    再生時間: 149
+    sound: "minecraft:music_disc.pigstep"
+
+  otherside:
+    曲名: "otherside"
+    説明:
+      - "旅情を感じる人気曲"
+    再生時間: 195
+    sound: "minecraft:music_disc.otherside"
+
+  "5":
+    曲名: "5"
+    説明:
+      - "断片的な音で物語性を持つ曲"
+    再生時間: 178
+    sound: "minecraft:music_disc.5"
+
+  relic:
+    曲名: "relic"
+    説明:
+      - "しっとりとした雰囲気の新しめの曲"
+    再生時間: 218
+    sound: "minecraft:music_disc.relic"
+
+  creator:
+    曲名: "creator"
+    説明:
+      - "1.21系追加の楽曲"
+    再生時間: 176
+    sound: "minecraft:music_disc.creator"
+
+  creator_music_box:
+    曲名: "creator_music_box"
+    説明:
+      - "オルゴール調のアレンジ版"
+    再生時間: 73
+    sound: "minecraft:music_disc.creator_music_box"
+
+  precipice:
+    曲名: "precipice"
+    説明:
+      - "1.21系追加の雰囲気重視トラック"
+    再生時間: 299
+    sound: "minecraft:music_disc.precipice"
