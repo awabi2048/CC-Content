@@ -24,6 +24,9 @@ import jp.awabi2048.cccontent.items.misc.RadioCassetteConfig
 import jp.awabi2048.cccontent.items.misc.RadioCassetteGuiListener
 import jp.awabi2048.cccontent.items.misc.RadioCassettePlaybackManager
 import jp.awabi2048.cccontent.items.misc.RadioCassettePlayerItem
+import jp.awabi2048.cccontent.items.misc.StorageBoxGuiListener
+import jp.awabi2048.cccontent.items.misc.StorageBoxSingleItem
+import jp.awabi2048.cccontent.items.misc.StorageBoxTripleItem
 import jp.awabi2048.cccontent.items.sukima.*
 import jp.awabi2048.cccontent.items.brewery.BreweryMockClockItem
 import jp.awabi2048.cccontent.items.brewery.BreweryMockYeastItem
@@ -206,6 +209,7 @@ class CCContent : JavaPlugin(), Listener {
         server.pluginManager.registerEvents(CustomHeadGuiListener(this), this)
         server.pluginManager.registerEvents(CustomItemInteractionListener(), this)
         server.pluginManager.registerEvents(RadioCassetteGuiListener(), this)
+        server.pluginManager.registerEvents(StorageBoxGuiListener(this), this)
         
         // ScaleManagerタスクの開始（毎tick実行）
         server.scheduler.runTaskTimer(this, GulliverScaleManager(), 0L, 1L)
@@ -546,6 +550,8 @@ class CCContent : JavaPlugin(), Listener {
         CustomItemManager.register(SmallLight())
         CustomItemManager.register(AutoIgnitionBoosterItem())
         CustomItemManager.register(AirCannonItem())
+        CustomItemManager.register(StorageBoxSingleItem())
+        CustomItemManager.register(StorageBoxTripleItem())
         registerRadioCassetteItems()
         registerCustomHeadItems()
 
