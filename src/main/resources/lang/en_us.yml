@@ -255,6 +255,17 @@ custom_items:
         - "§7Right click to open the radio menu."
         - "§7Insert a cassette and start playback"
         - "§7to loop until you stop it from the menu."
+    storage_box_single:
+      name: "§6Storage Box (1)"
+      lore:
+        - "§7Stores a large amount of items."
+        - "§7Hold it and press §eShift twice§7 to open the menu."
+    storage_box_triple:
+      name: "§6Storage Box (3)"
+      lore:
+        - "§7Stores up to 3 item types in large quantities."
+        - "§7Hold it and press §eShift twice§7 to open the menu."
+        - "§7Use §eShift + scroll§7 to change selected item."
   arena:
     ticket:
       name: "§6Arena Ticket"
