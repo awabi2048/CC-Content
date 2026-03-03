@@ -882,26 +882,26 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
                     playMenuClick(player)
                     StorageBoxCodec.storeAllFromInventory(player, openedBoxProtectedSlot(player, holder), state, existingOnly = true)
                 }
-                40 -> {
+                39 -> {
                     if (!hasTemplate) {
                         return
                     }
                     playMenuClick(player)
                     state.autoStore = !state.autoStore
-                    player.sendMessage("§b自動収納: ${if (state.autoStore) "ON" else "OFF"}")
+                }
+                41 -> {
+                    if (!hasTemplate) {
+                        return
+                    }
+                    playMenuClick(player)
+                    state.useFromBox = !state.useFromBox
                 }
                 43 -> {
                     if (!hasTemplate) {
                         return
                     }
                     playMenuClick(player)
-                    state.useFromBox = !state.useFromBox
-                    player.sendMessage("§dストレージボックスから使用: ${if (state.useFromBox) "ON" else "OFF"}")
-                }
-                44 -> {
-                    playMenuClick(player)
                     state.containerIo = !state.containerIo
-                    player.sendMessage("§aコンテナ連携: ${if (state.containerIo) "ON" else "OFF"}")
                 }
                 in 18..26 -> {
                     val idx = storageSlots.indexOf(event.rawSlot)
@@ -1117,7 +1117,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         } else {
             inventory.setItem(37, button(Material.CHEST, "§6インベントリ内一括収納", listOf("§7インベントリ内の対象アイテムを格納")))
             inventory.setItem(
-                40,
+                39,
                 button(
                     Material.COMPARATOR,
                     "§b自動収納",
@@ -1125,23 +1125,22 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
                 )
             )
             inventory.setItem(
-                43,
+                41,
                 button(
                     Material.REDSTONE_BLOCK,
                     "§dストレージボックスから使用",
                     listOf("§7現在: ${if (state.useFromBox) "§aON" else "§cOFF"}", "§7クリックで切替")
                 )
             )
-        }
-
-        inventory.setItem(
-            44,
-            button(
-                Material.CHEST_MINECART,
-                "§aコンテナ連携",
-                listOf("§7現在: ${if (state.containerIo) "§aON" else "§cOFF"}", "§7クリックで切替")
+            inventory.setItem(
+                43,
+                button(
+                    Material.CHEST_MINECART,
+                    "§aコンテナ連携",
+                    listOf("§7現在: ${if (state.containerIo) "§aON" else "§cOFF"}", "§7クリックで切替")
+                )
             )
-        )
+        }
     }
 
     private fun getStorageSlots(capacity: Int): List<Int> {
@@ -1208,7 +1207,15 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
 
     private fun updateHoldActionBar(player: Player) {
         val uuid = player.uniqueId
-        val actionBar = StorageBoxCodec.createHoldActionBar(player.inventory.itemInMainHand)
+        val main = player.inventory.itemInMainHand
+        val off = player.inventory.itemInOffHand
+        val source = when {
+            StorageBoxCodec.isStorageBox(main) -> main
+            StorageBoxCodec.isStorageBox(off) -> off
+            else -> null
+        }
+
+        val actionBar = source?.let { StorageBoxCodec.createHoldActionBar(it) }
         if (actionBar != null) {
             player.sendActionBar(actionBar)
             actionBarVisiblePlayers.add(uuid)
