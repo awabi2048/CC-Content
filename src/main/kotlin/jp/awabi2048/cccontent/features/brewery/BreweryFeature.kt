@@ -37,10 +37,14 @@ class BreweryFeature(private val plugin: JavaPlugin) {
         controller?.shutdown()
     }
 
+    fun flushDirty() {
+        controller?.flushIfDirty()
+    }
+
     private fun ensureResources() {
-        ensureFile("brewery/config.yml")
-        ensureFile("recipe/brewery.yml")
-        ensureFile("recipe/ingredient_definition.yml")
+        ensureFile("config/brewery/config.yml")
+        ensureFile("config/brewery/recipe.yml")
+        ensureFile("config/ingredient_definition.yml")
     }
 
     private fun ensureFile(path: String) {

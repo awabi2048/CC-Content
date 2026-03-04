@@ -33,8 +33,8 @@ class FarmerAreaHarvestingHandler(
     private val farmerExpMap: Map<Material, Long>
 
     init {
-        val jobDir = File(plugin.dataFolder, "job").apply { mkdirs() }
-        val expFile = File(jobDir, "exp.yml")
+        val rankDir = File(plugin.dataFolder, "config/rank").apply { mkdirs() }
+        val expFile = File(rankDir, "job_exp.yml")
         val config = if (expFile.exists()) YamlConfiguration.loadConfiguration(expFile) else YamlConfiguration()
         farmerExpMap = loadBlockExpMap(config, "farmer")
     }

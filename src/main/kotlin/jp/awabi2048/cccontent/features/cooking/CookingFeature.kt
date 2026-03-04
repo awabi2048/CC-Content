@@ -26,9 +26,9 @@ class CookingFeature(private val plugin: JavaPlugin) {
     }
 
     private fun ensureResources() {
-        ensureFile("cooking/config.yml")
-        ensureFile("recipe/cooking.yml")
-        ensureFile("recipe/ingredient_definition.yml")
+        ensureFile("config/cooking/config.yml")
+        ensureFile("config/cooking/recipe.yml")
+        ensureFile("config/ingredient_definition.yml")
     }
 
     private fun ensureFile(path: String) {

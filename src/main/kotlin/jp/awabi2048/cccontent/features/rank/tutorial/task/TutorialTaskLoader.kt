@@ -15,7 +15,7 @@ class TutorialTaskLoader {
     
     /**
      * YAML ファイルからタスク要件を読み込む
-     * @param file tutorial-tasks.yml ファイル
+     * @param file tutorial_tasks.yml ファイル
      */
     fun loadRequirements(file: File) {
         if (!file.exists()) {

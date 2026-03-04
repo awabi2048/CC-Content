@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent
 
 import jp.awabi2048.cccontent.command.CCCommand
 import jp.awabi2048.cccontent.command.GiveCommand
+import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemInteractionListener
 import jp.awabi2048.cccontent.items.CustomItemManager
@@ -66,11 +67,14 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.items.ItemManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.listeners.*
 import jp.awabi2048.cccontent.features.sukima_dungeon.tasks.SpecialTileTask
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
+import org.bukkit.configuration.file.FileConfiguration
+import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.event.Listener
 import org.bukkit.event.EventHandler
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
+import org.bukkit.scheduler.BukkitTask
 import java.io.File
 
 class CCContent : JavaPlugin(), Listener {
@@ -88,7 +92,9 @@ class CCContent : JavaPlugin(), Listener {
     }
     
     private var playTimeTrackerTaskId: Int = -1
+    private var persistenceFlushTask: BukkitTask? = null
     private lateinit var featureInitLogger: FeatureInitializationLogger
+    private lateinit var coreConfig: YamlConfiguration
     
     // SukimaDungeon マネージャー (GitHub版)
     private lateinit var structureLoader: StructureLoader
@@ -114,12 +120,14 @@ class CCContent : JavaPlugin(), Listener {
     fun getItemManager(): ItemManager = itemManager
     fun getStructureLoader(): StructureLoader = structureLoader
     fun getRankManager(): RankManager? = rankManagerInstance
+    fun getCoreConfig(): FileConfiguration = coreConfig
+    fun getPersistenceFlushIntervalMinutes(): Long {
+        return coreConfig.getLong("persistence.flush_interval_minutes", 1L).coerceAtLeast(1L)
+    }
      
     override fun onEnable() {
         instance = this
-        saveDefaultConfig()
-        reloadConfig()
-        migrateLegacyConfigLayout()
+        coreConfig = CoreConfigManager.load(this)
         contentEnabledAtStartup = loadContentEnabledSettings()
         
         // 初期化ロガーを初期化
@@ -216,16 +224,31 @@ class CCContent : JavaPlugin(), Listener {
         
         // 初期化結果をまとめて表示
         featureInitLogger.printSummary()
+
+        startPersistenceFlushTask()
     }
 
     private fun loadContentEnabledSettings(): ContentEnabledSettings {
         return ContentEnabledSettings(
-            arena = config.getBoolean("content_enabled.arena", true),
-            rank = config.getBoolean("content_enabled.rank", true),
-            brewery = config.getBoolean("content_enabled.brewery", true),
-            cooking = config.getBoolean("content_enabled.cooking", true),
-            sukimaDungeon = config.getBoolean("content_enabled.sukima_dungeon", true)
+            arena = coreConfig.getBoolean("content_enabled.arena", true),
+            rank = coreConfig.getBoolean("content_enabled.rank", true),
+            brewery = coreConfig.getBoolean("content_enabled.brewery", true),
+            cooking = coreConfig.getBoolean("content_enabled.cooking", true),
+            sukimaDungeon = coreConfig.getBoolean("content_enabled.sukima_dungeon", true)
         )
+    }
+
+    private fun startPersistenceFlushTask() {
+        persistenceFlushTask?.cancel()
+        val intervalTicks = getPersistenceFlushIntervalMinutes() * 60L * 20L
+        persistenceFlushTask = server.scheduler.runTaskTimer(this, Runnable {
+            if (isContentEnabledAtStartup("sukima_dungeon")) {
+                DungeonSessionManager.flushIfDirty(this)
+            }
+            if (isContentEnabledAtStartup("brewery") && ::breweryFeature.isInitialized) {
+                breweryFeature.flushDirty()
+            }
+        }, intervalTicks, intervalTicks)
     }
 
     private fun isContentEnabledAtStartup(contentKey: String): Boolean {
@@ -279,7 +302,7 @@ class CCContent : JavaPlugin(), Listener {
             rankManagerInstance = rankManager
 
             // 言語ファイルを読み込み
-            val languageLoader = LanguageLoader(this, "ja_JP")
+            val languageLoader = LanguageLoader(this, "ja_jp")
             languageManager = languageLoader
             val messageProvider = MessageProviderImpl(languageLoader)
             rankManager.setMessageProvider(messageProvider)
@@ -296,7 +319,7 @@ class CCContent : JavaPlugin(), Listener {
                 this
             )
 
-            val ignoreBlockStore = IgnoreBlockStore(File(dataFolder, "job/.ignore_blocks.yml"))
+            val ignoreBlockStore = IgnoreBlockStore(File(dataFolder, "data/rank/ignore_blocks.yml"))
             ignoreBlockStoreInstance = ignoreBlockStore
 
             // スキル効果システムを初期化
@@ -323,7 +346,7 @@ class CCContent : JavaPlugin(), Listener {
 
             // 追加のランク系リスナー登録
             val minerListener = ProfessionMinerExpListener(this, rankManager, ignoreBlockStore)
-            val combatExpListener = ProfessionCombatExpListener(rankManager, config)
+            val combatExpListener = ProfessionCombatExpListener(rankManager, coreConfig)
             server.pluginManager.registerEvents(minerListener, this)
             server.pluginManager.registerEvents(combatExpListener, this)
             
@@ -425,8 +448,8 @@ class CCContent : JavaPlugin(), Listener {
         ignoreBlockStore: IgnoreBlockStore
     ): Pair<TutorialTaskLoader?, TutorialTaskCheckerImpl?> {
         try {
-            // tutorial-tasks.yml ファイルを確認・抽出
-            val tutorialTasksFile = File(dataFolder, "tutorial-tasks.yml")
+            // tutorial_tasks.yml ファイルを確認・抽出
+            val tutorialTasksFile = File(dataFolder, "config/rank/tutorial_tasks.yml")
             if (!tutorialTasksFile.exists()) {
                 extractTutorialTasksFile(tutorialTasksFile)
             }
@@ -469,11 +492,11 @@ class CCContent : JavaPlugin(), Listener {
     }
     
     /**
-     * リソースから tutorial-tasks.yml をコピー
+     * リソースから tutorial_tasks.yml をコピー
      */
     private fun extractTutorialTasksFile(destination: File) {
-        val resourceStream = getResource("tutorial-tasks.yml")
-            ?: throw IllegalArgumentException("リソースが見つかりません: tutorial-tasks.yml")
+        val resourceStream = getResource("config/rank/tutorial_tasks.yml")
+            ?: throw IllegalArgumentException("リソースが見つかりません: config/rank/tutorial_tasks.yml")
         
         resourceStream.use { input ->
             destination.outputStream().use { output ->
@@ -487,13 +510,13 @@ class CCContent : JavaPlugin(), Listener {
      */
     private fun registerSkillTrees() {
         SkillTreeRegistry.clear()
-        val jobDir = File(dataFolder, "job").apply { mkdirs() }
-        val expFile = File(jobDir, "exp.yml")
+        val jobDir = File(dataFolder, "config/rank/job").apply { mkdirs() }
+        val expFile = File(dataFolder, "config/rank/job_exp.yml")
         val errors = mutableListOf<String>()
 
         if (!expFile.exists()) {
             try {
-                extractJobFile("exp.yml", expFile)
+                copyResourceFile("config/rank/job_exp.yml", expFile)
             } catch (e: Exception) {
                 logger.warning("ジョブ経験値設定ファイルのコピーに失敗しました: ${e.message}")
             }
@@ -534,8 +557,8 @@ class CCContent : JavaPlugin(), Listener {
      * リソースからジョブファイルをコピー
      */
     private fun extractJobFile(resourceName: String, destination: File) {
-        val resourceStream = getResource("job/$resourceName")
-            ?: throw IllegalArgumentException("リソースが見つかりません: job/$resourceName")
+        val resourceStream = getResource("config/rank/job/$resourceName")
+            ?: throw IllegalArgumentException("リソースが見つかりません: config/rank/job/$resourceName")
         
         resourceStream.use { input ->
             destination.outputStream().use { output ->
@@ -614,42 +637,47 @@ class CCContent : JavaPlugin(), Listener {
 
             // /ccc reload 時に欠損補完する必須リソース
             val requiredResources = listOf(
-                RequiredResource("config.yml"),
-                RequiredResource("tutorial-tasks.yml"),
+                RequiredResource("config/core.yml"),
+                RequiredResource("config/rank/tutorial_tasks.yml"),
                 RequiredResource("lang/ja_jp.yml"),
                 RequiredResource("lang/en_us.yml"),
-                RequiredResource("lang/ja_jp.yml", "lang/ja_JP.yml"),
-                RequiredResource("gulliverlight/gulliverlight.yml"),
-                RequiredResource("misc/auto_ignition_booster.yml"),
-                RequiredResource("misc/air_cannon.yml"),
-                RequiredResource("misc/radio_cassette.yml"),
-                RequiredResource("misc/custom_heads/sakura.yml"),
-                RequiredResource("misc/custom_heads/halloween.yml"),
-                RequiredResource("arena/theme.yml"),
-                RequiredResource("sukima/items.yml"),
-                RequiredResource("sukima/mobs.yml"),
-                RequiredResource("sukima/mob_spawn.yml"),
-                RequiredResource("sukima/theme.yml"),
-                RequiredResource("brewery/config.yml"),
-                RequiredResource("cooking/config.yml"),
-                RequiredResource("recipe/ingredient_definition.yml"),
-                RequiredResource("recipe/brewery.yml"),
-                RequiredResource("recipe/cooking.yml")
+                RequiredResource("config/custom_item/gulliver_light.yml"),
+                RequiredResource("config/custom_item/auto_ignition_booster.yml"),
+                RequiredResource("config/custom_item/air_cannon.yml"),
+                RequiredResource("config/custom_item/radio_cassette.yml"),
+                RequiredResource("config/custom_item/custom_head.yml"),
+                RequiredResource("config/arena/config.yml"),
+                RequiredResource("config/arena/theme.yml"),
+                RequiredResource("config/sukima_dungeon/theme.yml"),
+                RequiredResource("config/sukima_dungeon/mob_definition.yml"),
+                RequiredResource("config/sukima_dungeon/loot.yml"),
+                RequiredResource("config/brewery/config.yml"),
+                RequiredResource("config/brewery/recipe.yml"),
+                RequiredResource("config/cooking/config.yml"),
+                RequiredResource("config/cooking/recipe.yml"),
+                RequiredResource("config/ingredient_definition.yml"),
+                RequiredResource("config/rank/job_exp.yml")
             )
             
             // 必須ディレクトリのリスト
             val requiredDirs = listOf(
-                "job",
+                "config",
+                "config/custom_item",
+                "config/arena",
+                "config/sukima_dungeon",
+                "config/brewery",
+                "config/cooking",
+                "config/rank",
+                "config/rank/job",
                 "lang",
-                "misc",
-                "misc/custom_heads",
-                "arena",
-                "sukima",
-                "gulliverlight",
-                "brewery",
-                "cooking",
-                "recipe",
-                "data/cccontent/advancement/tutorial"
+                "structures",
+                "structures/arena",
+                "structures/sukima_dungeon",
+                "data",
+                "data/rank",
+                "data/brewery",
+                "data/sukima_dungeon",
+                "playerdata"
             )
             
             // 欠損しているファイルを確認してコピー
@@ -668,12 +696,12 @@ class CCContent : JavaPlugin(), Listener {
                 }
             }
             
-            reloadConfig()
+            coreConfig = CoreConfigManager.load(this)
+            startPersistenceFlushTask()
             CustomItemI18n.initialize(this)
             AutoIgnitionBoosterConfig.reload()
             AirCannonConfig.reload()
             RadioCassetteConfig.reload()
-            migrateLegacyConfigLayout()
             HeadDatabaseBridge.reset()
             CustomHeadConfigRegistry.reload(this)
             registerRadioCassetteItems()
@@ -683,14 +711,29 @@ class CCContent : JavaPlugin(), Listener {
             logContentEnabledChangeIfNeeded(reloadedContentEnabled)
 
             if (isContentEnabledAtStartup("rank")) {
-                val jobDir = File(dataFolder, "job")
+                val jobDir = File(dataFolder, "config/rank/job")
                 if (jobDir.exists()) {
-                    val requiredJobFiles = listOf("brewer.yml", "lumberjack.yml", "miner.yml", "cook.yml", "exp.yml")
+                    val requiredJobFiles = listOf(
+                        "brewer.yml",
+                        "carpenter.yml",
+                        "cook.yml",
+                        "farmer.yml",
+                        "gardener.yml",
+                        "lumberjack.yml",
+                        "miner.yml",
+                        "swordsman.yml",
+                        "warrior.yml"
+                    )
                     for (jobFile in requiredJobFiles) {
                         val file = File(jobDir, jobFile)
                         if (!file.exists()) {
-                            copyResourceFile("job/$jobFile", file)
+                            copyResourceFile("config/rank/job/$jobFile", file)
                         }
+                    }
+
+                    val jobExpFile = File(dataFolder, "config/rank/job_exp.yml")
+                    if (!jobExpFile.exists()) {
+                        copyResourceFile("config/rank/job_exp.yml", jobExpFile)
                     }
 
                     try {
@@ -710,20 +753,6 @@ class CCContent : JavaPlugin(), Listener {
                                 playerProfession.prestigeSkills,
                                 playerProfession.skillActivationStates
                             )
-                        }
-                    }
-                }
-
-                val advancementDir = File(dataFolder, "data/cccontent/advancement/tutorial")
-                if (advancementDir.exists()) {
-                    val requiredAdvancementFiles = listOf(
-                        "newbie.json", "visitor.json", "pioneer.json",
-                        "adventurer.json", "attainer.json"
-                    )
-                    for (advFile in requiredAdvancementFiles) {
-                        val file = File(advancementDir, advFile)
-                        if (!file.exists()) {
-                            copyResourceFile("data/cccontent/advancement/tutorial/$advFile", file)
                         }
                     }
                 }
@@ -783,42 +812,6 @@ class CCContent : JavaPlugin(), Listener {
         }
 
         store.clearAll()
-    }
-
-    private fun migrateLegacyConfigLayout() {
-        data class LegacyMapping(val oldPath: String, val newPath: String)
-
-        val mappings = listOf(
-            LegacyMapping("config/gulliverlight.yml", "gulliverlight/gulliverlight.yml"),
-            LegacyMapping("config/arena/theme.yml", "arena/theme.yml"),
-            LegacyMapping("config/sukima/items.yml", "sukima/items.yml"),
-            LegacyMapping("config/sukima/mobs.yml", "sukima/mobs.yml"),
-            LegacyMapping("config/sukima/mob_spawn.yml", "sukima/mob_spawn.yml"),
-            LegacyMapping("config/sukima/theme.yml", "sukima/theme.yml"),
-            LegacyMapping("resources/gulliverlight/gulliverlight.yml", "gulliverlight/gulliverlight.yml"),
-            LegacyMapping("resources/arena/theme.yml", "arena/theme.yml"),
-            LegacyMapping("resources/sukima/items.yml", "sukima/items.yml"),
-            LegacyMapping("resources/sukima/mobs.yml", "sukima/mobs.yml"),
-            LegacyMapping("resources/sukima/mob_spawn.yml", "sukima/mob_spawn.yml"),
-            LegacyMapping("resources/sukima/theme.yml", "sukima/theme.yml"),
-            LegacyMapping("resources/brewery/config.yml", "brewery/config.yml"),
-            LegacyMapping("resources/cooking/config.yml", "cooking/config.yml")
-        )
-
-        for (mapping in mappings) {
-            val oldFile = File(dataFolder, mapping.oldPath)
-            val newFile = File(dataFolder, mapping.newPath)
-
-            if (!oldFile.exists() || newFile.exists()) continue
-
-            try {
-                newFile.parentFile?.mkdirs()
-                oldFile.copyTo(newFile, overwrite = false)
-                logger.info("旧設定ファイルを移行しました: ${mapping.oldPath} -> ${mapping.newPath}")
-            } catch (e: Exception) {
-                logger.warning("旧設定ファイル移行に失敗しました (${mapping.oldPath}): ${e.message}")
-            }
-        }
     }
 
     private fun initializeBrewery() {
@@ -939,6 +932,9 @@ class CCContent : JavaPlugin(), Listener {
                         }
                     }
                 }
+                if (DungeonSessionManager.getAllSessions().isNotEmpty()) {
+                    DungeonSessionManager.markDirty()
+                }
                 mobManager.tick()
                 SpecialTileTask.tick(this@CCContent, mobManager)
             }, 20L, 20L)
@@ -959,7 +955,7 @@ class CCContent : JavaPlugin(), Listener {
      * SukimaDungeonの設定をリロード
      */
     fun reloadSukimaDungeon() {
-        // SukimaDungeon用config読み込み (root config.yml)
+        // SukimaDungeon用config読み込み (config/core.yml)
         SukimaConfigHelper.reload(this)
         
         // Load messages
@@ -1017,6 +1013,8 @@ class CCContent : JavaPlugin(), Listener {
             RadioCassettePlaybackManager.shutdown()
             BGMManager.stopAll()
             DungeonSessionManager.saveSessions(this)
+            persistenceFlushTask?.cancel()
+            persistenceFlushTask = null
             if (::arenaManager.isInitialized) {
                 arenaManager.shutdown()
             }

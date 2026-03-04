@@ -64,10 +64,10 @@ class ArenaManager(private val plugin: JavaPlugin) {
     }
 
     private fun loadConfig() {
-        val configFile = File(plugin.dataFolder, "arena/config.yml")
+        val configFile = File(plugin.dataFolder, "config/arena/config.yml")
         if (!configFile.exists()) {
             configFile.parentFile.mkdirs()
-            plugin.saveResource("arena/config.yml", false)
+            plugin.saveResource("config/arena/config.yml", false)
         }
 
         val config = YamlConfiguration.loadConfiguration(configFile)

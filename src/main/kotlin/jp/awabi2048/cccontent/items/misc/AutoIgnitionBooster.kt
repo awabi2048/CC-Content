@@ -25,14 +25,14 @@ object AutoIgnitionBoosterConfig {
     private lateinit var configFile: File
 
     fun initialize(plugin: JavaPlugin) {
-        val miscDir = File(plugin.dataFolder, "misc")
-        if (!miscDir.exists()) {
-            miscDir.mkdirs()
+        val configDir = File(plugin.dataFolder, "config/custom_item")
+        if (!configDir.exists()) {
+            configDir.mkdirs()
         }
 
-        configFile = File(miscDir, "auto_ignition_booster.yml")
+        configFile = File(configDir, "auto_ignition_booster.yml")
         if (!configFile.exists()) {
-            plugin.saveResource("misc/auto_ignition_booster.yml", false)
+            plugin.saveResource("config/custom_item/auto_ignition_booster.yml", false)
         }
 
         reload()

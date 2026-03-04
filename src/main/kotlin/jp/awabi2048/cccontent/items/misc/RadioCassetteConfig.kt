@@ -22,14 +22,14 @@ object RadioCassetteConfig {
 
     fun initialize(plugin: JavaPlugin) {
         this.plugin = plugin
-        val miscDir = File(plugin.dataFolder, "misc")
-        if (!miscDir.exists()) {
-            miscDir.mkdirs()
+        val configDir = File(plugin.dataFolder, "config/custom_item")
+        if (!configDir.exists()) {
+            configDir.mkdirs()
         }
 
-        configFile = File(miscDir, "radio_cassette.yml")
+        configFile = File(configDir, "radio_cassette.yml")
         if (!configFile.exists()) {
-            plugin.saveResource("misc/radio_cassette.yml", false)
+            plugin.saveResource("config/custom_item/radio_cassette.yml", false)
         }
 
         reload()

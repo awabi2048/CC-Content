@@ -26,7 +26,7 @@ object PlayerDataManager {
         val data = if (file.exists()) {
             val config = YamlConfiguration.loadConfiguration(file)
             PlayerData(
-                lang = config.getString("lang", "ja_jp") ?: "ja_jp"
+                lang = config.getString("sukima_dungeon.lang", "ja_jp") ?: "ja_jp"
             )
         } else {
             PlayerData()
@@ -38,8 +38,8 @@ object PlayerDataManager {
     fun save(player: Player) {
         val data = dataCache[player.uniqueId] ?: return
         val file = File(dataDir, "${player.uniqueId}.yml")
-        val config = YamlConfiguration()
-        config.set("lang", data.lang)
+        val config = if (file.exists()) YamlConfiguration.loadConfiguration(file) else YamlConfiguration()
+        config.set("sukima_dungeon.lang", data.lang)
         config.save(file)
     }
 
