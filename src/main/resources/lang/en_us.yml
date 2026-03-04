@@ -249,6 +249,16 @@ custom_items:
         - "§7Right click to compress and release the air ahead."
         - "§7Launches targets in front toward §fforward + upward§7."
         - "§7The user also receives a small §fback-upward§7 recoil."
+    invisible_item_frame:
+      name: "§fTransparent Item Frame"
+      lore:
+        - "§7Turns invisible after placement."
+        - "§7Hold it and §eSneak§7 to temporarily reveal nearby transparent frames."
+    invisible_glow_item_frame:
+      name: "§bTransparent Glow Item Frame"
+      lore:
+        - "§7Turns invisible after placement."
+        - "§7Hold it and §eSneak§7 to temporarily reveal nearby transparent frames."
     radio_cassette_player:
       name: "§6Radio Cassette"
       lore:
