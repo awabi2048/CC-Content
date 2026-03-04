@@ -12,17 +12,17 @@ class StructureLoader(val plugin: JavaPlugin) {
     private val themes = mutableMapOf<String, Theme>()
 
     fun loadThemes() {
-        val themeFile = File(plugin.dataFolder, "sukima/theme.yml")
+        val themeFile = File(plugin.dataFolder, "config/sukima_dungeon/theme.yml")
         if (!themeFile.exists()) {
             themeFile.parentFile.mkdirs()
-            plugin.saveResource("sukima/theme.yml", false)
+            plugin.saveResource("config/sukima_dungeon/theme.yml", false)
         }
         val config = YamlConfiguration.loadConfiguration(themeFile)
         
         themes.clear()
         val themesSection = config.getConfigurationSection("themes") ?: return
 
-        val baseStructureFolder = File(plugin.dataFolder, "structures")
+        val baseStructureFolder = File(plugin.dataFolder, "structures/sukima_dungeon")
         if (!baseStructureFolder.exists()) {
             baseStructureFolder.mkdirs()
         }

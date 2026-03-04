@@ -76,7 +76,7 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
     private val ingredientDefinitions: Map<String, IngredientDefinition> by lazy { loadIngredientDefinitions() }
 
     fun loadSettings(): BrewerySettings {
-        val file = File(plugin.dataFolder, "brewery/config.yml")
+        val file = File(plugin.dataFolder, "config/brewery/config.yml")
         val yml = YamlConfiguration.loadConfiguration(file)
         val mediumRaw = yml.getStringList("settings.fire.medium_materials")
         val mediumMaterials = mediumRaw.mapNotNull { runCatching { Material.valueOf(it) }.getOrNull() }.toSet()
@@ -94,7 +94,7 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
     }
 
     fun loadRecipes(): Map<String, BreweryRecipe> {
-        val file = File(plugin.dataFolder, "recipe/brewery.yml")
+        val file = File(plugin.dataFolder, "config/brewery/recipe.yml")
         val yml = YamlConfiguration.loadConfiguration(file)
         val recipes = mutableMapOf<String, BreweryRecipe>()
         for (id in yml.getKeys(false)) {
@@ -186,7 +186,7 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
     }
 
     private fun loadIngredientDefinitions(): Map<String, IngredientDefinition> {
-        val file = File(plugin.dataFolder, "recipe/ingredient_definition.yml")
+        val file = File(plugin.dataFolder, "config/ingredient_definition.yml")
         val yml = YamlConfiguration.loadConfiguration(file)
         val section = yml.getConfigurationSection("ingredients") ?: return emptyMap()
         val map = mutableMapOf<String, IngredientDefinition>()

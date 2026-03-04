@@ -43,10 +43,10 @@ class MobManager(private val plugin: JavaPlugin) {
     }
 
     private fun loadMobs() {
-        val file = File(plugin.dataFolder, "sukima/mobs.yml")
+        val file = File(plugin.dataFolder, "config/sukima_dungeon/mob_definition.yml")
         if (!file.exists()) {
             file.parentFile.mkdirs()
-            plugin.saveResource("sukima/mobs.yml", false)
+            plugin.saveResource("config/sukima_dungeon/mob_definition.yml", false)
         }
         
         val config = YamlConfiguration.loadConfiguration(file)
@@ -84,14 +84,14 @@ class MobManager(private val plugin: JavaPlugin) {
     }
 
     private fun loadSpawnSettings() {
-        val file = File(plugin.dataFolder, "sukima/mob_spawn.yml")
+        val file = File(plugin.dataFolder, "config/sukima_dungeon/theme.yml")
         if (!file.exists()) {
             file.parentFile.mkdirs()
-            plugin.saveResource("sukima/mob_spawn.yml", false)
+            plugin.saveResource("config/sukima_dungeon/theme.yml", false)
         }
 
         val config = YamlConfiguration.loadConfiguration(file)
-        val section = config.getConfigurationSection("themes") ?: return
+        val section = config.getConfigurationSection("mob_spawn.themes") ?: return
 
         themeSpawns.clear()
         for (key in section.getKeys(false)) {

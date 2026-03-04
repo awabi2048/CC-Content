@@ -22,14 +22,14 @@ object AirCannonConfig {
     private lateinit var configFile: File
 
     fun initialize(plugin: JavaPlugin) {
-        val miscDir = File(plugin.dataFolder, "misc")
-        if (!miscDir.exists()) {
-            miscDir.mkdirs()
+        val configDir = File(plugin.dataFolder, "config/custom_item")
+        if (!configDir.exists()) {
+            configDir.mkdirs()
         }
 
-        configFile = File(miscDir, "air_cannon.yml")
+        configFile = File(configDir, "air_cannon.yml")
         if (!configFile.exists()) {
-            plugin.saveResource("misc/air_cannon.yml", false)
+            plugin.saveResource("config/custom_item/air_cannon.yml", false)
         }
 
         reload()

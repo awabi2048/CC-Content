@@ -1,11 +1,12 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
+import jp.awabi2048.cccontent.config.CoreConfigManager
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 
 /**
  * SukimaDungeon用の設定ファイルヘルパー。
- * CC-Content全体の root config.yml を参照する。
+ * CC-Content全体の config/core.yml を参照する。
  */
 object SukimaConfigHelper {
     private var cachedConfig: YamlConfiguration? = null
@@ -16,13 +17,10 @@ object SukimaConfigHelper {
     }
 
     fun reload(plugin: JavaPlugin): YamlConfiguration {
-        plugin.saveDefaultConfig()
-        plugin.reloadConfig()
-
         val config = YamlConfiguration()
-        val section = plugin.config.getConfigurationSection("sukima_dungeon")
+        val section = CoreConfigManager.get(plugin).getConfigurationSection("sukima_dungeon")
         if (section == null) {
-            plugin.logger.warning("config.yml に sukima_dungeon セクションが見つかりません")
+            plugin.logger.warning("config/core.yml に sukima_dungeon セクションが見つかりません")
             cachedConfig = config
             return config
         }

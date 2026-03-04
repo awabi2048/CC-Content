@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets
  */
 class LanguageLoader(
     private val plugin: JavaPlugin,
-    private val language: String = "ja_JP"
+    private val language: String = "ja_jp"
 ) {
     private val languageData: MutableMap<String, String> = mutableMapOf()
     private val bundledLanguageData: MutableMap<String, String> = mutableMapOf()
@@ -35,23 +35,11 @@ class LanguageLoader(
 
     private fun resolveLanguageFile(langDir: File): File {
         val lowerCaseFile = File(langDir, "$normalizedLanguage.yml")
-        if (lowerCaseFile.exists()) {
-            return lowerCaseFile
-        }
-
-        val exactCaseFile = File(langDir, "$language.yml")
-        if (exactCaseFile.exists()) {
-            return exactCaseFile
-        }
-
         return lowerCaseFile
     }
 
     private fun resourcePathCandidates(): List<String> {
-        return listOf(
-            "lang/$normalizedLanguage.yml",
-            "lang/$language.yml"
-        ).distinct()
+        return listOf("lang/$normalizedLanguage.yml")
     }
     
     /**

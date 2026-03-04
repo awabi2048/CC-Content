@@ -91,7 +91,7 @@ object HeadDatabaseBridge {
     }
 
     private fun isBypassEnabled(plugin: JavaPlugin): Boolean {
-        return plugin.config.getBoolean("misc.custom_head.test_mode_without_hdb", false)
+        return CustomHeadConfigRegistry.isBypassEnabled(plugin)
     }
 
     private fun createBypassHead(hdbId: String): ItemStack {

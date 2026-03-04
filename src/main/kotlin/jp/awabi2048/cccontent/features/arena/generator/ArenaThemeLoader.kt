@@ -35,10 +35,10 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
     private val themes = mutableMapOf<String, ArenaTheme>()
 
     fun load(featureInitLogger: FeatureInitializationLogger? = null) {
-        val configFile = File(plugin.dataFolder, "arena/theme.yml")
+        val configFile = File(plugin.dataFolder, "config/arena/theme.yml")
         if (!configFile.exists()) {
             configFile.parentFile.mkdirs()
-            plugin.saveResource("arena/theme.yml", false)
+            plugin.saveResource("config/arena/theme.yml", false)
         }
 
         val config = YamlConfiguration.loadConfiguration(configFile)

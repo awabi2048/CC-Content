@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.items.misc
 
 import org.bukkit.Material
+import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
@@ -10,27 +11,32 @@ object CustomHeadConfigRegistry {
     private val variants = linkedMapOf<String, CustomHeadVariant>()
 
     fun initialize(plugin: JavaPlugin) {
-        ensureDefaultFiles(plugin)
+        ensureDefaultFile(plugin)
         reload(plugin)
     }
 
     fun reload(plugin: JavaPlugin) {
-        ensureDefaultFiles(plugin)
+        ensureDefaultFile(plugin)
         variants.clear()
 
-        val baseDir = getConfigDir(plugin)
-        val files = baseDir.listFiles { file -> file.isFile && file.extension.equals("yml", ignoreCase = true) }
-            ?.sortedBy { it.name.lowercase(Locale.ROOT) }
-            ?: emptyList()
+        val configFile = getConfigFile(plugin)
+        val yaml = YamlConfiguration.loadConfiguration(configFile)
+        val variantsSection = yaml.getConfigurationSection("variants")
 
-        for (file in files) {
-            val loaded = runCatching { loadVariant(file) }
+        if (variantsSection == null) {
+            plugin.logger.warning("[CustomHead] variants セクションが見つかりません: ${configFile.name}")
+            return
+        }
+
+        for (variantKey in variantsSection.getKeys(false).sorted()) {
+            val section = variantsSection.getConfigurationSection(variantKey) ?: continue
+            val loaded = runCatching { loadVariant(section, variantKey) }
             loaded.onFailure {
-                plugin.logger.warning("[CustomHead] 設定読み込み失敗: ${file.name} (${it.message})")
+                plugin.logger.warning("[CustomHead] 設定読み込み失敗: $variantKey (${it.message})")
             }
             loaded.getOrNull()?.let { variant ->
                 if (variants.containsKey(variant.variantId)) {
-                    plugin.logger.warning("[CustomHead] variant_id が重複しています: ${variant.variantId} (${file.name})")
+                    plugin.logger.warning("[CustomHead] variant_id が重複しています: ${variant.variantId}")
                     return@let
                 }
                 variants[variant.variantId] = variant
@@ -42,61 +48,54 @@ object CustomHeadConfigRegistry {
 
     fun getAllVariants(): List<CustomHeadVariant> = variants.values.toList()
 
-    private fun getConfigDir(plugin: JavaPlugin): File {
-        val dir = File(plugin.dataFolder, "misc/custom_heads")
-        if (!dir.exists()) {
-            dir.mkdirs()
-        }
-        return dir
+    fun isBypassEnabled(plugin: JavaPlugin): Boolean {
+        val configFile = getConfigFile(plugin)
+        val yaml = YamlConfiguration.loadConfiguration(configFile)
+        return yaml.getBoolean("settings.test_mode_without_hdb", false)
     }
 
-    private fun ensureDefaultFiles(plugin: JavaPlugin) {
-        val dir = getConfigDir(plugin)
-        val defaults = listOf(
-            "misc/custom_heads/sakura.yml",
-            "misc/custom_heads/halloween.yml"
-        )
-        for (resourcePath in defaults) {
-            val outFile = File(plugin.dataFolder, resourcePath)
-            if (!outFile.exists()) {
-                plugin.saveResource(resourcePath, false)
-            }
+    private fun getConfigFile(plugin: JavaPlugin): File {
+        val file = File(plugin.dataFolder, "config/custom_item/custom_head.yml")
+        if (!file.parentFile.exists()) {
+            file.parentFile.mkdirs()
         }
-        if (!dir.exists()) {
-            dir.mkdirs()
+        return file
+    }
+
+    private fun ensureDefaultFile(plugin: JavaPlugin) {
+        val file = getConfigFile(plugin)
+        if (!file.exists()) {
+            plugin.saveResource("config/custom_item/custom_head.yml", false)
         }
     }
 
-    private fun loadVariant(file: File): CustomHeadVariant {
-        val yaml = YamlConfiguration.loadConfiguration(file)
-
-        val fallbackId = file.nameWithoutExtension.lowercase(Locale.ROOT)
-        val rawVariantId = yaml.getString("variant_id")?.trim().orEmpty()
+    private fun loadVariant(section: ConfigurationSection, fallbackId: String): CustomHeadVariant {
+        val rawVariantId = section.getString("variant_id")?.trim().orEmpty()
         val variantId = (if (rawVariantId.isNotBlank()) rawVariantId else fallbackId)
             .lowercase(Locale.ROOT)
             .replace(Regex("[^a-z0-9_]+"), "_")
             .trim('_')
         require(variantId.isNotBlank()) { "variant_id が空です" }
 
-        val itemMaterial = parseMaterial(yaml.getString("item.material"), Material.NAME_TAG)
-        val itemDisplayName = colorize(yaml.getString("item.name") ?: "&dカスタムヘッド券")
-        val itemLore = yaml.getStringList("item.lore").ifEmpty {
+        val itemMaterial = parseMaterial(section.getString("item.material"), Material.NAME_TAG)
+        val itemDisplayName = colorize(section.getString("item.name") ?: "&dカスタムヘッド券")
+        val itemLore = section.getStringList("item.lore").ifEmpty {
             listOf(
                 "&7右クリックでヘッド選択GUIを開く",
                 "&7選択後に確認ダイアログで交換"
             )
         }.map(::colorize)
-        val itemCustomModelData = if (yaml.contains("item.custom_model_data")) {
-            yaml.getInt("item.custom_model_data")
+        val itemCustomModelData = if (section.contains("item.custom_model_data")) {
+            section.getInt("item.custom_model_data")
         } else {
             null
         }
 
-        val guiTitle = colorize(yaml.getString("gui.title") ?: "&0&lカスタムヘッド選択")
-        val themeIconMaterial = parseMaterial(yaml.getString("gui.theme_icon_material"), Material.PAPER)
-        val themeIconName = colorize(yaml.getString("gui.theme_icon_name") ?: "&eテーマ")
+        val guiTitle = colorize(section.getString("gui.title") ?: "&0&lカスタムヘッド選択")
+        val themeIconMaterial = parseMaterial(section.getString("gui.theme_icon_material"), Material.PAPER)
+        val themeIconName = colorize(section.getString("gui.theme_icon_name") ?: "&eテーマ")
 
-        val headSection = yaml.getMapList("heads")
+        val headSection = section.getMapList("heads")
         val heads = headSection.mapNotNull { row ->
             val id = (row["hdb_id"] ?: row["id"])?.toString()?.trim().orEmpty()
             if (id.isBlank()) return@mapNotNull null

@@ -7,9 +7,8 @@ content_enabled:
   cooking: true
   sukima_dungeon: true
 
-misc:
-  custom_head:
-    test_mode_without_hdb: false
+persistence:
+  flush_interval_minutes: 1
 
 sukima_dungeon:
   sizes:

@@ -43,12 +43,12 @@ class ProfessionMinerExpListener(
     private val brewerLastGainAt: MutableMap<UUID, Long> = mutableMapOf()
 
     init {
-        val jobDir = File(plugin.dataFolder, "job").apply { mkdirs() }
-        val expFile = File(jobDir, "exp.yml")
+        val rankDir = File(plugin.dataFolder, "config/rank").apply { mkdirs() }
+        val expFile = File(rankDir, "job_exp.yml")
 
         val config = if (expFile.exists()) YamlConfiguration.loadConfiguration(expFile) else YamlConfiguration()
         if (!expFile.exists()) {
-            plugin.logger.warning("job/exp.yml が見つからないため、職業経験値付与を無効化します")
+            plugin.logger.warning("config/rank/job_exp.yml が見つからないため、職業経験値付与を無効化します")
         }
         
         minerExpMap = loadBlockExpMap(config, "miner")

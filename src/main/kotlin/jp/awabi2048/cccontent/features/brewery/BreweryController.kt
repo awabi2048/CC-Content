@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.brewery
 
 import jp.awabi2048.cccontent.CCContent
+import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.features.brewery.item.BreweryItemCodec
 import jp.awabi2048.cccontent.features.brewery.model.BarrelSize
 import jp.awabi2048.cccontent.features.brewery.model.BreweryLocationKey
@@ -37,7 +38,7 @@ import kotlin.math.floor
 class BreweryController(private val plugin: JavaPlugin) : Listener {
     private val settingsLoader = BrewerySettingsLoader(plugin)
     private val codec = BreweryItemCodec(plugin)
-    private val stateFile = File(plugin.dataFolder, "brewery/state.yml")
+    private val stateFile = File(plugin.dataFolder, "data/brewery/state.yml")
     private val filterRecipeKey = NamespacedKey(plugin, "brewery_sample_filter")
     private val rankManager = (plugin as? CCContent)?.getRankManager()
 
@@ -45,6 +46,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
     private var recipes: Map<String, BreweryRecipe> = settingsLoader.loadRecipes()
     private var tickerTask: BukkitTask? = null
     private var autosaveTask: BukkitTask? = null
+    private var dirty: Boolean = false
 
     private val fermentationStates = mutableMapOf<BreweryLocationKey, FermentationState>()
     private val distillationStates = mutableMapOf<BreweryLocationKey, DistillationState>()
@@ -90,25 +92,36 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         tickerTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
             tickFermentation()
             tickDistillation()
+            if (fermentationStates.isNotEmpty() || distillationStates.isNotEmpty() || agingStates.isNotEmpty()) {
+                markDirty()
+            }
         }, 20L, 20L)
 
         autosaveTask?.cancel()
         autosaveTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
-            saveState()
-        }, 20L * 30L, 20L * 30L)
+            flushIfDirty()
+        }, getFlushIntervalTicks(), getFlushIntervalTicks())
     }
 
     fun reload() {
         settings = settingsLoader.loadSettings()
         recipes = settingsLoader.loadRecipes()
         registerSampleFilterRecipe()
-        saveState()
+        flushNow()
     }
 
     fun shutdown() {
-        saveState()
+        flushNow()
         tickerTask?.cancel()
         autosaveTask?.cancel()
+    }
+
+    fun flushIfDirty() {
+        if (!dirty) {
+            return
+        }
+        saveStateInternal()
+        dirty = false
     }
 
     @EventHandler
@@ -196,6 +209,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             is DistillationHolder -> handleDistillationClick(player, holder.locationKey, event)
             is AgingHolder -> handleAgingClick(player, holder.locationKey, event)
         }
+        markDirty()
     }
 
     private fun handleShiftQuickMove(player: Player, holder: InventoryHolder, event: InventoryClickEvent) {
@@ -1501,7 +1515,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         Bukkit.addRecipe(recipe)
     }
 
-    private fun saveState() {
+    private fun saveStateInternal() {
         val yml = YamlConfiguration()
         fermentationStates.forEach { (key, state) ->
             val base = "fermentation.${key.toSerialized()}"
@@ -1542,6 +1556,11 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
 
         stateFile.parentFile?.mkdirs()
         yml.save(stateFile)
+    }
+
+    private fun flushNow() {
+        saveStateInternal()
+        dirty = false
     }
 
     private fun loadState() {
@@ -1619,6 +1638,18 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             agingStates[key] = state
             refreshAgingDecor(state)
         }
+        dirty = false
+    }
+
+    private fun markDirty() {
+        dirty = true
+    }
+
+    private fun getFlushIntervalTicks(): Long {
+        val minutes = CoreConfigManager.get(plugin)
+            .getLong("persistence.flush_interval_minutes", 1L)
+            .coerceAtLeast(1L)
+        return minutes * 60L * 20L
     }
 
     private fun saveInventory(yml: YamlConfiguration, path: String, inventory: Inventory) {
