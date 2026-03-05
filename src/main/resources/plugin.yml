@@ -10,7 +10,7 @@ commands:
   cc-content:
     description: CC-Contentメインコマンド
     usage: /cc-content reload
-    aliases: [cc, ccc]
+    aliases: [ccc]
   rank:
     description: ランクシステムコマンド（デバッグ用）
     usage: /rank <subcommand> [args]
