@@ -23,7 +23,7 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
         if (event.from.blockX == to.blockX && event.from.blockY == to.blockY && event.from.blockZ == to.blockZ) {
             return
         }
-        arenaManager.handleMove(event.player, to, event.from)
+        arenaManager.handleMove(event.player, to)
     }
 
     @EventHandler

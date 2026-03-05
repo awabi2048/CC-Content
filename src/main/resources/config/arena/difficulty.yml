@@ -1,0 +1,10 @@
+easy:
+  mob_stats_multiplier: 0.8 # 体力・攻撃力の基礎倍率
+  mob_spawn_interval: 20 # モブのスポーン間隔（tick）
+  mob_count_multiplier: 0.8 # モブの最大召喚数／ウェーブクリア扱いとするモブの討伐数にかかる倍率
+  wave_multiplier: 0.03 # モブ召喚数・ステータスに`1 + %wave_multiplier% * %wave%`を乗算
+  wave: 5 # ステージ全体での基礎ウェーブ数
+  color: "green"
+  display: "§c★§7☆☆"
+
+

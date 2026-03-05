@@ -1,0 +1,14 @@
+zombie:
+  structure: "zombie_arena" # 使用するストラクチャー名（structures/arena/zombie_arena.yml ）
+  icon_material: ZOMBIE_HEAD # アイコンに使用するマテリアル
+  max_summon_count: 10 # 1ウェーブでの最大召喚数
+  clear_mob_count: 20 # ウェーブクリア扱いとするモブの討伐数
+  mobs: # config/arena/mob_definition.yml に記述されたモブのidを参照
+    zombie_1:
+      weight: 10
+      wave: 1.. # 最小値1, 最大値なし
+    zombie_2:
+      weight: 15
+      wave: 2..5
+
+      

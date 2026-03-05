@@ -19,6 +19,8 @@ data class ArenaSession(
     val ownerPlayerId: UUID,
     val worldName: String,
     val themeId: String,
+    val mobTypeId: String,
+    val difficultyId: String,
     val waves: Int,
     val participants: MutableSet<UUID>,
     val returnLocations: MutableMap<UUID, Location>,
@@ -30,7 +32,13 @@ data class ArenaSession(
     var currentWave: Int = 0,
     var barrierActive: Boolean = false,
     val startedWaves: MutableSet<Int> = mutableSetOf(),
+    val clearedWaves: MutableSet<Int> = mutableSetOf(),
     val activeMobs: MutableSet<UUID> = mutableSetOf(),
-    val waveMobCount: MutableMap<Int, Int> = mutableMapOf(),
+    val waveMobIds: MutableMap<Int, MutableSet<UUID>> = mutableMapOf(),
+    val waveKillCount: MutableMap<Int, Int> = mutableMapOf(),
+    val waveClearTargets: MutableMap<Int, Int> = mutableMapOf(),
+    val waveMaxAliveCounts: MutableMap<Int, Int> = mutableMapOf(),
+    val mobWaveMap: MutableMap<UUID, Int> = mutableMapOf(),
+    val playerNotifiedWaves: MutableMap<UUID, MutableSet<Int>> = mutableMapOf(),
     val waveSpawnTasks: MutableMap<Int, BukkitTask> = mutableMapOf()
 )

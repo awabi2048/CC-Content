@@ -31,8 +31,8 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
     }
 
     private fun handleStart(sender: CommandSender, args: Array<out String>): Boolean {
-        if (args.size < 3) {
-            sender.sendMessage("§c使用法: /arenaa start <player|@s> <waves> [theme]")
+        if (args.size < 4) {
+            sender.sendMessage("§c使用法: /arenaa start <player|@s> <mob_type> <difficulty> [theme]")
             return true
         }
 
@@ -45,16 +45,15 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
             return true
         }
 
-        val waves = args[2].toIntOrNull()
-        if (waves == null || waves <= 0) {
-            sender.sendMessage("§cwaves は1以上の整数で指定してください")
-            return true
-        }
-
-        val theme = args.getOrNull(3)
-        when (val result = arenaManager.startSession(target, waves, theme)) {
+        val mobTypeId = args[2]
+        val difficultyId = args[3]
+        val theme = args.getOrNull(4)
+        when (val result = arenaManager.startSession(target, mobTypeId, difficultyId, theme)) {
             is ArenaStartResult.Success -> {
-                sender.sendMessage("§a${target.name} のアリーナを開始しました (theme=${result.themeId}, waves=${result.waves})")
+                sender.sendMessage(
+                    "§a${target.name} のアリーナを開始しました " +
+                        "(mob_type=${result.mobTypeId}, difficulty=${result.difficultyId}, theme=${result.themeId}, waves=${result.waves})"
+                )
             }
             is ArenaStartResult.Error -> {
                 sender.sendMessage("§c開始失敗: ${result.message}")
@@ -100,7 +99,7 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
 
     private fun showUsage(sender: CommandSender) {
         sender.sendMessage("§6=== Arena 管理コマンド ===")
-        sender.sendMessage("§f/arenaa start <player|@s> <waves> [theme]")
+        sender.sendMessage("§f/arenaa start <player|@s> <mob_type> <difficulty> [theme]")
         sender.sendMessage("§f/arenaa stop <player>")
         sender.sendMessage("§f/arenaa theme list")
     }
@@ -122,11 +121,15 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
                 else -> emptyList()
             }
             3 -> when (args[0].lowercase()) {
-                "start" -> listOf("1", "3", "5", "10").filter { it.startsWith(args[2], ignoreCase = true) }
+                "start" -> arenaManager.getMobTypeIds().filter { it.startsWith(args[2], ignoreCase = true) }
                 else -> emptyList()
             }
             4 -> when (args[0].lowercase()) {
-                "start" -> arenaManager.getThemeIds().filter { it.startsWith(args[3], ignoreCase = true) }
+                "start" -> arenaManager.getDifficultyIds().filter { it.startsWith(args[3], ignoreCase = true) }
+                else -> emptyList()
+            }
+            5 -> when (args[0].lowercase()) {
+                "start" -> arenaManager.getThemeIds().filter { it.startsWith(args[4], ignoreCase = true) }
                 else -> emptyList()
             }
             else -> emptyList()
