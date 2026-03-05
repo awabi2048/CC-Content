@@ -11,25 +11,9 @@ import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityExplodeEvent
 import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.player.PlayerInteractEvent
-import org.bukkit.event.player.PlayerMoveEvent
 import org.bukkit.event.player.PlayerQuitEvent
-import org.bukkit.event.player.PlayerTeleportEvent
 
 class ArenaListener(private val arenaManager: ArenaManager) : Listener {
-
-    @EventHandler
-    fun onPlayerMove(event: PlayerMoveEvent) {
-        val to = event.to
-        if (event.from.blockX == to.blockX && event.from.blockY == to.blockY && event.from.blockZ == to.blockZ) {
-            return
-        }
-        arenaManager.handleMove(event.player, to)
-    }
-
-    @EventHandler
-    fun onPlayerTeleport(event: PlayerTeleportEvent) {
-        arenaManager.handleTeleport(event.player, event.to)
-    }
 
     @EventHandler
     fun onEntityDeath(event: EntityDeathEvent) {

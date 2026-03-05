@@ -19,6 +19,8 @@ import org.bukkit.entity.EntityType
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Mob
 import org.bukkit.entity.Player
+import org.bukkit.potion.PotionEffect
+import org.bukkit.potion.PotionEffectType
 import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
@@ -117,6 +119,7 @@ class ArenaManager(private val plugin: JavaPlugin) {
     private val mobTypeConfigs = mutableMapOf<String, ArenaMobTypeConfig>()
     private val mobDefinitions = mutableMapOf<String, ArenaMobDefinition>()
     private var maintenanceTask: BukkitTask? = null
+    private var playerMonitorTask: BukkitTask? = null
 
     fun initialize(featureInitLogger: FeatureInitializationLogger? = null) {
         loadBattleConfigs()
@@ -430,6 +433,7 @@ class ArenaManager(private val plugin: JavaPlugin) {
                 playerSpawn = stage.playerSpawn,
                 stageBounds = stage.stageBounds,
                 roomBounds = stage.roomBounds,
+                corridorBounds = stage.corridorBounds,
                 roomMobSpawns = stage.roomMobSpawns,
                 barrierLocation = stage.barrierLocation
             )
@@ -461,6 +465,8 @@ class ArenaManager(private val plugin: JavaPlugin) {
     fun shutdown() {
         maintenanceTask?.cancel()
         maintenanceTask = null
+        playerMonitorTask?.cancel()
+        playerMonitorTask = null
 
         sessionsByWorld.values.toList().forEach { session ->
             terminateSession(session, false, "§cサーバー停止によりアリーナを終了しました")
@@ -487,39 +493,50 @@ class ArenaManager(private val plugin: JavaPlugin) {
         return playerToSessionWorld.keys.mapNotNull { uuid -> Bukkit.getPlayer(uuid)?.name }.toSet()
     }
 
-    fun handleMove(player: Player, to: Location) {
-        val session = getSession(player) ?: return
+    private fun monitorParticipantPositions() {
+        for (session in sessionsByWorld.values.toList()) {
+            val world = Bukkit.getWorld(session.worldName) ?: continue
 
-        if (pendingBarrierActivations.containsKey(player.uniqueId)) {
-            return
+            for (participantId in session.participants.toList()) {
+                if (pendingBarrierActivations.containsKey(participantId)) continue
+
+                val player = Bukkit.getPlayer(participantId)
+                if (player == null || !player.isOnline) continue
+
+                val location = player.location
+                val currentWave = session.currentWave.coerceAtLeast(1)
+                if (location.world?.name != world.name || !session.stageBounds.contains(location.x, location.y, location.z)) {
+                    teleportToCurrentWavePosition(player, session, world, applyBlindness = true)
+                    continue
+                }
+
+                val room = locateRoom(session, location)
+                if (room != null && room > currentWave) {
+                    teleportToCurrentWavePosition(player, session, world, applyBlindness = true)
+                    continue
+                }
+                if (room != null && room > 0 && session.startedWaves.contains(room)) {
+                    notifyWaveEntryIfNeeded(session, player, room)
+                }
+
+                val corridorWave = locateCorridorTargetWave(session, location)
+                if (corridorWave == null) {
+                    continue
+                }
+                if (corridorWave > currentWave) {
+                    teleportToCurrentWavePosition(player, session, world, applyBlindness = true)
+                    continue
+                }
+                if (corridorWave == currentWave) {
+                    if (session.startedWaves.contains(corridorWave) &&
+                        (corridorWave <= 1 || session.clearedWaves.contains(corridorWave - 1)) &&
+                        session.corridorTriggeredWaves.add(corridorWave)
+                    ) {
+                        rebalanceTargetsForWave(session, corridorWave)
+                    }
+                }
+            }
         }
-
-        if (to.world?.name != session.worldName || !session.stageBounds.contains(to.x, to.z)) {
-            leavePlayerFromSession(player.uniqueId, "§cステージ外に出たためアリーナを終了しました")
-            return
-        }
-
-        val room = locateRoom(session, to) ?: return
-        if (room <= 0) return
-        if (!session.startedWaves.contains(room)) return
-        notifyWaveEntryIfNeeded(session, player, room)
-
-    }
-
-    fun handleTeleport(player: Player, to: Location?) {
-        val session = getSession(player) ?: return
-        if (pendingBarrierActivations.containsKey(player.uniqueId)) {
-            return
-        }
-        if (to == null || to.world?.name != session.worldName || !session.stageBounds.contains(to.x, to.z)) {
-            leavePlayerFromSession(player.uniqueId, "§cステージ外に出たためアリーナを終了しました")
-            return
-        }
-
-        val room = locateRoom(session, to) ?: return
-        if (room <= 0) return
-        if (!session.startedWaves.contains(room)) return
-        notifyWaveEntryIfNeeded(session, player, room)
     }
 
     fun handleMobDeath(entityId: UUID) {
@@ -619,6 +636,7 @@ class ArenaManager(private val plugin: JavaPlugin) {
         session.participants.clear()
         session.returnLocations.clear()
         session.playerNotifiedWaves.clear()
+        session.corridorTriggeredWaves.clear()
 
         session.activeMobs.toList().forEach { mobId ->
             mobToSessionWorld.remove(mobId)
@@ -727,8 +745,39 @@ class ArenaManager(private val plugin: JavaPlugin) {
 
     private fun locateRoom(session: ArenaSession, location: Location): Int? {
         return session.roomBounds.entries.firstOrNull { (_, bounds) ->
-            bounds.contains(location.x, location.z)
+            bounds.contains(location.x, location.y, location.z)
         }?.key
+    }
+
+    private fun locateCorridorTargetWave(session: ArenaSession, location: Location): Int? {
+        return session.corridorBounds.entries.firstOrNull { (_, bounds) ->
+            bounds.contains(location.x, location.y, location.z)
+        }?.key
+    }
+
+    private fun teleportToCurrentWavePosition(player: Player, session: ArenaSession, world: World, applyBlindness: Boolean = false) {
+        val target = currentWavePosition(session, world)
+        target.yaw = player.location.yaw
+        target.pitch = player.location.pitch
+        player.teleport(target)
+        if (applyBlindness) {
+            player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 15, 0, false, false, false))
+        }
+    }
+
+    private fun currentWavePosition(session: ArenaSession, world: World): Location {
+        val wave = session.currentWave.coerceIn(1, session.waves)
+        val bounds = session.roomBounds[wave]
+        if (bounds == null) {
+            return session.playerSpawn.clone().apply {
+                this.world = world
+            }
+        }
+
+        val centerX = (bounds.minX + bounds.maxX + 1) / 2.0
+        val centerY = bounds.minY + 1.0
+        val centerZ = (bounds.minZ + bounds.maxZ + 1) / 2.0
+        return Location(world, centerX, centerY, centerZ)
     }
 
     private fun notifyWaveEntryIfNeeded(session: ArenaSession, player: Player, wave: Int) {
@@ -811,6 +860,16 @@ class ArenaManager(private val plugin: JavaPlugin) {
 
         applyMobStats(entity, definition, difficulty, wave)
 
+        val combatActivated = session.corridorTriggeredWaves.contains(wave)
+        if (!combatActivated) {
+            entity.setAI(false)
+        } else {
+            entity.setAI(true)
+            if (entity is Mob) {
+                entity.target = findNearestParticipant(session, entity.location)
+            }
+        }
+
         val entityId = entity.uniqueId
         session.activeMobs.add(entityId)
         session.waveMobIds.getOrPut(wave) { mutableSetOf() }.add(entityId)
@@ -878,7 +937,6 @@ class ArenaManager(private val plugin: JavaPlugin) {
 
         session.clearedWaves.add(wave)
         onWaveClearedMock(session, wave)
-        rebalanceTargetsForWave(session, wave + 1)
 
         val nextWave = wave + 2
         if (nextWave <= session.waves) {
@@ -914,14 +972,25 @@ class ArenaManager(private val plugin: JavaPlugin) {
 
         if (mobs.isEmpty()) return
         if (targets.isEmpty()) {
-            mobs.forEach { mob -> mob.target = null }
+            mobs.forEach { mob ->
+                mob.setAI(false)
+                mob.target = null
+            }
             return
         }
 
         mobs.forEachIndexed { index, mob ->
+            mob.setAI(true)
             val target = targets[index % targets.size]
             mob.target = target
         }
+    }
+
+    private fun findNearestParticipant(session: ArenaSession, location: Location): Player? {
+        return session.participants
+            .mapNotNull { participantId -> Bukkit.getPlayer(participantId) }
+            .filter { it.isOnline && it.world.name == session.worldName }
+            .minByOrNull { it.location.distanceSquared(location) }
     }
 
     private fun removeWaveMobs(session: ArenaSession, wave: Int) {
@@ -1034,6 +1103,12 @@ class ArenaManager(private val plugin: JavaPlugin) {
             reconcileActiveMobs()
             processPendingWorldDeletions()
         }, 20L, 20L)
+
+        if (playerMonitorTask == null) {
+            playerMonitorTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+                monitorParticipantPositions()
+            }, 5L, 5L)
+        }
     }
 
     private fun reconcileActiveMobs() {

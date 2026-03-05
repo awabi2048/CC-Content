@@ -7,11 +7,13 @@ import java.util.UUID
 data class ArenaBounds(
     val minX: Int,
     val maxX: Int,
+    val minY: Int,
+    val maxY: Int,
     val minZ: Int,
     val maxZ: Int
 ) {
-    fun contains(x: Double, z: Double): Boolean {
-        return x >= minX && x < maxX + 1 && z >= minZ && z < maxZ + 1
+    fun contains(x: Double, y: Double, z: Double): Boolean {
+        return x >= minX && x < maxX + 1 && y >= minY && y < maxY + 1 && z >= minZ && z < maxZ + 1
     }
 }
 
@@ -27,6 +29,7 @@ data class ArenaSession(
     val playerSpawn: Location,
     val stageBounds: ArenaBounds,
     val roomBounds: Map<Int, ArenaBounds>,
+    val corridorBounds: Map<Int, ArenaBounds>,
     val roomMobSpawns: Map<Int, List<Location>>,
     val barrierLocation: Location,
     var currentWave: Int = 0,
@@ -40,5 +43,6 @@ data class ArenaSession(
     val waveMaxAliveCounts: MutableMap<Int, Int> = mutableMapOf(),
     val mobWaveMap: MutableMap<UUID, Int> = mutableMapOf(),
     val playerNotifiedWaves: MutableMap<UUID, MutableSet<Int>> = mutableMapOf(),
+    val corridorTriggeredWaves: MutableSet<Int> = mutableSetOf(),
     val waveSpawnTasks: MutableMap<Int, BukkitTask> = mutableMapOf()
 )

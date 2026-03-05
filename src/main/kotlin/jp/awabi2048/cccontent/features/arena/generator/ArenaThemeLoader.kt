@@ -12,8 +12,20 @@ import kotlin.random.Random
 data class ArenaTheme(
     val id: String,
     val path: String,
-    val tileSize: Int,
-    val structures: Map<ArenaStructureType, List<Structure>>
+    val gridPitch: Int,
+    val structures: Map<ArenaStructureType, List<ArenaStructureTemplate>>
+)
+
+data class ArenaStructureSize(
+    val x: Int,
+    val y: Int,
+    val z: Int
+)
+
+data class ArenaStructureTemplate(
+    val name: String,
+    val structure: Structure,
+    val size: ArenaStructureSize
 )
 
 enum class ArenaStructureType(val keyword: String) {
@@ -62,13 +74,6 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
 
         for (themeId in themesSection.getKeys(false)) {
             val path = themesSection.getString("$themeId.path") ?: themeId
-            val tileSize = themesSection.getInt("$themeId.tileSize", 16)
-            if (tileSize <= 0) {
-                val warning = "[Arena] tileSize が不正なためスキップします: $themeId"
-                plugin.logger.warning(warning)
-                warnings.add(warning)
-                continue
-            }
 
             val folder = File(structureRoot, path)
             if (!folder.exists()) {
@@ -84,7 +89,10 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 continue
             }
 
-            themes[themeId] = ArenaTheme(themeId, path, tileSize, structures)
+            val templates = structures.values.flatten()
+            val gridPitch = templates.maxOfOrNull { maxOf(it.size.x, it.size.z) } ?: 1
+
+            themes[themeId] = ArenaTheme(themeId, path, gridPitch, structures)
         }
 
         // FeatureInitializationLogger に情報を送信
@@ -103,8 +111,8 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
         }
     }
 
-    private fun loadStructures(folder: File): Map<ArenaStructureType, List<Structure>> {
-        val result = mutableMapOf<ArenaStructureType, MutableList<Structure>>()
+    private fun loadStructures(folder: File): Map<ArenaStructureType, List<ArenaStructureTemplate>> {
+        val result = mutableMapOf<ArenaStructureType, MutableList<ArenaStructureTemplate>>()
         ArenaStructureType.entries.forEach { result[it] = mutableListOf() }
 
         val files = folder.listFiles() ?: return result
@@ -113,11 +121,23 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             val type = ArenaStructureType.fromFileName(file.name) ?: continue
             try {
                 val structure = Bukkit.getStructureManager().loadStructure(file)
-                result[type]?.add(structure)
+                val blockSize = structure.size
+                val size = ArenaStructureSize(blockSize.blockX, blockSize.blockY, blockSize.blockZ)
+                if (size.x <= 0 || size.y <= 0 || size.z <= 0) {
+                    plugin.logger.warning("[Arena] 不正なサイズのためスキップ: ${file.name} size=${size.x}*${size.y}*${size.z}")
+                    continue
+                }
+                result[type]?.add(
+                    ArenaStructureTemplate(
+                        name = file.name,
+                        structure = structure,
+                        size = size
+                    )
+                )
             } catch (e: IOException) {
-                // ストラクチャー読み込み失敗時のログは loadStructures の呼び出し元で処理
+                plugin.logger.warning("[Arena] ストラクチャー読み込み失敗: ${file.name} (${e.message})")
             } catch (e: Exception) {
-                // ストラクチャー読み込み中のエラーログは loadStructures の呼び出し元で処理
+                plugin.logger.warning("[Arena] ストラクチャー処理中に例外: ${file.name} (${e.message})")
             }
         }
 
