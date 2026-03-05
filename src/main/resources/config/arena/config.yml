@@ -1,4 +1,0 @@
-arena:
-  clear_threshold: 0.2
-  spawn_interval: 5
-  spawn_randomness: 0.5

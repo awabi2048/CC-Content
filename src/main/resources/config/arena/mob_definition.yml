@@ -1,0 +1,22 @@
+zombie_1:
+    type: ZOMBIE
+    health: 20.0
+    attack: 5.0
+    movement_speed: 0.23
+    armor: 4.0
+    scale: 1.0
+    equipment: # equipmentによるattributeの変化は完全に無効化し、見た目だけになるように
+      helmet: LEATHER_HELMET
+      chestplate: LEATHER_CHESTPLATE
+      main_hand: WOODEN_SWORD
+zombie_2:
+    type: ZOMBIE
+    health: 25.0
+    attack: 6.0
+    armor: 10.0
+    movement_speed: 0.18
+    scale: 1.1
+    equipment:
+      helmet: IRON_HELMET
+      boots: IRON_BOOTS
+      main_hand: STONE_AXE

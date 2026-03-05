@@ -8,6 +8,7 @@ import org.bukkit.block.structure.StructureRotation
 import org.bukkit.entity.ArmorStand
 import org.bukkit.entity.Marker
 import kotlin.math.max
+import kotlin.math.floor
 import kotlin.random.Random
 
 private enum class PathDirection(val dx: Int, val dz: Int) {
@@ -31,10 +32,16 @@ private data class TilePlacement(
     val isRoom: Boolean
 )
 
+private data class PlacementGeometry(
+    val origin: Location,
+    val bounds: ArenaBounds
+)
+
 data class ArenaStageBuildResult(
     val playerSpawn: Location,
     val stageBounds: ArenaBounds,
     val roomBounds: Map<Int, ArenaBounds>,
+    val corridorBounds: Map<Int, ArenaBounds>,
     val roomMobSpawns: Map<Int, List<Location>>,
     val barrierLocation: Location
 )
@@ -48,62 +55,89 @@ class ArenaStageGenerator {
         random: Random = Random.Default
     ): ArenaStageBuildResult {
         val roomPath = generatePath(waves, random)
-        val placements = toPlacements(roomPath)
-        val tileSize = theme.tileSize
+        val placements = toPlacements(roomPath).sortedBy { it.index }
+        val gridPitch = theme.gridPitch
+        val placementBoundsByIndex = mutableMapOf<Int, ArenaBounds>()
+        var previousPlacement: TilePlacement? = null
 
         for (placement in placements) {
-            val base = locationForTile(origin, placement.point, tileSize)
-            placeStructure(theme, placement, base, random)
+            val base = locationForTile(origin, placement.point, gridPitch)
+            val template = pickStructureTemplate(theme, placement, random)
+                ?: error("[Arena] 構造テンプレートが見つかりません: type=${placement.structureType}")
+
+            val geometry = if (previousPlacement == null) {
+                computeFirstPlacementGeometry(base, gridPitch, template.size, placement.rotationQuarter)
+            } else {
+                val previous = previousPlacement ?: error("[Arena] 直前配置が見つかりません")
+                val previousBounds = placementBoundsByIndex[previous.index]
+                    ?: error("[Arena] 直前配置の境界情報が見つかりません: index=${previous.index}")
+                computeConnectedPlacementGeometry(
+                    world = world,
+                    previousPlacement = previous,
+                    currentPlacement = placement,
+                    previousBounds = previousBounds,
+                    currentSize = template.size,
+                    currentRotationQuarter = placement.rotationQuarter
+                )
+            }
+
+            placeStructure(template, placement.rotationQuarter, geometry.origin)
+            placementBoundsByIndex[placement.index] = geometry.bounds
+            previousPlacement = placement
         }
 
         val roomBounds = mutableMapOf<Int, ArenaBounds>()
+        val corridorBounds = mutableMapOf<Int, ArenaBounds>()
         val roomMobSpawns = mutableMapOf<Int, List<Location>>()
-        val minTileX = placements.minOf { it.point.x }
-        val maxTileX = placements.maxOf { it.point.x }
-        val minTileZ = placements.minOf { it.point.z }
-        val maxTileZ = placements.maxOf { it.point.z }
+        val allBounds = placementBoundsByIndex.values
+        require(allBounds.isNotEmpty()) { "[Arena] ステージ境界を計算できません" }
         val stageBounds = ArenaBounds(
-            minX = origin.blockX + minTileX * tileSize,
-            maxX = origin.blockX + (maxTileX + 1) * tileSize - 1,
-            minZ = origin.blockZ + minTileZ * tileSize,
-            maxZ = origin.blockZ + (maxTileZ + 1) * tileSize - 1
+            minX = allBounds.minOf { it.minX },
+            maxX = allBounds.maxOf { it.maxX },
+            minY = allBounds.minOf { it.minY },
+            maxY = allBounds.maxOf { it.maxY },
+            minZ = allBounds.minOf { it.minZ },
+            maxZ = allBounds.maxOf { it.maxZ }
         )
 
         val roomPlacements = placements.filter { it.isRoom }.sortedBy { it.index }
         roomPlacements.forEachIndexed { roomIndex, roomPlacement ->
-            val point = roomPlacement.point
-            val base = locationForTile(origin, point, tileSize)
-            roomBounds[roomIndex] = ArenaBounds(
-                minX = base.blockX,
-                maxX = base.blockX + tileSize - 1,
-                minZ = base.blockZ,
-                maxZ = base.blockZ + tileSize - 1
-            )
+            val bounds = placementBoundsByIndex[roomPlacement.index] ?: return@forEachIndexed
+            roomBounds[roomIndex] = bounds
 
             if (roomIndex > 0) {
-                val markers = findMarkers(world, base, tileSize)
+                val markers = findMarkers(world, bounds)
                 roomMobSpawns[roomIndex] = if (markers.mobSpawns.isNotEmpty()) {
                     markers.mobSpawns
                 } else {
-                    listOf(base.clone().add(tileSize / 2.0, 1.0, tileSize / 2.0))
+                    listOf(boundsCenter(world, bounds, 1.0))
                 }
             }
         }
 
-        val finalRoomPoint = roomPlacements.last().point
-        val finalRoomBase = locationForTile(origin, finalRoomPoint, tileSize)
-        val finalMarkers = findMarkers(world, finalRoomBase, tileSize)
+        placements.filter { !it.isRoom }.forEach { corridorPlacement ->
+            val targetWave = (corridorPlacement.index + 1) / 2
+            if (targetWave !in 1..waves) return@forEach
+            val bounds = placementBoundsByIndex[corridorPlacement.index] ?: return@forEach
+            corridorBounds[targetWave] = bounds
+        }
+
+        val finalRoomBounds = placementBoundsByIndex[roomPlacements.last().index]
+            ?: error("[Arena] 最終部屋の境界が見つかりません")
+        val finalMarkers = findMarkers(world, finalRoomBounds)
         val barrierLocation = finalMarkers.barrierCore
-            ?: finalRoomBase.clone().add(tileSize / 2.0, 1.0, tileSize / 2.0)
+            ?: boundsCenter(world, finalRoomBounds, 1.0)
         barrierLocation.block.type = org.bukkit.Material.RESPAWN_ANCHOR
 
-        val playerSpawn = locationForTile(origin, roomPlacements.first().point, tileSize)
-            .add(tileSize / 2.0, 1.0, tileSize / 2.0)
+        val firstRoomBounds = placementBoundsByIndex[roomPlacements.first().index]
+            ?: error("[Arena] 開始部屋の境界が見つかりません")
+        val playerSpawn = boundsCenter(world, firstRoomBounds, 1.0)
 
         return ArenaStageBuildResult(
             playerSpawn = playerSpawn,
             stageBounds = stageBounds,
             roomBounds = roomBounds,
+            corridorBounds = corridorBounds,
             roomMobSpawns = roomMobSpawns,
             barrierLocation = barrierLocation
         )
@@ -245,33 +279,24 @@ class ArenaStageGenerator {
         }
     }
 
-    private fun placeStructure(
+    private fun pickStructureTemplate(
         theme: ArenaTheme,
         placement: TilePlacement,
-        location: Location,
         random: Random
-    ) {
-        val structure = theme.structures[placement.structureType]
+    ): ArenaStructureTemplate? {
+        return theme.structures[placement.structureType]
             ?.randomOrNull(random)
-            ?: return
+    }
 
-        val rotation = toRotation(placement.rotationQuarter)
-        val shift = (theme.tileSize - 1).toDouble()
-        var offsetX = 0.0
-        var offsetZ = 0.0
+    private fun placeStructure(
+        template: ArenaStructureTemplate,
+        rotationQuarter: Int,
+        location: Location
+    ) {
+        val rotation = toRotation(rotationQuarter)
 
-        when (rotation) {
-            StructureRotation.CLOCKWISE_90 -> offsetX = shift
-            StructureRotation.CLOCKWISE_180 -> {
-                offsetX = shift
-                offsetZ = shift
-            }
-            StructureRotation.COUNTERCLOCKWISE_90 -> offsetZ = shift
-            else -> {}
-        }
-
-        structure.place(
-            location.clone().add(offsetX, 0.0, offsetZ),
+        template.structure.place(
+            location,
             true,
             rotation,
             Mirror.NONE,
@@ -290,18 +315,115 @@ class ArenaStageGenerator {
         }
     }
 
+    private fun computeFirstPlacementGeometry(
+        tileBase: Location,
+        gridPitch: Int,
+        size: ArenaStructureSize,
+        rotationQuarter: Int
+    ): PlacementGeometry {
+        val (widthX, widthZ) = rotatedFootprint(size, rotationQuarter)
+        val offsetX = ((gridPitch - widthX) / 2.0).coerceAtLeast(0.0)
+        val offsetZ = ((gridPitch - widthZ) / 2.0).coerceAtLeast(0.0)
+        val footprintMin = tileBase.clone().add(offsetX, 0.0, offsetZ)
+        val rotation = toRotation(rotationQuarter)
+        val (rotationOffsetX, rotationOffsetZ) = placementOffset(size, rotation)
+        val placeOrigin = footprintMin.clone().add(rotationOffsetX, 0.0, rotationOffsetZ)
+        val bounds = placementBounds(footprintMin, widthX, widthZ, size.y)
+        return PlacementGeometry(placeOrigin, bounds)
+    }
+
+    private fun computeConnectedPlacementGeometry(
+        world: World,
+        previousPlacement: TilePlacement,
+        currentPlacement: TilePlacement,
+        previousBounds: ArenaBounds,
+        currentSize: ArenaStructureSize,
+        currentRotationQuarter: Int
+    ): PlacementGeometry {
+        val direction = directionOf(previousPlacement.point, currentPlacement.point)
+        val (currentWidthX, currentWidthZ) = rotatedFootprint(currentSize, currentRotationQuarter)
+        val previousCenterX2 = previousBounds.minX + previousBounds.maxX + 1
+        val previousCenterZ2 = previousBounds.minZ + previousBounds.maxZ + 1
+
+        val minX: Int
+        val minZ: Int
+        when (direction) {
+            PathDirection.EAST -> {
+                minX = previousBounds.maxX + 1
+                minZ = centeredMin(previousCenterZ2, currentWidthZ)
+            }
+            PathDirection.WEST -> {
+                minX = previousBounds.minX - currentWidthX
+                minZ = centeredMin(previousCenterZ2, currentWidthZ)
+            }
+            PathDirection.SOUTH -> {
+                minX = centeredMin(previousCenterX2, currentWidthX)
+                minZ = previousBounds.maxZ + 1
+            }
+            PathDirection.NORTH -> {
+                minX = centeredMin(previousCenterX2, currentWidthX)
+                minZ = previousBounds.minZ - currentWidthZ
+            }
+        }
+
+        val footprintMin = Location(world, minX.toDouble(), previousBounds.minY.toDouble(), minZ.toDouble())
+        val rotation = toRotation(currentRotationQuarter)
+        val (rotationOffsetX, rotationOffsetZ) = placementOffset(currentSize, rotation)
+        val placeOrigin = footprintMin.clone().add(rotationOffsetX, 0.0, rotationOffsetZ)
+        val bounds = placementBounds(footprintMin, currentWidthX, currentWidthZ, currentSize.y)
+        return PlacementGeometry(placeOrigin, bounds)
+    }
+
+    private fun centeredMin(referenceCenter2: Int, width: Int): Int {
+        return floor((referenceCenter2 - width) / 2.0).toInt()
+    }
+
+    private fun placementOffset(size: ArenaStructureSize, rotation: StructureRotation): Pair<Double, Double> {
+        return when (rotation) {
+            StructureRotation.CLOCKWISE_90 -> (size.z - 1).toDouble() to 0.0
+            StructureRotation.CLOCKWISE_180 -> (size.x - 1).toDouble() to (size.z - 1).toDouble()
+            StructureRotation.COUNTERCLOCKWISE_90 -> 0.0 to (size.x - 1).toDouble()
+            else -> 0.0 to 0.0
+        }
+    }
+
+    private fun rotatedFootprint(size: ArenaStructureSize, rotationQuarter: Int): Pair<Int, Int> {
+        val rotatedQuarter = rotationQuarter.mod(4)
+        val widthX = if (rotatedQuarter == 1 || rotatedQuarter == 3) size.z else size.x
+        val widthZ = if (rotatedQuarter == 1 || rotatedQuarter == 3) size.x else size.z
+        return widthX to widthZ
+    }
+
+    private fun placementBounds(base: Location, widthX: Int, widthZ: Int, height: Int): ArenaBounds {
+        return ArenaBounds(
+            minX = base.blockX,
+            maxX = base.blockX + widthX - 1,
+            minY = base.blockY,
+            maxY = base.blockY + height - 1,
+            minZ = base.blockZ,
+            maxZ = base.blockZ + widthZ - 1
+        )
+    }
+
+    private fun boundsCenter(world: World, bounds: ArenaBounds, yOffset: Double): Location {
+        val centerX = (bounds.minX + bounds.maxX + 1) / 2.0
+        val centerY = bounds.minY + yOffset
+        val centerZ = (bounds.minZ + bounds.maxZ + 1) / 2.0
+        return Location(world, centerX, centerY, centerZ)
+    }
+
     private data class TileMarkers(
         val mobSpawns: List<Location>,
         val barrierCore: Location?
     )
 
-    private fun findMarkers(world: World, tileBase: Location, tileSize: Int): TileMarkers {
-        val minX = tileBase.blockX
-        val maxX = minX + tileSize - 1
-        val minZ = tileBase.blockZ
-        val maxZ = minZ + tileSize - 1
-        val minY = tileBase.blockY - 32
-        val maxY = tileBase.blockY + 32
+    private fun findMarkers(world: World, bounds: ArenaBounds): TileMarkers {
+        val minX = bounds.minX
+        val maxX = bounds.maxX
+        val minZ = bounds.minZ
+        val maxZ = bounds.maxZ
+        val minY = bounds.minY - 2
+        val maxY = bounds.maxY + 2
 
         val minChunkX = minX shr 4
         val maxChunkX = maxX shr 4
@@ -356,7 +478,7 @@ class ArenaStageGenerator {
         return TileMarkers(mobs, barrier)
     }
 
-    private fun locationForTile(origin: Location, point: TilePoint, tileSize: Int): Location {
-        return origin.clone().add((point.x * tileSize).toDouble(), 0.0, (point.z * tileSize).toDouble())
+    private fun locationForTile(origin: Location, point: TilePoint, gridPitch: Int): Location {
+        return origin.clone().add((point.x * gridPitch).toDouble(), 0.0, (point.z * gridPitch).toDouble())
     }
 }
