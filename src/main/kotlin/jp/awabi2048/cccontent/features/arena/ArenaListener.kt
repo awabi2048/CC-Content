@@ -24,6 +24,10 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     fun onBarrierClick(event: PlayerInteractEvent) {
         if (event.action != Action.RIGHT_CLICK_BLOCK) return
         val clicked = event.clickedBlock?.location ?: return
+        if (arenaManager.handleDoorClick(event.player, clicked)) {
+            event.isCancelled = true
+            return
+        }
         if (arenaManager.handleBarrierClick(event.player, clicked)) {
             event.isCancelled = true
         }
