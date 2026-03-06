@@ -44,5 +44,10 @@ data class ArenaSession(
     val mobWaveMap: MutableMap<UUID, Int> = mutableMapOf(),
     val playerNotifiedWaves: MutableMap<UUID, MutableSet<Int>> = mutableMapOf(),
     val corridorTriggeredWaves: MutableSet<Int> = mutableSetOf(),
+    val openedCorridors: MutableSet<Int> = mutableSetOf(),
+    val enteredWaves: MutableSet<Int> = mutableSetOf(),
+    val waveSpawningStopped: MutableSet<Int> = mutableSetOf(),
+    val animatingDoorWaves: MutableSet<Int> = mutableSetOf(),
+    val transitionTasks: MutableList<BukkitTask> = mutableListOf(),
     val waveSpawnTasks: MutableMap<Int, BukkitTask> = mutableMapOf()
 )

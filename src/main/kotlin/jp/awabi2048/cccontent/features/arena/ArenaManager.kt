@@ -107,6 +107,12 @@ private data class ArenaMobDefinition(
 )
 
 class ArenaManager(private val plugin: JavaPlugin) {
+    private companion object {
+        const val DOOR_ANIMATION_START_DELAY_TICKS = 40L
+        const val DOOR_ANIMATION_FRAME_INTERVAL_TICKS = 20L
+        val DOOR_ANIMATION_ANGLES = intArrayOf(30, 60, 90)
+    }
+
     private val random = kotlin.random.Random.Default
     private val themeLoader = ArenaThemeLoader(plugin)
     private val stageGenerator = ArenaStageGenerator()
@@ -439,6 +445,7 @@ class ArenaManager(private val plugin: JavaPlugin) {
             )
             sessionsByWorld[world.name] = session
             playerToSessionWorld[target.uniqueId] = world.name
+            session.openedCorridors.add(1)
 
             target.teleport(stage.playerSpawn)
             target.sendMessage(
@@ -517,13 +524,14 @@ class ArenaManager(private val plugin: JavaPlugin) {
                 }
                 if (room != null && room > 0 && session.startedWaves.contains(room)) {
                     notifyWaveEntryIfNeeded(session, player, room)
+                    handleWaveRoomEntry(session, room)
                 }
 
                 val corridorWave = locateCorridorTargetWave(session, location)
                 if (corridorWave == null) {
                     continue
                 }
-                if (corridorWave > currentWave) {
+                if (!session.openedCorridors.contains(corridorWave)) {
                     teleportToCurrentWavePosition(player, session, world, applyBlindness = true)
                     continue
                 }
@@ -609,6 +617,8 @@ class ArenaManager(private val plugin: JavaPlugin) {
 
         session.waveSpawnTasks.values.forEach { it.cancel() }
         session.waveSpawnTasks.clear()
+        session.transitionTasks.forEach { it.cancel() }
+        session.transitionTasks.clear()
 
         session.participants.toList().forEach { participantId ->
             cancelBarrierActivation(participantId)
@@ -637,6 +647,10 @@ class ArenaManager(private val plugin: JavaPlugin) {
         session.returnLocations.clear()
         session.playerNotifiedWaves.clear()
         session.corridorTriggeredWaves.clear()
+        session.openedCorridors.clear()
+        session.enteredWaves.clear()
+        session.waveSpawningStopped.clear()
+        session.animatingDoorWaves.clear()
 
         session.activeMobs.toList().forEach { mobId ->
             mobToSessionWorld.remove(mobId)
@@ -725,7 +739,7 @@ class ArenaManager(private val plugin: JavaPlugin) {
         val task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
             val currentSession = sessionsByWorld[session.worldName] ?: return@Runnable
             if (!currentSession.startedWaves.contains(wave)) return@Runnable
-            if (currentSession.clearedWaves.contains(wave)) return@Runnable
+            if (currentSession.waveSpawningStopped.contains(wave)) return@Runnable
 
             val maxAlive = currentSession.waveMaxAliveCounts[wave] ?: return@Runnable
             val aliveCount = currentSession.waveMobIds[wave]?.size ?: 0
@@ -788,6 +802,22 @@ class ArenaManager(private val plugin: JavaPlugin) {
 
         player.sendTitle("", "§6Wave $wave", 10, 50, 10)
         player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f)
+    }
+
+    private fun handleWaveRoomEntry(session: ArenaSession, wave: Int) {
+        if (!session.enteredWaves.add(wave)) return
+
+        val previousWave = wave - 1
+        if (previousWave <= 0) return
+
+        stopWaveSpawning(session, previousWave)
+        removeWaveMobs(session, previousWave)
+    }
+
+    private fun stopWaveSpawning(session: ArenaSession, wave: Int) {
+        if (wave <= 0) return
+        session.waveSpawningStopped.add(wave)
+        session.waveSpawnTasks.remove(wave)?.cancel()
     }
 
     private fun selectSpawnPoint(session: ArenaSession, markers: List<Location>): Location? {
@@ -936,24 +966,66 @@ class ArenaManager(private val plugin: JavaPlugin) {
         if (session.clearedWaves.contains(wave)) return
 
         session.clearedWaves.add(wave)
-        onWaveClearedMock(session, wave)
 
         val nextWave = wave + 2
         if (nextWave <= session.waves) {
             startWave(session, nextWave, mobType, difficulty)
         }
 
-        session.waveSpawnTasks.remove(wave)?.cancel()
-        removeWaveMobs(session, wave)
-
-        updateCurrentWave(session)
         if (session.clearedWaves.size >= session.waves) {
             onAllWavesCleared(session)
+            return
         }
+
+        scheduleDoorAnimationMock(session, wave)
     }
 
-    private fun onWaveClearedMock(session: ArenaSession, wave: Int) {
-        plugin.logger.info("[Arena][Mock] onWaveCleared: world=${session.worldName} wave=$wave")
+    private fun scheduleDoorAnimationMock(session: ArenaSession, wave: Int) {
+        val nextWave = wave + 1
+        if (nextWave > session.waves) return
+        if (!session.animatingDoorWaves.add(nextWave)) return
+
+        val delayedTask = Bukkit.getScheduler().runTaskLater(plugin, Runnable delayedStart@{
+            val activeSession = sessionsByWorld[session.worldName] ?: return@delayedStart
+            if (!activeSession.animatingDoorWaves.contains(nextWave)) return@delayedStart
+
+            activeSession.openedCorridors.add(nextWave)
+            plugin.logger.info(
+                "[Arena][Mock] door animation start: world=${activeSession.worldName} wave=$wave next_wave=$nextWave"
+            )
+
+            var frameIndex = 0
+            val taskRef = arrayOfNulls<BukkitTask>(1)
+            val animationTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable animationTick@{
+                val currentSession = sessionsByWorld[session.worldName] ?: run {
+                    taskRef[0]?.cancel()
+                    return@animationTick
+                }
+
+                if (frameIndex >= DOOR_ANIMATION_ANGLES.size) {
+                    currentSession.animatingDoorWaves.remove(nextWave)
+                    currentSession.corridorTriggeredWaves.add(nextWave)
+                    rebalanceTargetsForWave(currentSession, nextWave)
+                    updateCurrentWave(currentSession)
+                    taskRef[0]?.cancel()
+                    return@animationTick
+                }
+
+                val angle = DOOR_ANIMATION_ANGLES[frameIndex]
+                reinstallCorridorDoorMock(currentSession, nextWave, angle)
+                frameIndex += 1
+            }, 0L, DOOR_ANIMATION_FRAME_INTERVAL_TICKS)
+            taskRef[0] = animationTask
+            activeSession.transitionTasks.add(animationTask)
+        }, DOOR_ANIMATION_START_DELAY_TICKS)
+
+        session.transitionTasks.add(delayedTask)
+    }
+
+    private fun reinstallCorridorDoorMock(session: ArenaSession, wave: Int, angle: Int) {
+        plugin.logger.info(
+            "[Arena][Mock] corridor door reinstall: world=${session.worldName} wave=$wave angle=$angle"
+        )
     }
 
     private fun rebalanceTargetsForWave(session: ArenaSession, wave: Int) {
