@@ -39,10 +39,12 @@ private data class PlacementGeometry(
 
 data class ArenaStageBuildResult(
     val playerSpawn: Location,
+    val entranceLocation: Location,
     val stageBounds: ArenaBounds,
     val roomBounds: Map<Int, ArenaBounds>,
     val corridorBounds: Map<Int, ArenaBounds>,
     val roomMobSpawns: Map<Int, List<Location>>,
+    val corridorDoorBlocks: Map<Int, List<Location>>,
     val barrierLocation: Location
 )
 
@@ -89,6 +91,7 @@ class ArenaStageGenerator {
         val roomBounds = mutableMapOf<Int, ArenaBounds>()
         val corridorBounds = mutableMapOf<Int, ArenaBounds>()
         val roomMobSpawns = mutableMapOf<Int, List<Location>>()
+        val corridorDoorBlocks = mutableMapOf<Int, List<Location>>()
         val allBounds = placementBoundsByIndex.values
         require(allBounds.isNotEmpty()) { "[Arena] ステージ境界を計算できません" }
         val stageBounds = ArenaBounds(
@@ -120,6 +123,12 @@ class ArenaStageGenerator {
             if (targetWave !in 1..waves) return@forEach
             val bounds = placementBoundsByIndex[corridorPlacement.index] ?: return@forEach
             corridorBounds[targetWave] = bounds
+
+            val markers = findMarkers(world, bounds)
+            require(markers.doorBlocks.isNotEmpty()) {
+                "[Arena] ドアブロックマーカーが見つかりません: wave=$targetWave bounds=$bounds"
+            }
+            corridorDoorBlocks[targetWave] = markers.doorBlocks
         }
 
         val finalRoomBounds = placementBoundsByIndex[roomPlacements.last().index]
@@ -131,14 +140,19 @@ class ArenaStageGenerator {
 
         val firstRoomBounds = placementBoundsByIndex[roomPlacements.first().index]
             ?: error("[Arena] 開始部屋の境界が見つかりません")
-        val playerSpawn = boundsCenter(world, firstRoomBounds, 1.0)
+        val firstRoomMarkers = findMarkers(world, firstRoomBounds)
+        val entranceLocation = firstRoomMarkers.entrance
+            ?: error("[Arena] entrance マーカーが見つかりません")
+        val playerSpawn = entranceLocation.clone()
 
         return ArenaStageBuildResult(
             playerSpawn = playerSpawn,
+            entranceLocation = entranceLocation,
             stageBounds = stageBounds,
             roomBounds = roomBounds,
             corridorBounds = corridorBounds,
             roomMobSpawns = roomMobSpawns,
+            corridorDoorBlocks = corridorDoorBlocks,
             barrierLocation = barrierLocation
         )
     }
@@ -414,6 +428,8 @@ class ArenaStageGenerator {
 
     private data class TileMarkers(
         val mobSpawns: List<Location>,
+        val entrance: Location?,
+        val doorBlocks: List<Location>,
         val barrierCore: Location?
     )
 
@@ -431,6 +447,8 @@ class ArenaStageGenerator {
         val maxChunkZ = maxZ shr 4
 
         val mobs = mutableListOf<Location>()
+        var entrance: Location? = null
+        val doorBlocks = mutableListOf<Location>()
         var barrier: Location? = null
 
         for (cx in minChunkX..maxChunkX) {
@@ -448,6 +466,12 @@ class ArenaStageGenerator {
                             if (entity.scoreboardTags.contains("arena.marker.mob")) {
                                 mobs.add(loc.clone())
                             }
+                            if (entity.scoreboardTags.contains("arena.marker.entrance")) {
+                                entrance = loc.clone()
+                            }
+                            if (entity.scoreboardTags.contains("arena.marker.door_block")) {
+                                doorBlocks.add(loc.clone())
+                            }
                             if (entity.scoreboardTags.contains("arena.marker.barrier_core")) {
                                 barrier = loc.clone()
                             }
@@ -455,6 +479,8 @@ class ArenaStageGenerator {
                         is ArmorStand -> {
                             when (entity.customName) {
                                 "ARENA_MOB" -> mobs.add(loc.clone())
+                                "ARENA_ENTRANCE" -> entrance = loc.clone()
+                                "ARENA_DOOR_BLOCK" -> doorBlocks.add(loc.clone())
                                 "ARENA_BARRIER_CORE" -> barrier = loc.clone()
                             }
                         }
@@ -475,7 +501,7 @@ class ArenaStageGenerator {
             barrier = center
         }
 
-        return TileMarkers(mobs, barrier)
+        return TileMarkers(mobs, entrance, doorBlocks, barrier)
     }
 
     private fun locationForTile(origin: Location, point: TilePoint, gridPitch: Int): Location {

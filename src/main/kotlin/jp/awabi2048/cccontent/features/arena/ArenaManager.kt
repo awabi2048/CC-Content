@@ -437,17 +437,22 @@ class ArenaManager(private val plugin: JavaPlugin) {
                 participants = mutableSetOf(target.uniqueId),
                 returnLocations = mutableMapOf(target.uniqueId to returnLocation),
                 playerSpawn = stage.playerSpawn,
+                entranceLocation = stage.entranceLocation,
                 stageBounds = stage.stageBounds,
                 roomBounds = stage.roomBounds,
                 corridorBounds = stage.corridorBounds,
                 roomMobSpawns = stage.roomMobSpawns,
+                corridorDoorBlocks = stage.corridorDoorBlocks,
                 barrierLocation = stage.barrierLocation
             )
             sessionsByWorld[world.name] = session
             playerToSessionWorld[target.uniqueId] = world.name
-            session.openedCorridors.add(1)
 
-            target.teleport(stage.playerSpawn)
+            session.participants.forEach { participantId ->
+                val participant = Bukkit.getPlayer(participantId) ?: return@forEach
+                if (!participant.isOnline) return@forEach
+                participant.teleport(stage.entranceLocation)
+            }
             target.sendMessage(
                 "§6[Arena] セッション開始: " +
                     "theme=${theme.id}, mob_type=${mobType.id}, difficulty=${difficulty.id}, waves=${difficulty.waves}"
@@ -575,6 +580,25 @@ class ArenaManager(private val plugin: JavaPlugin) {
         return true
     }
 
+    fun handleDoorClick(player: Player, clicked: Location): Boolean {
+        val session = getSession(player) ?: return false
+        if (player.world.name != session.worldName) return false
+
+        val wave = locateDoorWave(session, clicked) ?: return false
+        if (wave != 1) return true
+        if (session.stageStarted) {
+            player.sendMessage("§eステージはすでに開始しています")
+            return true
+        }
+        if (session.animatingDoorWaves.contains(wave)) {
+            player.sendMessage("§e開扉中です")
+            return true
+        }
+
+        startDoorAnimation(session, wave)
+        return true
+    }
+
     fun isBarrierBlock(location: Location): Boolean {
         return sessionsByWorld.values.any { session ->
             val block = session.barrierLocation.block
@@ -583,6 +607,10 @@ class ArenaManager(private val plugin: JavaPlugin) {
                 block.y == location.blockY &&
                 block.z == location.blockZ
         }
+    }
+
+    fun isDoorBlock(location: Location): Boolean {
+        return sessionsByWorld.values.any { session -> locateDoorWave(session, location) != null }
     }
 
     private fun leavePlayerFromSession(playerId: UUID, reason: String): Boolean {
@@ -651,6 +679,7 @@ class ArenaManager(private val plugin: JavaPlugin) {
         session.enteredWaves.clear()
         session.waveSpawningStopped.clear()
         session.animatingDoorWaves.clear()
+        session.stageStarted = false
 
         session.activeMobs.toList().forEach { mobId ->
             mobToSessionWorld.remove(mobId)
@@ -780,6 +809,12 @@ class ArenaManager(private val plugin: JavaPlugin) {
     }
 
     private fun currentWavePosition(session: ArenaSession, world: World): Location {
+        if (!session.stageStarted) {
+            return session.entranceLocation.clone().apply {
+                this.world = world
+            }
+        }
+
         val wave = session.currentWave.coerceIn(1, session.waves)
         val bounds = session.roomBounds[wave]
         if (bounds == null) {
@@ -977,22 +1012,18 @@ class ArenaManager(private val plugin: JavaPlugin) {
             return
         }
 
-        scheduleDoorAnimationMock(session, wave)
+        startDoorAnimation(session, wave + 1)
     }
 
-    private fun scheduleDoorAnimationMock(session: ArenaSession, wave: Int) {
-        val nextWave = wave + 1
-        if (nextWave > session.waves) return
-        if (!session.animatingDoorWaves.add(nextWave)) return
+    private fun startDoorAnimation(session: ArenaSession, targetWave: Int) {
+        if (targetWave <= 0 || targetWave > session.waves) return
+        if (!session.animatingDoorWaves.add(targetWave)) return
 
         val delayedTask = Bukkit.getScheduler().runTaskLater(plugin, Runnable delayedStart@{
             val activeSession = sessionsByWorld[session.worldName] ?: return@delayedStart
-            if (!activeSession.animatingDoorWaves.contains(nextWave)) return@delayedStart
+            if (!activeSession.animatingDoorWaves.contains(targetWave)) return@delayedStart
 
-            activeSession.openedCorridors.add(nextWave)
-            plugin.logger.info(
-                "[Arena][Mock] door animation start: world=${activeSession.worldName} wave=$wave next_wave=$nextWave"
-            )
+            onDoorAnimationStarted(activeSession, targetWave)
 
             var frameIndex = 0
             val taskRef = arrayOfNulls<BukkitTask>(1)
@@ -1003,16 +1034,16 @@ class ArenaManager(private val plugin: JavaPlugin) {
                 }
 
                 if (frameIndex >= DOOR_ANIMATION_ANGLES.size) {
-                    currentSession.animatingDoorWaves.remove(nextWave)
-                    currentSession.corridorTriggeredWaves.add(nextWave)
-                    rebalanceTargetsForWave(currentSession, nextWave)
+                    currentSession.animatingDoorWaves.remove(targetWave)
+                    currentSession.corridorTriggeredWaves.add(targetWave)
+                    rebalanceTargetsForWave(currentSession, targetWave)
                     updateCurrentWave(currentSession)
                     taskRef[0]?.cancel()
                     return@animationTick
                 }
 
                 val angle = DOOR_ANIMATION_ANGLES[frameIndex]
-                reinstallCorridorDoorMock(currentSession, nextWave, angle)
+                reinstallCorridorDoorMock(currentSession, targetWave, angle)
                 frameIndex += 1
             }, 0L, DOOR_ANIMATION_FRAME_INTERVAL_TICKS)
             taskRef[0] = animationTask
@@ -1022,10 +1053,33 @@ class ArenaManager(private val plugin: JavaPlugin) {
         session.transitionTasks.add(delayedTask)
     }
 
+    private fun onDoorAnimationStarted(session: ArenaSession, targetWave: Int) {
+        session.openedCorridors.add(targetWave)
+        if (targetWave == 1 && !session.stageStarted) {
+            session.stageStarted = true
+            broadcastSubtitle(session, "§6ステージ開始", 5, 40, 10)
+            playSound(session, Sound.BLOCK_IRON_DOOR_OPEN, 1.0f, 1.0f)
+        }
+        val message = "[Arena][Mock] door animation start: world=${session.worldName} target_wave=$targetWave"
+        plugin.logger.info(message)
+        broadcastMessage(session, "§7$message")
+    }
+
     private fun reinstallCorridorDoorMock(session: ArenaSession, wave: Int, angle: Int) {
-        plugin.logger.info(
-            "[Arena][Mock] corridor door reinstall: world=${session.worldName} wave=$wave angle=$angle"
-        )
+        val message = "[Arena][Mock] corridor door reinstall: world=${session.worldName} wave=$wave angle=$angle"
+        plugin.logger.info(message)
+        broadcastMessage(session, "§7$message")
+    }
+
+    private fun locateDoorWave(session: ArenaSession, clicked: Location): Int? {
+        return session.corridorDoorBlocks.entries.firstOrNull { (_, markers) ->
+            markers.any { marker ->
+                marker.world?.name == clicked.world?.name &&
+                    marker.blockX == clicked.blockX &&
+                    marker.blockY == clicked.blockY &&
+                    marker.blockZ == clicked.blockZ
+            }
+        }?.key
     }
 
     private fun rebalanceTargetsForWave(session: ArenaSession, wave: Int) {
@@ -1123,6 +1177,12 @@ class ArenaManager(private val plugin: JavaPlugin) {
     private fun broadcastSubtitle(session: ArenaSession, subtitle: String, fadeIn: Int, stay: Int, fadeOut: Int) {
         session.participants.forEach { participantId ->
             Bukkit.getPlayer(participantId)?.sendTitle("", subtitle, fadeIn, stay, fadeOut)
+        }
+    }
+
+    private fun broadcastMessage(session: ArenaSession, message: String) {
+        session.participants.forEach { participantId ->
+            Bukkit.getPlayer(participantId)?.sendMessage(message)
         }
     }
 
