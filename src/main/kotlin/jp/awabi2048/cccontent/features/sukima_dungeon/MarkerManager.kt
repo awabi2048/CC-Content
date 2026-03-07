@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
+import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.Particle
@@ -19,6 +20,7 @@ import org.bukkit.scheduler.BukkitRunnable
 class MarkerManager(private val plugin: JavaPlugin) : Listener {
     private val MODE_KEY = NamespacedKey(plugin, "marker_mode")
     private val TOOL_KEY = NamespacedKey(plugin, "marker_tool")
+    private val MARKER_TOOL_MODEL = NamespacedKey.minecraft("blaze_rod")
     private val lastSwitchTime = mutableMapOf<java.util.UUID, Long>()
 
     enum class MarkerMode(val tag: String, val displayName: String, val particle: Particle) {
@@ -29,10 +31,12 @@ class MarkerManager(private val plugin: JavaPlugin) : Listener {
         SPAWN("sd.marker.spawn", "§fSPAWN", Particle.CLOUD)
     }
 
-    fun getMarkerTool(player: Player): ItemStack {
-        val item = ItemStack(Material.BLAZE_ROD)
+    fun getMarkerTool(player: Player? = null): ItemStack {
+        val item = ItemStack(Material.POISONOUS_POTATO)
+        PoisonousPotatoComponentPack.applyNonConsumable(item)
         val meta = item.itemMeta ?: return item
-        
+
+        meta.setItemModel(MARKER_TOOL_MODEL)
         meta.setDisplayName("§dマーカー設置ツール")
         val mode = getMode(item)
         updateLore(meta, mode)

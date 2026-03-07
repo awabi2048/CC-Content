@@ -6,6 +6,7 @@ import org.bukkit.attribute.Attribute
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.LivingEntity
+import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import jp.awabi2048.cccontent.features.sukima_dungeon.SukimaConfigHelper
@@ -19,11 +20,14 @@ class MobManager(private val plugin: JavaPlugin) {
     private var amplificationRatio = 0.0
 
     data class MobDefinition(
+        val id: String,
         val type: EntityType,
         val health: Double,
         val attack: Double,
+        val movementSpeed: Double,
+        val armor: Double,
         val scale: Double,
-        val equipment: Map<String, Material>,
+        val equipment: Map<EquipmentSlot, Material>,
         val minDist: Double,
         val maxDist: Double,
         val specialBehaviorId: String? = null
@@ -50,36 +54,74 @@ class MobManager(private val plugin: JavaPlugin) {
         }
         
         val config = YamlConfiguration.loadConfiguration(file)
-        val section = config.getConfigurationSection("mobs") ?: return
+        val section = config.getConfigurationSection("mobs") ?: config
 
         mobs.clear()
         for (key in section.getKeys(false)) {
-            try {
-                val type = EntityType.valueOf(section.getString("$key.type") ?: "ZOMBIE")
-                val health = section.getDouble("$key.health", 20.0)
-                val attack = section.getDouble("$key.attack", 5.0)
-                val scale = section.getDouble("$key.scale", 1.0)
-                
-                val equipmentSection = section.getConfigurationSection("$key.equipment")
-                val equipment = mutableMapOf<String, Material>()
-                if (equipmentSection != null) {
-                    for (slot in equipmentSection.getKeys(false)) {
-                        val matName = equipmentSection.getString(slot)
-                        if (matName != null) {
-                            equipment[slot] = Material.valueOf(matName)
-                        }
-                    }
-                }
-
-                val minDist = section.getDouble("$key.min_dist", 0.0)
-                val maxDist = section.getDouble("$key.max_dist", Double.MAX_VALUE)
-                val specialBehaviorId = section.getString("$key.special_behavior")
-
-                mobs[key] = MobDefinition(type, health, attack, scale, equipment, minDist, maxDist, specialBehaviorId)
-            } catch (e: Exception) {
-                plugin.logger.warning("Failed to load mob definition: $key")
-                e.printStackTrace()
+            val mobSection = section.getConfigurationSection(key)
+            if (mobSection == null) {
+                plugin.logger.warning("[SukimaDungeon] mob_definition.yml の読み込み失敗: $key")
+                continue
             }
+
+            val entityTypeName = mobSection.getString("type") ?: "ZOMBIE"
+            val entityType = try {
+                EntityType.valueOf(entityTypeName)
+            } catch (_: IllegalArgumentException) {
+                plugin.logger.warning("[SukimaDungeon] mob_definition.yml の type が不正です: $key type=$entityTypeName")
+                continue
+            }
+
+            if (!entityType.isAlive) {
+                plugin.logger.warning("[SukimaDungeon] mob_definition.yml の type は生物のみ指定可能です: $key type=$entityTypeName")
+                continue
+            }
+
+            val health = mobSection.getDouble("health", 20.0).coerceAtLeast(1.0)
+            val attack = mobSection.getDouble("attack", 5.0).coerceAtLeast(0.0)
+            val movementSpeed = mobSection.getDouble("movement_speed", 0.23).coerceAtLeast(0.01)
+            val armor = mobSection.getDouble("armor", 0.0).coerceAtLeast(0.0)
+            val scale = mobSection.getDouble("scale", 1.0).coerceAtLeast(0.1)
+
+            val equipmentSection = mobSection.getConfigurationSection("equipment")
+            val equipment = mutableMapOf<EquipmentSlot, Material>()
+            if (equipmentSection != null) {
+                for (slotKey in equipmentSection.getKeys(false)) {
+                    val slot = parseEquipmentSlot(slotKey)
+                    if (slot == null) {
+                        plugin.logger.warning("[SukimaDungeon] equipment slot が不正です: $key slot=$slotKey")
+                        continue
+                    }
+
+                    val materialName = equipmentSection.getString(slotKey) ?: continue
+                    val material = try {
+                        Material.valueOf(materialName)
+                    } catch (_: IllegalArgumentException) {
+                        plugin.logger.warning("[SukimaDungeon] equipment material が不正です: $key slot=$slotKey material=$materialName")
+                        continue
+                    }
+
+                    equipment[slot] = material
+                }
+            }
+
+            val minDist = mobSection.getDouble("min_dist", 0.0)
+            val maxDist = mobSection.getDouble("max_dist", Double.MAX_VALUE)
+            val specialBehaviorId = mobSection.getString("special_behavior")
+
+            mobs[key] = MobDefinition(
+                id = key,
+                type = entityType,
+                health = health,
+                attack = attack,
+                movementSpeed = movementSpeed,
+                armor = armor,
+                scale = scale,
+                equipment = equipment,
+                minDist = minDist,
+                maxDist = maxDist,
+                specialBehaviorId = specialBehaviorId
+            )
         }
     }
 
@@ -101,7 +143,7 @@ class MobManager(private val plugin: JavaPlugin) {
     }
 
     fun spawnMob(location: Location, themeName: String, center: Location): LivingEntity? {
-        val mobList = themeSpawns[themeName]
+        val mobList = themeSpawns[themeName] ?: themeSpawns["default"]
         if (mobList.isNullOrEmpty()) {
             plugin.logger.warning("No mob spawn settings found for theme: $themeName")
             return null
@@ -136,7 +178,8 @@ class MobManager(private val plugin: JavaPlugin) {
         val multiplier = 1.0 + (distance * amplificationRatio)
 
         val entity = location.world?.spawnEntity(location, definition.type) as? LivingEntity ?: return null
-        
+        entity.removeWhenFarAway = false
+
         // Apply stats
         val maxHealth = definition.health * multiplier
         val attack = definition.attack * multiplier
@@ -144,17 +187,16 @@ class MobManager(private val plugin: JavaPlugin) {
         entity.getAttribute(Attribute.MAX_HEALTH)?.baseValue = maxHealth
         entity.health = maxHealth
         entity.getAttribute(Attribute.ATTACK_DAMAGE)?.baseValue = attack
+        entity.getAttribute(Attribute.MOVEMENT_SPEED)?.baseValue = definition.movementSpeed
+        entity.getAttribute(Attribute.ARMOR)?.baseValue = definition.armor
         entity.getAttribute(Attribute.SCALE)?.baseValue = definition.scale
 
         // Equip items
         val equip = entity.equipment
         if (equip != null) {
-            definition.equipment["helmet"]?.let { equip.helmet = ItemStack(it) }
-            definition.equipment["chestplate"]?.let { equip.chestplate = ItemStack(it) }
-            definition.equipment["leggings"]?.let { equip.leggings = ItemStack(it) }
-            definition.equipment["boots"]?.let { equip.boots = ItemStack(it) }
-            definition.equipment["main_hand"]?.let { equip.setItemInMainHand(ItemStack(it)) }
-            definition.equipment["off_hand"]?.let { equip.setItemInOffHand(ItemStack(it)) }
+            definition.equipment.forEach { (slot, material) ->
+                equip.setItem(slot, ItemStack(material))
+            }
         }
 
         // Apply special behavior if exists
@@ -180,6 +222,18 @@ class MobManager(private val plugin: JavaPlugin) {
             }
             
             entry.value.onTick(entity)
+        }
+    }
+
+    private fun parseEquipmentSlot(slotKey: String): EquipmentSlot? {
+        return when (slotKey.lowercase()) {
+            "helmet" -> EquipmentSlot.HEAD
+            "chestplate" -> EquipmentSlot.CHEST
+            "leggings" -> EquipmentSlot.LEGS
+            "boots" -> EquipmentSlot.FEET
+            "main_hand" -> EquipmentSlot.HAND
+            "off_hand" -> EquipmentSlot.OFF_HAND
+            else -> null
         }
     }
 }

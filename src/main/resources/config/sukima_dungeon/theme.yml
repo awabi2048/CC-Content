@@ -1,25 +1,32 @@
 themes:
   test:
     icon: GRASS_BLOCK
+    path: test
     tileSize: 16
     void_y_limit: 10.0
   cave:
     icon: COBBLESTONE
+    path: cave
     tileSize: 32
   mineshaft:
     icon: CHEST_MINECART
+    path: mineshaft
     tileSize: 48
   library:
     icon: BOOKSHELF
+    path: library
     tileSize: 48
   ruin:
     icon: CHISELED_STONE_BRICKS
+    path: ruins
     tileSize: 48
   see_of_trees:
     icon: MOSS_BLOCK
+    path: see_of_trees
     tileSize: 48
   maze:
     icon: COMPASS
+    path: maze
     tileSize: 48
 
 mob_spawn:
@@ -29,6 +36,23 @@ mob_spawn:
       - skeleton_lvl1
     test:
       - zombie_lvl1
+    cave:
+      - zombie_lvl1
+      - skeleton_lvl1
+    mineshaft:
+      - zombie_lvl1
+      - skeleton_lvl1
+    library:
+      - skeleton_lvl1
+    ruin:
+      - zombie_lvl1
+      - skeleton_lvl1
+      - zombie_boss
+    see_of_trees:
+      - zombie_lvl1
+    maze:
+      - zombie_lvl1
+      - skeleton_lvl1
     dungeon:
       - zombie_lvl1
       - skeleton_lvl1

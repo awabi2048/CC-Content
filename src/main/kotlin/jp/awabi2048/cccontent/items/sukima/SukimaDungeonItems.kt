@@ -24,23 +24,26 @@ import org.bukkit.persistence.PersistentDataType
 
 private val COMPASS_TIER_KEY = NamespacedKey("sukimadungeon", "compass_tier")
 
+private fun createSukimaItem(amount: Int): ItemStack = ItemStack(Material.POISONOUS_POTATO, amount.coerceAtLeast(1))
+
 class SukimaCompassTier1Item : CustomItem {
     override val feature: String = "sukima_dungeon"
     override val id: String = "compass_tier_1"
     override val displayName: String = "§bワールドの芽コンパス [Tier 1]"
+    override val itemModel = NamespacedKey.minecraft("amethyst_shard")
     override val lore: List<String> = emptyList()
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        return SukimaCustomItemManager.getCompassItem(player, 1).apply {
-            this.amount = amount
-            val meta = this.itemMeta
-            if (meta != null) {
-                meta.persistentDataContainer.set(COMPASS_TIER_KEY, PersistentDataType.INTEGER, 1)
-                this.itemMeta = meta
-            }
+        val item = createSukimaItem(amount)
+        SukimaCustomItemManager.applyCompassMetadata(item, player, 1)
+        val meta = item.itemMeta
+        if (meta != null) {
+            meta.persistentDataContainer.set(COMPASS_TIER_KEY, PersistentDataType.INTEGER, 1)
+            item.itemMeta = meta
         }
+        return item
     }
 
     override fun matches(item: ItemStack): Boolean {
@@ -55,19 +58,20 @@ class SukimaCompassTier2Item : CustomItem {
     override val feature: String = "sukima_dungeon"
     override val id: String = "compass_tier_2"
     override val displayName: String = "§bワールドの芽コンパス [Tier 2]"
+    override val itemModel = NamespacedKey.minecraft("amethyst_shard")
     override val lore: List<String> = emptyList()
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        return SukimaCustomItemManager.getCompassItem(player, 2).apply {
-            this.amount = amount
-            val meta = this.itemMeta
-            if (meta != null) {
-                meta.persistentDataContainer.set(COMPASS_TIER_KEY, PersistentDataType.INTEGER, 2)
-                this.itemMeta = meta
-            }
+        val item = createSukimaItem(amount)
+        SukimaCustomItemManager.applyCompassMetadata(item, player, 2)
+        val meta = item.itemMeta
+        if (meta != null) {
+            meta.persistentDataContainer.set(COMPASS_TIER_KEY, PersistentDataType.INTEGER, 2)
+            item.itemMeta = meta
         }
+        return item
     }
 
     override fun matches(item: ItemStack): Boolean {
@@ -82,19 +86,20 @@ class SukimaCompassTier3Item : CustomItem {
     override val feature: String = "sukima_dungeon"
     override val id: String = "compass_tier_3"
     override val displayName: String = "§bワールドの芽コンパス [Tier 3]"
+    override val itemModel = NamespacedKey.minecraft("amethyst_shard")
     override val lore: List<String> = emptyList()
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        return SukimaCustomItemManager.getCompassItem(player, 3).apply {
-            this.amount = amount
-            val meta = this.itemMeta
-            if (meta != null) {
-                meta.persistentDataContainer.set(COMPASS_TIER_KEY, PersistentDataType.INTEGER, 3)
-                this.itemMeta = meta
-            }
+        val item = createSukimaItem(amount)
+        SukimaCustomItemManager.applyCompassMetadata(item, player, 3)
+        val meta = item.itemMeta
+        if (meta != null) {
+            meta.persistentDataContainer.set(COMPASS_TIER_KEY, PersistentDataType.INTEGER, 3)
+            item.itemMeta = meta
         }
+        return item
     }
 
     override fun matches(item: ItemStack): Boolean {
@@ -109,17 +114,13 @@ class SukimaMarkerToolItem : CustomItem {
     override val feature: String = "sukima_dungeon"
     override val id: String = "marker_tool"
     override val displayName: String = "§dマーカー設置ツール"
+    override val itemModel = NamespacedKey.minecraft("blaze_rod")
     override val lore: List<String> = emptyList()
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        val target = player ?: CCContent.instance.server.onlinePlayers.firstOrNull()
-        val item = if (target != null) {
-            CCContent.instance.getMarkerManager().getMarkerTool(target)
-        } else {
-            ItemStack(Material.BLAZE_ROD)
-        }
+        val item = CCContent.instance.getMarkerManager().getMarkerTool(player)
         item.amount = amount
         return item
     }
@@ -135,12 +136,15 @@ class SukimaBookmarkBrokenItem : CustomItem {
     override val feature: String = "sukima_dungeon"
     override val id: String = "bookmark_broken"
     override val displayName: String = "§dぼろぼろのふしぎなしおり"
+    override val itemModel = NamespacedKey.minecraft("feather")
     override val lore: List<String> = emptyList()
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        return SukimaCustomItemManager.getBookmarkItem(player, DungeonTier.BROKEN).apply { this.amount = amount }
+        val item = createSukimaItem(amount)
+        SukimaCustomItemManager.applyBookmarkMetadata(item, player, DungeonTier.BROKEN)
+        return item
     }
 
     override fun matches(item: ItemStack): Boolean {
@@ -167,12 +171,15 @@ class SukimaBookmarkWornItem : CustomItem {
     override val feature: String = "sukima_dungeon"
     override val id: String = "bookmark_worn"
     override val displayName: String = "§d擦り切れたふしぎなしおり"
+    override val itemModel = NamespacedKey.minecraft("feather")
     override val lore: List<String> = emptyList()
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        return SukimaCustomItemManager.getBookmarkItem(player, DungeonTier.WORN).apply { this.amount = amount }
+        val item = createSukimaItem(amount)
+        SukimaCustomItemManager.applyBookmarkMetadata(item, player, DungeonTier.WORN)
+        return item
     }
 
     override fun matches(item: ItemStack): Boolean {
@@ -199,12 +206,15 @@ class SukimaBookmarkFadedItem : CustomItem {
     override val feature: String = "sukima_dungeon"
     override val id: String = "bookmark_faded"
     override val displayName: String = "§d色褪せたふしぎなしおり"
+    override val itemModel = NamespacedKey.minecraft("feather")
     override val lore: List<String> = emptyList()
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        return SukimaCustomItemManager.getBookmarkItem(player, DungeonTier.FADED).apply { this.amount = amount }
+        val item = createSukimaItem(amount)
+        SukimaCustomItemManager.applyBookmarkMetadata(item, player, DungeonTier.FADED)
+        return item
     }
 
     override fun matches(item: ItemStack): Boolean {
@@ -231,12 +241,15 @@ class SukimaBookmarkNewItem : CustomItem {
     override val feature: String = "sukima_dungeon"
     override val id: String = "bookmark_new"
     override val displayName: String = "§d新品のふしぎなしおり"
+    override val itemModel = NamespacedKey.minecraft("feather")
     override val lore: List<String> = emptyList()
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        return SukimaCustomItemManager.getBookmarkItem(player, DungeonTier.NEW).apply { this.amount = amount }
+        val item = createSukimaItem(amount)
+        SukimaCustomItemManager.applyBookmarkMetadata(item, player, DungeonTier.NEW)
+        return item
     }
 
     override fun matches(item: ItemStack): Boolean {
@@ -263,12 +276,15 @@ class SukimaTalismanItem : CustomItem {
     override val feature: String = "sukima_dungeon"
     override val id: String = "talisman"
     override val displayName: String = "§6おあげちゃんのお札"
+    override val itemModel = NamespacedKey.minecraft("filled_map")
     override val lore: List<String> = emptyList()
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        return SukimaCustomItemManager.getTalismanItem(player).apply { this.amount = amount }
+        val item = createSukimaItem(amount)
+        SukimaCustomItemManager.applyTalismanMetadata(item, player)
+        return item
     }
 
     override fun matches(item: ItemStack): Boolean = SukimaCustomItemManager.isTalismanItem(item)
@@ -347,12 +363,15 @@ class SukimaWorldSproutItem : CustomItem {
     override val feature: String = "sukima_dungeon"
     override val id: String = "world_sprout"
     override val displayName: String = "§dワールドの芽"
+    override val itemModel = NamespacedKey.minecraft("mangrove_propagule")
     override val lore: List<String> = emptyList()
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        return SukimaCustomItemManager.getWorldSproutItem().apply { this.amount = amount }
+        val item = createSukimaItem(amount)
+        SukimaCustomItemManager.applyWorldSproutMetadata(item)
+        return item
     }
 
     override fun matches(item: ItemStack): Boolean = SukimaCustomItemManager.isWorldSproutItem(item)

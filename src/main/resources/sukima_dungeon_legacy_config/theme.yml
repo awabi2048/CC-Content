@@ -1,0 +1,28 @@
+themes:
+  cave:
+    name: "洞窟"
+    description: "上下左右に広がる洞窟。段差に足を取られない様に気をつけよう。"
+    path: "cave"
+    icon: COBBLESTONE
+    tileSize: 32
+    oage_message:
+    - "この洞窟は上下左右に広がっていて、上るには梯子が必要かも"
+    - "段差が沢山あるので足を取られない様に気をつけてね！"
+  mineshaft:
+    name: "廃坑"
+    description: "古代人が掘削したであろう廃坑。この異次元で採掘できるものはいったい何だろう。"
+    path: "mineshaft"
+    icon: CHEST_MINECART
+    tileSize: 48
+    oage_message:
+    - "この廃坑は古代人が掘削を行った際に出来た場所みたい"
+    - "次元の狭間では特別な鉱石とかが見つかるのかな…？"
+  ruins:
+    name: "遺跡"
+    description: "古代人の遺跡跡。入り組んだ場所で生活していて迷子にならないのかな？"
+    path: "ruins"
+    icon: CHISELED_STONE_BRICKS
+    tileSize: 48
+    oage_message:
+    - "ここは遺跡みたい。多分ここで生活をしていた人たちが居たんだと思うけれど、"
+    - "異空間での生活ってどんな感じだったんだろう…？"

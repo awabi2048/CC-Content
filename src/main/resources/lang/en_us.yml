@@ -133,6 +133,46 @@ sukima_dungeon:
     FADED: "Faded"
     NEW: "Brand New"
 
+  theme:
+    test:
+      name: "Test"
+      description: "A test dungeon used for debugging."
+      oage_messages:
+        - "Looks like this one is just a test!"
+    cave:
+      name: "Cave"
+      description: "A cave spreading in every direction. Watch your footing on the many ledges."
+      oage_messages:
+        - "This cave stretches up, down, left, and right. You might need ladders to climb."
+        - "There are lots of ledges here, so be careful not to lose your footing!"
+    mineshaft:
+      name: "Mineshaft"
+      description: "An abandoned mineshaft likely dug out by ancient people. What can be mined in this strange dimension?"
+      oage_messages:
+        - "This mineshaft looks like a place ancient people once excavated."
+        - "Maybe you can find some unusual ores in the rift between dimensions...?"
+    library:
+      name: "Library"
+      description: "A quiet library where vast knowledge sleeps."
+      oage_messages:
+        - "Keep it down... there are books everywhere!"
+    ruin:
+      name: "Ruins"
+      description: "Ruins left behind by ancient people. I wonder how they ever lived in such a maze-like place."
+      oage_messages:
+        - "These look like ruins. I bet people used to live here once..."
+        - "I wonder what life in another dimension was like...?"
+    see_of_trees:
+      name: "Sea of Trees"
+      description: "A dense forest where thick trees block your view in every direction."
+      oage_messages:
+        - "So many trees... it feels easy to get lost in here!"
+    maze:
+      name: "3D Maze"
+      description: "A labyrinth-like space built from complex, intertwined paths."
+      oage_messages:
+        - "Whoa... this place makes my head spin just looking at it!"
+
   sizes:
     small: "Small"
     medium: "Medium"
