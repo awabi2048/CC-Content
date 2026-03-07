@@ -51,6 +51,8 @@ sukima_dungeon:
     normal_range: 16.0
     sneak_range: 8.0
 
+  generator_cells_per_tick: 5
+
   npc_count_variation: 0.2
   sprout_count_variation: 0.2
 
@@ -67,6 +69,8 @@ sukima_dungeon:
 
   bookmark_blacklist_worlds:
     - "world_the_end"
+
+  bookmark_portal_duration: 300
 
   oage_message_sound: "entity.villager.ambient"
   oage_message_prefix: "§e【おあげちゃん】§r"

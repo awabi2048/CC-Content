@@ -25,3 +25,8 @@ items:
     weight: 1
     lore:
       - "&a価値の高い宝石。"
+  sharp_diamond_sword:
+    material: DIAMOND_SWORD
+    weight: 20
+    enchantments:
+      sharpness: 1

@@ -1,0 +1,32 @@
+items:
+  rotten_flesh:
+    material: ROTTEN_FLESH
+    name: '&7腐った肉'
+    weight: 10
+    lore:
+    - '&7誰の肉かは分からないが、'
+    - '&7腐敗が進んでいる。'
+  iron_nugget:
+    material: IRON_NUGGET
+    name: '&f鉄塊'
+    weight: 5
+    lore:
+    - '&7どこかの兵士が落とした'
+    - '&7欠片のようだ。'
+  gold_nugget:
+    material: GOLD_NUGGET
+    name: '&e金塊'
+    weight: 3
+    lore:
+    - '&7鈍く光る金色の破片。'
+  emerald:
+    material: EMERALD
+    name: '&aエメラルド'
+    weight: 1
+    lore:
+    - '&a価値の高い宝石。'
+  _1:
+    material: DIAMOND_SWORD
+    weight: 20
+    enchantments:
+      sharpness: 1

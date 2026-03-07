@@ -24,6 +24,7 @@ class CompassListener(private val plugin: JavaPlugin) : Listener {
 
     private val sneakingPlayers = mutableMapOf<UUID, Long>()
     private val activeSessions = mutableMapOf<UUID, CompassSession>()
+    private val cooldownUntil = mutableMapOf<UUID, Long>()
 
     private var maxRadiusParticle: org.bukkit.Particle = org.bukkit.Particle.FLAME
     private var currentRadiusParticle: org.bukkit.Particle = org.bukkit.Particle.SOUL_FIRE_FLAME
@@ -77,9 +78,9 @@ class CompassListener(private val plugin: JavaPlugin) : Listener {
 
                     if (System.currentTimeMillis() - startTime >= 1000) {
                         val item = player.inventory.itemInMainHand
-                        
-                        // Check cooldown
-                        if (player.getCooldown(item.type) > 0) {
+
+                        val cooldownRemainingMillis = (cooldownUntil[uuid] ?: 0L) - System.currentTimeMillis()
+                        if (cooldownRemainingMillis > 0) {
                             player.sendMessage("§cコンパスは現在クールタイム中です。")
                             player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 0.5f)
                             toRemoveSneak.add(uuid)
@@ -215,16 +216,14 @@ class CompassListener(private val plugin: JavaPlugin) : Listener {
                     session?.markerEntities?.values?.forEach { it.remove() }
                     val player = Bukkit.getPlayer(uuid)
                     
-                    if (player != null && session != null) {
-                        player.sendMessage(MessageManager.getMessage(player, "compass_detect_stop").replace("[Compass] ", ""))
-                        player.playSound(player.location, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1.0f, 0.5f)
-                        
-                        // Apply cooldown
-                        val ticks = session.cooldownSeconds * 20
-                        player.setCooldown(org.bukkit.Material.STONE_PICKAXE, ticks)
+                        if (player != null && session != null) {
+                            player.sendMessage(MessageManager.getMessage(player, "compass_detect_stop").replace("[Compass] ", ""))
+                            player.playSound(player.location, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1.0f, 0.5f)
+
+                            cooldownUntil[uuid] = System.currentTimeMillis() + session.cooldownSeconds * 1000L
+                        }
                     }
                 }
-            }
         }.runTaskTimer(plugin, 1L, 1L)
     }
 
@@ -370,6 +369,7 @@ class CompassListener(private val plugin: JavaPlugin) : Listener {
         sneakingPlayers.remove(event.player.uniqueId)
         val session = activeSessions.remove(event.player.uniqueId)
         session?.markerEntities?.values?.forEach { it.remove() }
+        cooldownUntil.remove(event.player.uniqueId)
     }
 
     @EventHandler

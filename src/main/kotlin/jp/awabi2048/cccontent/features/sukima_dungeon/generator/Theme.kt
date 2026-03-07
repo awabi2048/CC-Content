@@ -14,14 +14,14 @@ data class Theme(
     val structures: Map<StructureType, List<Structure>>
 ) {
     fun getDisplayName(player: org.bukkit.entity.Player? = null): String {
-        return jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager.getMessage(player, "sukima_dungeon.theme.$id.name")
+        return jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager.getMessage(player, "theme.$id.name")
     }
 
     fun getDescription(player: org.bukkit.entity.Player? = null): String {
-        return jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager.getMessage(player, "sukima_dungeon.theme.$id.description")
+        return jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager.getMessage(player, "theme.$id.description")
     }
 
     fun getOageMessages(player: org.bukkit.entity.Player? = null): List<String> {
-        return jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager.getList(player, "sukima_dungeon.theme.$id.oage_messages")
+        return jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager.getList(player, "theme.$id.oage_messages")
     }
 }
