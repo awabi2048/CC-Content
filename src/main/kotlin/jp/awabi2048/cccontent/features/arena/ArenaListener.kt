@@ -37,14 +37,14 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     fun onBarrierBreak(event: BlockBreakEvent) {
         if (!arenaManager.isBarrierBlock(event.block.location)) return
         event.isCancelled = true
-        event.player.sendMessage("§c結界石は破壊できません")
+        event.player.sendMessage(ArenaI18n.text(event.player, "arena.messages.barrier.cannot_break", "&c結界石は破壊できません"))
     }
 
     @EventHandler(ignoreCancelled = true)
     fun onBarrierPlace(event: BlockPlaceEvent) {
         if (!arenaManager.isBarrierBlock(event.block.location)) return
         event.isCancelled = true
-        event.player.sendMessage("§c結界石の上には設置できません")
+        event.player.sendMessage(ArenaI18n.text(event.player, "arena.messages.barrier.cannot_place_on", "&c結界石の上には設置できません"))
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -59,11 +59,17 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
 
     @EventHandler
     fun onPlayerQuit(event: PlayerQuitEvent) {
-        arenaManager.stopSession(event.player, "§cログアウトしたためアリーナを終了しました")
+        arenaManager.stopSession(
+            event.player,
+            ArenaI18n.text(event.player, "arena.messages.session.ended_by_logout", "&cログアウトしたためアリーナを終了しました")
+        )
     }
 
     @EventHandler
     fun onPlayerDeath(event: PlayerDeathEvent) {
-        arenaManager.stopSession(event.player, "§c死亡したためアリーナを終了しました")
+        arenaManager.stopSession(
+            event.player,
+            ArenaI18n.text(event.player, "arena.messages.session.ended_by_death", "&c死亡したためアリーナを終了しました")
+        )
     }
 }

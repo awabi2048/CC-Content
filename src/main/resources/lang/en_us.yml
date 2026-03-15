@@ -329,6 +329,59 @@ custom_items:
       name: "§6Arena Prize Box"
       lore:
         - "§7Victory reward from the arena"
+    messages:
+      command:
+        no_permission: '&cYou do not have permission'
+        target_not_found: '&cTarget player not found'
+        start_success: '&aStarted arena for {player} (mob_type={mob_type}, difficulty={difficulty}, theme={theme}, waves={waves})'
+        stop_success: '&aStopped arena for {player}'
+        stop_not_in_session: '&e{player} is not in an arena session'
+        theme_none: '&eNo themes are available'
+        theme_list: '&6[Arena] Available themes: {themes}'
+        usage:
+          start: '&cUsage: /arenaa start <player|@s> <mob_type> <difficulty> [theme]'
+          stop: '&cUsage: /arenaa stop <player>'
+          theme: '&cUsage: /arenaa theme list'
+        help:
+          header: '&6=== Arena Admin Commands ==='
+          start: '&f/arenaa start <player|@s> <mob_type> <difficulty> [theme]'
+          stop: '&f/arenaa stop <player>'
+          theme: '&f/arenaa theme list'
+        start_error:
+          already_in_session: '&c{player} is already in an arena session'
+          mob_type_not_found: '&cmob_type not found: {mob_type}'
+          difficulty_not_found: '&cdifficulty not found: {difficulty}'
+          undefined_wave_spawn: '&cmob_type ''{mob_type}'' has no spawn definition for wave {wave}'
+          theme_not_found: '&cNo valid theme was found'
+          world_create_failed: '&cFailed to create arena world'
+          stage_build_failed: '&cFailed to generate stage: {message}'
+      barrier:
+        cannot_break: '&cThe barrier core cannot be broken'
+        cannot_place_on: '&cYou cannot place blocks on the barrier core'
+        not_ready: '&cThe barrier core cannot be reactivated yet. Clear all waves first'
+        activating: '&eBarrier core is already activating'
+        ready_subtitle: '&bRight-click the barrier core to reactivate it'
+        activating_title: '&bReactivating barrier core...'
+        activation_complete_title: '&aReactivation complete'
+      session:
+        started: '&6[Arena] Session started: theme={theme}, mob_type={mob_type}, difficulty={difficulty}, waves={waves}'
+        retry_hint: '&7You can retry with admin command by specifying mob_type / difficulty / theme'
+        cleared: '&aArena cleared!'
+        ended: '&cArena session ended'
+        ended_by_logout: '&cArena ended because you logged out'
+        ended_by_death: '&cArena ended because you died'
+        ended_by_shutdown: '&cArena ended because the server is shutting down'
+        stopped_by_admin: '&cArena stopped by admin command'
+      stage:
+        already_started: '&eThe stage has already started'
+        start_subtitle: '&6Stage Start'
+      door:
+        animating: '&eDoor is opening'
+      wave:
+        title: '&6Wave {wave}'
+      mock:
+        door_animation_start: '&7{message}'
+        corridor_door_reinstall: '&7{message}'
   brewery:
     sample_filter:
       name: "§eDistillation Filter (Prototype)"

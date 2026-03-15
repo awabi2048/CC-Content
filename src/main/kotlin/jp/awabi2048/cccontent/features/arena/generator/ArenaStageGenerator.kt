@@ -5,7 +5,6 @@ import org.bukkit.Location
 import org.bukkit.World
 import org.bukkit.block.structure.Mirror
 import org.bukkit.block.structure.StructureRotation
-import org.bukkit.entity.ArmorStand
 import org.bukkit.entity.Marker
 import kotlin.math.max
 import kotlin.math.floor
@@ -461,28 +460,18 @@ class ArenaStageGenerator {
                     if (loc.blockX !in minX..maxX || loc.blockZ !in minZ..maxZ) continue
                     if (loc.blockY !in minY..maxY) continue
 
-                    when (entity) {
-                        is Marker -> {
-                            if (entity.scoreboardTags.contains("arena.marker.mob")) {
-                                mobs.add(loc.clone())
-                            }
-                            if (entity.scoreboardTags.contains("arena.marker.entrance")) {
-                                entrance = loc.clone()
-                            }
-                            if (entity.scoreboardTags.contains("arena.marker.door_block")) {
-                                doorBlocks.add(loc.clone())
-                            }
-                            if (entity.scoreboardTags.contains("arena.marker.barrier_core")) {
-                                barrier = loc.clone()
-                            }
+                    if (entity is Marker) {
+                        if (entity.scoreboardTags.contains("arena.marker.mob")) {
+                            mobs.add(loc.clone())
                         }
-                        is ArmorStand -> {
-                            when (entity.customName) {
-                                "ARENA_MOB" -> mobs.add(loc.clone())
-                                "ARENA_ENTRANCE" -> entrance = loc.clone()
-                                "ARENA_DOOR_BLOCK" -> doorBlocks.add(loc.clone())
-                                "ARENA_BARRIER_CORE" -> barrier = loc.clone()
-                            }
+                        if (entity.scoreboardTags.contains("arena.marker.entrance")) {
+                            entrance = loc.clone()
+                        }
+                        if (entity.scoreboardTags.contains("arena.marker.door_block")) {
+                            doorBlocks.add(loc.clone())
+                        }
+                        if (entity.scoreboardTags.contains("arena.marker.barrier_core")) {
+                            barrier = loc.clone()
                         }
                     }
                 }

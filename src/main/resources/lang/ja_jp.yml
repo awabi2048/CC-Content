@@ -921,6 +921,59 @@ custom_items:
       name: '§6アリーナ報酬箱'
       lore:
         - '§7アリーナでの勝利報酬'
+    messages:
+      command:
+        no_permission: '&c権限がありません'
+        target_not_found: '&c対象プレイヤーが見つかりません'
+        start_success: '&a{player} のアリーナを開始しました (mob_type={mob_type}, difficulty={difficulty}, theme={theme}, waves={waves})'
+        stop_success: '&a{player} のアリーナを停止しました'
+        stop_not_in_session: '&e{player} はアリーナセッションに参加していません'
+        theme_none: '&e利用可能なテーマがありません'
+        theme_list: '&6[Arena] 利用可能テーマ: {themes}'
+        usage:
+          start: '&c使用法: /arenaa start <player|@s> <mob_type> <difficulty> [theme]'
+          stop: '&c使用法: /arenaa stop <player>'
+          theme: '&c使用法: /arenaa theme list'
+        help:
+          header: '&6=== Arena 管理コマンド ==='
+          start: '&f/arenaa start <player|@s> <mob_type> <difficulty> [theme]'
+          stop: '&f/arenaa stop <player>'
+          theme: '&f/arenaa theme list'
+        start_error:
+          already_in_session: '&c{player} はすでにアリーナセッション中です'
+          mob_type_not_found: '&cmob_type が見つかりません: {mob_type}'
+          difficulty_not_found: '&cdifficulty が見つかりません: {difficulty}'
+          undefined_wave_spawn: '&cmob_type ''{mob_type}'' は wave {wave} のスポーンが未定義です'
+          theme_not_found: '&c有効なテーマが見つかりません'
+          world_create_failed: '&cアリーナ用ワールド作成に失敗しました'
+          stage_build_failed: '&cステージ生成に失敗しました: {message}'
+      barrier:
+        cannot_break: '&c結界石は破壊できません'
+        cannot_place_on: '&c結界石の上には設置できません'
+        not_ready: '&cまだ結界石を再起動できません。全ウェーブをクリアしてください'
+        activating: '&e結界石を再起動中です'
+        ready_subtitle: '&b結界石を右クリックして再起動'
+        activating_title: '&b結界石を再起動中...'
+        activation_complete_title: '&a再起動完了'
+      session:
+        started: '&6[Arena] セッション開始: theme={theme}, mob_type={mob_type}, difficulty={difficulty}, waves={waves}'
+        retry_hint: '&7管理コマンドで mob_type / difficulty / theme を指定して再挑戦できます'
+        cleared: '&aアリーナクリア！'
+        ended: '&cアリーナセッションが終了しました'
+        ended_by_logout: '&cログアウトしたためアリーナを終了しました'
+        ended_by_death: '&c死亡したためアリーナを終了しました'
+        ended_by_shutdown: '&cサーバー停止によりアリーナを終了しました'
+        stopped_by_admin: '&c管理コマンドによりアリーナを停止しました'
+      stage:
+        already_started: '&eステージはすでに開始しています'
+        start_subtitle: '&6ステージ開始'
+      door:
+        animating: '&e開扉中です'
+      wave:
+        title: '&6Wave {wave}'
+      mock:
+        door_animation_start: '&7{message}'
+        corridor_door_reinstall: '&7{message}'
   brewery:
     sample_filter:
       name: '§e蒸留フィルター（試作）'

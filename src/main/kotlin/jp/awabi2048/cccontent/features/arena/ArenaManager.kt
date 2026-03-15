@@ -37,7 +37,11 @@ sealed class ArenaStartResult {
         val difficultyId: String
     ) : ArenaStartResult()
 
-    data class Error(val message: String) : ArenaStartResult()
+    data class Error(
+        val messageKey: String,
+        val fallback: String,
+        val placeholders: Array<out Pair<String, Any?>> = emptyArray()
+    ) : ArenaStartResult()
 }
 
 private data class PendingWorldDeletion(
@@ -396,13 +400,25 @@ class ArenaManager(private val plugin: JavaPlugin) {
         requestedTheme: String?
     ): ArenaStartResult {
         if (playerToSessionWorld.containsKey(target.uniqueId)) {
-            return ArenaStartResult.Error("${target.name} はすでにアリーナセッション中です")
+            return ArenaStartResult.Error(
+                "arena.messages.command.start_error.already_in_session",
+                "&c{player} はすでにアリーナセッション中です",
+                arrayOf("player" to target.name)
+            )
         }
 
         val mobType = mobTypeConfigs[mobTypeId]
-            ?: return ArenaStartResult.Error("mob_type が見つかりません: $mobTypeId")
+            ?: return ArenaStartResult.Error(
+                "arena.messages.command.start_error.mob_type_not_found",
+                "&cmob_type が見つかりません: {mob_type}",
+                arrayOf("mob_type" to mobTypeId)
+            )
         val difficulty = difficultyConfigs[difficultyId]
-            ?: return ArenaStartResult.Error("difficulty が見つかりません: $difficultyId")
+            ?: return ArenaStartResult.Error(
+                "arena.messages.command.start_error.difficulty_not_found",
+                "&cdifficulty が見つかりません: {difficulty}",
+                arrayOf("difficulty" to difficultyId)
+            )
 
         val undefinedWave = (1..difficulty.waves).firstOrNull { wave ->
             mobType.candidatesForWave(wave).isEmpty()
@@ -412,16 +428,26 @@ class ArenaManager(private val plugin: JavaPlugin) {
                 "[Arena] セッション開始失敗: mobスポーン未定義ウェーブがあります " +
                     "mob_type=$mobTypeId difficulty=$difficultyId wave=$undefinedWave"
             )
-            return ArenaStartResult.Error("mob_type '$mobTypeId' は wave $undefinedWave のスポーンが未定義です")
+            return ArenaStartResult.Error(
+                "arena.messages.command.start_error.undefined_wave_spawn",
+                "&cmob_type '{mob_type}' は wave {wave} のスポーンが未定義です",
+                arrayOf("mob_type" to mobTypeId, "wave" to undefinedWave)
+            )
         }
 
         val theme = if (requestedTheme.isNullOrBlank()) {
             themeLoader.getRandomTheme(random)
         } else {
             themeLoader.getTheme(requestedTheme)
-        } ?: return ArenaStartResult.Error("有効なテーマが見つかりません")
+        } ?: return ArenaStartResult.Error(
+            "arena.messages.command.start_error.theme_not_found",
+            "&c有効なテーマが見つかりません"
+        )
 
-        val world = createArenaWorld() ?: return ArenaStartResult.Error("アリーナ用ワールド作成に失敗しました")
+        val world = createArenaWorld() ?: return ArenaStartResult.Error(
+            "arena.messages.command.start_error.world_create_failed",
+            "&cアリーナ用ワールド作成に失敗しました"
+        )
 
         return try {
             val returnLocation = target.location.clone()
@@ -454,24 +480,37 @@ class ArenaManager(private val plugin: JavaPlugin) {
                 participant.teleport(stage.entranceLocation)
             }
             target.sendMessage(
-                "§6[Arena] セッション開始: " +
-                    "theme=${theme.id}, mob_type=${mobType.id}, difficulty=${difficulty.id}, waves=${difficulty.waves}"
+                ArenaI18n.text(
+                    target,
+                    "arena.messages.session.started",
+                    "&6[Arena] セッション開始: theme={theme}, mob_type={mob_type}, difficulty={difficulty}, waves={waves}",
+                    "theme" to theme.id,
+                    "mob_type" to mobType.id,
+                    "difficulty" to difficulty.id,
+                    "waves" to difficulty.waves
+                )
             )
 
             initializeWavePipeline(session, mobType, difficulty)
             ArenaStartResult.Success(theme.id, difficulty.waves, mobType.id, difficulty.id)
         } catch (e: Exception) {
             tryDeleteWorld(world)
-            ArenaStartResult.Error("ステージ生成に失敗しました: ${e.message}")
+            ArenaStartResult.Error(
+                "arena.messages.command.start_error.stage_build_failed",
+                "&cステージ生成に失敗しました: {message}",
+                arrayOf("message" to (e.message ?: "unknown"))
+            )
         }
     }
 
-    fun stopSession(player: Player, reason: String = "§cアリーナセッションが終了しました"): Boolean {
+    fun stopSession(player: Player, reason: String = ArenaI18n.text(player, "arena.messages.session.ended", "&cアリーナセッションが終了しました")): Boolean {
         return leavePlayerFromSession(player.uniqueId, reason)
     }
 
-    fun stopSessionById(playerId: UUID, reason: String = "§cアリーナセッションが終了しました"): Boolean {
-        return leavePlayerFromSession(playerId, reason)
+    fun stopSessionById(playerId: UUID, reason: String? = null): Boolean {
+        val player = Bukkit.getPlayer(playerId)
+        val localizedReason = reason ?: ArenaI18n.text(player, "arena.messages.session.ended", "&cアリーナセッションが終了しました")
+        return leavePlayerFromSession(playerId, localizedReason)
     }
 
     fun shutdown() {
@@ -481,7 +520,12 @@ class ArenaManager(private val plugin: JavaPlugin) {
         playerMonitorTask = null
 
         sessionsByWorld.values.toList().forEach { session ->
-            terminateSession(session, false, "§cサーバー停止によりアリーナを終了しました")
+            terminateSession(
+                session,
+                false,
+                messageKey = "arena.messages.session.ended_by_shutdown",
+                fallbackMessage = "&cサーバー停止によりアリーナを終了しました"
+            )
         }
         sessionsByWorld.clear()
         playerToSessionWorld.clear()
@@ -567,12 +611,18 @@ class ArenaManager(private val plugin: JavaPlugin) {
         if (block.x != core.x || block.y != core.y || block.z != core.z) return false
 
         if (!session.barrierActive) {
-            player.sendMessage("§cまだ結界石を再起動できません。全ウェーブをクリアしてください")
+            player.sendMessage(
+                ArenaI18n.text(
+                    player,
+                    "arena.messages.barrier.not_ready",
+                    "&cまだ結界石を再起動できません。全ウェーブをクリアしてください"
+                )
+            )
             return true
         }
 
         if (pendingBarrierActivations.containsKey(player.uniqueId)) {
-            player.sendMessage("§e結界石を再起動中です")
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.barrier.activating", "&e結界石を再起動中です"))
             return true
         }
 
@@ -587,11 +637,11 @@ class ArenaManager(private val plugin: JavaPlugin) {
         val wave = locateDoorWave(session, clicked) ?: return false
         if (wave != 1) return true
         if (session.stageStarted) {
-            player.sendMessage("§eステージはすでに開始しています")
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.stage.already_started", "&eステージはすでに開始しています"))
             return true
         }
         if (session.animatingDoorWaves.contains(wave)) {
-            player.sendMessage("§e開扉中です")
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.door.animating", "&e開扉中です"))
             return true
         }
 
@@ -635,12 +685,18 @@ class ArenaManager(private val plugin: JavaPlugin) {
         }
 
         if (session.participants.isEmpty()) {
-            terminateSession(session, false, null)
+            terminateSession(session, false)
         }
         return true
     }
 
-    private fun terminateSession(session: ArenaSession, success: Boolean, message: String?) {
+    private fun terminateSession(
+        session: ArenaSession,
+        success: Boolean,
+        messageKey: String? = null,
+        fallbackMessage: String? = null,
+        vararg messagePlaceholders: Pair<String, Any?>
+    ) {
         sessionsByWorld.remove(session.worldName)
 
         session.waveSpawnTasks.values.forEach { it.cancel() }
@@ -662,10 +718,16 @@ class ArenaManager(private val plugin: JavaPlugin) {
                 if (destination != null) {
                     player.teleport(destination)
                 }
-                if (message != null) {
-                    player.sendMessage(message)
+                if (messageKey != null && fallbackMessage != null) {
+                    player.sendMessage(ArenaI18n.text(player, messageKey, fallbackMessage, *messagePlaceholders))
                     if (success) {
-                        player.sendMessage("§7管理コマンドで mob_type / difficulty / theme を指定して再挑戦できます")
+                        player.sendMessage(
+                            ArenaI18n.text(
+                                player,
+                                "arena.messages.session.retry_hint",
+                                "&7管理コマンドで mob_type / difficulty / theme を指定して再挑戦できます"
+                            )
+                        )
                     }
                 }
             }
@@ -835,7 +897,13 @@ class ArenaManager(private val plugin: JavaPlugin) {
         val notified = session.playerNotifiedWaves.getOrPut(player.uniqueId) { mutableSetOf() }
         if (!notified.add(wave)) return
 
-        player.sendTitle("", "§6Wave $wave", 10, 50, 10)
+        player.sendTitle(
+            "",
+            ArenaI18n.text(player, "arena.messages.wave.title", "&6Wave {wave}", "wave" to wave),
+            10,
+            50,
+            10
+        )
         player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f)
     }
 
@@ -1057,18 +1125,18 @@ class ArenaManager(private val plugin: JavaPlugin) {
         session.openedCorridors.add(targetWave)
         if (targetWave == 1 && !session.stageStarted) {
             session.stageStarted = true
-            broadcastSubtitle(session, "§6ステージ開始", 5, 40, 10)
+            broadcastSubtitle(session, "arena.messages.stage.start_subtitle", "&6ステージ開始", 5, 40, 10)
             playSound(session, Sound.BLOCK_IRON_DOOR_OPEN, 1.0f, 1.0f)
         }
         val message = "[Arena][Mock] door animation start: world=${session.worldName} target_wave=$targetWave"
         plugin.logger.info(message)
-        broadcastMessage(session, "§7$message")
+        broadcastMessage(session, "arena.messages.mock.door_animation_start", "&7{message}", "message" to message)
     }
 
     private fun reinstallCorridorDoorMock(session: ArenaSession, wave: Int, angle: Int) {
         val message = "[Arena][Mock] corridor door reinstall: world=${session.worldName} wave=$wave angle=$angle"
         plugin.logger.info(message)
-        broadcastMessage(session, "§7$message")
+        broadcastMessage(session, "arena.messages.mock.corridor_door_reinstall", "&7{message}", "message" to message)
     }
 
     private fun locateDoorWave(session: ArenaSession, clicked: Location): Int? {
@@ -1139,7 +1207,7 @@ class ArenaManager(private val plugin: JavaPlugin) {
         session.waveSpawnTasks.values.forEach { it.cancel() }
         session.waveSpawnTasks.clear()
         session.barrierActive = true
-        broadcastSubtitle(session, "§b結界石を右クリックして再起動", 10, 70, 20)
+        broadcastSubtitle(session, "arena.messages.barrier.ready_subtitle", "&b結界石を右クリックして再起動", 10, 70, 20)
     }
 
     private fun startBarrierActivation(player: Player, session: ArenaSession) {
@@ -1147,7 +1215,7 @@ class ArenaManager(private val plugin: JavaPlugin) {
             if (!player.isOnline || player.world.name != session.worldName) return@Runnable
             val center = session.barrierLocation.clone().add(0.5, 0.8, 0.5)
             player.world.spawnParticle(Particle.END_ROD, center, 24, 0.35, 0.45, 0.35, 0.01)
-            player.sendTitle("", "§b結界石を再起動中...", 0, 15, 5)
+            player.sendTitle("", ArenaI18n.text(player, "arena.messages.barrier.activating_title", "&b結界石を再起動中..."), 0, 15, 5)
         }, 0L, 10L)
 
         val completionTask = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
@@ -1158,8 +1226,13 @@ class ArenaManager(private val plugin: JavaPlugin) {
             if (!activeSession.participants.contains(player.uniqueId)) return@Runnable
             if (!player.isOnline || player.world.name != session.worldName) return@Runnable
 
-            player.sendTitle("", "§a再起動完了", 5, 30, 10)
-            terminateSession(activeSession, true, "§aアリーナクリア！")
+            player.sendTitle("", ArenaI18n.text(player, "arena.messages.barrier.activation_complete_title", "&a再起動完了"), 5, 30, 10)
+            terminateSession(
+                activeSession,
+                true,
+                messageKey = "arena.messages.session.cleared",
+                fallbackMessage = "&aアリーナクリア！"
+            )
         }, 200L)
 
         pendingBarrierActivations[player.uniqueId] = PendingBarrierActivation(
@@ -1174,15 +1247,30 @@ class ArenaManager(private val plugin: JavaPlugin) {
         pending.completionTask.cancel()
     }
 
-    private fun broadcastSubtitle(session: ArenaSession, subtitle: String, fadeIn: Int, stay: Int, fadeOut: Int) {
+    private fun broadcastSubtitle(
+        session: ArenaSession,
+        key: String,
+        fallback: String,
+        fadeIn: Int,
+        stay: Int,
+        fadeOut: Int,
+        vararg placeholders: Pair<String, Any?>
+    ) {
         session.participants.forEach { participantId ->
-            Bukkit.getPlayer(participantId)?.sendTitle("", subtitle, fadeIn, stay, fadeOut)
+            val player = Bukkit.getPlayer(participantId) ?: return@forEach
+            player.sendTitle("", ArenaI18n.text(player, key, fallback, *placeholders), fadeIn, stay, fadeOut)
         }
     }
 
-    private fun broadcastMessage(session: ArenaSession, message: String) {
+    private fun broadcastMessage(
+        session: ArenaSession,
+        key: String,
+        fallback: String,
+        vararg placeholders: Pair<String, Any?>
+    ) {
         session.participants.forEach { participantId ->
-            Bukkit.getPlayer(participantId)?.sendMessage(message)
+            val player = Bukkit.getPlayer(participantId) ?: return@forEach
+            player.sendMessage(ArenaI18n.text(player, key, fallback, *placeholders))
         }
     }
 

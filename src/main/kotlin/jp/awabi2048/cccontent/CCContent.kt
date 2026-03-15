@@ -37,6 +37,7 @@ import jp.awabi2048.cccontent.items.brewery.BreweryMockYeastItem
 import jp.awabi2048.cccontent.items.brewery.BrewerySampleFilterItem
 import jp.awabi2048.cccontent.items.arena.*
 import jp.awabi2048.cccontent.features.arena.ArenaCommand
+import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.arena.ArenaItemListener
 import jp.awabi2048.cccontent.features.arena.ArenaListener
 import jp.awabi2048.cccontent.features.arena.ArenaManager
@@ -201,6 +202,7 @@ class CCContent : JavaPlugin(), Listener {
         getCommand("cc")?.tabCompleter = ccCommand
 
         if (isContentEnabledAtStartup("arena") && ::arenaManager.isInitialized) {
+            ArenaI18n.initialize(this)
             val arenaCommand = ArenaCommand(arenaManager)
             getCommand("arenaa")?.setExecutor(arenaCommand)
             getCommand("arenaa")?.tabCompleter = arenaCommand
@@ -707,6 +709,7 @@ class CCContent : JavaPlugin(), Listener {
             coreConfig = CoreConfigManager.load(this)
             startPersistenceFlushTask()
             CustomItemI18n.initialize(this)
+            ArenaI18n.initialize(this)
             AutoIgnitionBoosterConfig.reload()
             AirCannonConfig.reload()
             RadioCassetteConfig.reload()

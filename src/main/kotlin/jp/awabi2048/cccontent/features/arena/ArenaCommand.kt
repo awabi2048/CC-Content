@@ -10,7 +10,7 @@ import org.bukkit.entity.Player
 class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, TabCompleter {
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (!sender.hasPermission("cc-content.arena.admin")) {
-            sender.sendMessage("§c権限がありません")
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.no_permission", "&c権限がありません"))
             return true
         }
 
@@ -32,7 +32,13 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
 
     private fun handleStart(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 4) {
-            sender.sendMessage("§c使用法: /arenaa start <player|@s> <mob_type> <difficulty> [theme]")
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.usage.start",
+                    "&c使用法: /arenaa start <player|@s> <mob_type> <difficulty> [theme]"
+                )
+            )
             return true
         }
 
@@ -41,7 +47,7 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
             else -> Bukkit.getPlayer(args[1])
         }
         if (target == null) {
-            sender.sendMessage("§c対象プレイヤーが見つかりません")
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found", "&c対象プレイヤーが見つかりません"))
             return true
         }
 
@@ -51,12 +57,27 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
         when (val result = arenaManager.startSession(target, mobTypeId, difficultyId, theme)) {
             is ArenaStartResult.Success -> {
                 sender.sendMessage(
-                    "§a${target.name} のアリーナを開始しました " +
-                        "(mob_type=${result.mobTypeId}, difficulty=${result.difficultyId}, theme=${result.themeId}, waves=${result.waves})"
+                    ArenaI18n.text(
+                        sender,
+                        "arena.messages.command.start_success",
+                        "&a{player} のアリーナを開始しました (mob_type={mob_type}, difficulty={difficulty}, theme={theme}, waves={waves})",
+                        "player" to target.name,
+                        "mob_type" to result.mobTypeId,
+                        "difficulty" to result.difficultyId,
+                        "theme" to result.themeId,
+                        "waves" to result.waves
+                    )
                 )
             }
             is ArenaStartResult.Error -> {
-                sender.sendMessage("§c開始失敗: ${result.message}")
+                sender.sendMessage(
+                    ArenaI18n.text(
+                        sender,
+                        result.messageKey,
+                        result.fallback,
+                        *result.placeholders
+                    )
+                )
             }
         }
         return true
@@ -64,44 +85,68 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
 
     private fun handleStop(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 2) {
-            sender.sendMessage("§c使用法: /arenaa stop <player>")
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.usage.stop", "&c使用法: /arenaa stop <player>"))
             return true
         }
         val target = Bukkit.getPlayer(args[1])
         if (target == null) {
-            sender.sendMessage("§c対象プレイヤーが見つかりません")
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found", "&c対象プレイヤーが見つかりません"))
             return true
         }
-        val stopped = arenaManager.stopSession(target, "§c管理コマンドによりアリーナを停止しました")
+        val stopped = arenaManager.stopSession(
+            target,
+            ArenaI18n.text(target, "arena.messages.session.stopped_by_admin", "&c管理コマンドによりアリーナを停止しました")
+        )
         if (stopped) {
-            sender.sendMessage("§a${target.name} のアリーナを停止しました")
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.stop_success",
+                    "&a{player} のアリーナを停止しました",
+                    "player" to target.name
+                )
+            )
         } else {
-            sender.sendMessage("§e${target.name} はアリーナセッションに参加していません")
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.stop_not_in_session",
+                    "&e{player} はアリーナセッションに参加していません",
+                    "player" to target.name
+                )
+            )
         }
         return true
     }
 
     private fun handleTheme(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 2 || !args[1].equals("list", ignoreCase = true)) {
-            sender.sendMessage("§c使用法: /arenaa theme list")
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.usage.theme", "&c使用法: /arenaa theme list"))
             return true
         }
 
         val ids = arenaManager.getThemeIds().sorted()
         if (ids.isEmpty()) {
-            sender.sendMessage("§e利用可能なテーマがありません")
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.theme_none", "&e利用可能なテーマがありません"))
             return true
         }
 
-        sender.sendMessage("§6[Arena] 利用可能テーマ: ${ids.joinToString(", ")}")
+        sender.sendMessage(
+            ArenaI18n.text(
+                sender,
+                "arena.messages.command.theme_list",
+                "&6[Arena] 利用可能テーマ: {themes}",
+                "themes" to ids.joinToString(", ")
+            )
+        )
         return true
     }
 
     private fun showUsage(sender: CommandSender) {
-        sender.sendMessage("§6=== Arena 管理コマンド ===")
-        sender.sendMessage("§f/arenaa start <player|@s> <mob_type> <difficulty> [theme]")
-        sender.sendMessage("§f/arenaa stop <player>")
-        sender.sendMessage("§f/arenaa theme list")
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.header", "&6=== Arena 管理コマンド ==="))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s> <mob_type> <difficulty> [theme]"))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop", "&f/arenaa stop <player>"))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.theme", "&f/arenaa theme list"))
     }
 
     override fun onTabComplete(
