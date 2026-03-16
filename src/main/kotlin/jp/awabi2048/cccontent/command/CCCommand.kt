@@ -1,9 +1,15 @@
 package jp.awabi2048.cccontent.command
 
+import org.bukkit.Location
 import org.bukkit.command.Command
+import org.bukkit.command.BlockCommandSender
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
+import org.bukkit.entity.Entity
+import org.bukkit.entity.LivingEntity
+import org.bukkit.entity.Player
+import org.bukkit.util.Vector
 
 /**
  * /cc-content メインコマンド
@@ -13,8 +19,10 @@ class CCCommand(
     private val giveCommand: GiveCommand,
     private val onReload: (() -> Unit)? = null,
     private val onClearBlockPlacementData: (() -> Unit)? = null,
-    private val onBatchBreakDebug: ((org.bukkit.entity.Player, String, Int, Int, Boolean) -> Boolean)? = null,
-    private val onBlastMineDebug: ((org.bukkit.entity.Player, Double, Int, Boolean, Double) -> Boolean)? = null
+    private val mobDefinitionIdsProvider: (() -> Collection<String>)? = null,
+    private val onSummonMob: ((String, Location) -> LivingEntity?)? = null,
+    private val onBatchBreakDebug: ((Player, String, Int, Int, Boolean) -> Boolean)? = null,
+    private val onBlastMineDebug: ((Player, Double, Int, Boolean, Double) -> Boolean)? = null
 ) : CommandExecutor, TabCompleter {
     
     override fun onCommand(
@@ -41,6 +49,9 @@ class CCCommand(
             "clear_block_placement_data" -> {
                 handleClearBlockPlacementData(sender)
             }
+            "summon" -> {
+                handleSummon(sender, args)
+            }
             "debug" -> {
                 handleDebug(sender, args)
             }
@@ -54,6 +65,47 @@ class CCCommand(
                 true
             }
         }
+    }
+
+    private fun handleSummon(sender: CommandSender, args: Array<String>): Boolean {
+        if (!sender.hasPermission("cc-content.admin")) {
+            sender.sendMessage("§c権限がありません")
+            return false
+        }
+
+        if (onSummonMob == null || mobDefinitionIdsProvider == null) {
+            sender.sendMessage("§cモブ召喚機能が利用できません")
+            return false
+        }
+
+        if (args.size != 5) {
+            sender.sendMessage("§c使用法: /ccc summon <mob_definition_id> <x> <y> <z>")
+            return false
+        }
+
+        val definitionId = args[1]
+        if (!mobDefinitionIdsProvider.invoke().contains(definitionId)) {
+            sender.sendMessage("§c未定義の mob_definition です: $definitionId")
+            return false
+        }
+
+        val location = try {
+            parseLocation(sender, args[2], args[3], args[4])
+        } catch (e: IllegalArgumentException) {
+            sender.sendMessage("§c${e.message}")
+            return false
+        }
+
+        val entity = onSummonMob.invoke(definitionId, location)
+        if (entity == null) {
+            sender.sendMessage("§cモブの召喚に失敗しました: $definitionId")
+            return false
+        }
+
+        sender.sendMessage(
+            "§aモブを召喚しました: id=${definitionId}, type=${entity.type}, world=${location.world?.name}, x=${formatCoord(location.x)}, y=${formatCoord(location.y)}, z=${formatCoord(location.z)}"
+        )
+        return true
     }
 
     private fun handleDebug(sender: CommandSender, args: Array<String>): Boolean {
@@ -85,7 +137,7 @@ class CCCommand(
         }
     }
 
-    private fun handleBatchBreakDebug(sender: CommandSender, player: org.bukkit.entity.Player, args: Array<String>): Boolean {
+    private fun handleBatchBreakDebug(sender: CommandSender, player: Player, args: Array<String>): Boolean {
         if (onBatchBreakDebug == null) {
             sender.sendMessage("§cデバッグ機能が利用できません")
             return false
@@ -116,7 +168,7 @@ class CCCommand(
         return true
     }
 
-    private fun handleBlastMineDebug(sender: CommandSender, player: org.bukkit.entity.Player, args: Array<String>): Boolean {
+    private fun handleBlastMineDebug(sender: CommandSender, player: Player, args: Array<String>): Boolean {
         if (onBlastMineDebug == null) {
             sender.sendMessage("§cデバッグ機能が利用できません")
             return false
@@ -207,11 +259,15 @@ class CCCommand(
               §7  - 例: /cc-content give @a arena.prize 10
               §7  - 例: /cc-content give @s sukima_dungeon.talisman
               
-              §f/cc-content reload
-              §7  - 設定ファイルをリロードします
+               §f/cc-content reload
+               §7  - 設定ファイルをリロードします
 
-              §f/ccc clear_block_placement_data
-              §7  - プレイヤー設置ブロック判定データを削除します
+               §f/ccc summon <mob_definition_id> <x> <y> <z>
+               §7  - 共通 mob_definition からモブを召喚します
+               §7  - 例: /ccc summon spark_zombie_basic ~ ~ ~
+
+               §f/ccc clear_block_placement_data
+               §7  - プレイヤー設置ブロック判定データを削除します
 
               §f/ccc debug <mine_all|cut_all> <delay> <max_chain> <auto_collect>
               §7  - MineAll/CutAll のデバッグ設定を適用します
@@ -238,6 +294,7 @@ class CCCommand(
                val candidates = mutableListOf("give", "help")
                 if (sender.hasPermission("cc-content.admin")) {
                     candidates.add("reload")
+                    candidates.add("summon")
                     candidates.add("clear_block_placement_data")
                     candidates.add("debug")
                 }
@@ -250,8 +307,8 @@ class CCCommand(
                   val subArgs = args.drop(1).toTypedArray()
                   giveCommand.onTabComplete(sender, cmd, "give", subArgs)
               }
-             "debug" -> {
-                 when (args.size) {
+              "debug" -> {
+                  when (args.size) {
                      2 -> listOf("mine_all", "cut_all", "blast_mine").filter { it.startsWith(args[1].lowercase()) }
                      3 -> {
                          when (args[1].lowercase()) {
@@ -281,9 +338,94 @@ class CCCommand(
                          }
                      }
                      else -> emptyList()
-                 }
-             }
-             else -> emptyList()
-         }
-     }
+                  }
+              }
+              "summon" -> {
+                  when (args.size) {
+                      2 -> {
+                          val ids = mobDefinitionIdsProvider?.invoke().orEmpty().sorted()
+                          ids.filter { it.startsWith(args[1], ignoreCase = true) }
+                      }
+                      3, 4, 5 -> listOf("~", "~1", "~-1").filter { it.startsWith(args[args.lastIndex]) }
+                      else -> emptyList()
+                  }
+              }
+              else -> emptyList()
+          }
+      }
+
+    private fun parseLocation(sender: CommandSender, xArg: String, yArg: String, zArg: String): Location {
+        val baseLocation = senderLocation(sender)
+        val args = listOf(xArg, yArg, zArg)
+
+        return if (args.any { it.startsWith("^") }) {
+            if (args.any { !it.startsWith("^") }) {
+                throw IllegalArgumentException("ローカル座標(^)と通常座標は混在できません")
+            }
+            val anchor = baseLocation ?: throw IllegalArgumentException("ローカル座標(^)は位置を持つ実行者のみ使用できます")
+            parseLocalLocation(anchor, xArg, yArg, zArg)
+        } else {
+            val anchor = baseLocation ?: throw IllegalArgumentException("このコマンドは位置を持つ実行者のみ使用できます")
+            Location(
+                anchor.world,
+                parseWorldCoordinate(anchor.x, xArg),
+                parseWorldCoordinate(anchor.y, yArg),
+                parseWorldCoordinate(anchor.z, zArg),
+                anchor.yaw,
+                anchor.pitch
+            )
+        }
+    }
+
+    private fun parseWorldCoordinate(base: Double, raw: String): Double {
+        return if (raw.startsWith("~")) {
+            if (raw == "~") {
+                base
+            } else {
+                base + (raw.substring(1).toDoubleOrNull()
+                    ?: throw IllegalArgumentException("座標の指定が不正です: $raw"))
+            }
+        } else {
+            raw.toDoubleOrNull() ?: throw IllegalArgumentException("座標の指定が不正です: $raw")
+        }
+    }
+
+    private fun parseLocalLocation(anchor: Location, xArg: String, yArg: String, zArg: String): Location {
+        val x = parseLocalComponent(xArg)
+        val y = parseLocalComponent(yArg)
+        val z = parseLocalComponent(zArg)
+
+        val forward = anchor.direction.normalize()
+        var left = Vector(0, 1, 0).crossProduct(forward).normalize()
+        if (left.lengthSquared() == 0.0) {
+            left = Vector(1, 0, 0)
+        }
+        val up = forward.clone().crossProduct(left).normalize()
+        val offset = left.multiply(x).add(up.multiply(y)).add(forward.multiply(z))
+
+        return anchor.clone().add(offset)
+    }
+
+    private fun parseLocalComponent(raw: String): Double {
+        if (!raw.startsWith("^")) {
+            throw IllegalArgumentException("ローカル座標は ^ を使用してください: $raw")
+        }
+        return if (raw == "^") {
+            0.0
+        } else {
+            raw.substring(1).toDoubleOrNull() ?: throw IllegalArgumentException("座標の指定が不正です: $raw")
+        }
+    }
+
+    private fun senderLocation(sender: CommandSender): Location? {
+        return when (sender) {
+            is Entity -> sender.location
+            is BlockCommandSender -> sender.block.location.add(0.5, 0.0, 0.5)
+            else -> null
+        }
+    }
+
+    private fun formatCoord(value: Double): String {
+        return String.format(java.util.Locale.ROOT, "%.2f", value)
+    }
 }

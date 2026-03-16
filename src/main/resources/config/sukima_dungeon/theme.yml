@@ -4,56 +4,94 @@ themes:
     path: test
     tileSize: 16
     void_y_limit: 10.0
+    mobs:
+      - id: zombie_basic
+        weight: 10
+        min_dist: 0
+        max_dist: 50
   cave:
     icon: COBBLESTONE
     path: cave
     tileSize: 32
+    mobs:
+      - id: zombie_basic
+        weight: 10
+        min_dist: 0
+        max_dist: 50
+      - id: skeleton_basic
+        weight: 8
+        min_dist: 0
+        max_dist: 60
+      - id: spark_zombie_basic
+        weight: 4
+        min_dist: 20
+        max_dist: 90
   mineshaft:
     icon: CHEST_MINECART
     path: mineshaft
     tileSize: 48
+    mobs:
+      - id: zombie_basic
+        weight: 8
+        min_dist: 0
+        max_dist: 50
+      - id: skeleton_basic
+        weight: 8
+        min_dist: 0
+        max_dist: 60
   library:
     icon: BOOKSHELF
     path: library
     tileSize: 48
+    mobs:
+      - id: skeleton_basic
+        weight: 12
+        min_dist: 0
+        max_dist: 60
   ruin:
     icon: CHISELED_STONE_BRICKS
     path: ruins
     tileSize: 48
+    mobs:
+      - id: zombie_basic
+        weight: 8
+        min_dist: 0
+        max_dist: 50
+      - id: skeleton_basic
+        weight: 8
+        min_dist: 0
+        max_dist: 60
+      - id: zombie_boss
+        weight: 3
+        min_dist: 40
+        max_dist: 1000
+      - id: spark_zombie_basic
+        weight: 6
+        min_dist: 20
+        max_dist: 90
   see_of_trees:
     icon: MOSS_BLOCK
     path: see_of_trees
     tileSize: 48
+    mobs:
+      - id: zombie_basic
+        weight: 10
+        min_dist: 0
+        max_dist: 50
   maze:
     icon: COMPASS
     path: maze
     tileSize: 48
-
-mob_spawn:
-  themes:
-    default:
-      - zombie_lvl1
-      - skeleton_lvl1
-    test:
-      - zombie_lvl1
-    cave:
-      - zombie_lvl1
-      - skeleton_lvl1
-    mineshaft:
-      - zombie_lvl1
-      - skeleton_lvl1
-    library:
-      - skeleton_lvl1
-    ruin:
-      - zombie_lvl1
-      - skeleton_lvl1
-      - zombie_boss
-    see_of_trees:
-      - zombie_lvl1
-    maze:
-      - zombie_lvl1
-      - skeleton_lvl1
-    dungeon:
-      - zombie_lvl1
-      - skeleton_lvl1
-      - zombie_boss
+    mobs:
+      - id: zombie_basic
+        weight: 8
+        min_dist: 0
+        max_dist: 50
+      - id: skeleton_basic
+        weight: 8
+        min_dist: 0
+        max_dist: 60
+      - id: spark_zombie_basic
+        weight: 6
+        min_dist: 20
+        max_dist: 90
