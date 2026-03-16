@@ -68,9 +68,8 @@ object CustomItemManager {
             CustomItem.COMPASS_TIER_1 -> getCompassItem(player, 1)
             CustomItem.COMPASS_TIER_2 -> getCompassItem(player, 2)
             CustomItem.COMPASS_TIER_3 -> getCompassItem(player, 3)
-            CustomItem.MARKER_TOOL -> {
-                CCContent.instance.getMarkerManager().getMarkerTool(player)
-            }
+            CustomItem.MARKER_TOOL -> GlobalCustomItemManager.createItemForPlayer("sukima_dungeon.marker_tool", player)
+                ?: ItemStack(Material.POISONOUS_POTATO)
             CustomItem.BOOKMARK_BROKEN -> getBookmarkItem(player, DungeonTier.BROKEN)
             CustomItem.BOOKMARK_WORN -> getBookmarkItem(player, DungeonTier.WORN)
             CustomItem.BOOKMARK_FADED -> getBookmarkItem(player, DungeonTier.FADED)

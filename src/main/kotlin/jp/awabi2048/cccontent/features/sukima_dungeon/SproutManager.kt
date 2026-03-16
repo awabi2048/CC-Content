@@ -13,7 +13,7 @@ import java.util.UUID
 object SproutManager {
     private const val MARKER_TAG = "world_sprout_marker"
 
-    fun populate(plugin: JavaPlugin, world: World, targetCount: Int): Int {
+    fun populate(plugin: JavaPlugin, world: World, targetCount: Int, missingStructures: List<String> = emptyList()): Int {
         // Find all "SPROUT" markers
         val markers = world.entities.filter { 
             (it is org.bukkit.entity.Marker && it.scoreboardTags.contains("sd.marker.sprout")) ||
@@ -21,8 +21,27 @@ object SproutManager {
         }
         
         if (markers.isEmpty()) {
-            plugin.logger.warning("No SPROUT markers found in dungeon generation.")
+            plugin.logger.warning(
+                "[SukimaDungeon] SPROUT マーカーが見つかりません。" +
+                    " 構造内に 'sd.marker.sprout' を1個以上配置してください。" +
+                    if (missingStructures.isNotEmpty()) {
+                        " missingStructures=${missingStructures.joinToString("; ")}"
+                    } else {
+                        ""
+                    }
+            )
             return 0
+        }
+
+        if (markers.size < targetCount) {
+            plugin.logger.warning(
+                "[SukimaDungeon] SPROUT マーカー数が不足しています。 required=$targetCount available=${markers.size}" +
+                    if (missingStructures.isNotEmpty()) {
+                        " missingStructures=${missingStructures.joinToString("; ")}"
+                    } else {
+                        ""
+                    }
+            )
         }
 
         val selected = markers.shuffled().take(targetCount)

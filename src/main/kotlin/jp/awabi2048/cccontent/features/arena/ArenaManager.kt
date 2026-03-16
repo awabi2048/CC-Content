@@ -715,7 +715,8 @@ class ArenaManager(
 
         if (spawns.isEmpty()) {
             plugin.logger.severe(
-                "[Arena] スポーンマーカーが無いためウェーブを自動クリアします: world=${session.worldName} wave=$wave"
+                "[Arena] wave=$wave の mob スポーン位置が0件のため自動クリアします。" +
+                    " 対象部屋に 'arena.marker.mob' を1個以上配置してください: world=${session.worldName}"
             )
             session.startedWaves.add(wave)
             clearWave(session, wave, mobType, difficulty)
