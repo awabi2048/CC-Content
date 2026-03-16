@@ -31,6 +31,7 @@ import jp.awabi2048.cccontent.items.misc.StorageBoxTripleItem
 import jp.awabi2048.cccontent.items.misc.TransparentGlowItemFrameItem
 import jp.awabi2048.cccontent.items.misc.TransparentItemFrameItem
 import jp.awabi2048.cccontent.items.misc.TransparentItemFrameListener
+import jp.awabi2048.cccontent.items.marker.AdminMarkerToolService
 import jp.awabi2048.cccontent.items.sukima.*
 import jp.awabi2048.cccontent.items.brewery.BreweryMockClockItem
 import jp.awabi2048.cccontent.items.brewery.BreweryMockYeastItem
@@ -107,6 +108,7 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var mobManager: MobManager
     private lateinit var itemManager: ItemManager
     private lateinit var markerManager: MarkerManager
+    private lateinit var adminMarkerToolService: AdminMarkerToolService
     private lateinit var arenaManager: ArenaManager
     private lateinit var sharedMobService: MobService
     private lateinit var breweryFeature: BreweryFeature
@@ -124,6 +126,7 @@ class CCContent : JavaPlugin(), Listener {
     )
     
     fun getMarkerManager(): MarkerManager = markerManager
+    fun getAdminMarkerToolService(): AdminMarkerToolService = adminMarkerToolService
     fun getItemManager(): ItemManager = itemManager
     fun getStructureLoader(): StructureLoader = structureLoader
     fun getRankManager(): RankManager? = rankManagerInstance
@@ -159,6 +162,9 @@ class CCContent : JavaPlugin(), Listener {
         sharedMobService = MobService(this)
         sharedMobService.reloadDefinitions()
         sharedMobService.startTickTask()
+        adminMarkerToolService = AdminMarkerToolService(this)
+        server.pluginManager.registerEvents(adminMarkerToolService, this)
+        adminMarkerToolService.start()
 
         // アイテム登録
         registerCustomItems()
@@ -605,6 +611,7 @@ class CCContent : JavaPlugin(), Listener {
             CustomItemManager.register(ArenaTicketItem())
             CustomItemManager.register(ArenaMedalItem())
             CustomItemManager.register(ArenaPrizeItem())
+            CustomItemManager.register(ArenaMarkerToolItem())
         }
 
         if (isContentEnabledAtStartup("sukima_dungeon")) {
@@ -871,8 +878,6 @@ class CCContent : JavaPlugin(), Listener {
             server.pluginManager.registerEvents(MobTargetListener(this), this)
             
             markerManager = MarkerManager(this)
-            server.pluginManager.registerEvents(markerManager, this)
-            markerManager.startParticleTask()
             
             PortalManager.init(this)
             

@@ -23,7 +23,13 @@ object StructureBuilder {
 
     data class BuildResult(
         val minibossMarkers: Map<Pair<Int, Int>, Location>,
-        val restCells: Set<Pair<Int, Int>>
+        val restCells: Set<Pair<Int, Int>>,
+        val builtStructures: Map<Pair<Int, Int>, BuiltStructureInfo>
+    )
+
+    data class BuiltStructureInfo(
+        val type: StructureType,
+        val structureName: String
     )
 
     data class MarkerProcessResult(
@@ -50,6 +56,7 @@ object StructureBuilder {
 
         val restCells = mutableSetOf<Pair<Int, Int>>()
         val minibossCells = mutableSetOf<Pair<Int, Int>>()
+        val builtStructures = mutableMapOf<Pair<Int, Int>, BuiltStructureInfo>()
 
         val cellsToBuild = mutableListOf<Pair<Int, Int>>()
         for (x in grid.indices) {
@@ -75,7 +82,9 @@ object StructureBuilder {
                     
                     val isEntrance = x == entranceX && z == entranceZ
                     val location = Location(world, cellX.toDouble(), startY.toDouble(), cellZ.toDouble())
-                    val resultType = buildCell(theme, location, cell, isEntrance)
+                    val buildInfo = buildCell(theme, location, cell, isEntrance)
+                    val resultType = buildInfo.type
+                    builtStructures[x to z] = buildInfo
                     
                     when (resultType) {
                         StructureType.REST -> restCells.add(x to z)
@@ -88,7 +97,7 @@ object StructureBuilder {
                 if (index >= cellsToBuild.size) {
                     this.cancel()
                     val minibossMarkers = processSpecialMarkers(startLocation, width, length, theme, minibossCells)
-                    onComplete(BuildResult(minibossMarkers, restCells))
+                    onComplete(BuildResult(minibossMarkers, restCells, builtStructures.toMap()))
                 }
             }
         }.runTaskTimer(plugin, 1L, 1L)
@@ -99,7 +108,7 @@ object StructureBuilder {
         val loader = this.loader ?: throw IllegalStateException("StructureBuilder not initialized")
         val mobManager = this.mobManager ?: throw IllegalStateException("StructureBuilder not initialized")
         val itemManager = this.itemManager ?: throw IllegalStateException("StructureBuilder not initialized")
-        val world = startLocation.world ?: return BuildResult(emptyMap(), emptySet()) // Fixed return type
+        val world = startLocation.world ?: return BuildResult(emptyMap(), emptySet(), emptyMap()) // Fixed return type
         val startX = startLocation.blockX
         val startY = startLocation.blockY
         val startZ = startLocation.blockZ
@@ -121,6 +130,7 @@ object StructureBuilder {
 
         val restCells = mutableSetOf<Pair<Int, Int>>()
         val minibossCells = mutableSetOf<Pair<Int, Int>>()
+        val builtStructures = mutableMapOf<Pair<Int, Int>, BuiltStructureInfo>()
 
         for (x in grid.indices) {
             for (z in grid[0].indices) {
@@ -130,7 +140,9 @@ object StructureBuilder {
                 
                 val isEntrance = x == entranceX && z == entranceZ
                 val location = Location(world, cellX.toDouble(), startY.toDouble(), cellZ.toDouble())
-                val resultType = buildCell(theme, location, cell, isEntrance)
+                val buildInfo = buildCell(theme, location, cell, isEntrance)
+                val resultType = buildInfo.type
+                builtStructures[x to z] = buildInfo
                 
                 when (resultType) {
                     StructureType.REST -> restCells.add(x to z)
@@ -142,7 +154,7 @@ object StructureBuilder {
 
         val minibossMarkers = processSpecialMarkers(startLocation, width, length, theme, minibossCells)
 
-        return BuildResult(minibossMarkers, restCells)
+        return BuildResult(minibossMarkers, restCells, builtStructures.toMap())
     }
 
     private fun processSpecialMarkers(startLocation: Location, width: Int, length: Int, theme: Theme, minibossCells: Set<Pair<Int, Int>>): Map<Pair<Int, Int>, Location> {
@@ -325,7 +337,7 @@ object StructureBuilder {
         return MarkerProcessResult(spawnLocations, mobSpawnPoints)
     }
 
-    private fun buildCell(theme: Theme, location: Location, cell: MazeGenerator.Cell, isEntrance: Boolean): StructureType {
+    private fun buildCell(theme: Theme, location: Location, cell: MazeGenerator.Cell, isEntrance: Boolean): BuiltStructureInfo {
         var (type, rotation) = if (isEntrance) {
             StructureType.ENTRANCE to 0
         } else {
@@ -362,7 +374,7 @@ object StructureBuilder {
             // Fallback: Place a single block to prevent void holes and indicate error
             location.block.type = org.bukkit.Material.BEDROCK
             loader?.plugin?.logger?.warning("Missing structure for type $type in theme ${theme.id}")
-            return type
+            return BuiltStructureInfo(type, "missing:$type")
         }
         
         val structure = structures[random.nextInt(structures.size)]
@@ -402,7 +414,66 @@ object StructureBuilder {
         // Place structure
         structure.place(placeLocation, true, structureRotation, org.bukkit.block.structure.Mirror.NONE, 0, 1.0f, random)
         
-        return type
+        return BuiltStructureInfo(type, "${theme.id}/${type.keyword}")
+    }
+
+    fun describeStructuresWithoutMarker(
+        startLocation: Location,
+        width: Int,
+        length: Int,
+        theme: Theme,
+        builtStructures: Map<Pair<Int, Int>, BuiltStructureInfo>,
+        markerTag: String
+    ): List<String> {
+        val world = startLocation.world ?: return emptyList()
+        val startX = startLocation.blockX
+        val startY = startLocation.blockY
+        val startZ = startLocation.blockZ
+        val tileSize = theme.tileSize
+        val config = loader?.plugin?.config ?: return emptyList()
+        val searchRadiusY = config.getDouble("marker_search_radius_y", 20.0)
+        val missing = mutableListOf<String>()
+
+        for (x in 0 until width) {
+            for (z in 0 until length) {
+                val info = builtStructures[x to z] ?: continue
+                val cellX = startX + x * tileSize
+                val cellZ = startZ + z * tileSize
+                val minX = cellX.toDouble() - 0.1
+                val maxX = (cellX + tileSize).toDouble() + 0.1
+                val minZ = cellZ.toDouble() - 0.1
+                val maxZ = (cellZ + tileSize).toDouble() + 0.1
+                val minY = startY.toDouble() - searchRadiusY
+                val maxY = startY.toDouble() + searchRadiusY
+
+                val minChunkX = minX.toInt() shr 4
+                val maxChunkX = maxX.toInt() shr 4
+                val minChunkZ = minZ.toInt() shr 4
+                val maxChunkZ = maxZ.toInt() shr 4
+
+                var found = false
+                loop@ for (cx in minChunkX..maxChunkX) {
+                    for (cz in minChunkZ..maxChunkZ) {
+                        val chunk = world.getChunkAt(cx, cz)
+                        if (!chunk.isLoaded) chunk.load()
+                        for (entity in chunk.entities) {
+                            val loc = entity.location
+                            if (loc.x !in minX..maxX || loc.z !in minZ..maxZ || loc.y !in minY..maxY) continue
+                            if (entity is org.bukkit.entity.Marker && entity.scoreboardTags.contains(markerTag)) {
+                                found = true
+                                break@loop
+                            }
+                        }
+                    }
+                }
+
+                if (!found) {
+                    missing += "cell=($x,$z) structure=${info.structureName} type=${info.type.name.lowercase()}"
+                }
+            }
+        }
+
+        return missing.distinct()
     }
 
     private fun determineStructureTypeAndRotation(cell: MazeGenerator.Cell): Pair<StructureType, Int> {

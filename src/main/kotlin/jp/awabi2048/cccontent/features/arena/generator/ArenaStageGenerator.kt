@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.arena.generator
 
 import jp.awabi2048.cccontent.features.arena.ArenaBounds
+import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.World
 import org.bukkit.block.structure.Mirror
@@ -59,6 +60,7 @@ class ArenaStageGenerator {
         val placements = toPlacements(roomPath).sortedBy { it.index }
         val gridPitch = theme.gridPitch
         val placementBoundsByIndex = mutableMapOf<Int, ArenaBounds>()
+        val templateByPlacementIndex = mutableMapOf<Int, ArenaStructureTemplate>()
         var previousPlacement: TilePlacement? = null
 
         for (placement in placements) {
@@ -84,6 +86,7 @@ class ArenaStageGenerator {
 
             placeStructure(template, placement.rotationQuarter, geometry.origin)
             placementBoundsByIndex[placement.index] = geometry.bounds
+            templateByPlacementIndex[placement.index] = template
             previousPlacement = placement
         }
 
@@ -112,6 +115,11 @@ class ArenaStageGenerator {
                 roomMobSpawns[roomIndex] = if (markers.mobSpawns.isNotEmpty()) {
                     markers.mobSpawns
                 } else {
+                    val templateName = templateByPlacementIndex[roomPlacement.index]?.name ?: "unknown"
+                    Bukkit.getLogger().warning(
+                        "[Arena] room=$roomIndex structure=$templateName に 'arena.marker.mob' がありません。" +
+                            " テーマ=${theme.id} bounds=$bounds"
+                    )
                     listOf(boundsCenter(world, bounds, 1.0))
                 }
             }
@@ -125,7 +133,9 @@ class ArenaStageGenerator {
 
             val markers = findMarkers(world, bounds)
             require(markers.doorBlocks.isNotEmpty()) {
-                "[Arena] ドアブロックマーカーが見つかりません: wave=$targetWave bounds=$bounds"
+                val templateName = templateByPlacementIndex[corridorPlacement.index]?.name ?: "unknown"
+                "[Arena] wave=$targetWave の通路に door_block マーカーがありません。" +
+                    " structure=$templateName theme=${theme.id} に 'arena.marker.door_block' を1個以上配置してください。 bounds=$bounds"
             }
             corridorDoorBlocks[targetWave] = markers.doorBlocks
         }
@@ -141,7 +151,11 @@ class ArenaStageGenerator {
             ?: error("[Arena] 開始部屋の境界が見つかりません")
         val firstRoomMarkers = findMarkers(world, firstRoomBounds)
         val entranceLocation = firstRoomMarkers.entrance
-            ?: error("[Arena] entrance マーカーが見つかりません")
+            ?: error(
+                "[Arena] 開始部屋に entrance マーカーがありません。" +
+                    " structure=${templateByPlacementIndex[roomPlacements.first().index]?.name ?: "unknown"}" +
+                    " テーマ=${theme.id} の該当構造に 'arena.marker.entrance' を1個配置してください。 bounds=$firstRoomBounds"
+            )
         val playerSpawn = entranceLocation.clone()
 
         return ArenaStageBuildResult(

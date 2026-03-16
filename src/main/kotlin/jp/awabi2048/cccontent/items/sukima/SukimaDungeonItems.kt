@@ -120,14 +120,14 @@ class SukimaMarkerToolItem : CustomItem {
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        val item = CCContent.instance.getMarkerManager().getMarkerTool(player)
+        val item = CCContent.instance.getAdminMarkerToolService().createTool("sukima_dungeon.marker_tool", player)
         item.amount = amount
         return item
     }
 
     override fun matches(item: ItemStack): Boolean {
         return runCatching {
-            CCContent.instance.getMarkerManager().isMarkerTool(item)
+            CCContent.instance.getAdminMarkerToolService().isTool(item, "sukima_dungeon.marker_tool")
         }.getOrDefault(false)
     }
 }

@@ -284,18 +284,46 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
                         val spawnLocations = markerResult.playerSpawns
                         
                         val teleportLocation = if (spawnLocations.isEmpty()) {
+                            val missingStructures = StructureBuilder.describeStructuresWithoutMarker(
+                                startLocation,
+                                size,
+                                size,
+                                theme,
+                                buildResult.builtStructures,
+                                "sd.marker.spawn"
+                            )
                             val markerCount = world.entities.count {
                                 (it is org.bukkit.entity.Marker && it.scoreboardTags.contains("sd.marker.spawn")) ||
                                     (it is org.bukkit.entity.ArmorStand && it.customName == "SPAWN")
                             }
                             plugin.logger.warning(
-                                "No spawn locations found in generated dungeon. fallback=origin mazeSize=$size theme=${theme.id} world=${world.name} markerCount=$markerCount"
+                                "[SukimaDungeon] 生成ダンジョン内に spawn マーカーが見つかりません。" +
+                                    " 'sd.marker.spawn' を1個以上配置してください。" +
+                                    " fallback=origin mazeSize=$size theme=${theme.id} world=${world.name} markerCount=$markerCount" +
+                                    if (missingStructures.isNotEmpty()) {
+                                        " missingStructures=${missingStructures.joinToString("; ")}"
+                                    } else {
+                                        ""
+                                    }
                             )
                             org.bukkit.Location(world, 0.5, 64.0, 0.5)
                         } else {
                             spawnLocations.random()
                         }
-                         val sproutCount = jp.awabi2048.cccontent.features.sukima_dungeon.SproutManager.populate(plugin, world, finalSproutCount)
+                        val sproutMissingStructures = StructureBuilder.describeStructuresWithoutMarker(
+                            startLocation,
+                            size,
+                            size,
+                            theme,
+                            buildResult.builtStructures,
+                            "sd.marker.sprout"
+                        )
+                         val sproutCount = jp.awabi2048.cccontent.features.sukima_dungeon.SproutManager.populate(
+                             plugin,
+                             world,
+                             finalSproutCount,
+                             sproutMissingStructures
+                         )
 
                          if (isMultiplayer && portalSession != null) {
                              portalSession.isReady = true
