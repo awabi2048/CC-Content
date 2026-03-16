@@ -7,7 +7,7 @@ skills:
       maxLevel: 50
     overviewIcon: "FLOWER_POT"
 
-  skill0:
+  initial:
     requiredLevel: 1
     icon: "OAK_SAPLING"
     children: ["skill1"]

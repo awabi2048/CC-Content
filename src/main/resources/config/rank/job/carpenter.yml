@@ -7,7 +7,7 @@ skills:
       maxLevel: 50
     overviewIcon: "CRAFTING_TABLE"
 
-  skill0:
+  initial:
     requiredLevel: 1
     icon: "OAK_PLANKS"
     children: ["skill1"]

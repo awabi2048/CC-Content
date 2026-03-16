@@ -7,7 +7,7 @@ skills:
       maxLevel: 50
     overviewIcon: "FURNACE"
 
-  skill0:
+  initial:
     requiredLevel: 1
     icon: "SMOKER"
     children: ["skill1"]

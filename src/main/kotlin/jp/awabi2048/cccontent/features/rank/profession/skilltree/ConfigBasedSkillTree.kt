@@ -19,7 +19,7 @@ class ConfigBasedSkillTree(
     private val childrenByParent: MutableMap<String, List<String>> = mutableMapOf()
     private val parentsByChild: MutableMap<String, List<String>> = mutableMapOf()
 
-    private var startSkillId: String = "skill0"
+    private var startSkillId: String = "initial"
     private var levelInitialExp: Long = 100L
     private var levelBase: Double = 1.2
     private var maxLevel: Int = 100

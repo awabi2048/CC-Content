@@ -108,7 +108,7 @@ skill:
   
   # 醸造家のスキルツリー
   brewer:
-    skill0:
+    initial:
       name: 初心者の醸造家
       description: 基本的なポーション醸造を学んだ
     skill1:
@@ -142,45 +142,45 @@ skill:
   # 鉱夫のスキルツリー
   miner:
     initial:
-      name: 初期解放
-      description: 初期解放
+      name: 石の中へ
+      description: 鉱夫としての一歩を踏み出す
     speed_1:
-      name: はやさ１
-      description: すこしはやい
+      name: 止まらぬ手
+      description: ツルハシさばきが冴えわたり 採掘速度がわずかに上昇する
     fortune_1:
-      name: 幸運１
-      description: すこし幸運
+      name: 思わぬ収穫
+      description: 鉱石から得られる恵みが少し増える
     speed_2:
-      name: はやさ２
-      description: よりはやい
+      name: 岩を穿つ者
+      description: 石系ブロックの扱いに慣れ 採掘速度がさらに上昇する
     fortune_2:
-      name: 幸運２
-      description: より幸運
+      name: 鉱脈を追って
+      description: 鉱石から得られる恵みがさらに増える
     durability_1:
-      name: 耐久１
-      description: 耐久
+      name: 使い慣れた一振り
+      description: 道具を長く使う術を覚え 耐久消費を抑える
     fortune_3:
-      name: 幸運３
-      description: さらに幸運
+      name: 地底の寵愛
+      description: 鉱石から得られる恵みが大きく増える
     mineall_1:
-      name: 一括破壊
-      description: 一括破壊を解放
+      name: 掘り進め！
+      description: MineAll（小）を解放する
     mineall_2:
-      name: 一括破壊２
-      description: さらに一括破壊
+      name: まとめて採掘
+      description: MineAll（大）となり 連結数と回収性能が強化される
     mineall_3:
-      name: 一括破壊３
-      description: さらに一括破壊を強化
+      name: 一気呵成
+      description: MineAll+α を解放し 即時破壊が可能になる
     blastmine_1:
-      name: 爆破採掘１
-      description: 爆破採掘を解放
+      name: 火薬の心得
+      description: 爆破採掘を解放する
     blastmine_2:
-      name: 爆破採掘２
-      description: 爆破採掘をさらに強化
+      name: 粉砕採掘
+      description: 爆破採掘（大）となり 範囲と回収性能が強化される
       
   # 料理人のスキルツリー
   cook:
-    skill0:
+    initial:
       name: 初心者の料理人
       description: 基本的な料理法を学んだ
     skill1:

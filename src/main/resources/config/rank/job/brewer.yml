@@ -7,7 +7,7 @@ skills:
       maxLevel: 50
     overviewIcon: "BREWING_STAND"
 
-  skill0:
+  initial:
     requiredLevel: 1
     icon: "BREWING_STAND"
     children: ["skill1"]
