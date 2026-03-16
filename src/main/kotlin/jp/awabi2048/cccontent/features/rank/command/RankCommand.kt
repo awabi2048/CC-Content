@@ -1024,7 +1024,7 @@ class RankCommand(
     private fun getProfessionOverviewIcon(profession: Profession): Material {
         val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return Material.BARRIER
         
-        // settings.overviewIconが設定されていればそれを使用、なければskill0のアイコンを使用
+        // settings.overviewIconが設定されていればそれを使用、なければ開始スキルのアイコンを使用
         val overviewIcon = skillTree.getOverviewIcon()
         if (overviewIcon != null) {
             val material = Material.matchMaterial(overviewIcon.uppercase())
@@ -1033,7 +1033,7 @@ class RankCommand(
             }
         }
         
-        // フォールバック: skill0のアイコンを使用
+        // フォールバック: 開始スキルのアイコンを使用
         val startSkill = skillTree.getSkill(skillTree.getStartSkillId())
         if (startSkill?.icon != null) {
             val material = Material.matchMaterial(startSkill.icon.uppercase())

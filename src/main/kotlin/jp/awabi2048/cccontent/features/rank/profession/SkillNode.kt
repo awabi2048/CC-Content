@@ -6,7 +6,7 @@ import jp.awabi2048.cccontent.features.rank.skill.SkillEffect
  * スキルツリーの各ノードを表現
  */
 data class SkillNode(
-    /** スキルID（例：skill0, skill1など） */
+    /** スキルID（例：initial, skill1など） */
     val skillId: String,
 
     /** スキル名の翻訳キー */

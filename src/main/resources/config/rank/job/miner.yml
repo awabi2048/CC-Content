@@ -7,7 +7,7 @@ skills:
       maxLevel: 50
     overviewIcon: "DIAMOND_PICKAXE"
 
-  skill0:
+  initial:
     requiredLevel: 0
     icon: "WOODEN_PICKAXE"
     children: ["speed_1"]
