@@ -8,72 +8,95 @@ skills:
     overviewIcon: "BREWING_STAND"
 
   initial:
-    requiredLevel: 1
+    requiredLevel: 0
     icon: "BREWING_STAND"
     children: ["skill1"]
 
   skill1:
-    requiredLevel: 2
-    icon: "GLASS_BOTTLE"
+    requiredLevel: 5
+    icon: "POTION"
     effect:
       type: "craft.unlock_system"
       params: {}
-    children: ["skill2", "skill4"]
+    children: ["skill2", "skill3"]
 
   skill2:
-    requiredLevel: 3
-    icon: "POTION"
+    requiredLevel: 10
+    icon: "HONEY_BOTTLE"
     effect:
       type: "craft.unlock_recipe"
       params:
         recipes: ["potion_water", "potion_mundane"]
-    children: ["skill3"]
+    children: ["skill4"]
 
   skill3:
-    requiredLevel: 4
-    icon: "BLAZE_POWDER"
-    effect:
-      type: "craft.work_speed_bonus_mock"
-      params:
-        bonus: 0.1
-    children: ["skill8"]
-
-  skill4:
-    requiredLevel: 3
+    requiredLevel: 10
     icon: "SPLASH_POTION"
     effect:
       type: "craft.unlock_recipe"
       params:
         recipes: ["potion_strength", "potion_weakness"]
-    children: ["skill5", "skill6"]
+    children: ["skill5"]
+
+  skill4:
+    requiredLevel: 15
+    icon: "BLAZE_POWDER"
+    children: ["skill6"]
 
   skill5:
-    requiredLevel: 4
-    icon: "LINGERING_POTION"
+    requiredLevel: 20
+    icon: "FERMENTED_SPIDER_EYE"
+    effect:
+      type: "craft.work_speed_bonus_mock"
+      params:
+        bonus: 0.1
+    children: ["skill7", "skill9"]
+
+  skill6:
+    requiredLevel: 25
+    icon: "CLOCK"
+    children: ["skill8"]
+
+  skill7:
+    requiredLevel: 30
+    icon: "CAULDRON"
+    children: ["skill10"]
+
+  skill8:
+    requiredLevel: 35
+    icon: "GLOWSTONE_DUST"
+    effect:
+      type: "craft.success_rate_bonus_mock"
+      params:
+        bonus: 0.1
+    children: ["skill11"]
+
+  skill9:
+    requiredLevel: 30
+    icon: "GUNPOWDER"
     effect:
       type: "craft.success_rate_bonus_mock"
       params:
         bonus: 0.15
-    children: ["skill8"]
+    children: ["skill10"]
 
-  skill6:
-    requiredLevel: 4
-    icon: "FERMENTED_SPIDER_EYE"
-    children: ["skill7"]
-
-  skill7:
-    requiredLevel: 5
-    icon: "GHAST_TEAR"
-    children: ["skill9"]
-
-  skill8:
-    requiredLevel: 6
-    icon: "ENCHANTED_GOLDEN_APPLE"
-    children: ["skill9"]
-
-  skill9:
-    requiredLevel: 7
+  skill10:
+    requiredLevel: 35
     icon: "DRAGON_BREATH"
+    effect:
+      type: "craft.work_speed_bonus_mock"
+      params:
+        bonus: 0.2
+    children: ["skill11"]
+
+  skill11:
+    requiredLevel: 40
+    icon: "ENCHANTED_GOLDEN_APPLE"
+    children: ["skill12"]
+
+  skill12:
+    requiredLevel: 50
+    icon: "ENCHANTED_BOOK"
     effect:
       type: "general.unlock_item_token"
       params:

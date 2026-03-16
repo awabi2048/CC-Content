@@ -36,6 +36,12 @@ skills:
   speed_2:
     requiredLevel: 15
     icon: "DIAMOND_AXE"
+    effect:
+      type: "collect.break_speed_boost"
+      combineRule: "add"
+      params:
+        efficiency_level: 1
+        targetBlocks: ["AnyLog"]
     children: ["cut_all_1"]
 
   harvest_2:

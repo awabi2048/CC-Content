@@ -54,9 +54,9 @@ skills:
     requiredLevel: 30
     icon: "NETHERITE_SWORD"
     effect:
-      type: "swordsman.sword_damage_boost"
+      type: "swordsman.sweep_damage_boost"
       params:
-        sharpness: 1.0
+        sweeping_edge: 1
     children: ["power_3"]
 
   drain_1:

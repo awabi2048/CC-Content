@@ -115,9 +115,11 @@ skills:
     requiredLevel: 20
     icon: "BOW"
     effect:
-      type: "warrior.bow_power_boost"
+      type: "warrior.snipe"
       params:
-        power: 0.5
+        max_charge_time: 20.0
+        damage_multiplier: 1.2
+        range_multiplier: 1.25
     children: ["piercing_1"]
 
   3way_1:
@@ -173,9 +175,11 @@ skills:
     requiredLevel: 40
     icon: "BOW"
     effect:
-      type: "warrior.quick_charge"
+      type: "warrior.snipe"
       params:
-        speed_multiplier: 1.5
+        max_charge_time: 20.0
+        damage_multiplier: 1.0
+        range_multiplier: 1.5
     children: ["aiming_1"]
 
   aiming_1:
@@ -186,16 +190,5 @@ skills:
       params:
         homing_strength: 6.0
         duration: 40
-    children: ["snipe_2"]
-
-  snipe_2:
-    requiredLevel: 50
-    icon: "BOW"
-    effect:
-      type: "warrior.snipe"
-      params:
-        max_charge_time: 20.0
-        damage_multiplier: 1.5
-        range_multiplier: 1.5
     children: []
 

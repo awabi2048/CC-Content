@@ -8,52 +8,32 @@ skills:
     overviewIcon: "FLOWER_POT"
 
   initial:
-    requiredLevel: 1
+    requiredLevel: 0
     icon: "OAK_SAPLING"
     children: ["skill1"]
 
   skill1:
-    requiredLevel: 2
-    icon: "BONE_MEAL"
-    children: ["skill2", "skill4"]
+    requiredLevel: 5
+    icon: "FEATHER"
+    children: ["skill2"]
 
   skill2:
-    requiredLevel: 3
-    icon: "FLOWER_POT"
+    requiredLevel: 10
+    icon: "SHULKER_BOX"
     children: ["skill3"]
 
   skill3:
-    requiredLevel: 4
-    icon: "AZURE_BLUET"
-    children: ["skill8"]
+    requiredLevel: 15
+    icon: "BRUSH"
+    children: ["skill4"]
 
   skill4:
-    requiredLevel: 3
-    icon: "SHEARS"
-    children: ["skill5", "skill6"]
+    requiredLevel: 20
+    icon: "STICK"
+    children: ["skill5"]
 
   skill5:
-    requiredLevel: 4
-    icon: "MOSS_BLOCK"
-    children: ["skill8"]
-
-  skill6:
-    requiredLevel: 4
-    icon: "PINK_TULIP"
-    children: ["skill7"]
-
-  skill7:
-    requiredLevel: 5
-    icon: "GLOW_BERRIES"
-    children: ["skill9"]
-
-  skill8:
-    requiredLevel: 6
-    icon: "BIG_DRIPLEAF"
-    children: ["skill9"]
-
-  skill9:
-    requiredLevel: 7
+    requiredLevel: 25
     icon: "ENCHANTED_BOOK"
     effect:
       type: "general.unlock_item_token"

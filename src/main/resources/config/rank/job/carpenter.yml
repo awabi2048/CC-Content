@@ -8,52 +8,22 @@ skills:
     overviewIcon: "CRAFTING_TABLE"
 
   initial:
-    requiredLevel: 1
+    requiredLevel: 0
     icon: "OAK_PLANKS"
     children: ["skill1"]
 
   skill1:
-    requiredLevel: 2
-    icon: "OAK_STAIRS"
-    children: ["skill2", "skill4"]
+    requiredLevel: 5
+    icon: "ITEM_FRAME"
+    children: ["skill2"]
 
   skill2:
-    requiredLevel: 3
-    icon: "OAK_FENCE"
+    requiredLevel: 15
+    icon: "STONECUTTER"
     children: ["skill3"]
 
   skill3:
-    requiredLevel: 4
-    icon: "ITEM_FRAME"
-    children: ["skill8"]
-
-  skill4:
-    requiredLevel: 3
-    icon: "STONE_BRICKS"
-    children: ["skill5", "skill6"]
-
-  skill5:
-    requiredLevel: 4
-    icon: "BRICKS"
-    children: ["skill8"]
-
-  skill6:
-    requiredLevel: 4
-    icon: "SCAFFOLDING"
-    children: ["skill7"]
-
-  skill7:
-    requiredLevel: 5
-    icon: "PAINTING"
-    children: ["skill9"]
-
-  skill8:
-    requiredLevel: 6
-    icon: "RED_BED"
-    children: ["skill9"]
-
-  skill9:
-    requiredLevel: 7
+    requiredLevel: 25
     icon: "ENCHANTED_BOOK"
     effect:
       type: "general.unlock_item_token"
