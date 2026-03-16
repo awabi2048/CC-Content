@@ -3,12 +3,13 @@ zombie:
   icon_material: ZOMBIE_HEAD # アイコンに使用するマテリアル
   max_summon_count: 10 # 1ウェーブでの最大召喚数
   clear_mob_count: 20 # ウェーブクリア扱いとするモブの討伐数
-  mobs: # config/arena/mob_definition.yml に記述されたモブのidを参照
-    zombie_1:
+  mobs: # config/mob_definition.yml に記述されたモブのidを参照
+    zombie_basic:
       weight: 10
       wave: 1.. # 最小値1, 最大値なし
-    zombie_2:
+    zombie_heavy:
       weight: 15
       wave: 2..5
-
-      
+    spark_zombie_basic:
+      weight: 6
+      wave: 3..

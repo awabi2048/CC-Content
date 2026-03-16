@@ -1,37 +1,34 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon.mobs
 
+import jp.awabi2048.cccontent.mob.MobDefinition
+import jp.awabi2048.cccontent.mob.MobService
+import jp.awabi2048.cccontent.mob.MobSpawnOptions
+import org.bukkit.Bukkit
 import org.bukkit.Location
-import org.bukkit.Material
 import org.bukkit.attribute.Attribute
 import org.bukkit.configuration.file.YamlConfiguration
-import org.bukkit.entity.EntityType
 import org.bukkit.entity.LivingEntity
-import org.bukkit.inventory.EquipmentSlot
-import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import jp.awabi2048.cccontent.features.sukima_dungeon.SukimaConfigHelper
 import java.io.File
 import java.util.Random
 
-class MobManager(private val plugin: JavaPlugin) {
+private data class ThemeMobSpawnEntry(
+    val id: String,
+    val weight: Int,
+    val minDist: Double,
+    val maxDist: Double,
+    val specialBehaviorId: String?
+)
+
+class MobManager(
+    private val plugin: JavaPlugin,
+    private val mobService: MobService = MobService(plugin)
+) {
     private val mobs = mutableMapOf<String, MobDefinition>()
-    private val themeSpawns = mutableMapOf<String, List<String>>()
+    private val themeSpawns = mutableMapOf<String, List<ThemeMobSpawnEntry>>()
     private val random = Random()
     private var amplificationRatio = 0.0
-
-    data class MobDefinition(
-        val id: String,
-        val type: EntityType,
-        val health: Double,
-        val attack: Double,
-        val movementSpeed: Double,
-        val armor: Double,
-        val scale: Double,
-        val equipment: Map<EquipmentSlot, Material>,
-        val minDist: Double,
-        val maxDist: Double,
-        val specialBehaviorId: String? = null
-    )
 
     private val behaviors = mutableMapOf<String, SpecialBehavior>()
     private val activeEntities = mutableMapOf<java.util.UUID, SpecialBehavior>()
@@ -47,82 +44,9 @@ class MobManager(private val plugin: JavaPlugin) {
     }
 
     private fun loadMobs() {
-        val file = File(plugin.dataFolder, "config/sukima_dungeon/mob_definition.yml")
-        if (!file.exists()) {
-            file.parentFile.mkdirs()
-            plugin.saveResource("config/sukima_dungeon/mob_definition.yml", false)
-        }
-        
-        val config = YamlConfiguration.loadConfiguration(file)
-        val section = config.getConfigurationSection("mobs") ?: config
-
+        val loaded = mobService.reloadDefinitions()
         mobs.clear()
-        for (key in section.getKeys(false)) {
-            val mobSection = section.getConfigurationSection(key)
-            if (mobSection == null) {
-                plugin.logger.warning("[SukimaDungeon] mob_definition.yml の読み込み失敗: $key")
-                continue
-            }
-
-            val entityTypeName = mobSection.getString("type") ?: "ZOMBIE"
-            val entityType = try {
-                EntityType.valueOf(entityTypeName)
-            } catch (_: IllegalArgumentException) {
-                plugin.logger.warning("[SukimaDungeon] mob_definition.yml の type が不正です: $key type=$entityTypeName")
-                continue
-            }
-
-            if (!entityType.isAlive) {
-                plugin.logger.warning("[SukimaDungeon] mob_definition.yml の type は生物のみ指定可能です: $key type=$entityTypeName")
-                continue
-            }
-
-            val health = mobSection.getDouble("health", 20.0).coerceAtLeast(1.0)
-            val attack = mobSection.getDouble("attack", 5.0).coerceAtLeast(0.0)
-            val movementSpeed = mobSection.getDouble("movement_speed", 0.23).coerceAtLeast(0.01)
-            val armor = mobSection.getDouble("armor", 0.0).coerceAtLeast(0.0)
-            val scale = mobSection.getDouble("scale", 1.0).coerceAtLeast(0.1)
-
-            val equipmentSection = mobSection.getConfigurationSection("equipment")
-            val equipment = mutableMapOf<EquipmentSlot, Material>()
-            if (equipmentSection != null) {
-                for (slotKey in equipmentSection.getKeys(false)) {
-                    val slot = parseEquipmentSlot(slotKey)
-                    if (slot == null) {
-                        plugin.logger.warning("[SukimaDungeon] equipment slot が不正です: $key slot=$slotKey")
-                        continue
-                    }
-
-                    val materialName = equipmentSection.getString(slotKey) ?: continue
-                    val material = try {
-                        Material.valueOf(materialName)
-                    } catch (_: IllegalArgumentException) {
-                        plugin.logger.warning("[SukimaDungeon] equipment material が不正です: $key slot=$slotKey material=$materialName")
-                        continue
-                    }
-
-                    equipment[slot] = material
-                }
-            }
-
-            val minDist = mobSection.getDouble("min_dist", 0.0)
-            val maxDist = mobSection.getDouble("max_dist", Double.MAX_VALUE)
-            val specialBehaviorId = mobSection.getString("special_behavior")
-
-            mobs[key] = MobDefinition(
-                id = key,
-                type = entityType,
-                health = health,
-                attack = attack,
-                movementSpeed = movementSpeed,
-                armor = armor,
-                scale = scale,
-                equipment = equipment,
-                minDist = minDist,
-                maxDist = maxDist,
-                specialBehaviorId = specialBehaviorId
-            )
-        }
+        mobs.putAll(loaded)
     }
 
     private fun loadSpawnSettings() {
@@ -133,54 +57,94 @@ class MobManager(private val plugin: JavaPlugin) {
         }
 
         val config = YamlConfiguration.loadConfiguration(file)
-        val section = config.getConfigurationSection("mob_spawn.themes") ?: return
+        val section = config.getConfigurationSection("themes") ?: return
 
         themeSpawns.clear()
-        for (key in section.getKeys(false)) {
-            val list = section.getStringList(key)
-            themeSpawns[key] = list
+        for (themeId in section.getKeys(false)) {
+            val themeSection = section.getConfigurationSection(themeId) ?: continue
+            val mobSectionList = themeSection.getMapList("mobs")
+            if (mobSectionList.isEmpty()) {
+                continue
+            }
+
+            val entries = mobSectionList.mapNotNull { raw ->
+                val mobId = raw["id"]?.toString()?.trim().orEmpty()
+                if (mobId.isBlank()) {
+                    plugin.logger.warning("[SukimaDungeon] theme.yml の mobs.id が空です: theme=$themeId")
+                    return@mapNotNull null
+                }
+                if (!mobs.containsKey(mobId)) {
+                    plugin.logger.warning("[SukimaDungeon] theme.yml が未定義 mob_definition を参照しています: theme=$themeId mob=$mobId")
+                    return@mapNotNull null
+                }
+
+                val weight = when (val rawWeight = raw["weight"]) {
+                    is Number -> rawWeight.toInt()
+                    is String -> rawWeight.toIntOrNull()
+                    else -> null
+                } ?: 1
+                if (weight <= 0) {
+                    plugin.logger.warning("[SukimaDungeon] theme.yml の weight は1以上である必要があります: theme=$themeId mob=$mobId")
+                    return@mapNotNull null
+                }
+
+                val minDist = when (val value = raw["min_dist"]) {
+                    is Number -> value.toDouble()
+                    is String -> value.toDoubleOrNull()
+                    else -> null
+                } ?: 0.0
+                val maxDist = when (val value = raw["max_dist"]) {
+                    is Number -> value.toDouble()
+                    is String -> value.toDoubleOrNull()
+                    else -> null
+                } ?: Double.MAX_VALUE
+
+                ThemeMobSpawnEntry(
+                    id = mobId,
+                    weight = weight,
+                    minDist = minDist,
+                    maxDist = maxDist,
+                    specialBehaviorId = raw["special_behavior"]?.toString()?.takeIf { it.isNotBlank() }
+                )
+            }
+
+            if (entries.isNotEmpty()) {
+                themeSpawns[themeId] = entries
+            }
         }
     }
 
     fun spawnMob(location: Location, themeName: String, center: Location): LivingEntity? {
-        val mobList = themeSpawns[themeName] ?: themeSpawns["default"]
+        val mobList = themeSpawns[themeName]
         if (mobList.isNullOrEmpty()) {
             plugin.logger.warning("No mob spawn settings found for theme: $themeName")
             return null
         }
 
         val distance = location.distance(center)
-        
-        // Filter mobs by distance
-        val suitableMobs = mobList.filter { mobId ->
-            val def = mobs[mobId]
-            if (def != null) {
-                distance >= def.minDist && distance <= def.maxDist
-            } else {
-                false
-            }
-        }
 
-        // If no suitable mobs found, fallback to any from the list (or return)
-        val finalMobId = if (suitableMobs.isNotEmpty()) {
-            suitableMobs[random.nextInt(suitableMobs.size)]
-        } else {
-            // Fallback: just pick random or maybe nothing. 
-            // Let's pick random to ensure something spawns if config is messy, 
-            // but arguably we should spawn nothing if out of range. 
-            // For now, let's respect the range strictly.
+        val suitableMobs = mobList.filter { entry ->
+            distance >= entry.minDist && distance <= entry.maxDist
+        }
+        if (suitableMobs.isEmpty()) {
             return null
         }
 
-        val definition = mobs[finalMobId] ?: return null
+        val finalEntry = selectWeightedEntry(suitableMobs) ?: return null
+        val definition = mobs[finalEntry.id] ?: return null
         
-        // Calculate scaling based on distance (keep existing logic)
         val multiplier = 1.0 + (distance * amplificationRatio)
 
-        val entity = location.world?.spawnEntity(location, definition.type) as? LivingEntity ?: return null
+        val entity = mobService.spawn(
+            definition,
+            location,
+            MobSpawnOptions(
+                featureId = "sukima_dungeon",
+                metadata = mapOf("theme" to themeName)
+            )
+        ) ?: return null
         entity.removeWhenFarAway = false
 
-        // Apply stats
         val maxHealth = definition.health * multiplier
         val attack = definition.attack * multiplier
 
@@ -191,16 +155,7 @@ class MobManager(private val plugin: JavaPlugin) {
         entity.getAttribute(Attribute.ARMOR)?.baseValue = definition.armor
         entity.getAttribute(Attribute.SCALE)?.baseValue = definition.scale
 
-        // Equip items
-        val equip = entity.equipment
-        if (equip != null) {
-            definition.equipment.forEach { (slot, material) ->
-                equip.setItem(slot, ItemStack(material))
-            }
-        }
-
-        // Apply special behavior if exists
-        definition.specialBehaviorId?.let { behaviorId ->
+        finalEntry.specialBehaviorId?.let { behaviorId ->
             val behavior = behaviors[behaviorId]
             if (behavior != null) {
                 behavior.onApply(entity)
@@ -214,7 +169,7 @@ class MobManager(private val plugin: JavaPlugin) {
         val iterator = activeEntities.entries.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
-            val entity = org.bukkit.Bukkit.getEntity(entry.key) as? LivingEntity
+            val entity = Bukkit.getEntity(entry.key) as? LivingEntity
             
             if (entity == null || entity.isDead || !entity.isValid) {
                 iterator.remove()
@@ -225,15 +180,20 @@ class MobManager(private val plugin: JavaPlugin) {
         }
     }
 
-    private fun parseEquipmentSlot(slotKey: String): EquipmentSlot? {
-        return when (slotKey.lowercase()) {
-            "helmet" -> EquipmentSlot.HEAD
-            "chestplate" -> EquipmentSlot.CHEST
-            "leggings" -> EquipmentSlot.LEGS
-            "boots" -> EquipmentSlot.FEET
-            "main_hand" -> EquipmentSlot.HAND
-            "off_hand" -> EquipmentSlot.OFF_HAND
-            else -> null
+    private fun selectWeightedEntry(entries: List<ThemeMobSpawnEntry>): ThemeMobSpawnEntry? {
+        val totalWeight = entries.sumOf { it.weight }
+        if (totalWeight <= 0) {
+            return null
         }
+
+        var roll = random.nextInt(totalWeight)
+        for (entry in entries) {
+            roll -= entry.weight
+            if (roll < 0) {
+                return entry
+            }
+        }
+
+        return entries.lastOrNull()
     }
 }

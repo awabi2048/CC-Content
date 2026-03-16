@@ -3,6 +3,9 @@ package jp.awabi2048.cccontent.features.arena
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageGenerator
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeLoader
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
+import jp.awabi2048.cccontent.mob.MobDefinition
+import jp.awabi2048.cccontent.mob.MobService
+import jp.awabi2048.cccontent.mob.MobSpawnOptions
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import jp.awabi2048.cccontent.world.WorldSettingsHelper
 import org.bukkit.Bukkit
@@ -21,8 +24,6 @@ import org.bukkit.entity.Mob
 import org.bukkit.entity.Player
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
-import org.bukkit.inventory.EquipmentSlot
-import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import java.io.File
@@ -99,18 +100,10 @@ private data class ArenaDifficultyConfig(
     }
 }
 
-private data class ArenaMobDefinition(
-    val id: String,
-    val type: EntityType,
-    val health: Double,
-    val attack: Double,
-    val movementSpeed: Double,
-    val armor: Double,
-    val scale: Double,
-    val equipment: Map<EquipmentSlot, Material>
-)
-
-class ArenaManager(private val plugin: JavaPlugin) {
+class ArenaManager(
+    private val plugin: JavaPlugin,
+    private val mobService: MobService = MobService(plugin)
+) {
     private companion object {
         const val DOOR_ANIMATION_START_DELAY_TICKS = 40L
         const val DOOR_ANIMATION_FRAME_INTERVAL_TICKS = 20L
@@ -127,7 +120,7 @@ class ArenaManager(private val plugin: JavaPlugin) {
     private val pendingBarrierActivations = mutableMapOf<UUID, PendingBarrierActivation>()
     private val difficultyConfigs = mutableMapOf<String, ArenaDifficultyConfig>()
     private val mobTypeConfigs = mutableMapOf<String, ArenaMobTypeConfig>()
-    private val mobDefinitions = mutableMapOf<String, ArenaMobDefinition>()
+    private val mobDefinitions = mutableMapOf<String, MobDefinition>()
     private var maintenanceTask: BukkitTask? = null
     private var playerMonitorTask: BukkitTask? = null
 
@@ -149,10 +142,9 @@ class ArenaManager(private val plugin: JavaPlugin) {
     private fun loadBattleConfigs() {
         val difficultyFile = ensureArenaConfig("config/arena/difficulty.yml")
         val mobTypeFile = ensureArenaConfig("config/arena/mob_type.yml")
-        val mobDefinitionFile = ensureArenaConfig("config/arena/mob_definition.yml")
 
         loadDifficultyConfigs(difficultyFile)
-        loadMobDefinitions(mobDefinitionFile)
+        loadMobDefinitions()
         loadMobTypeConfigs(mobTypeFile)
         validateWaveCoverage()
     }
@@ -205,73 +197,13 @@ class ArenaManager(private val plugin: JavaPlugin) {
         }
     }
 
-    private fun loadMobDefinitions(file: File) {
-        val config = YamlConfiguration.loadConfiguration(file)
-        val loaded = mutableMapOf<String, ArenaMobDefinition>()
-
-        for (mobId in config.getKeys(false)) {
-            val section = config.getConfigurationSection(mobId)
-            if (section == null) {
-                plugin.logger.severe("[Arena] mob_definition.yml の読み込み失敗: $mobId")
-                continue
-            }
-
-            val entityTypeName = section.getString("type") ?: "ZOMBIE"
-            val entityType = try {
-                EntityType.valueOf(entityTypeName)
-            } catch (_: IllegalArgumentException) {
-                plugin.logger.severe("[Arena] mob_definition.yml の type が不正です: $mobId type=$entityTypeName")
-                continue
-            }
-
-            if (!entityType.isAlive) {
-                plugin.logger.severe("[Arena] mob_definition.yml の type は生物のみ指定可能です: $mobId type=$entityTypeName")
-                continue
-            }
-
-            val health = section.getDouble("health", 20.0).coerceAtLeast(1.0)
-            val attack = section.getDouble("attack", 1.0).coerceAtLeast(0.0)
-            val movementSpeed = section.getDouble("movement_speed", 0.23).coerceAtLeast(0.01)
-            val armor = section.getDouble("armor", 0.0).coerceAtLeast(0.0)
-            val scale = section.getDouble("scale", 1.0).coerceAtLeast(0.1)
-
-            val equipment = mutableMapOf<EquipmentSlot, Material>()
-            val equipmentSection = section.getConfigurationSection("equipment")
-            if (equipmentSection != null) {
-                for (slotKey in equipmentSection.getKeys(false)) {
-                    val slot = parseEquipmentSlot(slotKey)
-                    if (slot == null) {
-                        plugin.logger.severe("[Arena] equipment slot が不正です: $mobId slot=$slotKey")
-                        continue
-                    }
-                    val materialName = equipmentSection.getString(slotKey) ?: continue
-                    val material = try {
-                        Material.valueOf(materialName)
-                    } catch (_: IllegalArgumentException) {
-                        plugin.logger.severe("[Arena] equipment material が不正です: $mobId slot=$slotKey material=$materialName")
-                        continue
-                    }
-                    equipment[slot] = material
-                }
-            }
-
-            loaded[mobId] = ArenaMobDefinition(
-                id = mobId,
-                type = entityType,
-                health = health,
-                attack = attack,
-                movementSpeed = movementSpeed,
-                armor = armor,
-                scale = scale,
-                equipment = equipment
-            )
-        }
-
+    private fun loadMobDefinitions() {
+        val loaded = mobService.reloadDefinitions()
         mobDefinitions.clear()
         mobDefinitions.putAll(loaded)
 
         if (mobDefinitions.isEmpty()) {
-            plugin.logger.severe("[Arena] mob_definition.yml が空のためアリーナを開始できません")
+            plugin.logger.severe("[Arena] config/mob_definition.yml が空のためアリーナを開始できません")
         }
     }
 
@@ -361,18 +293,6 @@ class ArenaManager(private val plugin: JavaPlugin) {
                     }
                 }
             }
-        }
-    }
-
-    private fun parseEquipmentSlot(slotKey: String): EquipmentSlot? {
-        return when (slotKey.lowercase()) {
-            "helmet" -> EquipmentSlot.HEAD
-            "chestplate" -> EquipmentSlot.CHEST
-            "leggings" -> EquipmentSlot.LEGS
-            "boots" -> EquipmentSlot.FEET
-            "main_hand" -> EquipmentSlot.HAND
-            "off_hand" -> EquipmentSlot.OFF_HAND
-            else -> null
         }
     }
 
@@ -746,6 +666,7 @@ class ArenaManager(private val plugin: JavaPlugin) {
         session.activeMobs.toList().forEach { mobId ->
             mobToSessionWorld.remove(mobId)
             session.mobWaveMap.remove(mobId)
+            mobService.untrack(mobId)
             Bukkit.getEntity(mobId)?.remove()
             session.activeMobs.remove(mobId)
         }
@@ -977,19 +898,20 @@ class ArenaManager(private val plugin: JavaPlugin) {
         session: ArenaSession,
         wave: Int,
         spawn: Location,
-        definition: ArenaMobDefinition,
+        definition: MobDefinition,
         difficulty: ArenaDifficultyConfig
     ) {
-        val entity = world.spawnEntity(spawn, definition.type) as? LivingEntity ?: return
+        val entity = mobService.spawn(
+            definition,
+            spawn,
+            MobSpawnOptions(
+                featureId = "arena",
+                combatActiveProvider = { session.corridorTriggeredWaves.contains(wave) },
+                metadata = mapOf("world" to session.worldName, "wave" to wave.toString())
+            )
+        ) ?: return
         entity.removeWhenFarAway = false
         entity.canPickupItems = false
-
-        val equipment = entity.equipment
-        if (equipment != null) {
-            definition.equipment.forEach { (slot, material) ->
-                equipment.setItem(slot, ItemStack(material))
-            }
-        }
 
         applyMobStats(entity, definition, difficulty, wave)
 
@@ -1012,7 +934,7 @@ class ArenaManager(private val plugin: JavaPlugin) {
 
     private fun applyMobStats(
         entity: LivingEntity,
-        definition: ArenaMobDefinition,
+        definition: MobDefinition,
         difficulty: ArenaDifficultyConfig,
         wave: Int
     ) {
@@ -1193,6 +1115,7 @@ class ArenaManager(private val plugin: JavaPlugin) {
             session.activeMobs.remove(mobId)
             session.mobWaveMap.remove(mobId)
             mobToSessionWorld.remove(mobId)
+            mobService.untrack(mobId)
             Bukkit.getEntity(mobId)?.remove()
         }
     }

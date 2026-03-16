@@ -4,6 +4,8 @@ import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureBuilder
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureLoader
 import jp.awabi2048.cccontent.features.sukima_dungeon.mobs.MobManager
+import jp.awabi2048.cccontent.mob.MobEventListener
+import jp.awabi2048.cccontent.mob.MobService
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
@@ -15,12 +17,15 @@ class SukimaDungeon : JavaPlugin(), Listener {
     private lateinit var mobManager: MobManager
     private lateinit var itemManager: jp.awabi2048.cccontent.features.sukima_dungeon.items.ItemManager
     private lateinit var markerManager: MarkerManager
+    private lateinit var mobService: MobService
 
     fun getMarkerManager(): MarkerManager = markerManager
     fun getItemManager(): jp.awabi2048.cccontent.features.sukima_dungeon.items.ItemManager = itemManager
 
     override fun onEnable() {
         logger.info("SukimaDungeon has been enabled!")
+        mobService = MobService(this)
+        mobService.startTickTask()
         
         reloadPlugin()
         BGMManager.loadConfig()
@@ -39,6 +44,7 @@ class SukimaDungeon : JavaPlugin(), Listener {
         server.pluginManager.registerEvents(jp.awabi2048.cccontent.features.sukima_dungeon.listeners.ItemPickupListener(this), this)
         server.pluginManager.registerEvents(jp.awabi2048.cccontent.features.sukima_dungeon.listeners.CompassListener(this), this)
         server.pluginManager.registerEvents(jp.awabi2048.cccontent.features.sukima_dungeon.listeners.MobTargetListener(this), this)
+        server.pluginManager.registerEvents(MobEventListener(mobService), this)
         
         markerManager = MarkerManager(this)
         server.pluginManager.registerEvents(markerManager, this)
@@ -159,7 +165,7 @@ class SukimaDungeon : JavaPlugin(), Listener {
         
         // Re-initialize or refresh managers
         if (!::mobManager.isInitialized) {
-            mobManager = MobManager(this)
+            mobManager = MobManager(this, mobService)
         }
         mobManager.load()
         
@@ -185,6 +191,9 @@ class SukimaDungeon : JavaPlugin(), Listener {
     }
 
     override fun onDisable() {
+        if (::mobService.isInitialized) {
+            mobService.shutdown()
+        }
         BGMManager.stopAll()
         DungeonSessionManager.saveSessions(this)
         for (player in server.onlinePlayers) {

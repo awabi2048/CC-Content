@@ -70,6 +70,8 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.mobs.MobManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.items.ItemManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.listeners.*
 import jp.awabi2048.cccontent.features.sukima_dungeon.tasks.SpecialTileTask
+import jp.awabi2048.cccontent.mob.MobEventListener
+import jp.awabi2048.cccontent.mob.MobService
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
@@ -106,6 +108,7 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var itemManager: ItemManager
     private lateinit var markerManager: MarkerManager
     private lateinit var arenaManager: ArenaManager
+    private lateinit var sharedMobService: MobService
     private lateinit var breweryFeature: BreweryFeature
     private lateinit var cookingFeature: CookingFeature
     private var rankManagerInstance: RankManagerImpl? = null
@@ -153,7 +156,10 @@ class CCContent : JavaPlugin(), Listener {
         CustomHeadConfigRegistry.initialize(this)
         RadioCassetteConfig.initialize(this)
         RadioCassettePlaybackManager.initialize(this)
-        
+        sharedMobService = MobService(this)
+        sharedMobService.reloadDefinitions()
+        sharedMobService.startTickTask()
+
         // アイテム登録
         registerCustomItems()
 
@@ -162,7 +168,7 @@ class CCContent : JavaPlugin(), Listener {
         }
 
         initializeFeatureIfEnabled("Arena", "arena") {
-            arenaManager = ArenaManager(this)
+            arenaManager = ArenaManager(this, sharedMobService)
             arenaManager.initialize(featureInitLogger)
         }
 
@@ -180,6 +186,8 @@ class CCContent : JavaPlugin(), Listener {
             giveCommand = giveCommand,
             onReload = { reloadConfiguration() },
             onClearBlockPlacementData = { clearBlockPlacementData() },
+            mobDefinitionIdsProvider = { sharedMobService.getDefinitionIds() },
+            onSummonMob = { definitionId, location -> summonConfiguredMob(definitionId, location) },
             onBatchBreakDebug = { player, mode, delay, maxChain, autoCollect ->
                 val batchMode = UnlockBatchBreakHandler.BatchBreakMode.fromRaw(mode)
                 if (batchMode == null) {
@@ -215,6 +223,7 @@ class CCContent : JavaPlugin(), Listener {
         // リスナー登録（スキマダンジョン以外）
         server.pluginManager.registerEvents(GulliverItemListener(this), this)
         server.pluginManager.registerEvents(AutoIgnitionBoosterListener(this), this)
+        server.pluginManager.registerEvents(MobEventListener(sharedMobService), this)
         if (isContentEnabledAtStartup("arena") && ::arenaManager.isInitialized) {
             server.pluginManager.registerEvents(ArenaItemListener(), this)
             server.pluginManager.registerEvents(ArenaListener(arenaManager), this)
@@ -657,9 +666,8 @@ class CCContent : JavaPlugin(), Listener {
                 RequiredResource("config/arena/theme.yml"),
                 RequiredResource("config/arena/difficulty.yml"),
                 RequiredResource("config/arena/mob_type.yml"),
-                RequiredResource("config/arena/mob_definition.yml"),
+                RequiredResource("config/mob_definition.yml"),
                 RequiredResource("config/sukima_dungeon/theme.yml"),
-                RequiredResource("config/sukima_dungeon/mob_definition.yml"),
                 RequiredResource("config/sukima_dungeon/loot.yml"),
                 RequiredResource("config/brewery/config.yml"),
                 RequiredResource("config/brewery/recipe.yml"),
@@ -707,6 +715,7 @@ class CCContent : JavaPlugin(), Listener {
             }
             
             coreConfig = CoreConfigManager.load(this)
+            sharedMobService.reloadDefinitions()
             startPersistenceFlushTask()
             CustomItemI18n.initialize(this)
             ArenaI18n.initialize(this)
@@ -979,7 +988,7 @@ class CCContent : JavaPlugin(), Listener {
         
         // Re-initialize or refresh managers
         if (!::mobManager.isInitialized) {
-            mobManager = MobManager(this)
+            mobManager = MobManager(this, sharedMobService)
         }
         mobManager.load()
         
@@ -990,6 +999,17 @@ class CCContent : JavaPlugin(), Listener {
 
         StructureBuilder.init(structureLoader, mobManager, itemManager)
         BGMManager.loadConfig()
+    }
+
+    private fun summonConfiguredMob(definitionId: String, location: org.bukkit.Location): org.bukkit.entity.LivingEntity? {
+        return sharedMobService.spawnByDefinitionId(
+            definitionId,
+            location,
+            jp.awabi2048.cccontent.mob.MobSpawnOptions(
+                featureId = "command",
+                metadata = mapOf("source" to "ccc_summon")
+            )
+        )
     }
     
     @EventHandler
@@ -1026,6 +1046,9 @@ class CCContent : JavaPlugin(), Listener {
             DungeonSessionManager.saveSessions(this)
             persistenceFlushTask?.cancel()
             persistenceFlushTask = null
+            if (::sharedMobService.isInitialized) {
+                sharedMobService.shutdown()
+            }
             if (::arenaManager.isInitialized) {
                 arenaManager.shutdown()
             }

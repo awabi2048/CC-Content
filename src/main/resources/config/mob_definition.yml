@@ -1,0 +1,56 @@
+zombie_basic:
+  type: ZOMBIE
+  health: 20.0
+  attack: 5.0
+  movement_speed: 0.23
+  armor: 4.0
+  scale: 1.0
+  equipment:
+    helmet: LEATHER_HELMET
+    chestplate: LEATHER_CHESTPLATE
+    main_hand: WOODEN_SWORD
+
+skeleton_basic:
+  type: SKELETON
+  health: 20.0
+  attack: 4.0
+  movement_speed: 0.23
+  armor: 0.0
+  scale: 1.0
+  equipment:
+    main_hand: BOW
+
+zombie_heavy:
+  type: ZOMBIE
+  health: 25.0
+  attack: 6.0
+  movement_speed: 0.18
+  armor: 10.0
+  scale: 1.1
+  equipment:
+    helmet: IRON_HELMET
+    boots: IRON_BOOTS
+    main_hand: STONE_AXE
+
+zombie_boss:
+  type: ZOMBIE
+  health: 50.0
+  attack: 10.0
+  movement_speed: 0.23
+  armor: 12.0
+  scale: 1.5
+  equipment:
+    helmet: DIAMOND_HELMET
+    chestplate: DIAMOND_CHESTPLATE
+    main_hand: DIAMOND_SWORD
+
+spark_zombie_basic:
+  type: spark_zombie
+  health: 28.0
+  attack: 6.0
+  movement_speed: 0.24
+  armor: 6.0
+  scale: 1.0
+  equipment:
+    chestplate: CHAINMAIL_CHESTPLATE
+    boots: CHAINMAIL_BOOTS
