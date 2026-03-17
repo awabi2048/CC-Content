@@ -107,6 +107,10 @@ class ArenaManager(
     private companion object {
         const val DOOR_ANIMATION_START_DELAY_TICKS = 40L
         const val DOOR_ANIMATION_FRAME_INTERVAL_TICKS = 20L
+        const val POSITION_SAMPLE_INTERVAL_MILLIS = 1000L
+        const val POSITION_RESTORE_LOOKBACK_MILLIS = 10_000L
+        const val POSITION_HISTORY_RETENTION_MILLIS = 12_000L
+        const val POSITION_HISTORY_MAX_SAMPLES = 24
         val DOOR_ANIMATION_ANGLES = intArrayOf(30, 60, 90)
     }
 
@@ -393,6 +397,11 @@ class ArenaManager(
             )
             sessionsByWorld[world.name] = session
             playerToSessionWorld[target.uniqueId] = world.name
+            val now = System.currentTimeMillis()
+            session.participantLocationHistory[target.uniqueId] = ArrayDeque<TimedPlayerLocation>().apply {
+                addLast(TimedPlayerLocation(now, stage.entranceLocation.clone()))
+            }
+            session.participantLastSampleMillis[target.uniqueId] = now
 
             session.participants.forEach { participantId ->
                 val participant = Bukkit.getPlayer(participantId) ?: return@forEach
@@ -482,7 +491,14 @@ class ArenaManager(
                 val location = player.location
                 val currentWave = session.currentWave.coerceAtLeast(1)
                 if (location.world?.name != world.name || !session.stageBounds.contains(location.x, location.y, location.z)) {
-                    teleportToCurrentWavePosition(player, session, world, applyBlindness = true)
+                    if (location.world?.name != world.name) {
+                        stopSessionById(
+                            participantId,
+                            ArenaI18n.text(player, "arena.messages.session.ended_by_warp", "&cワープしたため死亡扱いでアリーナを終了しました")
+                        )
+                    } else {
+                        teleportToRecentValidPosition(player, session, world, currentWave, applyBlindness = true)
+                    }
                     continue
                 }
 
@@ -491,27 +507,27 @@ class ArenaManager(
                     teleportToCurrentWavePosition(player, session, world, applyBlindness = true)
                     continue
                 }
-                if (room != null && room > 0 && session.startedWaves.contains(room)) {
-                    notifyWaveEntryIfNeeded(session, player, room)
-                    handleWaveRoomEntry(session, room)
+                if (room != null && room > 0) {
+                    processRoomProgress(session, player, room)
                 }
 
                 val corridorWave = locateCorridorTargetWave(session, location)
-                if (corridorWave == null) {
-                    continue
-                }
-                if (!session.openedCorridors.contains(corridorWave)) {
-                    teleportToCurrentWavePosition(player, session, world, applyBlindness = true)
-                    continue
-                }
-                if (corridorWave == currentWave) {
-                    if (session.startedWaves.contains(corridorWave) &&
-                        (corridorWave <= 1 || session.clearedWaves.contains(corridorWave - 1)) &&
-                        session.corridorTriggeredWaves.add(corridorWave)
-                    ) {
-                        rebalanceTargetsForWave(session, corridorWave)
+                if (corridorWave != null) {
+                    if (!session.openedCorridors.contains(corridorWave)) {
+                        teleportToCurrentWavePosition(player, session, world, applyBlindness = true)
+                        continue
+                    }
+                    if (corridorWave == currentWave) {
+                        if (session.startedWaves.contains(corridorWave) &&
+                            (corridorWave <= 1 || session.clearedWaves.contains(corridorWave - 1)) &&
+                            session.corridorTriggeredWaves.add(corridorWave)
+                        ) {
+                            rebalanceTargetsForWave(session, corridorWave)
+                        }
                     }
                 }
+
+                recordParticipantValidLocation(session, participantId, location)
             }
         }
     }
@@ -593,6 +609,8 @@ class ArenaManager(
         session.participants.remove(playerId)
         val returnLocation = session.returnLocations.remove(playerId)
         session.playerNotifiedWaves.remove(playerId)
+        session.participantLocationHistory.remove(playerId)
+        session.participantLastSampleMillis.remove(playerId)
 
         val player = Bukkit.getPlayer(playerId)
         if (player != null && player.isOnline) {
@@ -656,8 +674,11 @@ class ArenaManager(
         session.participants.clear()
         session.returnLocations.clear()
         session.playerNotifiedWaves.clear()
+        session.participantLocationHistory.clear()
+        session.participantLastSampleMillis.clear()
         session.corridorTriggeredWaves.clear()
         session.openedCorridors.clear()
+        session.corridorOpenAnnouncements.clear()
         session.enteredWaves.clear()
         session.waveSpawningStopped.clear()
         session.animatingDoorWaves.clear()
@@ -792,6 +813,76 @@ class ArenaManager(
         }
     }
 
+    private fun teleportToRecentValidPosition(
+        player: Player,
+        session: ArenaSession,
+        world: World,
+        currentWave: Int,
+        applyBlindness: Boolean = false
+    ) {
+        val target = selectRecentValidPosition(session, player.uniqueId, world, currentWave)
+            ?: currentWavePosition(session, world)
+        target.yaw = player.location.yaw
+        target.pitch = player.location.pitch
+        player.teleport(target)
+        if (applyBlindness) {
+            player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 15, 0, false, false, false))
+        }
+    }
+
+    private fun selectRecentValidPosition(session: ArenaSession, playerId: UUID, world: World, currentWave: Int): Location? {
+        val history = session.participantLocationHistory[playerId] ?: return null
+        if (history.isEmpty()) return null
+
+        val now = System.currentTimeMillis()
+        val targetMillis = now - POSITION_RESTORE_LOOKBACK_MILLIS
+        var best: TimedPlayerLocation? = null
+        var bestDistance = Long.MAX_VALUE
+
+        for (sample in history) {
+            if (!isValidPositionForRestore(session, sample.location, world, currentWave)) {
+                continue
+            }
+            val distance = kotlin.math.abs(sample.timestampMillis - targetMillis)
+            if (distance < bestDistance) {
+                best = sample
+                bestDistance = distance
+            }
+        }
+
+        return best?.location?.clone()?.apply { this.world = world }
+    }
+
+    private fun isValidPositionForRestore(session: ArenaSession, location: Location, world: World, currentWave: Int): Boolean {
+        if (location.world?.name != world.name) return false
+        if (!session.stageBounds.contains(location.x, location.y, location.z)) return false
+
+        val room = locateRoom(session, location)
+        if (room != null && room > currentWave) return false
+
+        val corridorWave = locateCorridorTargetWave(session, location) ?: return true
+        return session.openedCorridors.contains(corridorWave)
+    }
+
+    private fun recordParticipantValidLocation(session: ArenaSession, participantId: UUID, location: Location) {
+        val now = System.currentTimeMillis()
+        val lastSampleMillis = session.participantLastSampleMillis[participantId] ?: 0L
+        if (now - lastSampleMillis < POSITION_SAMPLE_INTERVAL_MILLIS) {
+            return
+        }
+
+        val history = session.participantLocationHistory.getOrPut(participantId) { ArrayDeque() }
+        history.addLast(TimedPlayerLocation(now, location.clone()))
+        session.participantLastSampleMillis[participantId] = now
+
+        while (history.size > POSITION_HISTORY_MAX_SAMPLES) {
+            history.removeFirstOrNull()
+        }
+        while (history.firstOrNull()?.timestampMillis?.let { now - it > POSITION_HISTORY_RETENTION_MILLIS } == true) {
+            history.removeFirstOrNull()
+        }
+    }
+
     private fun currentWavePosition(session: ArenaSession, world: World): Location {
         if (!session.stageStarted) {
             return session.entranceLocation.clone().apply {
@@ -799,7 +890,7 @@ class ArenaManager(
             }
         }
 
-        val wave = session.currentWave.coerceIn(1, session.waves)
+        val wave = session.fallbackWave.coerceIn(1, session.waves)
         val bounds = session.roomBounds[wave]
         if (bounds == null) {
             return session.playerSpawn.clone().apply {
@@ -829,8 +920,15 @@ class ArenaManager(
         player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f)
     }
 
+    private fun processRoomProgress(session: ArenaSession, player: Player, room: Int) {
+        notifyWaveEntryIfNeeded(session, player, room)
+        handleWaveRoomEntry(session, room)
+    }
+
     private fun handleWaveRoomEntry(session: ArenaSession, wave: Int) {
         if (!session.enteredWaves.add(wave)) return
+
+        session.fallbackWave = wave.coerceIn(1, session.waves)
 
         val previousWave = wave - 1
         if (previousWave <= 0) return
@@ -968,6 +1066,8 @@ class ArenaManager(
             return
         }
 
+        session.totalKillCount += 1
+
         if (session.clearedWaves.contains(wave)) {
             return
         }
@@ -992,6 +1092,7 @@ class ArenaManager(
         if (session.clearedWaves.contains(wave)) return
 
         session.clearedWaves.add(wave)
+        stopWaveSpawning(session, wave)
 
         val nextWave = wave + 2
         if (nextWave <= session.waves) {
@@ -1026,8 +1127,6 @@ class ArenaManager(
 
                 if (frameIndex >= DOOR_ANIMATION_ANGLES.size) {
                     currentSession.animatingDoorWaves.remove(targetWave)
-                    currentSession.corridorTriggeredWaves.add(targetWave)
-                    rebalanceTargetsForWave(currentSession, targetWave)
                     updateCurrentWave(currentSession)
                     taskRef[0]?.cancel()
                     return@animationTick
@@ -1035,6 +1134,7 @@ class ArenaManager(
 
                 val angle = DOOR_ANIMATION_ANGLES[frameIndex]
                 reinstallCorridorDoorMock(currentSession, targetWave, angle)
+                playSound(currentSession, Sound.BLOCK_IRON_DOOR_OPEN, 0.85f, 0.9f + frameIndex * 0.1f)
                 frameIndex += 1
             }, 0L, DOOR_ANIMATION_FRAME_INTERVAL_TICKS)
             taskRef[0] = animationTask
@@ -1046,20 +1146,25 @@ class ArenaManager(
 
     private fun onDoorAnimationStarted(session: ArenaSession, targetWave: Int) {
         session.openedCorridors.add(targetWave)
+        onCorridorOpened(session, targetWave)
         if (targetWave == 1 && !session.stageStarted) {
             session.stageStarted = true
             broadcastSubtitle(session, "arena.messages.stage.start_subtitle", "&6ステージ開始", 5, 40, 10)
             playSound(session, Sound.BLOCK_IRON_DOOR_OPEN, 1.0f, 1.0f)
         }
-        val message = "[Arena][Mock] door animation start: world=${session.worldName} target_wave=$targetWave"
-        plugin.logger.info(message)
-        broadcastMessage(session, "arena.messages.mock.door_animation_start", "&7{message}", "message" to message)
+        playSound(session, Sound.BLOCK_IRON_DOOR_OPEN, 1.0f, 0.8f)
+        plugin.logger.info("[Arena] door animation start: world=${session.worldName} target_wave=$targetWave")
     }
 
     private fun reinstallCorridorDoorMock(session: ArenaSession, wave: Int, angle: Int) {
-        val message = "[Arena][Mock] corridor door reinstall: world=${session.worldName} wave=$wave angle=$angle"
-        plugin.logger.info(message)
-        broadcastMessage(session, "arena.messages.mock.corridor_door_reinstall", "&7{message}", "message" to message)
+        plugin.logger.info("[Arena][Mock] corridor door reinstall: world=${session.worldName} wave=$wave angle=$angle")
+    }
+
+    private fun onCorridorOpened(session: ArenaSession, wave: Int) {
+        if (!session.corridorOpenAnnouncements.add(wave)) return
+        broadcastSubtitle(session, "arena.messages.door.corridor_opened_subtitle", "&a次の通路が開きました", 5, 35, 10)
+        broadcastMessage(session, "arena.messages.door.corridor_opened", "&aWave {wave} への通路が解放されました", "wave" to wave)
+        playSound(session, Sound.BLOCK_IRON_DOOR_OPEN, 1.0f, 1.2f)
     }
 
     private fun locateDoorWave(session: ArenaSession, clicked: Location): Int? {
@@ -1231,9 +1336,37 @@ class ArenaManager(
             }
         }
 
-        Bukkit.unloadWorld(world, false)
-        if (!deleteDirectory(world.worldFolder)) {
+        val unloaded = Bukkit.unloadWorld(world, false)
+        if (!unloaded) {
             queueWorldDeletion(world.name, world.worldFolder)
+            return
+        }
+
+        queueWorldDeletion(world.name, world.worldFolder)
+    }
+
+    private fun deleteQueuedWorldFolder(pending: PendingWorldDeletion): Boolean {
+        if (Bukkit.getWorld(pending.worldName) != null) {
+            return false
+        }
+
+        if (!pending.folder.exists()) {
+            return true
+        }
+
+        return deleteDirectory(pending.folder)
+    }
+
+    private fun unloadQueuedWorldIfLoaded(pending: PendingWorldDeletion): Boolean {
+        val loaded = Bukkit.getWorld(pending.worldName) ?: return true
+        return Bukkit.unloadWorld(loaded, false)
+    }
+
+    private fun markQueuedWorldDeletionFailed(pending: PendingWorldDeletion, maxAttempts: Int) {
+        pending.attempts += 1
+        if (pending.attempts >= maxAttempts) {
+            plugin.logger.severe("[Arena] ワールド削除を断念: ${pending.worldName} path=${pending.folder.absolutePath}")
+            pendingWorldDeletions.remove(pending.worldName)
         }
     }
 
@@ -1270,21 +1403,18 @@ class ArenaManager(
     private fun processPendingWorldDeletions() {
         val maxAttempts = 30
         pendingWorldDeletions.values.toList().forEach { pending ->
-            Bukkit.getWorld(pending.worldName)?.let { loaded ->
-                Bukkit.unloadWorld(loaded, false)
+            if (!unloadQueuedWorldIfLoaded(pending)) {
+                markQueuedWorldDeletionFailed(pending, maxAttempts)
+                return@forEach
             }
 
-            if (!pending.folder.exists() || deleteDirectory(pending.folder)) {
+            if (deleteQueuedWorldFolder(pending)) {
                 pendingWorldDeletions.remove(pending.worldName)
                 plugin.logger.info("[Arena] 未削除ワールドの削除に成功: ${pending.worldName}")
                 return@forEach
             }
 
-            pending.attempts += 1
-            if (pending.attempts >= maxAttempts) {
-                plugin.logger.severe("[Arena] ワールド削除を断念: ${pending.worldName} path=${pending.folder.absolutePath}")
-                pendingWorldDeletions.remove(pending.worldName)
-            }
+            markQueuedWorldDeletionFailed(pending, maxAttempts)
         }
     }
 

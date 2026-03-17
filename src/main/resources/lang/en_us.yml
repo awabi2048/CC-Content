@@ -370,6 +370,7 @@ custom_items:
         ended: '&cArena session ended'
         ended_by_logout: '&cArena ended because you logged out'
         ended_by_death: '&cArena ended because you died'
+        ended_by_warp: '&cArena ended as death because you warped'
         ended_by_shutdown: '&cArena ended because the server is shutting down'
         stopped_by_admin: '&cArena stopped by admin command'
       stage:
@@ -377,6 +378,8 @@ custom_items:
         start_subtitle: '&6Stage Start'
       door:
         animating: '&eDoor is opening'
+        corridor_opened: '&aCorridor to Wave {wave} is now open'
+        corridor_opened_subtitle: '&aThe next corridor has opened'
       wave:
         title: '&6Wave {wave}'
       mock:

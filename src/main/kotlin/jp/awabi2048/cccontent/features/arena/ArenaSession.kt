@@ -17,6 +17,11 @@ data class ArenaBounds(
     }
 }
 
+data class TimedPlayerLocation(
+    val timestampMillis: Long,
+    val location: Location
+)
+
 data class ArenaSession(
     val ownerPlayerId: UUID,
     val worldName: String,
@@ -35,6 +40,7 @@ data class ArenaSession(
     val corridorDoorBlocks: Map<Int, List<Location>>,
     val barrierLocation: Location,
     var currentWave: Int = 0,
+    var fallbackWave: Int = 1,
     var stageStarted: Boolean = false,
     var barrierActive: Boolean = false,
     val startedWaves: MutableSet<Int> = mutableSetOf(),
@@ -42,12 +48,16 @@ data class ArenaSession(
     val activeMobs: MutableSet<UUID> = mutableSetOf(),
     val waveMobIds: MutableMap<Int, MutableSet<UUID>> = mutableMapOf(),
     val waveKillCount: MutableMap<Int, Int> = mutableMapOf(),
+    var totalKillCount: Int = 0,
     val waveClearTargets: MutableMap<Int, Int> = mutableMapOf(),
     val waveMaxAliveCounts: MutableMap<Int, Int> = mutableMapOf(),
     val mobWaveMap: MutableMap<UUID, Int> = mutableMapOf(),
     val playerNotifiedWaves: MutableMap<UUID, MutableSet<Int>> = mutableMapOf(),
+    val participantLocationHistory: MutableMap<UUID, ArrayDeque<TimedPlayerLocation>> = mutableMapOf(),
+    val participantLastSampleMillis: MutableMap<UUID, Long> = mutableMapOf(),
     val corridorTriggeredWaves: MutableSet<Int> = mutableSetOf(),
     val openedCorridors: MutableSet<Int> = mutableSetOf(),
+    val corridorOpenAnnouncements: MutableSet<Int> = mutableSetOf(),
     val enteredWaves: MutableSet<Int> = mutableSetOf(),
     val waveSpawningStopped: MutableSet<Int> = mutableSetOf(),
     val animatingDoorWaves: MutableSet<Int> = mutableSetOf(),

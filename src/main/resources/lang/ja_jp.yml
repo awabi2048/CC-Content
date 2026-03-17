@@ -1000,6 +1000,7 @@ custom_items:
         ended: '&cアリーナセッションが終了しました'
         ended_by_logout: '&cログアウトしたためアリーナを終了しました'
         ended_by_death: '&c死亡したためアリーナを終了しました'
+        ended_by_warp: '&cワープしたため死亡扱いでアリーナを終了しました'
         ended_by_shutdown: '&cサーバー停止によりアリーナを終了しました'
         stopped_by_admin: '&c管理コマンドによりアリーナを停止しました'
       stage:
@@ -1007,6 +1008,8 @@ custom_items:
         start_subtitle: '&6ステージ開始'
       door:
         animating: '&e開扉中です'
+        corridor_opened: '&aWave {wave} への通路が解放されました'
+        corridor_opened_subtitle: '&a次の通路が開きました'
       wave:
         title: '&6Wave {wave}'
       mock:
