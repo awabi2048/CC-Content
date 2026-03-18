@@ -611,6 +611,14 @@ class CCContent : JavaPlugin(), Listener {
             CustomItemManager.register(ArenaTicketItem())
             CustomItemManager.register(ArenaMedalItem())
             CustomItemManager.register(ArenaPrizeItem())
+            CustomItemManager.register(ArenaDecayedEquipmentItem("axe", "斧", "stone_axe"))
+            CustomItemManager.register(ArenaDecayedEquipmentItem("sword", "剣", "stone_sword"))
+            CustomItemManager.register(ArenaDecayedEquipmentItem("shield", "盾", "stone_pickaxe"))
+            CustomItemManager.register(ArenaDecayedEquipmentItem("bow", "弓", "stone_shovel"))
+            CustomItemManager.register(ArenaDecayedEquipmentItem("helmet", "ヘルメット", "leather_helmet"))
+            CustomItemManager.register(ArenaDecayedEquipmentItem("chestplate", "チェストプレート", "leather_chestplate"))
+            CustomItemManager.register(ArenaDecayedEquipmentItem("leggings", "レギンス", "leather_leggings"))
+            CustomItemManager.register(ArenaDecayedEquipmentItem("boots", "ブーツ", "leather_boots"))
             CustomItemManager.register(ArenaMarkerToolItem())
         }
 
@@ -673,6 +681,7 @@ class CCContent : JavaPlugin(), Listener {
                 RequiredResource("config/arena/theme.yml"),
                 RequiredResource("config/arena/difficulty.yml"),
                 RequiredResource("config/arena/mob_type.yml"),
+                RequiredResource("config/arena/drop.yml"),
                 RequiredResource("config/mob_definition.yml"),
                 RequiredResource("config/sukima_dungeon/theme.yml"),
                 RequiredResource("config/sukima_dungeon/loot.yml"),

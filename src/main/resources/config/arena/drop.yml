@@ -1,0 +1,19 @@
+settings:
+  equipment_drop_chance: 0.25
+
+difficulty_mock:
+  item_count_bonus: 0
+  exp_bonus_rate: 1.0
+  rarity: common
+
+additional_drops:
+  default:
+    - item: ROTTEN_FLESH
+      amount: 1
+  by_mob_type:
+    zombie:
+      - item: IRON_NUGGET
+        amount: 1
+    skeleton:
+      - item: BONE
+        amount: 1

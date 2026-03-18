@@ -3,6 +3,8 @@ package jp.awabi2048.cccontent.features.arena
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageGenerator
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeLoader
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
+import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
 import jp.awabi2048.cccontent.mob.MobDefinition
 import jp.awabi2048.cccontent.mob.MobService
 import jp.awabi2048.cccontent.mob.MobSpawnOptions
@@ -22,13 +24,19 @@ import org.bukkit.entity.EntityType
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Mob
 import org.bukkit.entity.Player
+import org.bukkit.enchantments.Enchantment
+import org.bukkit.event.entity.EntityDeathEvent
+import org.bukkit.inventory.ItemStack
+import org.bukkit.inventory.PlayerInventory
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import java.io.File
+import java.util.Locale
 import java.util.UUID
 import kotlin.math.ceil
+import kotlin.math.floor
 
 sealed class ArenaStartResult {
     data class Success(
@@ -100,6 +108,20 @@ private data class ArenaDifficultyConfig(
     }
 }
 
+private data class ArenaDropEntry(
+    val itemId: String,
+    val baseAmount: Int
+)
+
+private data class ArenaDropConfig(
+    val equipmentDropChance: Double,
+    val additionalDefaultDrops: List<ArenaDropEntry>,
+    val additionalByMobType: Map<String, List<ArenaDropEntry>>,
+    val mockItemCountBonus: Int,
+    val mockExpBonusRate: Double,
+    val mockRarity: String
+)
+
 class ArenaManager(
     private val plugin: JavaPlugin,
     private val mobService: MobService = MobService(plugin)
@@ -125,8 +147,18 @@ class ArenaManager(
     private val difficultyConfigs = mutableMapOf<String, ArenaDifficultyConfig>()
     private val mobTypeConfigs = mutableMapOf<String, ArenaMobTypeConfig>()
     private val mobDefinitions = mutableMapOf<String, MobDefinition>()
+    private val knownMobTypeIds = mutableSetOf<String>()
+    private val mobToDefinitionTypeId = mutableMapOf<UUID, String>()
     private var maintenanceTask: BukkitTask? = null
     private var playerMonitorTask: BukkitTask? = null
+    private var dropConfig = ArenaDropConfig(
+        equipmentDropChance = 0.0,
+        additionalDefaultDrops = emptyList(),
+        additionalByMobType = emptyMap(),
+        mockItemCountBonus = 0,
+        mockExpBonusRate = 1.0,
+        mockRarity = "common"
+    )
 
     fun initialize(featureInitLogger: FeatureInitializationLogger? = null) {
         loadBattleConfigs()
@@ -146,10 +178,12 @@ class ArenaManager(
     private fun loadBattleConfigs() {
         val difficultyFile = ensureArenaConfig("config/arena/difficulty.yml")
         val mobTypeFile = ensureArenaConfig("config/arena/mob_type.yml")
+        val dropFile = ensureArenaConfig("config/arena/drop.yml")
 
         loadDifficultyConfigs(difficultyFile)
         loadMobDefinitions()
         loadMobTypeConfigs(mobTypeFile)
+        loadDropConfig(dropFile)
         validateWaveCoverage()
     }
 
@@ -205,10 +239,55 @@ class ArenaManager(
         val loaded = mobService.reloadDefinitions()
         mobDefinitions.clear()
         mobDefinitions.putAll(loaded)
+        knownMobTypeIds.clear()
+        knownMobTypeIds.addAll(loaded.values.map { it.typeId.trim().lowercase(Locale.ROOT) })
+        registerMobTypeTokenItems()
 
         if (mobDefinitions.isEmpty()) {
             plugin.logger.severe("[Arena] config/mob_definition.yml が空のためアリーナを開始できません")
         }
+    }
+
+    private fun loadDropConfig(file: File) {
+        val config = YamlConfiguration.loadConfiguration(file)
+        val equipmentDropChance = config.getDouble("settings.equipment_drop_chance", 0.25)
+            .coerceIn(0.0, 1.0)
+
+        val mockItemCountBonus = config.getInt("difficulty_mock.item_count_bonus", 0)
+        val mockExpBonusRate = config.getDouble("difficulty_mock.exp_bonus_rate", 1.0)
+            .coerceAtLeast(0.0)
+        val mockRarity = config.getString("difficulty_mock.rarity", "common") ?: "common"
+
+        val additionalDefaultDrops = parseDropEntries(config, "additional_drops.default")
+        val additionalByMobType = mutableMapOf<String, List<ArenaDropEntry>>()
+        val byMobTypeSection = config.getConfigurationSection("additional_drops.by_mob_type")
+        byMobTypeSection?.getKeys(false)?.forEach { mobTypeId ->
+            val key = mobTypeId.trim().lowercase(Locale.ROOT)
+            additionalByMobType[key] = parseDropEntries(config, "additional_drops.by_mob_type.$mobTypeId")
+        }
+
+        dropConfig = ArenaDropConfig(
+            equipmentDropChance = equipmentDropChance,
+            additionalDefaultDrops = additionalDefaultDrops,
+            additionalByMobType = additionalByMobType,
+            mockItemCountBonus = mockItemCountBonus,
+            mockExpBonusRate = mockExpBonusRate,
+            mockRarity = mockRarity
+        )
+    }
+
+    private fun parseDropEntries(config: YamlConfiguration, path: String): List<ArenaDropEntry> {
+        val raw = config.getMapList(path)
+        val entries = mutableListOf<ArenaDropEntry>()
+        for (entry in raw) {
+            val itemId = entry["item"]?.toString()?.trim().orEmpty()
+            if (itemId.isBlank()) {
+                continue
+            }
+            val baseAmount = entry["amount"]?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
+            entries.add(ArenaDropEntry(itemId = itemId, baseAmount = baseAmount))
+        }
+        return entries
     }
 
     private fun loadMobTypeConfigs(file: File) {
@@ -459,6 +538,7 @@ class ArenaManager(
         sessionsByWorld.clear()
         playerToSessionWorld.clear()
         mobToSessionWorld.clear()
+        mobToDefinitionTypeId.clear()
         pendingBarrierActivations.values.toList().forEach { pending ->
             pending.effectTask.cancel()
             pending.completionTask.cancel()
@@ -532,10 +612,150 @@ class ArenaManager(
         }
     }
 
-    fun handleMobDeath(entityId: UUID) {
+    fun handleMobDeath(event: EntityDeathEvent) {
+        val entityId = event.entity.uniqueId
+        applyArenaMobDrop(event)
         val worldName = mobToSessionWorld.remove(entityId) ?: return
         val session = sessionsByWorld[worldName] ?: return
         consumeMob(session, entityId, countKill = true)
+    }
+
+    private fun applyArenaMobDrop(event: EntityDeathEvent) {
+        val entity = event.entity
+        if (!mobToSessionWorld.containsKey(entity.uniqueId)) {
+            return
+        }
+
+        val killer = entity.killer
+        val baseExp = event.droppedExp
+        val vanillaDrops = event.drops.map { it.clone() }
+        event.drops.clear()
+
+        if (killer == null) {
+            event.droppedExp = 0
+            return
+        }
+
+        val definitionTypeId = mobToDefinitionTypeId[entity.uniqueId] ?: entity.type.name
+        val normalizedTypeId = definitionTypeId.trim().lowercase(Locale.ROOT)
+        val lootingLevel = resolveLootingLevel(killer.inventory)
+
+        val rebuiltDrops = mutableListOf<ItemStack>()
+        rebuiltDrops += rebuildVanillaNonEquipmentDrops(vanillaDrops)
+        rebuiltDrops += buildConfiguredAdditionalDrops(killer, normalizedTypeId, lootingLevel)
+
+        selectEquipmentDrop(entity.equipment)?.let { fullId ->
+            val dropped = CustomItemManager.createItemForPlayer(fullId, killer, 1)
+            if (dropped != null) {
+                rebuiltDrops += dropped
+            }
+        }
+
+        createMobTokenDrop(killer, normalizedTypeId)?.let { token ->
+            rebuiltDrops += token
+        }
+
+        rebuiltDrops.forEach { stack ->
+            if (stack.type.isAir || stack.amount <= 0) return@forEach
+            event.drops += stack
+        }
+        event.droppedExp = floor(baseExp * dropConfig.mockExpBonusRate).toInt().coerceAtLeast(0)
+    }
+
+    private fun rebuildVanillaNonEquipmentDrops(vanillaDrops: List<ItemStack>): List<ItemStack> {
+        return vanillaDrops
+            .filter { !it.type.isAir && it.amount > 0 }
+            .filterNot { classifyEquipmentDropType(it.type) != null }
+            .map { it.clone() }
+    }
+
+    private fun buildConfiguredAdditionalDrops(killer: Player, mobTypeId: String, lootingLevel: Int): List<ItemStack> {
+        val entries = mutableListOf<ArenaDropEntry>()
+        entries += dropConfig.additionalDefaultDrops
+        entries += dropConfig.additionalByMobType[mobTypeId].orEmpty()
+
+        return entries.mapNotNull { entry ->
+            val amount = applyAmountModifiers(entry.baseAmount, lootingLevel)
+            resolveConfiguredDrop(entry.itemId, killer, amount)
+        }
+    }
+
+    private fun resolveConfiguredDrop(itemId: String, killer: Player, amount: Int): ItemStack? {
+        if (amount <= 0) return null
+        CustomItemManager.createItemForPlayer(itemId, killer, amount)?.let { return it }
+        val material = runCatching { Material.valueOf(itemId.uppercase(Locale.ROOT)) }.getOrNull() ?: return null
+        if (!material.isItem || material.isAir) return null
+        return ItemStack(material, amount)
+    }
+
+    private fun applyAmountModifiers(baseAmount: Int, lootingLevel: Int): Int {
+        val base = baseAmount.coerceAtLeast(1)
+        val mockBonus = dropConfig.mockItemCountBonus
+        val lootingBonus = if (lootingLevel > 0) random.nextInt(lootingLevel + 1) else 0
+        return (base + mockBonus + lootingBonus).coerceAtLeast(1)
+    }
+
+    private fun resolveLootingLevel(inventory: PlayerInventory): Int {
+        val main = inventory.itemInMainHand
+        val off = inventory.itemInOffHand
+        val mainLevel = main.getEnchantmentLevel(Enchantment.LOOTING)
+        val offLevel = off.getEnchantmentLevel(Enchantment.LOOTING)
+        return maxOf(mainLevel, offLevel)
+    }
+
+    private fun selectEquipmentDrop(equipment: org.bukkit.inventory.EntityEquipment?): String? {
+        if (equipment == null) return null
+        if (random.nextDouble() > dropConfig.equipmentDropChance) return null
+
+        val candidates = mutableListOf<String>()
+        val slots = listOf(
+            equipment.helmet,
+            equipment.chestplate,
+            equipment.leggings,
+            equipment.boots,
+            equipment.itemInMainHand,
+            equipment.itemInOffHand
+        )
+
+        for (item in slots) {
+            if (item == null || item.type.isAir) continue
+            val category = classifyEquipmentDropType(item.type) ?: continue
+            candidates += "arena.decayed_$category"
+        }
+
+        if (candidates.isEmpty()) return null
+        return candidates[random.nextInt(candidates.size)]
+    }
+
+    private fun classifyEquipmentDropType(material: Material): String? {
+        val name = material.name
+        return when {
+            name.endsWith("_AXE") -> "axe"
+            name.endsWith("_SWORD") -> "sword"
+            name == "SHIELD" -> "shield"
+            name == "BOW" -> "bow"
+            name.endsWith("_HELMET") -> "helmet"
+            name.endsWith("_CHESTPLATE") -> "chestplate"
+            name.endsWith("_LEGGINGS") -> "leggings"
+            name.endsWith("_BOOTS") -> "boots"
+            else -> null
+        }
+    }
+
+    private fun createMobTokenDrop(killer: Player, mobTypeId: String): ItemStack? {
+        val fullId = "arena.mob_token_${sanitizeMobTypeId(mobTypeId)}"
+        return CustomItemManager.createItemForPlayer(fullId, killer, 1)
+    }
+
+    private fun sanitizeMobTypeId(typeId: String): String {
+        val normalized = typeId.trim().lowercase(Locale.ROOT)
+        return normalized.replace(Regex("[^a-z0-9_]+"), "_")
+    }
+
+    private fun registerMobTypeTokenItems() {
+        for (typeId in knownMobTypeIds) {
+            CustomItemManager.register(ArenaMobTokenItem(typeId))
+        }
     }
 
     fun handleBarrierClick(player: Player, clicked: Location): Boolean {
@@ -686,6 +906,7 @@ class ArenaManager(
 
         session.activeMobs.toList().forEach { mobId ->
             mobToSessionWorld.remove(mobId)
+            mobToDefinitionTypeId.remove(mobId)
             session.mobWaveMap.remove(mobId)
             mobService.untrack(mobId)
             Bukkit.getEntity(mobId)?.remove()
@@ -1029,6 +1250,7 @@ class ArenaManager(
         session.waveMobIds.getOrPut(wave) { mutableSetOf() }.add(entityId)
         session.mobWaveMap[entityId] = wave
         mobToSessionWorld[entityId] = session.worldName
+        mobToDefinitionTypeId[entityId] = definition.typeId
     }
 
     private fun applyMobStats(
@@ -1057,6 +1279,7 @@ class ArenaManager(
         if (!removed) return
 
         mobToSessionWorld.remove(mobId)
+        mobToDefinitionTypeId.remove(mobId)
         val wave = session.mobWaveMap.remove(mobId)
         if (wave != null) {
             session.waveMobIds[wave]?.remove(mobId)
@@ -1221,6 +1444,7 @@ class ArenaManager(
             session.activeMobs.remove(mobId)
             session.mobWaveMap.remove(mobId)
             mobToSessionWorld.remove(mobId)
+            mobToDefinitionTypeId.remove(mobId)
             mobService.untrack(mobId)
             Bukkit.getEntity(mobId)?.remove()
         }

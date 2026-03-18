@@ -17,7 +17,7 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
 
     @EventHandler
     fun onEntityDeath(event: EntityDeathEvent) {
-        arenaManager.handleMobDeath(event.entity.uniqueId)
+        arenaManager.handleMobDeath(event)
     }
 
     @EventHandler
