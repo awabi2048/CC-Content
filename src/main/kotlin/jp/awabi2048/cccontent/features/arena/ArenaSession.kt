@@ -28,6 +28,7 @@ data class ArenaSession(
     val themeId: String,
     val mobTypeId: String,
     val difficultyId: String,
+    val difficultyValue: Double,
     val waves: Int,
     val participants: MutableSet<UUID>,
     val returnLocations: MutableMap<UUID, Location>,

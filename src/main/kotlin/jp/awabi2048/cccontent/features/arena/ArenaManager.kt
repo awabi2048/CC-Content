@@ -43,7 +43,8 @@ sealed class ArenaStartResult {
         val themeId: String,
         val waves: Int,
         val mobTypeId: String,
-        val difficultyId: String
+        val difficultyId: String,
+        val difficultyDisplay: String
     ) : ArenaStartResult()
 
     data class Error(
@@ -95,14 +96,21 @@ private data class ArenaMobTypeConfig(
 
 private data class ArenaDifficultyConfig(
     val id: String,
-    val mobStatsMultiplier: Double,
+    val difficultyRange: ClosedFloatingPointRange<Double>,
     val mobSpawnIntervalTicks: Long,
     val mobCountMultiplier: Double,
     val waveMultiplier: Double,
     val waves: Int,
-    val color: String,
-    val display: String
+    val display: String,
+    val mobStatsMaxHealth: Double,
+    val mobStatsMaxAttack: Double,
+    val mobStatsMaxMovementSpeed: Double,
+    val mobStatsMaxArmor: Double,
+    val mobStatsMaxScale: Double
 ) {
+    val difficultyValue: Double
+        get() = (difficultyRange.start + difficultyRange.endInclusive) / 2.0
+
     fun waveScale(wave: Int): Double {
         return (1.0 + waveMultiplier * wave).coerceAtLeast(0.0)
     }
@@ -207,23 +215,35 @@ class ArenaManager(
                 continue
             }
 
-            val mobStatsMultiplier = section.getDouble("mob_stats_multiplier", 1.0).coerceAtLeast(0.01)
+            val difficultyRange = parseDifficultyRange(section.getString("difficulty_range"))
+            if (difficultyRange == null) {
+                plugin.logger.severe("[Arena] difficulty.yml の difficulty_range が不正です: $difficultyId")
+                continue
+            }
             val mobSpawnIntervalTicks = section.getLong("mob_spawn_interval", 20L).coerceAtLeast(1L)
             val mobCountMultiplier = section.getDouble("mob_count_multiplier", 1.0).coerceAtLeast(0.01)
             val waveMultiplier = section.getDouble("wave_multiplier", 0.0)
             val waves = section.getInt("wave", 5).coerceAtLeast(1)
-            val color = section.getString("color", "white") ?: "white"
-            val display = section.getString("display", "") ?: ""
+            val display = section.getString("display", difficultyId) ?: difficultyId
+            val mobStatsMaxHealth = section.getDouble("mob_stats_max_health", 20.0).coerceAtLeast(1.0)
+            val mobStatsMaxAttack = section.getDouble("mob_stats_max_attack", 1.0).coerceAtLeast(0.0)
+            val mobStatsMaxMovementSpeed = section.getDouble("mob_stats_max_movement_speed", 0.23).coerceAtLeast(0.01)
+            val mobStatsMaxArmor = section.getDouble("mob_stats_max_armor", 0.0).coerceAtLeast(0.0)
+            val mobStatsMaxScale = section.getDouble("mob_stats_max_scale", 1.0).coerceAtLeast(0.1)
 
             loaded[difficultyId] = ArenaDifficultyConfig(
                 id = difficultyId,
-                mobStatsMultiplier = mobStatsMultiplier,
+                difficultyRange = difficultyRange,
                 mobSpawnIntervalTicks = mobSpawnIntervalTicks,
                 mobCountMultiplier = mobCountMultiplier,
                 waveMultiplier = waveMultiplier,
                 waves = waves,
-                color = color,
-                display = display
+                display = display,
+                mobStatsMaxHealth = mobStatsMaxHealth,
+                mobStatsMaxAttack = mobStatsMaxAttack,
+                mobStatsMaxMovementSpeed = mobStatsMaxMovementSpeed,
+                mobStatsMaxArmor = mobStatsMaxArmor,
+                mobStatsMaxScale = mobStatsMaxScale
             )
         }
 
@@ -396,6 +416,16 @@ class ArenaManager(
         return WaveRange(min, max)
     }
 
+    private fun parseDifficultyRange(text: String?): ClosedFloatingPointRange<Double>? {
+        val raw = text?.trim().orEmpty()
+        val matched = Regex("^([0-9]+(?:\\.[0-9]+)?)\\.\\.([0-9]+(?:\\.[0-9]+)?)$").matchEntire(raw) ?: return null
+        val min = matched.groupValues[1].toDoubleOrNull() ?: return null
+        val max = matched.groupValues[2].toDoubleOrNull() ?: return null
+        if (min <= 0.0) return null
+        if (max < min) return null
+        return min..max
+    }
+
     fun startSession(
         target: Player,
         mobTypeId: String,
@@ -462,6 +492,7 @@ class ArenaManager(
                 themeId = theme.id,
                 mobTypeId = mobType.id,
                 difficultyId = difficulty.id,
+                difficultyValue = difficulty.difficultyValue,
                 waves = difficulty.waves,
                 participants = mutableSetOf(target.uniqueId),
                 returnLocations = mutableMapOf(target.uniqueId to returnLocation),
@@ -494,13 +525,13 @@ class ArenaManager(
                     "&6[Arena] セッション開始: theme={theme}, mob_type={mob_type}, difficulty={difficulty}, waves={waves}",
                     "theme" to theme.id,
                     "mob_type" to mobType.id,
-                    "difficulty" to difficulty.id,
+                    "difficulty" to difficulty.display,
                     "waves" to difficulty.waves
                 )
             )
 
             initializeWavePipeline(session, mobType, difficulty)
-            ArenaStartResult.Success(theme.id, difficulty.waves, mobType.id, difficulty.id)
+            ArenaStartResult.Success(theme.id, difficulty.waves, mobType.id, difficulty.id, difficulty.display)
         } catch (e: Exception) {
             tryDeleteWorld(world)
             ArenaStartResult.Error(
@@ -1233,7 +1264,7 @@ class ArenaManager(
         entity.removeWhenFarAway = false
         entity.canPickupItems = false
 
-        applyMobStats(entity, definition, difficulty, wave)
+        applyMobStats(entity, definition, difficulty, session.difficultyValue)
 
         val combatActivated = session.corridorTriggeredWaves.contains(wave)
         if (!combatActivated) {
@@ -1257,21 +1288,31 @@ class ArenaManager(
         entity: LivingEntity,
         definition: MobDefinition,
         difficulty: ArenaDifficultyConfig,
-        wave: Int
+        difficultyValue: Double
     ) {
-        val statScale = (difficulty.mobStatsMultiplier * difficulty.waveScale(wave)).coerceAtLeast(0.01)
-
-        val maxHealth = (definition.health * statScale).coerceAtLeast(1.0)
-        val attack = (definition.attack * statScale).coerceAtLeast(0.0)
-        val speed = (definition.movementSpeed * statScale).coerceAtLeast(0.01)
-        val armor = (definition.armor * statScale).coerceAtLeast(0.0)
+        val progress = difficultyProgress(difficulty.difficultyRange, difficultyValue)
+        val maxHealth = interpolate(definition.health, difficulty.mobStatsMaxHealth, progress).coerceAtLeast(1.0)
+        val attack = interpolate(definition.attack, difficulty.mobStatsMaxAttack, progress).coerceAtLeast(0.0)
+        val speed = interpolate(definition.movementSpeed, difficulty.mobStatsMaxMovementSpeed, progress).coerceAtLeast(0.01)
+        val armor = interpolate(definition.armor, difficulty.mobStatsMaxArmor, progress).coerceAtLeast(0.0)
+        val scale = interpolate(definition.scale, difficulty.mobStatsMaxScale, progress).coerceAtLeast(0.1)
 
         entity.getAttribute(Attribute.MAX_HEALTH)?.baseValue = maxHealth
         entity.getAttribute(Attribute.ATTACK_DAMAGE)?.baseValue = attack
         entity.getAttribute(Attribute.MOVEMENT_SPEED)?.baseValue = speed
         entity.getAttribute(Attribute.ARMOR)?.baseValue = armor
-        entity.getAttribute(Attribute.SCALE)?.baseValue = definition.scale
+        entity.getAttribute(Attribute.SCALE)?.baseValue = scale
         entity.health = maxHealth
+    }
+
+    private fun interpolate(base: Double, maximum: Double, progress: Double): Double {
+        return base + (maximum - base) * progress.coerceIn(0.0, 1.0)
+    }
+
+    private fun difficultyProgress(range: ClosedFloatingPointRange<Double>, difficultyValue: Double): Double {
+        val width = range.endInclusive - range.start
+        if (width <= 0.0) return 1.0
+        return ((difficultyValue - range.start) / width).coerceIn(0.0, 1.0)
     }
 
     private fun consumeMob(session: ArenaSession, mobId: UUID, countKill: Boolean) {

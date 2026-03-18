@@ -36,7 +36,7 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
                 ArenaI18n.text(
                     sender,
                     "arena.messages.command.usage.start",
-                    "&c使用法: /arenaa start <player|@s> <mob_type> <difficulty> [theme]"
+                    "&c使用法: /arenaa start <player|@s> <mob_type> <difficulty_id> [theme]"
                 )
             )
             return true
@@ -63,7 +63,7 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
                         "&a{player} のアリーナを開始しました (mob_type={mob_type}, difficulty={difficulty}, theme={theme}, waves={waves})",
                         "player" to target.name,
                         "mob_type" to result.mobTypeId,
-                        "difficulty" to result.difficultyId,
+                        "difficulty" to result.difficultyDisplay,
                         "theme" to result.themeId,
                         "waves" to result.waves
                     )
@@ -144,7 +144,7 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
 
     private fun showUsage(sender: CommandSender) {
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.header", "&6=== Arena 管理コマンド ==="))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s> <mob_type> <difficulty> [theme]"))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s> <mob_type> <difficulty_id> [theme]"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop", "&f/arenaa stop <player>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.theme", "&f/arenaa theme list"))
     }

@@ -1,10 +1,14 @@
 easy:
-  mob_stats_multiplier: 0.8 # 体力・攻撃力の基礎倍率
+  difficulty_range: 1.0..2.0 # この設定に割り当てる難易度の範囲
   mob_spawn_interval: 20 # モブのスポーン間隔（tick）
   mob_count_multiplier: 0.8 # モブの最大召喚数／ウェーブクリア扱いとするモブの討伐数にかかる倍率
   wave_multiplier: 0.03 # モブ召喚数・ステータスに`1 + %wave_multiplier% * %wave%`を乗算
   wave: 5 # ステージ全体での基礎ウェーブ数
-  color: "green"
   display: "§c★§7☆☆"
+  mob_stats_max_health: 26.0
+  mob_stats_max_attack: 6.5
+  mob_stats_max_movement_speed: 0.28
+  mob_stats_max_armor: 5.0
+  mob_stats_max_scale: 1.1
 
 
