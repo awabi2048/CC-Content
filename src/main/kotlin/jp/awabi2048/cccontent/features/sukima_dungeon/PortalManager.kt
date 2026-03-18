@@ -5,6 +5,7 @@ import org.bukkit.Particle
 import org.bukkit.World
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.Interaction
+import org.bukkit.scheduler.BukkitTask
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
@@ -15,8 +16,12 @@ import java.util.UUID
 object PortalManager {
     private val portals = mutableMapOf<UUID, PortalSession>()
     private lateinit var plugin: JavaPlugin
+    private var particleTask: BukkitTask? = null
 
     fun init(plugin: JavaPlugin) {
+        if (this::plugin.isInitialized) {
+            shutdown()
+        }
         this.plugin = plugin
         startParticleTask()
     }
@@ -36,19 +41,12 @@ object PortalManager {
             tier = tier,
             themeName = themeName,
             sizeKey = sizeKey,
-            createdAt = System.currentTimeMillis()
+            createdAt = System.currentTimeMillis(),
+            worldName = world.name
         )
-        
+
         portals[interaction.uniqueId] = session
-        
-        // Expiry task
-        val durationTicks = SukimaConfigHelper.getConfig(plugin).getInt("bookmark_portal_duration", 300) * 20L
-        object : BukkitRunnable() {
-            override fun run() {
-                removePortal(interaction.uniqueId)
-            }
-        }.runTaskLater(plugin, durationTicks)
-        
+
         return session
     }
 
@@ -73,7 +71,9 @@ object PortalManager {
             sizeKey = "",
             createdAt = System.currentTimeMillis(),
             isReady = true,
-            isReturn = true
+            isReturn = true,
+            worldName = world.name,
+            markerId = marker.uniqueId
         )
         
         portals[interaction.uniqueId] = session
@@ -83,15 +83,16 @@ object PortalManager {
     fun getPortal(uuid: UUID): PortalSession? = portals[uuid]
 
     fun getReturnPortal(world: World): PortalSession? {
-        return portals.values.find { it.location.world == world && it.isReturn }
+        return portals.values.find { it.isReturn && it.worldName == world.name }
     }
 
     fun onDungeonClose(worldName: String) {
         val iterator = portals.entries.iterator()
         while (iterator.hasNext()) {
             val entry = iterator.next()
-            if (entry.value.worldName == worldName || entry.value.location.world?.name == worldName) {
-                entry.value.interaction.remove()
+            if (entry.value.worldName == worldName) {
+                entry.value.interactionOrNull()?.remove()
+                entry.value.markerOrNull()?.remove()
                 iterator.remove()
             }
         }
@@ -100,31 +101,36 @@ object PortalManager {
     fun removePortal(uuid: UUID) {
         val session = portals.remove(uuid)
         session?.let {
-            it.interaction.remove()
+            it.interactionOrNull()?.remove()
+            it.markerOrNull()?.remove()
         }
     }
 
+    fun shutdown() {
+        particleTask?.cancel()
+        particleTask = null
+        portals.values.forEach {
+            it.interactionOrNull()?.remove()
+            it.markerOrNull()?.remove()
+        }
+        portals.clear()
+    }
+
     private fun startParticleTask() {
-        object : BukkitRunnable() {
+        if (particleTask != null) return
+
+        particleTask = object : BukkitRunnable() {
             override fun run() {
                 val iterator = portals.entries.iterator()
                 while (iterator.hasNext()) {
                     val entry = iterator.next()
                     val session = entry.value
-                    
-                    if (!session.location.world!!.isChunkLoaded(session.location.blockX shr 4, session.location.blockZ shr 4)) continue
-                    if (System.currentTimeMillis() - session.createdAt > 30000 && 
-                        session.location.world!!.getNearbyEntities(session.location, 16.0, 16.0, 16.0).none { it is Player }) {
-                         // Condition 7: 付近にプレイヤーが存在しなくなること
-                         session.interaction.remove()
-                         iterator.remove()
-                         continue
-                    }
+                    val worldName = session.worldName ?: continue
+                    val world = Bukkit.getWorld(worldName) ?: continue
+                    if (!world.isChunkLoaded(session.location.blockX shr 4, session.location.blockZ shr 4)) continue
 
-                    val world = session.location.world!!
-                    val loc = session.location.clone().add(0.0, 1.0, 0.0)
+                    val loc = Location(world, session.location.x, session.location.y, session.location.z, session.location.yaw, session.location.pitch).add(0.0, 1.0, 0.0)
                     
-                    // Particle: minecraft:dust_color_transition{from_color:[0,0,1],to_color:[0, 1, 0],scale:1}
                     val dustOptions = Particle.DustTransition(Color.BLUE, Color.GREEN, 1.0f)
                     world.spawnParticle(Particle.DUST_COLOR_TRANSITION, loc, 20, 0.3, 0.8, 0.3, 0.05, dustOptions)
                 }
@@ -154,8 +160,10 @@ data class PortalSession(
     var restCells: Set<Pair<Int, Int>> = emptySet(),
     var dungeonThemeId: String? = null,
     var size: Int = 0,
-    var isReturn: Boolean = false
+    var isReturn: Boolean = false,
+    var markerId: UUID? = null
 ) {
-    val interaction: Interaction
-        get() = Bukkit.getEntity(id) as Interaction
+    fun interactionOrNull(): Interaction? = Bukkit.getEntity(id) as? Interaction
+
+    fun markerOrNull(): org.bukkit.entity.Marker? = markerId?.let { Bukkit.getEntity(it) as? org.bukkit.entity.Marker }
 }

@@ -64,12 +64,14 @@ class ItemPickupListener(private val plugin: JavaPlugin) : Listener {
             // Give item
             CustomItemManager.markAsDungeonItem(itemStack)
             player.inventory.addItem(itemStack)
+
+            val displayName = org.bukkit.ChatColor.translateAlternateColorCodes('&', itemStack.itemMeta?.displayName ?: itemName)
             
             // Sound
             player.playSound(player.location, Sound.ENTITY_ITEM_PICKUP, 1.0f, 1.0f)
             
             // Message
-            player.sendMessage("${itemName} §7を拾いました。")
+            player.sendMessage("${displayName} §7を拾いました。")
             
             // Remove entities
             interaction.remove()

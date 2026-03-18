@@ -194,6 +194,7 @@ class SukimaDungeon : JavaPlugin(), Listener {
         if (::mobService.isInitialized) {
             mobService.shutdown()
         }
+        PortalManager.shutdown()
         BGMManager.stopAll()
         DungeonSessionManager.saveSessions(this)
         for (player in server.onlinePlayers) {

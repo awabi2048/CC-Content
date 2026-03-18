@@ -60,13 +60,13 @@ object DungeonManager {
             player.sendMessage("Dungeon is closing...")
         }
 
+        PortalManager.onDungeonClose(world.name)
         Bukkit.unloadWorld(world, false)
         
         val worldFolder = world.worldFolder
         deleteDirectory(worldFolder)
         Bukkit.getLogger().info("Deleted dungeon world: ${world.name}")
         worldThemes.remove(world.name)
-        PortalManager.onDungeonClose(world.name)
     }
 
     fun deleteDirectory(directory: java.io.File): Boolean {
