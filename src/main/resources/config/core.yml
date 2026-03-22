@@ -101,6 +101,9 @@ sukima_dungeon:
 arena:
   quest:
     generate_count: 14
+  barrier_restart:
+    default_duration_seconds: 30
+    corruption_ratio_base: 0.05
   quest_charactor_config:
     none:
       weight: 70

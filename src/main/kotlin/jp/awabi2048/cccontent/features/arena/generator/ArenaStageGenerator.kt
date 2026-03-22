@@ -145,7 +145,6 @@ class ArenaStageGenerator {
         val finalMarkers = findMarkers(world, finalRoomBounds)
         val barrierLocation = finalMarkers.barrierCore
             ?: boundsCenter(world, finalRoomBounds, 1.0)
-        barrierLocation.block.type = org.bukkit.Material.RESPAWN_ANCHOR
 
         val firstRoomBounds = placementBoundsByIndex[roomPlacements.first().index]
             ?: error("[Arena] 開始部屋の境界が見つかりません")

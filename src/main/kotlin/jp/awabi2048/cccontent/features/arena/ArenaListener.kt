@@ -7,9 +7,13 @@ import org.bukkit.event.block.Action
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockExplodeEvent
 import org.bukkit.event.block.BlockPlaceEvent
+import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityExplodeEvent
 import org.bukkit.event.entity.PlayerDeathEvent
+import org.bukkit.event.inventory.InventoryClickEvent
+import org.bukkit.event.inventory.InventoryDragEvent
+import org.bukkit.event.player.PlayerInteractEntityEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerQuitEvent
 
@@ -31,6 +35,28 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
         if (arenaManager.handleBarrierClick(event.player, clicked)) {
             event.isCancelled = true
         }
+    }
+
+    @EventHandler
+    fun onBarrierCrystalInteract(event: PlayerInteractEntityEvent) {
+        if (arenaManager.handleBarrierCrystalInteract(event.player, event.rightClicked)) {
+            event.isCancelled = true
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onBarrierCrystalDamage(event: EntityDamageEvent) {
+        if (!arenaManager.handleBarrierCrystalDamage(event.entity)) return
+        event.isCancelled = true
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    fun onBarrierCrystalExplode(event: EntityExplodeEvent) {
+        if (arenaManager.handleBarrierCrystalExplosion(event.entity)) {
+            event.isCancelled = true
+            return
+        }
+        event.blockList().removeIf { block -> arenaManager.isBarrierBlock(block.location) }
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -55,6 +81,19 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     fun onBlockExplode(event: BlockExplodeEvent) {
         event.blockList().removeIf { block -> arenaManager.isBarrierBlock(block.location) }
+    }
+
+    @EventHandler
+    fun onBarrierMenuClick(event: InventoryClickEvent) {
+        val topInventory = event.view.topInventory
+        if (!arenaManager.handleBarrierRestartMenuClick(event.whoClicked as? org.bukkit.entity.Player ?: return, topInventory, event.rawSlot)) return
+        event.isCancelled = true
+    }
+
+    @EventHandler
+    fun onBarrierMenuDrag(event: InventoryDragEvent) {
+        if (!arenaManager.handleBarrierRestartMenuDrag(event.view.topInventory)) return
+        event.isCancelled = true
     }
 
     @EventHandler

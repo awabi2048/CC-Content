@@ -1,7 +1,7 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
 import jp.awabi2048.cccontent.CCContent
-import org.bukkit.ChatColor
+import jp.awabi2048.cccontent.util.OageMessageSender
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 
@@ -48,25 +48,11 @@ object MessageManager {
     }
 
     fun getOagePrefix(): String {
-        val plugin = CCContent.instance
-        val config = SukimaConfigHelper.getConfig(plugin)
-        return config.getString("oage_message_prefix", "§e【おあげちゃん】§r") ?: "§e【おあげちゃん】§r"
+        return OageMessageSender.getPrefix(CCContent.instance)
     }
 
     fun sendOageMessage(player: Player, message: String) {
-        val plugin = CCContent.instance
-        val config = SukimaConfigHelper.getConfig(plugin)
-        val prefix = getOagePrefix()
-        val soundStr = config.getString("oage_message_sound", "entity.villager.ambient")
-        val sound = try { 
-            if (soundStr != null) org.bukkit.Sound.valueOf(soundStr.uppercase().replace(".", "_")) 
-            else org.bukkit.Sound.ENTITY_VILLAGER_AMBIENT 
-        } catch (e: Exception) { 
-            org.bukkit.Sound.ENTITY_VILLAGER_AMBIENT 
-        }
-
-        player.sendMessage(prefix + message)
-        player.playSound(player.location, sound, 1f, 1f)
+        OageMessageSender.send(player, message, CCContent.instance)
     }
 
     /**
@@ -77,16 +63,9 @@ object MessageManager {
         if (messages.isEmpty()) return
 
         val plugin = CCContent.instance
-        val config = SukimaConfigHelper.getConfig(plugin)
         var cumulativeDelay = 100L // 最初の遅延: 5秒
         val prefix = getOagePrefix()
-        val soundStr = config.getString("oage_message_sound", "entity.villager.ambient")
-        val sound = try { 
-            if (soundStr != null) org.bukkit.Sound.valueOf(soundStr.uppercase().replace(".", "_")) 
-            else org.bukkit.Sound.ENTITY_VILLAGER_AMBIENT 
-        } catch (e: Exception) { 
-            org.bukkit.Sound.ENTITY_VILLAGER_AMBIENT 
-        }
+        val sound = OageMessageSender.getSound(plugin)
 
         messages.forEach { msg ->
             plugin.server.scheduler.runTaskLater(plugin, Runnable {

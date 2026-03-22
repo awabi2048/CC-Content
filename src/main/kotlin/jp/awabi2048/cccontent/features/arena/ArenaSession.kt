@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.arena
 
+import net.kyori.adventure.bossbar.BossBar
 import org.bukkit.Location
 import org.bukkit.scheduler.BukkitTask
 import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestModifiers
@@ -30,6 +31,7 @@ data class ArenaSession(
     val mobTypeId: String,
     val difficultyId: String,
     val difficultyValue: Double,
+    val difficultyScore: Double,
     val waves: Int,
     val questModifiers: ArenaQuestModifiers = ArenaQuestModifiers.NONE,
     val participants: MutableSet<UUID>,
@@ -47,6 +49,17 @@ data class ArenaSession(
     var fallbackWave: Int = 1,
     var stageStarted: Boolean = false,
     var barrierActive: Boolean = false,
+    var barrierRestarting: Boolean = false,
+    var barrierRestartCompleted: Boolean = false,
+    var barrierCrystalEntityId: UUID? = null,
+    var barrierRestartStartMillis: Long = 0L,
+    var barrierRestartDurationMillis: Long = 0L,
+    var barrierAmbientTask: BukkitTask? = null,
+    var barrierRestartTask: BukkitTask? = null,
+    var barrierDefenseSpawnTask: BukkitTask? = null,
+    var barrierRestartBossBar: BossBar? = null,
+    val barrierRestartCorruptedSlots: MutableSet<Int> = mutableSetOf(),
+    val barrierDefenseMobIds: MutableSet<UUID> = mutableSetOf(),
     val startedWaves: MutableSet<Int> = mutableSetOf(),
     val clearedWaves: MutableSet<Int> = mutableSetOf(),
     val activeMobs: MutableSet<UUID> = mutableSetOf(),

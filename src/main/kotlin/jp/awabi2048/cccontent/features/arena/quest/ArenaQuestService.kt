@@ -220,7 +220,14 @@ class ArenaQuestService(
                 return@Runnable
             }
 
-            when (val result = arenaManager.startSession(player, quest.mobTypeId, quest.difficultyId, quest.themeId, charactor.toModifiers())) {
+            when (val result = arenaManager.startSession(
+                player,
+                quest.mobTypeId,
+                quest.difficultyId,
+                quest.themeId,
+                charactor.toModifiers(),
+                quest.difficultyScore
+            )) {
                 is ArenaStartResult.Success -> {
                     activeQuests[player.uniqueId] = ArenaActiveQuestRecord(dateKey, quest.index, quest)
                 }
