@@ -51,4 +51,8 @@ object PlayerDataManager {
         save(player)
         dataCache.remove(player.uniqueId)
     }
+
+    fun clearAll() {
+        dataCache.clear()
+    }
 }

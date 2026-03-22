@@ -56,6 +56,10 @@ class ReplantHandler : SkillEffectHandler {
         fun clearProcessed(playerUuid: java.util.UUID) {
             processedBlocks.remove(playerUuid)
         }
+
+        fun clearAllProcessed() {
+            processedBlocks.clear()
+        }
     }
 
     override fun getEffectType(): String = EFFECT_TYPE

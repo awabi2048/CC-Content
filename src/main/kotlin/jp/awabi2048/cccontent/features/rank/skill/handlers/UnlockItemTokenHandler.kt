@@ -9,6 +9,10 @@ class UnlockItemTokenHandler : SkillEffectHandler {
     companion object {
         const val EFFECT_TYPE = "general.unlock_item_token"
         private val unlockedItems: MutableSet<String> = mutableSetOf()
+
+        fun clearUnlockedItems() {
+            unlockedItems.clear()
+        }
     }
 
     override fun getEffectType(): String = EFFECT_TYPE
@@ -38,9 +42,5 @@ class UnlockItemTokenHandler : SkillEffectHandler {
 
     fun isItemUnlocked(playerUuid: java.util.UUID, item: String): Boolean {
         return unlockedItems.contains("${playerUuid}_$item")
-    }
-
-    fun clearUnlockedItems() {
-        unlockedItems.clear()
     }
 }

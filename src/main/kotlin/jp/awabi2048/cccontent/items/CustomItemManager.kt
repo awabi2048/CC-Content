@@ -28,6 +28,10 @@ object CustomItemManager {
         items[item.fullId] = item
     }
 
+    fun clear() {
+        items.clear()
+    }
+
     fun unregisterByPrefix(prefix: String): Int {
         val before = items.size
         val iterator = items.keys.iterator()

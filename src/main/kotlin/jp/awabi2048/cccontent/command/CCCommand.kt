@@ -239,12 +239,12 @@ class CCCommand(
         }
         
         try {
-            sender.sendMessage("§6CC-Content の設定ファイルをリロード中...")
+            sender.sendMessage("§6CC-Content を再起動中...")
             onReload.invoke()
-            sender.sendMessage("§aCC-Content の設定ファイルをリロードしました")
+            sender.sendMessage("§aCC-Content を再起動しました")
             return true
         } catch (e: Exception) {
-            sender.sendMessage("§cリロード中にエラーが発生しました: ${e.message}")
+            sender.sendMessage("§c再起動中にエラーが発生しました: ${e.message}")
             e.printStackTrace()
             return false
         }
@@ -259,8 +259,8 @@ class CCCommand(
               §7  - 例: /cc-content give @a arena.prize 10
               §7  - 例: /cc-content give @s sukima_dungeon.talisman
               
-               §f/cc-content reload
-               §7  - 設定ファイルをリロードします
+                §f/cc-content reload
+                §7  - プラグインを再起動相当に再初期化します
 
                §f/ccc summon <mob_definition_id> <x> <y> <z>
                §7  - 共通 mob_definition からモブを召喚します

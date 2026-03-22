@@ -37,4 +37,8 @@ object MenuCooldownManager {
     fun clearCooldown(uuid: UUID) {
         lastClickMap.remove(uuid)
     }
+
+    fun clearAll() {
+        lastClickMap.clear()
+    }
 }

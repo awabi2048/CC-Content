@@ -79,6 +79,7 @@ import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.event.Listener
 import org.bukkit.event.EventHandler
+import org.bukkit.event.HandlerList
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.scheduler.BukkitTask
@@ -134,39 +135,38 @@ class CCContent : JavaPlugin(), Listener {
     fun getPersistenceFlushIntervalMinutes(): Long {
         return coreConfig.getLong("persistence.flush_interval_minutes", 1L).coerceAtLeast(1L)
     }
-     
-    override fun onEnable() {
+
+    private fun startPlugin() {
         instance = this
         coreConfig = CoreConfigManager.load(this)
         contentEnabledAtStartup = loadContentEnabledSettings()
-        
-        // 初期化ロガーを初期化
+
         featureInitLogger = FeatureInitializationLogger(logger)
         featureInitLogger.registerFeature("Rank System")
         featureInitLogger.registerFeature("Brewery")
         featureInitLogger.registerFeature("Cooking")
         featureInitLogger.registerFeature("Arena")
         featureInitLogger.registerFeature("SukimaDungeon")
-        
-        // ロガーをCustomItemManagerに設定
+
+        CustomItemManager.clear()
         CustomItemManager.setLogger(logger)
         CustomItemI18n.initialize(this)
-        
-        // GulliverLight設定の初期化
+
         GulliverConfig.initialize(this)
         AutoIgnitionBoosterConfig.initialize(this)
         AirCannonConfig.initialize(this)
         CustomHeadConfigRegistry.initialize(this)
         RadioCassetteConfig.initialize(this)
         RadioCassettePlaybackManager.initialize(this)
+
         sharedMobService = MobService(this)
         sharedMobService.reloadDefinitions()
         sharedMobService.startTickTask()
+
         adminMarkerToolService = AdminMarkerToolService(this)
         server.pluginManager.registerEvents(adminMarkerToolService, this)
         adminMarkerToolService.start()
 
-        // アイテム登録
         registerCustomItems()
 
         initializeFeatureIfEnabled("Rank System", "rank") {
@@ -185,8 +185,7 @@ class CCContent : JavaPlugin(), Listener {
         initializeFeatureIfEnabled("Cooking", "cooking") {
             initializeCooking()
         }
-        
-        // コマンド登録
+
         val giveCommand = GiveCommand()
         val ccCommand = CCCommand(
             giveCommand = giveCommand,
@@ -208,10 +207,9 @@ class CCContent : JavaPlugin(), Listener {
                 true
             }
         )
-        
+
         getCommand("cc-content")?.setExecutor(ccCommand)
         getCommand("cc-content")?.tabCompleter = ccCommand
-        // 旧エイリアスも対応
         getCommand("cc")?.setExecutor(ccCommand)
         getCommand("cc")?.tabCompleter = ccCommand
 
@@ -225,8 +223,7 @@ class CCContent : JavaPlugin(), Listener {
         initializeFeatureIfEnabled("SukimaDungeon", "sukima_dungeon") {
             initializeSukimaDungeon()
         }
-        
-        // リスナー登録（スキマダンジョン以外）
+
         server.pluginManager.registerEvents(GulliverItemListener(this), this)
         server.pluginManager.registerEvents(AutoIgnitionBoosterListener(this), this)
         server.pluginManager.registerEvents(MobEventListener(sharedMobService), this)
@@ -239,14 +236,75 @@ class CCContent : JavaPlugin(), Listener {
         server.pluginManager.registerEvents(RadioCassetteGuiListener(), this)
         server.pluginManager.registerEvents(StorageBoxGuiListener(this), this)
         server.pluginManager.registerEvents(TransparentItemFrameListener(this), this)
-        
-        // ScaleManagerタスクの開始（毎tick実行）
+
         server.scheduler.runTaskTimer(this, GulliverScaleManager(), 0L, 1L)
-        
-        // 初期化結果をまとめて表示
+
         featureInitLogger.printSummary()
 
         startPersistenceFlushTask()
+    }
+
+    private fun stopPlugin() {
+        try {
+            HandlerList.unregisterAll(this as org.bukkit.plugin.Plugin)
+            server.scheduler.cancelTasks(this)
+
+            UnlockBatchBreakHandler.stopAll()
+            BlastMineHandler.stopAll()
+            BreakSpeedBoostHandler.clearAllBoosts()
+            AttackReachBoostHandler.removeAllModifiers()
+            UnlockItemTokenHandler.Companion.clearUnlockedItems()
+            ReplantHandler.clearAllProcessed()
+            SkillEffectEngine.clearAllCache()
+            SkillEffectRegistry.clear()
+            SkillTreeRegistry.clear()
+
+            rankManagerInstance?.hideAllProfessionBossBars()
+            rankManagerInstance?.saveData()
+            ignoreBlockStoreInstance?.flush()
+
+            if (::breweryFeature.isInitialized) {
+                breweryFeature.shutdown()
+            }
+            if (::arenaManager.isInitialized) {
+                arenaManager.shutdown()
+            }
+
+            PortalManager.shutdown()
+            RadioCassettePlaybackManager.shutdown()
+            BGMManager.stopAll()
+            DungeonSessionManager.saveSessions(this)
+
+            persistenceFlushTask?.cancel()
+            persistenceFlushTask = null
+
+            if (::sharedMobService.isInitialized) {
+                sharedMobService.shutdown()
+            }
+
+            for (player in server.onlinePlayers) {
+                PlayerDataManager.unload(player)
+                MenuCooldownManager.clearCooldown(player.uniqueId)
+                rankManagerInstance?.hideProfessionBossBar(player.uniqueId)
+            }
+
+            PlayerDataManager.clearAll()
+            MenuCooldownManager.clearAll()
+            CustomItemManager.clear()
+            HeadDatabaseBridge.reset()
+            rankManagerInstance = null
+            ignoreBlockStoreInstance = null
+            playTimeTrackerTaskId = -1
+
+            logger.info("[CCContent] 停止処理を完了しました")
+        } catch (e: Exception) {
+            logger.warning("[CCContent] 停止処理中にエラーが発生しました: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
+    override fun onEnable() {
+        startPlugin()
     }
 
     private fun loadContentEnabledSettings(): ContentEnabledSettings {
@@ -658,160 +716,11 @@ class CCContent : JavaPlugin(), Listener {
     }
     
     /**
-     * 設定ファイルをリロード
+     * プラグインを再起動相当に再初期化
      */
     private fun reloadConfiguration() {
-        try {
-            data class RequiredResource(
-                val resourcePath: String,
-                val targetPath: String = resourcePath
-            )
-
-            // /ccc reload 時に欠損補完する必須リソース
-            val requiredResources = listOf(
-                RequiredResource("config/core.yml"),
-                RequiredResource("config/rank/tutorial_tasks.yml"),
-                RequiredResource("lang/ja_jp.yml"),
-                RequiredResource("lang/en_us.yml"),
-                RequiredResource("config/custom_item/gulliver_light.yml"),
-                RequiredResource("config/custom_item/auto_ignition_booster.yml"),
-                RequiredResource("config/custom_item/air_cannon.yml"),
-                RequiredResource("config/custom_item/radio_cassette.yml"),
-                RequiredResource("config/custom_item/custom_head.yml"),
-                RequiredResource("config/arena/theme.yml"),
-                RequiredResource("config/arena/difficulty.yml"),
-                RequiredResource("config/arena/mob_type.yml"),
-                RequiredResource("config/arena/drop.yml"),
-                RequiredResource("config/mob_definition.yml"),
-                RequiredResource("config/sukima_dungeon/theme.yml"),
-                RequiredResource("config/sukima_dungeon/loot.yml"),
-                RequiredResource("config/brewery/config.yml"),
-                RequiredResource("config/brewery/recipe.yml"),
-                RequiredResource("config/cooking/config.yml"),
-                RequiredResource("config/cooking/recipe.yml"),
-                RequiredResource("config/ingredient_definition.yml"),
-                RequiredResource("config/rank/job_exp.yml")
-            )
-            
-            // 必須ディレクトリのリスト
-            val requiredDirs = listOf(
-                "config",
-                "config/custom_item",
-                "config/arena",
-                "config/sukima_dungeon",
-                "config/brewery",
-                "config/cooking",
-                "config/rank",
-                "config/rank/job",
-                "lang",
-                "structures",
-                "structures/arena",
-                "structures/sukima_dungeon",
-                "data",
-                "data/rank",
-                "data/brewery",
-                "data/sukima_dungeon",
-                "playerdata"
-            )
-            
-            // 欠損しているファイルを確認してコピー
-            for (required in requiredResources) {
-                val file = File(dataFolder, required.targetPath)
-                if (!file.exists()) {
-                    copyResourceFile(required.resourcePath, file)
-                }
-            }
-            
-            // 欠損しているディレクトリを作成
-            for (dirName in requiredDirs) {
-                val dir = File(dataFolder, dirName)
-                if (!dir.exists()) {
-                    dir.mkdirs()
-                }
-            }
-            
-            coreConfig = CoreConfigManager.load(this)
-            sharedMobService.reloadDefinitions()
-            startPersistenceFlushTask()
-            CustomItemI18n.initialize(this)
-            ArenaI18n.initialize(this)
-            AutoIgnitionBoosterConfig.reload()
-            AirCannonConfig.reload()
-            RadioCassetteConfig.reload()
-            HeadDatabaseBridge.reset()
-            CustomHeadConfigRegistry.reload(this)
-            registerRadioCassetteItems()
-            registerCustomHeadItems()
-
-            val reloadedContentEnabled = loadContentEnabledSettings()
-            logContentEnabledChangeIfNeeded(reloadedContentEnabled)
-
-            if (isContentEnabledAtStartup("rank")) {
-                val jobDir = File(dataFolder, "config/rank/job")
-                if (jobDir.exists()) {
-                    val requiredJobFiles = listOf(
-                        "brewer.yml",
-                        "carpenter.yml",
-                        "cook.yml",
-                        "farmer.yml",
-                        "gardener.yml",
-                        "lumberjack.yml",
-                        "miner.yml",
-                        "swordsman.yml",
-                        "warrior.yml"
-                    )
-                    for (jobFile in requiredJobFiles) {
-                        val file = File(jobDir, jobFile)
-                        if (!file.exists()) {
-                            copyResourceFile("config/rank/job/$jobFile", file)
-                        }
-                    }
-
-                    val jobExpFile = File(dataFolder, "config/rank/job_exp.yml")
-                    if (!jobExpFile.exists()) {
-                        copyResourceFile("config/rank/job_exp.yml", jobExpFile)
-                    }
-
-                    try {
-                        registerSkillTrees()
-                    } catch (e: Exception) {
-                        logger.warning("スキルツリー定義の再読み込みに失敗しました: ${e.message}")
-                    }
-
-                    rankManagerInstance?.let { rankManager ->
-                        SkillEffectEngine.clearAllCache()
-                        server.onlinePlayers.forEach { player ->
-                            val playerProfession = rankManager.getPlayerProfession(player.uniqueId) ?: return@forEach
-                            SkillEffectEngine.rebuildCache(
-                                player.uniqueId,
-                                playerProfession.acquiredSkills,
-                                playerProfession.profession,
-                                playerProfession.prestigeSkills,
-                                playerProfession.skillActivationStates
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (isContentEnabledAtStartup("sukima_dungeon")) {
-                reloadSukimaDungeon()
-            }
-
-            if (isContentEnabledAtStartup("brewery") && ::breweryFeature.isInitialized) {
-                breweryFeature.reload()
-            }
-            if (isContentEnabledAtStartup("cooking") && ::cookingFeature.isInitialized) {
-                cookingFeature.reload()
-            }
-
-            if (isContentEnabledAtStartup("arena") && ::arenaManager.isInitialized) {
-                arenaManager.reloadThemes()
-            }
-        } catch (e: Exception) {
-            logger.warning("リロード中にエラーが発生しました: ${e.message}")
-            e.printStackTrace()
-        }
+        stopPlugin()
+        startPlugin()
     }
     
     /**
@@ -1045,41 +954,7 @@ class CCContent : JavaPlugin(), Listener {
     }
     
     override fun onDisable() {
-        // SukimaDungeon クリーンアップ
-        try {
-            UnlockBatchBreakHandler.stopAll()
-            BlastMineHandler.stopAll()
-            rankManagerInstance?.hideAllProfessionBossBars()
-            rankManagerInstance?.saveData()
-            ignoreBlockStoreInstance?.flush()
-            if (::breweryFeature.isInitialized) {
-                breweryFeature.shutdown()
-            }
-            RadioCassettePlaybackManager.shutdown()
-            BGMManager.stopAll()
-            DungeonSessionManager.saveSessions(this)
-            persistenceFlushTask?.cancel()
-            persistenceFlushTask = null
-            if (::sharedMobService.isInitialized) {
-                sharedMobService.shutdown()
-            }
-            if (::arenaManager.isInitialized) {
-                arenaManager.shutdown()
-            }
-            for (player in server.onlinePlayers) {
-                PlayerDataManager.unload(player)
-                MenuCooldownManager.clearCooldown(player.uniqueId)
-            }
-            logger.info("[SukimaDungeon] セッション情報を保存しました")
-        } catch (e: Exception) {
-            logger.warning("[SukimaDungeon] クリーンアップ中にエラーが発生しました: ${e.message}")
-        }
-        
-        // プレイ時間トラッカータスクを停止
-        if (playTimeTrackerTaskId != -1) {
-            server.scheduler.cancelTask(playTimeTrackerTaskId)
-        }
-        
+        stopPlugin()
         logger.info("CC-Content v${description.version} が無効化されました")
     }
 }
