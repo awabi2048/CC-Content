@@ -6,11 +6,24 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
+import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestService
 
-class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, TabCompleter {
+class ArenaCommand(
+    private val arenaManagerProvider: () -> ArenaManager? = { null },
+    private val questService: ArenaQuestService? = null,
+    private val featureEnabledProvider: () -> Boolean = { true },
+    private val featureFailureReasonProvider: () -> String? = { null }
+) : CommandExecutor, TabCompleter {
+
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (!sender.hasPermission("cc-content.arena.admin")) {
             sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.no_permission", "&c権限がありません"))
+            return true
+        }
+
+        if (!featureEnabledProvider()) {
+            sender.sendMessage("§cArena feature は初期化に失敗したため利用できません")
+            featureFailureReasonProvider()?.let { sender.sendMessage("§7理由: $it") }
             return true
         }
 
@@ -20,6 +33,7 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
         }
 
         return when (args[0].lowercase()) {
+            "menu" -> handleMenu(sender)
             "start" -> handleStart(sender, args)
             "stop" -> handleStop(sender, args)
             "theme" -> handleTheme(sender, args)
@@ -28,6 +42,36 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
                 true
             }
         }
+    }
+
+    private fun handleMenu(sender: CommandSender): Boolean {
+        val player = sender as? Player
+        if (player == null) {
+            sender.sendMessage("§cこのコマンドはプレイヤーのみ実行できます")
+            return true
+        }
+
+        if (!featureEnabledProvider()) {
+            sender.sendMessage("§cArena feature は初期化に失敗したため利用できません")
+            featureFailureReasonProvider()?.let { sender.sendMessage("§7理由: $it") }
+            return true
+        }
+
+        val manager = arenaManagerProvider()
+        if (manager == null) {
+            sender.sendMessage("§cArena feature は初期化に失敗したため利用できません")
+            featureFailureReasonProvider()?.let { sender.sendMessage("§7理由: $it") }
+            return true
+        }
+
+        val service = questService
+        if (service == null) {
+            sender.sendMessage("§cアリーナメニューを開けませんでした")
+            return true
+        }
+
+        service.openMenu(player)
+        return true
     }
 
     private fun handleStart(sender: CommandSender, args: Array<out String>): Boolean {
@@ -54,7 +98,14 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
         val mobTypeId = args[2]
         val difficultyId = args[3]
         val theme = args.getOrNull(4)
-        when (val result = arenaManager.startSession(target, mobTypeId, difficultyId, theme)) {
+        val manager = arenaManagerProvider()
+        if (manager == null) {
+            sender.sendMessage("§cArena feature は初期化に失敗したため利用できません")
+            featureFailureReasonProvider()?.let { sender.sendMessage("§7理由: $it") }
+            return true
+        }
+
+        when (val result = manager.startSession(target, mobTypeId, difficultyId, theme)) {
             is ArenaStartResult.Success -> {
                 sender.sendMessage(
                     ArenaI18n.text(
@@ -93,7 +144,14 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
             sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found", "&c対象プレイヤーが見つかりません"))
             return true
         }
-        val stopped = arenaManager.stopSession(
+        val manager = arenaManagerProvider()
+        if (manager == null) {
+            sender.sendMessage("§cArena feature は初期化に失敗したため利用できません")
+            featureFailureReasonProvider()?.let { sender.sendMessage("§7理由: $it") }
+            return true
+        }
+
+        val stopped = manager.stopSession(
             target,
             ArenaI18n.text(target, "arena.messages.session.stopped_by_admin", "&c管理コマンドによりアリーナを停止しました")
         )
@@ -125,7 +183,14 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
             return true
         }
 
-        val ids = arenaManager.getThemeIds().sorted()
+        val manager = arenaManagerProvider()
+        if (manager == null) {
+            sender.sendMessage("§cArena feature は初期化に失敗したため利用できません")
+            featureFailureReasonProvider()?.let { sender.sendMessage("§7理由: $it") }
+            return true
+        }
+
+        val ids = manager.getThemeIds().sorted()
         if (ids.isEmpty()) {
             sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.theme_none", "&e利用可能なテーマがありません"))
             return true
@@ -144,6 +209,7 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
 
     private fun showUsage(sender: CommandSender) {
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.header", "&6=== Arena 管理コマンド ==="))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.menu", "&f/arenaa menu"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s> <mob_type> <difficulty_id> [theme]"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop", "&f/arenaa stop <player>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.theme", "&f/arenaa theme list"))
@@ -156,25 +222,27 @@ class ArenaCommand(private val arenaManager: ArenaManager) : CommandExecutor, Ta
         args: Array<out String>
     ): List<String> {
         if (!sender.hasPermission("cc-content.arena.admin")) return emptyList()
+        if (!featureEnabledProvider()) return emptyList()
 
         return when (args.size) {
-            1 -> listOf("start", "stop", "theme").filter { it.startsWith(args[0], ignoreCase = true) }
+            1 -> listOf("menu", "start", "stop", "theme").filter { it.startsWith(args[0], ignoreCase = true) }
             2 -> when (args[0].lowercase()) {
+                "menu" -> emptyList()
                 "start" -> listOf("@s") + Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], ignoreCase = true) }
-                "stop" -> arenaManager.getActiveSessionPlayerNames().filter { it.startsWith(args[1], ignoreCase = true) }
+                "stop" -> arenaManagerProvider()?.getActiveSessionPlayerNames()?.filter { it.startsWith(args[1], ignoreCase = true) } ?: emptyList()
                 "theme" -> listOf("list").filter { it.startsWith(args[1], ignoreCase = true) }
                 else -> emptyList()
             }
             3 -> when (args[0].lowercase()) {
-                "start" -> arenaManager.getMobTypeIds().filter { it.startsWith(args[2], ignoreCase = true) }
+                "start" -> arenaManagerProvider()?.getMobTypeIds()?.filter { it.startsWith(args[2], ignoreCase = true) } ?: emptyList()
                 else -> emptyList()
             }
             4 -> when (args[0].lowercase()) {
-                "start" -> arenaManager.getDifficultyIds().filter { it.startsWith(args[3], ignoreCase = true) }
+                "start" -> arenaManagerProvider()?.getDifficultyIds()?.filter { it.startsWith(args[3], ignoreCase = true) } ?: emptyList()
                 else -> emptyList()
             }
             5 -> when (args[0].lowercase()) {
-                "start" -> arenaManager.getThemeIds().filter { it.startsWith(args[4], ignoreCase = true) }
+                "start" -> arenaManagerProvider()?.getThemeIds()?.filter { it.startsWith(args[4], ignoreCase = true) } ?: emptyList()
                 else -> emptyList()
             }
             else -> emptyList()

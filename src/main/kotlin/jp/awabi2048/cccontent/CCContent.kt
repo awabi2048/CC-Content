@@ -42,6 +42,7 @@ import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.arena.ArenaItemListener
 import jp.awabi2048.cccontent.features.arena.ArenaListener
 import jp.awabi2048.cccontent.features.arena.ArenaManager
+import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestService
 import jp.awabi2048.cccontent.features.brewery.BreweryFeature
 import jp.awabi2048.cccontent.features.cooking.CookingFeature
 import jp.awabi2048.cccontent.features.rank.RankManager
@@ -111,12 +112,15 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var markerManager: MarkerManager
     private lateinit var adminMarkerToolService: AdminMarkerToolService
     private lateinit var arenaManager: ArenaManager
+    private var arenaQuestService: ArenaQuestService? = null
     private lateinit var sharedMobService: MobService
     private lateinit var breweryFeature: BreweryFeature
     private lateinit var cookingFeature: CookingFeature
     private var rankManagerInstance: RankManagerImpl? = null
     private var ignoreBlockStoreInstance: IgnoreBlockStore? = null
     private lateinit var contentEnabledAtStartup: ContentEnabledSettings
+    private var arenaFeatureReady: Boolean = false
+    private var arenaFeatureFailureReason: String? = null
 
     private data class ContentEnabledSettings(
         val arena: Boolean,
@@ -174,8 +178,23 @@ class CCContent : JavaPlugin(), Listener {
         }
 
         initializeFeatureIfEnabled("Arena", "arena") {
-            arenaManager = ArenaManager(this, sharedMobService)
-            arenaManager.initialize(featureInitLogger)
+            try {
+                arenaFeatureReady = false
+                arenaFeatureFailureReason = null
+                arenaManager = ArenaManager(this, sharedMobService)
+                arenaManager.initialize(featureInitLogger)
+                arenaQuestService = ArenaQuestService(this, arenaManager)
+                arenaQuestService?.initialize()
+                arenaFeatureReady = true
+            } catch (e: Exception) {
+                runCatching { arenaQuestService?.shutdown() }
+                runCatching { if (::arenaManager.isInitialized) arenaManager.shutdown() }
+                arenaQuestService = null
+                arenaFeatureReady = false
+                arenaFeatureFailureReason = e.message?.takeIf { it.isNotBlank() }
+                    ?: "Arena feature の初期化に失敗しました"
+                throw e
+            }
         }
 
         initializeFeatureIfEnabled("Brewery", "brewery") {
@@ -205,6 +224,12 @@ class CCContent : JavaPlugin(), Listener {
             onBlastMineDebug = { player, radius, delayTicksPerLayer, autoCollect, lossRate ->
                 BlastMineHandler.setDebugOverride(player.uniqueId, radius, autoCollect, lossRate)
                 true
+            },
+            onUpdateDay = { target ->
+                when (target) {
+                    null, "arena" -> arenaQuestService?.updateToday() ?: false
+                    else -> false
+                }
             }
         )
 
@@ -213,9 +238,14 @@ class CCContent : JavaPlugin(), Listener {
         getCommand("cc")?.setExecutor(ccCommand)
         getCommand("cc")?.tabCompleter = ccCommand
 
-        if (isContentEnabledAtStartup("arena") && ::arenaManager.isInitialized) {
+        if (isContentEnabledAtStartup("arena")) {
             ArenaI18n.initialize(this)
-            val arenaCommand = ArenaCommand(arenaManager)
+            val arenaCommand = ArenaCommand(
+                arenaManagerProvider = { if (::arenaManager.isInitialized) arenaManager else null },
+                questService = arenaQuestService,
+                featureEnabledProvider = { arenaFeatureReady },
+                featureFailureReasonProvider = { arenaFeatureFailureReason }
+            )
             getCommand("arenaa")?.setExecutor(arenaCommand)
             getCommand("arenaa")?.tabCompleter = arenaCommand
         }
@@ -227,9 +257,12 @@ class CCContent : JavaPlugin(), Listener {
         server.pluginManager.registerEvents(GulliverItemListener(this), this)
         server.pluginManager.registerEvents(AutoIgnitionBoosterListener(this), this)
         server.pluginManager.registerEvents(MobEventListener(sharedMobService), this)
-        if (isContentEnabledAtStartup("arena") && ::arenaManager.isInitialized) {
+        if (isContentEnabledAtStartup("arena") && arenaFeatureReady && ::arenaManager.isInitialized) {
             server.pluginManager.registerEvents(ArenaItemListener(), this)
             server.pluginManager.registerEvents(ArenaListener(arenaManager), this)
+            arenaQuestService?.let {
+                server.pluginManager.registerEvents(it, this)
+            }
         }
         server.pluginManager.registerEvents(CustomHeadGuiListener(this), this)
         server.pluginManager.registerEvents(CustomItemInteractionListener(), this)
@@ -266,6 +299,8 @@ class CCContent : JavaPlugin(), Listener {
             if (::breweryFeature.isInitialized) {
                 breweryFeature.shutdown()
             }
+            arenaQuestService?.shutdown()
+            arenaQuestService = null
             if (::arenaManager.isInitialized) {
                 arenaManager.shutdown()
             }

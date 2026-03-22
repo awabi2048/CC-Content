@@ -22,7 +22,8 @@ class CCCommand(
     private val mobDefinitionIdsProvider: (() -> Collection<String>)? = null,
     private val onSummonMob: ((String, Location) -> LivingEntity?)? = null,
     private val onBatchBreakDebug: ((Player, String, Int, Int, Boolean) -> Boolean)? = null,
-    private val onBlastMineDebug: ((Player, Double, Int, Boolean, Double) -> Boolean)? = null
+    private val onBlastMineDebug: ((Player, Double, Int, Boolean, Double) -> Boolean)? = null,
+    private val onUpdateDay: ((String?) -> Boolean)? = null
 ) : CommandExecutor, TabCompleter {
     
     override fun onCommand(
@@ -54,6 +55,9 @@ class CCCommand(
             }
             "debug" -> {
                 handleDebug(sender, args)
+            }
+            "update_day" -> {
+                handleUpdateDay(sender, args)
             }
             "help" -> {
                 showHelp(sender)
@@ -200,6 +204,45 @@ class CCCommand(
         return true
     }
 
+    private fun handleUpdateDay(sender: CommandSender, args: Array<String>): Boolean {
+        if (!sender.hasPermission("cc-content.admin")) {
+            sender.sendMessage("§c権限がありません")
+            return false
+        }
+
+        if (onUpdateDay == null) {
+            sender.sendMessage("§c日付更新機能が利用できません")
+            return false
+        }
+
+        if (args.size > 2) {
+            sender.sendMessage("§c使用法: /ccc update_day [arena]")
+            return false
+        }
+
+        val target = args.getOrNull(1)?.lowercase()
+        if (target != null && target != "arena") {
+            sender.sendMessage("§c不明な更新対象です: $target")
+            sender.sendMessage("§7現在指定できるのは arena のみです")
+            return false
+        }
+
+        if (target == null) {
+            sender.sendMessage("§6日付更新を実行中...")
+        } else {
+            sender.sendMessage("§6日付更新を実行中: $target")
+        }
+
+        val result = onUpdateDay.invoke(target)
+        if (!result) {
+            sender.sendMessage("§c日付更新に失敗しました")
+            return false
+        }
+
+        sender.sendMessage(if (target == null) "§a日付更新を完了しました" else "§a日付更新を完了しました: $target")
+        return true
+    }
+
     private fun handleClearBlockPlacementData(sender: CommandSender): Boolean {
         if (!sender.hasPermission("cc-content.admin")) {
             sender.sendMessage("§c権限がありません")
@@ -272,12 +315,15 @@ class CCCommand(
               §f/ccc debug <mine_all|cut_all> <delay> <max_chain> <auto_collect>
               §7  - MineAll/CutAll のデバッグ設定を適用します
 
-              §f/ccc debug blast_mine <radius> <delay> <auto_collect> <loss_rate>
-              §7  - BlastMine のデバッグ設定を適用します
-              
-              §f/arenaa §7- アリーナ管理コマンド
-              §f/sukima_dungeon §7- スキマダンジョンコマンド
-          """.trimIndent())
+               §f/ccc debug blast_mine <radius> <delay> <auto_collect> <loss_rate>
+               §7  - BlastMine のデバッグ設定を適用します
+
+               §f/ccc update_day [arena]
+               §7  - 日付更新処理を実行します
+               
+               §f/arenaa §7- アリーナ管理コマンド
+               §f/sukima_dungeon §7- スキマダンジョンコマンド
+           """.trimIndent())
       }
      
      override fun onTabComplete(
@@ -297,9 +343,10 @@ class CCCommand(
                     candidates.add("summon")
                     candidates.add("clear_block_placement_data")
                     candidates.add("debug")
+                    candidates.add("update_day")
                 }
-               return candidates.filter { it.startsWith(prefix) }
-           }
+                return candidates.filter { it.startsWith(prefix) }
+            }
          
          // サブコマンドの引数補完
          return when (args[0].lowercase()) {
@@ -307,8 +354,8 @@ class CCCommand(
                   val subArgs = args.drop(1).toTypedArray()
                   giveCommand.onTabComplete(sender, cmd, "give", subArgs)
               }
-              "debug" -> {
-                  when (args.size) {
+               "debug" -> {
+                   when (args.size) {
                      2 -> listOf("mine_all", "cut_all", "blast_mine").filter { it.startsWith(args[1].lowercase()) }
                      3 -> {
                          when (args[1].lowercase()) {
@@ -337,11 +384,18 @@ class CCCommand(
                              else -> emptyList()
                          }
                      }
-                     else -> emptyList()
-                  }
-              }
-              "summon" -> {
-                  when (args.size) {
+                      else -> emptyList()
+                   }
+               }
+               "update_day" -> {
+                   if (args.size == 2) {
+                       listOf("arena").filter { it.startsWith(args[1], ignoreCase = true) }
+                   } else {
+                       emptyList()
+                   }
+               }
+               "summon" -> {
+                   when (args.size) {
                       2 -> {
                           val ids = mobDefinitionIdsProvider?.invoke().orEmpty().sorted()
                           ids.filter { it.startsWith(args[1], ignoreCase = true) }

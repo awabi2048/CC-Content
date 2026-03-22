@@ -2,6 +2,8 @@ package jp.awabi2048.cccontent.features.arena
 
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageGenerator
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeLoader
+import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
+import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestModifiers
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
@@ -37,6 +39,7 @@ import java.util.Locale
 import java.util.UUID
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.roundToLong
 
 sealed class ArenaStartResult {
     data class Success(
@@ -430,7 +433,8 @@ class ArenaManager(
         target: Player,
         mobTypeId: String,
         difficultyId: String,
-        requestedTheme: String?
+        requestedTheme: String?,
+        questModifiers: ArenaQuestModifiers = ArenaQuestModifiers.NONE
     ): ArenaStartResult {
         if (playerToSessionWorld.containsKey(target.uniqueId)) {
             return ArenaStartResult.Error(
@@ -494,6 +498,7 @@ class ArenaManager(
                 difficultyId = difficulty.id,
                 difficultyValue = difficulty.difficultyValue,
                 waves = difficulty.waves,
+                questModifiers = questModifiers,
                 participants = mutableSetOf(target.uniqueId),
                 returnLocations = mutableMapOf(target.uniqueId to returnLocation),
                 playerSpawn = stage.playerSpawn,
@@ -503,7 +508,8 @@ class ArenaManager(
                 corridorBounds = stage.corridorBounds,
                 roomMobSpawns = stage.roomMobSpawns,
                 corridorDoorBlocks = stage.corridorDoorBlocks,
-                barrierLocation = stage.barrierLocation
+                barrierLocation = stage.barrierLocation,
+                participantSpawnProtectionUntilMillis = System.currentTimeMillis() + 4000L
             )
             sessionsByWorld[world.name] = session
             playerToSessionWorld[target.uniqueId] = world.name
@@ -591,6 +597,10 @@ class ArenaManager(
 
     private fun monitorParticipantPositions() {
         for (session in sessionsByWorld.values.toList()) {
+            val now = System.currentTimeMillis()
+            if (now < session.participantSpawnProtectionUntilMillis) {
+                continue
+            }
             val world = Bukkit.getWorld(session.worldName) ?: continue
 
             for (participantId in session.participants.toList()) {
@@ -886,6 +896,19 @@ class ArenaManager(
         fallbackMessage: String? = null,
         vararg messagePlaceholders: Pair<String, Any?>
     ) {
+        Bukkit.getPluginManager().callEvent(
+            ArenaSessionEndedEvent(
+                ownerPlayerId = session.ownerPlayerId,
+                worldName = session.worldName,
+                themeId = session.themeId,
+                mobTypeId = session.mobTypeId,
+                difficultyId = session.difficultyId,
+                difficultyValue = session.difficultyValue,
+                waves = session.waves,
+                success = success
+            )
+        )
+
         sessionsByWorld.remove(session.worldName)
 
         session.waveSpawnTasks.values.forEach { it.cancel() }
@@ -996,8 +1019,8 @@ class ArenaManager(
             return
         }
 
-        val maxAlive = calculateWaveCount(mobType.maxSummonCount, difficulty, wave)
-        val clearTarget = calculateWaveCount(mobType.clearMobCount, difficulty, wave)
+        val maxAlive = calculateWaveCount(mobType.maxSummonCount, difficulty, wave, session.questModifiers.maxSummonCountMultiplier)
+        val clearTarget = calculateWaveCount(mobType.clearMobCount, difficulty, wave, session.questModifiers.clearMobCountMultiplier)
 
         session.startedWaves.add(wave)
         session.waveKillCount.putIfAbsent(wave, 0)
@@ -1009,8 +1032,8 @@ class ArenaManager(
         updateCurrentWave(session)
     }
 
-    private fun calculateWaveCount(base: Int, difficulty: ArenaDifficultyConfig, wave: Int): Int {
-        val scaled = base * difficulty.mobCountMultiplier * difficulty.waveScale(wave)
+    private fun calculateWaveCount(base: Int, difficulty: ArenaDifficultyConfig, wave: Int, questMultiplier: Double): Int {
+        val scaled = base * difficulty.mobCountMultiplier * difficulty.waveScale(wave) * questMultiplier
         return ceil(scaled).toInt().coerceAtLeast(1)
     }
 
@@ -1021,7 +1044,9 @@ class ArenaManager(
         difficulty: ArenaDifficultyConfig,
         spawns: List<Location>
     ) {
-        val interval = difficulty.mobSpawnIntervalTicks.coerceAtLeast(1L)
+        val interval = (difficulty.mobSpawnIntervalTicks * session.questModifiers.spawnIntervalMultiplier)
+            .roundToLong()
+            .coerceAtLeast(1L)
         val task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
             val currentSession = sessionsByWorld[session.worldName] ?: return@Runnable
             if (!currentSession.startedWaves.contains(wave)) return@Runnable
@@ -1264,7 +1289,7 @@ class ArenaManager(
         entity.removeWhenFarAway = false
         entity.canPickupItems = false
 
-        applyMobStats(entity, definition, difficulty, session.difficultyValue)
+        applyMobStats(entity, definition, difficulty, session.difficultyValue, session.questModifiers)
 
         val combatActivated = session.corridorTriggeredWaves.contains(wave)
         if (!combatActivated) {
@@ -1288,11 +1313,14 @@ class ArenaManager(
         entity: LivingEntity,
         definition: MobDefinition,
         difficulty: ArenaDifficultyConfig,
-        difficultyValue: Double
+        difficultyValue: Double,
+        questModifiers: ArenaQuestModifiers
     ) {
         val progress = difficultyProgress(difficulty.difficultyRange, difficultyValue)
-        val maxHealth = interpolate(definition.health, difficulty.mobStatsMaxHealth, progress).coerceAtLeast(1.0)
-        val attack = interpolate(definition.attack, difficulty.mobStatsMaxAttack, progress).coerceAtLeast(0.0)
+        val maxHealth = (interpolate(definition.health, difficulty.mobStatsMaxHealth, progress) * questModifiers.mobHealthMultiplier)
+            .coerceAtLeast(1.0)
+        val attack = (interpolate(definition.attack, difficulty.mobStatsMaxAttack, progress) * questModifiers.mobAttackMultiplier)
+            .coerceAtLeast(0.0)
         val speed = interpolate(definition.movementSpeed, difficulty.mobStatsMaxMovementSpeed, progress).coerceAtLeast(0.01)
         val armor = interpolate(definition.armor, difficulty.mobStatsMaxArmor, progress).coerceAtLeast(0.0)
         val scale = interpolate(definition.scale, difficulty.mobStatsMaxScale, progress).coerceAtLeast(0.1)

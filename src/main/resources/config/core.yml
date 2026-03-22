@@ -99,6 +99,33 @@ sukima_dungeon:
     send_view_distance: -1
 
 arena:
+  quest:
+    generate_count: 14
+  quest_charactor_config:
+    none:
+      weight: 70
+      spawn_interval_multiplier: 1.0
+      max_summon_count_multiplier: 1.0
+      clear_mob_count_multiplier: 1.0
+      mob_stats_multiplier:
+        health: 1.0
+        attack: 1.0
+    legion:
+      weight: 15
+      spawn_interval_multiplier: 0.5
+      max_summon_count_multiplier: 1.5
+      clear_mob_count_multiplier: 1.5
+      mob_stats_multiplier:
+        health: 0.75
+        attack: 0.75
+    elite:
+      weight: 15
+      spawn_interval_multiplier: 0.5
+      max_summon_count_multiplier: 0.75
+      clear_mob_count_multiplier: 0.75
+      mob_stats_multiplier:
+        health: 1.5
+        attack: 1.5
   world_settings:
     view_distance: 6
     simulation_distance: 4

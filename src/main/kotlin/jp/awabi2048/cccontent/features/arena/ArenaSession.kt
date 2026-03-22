@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.arena
 
 import org.bukkit.Location
 import org.bukkit.scheduler.BukkitTask
+import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestModifiers
 import java.util.UUID
 
 data class ArenaBounds(
@@ -30,6 +31,7 @@ data class ArenaSession(
     val difficultyId: String,
     val difficultyValue: Double,
     val waves: Int,
+    val questModifiers: ArenaQuestModifiers = ArenaQuestModifiers.NONE,
     val participants: MutableSet<UUID>,
     val returnLocations: MutableMap<UUID, Location>,
     val playerSpawn: Location,
@@ -40,6 +42,7 @@ data class ArenaSession(
     val roomMobSpawns: Map<Int, List<Location>>,
     val corridorDoorBlocks: Map<Int, List<Location>>,
     val barrierLocation: Location,
+    var participantSpawnProtectionUntilMillis: Long = 0L,
     var currentWave: Int = 0,
     var fallbackWave: Int = 1,
     var stageStarted: Boolean = false,
