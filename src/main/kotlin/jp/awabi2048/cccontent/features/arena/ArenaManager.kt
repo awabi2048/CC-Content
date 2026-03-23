@@ -592,7 +592,7 @@ class ArenaManager(
             }
             ArenaStartResult.Error(
                 "arena.messages.command.start_error.stage_build_failed",
-                "&cステージ生成に失敗しました: {message}",
+                "&c{message}",
                 arrayOf("message" to (e.message ?: "unknown"))
             )
         }
