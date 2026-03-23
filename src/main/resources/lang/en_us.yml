@@ -354,7 +354,7 @@ custom_items:
           undefined_wave_spawn: '&cmob_type ''{mob_type}'' has no spawn definition for wave {wave}'
           theme_not_found: '&cNo valid theme was found'
           world_create_failed: '&cFailed to create arena world'
-          stage_build_failed: '&cFailed to generate stage: {message}'
+          stage_build_failed: '&c{message}'
       barrier:
         cannot_break: '&cThe barrier core cannot be broken'
         cannot_place_on: '&cYou cannot place blocks on the barrier core'
