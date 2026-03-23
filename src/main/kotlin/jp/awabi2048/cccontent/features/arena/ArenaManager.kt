@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.arena
 
 import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageGenerator
+import jp.awabi2048.cccontent.features.arena.generator.ArenaStageBuildException
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeLoader
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
 import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestModifiers
@@ -584,6 +585,10 @@ class ArenaManager(
             initializeWavePipeline(session, mobType, difficulty)
             ArenaStartResult.Success(theme.id, difficulty.waves, mobType.id, difficulty.id, difficulty.display)
         } catch (e: Exception) {
+            if (e is ArenaStageBuildException) {
+                plugin.logger.severe("[Arena] ステージの生成に失敗しました: ${e.message}")
+                e.printStackTrace()
+            }
             val failedSession = sessionsByWorld[world.name]
             if (failedSession != null) {
                 terminateSession(failedSession, false)
