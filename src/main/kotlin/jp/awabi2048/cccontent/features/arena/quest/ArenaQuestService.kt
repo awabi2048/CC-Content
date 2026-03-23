@@ -113,6 +113,8 @@ class ArenaQuestService(
         }
         val quest = questSet.quests.getOrNull(questIndex) ?: return true
 
+        playUiClick(player)
+
         if (isQuestCompleted(player.uniqueId, holder.dateKey, quest.index)) {
             player.sendMessage("§eこのクエストはすでに完了済みです")
             return true
@@ -131,10 +133,12 @@ class ArenaQuestService(
 
         return when (rawSlot) {
             ArenaQuestLayout.CONFIRM_OK_SLOT -> {
+                playUiClick(player)
                 startQuest(player, holder.dateKey, holder.questIndex)
                 true
             }
             ArenaQuestLayout.CONFIRM_CANCEL_SLOT -> {
+                playUiClick(player)
                 if (!openMenu(player, holder.dateKey)) {
                     player.sendMessage("§cアリーナメニューを開けませんでした")
                 }
@@ -232,14 +236,18 @@ class ArenaQuestService(
                     activeQuests[player.uniqueId] = ArenaActiveQuestRecord(dateKey, quest.index, quest)
                 }
                 is ArenaStartResult.Error -> {
-                    player.sendMessage(
-                        ArenaI18n.text(
-                            player,
-                            result.messageKey,
-                            result.fallback,
-                            *result.placeholders
+                    if (result.messageKey == "arena.messages.command.start_error.stage_build_failed") {
+                        player.sendMessage("§cステージの生成に失敗しました。スタッフに報告してください。(STRUCTURE_ERROR)")
+                    } else {
+                        player.sendMessage(
+                            ArenaI18n.text(
+                                player,
+                                result.messageKey,
+                                result.fallback,
+                                *result.placeholders
+                            )
                         )
-                    )
+                    }
                 }
             }
         })
@@ -665,15 +673,14 @@ class ArenaQuestService(
         fillMenuBackground(inventory)
 
         val playerData = getPlayerData(player.uniqueId)
-        val completedCount = questSet.quests.count { playerData.isCompleted(questSet.dateKey, it.index) }
 
-        renderQuestSlots(inventory, questSet)
-        inventory.setItem(ArenaQuestLayout.MENU_PLAYER_SLOT, createPlayerHead(player, playerData, completedCount, questSet.quests.size))
+        renderQuestSlots(inventory, player.uniqueId, questSet)
+        inventory.setItem(ArenaQuestLayout.MENU_PLAYER_SLOT, createPlayerHead(player, playerData))
         inventory.setItem(ArenaQuestLayout.MENU_INFO_SLOT, createInfoItem())
         inventory.setItem(ArenaQuestLayout.MENU_REFRESH_SLOT, createRefreshItem())
     }
 
-    private fun renderQuestSlots(inventory: Inventory, questSet: ArenaDailyQuestSet) {
+    private fun renderQuestSlots(inventory: Inventory, playerId: UUID, questSet: ArenaDailyQuestSet) {
         for ((position, slot) in ArenaQuestLayout.MENU_QUEST_SLOTS.withIndex()) {
             val quest = questSet.quests.getOrNull(position)
             if (quest == null) {
@@ -681,15 +688,15 @@ class ArenaQuestService(
                 continue
             }
 
-            inventory.setItem(slot, createQuestItem(quest))
+            inventory.setItem(slot, createQuestItem(quest, isQuestCompleted(playerId, questSet.dateKey, quest.index)))
         }
     }
 
     private fun renderConfirmMenu(inventory: Inventory, quest: ArenaDailyQuestEntry) {
         fillConfirmBackground(inventory)
-        inventory.setItem(ArenaQuestLayout.CONFIRM_OK_SLOT, createActionItem(Material.LIME_STAINED_GLASS_PANE, "§a§lOK", listOf("§7このクエストを開始します")))
+        inventory.setItem(ArenaQuestLayout.CONFIRM_OK_SLOT, createActionItem(Material.LIME_WOOL, "§aOK", listOf("§7このクエストを開始します")))
         inventory.setItem(ArenaQuestLayout.CONFIRM_QUEST_SLOT, createQuestSummaryItem(quest))
-        inventory.setItem(ArenaQuestLayout.CONFIRM_CANCEL_SLOT, createActionItem(Material.RED_STAINED_GLASS_PANE, "§c§lキャンセル", listOf("§7クエスト開始を取り消します")))
+        inventory.setItem(ArenaQuestLayout.CONFIRM_CANCEL_SLOT, createActionItem(Material.RED_WOOL, "§cキャンセル", listOf("§7クエスト開始を取り消します")))
     }
 
     private fun openConfirmMenu(player: Player, dateKey: String, questIndex: Int): Boolean {
@@ -748,11 +755,11 @@ class ArenaQuestService(
         return item
     }
 
-    private fun createQuestItem(quest: ArenaDailyQuestEntry): ItemStack {
+    private fun createQuestItem(quest: ArenaDailyQuestEntry, isCompleted: Boolean): ItemStack {
         val item = ItemStack(Material.ROTTEN_FLESH)
         val meta = item.itemMeta ?: return item
-        meta.setDisplayName("§aクエスト: ${formatQuestMobName(quest.mobTypeId)}")
-        meta.lore = buildQuestLore(quest)
+        meta.setDisplayName(if (isCompleted) "§a§mクエスト: ${formatQuestMobName(quest.mobTypeId)}" else "§aクエスト: ${formatQuestMobName(quest.mobTypeId)}")
+        meta.lore = buildQuestLore(quest, showActionText = true, isCompleted = isCompleted)
         item.itemMeta = meta
         return item
     }
@@ -761,18 +768,19 @@ class ArenaQuestService(
         return createActionItem(
             Material.ROTTEN_FLESH,
             "§aクエスト: ${formatQuestMobName(quest.mobTypeId)}",
-            buildQuestLore(quest)
+            buildQuestLore(quest, showActionText = false, isCompleted = false)
         )
     }
 
-    private fun createPlayerHead(player: Player, playerData: ArenaPlayerQuestData, completedCount: Int, questCount: Int): ItemStack {
+    private fun createPlayerHead(player: Player, playerData: ArenaPlayerQuestData): ItemStack {
         val item = ItemStack(Material.PLAYER_HEAD)
         val meta = item.itemMeta as? SkullMeta ?: return item
         meta.owningPlayer = player
-        meta.setDisplayName("§6§l${player.name}")
+        meta.setDisplayName("§6${player.name}")
         meta.lore = listOf(
-            "§7累計クリア数: §f${playerData.totalClearCount}",
-            "§7今日の完了数: §f$completedCount/$questCount"
+            "§8§m――――――――――――――――――――",
+            "§f| §7累計クエストクリア §e${playerData.totalClearCount}回",
+            "§8§m――――――――――――――――――――"
         )
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
         item.itemMeta = meta
@@ -782,7 +790,7 @@ class ArenaQuestService(
     private fun createInfoItem(): ItemStack {
         return createActionItem(
             Material.BOOK,
-            "§b§lInfo",
+            "§bInfo",
             listOf(
                 "§7ここにはダミー説明を表示します",
                 "§7アリーナクエストの一覧を確認できます",
@@ -799,17 +807,23 @@ class ArenaQuestService(
         )
     }
 
-    private fun buildQuestLore(quest: ArenaDailyQuestEntry): List<String> {
+    private fun buildQuestLore(quest: ArenaDailyQuestEntry, showActionText: Boolean, isCompleted: Boolean): List<String> {
         val charactor = charactorDefinition(quest.charactorId)
-        return listOf(
+        val lore = mutableListOf(
             "§8§m――――――――――――――――――――",
             "§f│ §7出現モブ §e${formatQuestMobName(quest.mobTypeId)}",
             "§f│ §7特徴 ${charactorColor(quest.charactorId)}${charactor.displayName}",
             "§f│ §7難易度 ${difficultyDisplay(quest.difficultyId)}",
-            "§8§m――――――――――――――――――――",
-            "",
-            "§e§nクリックしてこのクエストを受注する"
+            "§8§m――――――――――――――――――――"
         )
+        if (showActionText) {
+            lore += if (isCompleted) "§a§n完了済み" else "§e§nクリックしてこのクエストを受注する"
+        }
+        return lore
+    }
+
+    private fun playUiClick(player: Player) {
+        player.playSound(player.location, "minecraft:ui.button.click", 0.8f, 2.0f)
     }
 
     private fun difficultyDisplay(difficultyId: String): String {
