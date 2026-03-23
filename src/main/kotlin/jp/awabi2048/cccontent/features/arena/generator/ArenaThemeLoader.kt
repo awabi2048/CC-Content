@@ -2,7 +2,6 @@ package jp.awabi2048.cccontent.features.arena.generator
 
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import org.bukkit.Bukkit
-import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.structure.Structure
 import java.io.File
@@ -47,39 +46,23 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
     private val themes = mutableMapOf<String, ArenaTheme>()
 
     fun load(featureInitLogger: FeatureInitializationLogger? = null) {
-        val configFile = File(plugin.dataFolder, "config/arena/theme.yml")
-        if (!configFile.exists()) {
-            configFile.parentFile.mkdirs()
-            plugin.saveResource("config/arena/theme.yml", false)
-        }
-
-        val config = YamlConfiguration.loadConfiguration(configFile)
-        val themesSection = config.getConfigurationSection("themes")
         themes.clear()
         val warnings = mutableListOf<String>()
-
-        if (themesSection == null) {
-            plugin.logger.warning("[Arena] テーマ定義が空です: arena/theme.yml")
-            featureInitLogger?.apply {
-                setStatus("Arena", FeatureInitializationLogger.Status.FAILURE)
-                addDetailMessage("Arena", "[Arena] テーマ定義が空です: arena/theme.yml")
-            }
-            return
-        }
 
         val structureRoot = File(plugin.dataFolder, "structures/arena")
         if (!structureRoot.exists()) {
             structureRoot.mkdirs()
         }
 
-        for (themeId in themesSection.getKeys(false)) {
-            val path = themesSection.getString("$themeId.path") ?: themeId
+        val themeFolders = structureRoot.listFiles { file -> file.isDirectory }?.sortedBy { it.name } ?: emptyList()
+        if (themeFolders.isEmpty()) {
+            val warning = "[Arena] テーマ用ストラクチャーフォルダが見つかりません: structures/arena"
+            plugin.logger.warning(warning)
+            warnings.add(warning)
+        }
 
-            val folder = File(structureRoot, path)
-            if (!folder.exists()) {
-                folder.mkdirs()
-            }
-
+        for (folder in themeFolders) {
+            val themeId = folder.name
             val structures = loadStructures(folder)
             val missing = ArenaStructureType.entries.filter { structures[it].isNullOrEmpty() }
             if (missing.isNotEmpty()) {
@@ -90,16 +73,23 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             }
 
             val templates = structures.values.flatten()
+            if (templates.isEmpty()) {
+                val warning = "[Arena] 有効なストラクチャーが見つからないためスキップ: $themeId"
+                plugin.logger.warning(warning)
+                warnings.add(warning)
+                continue
+            }
+
             val gridPitch = templates.maxOfOrNull { maxOf(it.size.x, it.size.z) } ?: 1
 
-            themes[themeId] = ArenaTheme(themeId, path, gridPitch, structures)
+            themes[themeId] = ArenaTheme(themeId, folder.name, gridPitch, structures)
         }
 
         // FeatureInitializationLogger に情報を送信
         featureInitLogger?.apply {
             if (themes.isEmpty()) {
                 setStatus("Arena", FeatureInitializationLogger.Status.FAILURE)
-                addDetailMessage("Arena", "[Arena] テーマ読み込み失敗: テーマが0個です")
+                addDetailMessage("Arena", "[Arena] テーマ読み込み失敗: 有効なテーマが0個です")
             } else if (warnings.isNotEmpty()) {
                 setStatus("Arena", FeatureInitializationLogger.Status.WARNING)
                 addSummaryMessage("Arena", "テーマ${themes.size}種")
