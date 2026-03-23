@@ -15,9 +15,8 @@ object SproutManager {
 
     fun populate(plugin: JavaPlugin, world: World, targetCount: Int, missingStructures: List<String> = emptyList()): Int {
         // Find all "SPROUT" markers
-        val markers = world.entities.filter { 
-            (it is org.bukkit.entity.Marker && it.scoreboardTags.contains("sd.marker.sprout")) ||
-            (it is ArmorStand && it.customName == "SPROUT")
+        val markers = world.entities.filter {
+            it is org.bukkit.entity.Marker && it.scoreboardTags.contains("sd.marker.sprout")
         }
         
         if (markers.isEmpty()) {

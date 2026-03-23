@@ -293,8 +293,7 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
                                 "sd.marker.spawn"
                             )
                             val markerCount = world.entities.count {
-                                (it is org.bukkit.entity.Marker && it.scoreboardTags.contains("sd.marker.spawn")) ||
-                                    (it is org.bukkit.entity.ArmorStand && it.customName == "SPAWN")
+                                it is org.bukkit.entity.Marker && it.scoreboardTags.contains("sd.marker.spawn")
                             }
                             plugin.logger.warning(
                                 "[SukimaDungeon] 生成ダンジョン内に spawn マーカーが見つかりません。" +

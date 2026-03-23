@@ -71,6 +71,21 @@ sukima_dungeon:
   command_restricted: "&cThis command cannot be used inside the dungeon."
   command_generator_failed: "&cDungeon generation failed."
   common_bar: "&7&m――――――――――――――――――――――――――――――"
+  marker:
+    current_mode: '&f§l| §7Current Mode §a{mode}'
+    mode_changed: '&7Placement mode changed to §a{mode}§7.'
+    placed: '&b[Marker] {mode} §fmarker placed.'
+    removed: '&b[Marker] {mode} §fmarker removed.'
+    usage:
+      place: '&eRight click block§7 to place a marker on the outside of the face'
+      delete: '&eShift + right click§7 to remove the marker in your line of sight'
+      switch: '&eF key§7 to switch to the next mode'
+    modes:
+      mob: '&cMob'
+      npc: '&aNPC'
+      item: '&bItem'
+      sprout: '&dSprout'
+      spawn: '&fSpawn'
 
   gui_entrance_title: "&5Connect Portals"
   gui_entrance_button: "&b&lOpen Dungeon Portal"
@@ -329,6 +344,20 @@ custom_items:
       name: "§6Arena Prize Box"
       lore:
         - "§7Victory reward from the arena"
+    marker:
+      current_mode: '&f§l| §7Current Mode §a{mode}'
+      mode_changed: '&7Placement mode changed to §a{mode}§7.'
+      placed: '&b[Marker] {mode} §fmarker placed.'
+      removed: '&b[Marker] {mode} §fmarker removed.'
+      usage:
+        place: '&eRight click block§7 to place a marker on the outside of the face'
+        delete: '&eShift + right click§7 to remove the marker in your line of sight'
+        switch: '&eF key§7 to switch to the next mode'
+      modes:
+        mob: '&cMob'
+        entrance: '&aEntrance'
+        door_block: '&eDoor'
+        barrier_core: '&bBarrier Core'
     messages:
       command:
         no_permission: '&cYou do not have permission'

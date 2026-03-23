@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.items.marker
 
+import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
 import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
@@ -32,12 +33,14 @@ import org.bukkit.scheduler.BukkitRunnable
 import org.bukkit.util.BoundingBox
 import org.bukkit.util.Vector
 import java.util.UUID
+import kotlin.math.round
 
 class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
     data class MarkerToolMode(
         val id: String,
         val tag: String,
-        val displayName: String,
+        val nameKey: String,
+        val fallbackName: String,
         val particle: Particle,
         val previewColor: Color
     )
@@ -46,6 +49,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         val toolId: String,
         val displayName: String,
         val itemModel: NamespacedKey,
+        val messageKeyPrefix: String,
         val modes: List<MarkerToolMode>,
         val unavailableMessage: (Player) -> String?
     )
@@ -53,7 +57,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
     private data class DeletionPreview(
         val marker: Marker,
         val mode: MarkerToolMode,
-        val block: Block,
+        val location: Location,
         val distance: Double
     )
 
@@ -74,12 +78,13 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             toolId = "sukima_dungeon.marker_tool",
             displayName = "§dスキマ管理マーカーツール",
             itemModel = NamespacedKey.minecraft("blaze_rod"),
+            messageKeyPrefix = "marker",
             modes = listOf(
-                MarkerToolMode("mob", "sd.marker.mob", "§cMOB", Particle.FLAME, Color.fromRGB(255, 96, 96)),
-                MarkerToolMode("npc", "sd.marker.npc", "§aNPC", Particle.HAPPY_VILLAGER, Color.fromRGB(96, 255, 128)),
-                MarkerToolMode("item", "sd.marker.item", "§bITEM", Particle.SOUL_FIRE_FLAME, Color.fromRGB(96, 224, 255)),
-                MarkerToolMode("sprout", "sd.marker.sprout", "§dSPROUT", Particle.GLOW, Color.fromRGB(255, 128, 224)),
-                MarkerToolMode("spawn", "sd.marker.spawn", "§fSPAWN", Particle.CLOUD, Color.fromRGB(240, 240, 240))
+                MarkerToolMode("mob", "sd.marker.mob", "modes.mob", "§cモブ", Particle.FLAME, Color.fromRGB(255, 96, 96)),
+                MarkerToolMode("npc", "sd.marker.npc", "modes.npc", "§aNPC", Particle.HAPPY_VILLAGER, Color.fromRGB(96, 255, 128)),
+                MarkerToolMode("item", "sd.marker.item", "modes.item", "§bアイテム", Particle.SOUL_FIRE_FLAME, Color.fromRGB(96, 224, 255)),
+                MarkerToolMode("sprout", "sd.marker.sprout", "modes.sprout", "§d芽", Particle.GLOW, Color.fromRGB(255, 128, 224)),
+                MarkerToolMode("spawn", "sd.marker.spawn", "modes.spawn", "§fスポーン", Particle.CLOUD, Color.fromRGB(240, 240, 240))
             ),
             unavailableMessage = { player ->
                 if (isSukimaDungeonWorld(player.world)) {
@@ -93,11 +98,12 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             toolId = "arena.marker_tool",
             displayName = "§6アリーナ管理マーカーツール",
             itemModel = NamespacedKey.minecraft("blaze_rod"),
+            messageKeyPrefix = "marker",
             modes = listOf(
-                MarkerToolMode("mob", "arena.marker.mob", "§cMOB", Particle.FLAME, Color.fromRGB(255, 96, 96)),
-                MarkerToolMode("entrance", "arena.marker.entrance", "§aENTRANCE", Particle.HAPPY_VILLAGER, Color.fromRGB(96, 255, 128)),
-                MarkerToolMode("door_block", "arena.marker.door_block", "§eDOOR", Particle.WAX_OFF, Color.fromRGB(255, 224, 96)),
-                MarkerToolMode("barrier_core", "arena.marker.barrier_core", "§bBARRIER", Particle.END_ROD, Color.fromRGB(96, 224, 255))
+                MarkerToolMode("mob", "arena.marker.mob", "modes.mob", "§cモブ", Particle.FLAME, Color.fromRGB(255, 96, 96)),
+                MarkerToolMode("entrance", "arena.marker.entrance", "modes.entrance", "§a入口", Particle.HAPPY_VILLAGER, Color.fromRGB(96, 255, 128)),
+                MarkerToolMode("door_block", "arena.marker.door_block", "modes.door_block", "§e扉", Particle.WAX_OFF, Color.fromRGB(255, 224, 96)),
+                MarkerToolMode("barrier_core", "arena.marker.barrier_core", "modes.barrier_core", "§b結界核", Particle.END_ROD, Color.fromRGB(96, 224, 255))
             ),
             unavailableMessage = { null }
         )
@@ -145,7 +151,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             val preview = resolveDeletionPreview(player, definition)
             if (preview != null) {
                 preview.marker.remove()
-                player.sendMessage("§b[Marker] ${preview.mode.displayName} §fマーカーを削除しました。")
+                player.sendMessage(text(definition, player, "removed", "§b[Marker] {mode} §fマーカーを削除しました。", "mode" to getModeDisplayName(player, definition, preview.mode)))
                 player.playSound(player.location, Sound.BLOCK_ANVIL_BREAK, 0.5f, 2.0f)
                 return
             }
@@ -154,10 +160,10 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         if (event.action != Action.RIGHT_CLICK_BLOCK) return
         val clickedBlock = event.clickedBlock ?: return
         val blockFace = event.blockFace
-        val targetBlock = clickedBlock.getRelative(blockFace)
         val mode = getMode(item, definition)
-        spawnMarker(targetBlock, mode)
-        player.sendMessage("§b[Marker] ${mode.displayName} §fマーカーを設置しました。")
+        val placementLocation = resolvePlacementLocation(player, clickedBlock, blockFace)
+        spawnMarker(placementLocation, mode)
+        player.sendMessage(text(definition, player, "placed", "§b[Marker] {mode} §fマーカーを設置しました。", "mode" to getModeDisplayName(player, definition, mode)))
         player.playSound(player.location, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.5f)
     }
 
@@ -190,15 +196,14 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         meta.persistentDataContainer.set(modeIdKey, PersistentDataType.STRING, newMode.id)
         updateLore(meta, definition, newMode, player)
         item.itemMeta = meta
-        player.sendActionBar(Component.text("§7設置モードを ${newMode.displayName} §7に変更しました。"))
+        player.sendActionBar(Component.text(text(definition, player, "mode_changed", "§7設置モードを {mode} §7に変更しました。", "mode" to getModeDisplayName(player, definition, newMode))))
         player.playSound(player.location, Sound.UI_BUTTON_CLICK, 1.0f, 2.0f)
     }
 
     fun cleanupMarkers(world: World, tagPrefix: String) {
         world.entities.forEach { entity ->
             val hasTag = entity.scoreboardTags.any { it.startsWith(tagPrefix) }
-            val isOldArmorStand = entity is org.bukkit.entity.ArmorStand && listOf("MOB", "NPC", "ITEM", "SPROUT", "SPAWN").contains(entity.customName)
-            if (hasTag || isOldArmorStand) {
+            if (hasTag) {
                 entity.remove()
             }
         }
@@ -214,28 +219,114 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         return definition.modes.firstOrNull { it.id == modeId } ?: definition.modes.first()
     }
 
+    private fun getModeDisplayName(player: Player?, definition: MarkerToolDefinition, mode: MarkerToolMode): String {
+        return text(definition, player, mode.nameKey, mode.fallbackName)
+    }
+
+    private fun text(
+        definition: MarkerToolDefinition,
+        player: Player?,
+        keySuffix: String,
+        fallback: String,
+        vararg placeholders: Pair<String, Any?>
+    ): String {
+        val fullKey = if (definition.toolId == "arena.marker_tool") {
+            "arena.${definition.messageKeyPrefix}.$keySuffix"
+        } else {
+            "${definition.messageKeyPrefix}.$keySuffix"
+        }
+
+        return when (definition.toolId) {
+            "arena.marker_tool" -> ArenaI18n.text(player, fullKey, fallback, *placeholders)
+            "sukima_dungeon.marker_tool" -> MessageManager.getMessage(
+                player,
+                fullKey,
+                placeholders.associate { it.first to (it.second?.toString() ?: "null") }
+            )
+            else -> fallback
+        }
+    }
+
     private fun updateLore(meta: ItemMeta, definition: MarkerToolDefinition, mode: MarkerToolMode, player: Player?) {
         val bar = if (definition.toolId == "sukima_dungeon.marker_tool") {
             MessageManager.getMessage(player, "common_bar")
         } else {
             "§8----------------"
         }
+        val modeName = getModeDisplayName(player, definition, mode)
         meta.lore = listOf(
             bar,
-            "§f§l| §7現在のモード §a${mode.displayName}",
+            text(definition, player, "current_mode", "§f§l| §7現在のモード §a{mode}", "mode" to modeName),
             "",
-            "§e右クリック(ブロック)§7 クリック面の外側にマーカーを設置",
-            "§eShift + 右クリック§7 視線上のマーカーを削除",
-            "§eFキー§7 次のモードへ変更",
+            text(definition, player, "usage.place", "§e右クリック(ブロック)§7 クリック面の外側にマーカーを設置"),
+            text(definition, player, "usage.delete", "§eShift + 右クリック§7 視線上のマーカーを削除"),
+            text(definition, player, "usage.switch", "§eFキー§7 次のモードへ変更"),
             bar
         )
     }
 
-    private fun spawnMarker(targetBlock: Block, mode: MarkerToolMode) {
-        val world = targetBlock.world
-        val markerLocation = targetBlock.location.add(0.5, 0.5, 0.5)
+    private fun spawnMarker(markerLocation: Location, mode: MarkerToolMode) {
+        val world = markerLocation.world
+        if (world == null) return
         val marker = world.spawnEntity(markerLocation, EntityType.MARKER) as Marker
         marker.addScoreboardTag(mode.tag)
+    }
+
+    private fun resolvePlacementLocation(player: Player, clickedBlock: Block, blockFace: BlockFace): Location {
+        val rayTrace = placementRayTrace(player)
+        val hitPosition = if (rayTrace?.hitBlock == clickedBlock && rayTrace.hitBlockFace == blockFace) {
+            rayTrace.hitPosition
+        } else {
+            null
+        }
+        return if (hitPosition != null) {
+            snapMarkerToFace(clickedBlock, blockFace, hitPosition)
+        } else {
+            markerFaceCenter(clickedBlock, blockFace)
+        }
+    }
+
+    private fun placementRayTrace(player: Player) = player.world.rayTraceBlocks(
+        player.eyeLocation,
+        player.eyeLocation.direction,
+        interactionReach(player),
+        FluidCollisionMode.NEVER,
+        true
+    )
+
+    private fun markerFaceCenter(block: Block, face: BlockFace): Location {
+        val centerHit = Vector(block.x + 0.5, block.y + 0.5, block.z + 0.5)
+        return snapMarkerToFace(block, face, centerHit)
+    }
+
+    private fun snapMarkerToFace(block: Block, face: BlockFace, hitPosition: Vector): Location {
+        return when {
+            face.modX != 0 -> Location(
+                block.world,
+                block.x + 0.5 + face.modX * 0.75,
+                snapFaceGrid(hitPosition.y, block.y),
+                snapFaceGrid(hitPosition.z, block.z)
+            )
+            face.modY != 0 -> Location(
+                block.world,
+                snapFaceGrid(hitPosition.x, block.x),
+                block.y + 0.5 + face.modY * 0.75,
+                snapFaceGrid(hitPosition.z, block.z)
+            )
+            face.modZ != 0 -> Location(
+                block.world,
+                snapFaceGrid(hitPosition.x, block.x),
+                snapFaceGrid(hitPosition.y, block.y),
+                block.z + 0.5 + face.modZ * 0.75
+            )
+            else -> block.location.clone().add(0.5, 0.5, 0.5)
+        }
+    }
+
+    private fun snapFaceGrid(value: Double, blockCoord: Int): Double {
+        val local = value - blockCoord.toDouble()
+        val snapped = round(local * 2.0) / 2.0
+        return blockCoord.toDouble() + snapped.coerceIn(0.0, 0.5)
     }
 
     private fun startPreviewTask() {
@@ -249,16 +340,16 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                     if (player.isSneaking) {
                         val preview = resolveDeletionPreview(player, definition)
                         if (preview != null) {
-                            drawDustBlockOutline(preview.block, Color.fromRGB(255, 64, 64), DELETE_PREVIEW_DUST_SIZE)
+                            drawDustLocationOutline(preview.location, Color.fromRGB(255, 64, 64), DELETE_PREVIEW_DUST_SIZE)
                             continue
                         }
                         val placementPreview = resolvePlacementPreview(player) ?: continue
                         val mode = getMode(item, definition)
-                        drawDustBlockOutline(placementPreview, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
+                        drawDustLocationOutline(placementPreview, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
                     } else {
                         val preview = resolvePlacementPreview(player) ?: continue
                         val mode = getMode(item, definition)
-                        drawDustBlockOutline(preview, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
+                        drawDustLocationOutline(preview, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
                     }
                 }
             }
@@ -276,14 +367,14 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                         .forEach { marker ->
                             val mode = definition.modes.firstOrNull { marker.scoreboardTags.contains(it.tag) } ?: return@forEach
                             if (marker.scoreboardTags.none { it in tags }) return@forEach
-                            drawParticleBlockOutline(marker.location.block, mode.particle)
+                            drawParticleLocationOutline(marker.location, mode.particle)
                         }
                 }
             }
         }.runTaskTimer(plugin, MARKER_PARTICLE_INTERVAL_TICKS, MARKER_PARTICLE_INTERVAL_TICKS)
     }
 
-    private fun resolvePlacementPreview(player: Player): Block? {
+    private fun resolvePlacementPreview(player: Player): Location? {
         val reach = interactionReach(player)
         val rayTrace = player.world.rayTraceBlocks(
             player.eyeLocation,
@@ -292,9 +383,9 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             FluidCollisionMode.NEVER,
             true
         ) ?: return null
-        val hitBlock = rayTrace.hitBlock ?: return null
-        val hitFace = rayTrace.hitBlockFace ?: return null
-        return hitBlock.getRelative(hitFace)
+        val block = rayTrace.hitBlock ?: return null
+        val face = rayTrace.hitBlockFace ?: return null
+        return snapMarkerToFace(block, face, rayTrace.hitPosition)
     }
 
     private fun resolveDeletionPreview(player: Player, definition: MarkerToolDefinition): DeletionPreview? {
@@ -313,19 +404,31 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             .filterIsInstance<Marker>()
             .mapNotNull { marker ->
                 val mode = definition.modes.firstOrNull { marker.scoreboardTags.contains(it.tag) } ?: return@mapNotNull null
-                val block = marker.location.block
-                val box = BoundingBox.of(block)
+                val location = marker.location.clone()
+                val box = markerBoundingBox(location)
                 val hitDistance = intersectRay(box, start, direction, reach) ?: return@mapNotNull null
-                if (isBlockedBefore(blockingHit?.hitBlock, block, hitDistance, blockingHit?.hitPosition?.distance(start))) {
+                if (isBlockedBefore(blockingHit?.hitBlock, location, hitDistance, blockingHit?.hitPosition?.distance(start))) {
                     return@mapNotNull null
                 }
-                DeletionPreview(marker, mode, block, hitDistance)
+                DeletionPreview(marker, mode, location, hitDistance)
             }
             .minByOrNull { it.distance }
     }
 
-    private fun isBlockedBefore(hitBlock: Block?, targetBlock: Block, targetDistance: Double, blockingDistance: Double?): Boolean {
+    private fun markerBoundingBox(location: Location): BoundingBox {
+        return BoundingBox(
+            location.x - 0.25,
+            location.y - 0.25,
+            location.z - 0.25,
+            location.x + 0.25,
+            location.y + 0.25,
+            location.z + 0.25
+        )
+    }
+
+    private fun isBlockedBefore(hitBlock: Block?, targetLocation: Location, targetDistance: Double, blockingDistance: Double?): Boolean {
         if (hitBlock == null || blockingDistance == null) return false
+        val targetBlock = targetLocation.block
         if (sameBlock(hitBlock, targetBlock)) return false
         return blockingDistance + 1.0E-4 < targetDistance
     }
@@ -368,28 +471,62 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         return if (tMax >= 0.0 && tMin <= maxDistance) tMin.coerceAtLeast(0.0) else null
     }
 
-    private fun drawDustBlockOutline(block: Block, color: Color, size: Float) {
-        val world = block.world
+    private fun drawDustLocationOutline(location: Location, color: Color, size: Float) {
+        val world = location.world ?: return
+        drawDustOutline(
+            world,
+            location.x - 0.25,
+            location.y - 0.25,
+            location.z - 0.25,
+            location.x + 0.25,
+            location.y + 0.25,
+            location.z + 0.25,
+            color,
+            size
+        )
+    }
+
+    private fun drawDustOutline(
+        world: World,
+        minX: Double,
+        minY: Double,
+        minZ: Double,
+        maxX: Double,
+        maxY: Double,
+        maxZ: Double,
+        color: Color,
+        size: Float
+    ) {
         val dust = Particle.DustOptions(color, size)
-        for ((x, y, z) in outlinePoints(block, PREVIEW_OUTLINE_STEP)) {
+        for ((x, y, z) in outlinePoints(minX, minY, minZ, maxX, maxY, maxZ, PREVIEW_OUTLINE_STEP)) {
             world.spawnParticle(Particle.DUST, x, y, z, 1, 0.0, 0.0, 0.0, 0.0, dust)
         }
     }
 
-    private fun drawParticleBlockOutline(block: Block, particle: Particle) {
-        val world = block.world
-        for ((x, y, z) in outlinePoints(block, MARKER_OUTLINE_STEP)) {
+    private fun drawParticleLocationOutline(location: Location, particle: Particle) {
+        val world = location.world ?: return
+        for ((x, y, z) in outlinePoints(
+            location.x - 0.25,
+            location.y - 0.25,
+            location.z - 0.25,
+            location.x + 0.25,
+            location.y + 0.25,
+            location.z + 0.25,
+            MARKER_OUTLINE_STEP
+        )) {
             world.spawnParticle(particle, x, y, z, 1, 0.0, 0.0, 0.0, 0.0)
         }
     }
 
-    private fun outlinePoints(block: Block, stepSize: Double): Set<Triple<Double, Double, Double>> {
-        val minX = block.x.toDouble()
-        val minY = block.y.toDouble()
-        val minZ = block.z.toDouble()
-        val maxX = minX + 1.0
-        val maxY = minY + 1.0
-        val maxZ = minZ + 1.0
+    private fun outlinePoints(
+        minX: Double,
+        minY: Double,
+        minZ: Double,
+        maxX: Double,
+        maxY: Double,
+        maxZ: Double,
+        stepSize: Double
+    ): Set<Triple<Double, Double, Double>> {
         val points = mutableSetOf<Triple<Double, Double, Double>>()
 
         fun addEdge(from: Triple<Double, Double, Double>, to: Triple<Double, Double, Double>) {

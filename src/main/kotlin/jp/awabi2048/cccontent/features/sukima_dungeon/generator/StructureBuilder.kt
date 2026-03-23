@@ -191,18 +191,11 @@ object StructureBuilder {
 
                     for (entity in chunk.entities) {
                         val loc = entity.location
-                        if (loc.x !in minX..maxX || loc.z !in minZ..maxZ || loc.y !in minY..maxY) continue
+                        if (loc.x < minX || loc.x > maxX + 1.0 || loc.z < minZ || loc.z > maxZ + 1.0 || loc.y < minY || loc.y > maxY + 1.0) continue
 
-                        if (entity is org.bukkit.entity.Marker) {
-                            if (entity.scoreboardTags.contains("sd.marker.mob")) {
-                                minibossMarkers[cell] = loc.clone()
-                                break // Only one miniboss per tile
-                            }
-                        } else if (entity is org.bukkit.entity.ArmorStand) {
-                            if (entity.customName == "MOB") {
-                                minibossMarkers[cell] = loc.clone()
-                                break
-                            }
+                        if (entity is org.bukkit.entity.Marker && entity.scoreboardTags.contains("sd.marker.mob")) {
+                            minibossMarkers[cell] = loc.clone()
+                            break // Only one miniboss per tile
                         }
                     }
                 }
@@ -269,7 +262,7 @@ object StructureBuilder {
 
                 for (entity in chunk.entities) {
                     val loc = entity.location
-                    if (loc.x !in minX..maxX || loc.z !in minZ..maxZ || loc.y !in minY..maxY) continue
+                    if (loc.x < minX || loc.x > maxX + 1.0 || loc.z < minZ || loc.z > maxZ + 1.0 || loc.y < minY || loc.y > maxY + 1.0) continue
 
                     // Check if this entity is in a miniboss cell
                     val relX = (loc.x - startX).toInt() / tileSize
@@ -297,28 +290,6 @@ object StructureBuilder {
                                 }
                             }
                             // Sprouts are handled by SproutManager later, they shouldn't be removed here.
-                        }
-                    }
-                    else if (entity is org.bukkit.entity.ArmorStand) {
-                        val name = entity.customName ?: continue
-                        
-                        when (name) {
-                            "SPAWN" -> {
-                                spawnLocations.add(loc.clone())
-                            }
-                            "MOB" -> {
-                                if (!isInMinibossCell && random.nextDouble() <= mobRate) {
-                                    mobSpawnPoints.add(loc.clone())
-                                }
-                            }
-                            "NPC" -> {
-                                npcMarkers.add(loc.clone())
-                            }
-                            "ITEM" -> {
-                                if (random.nextDouble() <= itemRate) {
-                                    itemManager.spawnItem(loc)
-                                }
-                            }
                         }
                     }
                 }

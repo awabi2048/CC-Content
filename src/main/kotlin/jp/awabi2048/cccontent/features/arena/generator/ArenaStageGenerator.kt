@@ -498,8 +498,9 @@ class ArenaStageGenerator {
 
                 for (entity in chunk.entities) {
                     val loc = entity.location
-                    if (loc.blockX !in minX..maxX || loc.blockZ !in minZ..maxZ) continue
-                    if (loc.blockY !in minY..maxY) continue
+                    if (loc.x < minX.toDouble() || loc.x > maxX.toDouble() + 1.0) continue
+                    if (loc.z < minZ.toDouble() || loc.z > maxZ.toDouble() + 1.0) continue
+                    if (loc.y < minY.toDouble() || loc.y > maxY.toDouble() + 1.0) continue
 
                     if (entity is Marker) {
                         if (entity.scoreboardTags.contains("arena.marker.mob")) {

@@ -606,6 +606,21 @@ sukima_dungeon:
   command_restricted: '&cダンジョン内ではこのコマンドを使用できません。'
   command_generator_failed: '&cダンジョンの生成に失敗しました。'
   common_bar: '&7&m――――――――――――――――――――――――――――――'
+  marker:
+    current_mode: '&f§l| §7現在のモード §a{mode}'
+    mode_changed: '&7設置モードを §a{mode} §7に変更しました。'
+    placed: '&b[Marker] {mode} §fマーカーを設置しました。'
+    removed: '&b[Marker] {mode} §fマーカーを削除しました。'
+    usage:
+      place: '&e右クリック(ブロック)§7 クリック面の外側にマーカーを設置'
+      delete: '&eShift + 右クリック§7 視線上のマーカーを削除'
+      switch: '&eFキー§7 次のモードへ変更'
+    modes:
+      mob: '&cモブ'
+      npc: '&aNPC'
+      item: '&bアイテム'
+      sprout: '&d芽'
+      spawn: '&fスポーン'
   
   gui_entrance_title: '&5ポータルをつなげる'
   gui_entrance_button: '&b&lダンジョンへのポータルを開く'
@@ -959,6 +974,20 @@ custom_items:
       name: '§6アリーナ報酬箱'
       lore:
         - '§7アリーナでの勝利報酬'
+    marker:
+      current_mode: '&f§l| §7現在のモード §a{mode}'
+      mode_changed: '&7設置モードを §a{mode} §7に変更しました。'
+      placed: '&b[Marker] {mode} §fマーカーを設置しました。'
+      removed: '&b[Marker] {mode} §fマーカーを削除しました。'
+      usage:
+        place: '&e右クリック(ブロック)§7 クリック面の外側にマーカーを設置'
+        delete: '&eShift + 右クリック§7 視線上のマーカーを削除'
+        switch: '&eFキー§7 次のモードへ変更'
+      modes:
+        mob: '&cモブ'
+        entrance: '&a入口'
+        door_block: '&e扉'
+        barrier_core: '&b結界核'
     messages:
       command:
         no_permission: '&c権限がありません'
