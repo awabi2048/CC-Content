@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.mob
 
 import jp.awabi2048.cccontent.mob.type.SparkZombieMobType
+import jp.awabi2048.cccontent.mob.type.ArenaEnhancedZombieMobType
 import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.Material
@@ -19,11 +20,47 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import java.io.File
 import java.util.UUID
+import java.util.WeakHashMap
 
 class MobService(private val plugin: JavaPlugin) {
+    companion object {
+        private val instances = WeakHashMap<JavaPlugin, MobService>()
+
+        fun getInstance(plugin: JavaPlugin): MobService? {
+            synchronized(instances) {
+                return instances[plugin]
+            }
+        }
+    }
+
+    private data class SessionLoadMetrics(
+        var accumulatedCpuNanos: Long = 0L,
+        var projectileLaunchCount: Int = 0,
+        var activeMobCount: Int = 0,
+        var emaCustomMspt: Double = 0.0,
+        var emaActiveMobCount: Double = 0.0,
+        var emaProjectilesPerSecond: Double = 0.0,
+        var lastSnapshot: MobLoadSnapshot = MobLoadSnapshot.DEFAULT,
+        var lastUpdatedMillis: Long = System.currentTimeMillis(),
+        var lastSeenMillis: Long = System.currentTimeMillis()
+    )
+
+    private val LOAD_UPDATE_INTERVAL_MILLIS = 1000L
+    private val LOAD_METRICS_TTL_MILLIS = 60_000L
+    private val LOAD_EMA_ALPHA = 0.35
+
+    private val CPU_PRESSURE_MSPT = 2.5
+    private val MOB_PRESSURE_COUNT = 48.0
+    private val PROJECTILE_PRESSURE_PER_SEC = 24.0
+
+    private val CPU_WEIGHT = 0.65
+    private val MOB_WEIGHT = 0.25
+    private val PROJECTILE_WEIGHT = 0.10
+
     private val customMobTypes = mutableMapOf<String, MobType>()
     private val activeMobs = mutableMapOf<UUID, ActiveMob>()
     private val definitions = mutableMapOf<String, MobDefinition>()
+    private val sessionLoadMetrics = mutableMapOf<String, SessionLoadMetrics>()
     private val mobTypeKey = NamespacedKey(plugin, "mob_type_id")
     private val mobDefinitionKey = NamespacedKey(plugin, "mob_definition_id")
     private val mobFeatureKey = NamespacedKey(plugin, "mob_feature_id")
@@ -31,6 +68,10 @@ class MobService(private val plugin: JavaPlugin) {
     private var tickTask: BukkitTask? = null
 
     init {
+        synchronized(instances) {
+            instances[plugin] = this
+        }
+        registerMobType(ArenaEnhancedZombieMobType())
         registerMobType(SparkZombieMobType())
     }
 
@@ -86,6 +127,26 @@ class MobService(private val plugin: JavaPlugin) {
             reloadDefinitions()
         }
         return definitions.keys
+    }
+
+    fun getSessionLoadSnapshot(sessionKey: String?): MobLoadSnapshot {
+        val key = normalizeSessionKey(sessionKey)
+        return sessionLoadMetrics[key]?.lastSnapshot ?: MobLoadSnapshot.DEFAULT
+    }
+
+    fun getSpawnThrottle(sessionKey: String?): MobSpawnThrottle {
+        val snapshot = getSessionLoadSnapshot(sessionKey)
+        return MobSpawnThrottle(
+            intervalMultiplier = snapshot.spawnIntervalMultiplier,
+            skipChance = snapshot.spawnSkipChance
+        )
+    }
+
+    fun recordProjectileLaunch(sessionKey: String?) {
+        val key = normalizeSessionKey(sessionKey)
+        val metrics = sessionLoadMetrics.getOrPut(key) { SessionLoadMetrics() }
+        metrics.projectileLaunchCount += 1
+        metrics.lastSeenMillis = System.currentTimeMillis()
     }
 
     fun spawnByDefinitionId(definitionId: String, location: Location, options: MobSpawnOptions): LivingEntity? {
@@ -147,6 +208,7 @@ class MobService(private val plugin: JavaPlugin) {
             plugin.logger.warning("[MobService] 未登録の mob type です: ${definition.typeId}")
             return null
         }
+        val sessionKey = resolveSessionKey(options, world.name)
 
         val entity = world.spawnEntity(location, mobType.baseEntityType) as? LivingEntity ?: return null
         markEntity(entity, definition, mobType, options)
@@ -159,6 +221,7 @@ class MobService(private val plugin: JavaPlugin) {
             definition = definition,
             mobType = mobType,
             featureId = options.featureId,
+            sessionKey = sessionKey,
             combatActiveProvider = options.combatActiveProvider,
             metadata = options.metadata,
             runtime = runtime
@@ -176,6 +239,7 @@ class MobService(private val plugin: JavaPlugin) {
         }
 
         tickTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+            val activeCountBySession = mutableMapOf<String, Int>()
             val iterator = activeMobs.entries.iterator()
             while (iterator.hasNext()) {
                 val (_, activeMob) = iterator.next()
@@ -185,12 +249,20 @@ class MobService(private val plugin: JavaPlugin) {
                     continue
                 }
 
+                activeCountBySession[activeMob.sessionKey] = (activeCountBySession[activeMob.sessionKey] ?: 0) + 1
+
                 activeMob.tickCount += intervalTicks
+                val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
+                val startedAt = System.nanoTime()
                 activeMob.mobType.onTick(
-                    MobRuntimeContext(plugin, entity, activeMob),
+                    MobRuntimeContext(plugin, entity, activeMob, snapshot),
                     activeMob.runtime
                 )
+                val elapsedNanos = System.nanoTime() - startedAt
+                addCpuNanos(activeMob.sessionKey, elapsedNanos)
             }
+
+            refreshSessionLoadSnapshots(activeCountBySession)
         }, intervalTicks, intervalTicks)
     }
 
@@ -198,6 +270,10 @@ class MobService(private val plugin: JavaPlugin) {
         tickTask?.cancel()
         tickTask = null
         activeMobs.clear()
+        sessionLoadMetrics.clear()
+        synchronized(instances) {
+            instances.remove(plugin)
+        }
     }
 
     fun untrack(entityId: UUID) {
@@ -206,39 +282,183 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun handleAttack(event: EntityDamageByEntityEvent, attacker: LivingEntity) {
         val activeMob = activeMobs[attacker.uniqueId] ?: return
+        val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
+        val startedAt = System.nanoTime()
         activeMob.mobType.onAttack(
             MobAttackContext(
                 plugin = plugin,
                 entity = attacker,
                 activeMob = activeMob,
                 event = event,
-                target = event.entity as? LivingEntity
+                target = event.entity as? LivingEntity,
+                loadSnapshot = snapshot
             ),
             activeMob.runtime
         )
+        addCpuNanos(activeMob.sessionKey, System.nanoTime() - startedAt)
     }
 
     fun handleDamaged(event: EntityDamageByEntityEvent, damaged: LivingEntity) {
         val activeMob = activeMobs[damaged.uniqueId] ?: return
+        val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
+        val startedAt = System.nanoTime()
         activeMob.mobType.onDamaged(
             MobDamagedContext(
                 plugin = plugin,
                 entity = damaged,
                 activeMob = activeMob,
                 event = event,
-                attacker = event.damager as? LivingEntity
+                attacker = event.damager as? LivingEntity,
+                loadSnapshot = snapshot
             ),
             activeMob.runtime
         )
+        addCpuNanos(activeMob.sessionKey, System.nanoTime() - startedAt)
     }
 
     fun handleDeath(event: EntityDeathEvent) {
         val entity = event.entity
         val activeMob = activeMobs.remove(entity.uniqueId) ?: return
+        val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
+        val startedAt = System.nanoTime()
         activeMob.mobType.onDeath(
-            MobDeathContext(plugin, entity, activeMob, event),
+            MobDeathContext(plugin, entity, activeMob, event, snapshot),
             activeMob.runtime
         )
+        addCpuNanos(activeMob.sessionKey, System.nanoTime() - startedAt)
+    }
+
+    private fun addCpuNanos(sessionKey: String, nanos: Long) {
+        if (nanos <= 0L) return
+        val metrics = sessionLoadMetrics.getOrPut(sessionKey) { SessionLoadMetrics() }
+        metrics.accumulatedCpuNanos += nanos
+        metrics.lastSeenMillis = System.currentTimeMillis()
+    }
+
+    private fun refreshSessionLoadSnapshots(activeCountBySession: Map<String, Int>) {
+        val now = System.currentTimeMillis()
+
+        sessionLoadMetrics.forEach { (sessionKey, metrics) ->
+            if (!activeCountBySession.containsKey(sessionKey)) {
+                metrics.activeMobCount = 0
+            }
+        }
+
+        activeCountBySession.forEach { (sessionKey, count) ->
+            val metrics = sessionLoadMetrics.getOrPut(sessionKey) { SessionLoadMetrics() }
+            metrics.activeMobCount = count
+            metrics.lastSeenMillis = now
+        }
+
+        val iterator = sessionLoadMetrics.entries.iterator()
+        while (iterator.hasNext()) {
+            val (_, metrics) = iterator.next()
+            if (now - metrics.lastUpdatedMillis < LOAD_UPDATE_INTERVAL_MILLIS) {
+                continue
+            }
+
+            val elapsedSec = ((now - metrics.lastUpdatedMillis).coerceAtLeast(1L) / 1000.0)
+            val sampleMspt = (metrics.accumulatedCpuNanos / 1_000_000.0) / (elapsedSec * 20.0)
+            val sampleProjectilesPerSec = metrics.projectileLaunchCount / elapsedSec
+
+            metrics.emaCustomMspt = ema(metrics.emaCustomMspt, sampleMspt, LOAD_EMA_ALPHA)
+            metrics.emaActiveMobCount = ema(metrics.emaActiveMobCount, metrics.activeMobCount.toDouble(), LOAD_EMA_ALPHA)
+            metrics.emaProjectilesPerSecond = ema(metrics.emaProjectilesPerSecond, sampleProjectilesPerSec, LOAD_EMA_ALPHA)
+
+            metrics.lastSnapshot = buildLoadSnapshot(metrics)
+            metrics.accumulatedCpuNanos = 0L
+            metrics.projectileLaunchCount = 0
+            metrics.lastUpdatedMillis = now
+
+            if (
+                metrics.activeMobCount <= 0 &&
+                metrics.accumulatedCpuNanos == 0L &&
+                metrics.projectileLaunchCount == 0 &&
+                now - metrics.lastSeenMillis > LOAD_METRICS_TTL_MILLIS
+            ) {
+                iterator.remove()
+            }
+        }
+    }
+
+    private fun buildLoadSnapshot(metrics: SessionLoadMetrics): MobLoadSnapshot {
+        val cpuRatio = (metrics.emaCustomMspt / CPU_PRESSURE_MSPT).coerceIn(0.0, 1.0)
+        val mobRatio = (metrics.emaActiveMobCount / MOB_PRESSURE_COUNT).coerceIn(0.0, 1.0)
+        val projectileRatio = (metrics.emaProjectilesPerSecond / PROJECTILE_PRESSURE_PER_SEC).coerceIn(0.0, 1.0)
+
+        val score = (
+            cpuRatio * CPU_WEIGHT +
+                mobRatio * MOB_WEIGHT +
+                projectileRatio * PROJECTILE_WEIGHT
+            ).coerceIn(0.0, 1.0)
+
+        val level = when {
+            score >= 0.80 -> MobLoadLevel.CRITICAL
+            score >= 0.65 -> MobLoadLevel.HOT
+            score >= 0.45 -> MobLoadLevel.WARM
+            else -> MobLoadLevel.NORMAL
+        }
+
+        return when (level) {
+            MobLoadLevel.NORMAL -> MobLoadSnapshot(
+                level = level,
+                score = score,
+                abilityCooldownMultiplier = 1.0,
+                abilityExecutionSkipChance = 0.0,
+                searchIntervalMultiplier = 1,
+                spawnIntervalMultiplier = 1.0,
+                spawnSkipChance = 0.0
+            )
+            MobLoadLevel.WARM -> MobLoadSnapshot(
+                level = level,
+                score = score,
+                abilityCooldownMultiplier = 1.1,
+                abilityExecutionSkipChance = 0.05,
+                searchIntervalMultiplier = 1,
+                spawnIntervalMultiplier = 1.1,
+                spawnSkipChance = 0.05
+            )
+            MobLoadLevel.HOT -> MobLoadSnapshot(
+                level = level,
+                score = score,
+                abilityCooldownMultiplier = 1.25,
+                abilityExecutionSkipChance = 0.12,
+                searchIntervalMultiplier = 2,
+                spawnIntervalMultiplier = 1.3,
+                spawnSkipChance = 0.20
+            )
+            MobLoadLevel.CRITICAL -> MobLoadSnapshot(
+                level = level,
+                score = score,
+                abilityCooldownMultiplier = 1.45,
+                abilityExecutionSkipChance = 0.20,
+                searchIntervalMultiplier = 2,
+                spawnIntervalMultiplier = 1.6,
+                spawnSkipChance = 0.40
+            )
+        }
+    }
+
+    private fun resolveSessionKey(options: MobSpawnOptions, worldName: String?): String {
+        val explicit = options.sessionKey?.trim().orEmpty()
+        if (explicit.isNotBlank()) {
+            return normalizeSessionKey(explicit)
+        }
+
+        val metadataWorld = options.metadata["world"]?.trim().orEmpty().ifBlank { worldName.orEmpty() }
+        if (metadataWorld.isNotBlank()) {
+            return normalizeSessionKey("${options.featureId}:$metadataWorld")
+        }
+
+        return normalizeSessionKey("${options.featureId}:global")
+    }
+
+    private fun normalizeSessionKey(sessionKey: String?): String {
+        return sessionKey?.trim()?.takeIf { it.isNotBlank() }?.lowercase() ?: "global:default"
+    }
+
+    private fun ema(current: Double, sample: Double, alpha: Double): Double {
+        return if (current <= 0.0) sample else (current * (1.0 - alpha) + sample * alpha)
     }
 
     private fun markEntity(entity: LivingEntity, definition: MobDefinition, mobType: MobType, options: MobSpawnOptions) {

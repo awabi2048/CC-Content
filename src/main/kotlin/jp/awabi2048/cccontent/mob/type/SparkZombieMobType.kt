@@ -15,6 +15,8 @@ import org.bukkit.entity.LivingEntity
 import org.bukkit.inventory.ItemStack
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
+import kotlin.math.roundToLong
+import kotlin.random.Random
 
 class SparkZombieMobType : MobType {
     override val id: String = "spark_zombie"
@@ -67,6 +69,14 @@ class SparkZombieMobType : MobType {
             return
         }
 
+        val loadSnapshot = context.loadSnapshot
+        if (context.activeMob.tickCount % (10L * loadSnapshot.searchIntervalMultiplier.toLong()) != 0L) {
+            return
+        }
+        if (Random.nextDouble() < loadSnapshot.abilityExecutionSkipChance) {
+            return
+        }
+
         if (mobRuntime.pulseCooldownTicks > 0L) {
             mobRuntime.pulseCooldownTicks -= 10L
             return
@@ -88,10 +98,14 @@ class SparkZombieMobType : MobType {
             0.3,
             0.02
         )
-        mobRuntime.pulseCooldownTicks = 40L
+        mobRuntime.pulseCooldownTicks =
+            (40L * loadSnapshot.abilityCooldownMultiplier).roundToLong().coerceAtLeast(40L)
     }
 
     override fun onAttack(context: MobAttackContext, runtime: CustomMobRuntime?) {
+        if (Random.nextDouble() < context.loadSnapshot.abilityExecutionSkipChance) {
+            return
+        }
         val target = context.target ?: return
         target.addPotionEffect(PotionEffect(PotionEffectType.SLOWNESS, 40, 0, false, true, true))
         context.entity.world.spawnParticle(

@@ -10,6 +10,9 @@ zombie:
     zombie_heavy:
       weight: 15
       wave: 2..5
+    arena_enhanced_zombie:
+      weight: 10
+      wave: 2..
     spark_zombie_basic:
       weight: 6
       wave: 3..

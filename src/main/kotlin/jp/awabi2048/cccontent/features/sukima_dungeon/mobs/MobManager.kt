@@ -115,6 +115,17 @@ class MobManager(
     }
 
     fun spawnMob(location: Location, themeName: String, center: Location): LivingEntity? {
+        val worldName = location.world?.name ?: return null
+        val sessionKey = "sukima:$worldName"
+        val spawnThrottle = mobService.getSpawnThrottle(sessionKey)
+        val intervalChance = (1.0 / spawnThrottle.intervalMultiplier).coerceIn(0.0, 1.0)
+        if (random.nextDouble() < spawnThrottle.skipChance) {
+            return null
+        }
+        if (random.nextDouble() > intervalChance) {
+            return null
+        }
+
         val mobList = themeSpawns[themeName]
         if (mobList.isNullOrEmpty()) {
             plugin.logger.warning("No mob spawn settings found for theme: $themeName")
@@ -140,6 +151,7 @@ class MobManager(
             location,
             MobSpawnOptions(
                 featureId = "sukima_dungeon",
+                sessionKey = sessionKey,
                 metadata = mapOf("theme" to themeName)
             )
         ) ?: return null

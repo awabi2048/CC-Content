@@ -44,6 +44,17 @@ zombie_boss:
     chestplate: DIAMOND_CHESTPLATE
     main_hand: DIAMOND_SWORD
 
+arena_enhanced_zombie:
+  type: arena_enhanced_zombie
+  health: 30.0
+  attack: 6.5
+  movement_speed: 0.24
+  armor: 7.0
+  scale: 1.0
+  equipment:
+    helmet: IRON_HELMET
+    chestplate: CHAINMAIL_CHESTPLATE
+
 spark_zombie_basic:
   type: spark_zombie
   health: 28.0

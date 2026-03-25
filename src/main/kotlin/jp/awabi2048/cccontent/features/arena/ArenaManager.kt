@@ -1156,6 +1156,11 @@ class ArenaManager(
             if (!currentSession.startedWaves.contains(wave)) return@Runnable
             if (currentSession.waveSpawningStopped.contains(wave)) return@Runnable
 
+            val spawnThrottle = mobService.getSpawnThrottle("arena:${currentSession.worldName}")
+            val intervalChance = (1.0 / spawnThrottle.intervalMultiplier).coerceIn(0.0, 1.0)
+            if (random.nextDouble() < spawnThrottle.skipChance) return@Runnable
+            if (random.nextDouble() > intervalChance) return@Runnable
+
             val maxAlive = currentSession.waveMaxAliveCounts[wave] ?: return@Runnable
             val aliveCount = currentSession.waveMobIds[wave]?.size ?: 0
             if (aliveCount >= maxAlive) return@Runnable
@@ -1356,6 +1361,7 @@ class ArenaManager(
             spawn,
             MobSpawnOptions(
                 featureId = "arena",
+                sessionKey = "arena:${session.worldName}",
                 combatActiveProvider = { true },
                 metadata = mapOf("world" to session.worldName, "wave" to wave.toString())
             )
@@ -1930,6 +1936,11 @@ class ArenaManager(
         difficulty: ArenaDifficultyConfig,
         spawnPoints: List<Location>
     ) {
+        val spawnThrottle = mobService.getSpawnThrottle("arena:${session.worldName}")
+        val intervalChance = (1.0 / spawnThrottle.intervalMultiplier).coerceIn(0.0, 1.0)
+        if (random.nextDouble() < spawnThrottle.skipChance) return
+        if (random.nextDouble() > intervalChance) return
+
         val spawnPoint = selectSpawnPoint(spawnPoints) ?: return
         val weightedMob = selectWeightedMob(mobType.candidatesForWave(session.waves)) ?: return
         val definition = mobDefinitions[weightedMob.mobId] ?: return
@@ -1939,6 +1950,7 @@ class ArenaManager(
             spawnPoint,
             MobSpawnOptions(
                 featureId = "arena_barrier_restart",
+                sessionKey = "arena:${session.worldName}",
                 combatActiveProvider = { true },
                 metadata = mapOf("world" to session.worldName, "restart" to "true")
             )

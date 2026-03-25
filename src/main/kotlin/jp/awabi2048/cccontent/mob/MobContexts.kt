@@ -8,8 +8,43 @@ import java.util.UUID
 
 data class MobSpawnOptions(
     val featureId: String,
+    val sessionKey: String? = null,
     val combatActiveProvider: (() -> Boolean)? = null,
     val metadata: Map<String, String> = emptyMap()
+)
+
+enum class MobLoadLevel {
+    NORMAL,
+    WARM,
+    HOT,
+    CRITICAL
+}
+
+data class MobLoadSnapshot(
+    val level: MobLoadLevel,
+    val score: Double,
+    val abilityCooldownMultiplier: Double,
+    val abilityExecutionSkipChance: Double,
+    val searchIntervalMultiplier: Int,
+    val spawnIntervalMultiplier: Double,
+    val spawnSkipChance: Double
+) {
+    companion object {
+        val DEFAULT = MobLoadSnapshot(
+            level = MobLoadLevel.NORMAL,
+            score = 0.0,
+            abilityCooldownMultiplier = 1.0,
+            abilityExecutionSkipChance = 0.0,
+            searchIntervalMultiplier = 1,
+            spawnIntervalMultiplier = 1.0,
+            spawnSkipChance = 0.0
+        )
+    }
+}
+
+data class MobSpawnThrottle(
+    val intervalMultiplier: Double,
+    val skipChance: Double
 )
 
 data class ActiveMob(
@@ -17,6 +52,7 @@ data class ActiveMob(
     val definition: MobDefinition,
     val mobType: MobType,
     val featureId: String,
+    val sessionKey: String,
     val combatActiveProvider: (() -> Boolean)?,
     val metadata: Map<String, String>,
     val runtime: CustomMobRuntime?,
@@ -37,6 +73,9 @@ data class MobSpawnContext(
     val featureId: String
         get() = options.featureId
 
+    val sessionKey: String?
+        get() = options.sessionKey
+
     fun isCombatActive(): Boolean {
         return options.combatActiveProvider?.invoke() ?: true
     }
@@ -45,7 +84,8 @@ data class MobSpawnContext(
 data class MobRuntimeContext(
     val plugin: JavaPlugin,
     val entity: LivingEntity,
-    val activeMob: ActiveMob
+    val activeMob: ActiveMob,
+    val loadSnapshot: MobLoadSnapshot
 ) {
     val definition: MobDefinition
         get() = activeMob.definition
@@ -53,6 +93,9 @@ data class MobRuntimeContext(
         get() = activeMob.mobType
     val featureId: String
         get() = activeMob.featureId
+
+    val sessionKey: String
+        get() = activeMob.sessionKey
 
     fun isCombatActive(): Boolean {
         return activeMob.isCombatActive()
@@ -64,7 +107,8 @@ data class MobAttackContext(
     val entity: LivingEntity,
     val activeMob: ActiveMob,
     val event: EntityDamageByEntityEvent,
-    val target: LivingEntity?
+    val target: LivingEntity?,
+    val loadSnapshot: MobLoadSnapshot
 ) {
     val definition: MobDefinition
         get() = activeMob.definition
@@ -72,6 +116,9 @@ data class MobAttackContext(
     fun isCombatActive(): Boolean {
         return activeMob.isCombatActive()
     }
+
+    val sessionKey: String
+        get() = activeMob.sessionKey
 }
 
 data class MobDamagedContext(
@@ -79,7 +126,8 @@ data class MobDamagedContext(
     val entity: LivingEntity,
     val activeMob: ActiveMob,
     val event: EntityDamageByEntityEvent,
-    val attacker: LivingEntity?
+    val attacker: LivingEntity?,
+    val loadSnapshot: MobLoadSnapshot
 ) {
     val definition: MobDefinition
         get() = activeMob.definition
@@ -87,14 +135,21 @@ data class MobDamagedContext(
     fun isCombatActive(): Boolean {
         return activeMob.isCombatActive()
     }
+
+    val sessionKey: String
+        get() = activeMob.sessionKey
 }
 
 data class MobDeathContext(
     val plugin: JavaPlugin,
     val entity: LivingEntity,
     val activeMob: ActiveMob,
-    val event: EntityDeathEvent
+    val event: EntityDeathEvent,
+    val loadSnapshot: MobLoadSnapshot
 ) {
     val definition: MobDefinition
         get() = activeMob.definition
+
+    val sessionKey: String
+        get() = activeMob.sessionKey
 }
