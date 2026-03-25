@@ -2,6 +2,8 @@ package jp.awabi2048.cccontent.features.arena.generator
 
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import org.bukkit.Bukkit
+import org.bukkit.Material
+import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.structure.Structure
 import java.io.File
@@ -11,9 +13,20 @@ import kotlin.random.Random
 data class ArenaTheme(
     val id: String,
     val path: String,
+    val iconMaterial: Material,
+    val orientation: ArenaStructureOrientation,
     val gridPitch: Int,
     val staticStructures: Map<ArenaStructureType, List<ArenaStaticStructureVariant>>,
     val animatedStructures: Map<ArenaStructureType, List<ArenaAnimatedStructureVariant>>
+)
+
+data class ArenaStructureOrientation(
+    val entranceExit: ArenaPathDirection,
+    val cornerEntry: ArenaPathDirection,
+    val cornerExit: ArenaPathDirection,
+    val straightEntry: ArenaPathDirection,
+    val corridorEntry: ArenaPathDirection,
+    val goalEntry: ArenaPathDirection
 )
 
 data class ArenaStaticStructureVariant(
@@ -48,6 +61,11 @@ enum class ArenaStructureType(val keyword: String, val supportsAnimation: Boolea
 }
 
 class ArenaThemeLoader(private val plugin: JavaPlugin) {
+    private data class ParsedThemeConfig(
+        val iconMaterial: Material,
+        val orientation: ArenaStructureOrientation
+    )
+
     private sealed interface StructureState {
         data object Closed : StructureState
         data class Open(val index: Int) : StructureState
@@ -89,8 +107,42 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             warnings.add(warning)
         }
 
-        for (folder in themeFolders) {
-            val themeId = folder.name
+        val themeConfigFile = File(plugin.dataFolder, "config/arena/theme.yml")
+        if (!themeConfigFile.exists()) {
+            themeConfigFile.parentFile.mkdirs()
+            plugin.saveResource("config/arena/theme.yml", false)
+        }
+        val themeConfig = YamlConfiguration.loadConfiguration(themeConfigFile)
+        val configuredThemeIds = themeConfig.getKeys(false)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toSet()
+        val folderById = themeFolders.associateBy { it.name }
+        val folderThemeIds = folderById.keys
+
+        configuredThemeIds
+            .filterNot { folderThemeIds.contains(it) }
+            .sorted()
+            .forEach { themeId ->
+                val warning = "[Arena] theme.yml に定義がありますが structures/arena/$themeId が存在しないためスキップ: $themeId"
+                plugin.logger.warning(warning)
+                warnings.add(warning)
+            }
+
+        folderThemeIds
+            .filterNot { configuredThemeIds.contains(it) }
+            .sorted()
+            .forEach { themeId ->
+                val warning = "[Arena] structures/arena/$themeId は存在しますが theme.yml に定義がないためスキップ: $themeId"
+                plugin.logger.warning(warning)
+                warnings.add(warning)
+            }
+
+        val validThemeIds = configuredThemeIds.intersect(folderThemeIds).sorted()
+
+        for (themeId in validThemeIds) {
+            val folder = folderById[themeId] ?: continue
+            val parsedThemeConfig = parseThemeConfig(themeConfig, themeId, warnings) ?: continue
             val loaded = loadStructures(folder, warnings)
             val missing = ArenaStructureType.entries.filter { type ->
                 if (type.supportsAnimation) {
@@ -123,6 +175,8 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             themes[themeId] = ArenaTheme(
                 id = themeId,
                 path = folder.name,
+                iconMaterial = parsedThemeConfig.iconMaterial,
+                orientation = parsedThemeConfig.orientation,
                 gridPitch = gridPitch,
                 staticStructures = loaded.staticStructures,
                 animatedStructures = loaded.animatedStructures
@@ -142,6 +196,94 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 addSummaryMessage("Arena", "テーマ${themes.size}種")
             }
         }
+    }
+
+    private fun parseThemeConfig(
+        config: YamlConfiguration,
+        themeId: String,
+        warnings: MutableList<String>
+    ): ParsedThemeConfig? {
+        val section = config.getConfigurationSection(themeId)
+        if (section == null) {
+            val warning = "[Arena] theme.yml のテーマ定義が不正なためスキップ: $themeId"
+            plugin.logger.warning(warning)
+            warnings.add(warning)
+            return null
+        }
+
+        val iconName = (section.getString("icon") ?: Material.PAPER.name).trim()
+        val iconMaterial = try {
+            Material.valueOf(iconName.uppercase())
+        } catch (_: IllegalArgumentException) {
+            val warning = "[Arena] theme.yml の icon が不正なためスキップ: theme=$themeId icon=$iconName"
+            plugin.logger.warning(warning)
+            warnings.add(warning)
+            return null
+        }
+
+        val orientationSection = section.getConfigurationSection("orientation")
+        if (orientationSection == null) {
+            val warning = "[Arena] theme.yml の orientation が見つからないためスキップ: theme=$themeId"
+            plugin.logger.warning(warning)
+            warnings.add(warning)
+            return null
+        }
+
+        val entranceExit = parseDirection(themeId, orientationSection, "entrance_exit", warnings) ?: return null
+        val cornerEntry = parseDirection(themeId, orientationSection, "corner_entry", warnings) ?: return null
+        val cornerExit = parseDirection(themeId, orientationSection, "corner_exit", warnings) ?: return null
+        val straightEntry = parseDirection(themeId, orientationSection, "straight_entry", warnings) ?: return null
+        val corridorEntry = parseDirection(themeId, orientationSection, "corridor_entry", warnings) ?: return null
+        val goalEntry = parseDirection(themeId, orientationSection, "goal_entry", warnings) ?: return null
+
+        if (cornerEntry == cornerExit) {
+            val warning = "[Arena] theme.yml の corner_entry/corner_exit が同じ方角のためスキップ: theme=$themeId value=${cornerEntry.token}"
+            plugin.logger.warning(warning)
+            warnings.add(warning)
+            return null
+        }
+
+        if (!cornerEntry.isAdjacent(cornerExit)) {
+            val warning = "[Arena] theme.yml の corner_entry/corner_exit は隣接方向のみ許可されています: theme=$themeId entry=${cornerEntry.token} exit=${cornerExit.token}"
+            plugin.logger.warning(warning)
+            warnings.add(warning)
+            return null
+        }
+
+        return ParsedThemeConfig(
+            iconMaterial = iconMaterial,
+            orientation = ArenaStructureOrientation(
+                entranceExit = entranceExit,
+                cornerEntry = cornerEntry,
+                cornerExit = cornerExit,
+                straightEntry = straightEntry,
+                corridorEntry = corridorEntry,
+                goalEntry = goalEntry
+            )
+        )
+    }
+
+    private fun parseDirection(
+        themeId: String,
+        section: org.bukkit.configuration.ConfigurationSection,
+        key: String,
+        warnings: MutableList<String>
+    ): ArenaPathDirection? {
+        val raw = section.getString(key)?.trim().orEmpty()
+        if (raw.isEmpty()) {
+            val warning = "[Arena] theme.yml の方角指定が未設定のためスキップ: theme=$themeId key=$key"
+            plugin.logger.warning(warning)
+            warnings.add(warning)
+            return null
+        }
+        val direction = ArenaPathDirection.fromToken(raw)
+        if (direction == null) {
+            val warning = "[Arena] theme.yml の方角指定が不正のためスキップ: theme=$themeId key=$key value=$raw"
+            plugin.logger.warning(warning)
+            warnings.add(warning)
+            return null
+        }
+        return direction
     }
 
     private fun loadStructures(folder: File, warnings: MutableList<String>): LoadedThemeStructures {
