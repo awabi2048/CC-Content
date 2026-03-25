@@ -8,7 +8,9 @@ import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockExplodeEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.EntityDeathEvent
+import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityExplodeEvent
+import org.bukkit.event.entity.EntityTargetLivingEntityEvent
 import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryDragEvent
@@ -20,6 +22,16 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     @EventHandler
     fun onEntityDeath(event: EntityDeathEvent) {
         arenaManager.handleMobDeath(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityDamage(event: EntityDamageEvent) {
+        arenaManager.handleMobFallDamage(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityTarget(event: EntityTargetLivingEntityEvent) {
+        arenaManager.handleMobTarget(event)
     }
 
     @EventHandler
