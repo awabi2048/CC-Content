@@ -273,6 +273,15 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
     }
 
     private fun resolvePlacementLocation(player: Player, clickedBlock: Block, blockFace: BlockFace): Location {
+        if (player.isSneaking) {
+            val rayTrace = placementRayTrace(player)
+            val hitBlock = rayTrace?.hitBlock
+            val hitFace = rayTrace?.hitBlockFace
+            if (hitBlock != null && hitFace != null) {
+                return snapMarkerToFace(hitBlock, hitFace, rayTrace.hitPosition)
+            }
+        }
+
         val rayTrace = placementRayTrace(player)
         val hitPosition = if (rayTrace?.hitBlock == clickedBlock && rayTrace.hitBlockFace == blockFace) {
             rayTrace.hitPosition
@@ -303,21 +312,21 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         return when {
             face.modX != 0 -> Location(
                 block.world,
-                block.x + 0.5 + face.modX * 0.75,
+                block.x + 0.5 + face.modX,
                 snapFaceGrid(hitPosition.y, block.y),
                 snapFaceGrid(hitPosition.z, block.z)
             )
             face.modY != 0 -> Location(
                 block.world,
                 snapFaceGrid(hitPosition.x, block.x),
-                block.y + 0.5 + face.modY * 0.75,
+                block.y + 0.5 + face.modY,
                 snapFaceGrid(hitPosition.z, block.z)
             )
             face.modZ != 0 -> Location(
                 block.world,
                 snapFaceGrid(hitPosition.x, block.x),
                 snapFaceGrid(hitPosition.y, block.y),
-                block.z + 0.5 + face.modZ * 0.75
+                block.z + 0.5 + face.modZ
             )
             else -> block.location.clone().add(0.5, 0.5, 0.5)
         }
@@ -345,11 +354,11 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                         }
                         val placementPreview = resolvePlacementPreview(player) ?: continue
                         val mode = getMode(item, definition)
-                        drawDustLocationOutline(placementPreview, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
+                        drawDustLocationCubeOutline(placementPreview, 0.5, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
                     } else {
                         val preview = resolvePlacementPreview(player) ?: continue
                         val mode = getMode(item, definition)
-                        drawDustLocationOutline(preview, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
+                        drawDustLocationCubeOutline(preview, 0.5, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
                     }
                 }
             }
@@ -383,9 +392,9 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             FluidCollisionMode.NEVER,
             true
         ) ?: return null
-        val block = rayTrace.hitBlock ?: return null
+        val hitBlock = rayTrace.hitBlock ?: return null
         val face = rayTrace.hitBlockFace ?: return null
-        return snapMarkerToFace(block, face, rayTrace.hitPosition)
+        return snapMarkerToFace(hitBlock, face, rayTrace.hitPosition)
     }
 
     private fun resolveDeletionPreview(player: Player, definition: MarkerToolDefinition): DeletionPreview? {
@@ -472,15 +481,19 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
     }
 
     private fun drawDustLocationOutline(location: Location, color: Color, size: Float) {
+        drawDustLocationCubeOutline(location, 0.25, color, size)
+    }
+
+    private fun drawDustLocationCubeOutline(location: Location, halfSize: Double, color: Color, size: Float) {
         val world = location.world ?: return
         drawDustOutline(
             world,
-            location.x - 0.25,
-            location.y - 0.25,
-            location.z - 0.25,
-            location.x + 0.25,
-            location.y + 0.25,
-            location.z + 0.25,
+            location.x - halfSize,
+            location.y - halfSize,
+            location.z - halfSize,
+            location.x + halfSize,
+            location.y + halfSize,
+            location.z + halfSize,
             color,
             size
         )
@@ -506,12 +519,12 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
     private fun drawParticleLocationOutline(location: Location, particle: Particle) {
         val world = location.world ?: return
         for ((x, y, z) in outlinePoints(
-            location.x - 0.25,
-            location.y - 0.25,
-            location.z - 0.25,
-            location.x + 0.25,
-            location.y + 0.25,
-            location.z + 0.25,
+            location.x - 0.5,
+            location.y - 0.5,
+            location.z - 0.5,
+            location.x + 0.5,
+            location.y + 0.5,
+            location.z + 0.5,
             MARKER_OUTLINE_STEP
         )) {
             world.spawnParticle(particle, x, y, z, 1, 0.0, 0.0, 0.0, 0.0)
