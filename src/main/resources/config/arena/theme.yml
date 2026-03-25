@@ -1,0 +1,10 @@
+# テーマIDごとに向きを定義します。
+# theme_id:
+#   icon: STONE
+#   orientation:
+#     entrance_exit: north
+#     corner_entry: north
+#     corner_exit: east
+#     straight_entry: north
+#     corridor_entry: north
+#     goal_entry: north
