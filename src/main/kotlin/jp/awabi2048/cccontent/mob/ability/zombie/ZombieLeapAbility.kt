@@ -5,6 +5,7 @@ import jp.awabi2048.cccontent.mob.ability.MobAbility
 import jp.awabi2048.cccontent.mob.ability.MobAbilityRuntime
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Mob
+import org.bukkit.Sound
 import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.roundToLong
@@ -49,6 +50,7 @@ class ZombieLeapAbility : MobAbility {
         val horizontal = delta.clone().setY(0.0)
         if (horizontal.lengthSquared() < 0.0001) return
 
+        entity.world.playSound(entity.location, Sound.ENTITY_IRON_GOLEM_STEP, 1.0f, 0.8f)
         entity.velocity = horizontal.normalize().multiply(LEAP_HORIZONTAL_SPEED).setY(LEAP_VERTICAL_SPEED)
 
         abilityRuntime.leapCooldownTicks =

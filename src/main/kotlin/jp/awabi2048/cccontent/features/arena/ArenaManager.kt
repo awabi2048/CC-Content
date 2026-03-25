@@ -37,9 +37,11 @@ import org.bukkit.entity.Ageable
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Mob
 import org.bukkit.entity.Player
+import org.bukkit.entity.Projectile
 import org.bukkit.entity.Zombie
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.event.entity.EntityDamageEvent
+import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
 import org.bukkit.event.inventory.InventoryClickEvent
@@ -736,11 +738,34 @@ class ArenaManager(
         event.isCancelled = true
     }
 
+    fun handleMobFriendlyFire(event: EntityDamageByEntityEvent) {
+        val damaged = event.entity as? LivingEntity ?: return
+        if (damaged is Player) return
+
+        val damagedWorld = mobToSessionWorld[damaged.uniqueId] ?: return
+        val attackerMobId = resolveArenaMobAttackerId(event) ?: return
+        val attackerWorld = mobToSessionWorld[attackerMobId] ?: return
+        if (damagedWorld != attackerWorld) return
+
+        event.isCancelled = true
+    }
+
     fun handleMobTarget(event: EntityTargetLivingEntityEvent) {
         val mob = event.entity as? Mob ?: return
-        val targetPlayer = event.target as? Player ?: return
         val worldName = mobToSessionWorld[mob.uniqueId] ?: return
         val session = sessionsByWorld[worldName] ?: return
+
+        val target = event.target as? LivingEntity ?: return
+        if (target !is Player) {
+            val targetWorld = mobToSessionWorld[target.uniqueId]
+            if (targetWorld == worldName) {
+                event.isCancelled = true
+                mob.target = selectNearestParticipant(session, mob.location)
+            }
+            return
+        }
+
+        val targetPlayer = target
         if (!session.participants.contains(targetPlayer.uniqueId)) return
 
         val wave = session.mobWaveMap[mob.uniqueId] ?: return
@@ -748,6 +773,36 @@ class ArenaManager(
 
         event.isCancelled = true
         mob.target = null
+    }
+
+    private fun resolveArenaMobAttackerId(event: EntityDamageByEntityEvent): UUID? {
+        val damager = event.damager
+        if (damager is LivingEntity && damager !is Player) {
+            return damager.uniqueId
+        }
+
+        if (damager is Projectile) {
+            val shooter = damager.shooter as? LivingEntity ?: return null
+            if (shooter is Player) return null
+            return shooter.uniqueId
+        }
+
+        return null
+    }
+
+    private fun selectNearestParticipant(session: ArenaSession, origin: Location): Player? {
+        val world = Bukkit.getWorld(session.worldName) ?: return null
+        return session.participants
+            .mapNotNull { participantId -> Bukkit.getPlayer(participantId) }
+            .filter { player ->
+                player.isOnline &&
+                    player.world.name == world.name &&
+                    !player.isDead &&
+                    player.gameMode != org.bukkit.GameMode.SPECTATOR
+            }
+            .minByOrNull { player ->
+                player.location.distanceSquared(origin)
+            }
     }
 
     private fun applyArenaMobDrop(event: EntityDeathEvent) {
