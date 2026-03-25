@@ -974,6 +974,20 @@ custom_items:
       name: '§6アリーナ報酬箱'
       lore:
         - '§7アリーナでの勝利報酬'
+    mob_token:
+      display_format: '§6{mob}の頭'
+      lore:
+        - '§7アリーナに出現するモンスターのヘッド'
+        - '§7アリーナロビーで報酬と交換しよう！'
+      mob_names:
+        zombie: 'ゾンビ'
+        skeleton: 'スケルトン'
+        arena_enhanced_zombie: '強化ゾンビ'
+        zombie_leap_only: '跳躍ゾンビ'
+        zombie_bow_only: '弓ゾンビ'
+        zombie_bow_swap: '換装ゾンビ'
+        zombie_shield_only: '盾ゾンビ'
+        spark_zombie: 'スパークゾンビ'
     marker:
       current_mode: '&f§l| §7現在のモード §a{mode}'
       mode_changed: '&7設置モードを §a{mode} §7に変更しました。'

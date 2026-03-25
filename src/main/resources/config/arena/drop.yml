@@ -1,6 +1,3 @@
-settings:
-  equipment_drop_chance: 0.25
-
 difficulty_mock:
   item_count_bonus: 0
   exp_bonus_rate: 1.0

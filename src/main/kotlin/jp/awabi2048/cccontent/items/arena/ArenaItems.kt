@@ -26,7 +26,7 @@ abstract class ArenaSimpleItem(
 
     final override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
-    final override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
+    override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
         val item = ItemStack(material, amount.coerceAtLeast(1))
         val meta = item.itemMeta ?: return item
         val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
@@ -88,14 +88,53 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
     material = Material.POISONOUS_POTATO,
     modelData = null,
     id = "mob_token_${sanitizeMobTypeId(mobTypeId)}",
-    displayName = "§6${mobTypeId.lowercase(Locale.ROOT)}のトークン",
-    lore = listOf("§7アリーナ討伐証", "§8rarity=common")
+    displayName = "§6${mobTypeId.lowercase(Locale.ROOT)}の頭",
+    lore = listOf("§7アリーナに出現するモンスターのヘッド", "§7アリーナロビーで報酬と交換しよう！")
 ) {
-    override val itemModel: NamespacedKey = NamespacedKey.minecraft("stone_sword")
+    override val itemModel: NamespacedKey = resolveItemModel(mobTypeId)
+
+    override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
+        val item = ItemStack(Material.POISONOUS_POTATO, amount.coerceAtLeast(1))
+        val meta = item.itemMeta ?: return item
+        val mobName = CustomItemI18n.text(
+            player,
+            "custom_items.arena.mob_token.mob_names.${sanitizeMobTypeId(mobTypeId)}",
+            mobTypeId.lowercase(Locale.ROOT)
+        )
+        val displayFormat = CustomItemI18n.text(
+            player,
+            "custom_items.arena.mob_token.display_format",
+            "{mob}の頭"
+        )
+        val localizedLore = CustomItemI18n.list(
+            player,
+            "custom_items.arena.mob_token.lore",
+            listOf("§7アリーナに出現するモンスターのヘッド", "§7アリーナロビーで報酬と交換しよう！")
+        )
+
+        meta.displayName(Component.text(displayFormat.replace("{mob}", mobName)))
+        meta.lore(localizedLore.map { Component.text(it) })
+        meta.persistentDataContainer.set(arenaItemKey, PersistentDataType.STRING, id)
+        item.itemMeta = meta
+        return item
+    }
 
     companion object {
         private fun sanitizeMobTypeId(typeId: String): String {
             return typeId.trim().lowercase(Locale.ROOT).replace(Regex("[^a-z0-9_]+"), "_")
+        }
+
+        private fun resolveItemModel(typeId: String): NamespacedKey {
+            val normalized = sanitizeMobTypeId(typeId)
+            return when {
+                normalized.contains("skeleton") -> NamespacedKey.minecraft("skeleton_skull")
+                normalized.contains("zombie") -> NamespacedKey.minecraft("zombie_head")
+                normalized.contains("creeper") -> NamespacedKey.minecraft("creeper_head")
+                normalized.contains("piglin") -> NamespacedKey.minecraft("piglin_head")
+                normalized.contains("wither") -> NamespacedKey.minecraft("wither_skeleton_skull")
+                normalized.contains("dragon") -> NamespacedKey.minecraft("dragon_head")
+                else -> NamespacedKey.minecraft("player_head")
+            }
         }
     }
 }

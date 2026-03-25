@@ -149,7 +149,6 @@ private data class ArenaDropEntry(
 )
 
 private data class ArenaDropConfig(
-    val equipmentDropChance: Double,
     val additionalDefaultDrops: List<ArenaDropEntry>,
     val additionalByMobType: Map<String, List<ArenaDropEntry>>,
     val mockItemCountBonus: Int,
@@ -200,7 +199,6 @@ class ArenaManager(
     private var doorAnimationTotalTicks = DOOR_ANIMATION_TOTAL_TICKS_DEFAULT
     private var sharedWaveMaxAlive = SHARED_WAVE_MAX_ALIVE_DEFAULT
     private var dropConfig = ArenaDropConfig(
-        equipmentDropChance = 0.0,
         additionalDefaultDrops = emptyList(),
         additionalByMobType = emptyMap(),
         mockItemCountBonus = 0,
@@ -323,9 +321,6 @@ class ArenaManager(
 
     private fun loadDropConfig(file: File) {
         val config = YamlConfiguration.loadConfiguration(file)
-        val equipmentDropChance = config.getDouble("settings.equipment_drop_chance", 0.25)
-            .coerceIn(0.0, 1.0)
-
         val mockItemCountBonus = config.getInt("difficulty_mock.item_count_bonus", 0)
         val mockExpBonusRate = config.getDouble("difficulty_mock.exp_bonus_rate", 1.0)
             .coerceAtLeast(0.0)
@@ -340,7 +335,6 @@ class ArenaManager(
         }
 
         dropConfig = ArenaDropConfig(
-            equipmentDropChance = equipmentDropChance,
             additionalDefaultDrops = additionalDefaultDrops,
             additionalByMobType = additionalByMobType,
             mockItemCountBonus = mockItemCountBonus,
@@ -829,13 +823,6 @@ class ArenaManager(
         rebuiltDrops += rebuildVanillaNonEquipmentDrops(vanillaDrops)
         rebuiltDrops += buildConfiguredAdditionalDrops(killer, normalizedTypeId, lootingLevel)
 
-        selectEquipmentDrop(entity.equipment)?.let { fullId ->
-            val dropped = CustomItemManager.createItemForPlayer(fullId, killer, 1)
-            if (dropped != null) {
-                rebuiltDrops += dropped
-            }
-        }
-
         createMobTokenDrop(killer, normalizedTypeId)?.let { token ->
             rebuiltDrops += token
         }
@@ -886,30 +873,6 @@ class ArenaManager(
         val mainLevel = main.getEnchantmentLevel(Enchantment.LOOTING)
         val offLevel = off.getEnchantmentLevel(Enchantment.LOOTING)
         return maxOf(mainLevel, offLevel)
-    }
-
-    private fun selectEquipmentDrop(equipment: org.bukkit.inventory.EntityEquipment?): String? {
-        if (equipment == null) return null
-        if (random.nextDouble() > dropConfig.equipmentDropChance) return null
-
-        val candidates = mutableListOf<String>()
-        val slots = listOf(
-            equipment.helmet,
-            equipment.chestplate,
-            equipment.leggings,
-            equipment.boots,
-            equipment.itemInMainHand,
-            equipment.itemInOffHand
-        )
-
-        for (item in slots) {
-            if (item == null || item.type.isAir) continue
-            val category = classifyEquipmentDropType(item.type) ?: continue
-            candidates += "arena.decayed_$category"
-        }
-
-        if (candidates.isEmpty()) return null
-        return candidates[random.nextInt(candidates.size)]
     }
 
     private fun classifyEquipmentDropType(material: Material): String? {

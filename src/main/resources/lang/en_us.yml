@@ -344,6 +344,20 @@ custom_items:
       name: "§6Arena Prize Box"
       lore:
         - "§7Victory reward from the arena"
+    mob_token:
+      display_format: "§6{mob} Head"
+      lore:
+        - "§7Head of a monster that appears in the arena"
+        - "§7Exchange it for rewards in the arena lobby!"
+      mob_names:
+        zombie: "Zombie"
+        skeleton: "Skeleton"
+        arena_enhanced_zombie: "Enhanced Zombie"
+        zombie_leap_only: "Leaper Zombie"
+        zombie_bow_only: "Archer Zombie"
+        zombie_bow_swap: "Swap Zombie"
+        zombie_shield_only: "Shield Zombie"
+        spark_zombie: "Spark Zombie"
     marker:
       current_mode: '&f§l| §7Current Mode §a{mode}'
       mode_changed: '&7Placement mode changed to §a{mode}§7.'
