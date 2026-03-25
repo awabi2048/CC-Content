@@ -254,6 +254,9 @@ class ArenaStageGenerator {
                 var selectedRoomPoint: TilePoint? = null
 
                 for (endDirection in candidateDirections) {
+                    if (endDirection != startDirection && !canResolveCornerRotation(orientation, startDirection.opposite(), endDirection)) {
+                        continue
+                    }
                     val nextRoom = if (endDirection == startDirection) {
                         TilePoint(corridorPoint.x + startDirection.dx, corridorPoint.z + startDirection.dz)
                     } else {
@@ -413,6 +416,9 @@ class ArenaStageGenerator {
         actualEntry: ArenaPathDirection,
         actualExit: ArenaPathDirection
     ): Int {
+        if (!canResolveCornerRotation(orientation, actualEntry, actualExit)) {
+            error("[Arena] corner 回転が解決できません: entry=${actualEntry.token}, exit=${actualExit.token}")
+        }
         for (quarter in 0..3) {
             val rotatedEntry = orientation.cornerEntry.rotateClockwise(quarter)
             val rotatedExit = orientation.cornerExit.rotateClockwise(quarter)
@@ -421,6 +427,24 @@ class ArenaStageGenerator {
             }
         }
         error("[Arena] corner 回転が解決できません: entry=${actualEntry.token}, exit=${actualExit.token}")
+    }
+
+    private fun canResolveCornerRotation(
+        orientation: ArenaStructureOrientation,
+        actualEntry: ArenaPathDirection,
+        actualExit: ArenaPathDirection
+    ): Boolean {
+        if (actualEntry == actualExit || actualEntry.opposite() == actualExit) {
+            return false
+        }
+        for (quarter in 0..3) {
+            val rotatedEntry = orientation.cornerEntry.rotateClockwise(quarter)
+            val rotatedExit = orientation.cornerExit.rotateClockwise(quarter)
+            if (rotatedEntry == actualEntry && rotatedExit == actualExit) {
+                return true
+            }
+        }
+        return false
     }
 
     private fun rotationQuarterBetween(from: ArenaPathDirection, to: ArenaPathDirection): Int {
