@@ -6,7 +6,6 @@ import org.bukkit.World
 import org.bukkit.block.structure.Mirror
 import org.bukkit.block.structure.StructureRotation
 import org.bukkit.entity.Marker
-import kotlin.math.max
 import kotlin.math.floor
 import kotlin.random.Random
 
@@ -57,7 +56,20 @@ data class ArenaStageBuildResult(
     val corridorBounds: Map<Int, ArenaBounds>,
     val roomMobSpawns: Map<Int, List<Location>>,
     val corridorDoorBlocks: Map<Int, List<Location>>,
+    val doorAnimationPlacements: Map<Int, List<ArenaDoorAnimationPlacement>>,
     val barrierLocation: Location
+)
+
+data class ArenaDoorAnimationPlacement(
+    val structureType: ArenaStructureType,
+    val placeOrigin: Location,
+    val rotationQuarter: Int,
+    val openFrames: List<ArenaStructureTemplate>
+)
+
+private data class SelectedStructureVariant(
+    val baseTemplate: ArenaStructureTemplate,
+    val animatedVariant: ArenaAnimatedStructureVariant?
 )
 
 class ArenaStageGenerator {
@@ -72,14 +84,16 @@ class ArenaStageGenerator {
         val placements = toPlacements(roomPath).sortedBy { it.index }
         val gridPitch = theme.gridPitch
         val placementBoundsByIndex = mutableMapOf<Int, ArenaBounds>()
-        val templateByPlacementIndex = mutableMapOf<Int, ArenaStructureTemplate>()
+        val selectedByPlacementIndex = mutableMapOf<Int, SelectedStructureVariant>()
+        val placementOriginByIndex = mutableMapOf<Int, Location>()
         val validationIssues = mutableListOf<ArenaStageValidationIssue>()
         var previousPlacement: TilePlacement? = null
 
         for (placement in placements) {
             val base = locationForTile(origin, placement.point, gridPitch)
-            val template = pickStructureTemplate(theme, placement, random)
+            val selected = pickStructureVariant(theme, placement, random)
                 ?: error("[Arena] 構造テンプレートが見つかりません: type=${placement.structureType}")
+            val template = selected.baseTemplate
 
             val geometry = if (previousPlacement == null) {
                 computeFirstPlacementGeometry(base, gridPitch, template.size, placement.rotationQuarter)
@@ -99,7 +113,8 @@ class ArenaStageGenerator {
 
             placeStructure(template, placement.rotationQuarter, geometry.origin)
             placementBoundsByIndex[placement.index] = geometry.bounds
-            templateByPlacementIndex[placement.index] = template
+            selectedByPlacementIndex[placement.index] = selected
+            placementOriginByIndex[placement.index] = geometry.origin.clone()
             previousPlacement = placement
         }
 
@@ -125,7 +140,7 @@ class ArenaStageGenerator {
 
             if (roomIndex > 0) {
                 val markers = findMarkers(world, bounds)
-                val templateName = templateByPlacementIndex[roomPlacement.index]?.name ?: "unknown"
+                val templateName = selectedByPlacementIndex[roomPlacement.index]?.baseTemplate?.name ?: "unknown"
                 if (markers.mobSpawns.isEmpty()) {
                     validationIssues.add(
                         ArenaStageValidationIssue(
@@ -146,7 +161,7 @@ class ArenaStageGenerator {
             corridorBounds[targetWave] = bounds
 
             val markers = findMarkers(world, bounds)
-            val templateName = templateByPlacementIndex[corridorPlacement.index]?.name ?: "unknown"
+            val templateName = selectedByPlacementIndex[corridorPlacement.index]?.baseTemplate?.name ?: "unknown"
             if (markers.doorBlocks.isEmpty()) {
                 validationIssues.add(
                     ArenaStageValidationIssue(
@@ -163,7 +178,14 @@ class ArenaStageGenerator {
             ?: error("[Arena] 最終部屋の境界が見つかりません")
         val finalMarkers = findMarkers(world, finalRoomBounds)
         val barrierLocation = finalMarkers.barrierCore
-            ?: boundsCenter(world, finalRoomBounds, 1.0)
+        if (barrierLocation == null) {
+            validationIssues.add(
+                ArenaStageValidationIssue(
+                    structureName = selectedByPlacementIndex[roomPlacements.last().index]?.baseTemplate?.name ?: "unknown",
+                    missingMarkers = listOf("arena.marker.barrier_core")
+                )
+            )
+        }
 
         val firstRoomBounds = placementBoundsByIndex[roomPlacements.first().index]
             ?: error("[Arena] 開始部屋の境界が見つかりません")
@@ -172,17 +194,25 @@ class ArenaStageGenerator {
         if (entranceLocation == null) {
             validationIssues.add(
                 ArenaStageValidationIssue(
-                    structureName = templateByPlacementIndex[roomPlacements.first().index]?.name ?: "unknown",
+                    structureName = selectedByPlacementIndex[roomPlacements.first().index]?.baseTemplate?.name ?: "unknown",
                     missingMarkers = listOf("arena.marker.entrance")
                 )
             )
         }
+
+        val doorAnimationPlacements = buildDoorAnimationPlacements(
+            placements = placements,
+            waves = waves,
+            selectedByPlacementIndex = selectedByPlacementIndex,
+            placementOriginByIndex = placementOriginByIndex
+        )
 
         if (validationIssues.isNotEmpty()) {
             throw ArenaStageBuildException(validationIssues)
         }
 
         val resolvedEntranceLocation = entranceLocation ?: error("[Arena] 開始部屋の entrance マーカーが見つかりません")
+        val resolvedBarrierLocation = barrierLocation ?: error("[Arena] 最終部屋の barrier_core マーカーが見つかりません")
         val playerSpawn = resolvedEntranceLocation.clone()
 
         return ArenaStageBuildResult(
@@ -193,7 +223,8 @@ class ArenaStageGenerator {
             corridorBounds = corridorBounds,
             roomMobSpawns = roomMobSpawns,
             corridorDoorBlocks = corridorDoorBlocks,
-            barrierLocation = barrierLocation
+            doorAnimationPlacements = doorAnimationPlacements,
+            barrierLocation = resolvedBarrierLocation
         )
     }
 
@@ -333,13 +364,72 @@ class ArenaStageGenerator {
         }
     }
 
-    private fun pickStructureTemplate(
+    private fun pickStructureVariant(
         theme: ArenaTheme,
         placement: TilePlacement,
         random: Random
-    ): ArenaStructureTemplate? {
-        return theme.structures[placement.structureType]
-            ?.randomOrNull(random)
+    ): SelectedStructureVariant? {
+        return if (placement.structureType.supportsAnimation) {
+            theme.animatedStructures[placement.structureType]
+                ?.randomOrNull(random)
+                ?.let { variant ->
+                    SelectedStructureVariant(
+                        baseTemplate = variant.closedTemplate,
+                        animatedVariant = variant
+                    )
+                }
+        } else {
+            theme.staticStructures[placement.structureType]
+                ?.randomOrNull(random)
+                ?.let { variant ->
+                    SelectedStructureVariant(
+                        baseTemplate = variant.template,
+                        animatedVariant = null
+                    )
+                }
+        }
+    }
+
+    private fun buildDoorAnimationPlacements(
+        placements: List<TilePlacement>,
+        waves: Int,
+        selectedByPlacementIndex: Map<Int, SelectedStructureVariant>,
+        placementOriginByIndex: Map<Int, Location>
+    ): Map<Int, List<ArenaDoorAnimationPlacement>> {
+        val placementsByIndex = placements.associateBy { it.index }
+        val result = mutableMapOf<Int, List<ArenaDoorAnimationPlacement>>()
+
+        for (targetWave in 1..waves) {
+            val animationTargets = mutableListOf<ArenaDoorAnimationPlacement>()
+            val corridorIndex = targetWave * 2 - 1
+            val roomIndex = targetWave * 2
+
+            listOf(corridorIndex, roomIndex).forEach { index ->
+                val placement = placementsByIndex[index] ?: return@forEach
+                if (placement.structureType != ArenaStructureType.CORRIDOR && placement.structureType != ArenaStructureType.CORNER) {
+                    return@forEach
+                }
+
+                val selected = selectedByPlacementIndex[index] ?: return@forEach
+                val variant = selected.animatedVariant ?: return@forEach
+                val origin = placementOriginByIndex[index] ?: return@forEach
+
+                animationTargets.add(
+                    ArenaDoorAnimationPlacement(
+                        structureType = placement.structureType,
+                        placeOrigin = origin.clone(),
+                        rotationQuarter = placement.rotationQuarter,
+                        openFrames = variant.openFrames
+                    )
+                )
+            }
+
+            if (animationTargets.isNotEmpty()) {
+                result[targetWave] = animationTargets
+            }
+        }
+
+        return result
     }
 
     private fun placeStructure(
@@ -459,13 +549,6 @@ class ArenaStageGenerator {
         )
     }
 
-    private fun boundsCenter(world: World, bounds: ArenaBounds, yOffset: Double): Location {
-        val centerX = (bounds.minX + bounds.maxX + 1) / 2.0
-        val centerY = bounds.minY + yOffset
-        val centerZ = (bounds.minZ + bounds.maxZ + 1) / 2.0
-        return Location(world, centerX, centerY, centerZ)
-    }
-
     private data class TileMarkers(
         val mobSpawns: List<Location>,
         val entrance: Location?,
@@ -518,18 +601,6 @@ class ArenaStageGenerator {
                     }
                 }
             }
-        }
-
-        if (barrier == null && mobs.isNotEmpty()) {
-            val center = mobs.reduce { acc, next ->
-                Location(
-                    acc.world,
-                    (acc.x + next.x) / 2.0,
-                    max(acc.y, next.y),
-                    (acc.z + next.z) / 2.0
-                )
-            }
-            barrier = center
         }
 
         return TileMarkers(mobs, entrance, doorBlocks, barrier)

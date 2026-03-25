@@ -4,6 +4,7 @@ import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageGenerator
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageBuildException
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeLoader
+import jp.awabi2048.cccontent.features.arena.generator.ArenaDoorAnimationPlacement
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
 import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestModifiers
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
@@ -28,7 +29,8 @@ import org.bukkit.WorldCreator
 import org.bukkit.attribute.Attribute
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
-import org.bukkit.entity.EnderCrystal
+import org.bukkit.block.structure.Mirror
+import org.bukkit.block.structure.StructureRotation
 import org.bukkit.entity.Entity
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.LivingEntity
@@ -161,18 +163,16 @@ class ArenaManager(
 ) {
     private companion object {
         const val DOOR_ANIMATION_START_DELAY_TICKS = 40L
-        const val DOOR_ANIMATION_FRAME_INTERVAL_TICKS = 20L
+        const val DOOR_ANIMATION_TOTAL_TICKS = 60
         const val BARRIER_RESTART_PROGRESS_STEP_TICKS = 5L
         const val BARRIER_RESTART_PROGRESS_STEP_MILLIS = 250L
         const val BARRIER_DEFENSE_TARGET_RATIO = 1.0 / 3.0
         const val BARRIER_DEFENSE_PRESSURE_RADIUS = 4.5
         const val BARRIER_DEFENSE_PRESSURE_RADIUS_SQUARED = BARRIER_DEFENSE_PRESSURE_RADIUS * BARRIER_DEFENSE_PRESSURE_RADIUS
-        const val BARRIER_DEFENSE_ATTACK_VELOCITY = 0.18
         const val POSITION_SAMPLE_INTERVAL_MILLIS = 1000L
         const val POSITION_RESTORE_LOOKBACK_MILLIS = 10_000L
         const val POSITION_HISTORY_RETENTION_MILLIS = 12_000L
         const val POSITION_HISTORY_MAX_SAMPLES = 24
-        val DOOR_ANIMATION_ANGLES = intArrayOf(30, 60, 90)
     }
 
     private val random = kotlin.random.Random.Default
@@ -548,16 +548,13 @@ class ArenaManager(
                 corridorBounds = stage.corridorBounds,
                 roomMobSpawns = stage.roomMobSpawns,
                 corridorDoorBlocks = stage.corridorDoorBlocks,
+                doorAnimationPlacements = stage.doorAnimationPlacements,
                 barrierLocation = stage.barrierLocation,
                 participantSpawnProtectionUntilMillis = System.currentTimeMillis() + 4000L
             )
             sessionsByWorld[world.name] = session
             playerToSessionWorld[target.uniqueId] = world.name
             initializeBarrierRestartState(session)
-            spawnBarrierCrystal(session)
-            if (session.barrierCrystalEntityId == null) {
-                throw IllegalStateException("結界石エンドクリスタルの召喚に失敗しました")
-            }
             startBarrierAmbientTask(session)
             val now = System.currentTimeMillis()
             session.participantLocationHistory[target.uniqueId] = ArrayDeque<TimedPlayerLocation>().apply {
@@ -716,7 +713,6 @@ class ArenaManager(
         session.barrierDefenseMobIds.remove(entityId)
         session.barrierDefenseTargetMobIds.remove(entityId)
         session.barrierDefenseAssaultMobIds.remove(entityId)
-        session.barrierDefenseLastAttackAnimationMillis.remove(entityId)
         consumeMob(session, entityId, countKill = true)
     }
 
@@ -867,23 +863,6 @@ class ArenaManager(
         if (block.x != core.x || block.y != core.y || block.z != core.z) return false
 
         return openBarrierRestartMenu(player, session)
-    }
-
-    fun handleBarrierCrystalInteract(player: Player, entity: Entity): Boolean {
-        val session = getSession(player) ?: return false
-        if (player.world.name != session.worldName) return false
-        if (!isBarrierCrystal(session, entity)) return false
-        return openBarrierRestartMenu(player, session)
-    }
-
-    fun handleBarrierCrystalDamage(entity: Entity): Boolean {
-        val session = sessionsByWorld[entity.world.name] ?: return false
-        return isBarrierCrystal(session, entity)
-    }
-
-    fun handleBarrierCrystalExplosion(entity: Entity): Boolean {
-        val session = sessionsByWorld[entity.world.name] ?: return false
-        return isBarrierCrystal(session, entity)
     }
 
     fun handleBarrierRestartMenuClick(player: Player, inventory: Inventory, slot: Int): Boolean {
@@ -1058,7 +1037,6 @@ class ArenaManager(
         session.barrierRestarting = false
         session.barrierRestartCompleted = false
         session.barrierRestartCorruptedSlots.clear()
-        removeBarrierCrystal(session)
 
         session.activeMobs.toList().forEach { mobId ->
             mobToSessionWorld.remove(mobId)
@@ -1511,7 +1489,15 @@ class ArenaManager(
 
             onDoorAnimationStarted(activeSession, targetWave)
 
-            var frameIndex = 0
+            val placements = activeSession.doorAnimationPlacements[targetWave].orEmpty()
+            if (placements.isEmpty()) {
+                activeSession.animatingDoorWaves.remove(targetWave)
+                updateCurrentWave(activeSession)
+                return@delayedStart
+            }
+
+            var elapsedTicks = 0
+            val lastAppliedFrameByPlacement = mutableMapOf<Int, Int>()
             val taskRef = arrayOfNulls<BukkitTask>(1)
             val animationTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable animationTick@{
                 val currentSession = sessionsByWorld[session.worldName] ?: run {
@@ -1519,18 +1505,29 @@ class ArenaManager(
                     return@animationTick
                 }
 
-                if (frameIndex >= DOOR_ANIMATION_ANGLES.size) {
+                elapsedTicks += 1
+
+                placements.forEachIndexed { placementIndex, placement ->
+                    val targetFrame = targetFrameIndex(elapsedTicks, placement.openFrames.size)
+                    if (targetFrame <= 0) return@forEachIndexed
+                    val lastFrame = lastAppliedFrameByPlacement[placementIndex]
+                    if (lastFrame == targetFrame) return@forEachIndexed
+                    applyDoorAnimationFrame(placement, targetFrame)
+                    lastAppliedFrameByPlacement[placementIndex] = targetFrame
+                }
+
+                if (elapsedTicks >= DOOR_ANIMATION_TOTAL_TICKS) {
                     currentSession.animatingDoorWaves.remove(targetWave)
                     updateCurrentWave(currentSession)
                     taskRef[0]?.cancel()
                     return@animationTick
                 }
 
-                val angle = DOOR_ANIMATION_ANGLES[frameIndex]
-                reinstallCorridorDoorMock(currentSession, targetWave, angle)
-                playSound(currentSession, Sound.BLOCK_IRON_DOOR_OPEN, 0.85f, 0.9f + frameIndex * 0.1f)
-                frameIndex += 1
-            }, 0L, DOOR_ANIMATION_FRAME_INTERVAL_TICKS)
+                if (elapsedTicks % 10 == 0) {
+                    val pitch = (0.8f + elapsedTicks / 100.0f).coerceAtMost(1.4f)
+                    playSound(currentSession, Sound.BLOCK_IRON_DOOR_OPEN, 0.85f, pitch)
+                }
+            }, 0L, 1L)
             taskRef[0] = animationTask
             activeSession.transitionTasks.add(animationTask)
         }, DOOR_ANIMATION_START_DELAY_TICKS)
@@ -1550,8 +1547,35 @@ class ArenaManager(
         plugin.logger.info("[Arena] door animation start: world=${session.worldName} target_wave=$targetWave")
     }
 
-    private fun reinstallCorridorDoorMock(session: ArenaSession, wave: Int, angle: Int) {
-        plugin.logger.info("[Arena][Mock] corridor door reinstall: world=${session.worldName} wave=$wave angle=$angle")
+    private fun targetFrameIndex(elapsedTicks: Int, totalFrames: Int): Int {
+        if (totalFrames <= 0 || elapsedTicks <= 0) return 0
+        val clampedElapsed = elapsedTicks.coerceIn(1, DOOR_ANIMATION_TOTAL_TICKS)
+        return ceil(clampedElapsed * totalFrames / DOOR_ANIMATION_TOTAL_TICKS.toDouble())
+            .toInt()
+            .coerceIn(1, totalFrames)
+    }
+
+    private fun applyDoorAnimationFrame(placement: ArenaDoorAnimationPlacement, frameIndex: Int) {
+        val world = placement.placeOrigin.world ?: return
+        val template = placement.openFrames.getOrNull(frameIndex - 1) ?: return
+        template.structure.place(
+            placement.placeOrigin.clone().apply { this.world = world },
+            false,
+            toStructureRotation(placement.rotationQuarter),
+            Mirror.NONE,
+            0,
+            1.0f,
+            java.util.Random()
+        )
+    }
+
+    private fun toStructureRotation(rotationQuarter: Int): StructureRotation {
+        return when (rotationQuarter.mod(4)) {
+            1 -> StructureRotation.CLOCKWISE_90
+            2 -> StructureRotation.CLOCKWISE_180
+            3 -> StructureRotation.COUNTERCLOCKWISE_90
+            else -> StructureRotation.NONE
+        }
     }
 
     private fun onCorridorOpened(session: ArenaSession, wave: Int) {
@@ -1648,20 +1672,6 @@ class ArenaManager(
         session.barrierRestartProgressMillis = 0L
         session.barrierDefenseTargetMobIds.clear()
         session.barrierDefenseAssaultMobIds.clear()
-        session.barrierDefenseLastAttackAnimationMillis.clear()
-    }
-
-    private fun spawnBarrierCrystal(session: ArenaSession) {
-        removeBarrierCrystal(session)
-
-        val world = Bukkit.getWorld(session.worldName) ?: return
-        val location = session.barrierLocation.clone().add(0.5, 1.0, 0.5)
-        val crystal = world.spawnEntity(location, EntityType.END_CRYSTAL) as? EnderCrystal
-            ?: return
-
-        crystal.isInvulnerable = true
-        crystal.isShowingBottom = false
-        session.barrierCrystalEntityId = crystal.uniqueId
     }
 
     private fun startBarrierAmbientTask(session: ArenaSession) {
@@ -1669,10 +1679,6 @@ class ArenaManager(
         val task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
             val currentSession = sessionsByWorld[session.worldName] ?: return@Runnable
             if (currentSession.barrierRestarting) return@Runnable
-
-            val world = Bukkit.getWorld(currentSession.worldName) ?: return@Runnable
-            val crystal = currentSession.barrierCrystalEntityId?.let { Bukkit.getEntity(it) } ?: return@Runnable
-            if (crystal.world.name != world.name) return@Runnable
 
             playSoundAtBarrier(currentSession, Sound.BLOCK_BEACON_AMBIENT, 1.0f, 0.5f)
         }, 0L, 100L)
@@ -1701,10 +1707,6 @@ class ArenaManager(
 
     private fun isBarrierRestartMenu(inventory: Inventory): Boolean {
         return inventory.holder is ArenaBarrierRestartMenuHolder
-    }
-
-    private fun isBarrierCrystal(session: ArenaSession, entity: Entity): Boolean {
-        return session.barrierCrystalEntityId == entity.uniqueId
     }
 
     private fun barrierRestartProgress(session: ArenaSession): Double {
@@ -1905,7 +1907,7 @@ class ArenaManager(
             val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
             if (!activeSession.barrierRestarting) return@Runnable
 
-            val barrierLocation = getBarrierCrystalLocation(activeSession) ?: activeSession.barrierLocation.clone().add(0.5, 1.0, 0.5)
+            val barrierLocation = activeSession.barrierLocation.clone().add(0.5, 1.0, 0.5)
             val targetIds = activeSession.barrierDefenseTargetMobIds.toList()
 
             targetIds.forEach { mobId ->
@@ -1927,8 +1929,6 @@ class ArenaManager(
                     activeSession.barrierDefenseAssaultMobIds.add(mobId)
                     mob.setAI(false)
                     mob.velocity = Vector(0.0, 0.0, 0.0)
-                    faceLocation(mob, barrierLocation)
-                    triggerBarrierAttackAnimation(mob)
                     return@forEach
                 }
 
@@ -1936,7 +1936,7 @@ class ArenaManager(
                 mob.setAI(false)
                 val direction = barrierLocation.toVector().subtract(currentLocation.toVector())
                 if (direction.lengthSquared() > 0.0001) {
-                    mob.velocity = direction.normalize().multiply(BARRIER_DEFENSE_ATTACK_VELOCITY)
+                    mob.velocity = direction.normalize().multiply(0.18)
                 }
             }
         }, 0L, 1L)
@@ -2085,7 +2085,6 @@ class ArenaManager(
 
         session.barrierDefenseTargetMobIds.clear()
         session.barrierDefenseAssaultMobIds.clear()
-        session.barrierDefenseLastAttackAnimationMillis.clear()
 
         hideBarrierRestartBossBar(session)
         if (session.barrierRestartCompleted) {
@@ -2101,7 +2100,6 @@ class ArenaManager(
             mobService.untrack(mobId)
             session.barrierDefenseTargetMobIds.remove(mobId)
             session.barrierDefenseAssaultMobIds.remove(mobId)
-            session.barrierDefenseLastAttackAnimationMillis.remove(mobId)
 
             val entity = Bukkit.getEntity(mobId) as? LivingEntity
             if (entity != null && entity.isValid && !entity.isDead) {
@@ -2112,13 +2110,6 @@ class ArenaManager(
             }
             session.barrierDefenseMobIds.remove(mobId)
         }
-    }
-
-    private fun removeBarrierCrystal(session: ArenaSession) {
-        val entityId = session.barrierCrystalEntityId ?: return
-        session.barrierCrystalEntityId = null
-        val entity = Bukkit.getEntity(entityId) ?: return
-        entity.remove()
     }
 
     private fun spawnSmoke(location: Location) {
@@ -2151,39 +2142,6 @@ class ArenaManager(
         val world = Bukkit.getWorld(session.worldName) ?: return
         val center = session.barrierLocation.clone().add(0.5, 0.5, 0.5)
         world.playSound(center, sound, volume, pitch)
-    }
-
-    private fun getBarrierCrystalLocation(session: ArenaSession): Location? {
-        val entityId = session.barrierCrystalEntityId ?: return null
-        val entity = Bukkit.getEntity(entityId) ?: return null
-        return entity.location.clone()
-    }
-
-    private fun faceLocation(entity: LivingEntity, target: Location) {
-        val location = entity.location.clone()
-        val dx = target.x - location.x
-        val dy = target.y + 0.5 - (location.y + 0.5)
-        val dz = target.z - location.z
-        val horizontal = kotlin.math.sqrt(dx * dx + dz * dz).coerceAtLeast(0.0001)
-        location.yaw = Math.toDegrees(kotlin.math.atan2(-dx, dz)).toFloat()
-        location.pitch = Math.toDegrees(kotlin.math.atan2(-dy, horizontal)).toFloat()
-        entity.teleport(location)
-    }
-
-    private fun triggerBarrierAttackAnimation(entity: LivingEntity) {
-        val mobId = entity.uniqueId
-        val now = System.currentTimeMillis()
-        val last = sessionsByWorld[entity.world.name]?.barrierDefenseLastAttackAnimationMillis?.get(mobId) ?: 0L
-        if (now - last < 500L) {
-            return
-        }
-        sessionsByWorld[entity.world.name]?.barrierDefenseLastAttackAnimationMillis?.set(mobId, now)
-
-        entity.world.spawnParticle(Particle.SWEEP_ATTACK, entity.location.clone().add(0.0, 1.0, 0.0), 1, 0.0, 0.0, 0.0, 0.0)
-        entity.world.playSound(entity.location, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.45f, 0.9f)
-        runCatching {
-            entity.javaClass.methods.firstOrNull { it.name == "swingMainHand" && it.parameterCount == 0 }?.invoke(entity)
-        }
     }
 
     private fun startBarrierActivation(player: Player, session: ArenaSession) {

@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.arena
 
 import net.kyori.adventure.bossbar.BossBar
+import jp.awabi2048.cccontent.features.arena.generator.ArenaDoorAnimationPlacement
 import org.bukkit.Location
 import org.bukkit.scheduler.BukkitTask
 import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestModifiers
@@ -43,6 +44,7 @@ data class ArenaSession(
     val corridorBounds: Map<Int, ArenaBounds>,
     val roomMobSpawns: Map<Int, List<Location>>,
     val corridorDoorBlocks: Map<Int, List<Location>>,
+    val doorAnimationPlacements: Map<Int, List<ArenaDoorAnimationPlacement>>,
     val barrierLocation: Location,
     var participantSpawnProtectionUntilMillis: Long = 0L,
     var currentWave: Int = 0,
@@ -51,7 +53,6 @@ data class ArenaSession(
     var barrierActive: Boolean = false,
     var barrierRestarting: Boolean = false,
     var barrierRestartCompleted: Boolean = false,
-    var barrierCrystalEntityId: UUID? = null,
     var barrierRestartStartMillis: Long = 0L,
     var barrierRestartDurationMillis: Long = 0L,
     var barrierRestartProgressMillis: Long = 0L,
@@ -64,7 +65,6 @@ data class ArenaSession(
     val barrierDefenseMobIds: MutableSet<UUID> = mutableSetOf(),
     val barrierDefenseTargetMobIds: MutableSet<UUID> = mutableSetOf(),
     val barrierDefenseAssaultMobIds: MutableSet<UUID> = mutableSetOf(),
-    val barrierDefenseLastAttackAnimationMillis: MutableMap<UUID, Long> = mutableMapOf(),
     val startedWaves: MutableSet<Int> = mutableSetOf(),
     val clearedWaves: MutableSet<Int> = mutableSetOf(),
     val activeMobs: MutableSet<UUID> = mutableSetOf(),
