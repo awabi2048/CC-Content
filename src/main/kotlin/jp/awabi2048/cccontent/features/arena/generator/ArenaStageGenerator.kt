@@ -80,8 +80,7 @@ class ArenaStageGenerator {
         waves: Int,
         random: Random = Random.Default
     ): ArenaStageBuildResult {
-        val roomPath = generatePath(waves, random)
-        val placements = toPlacements(roomPath).sortedBy { it.index }
+        val placements = generateAlternatingPlacements(waves, random).sortedBy { it.index }
         val gridPitch = theme.gridPitch
         val placementBoundsByIndex = mutableMapOf<Int, ArenaBounds>()
         val selectedByPlacementIndex = mutableMapOf<Int, SelectedStructureVariant>()
@@ -228,114 +227,162 @@ class ArenaStageGenerator {
         )
     }
 
-    private fun generatePath(stepCount: Int, random: Random): List<TilePoint> {
-        for (attempt in 0 until 80) {
-            val path = mutableListOf(TilePoint(0, 0))
-            val visited = mutableSetOf(TilePoint(0, 0))
-            var dir = PathDirection.entries.random(random)
+    private fun generateAlternatingPlacements(waves: Int, random: Random): List<TilePlacement> {
+        if (waves <= 0) {
+            return listOf(
+                TilePlacement(
+                    index = 0,
+                    point = TilePoint(0, 0),
+                    structureType = ArenaStructureType.ENTRANCE,
+                    rotationQuarter = 0,
+                    isRoom = true
+                )
+            )
+        }
 
+        repeat(200) {
+            val roomPoints = mutableListOf(TilePoint(0, 0))
+            val roomDirections = mutableListOf(PathDirection.entries.random(random))
+            val occupied = mutableSetOf(TilePoint(0, 0))
+            val corridors = mutableListOf<TilePlacement>()
             var failed = false
-            for (step in 0 until stepCount) {
-                val current = path.last()
-                val candidates = listOf(dir, dir.left(), dir.right())
-                    .map { candidate -> candidate to TilePoint(current.x + candidate.dx, current.z + candidate.dz) }
-                    .filter { (_, next) -> !visited.contains(next) }
 
-                val selected = when {
-                    candidates.isEmpty() -> null
-                    candidates.size == 1 -> candidates.first()
-                    else -> {
-                        val forward = candidates.firstOrNull { it.first == dir }
-                        val turnCandidates = candidates.filter { it.first != dir }
-                        if (forward != null && random.nextDouble() < 0.60) {
-                            forward
-                        } else {
-                            turnCandidates.randomOrNull(random) ?: forward
-                        }
-                    }
-                }
-
-                if (selected == null) {
+            for (wave in 1..waves) {
+                val previousRoom = roomPoints.last()
+                val startDirection = roomDirections.last()
+                val corridorPoint = TilePoint(previousRoom.x + startDirection.dx, previousRoom.z + startDirection.dz)
+                if (occupied.contains(corridorPoint)) {
                     failed = true
                     break
                 }
 
-                dir = selected.first
-                path.add(selected.second)
-                visited.add(selected.second)
-            }
+                val candidateDirections = listOf(startDirection, startDirection.left(), startDirection.right()).shuffled(random)
+                var selectedDirection: PathDirection? = null
+                var selectedRoomPoint: TilePoint? = null
 
-            if (!failed) {
-                return path
-            }
-        }
+                for (endDirection in candidateDirections) {
+                    val nextRoom = if (endDirection == startDirection) {
+                        TilePoint(corridorPoint.x + startDirection.dx, corridorPoint.z + startDirection.dz)
+                    } else {
+                        TilePoint(corridorPoint.x + endDirection.dx, corridorPoint.z + endDirection.dz)
+                    }
+                    if (occupied.contains(nextRoom)) {
+                        continue
+                    }
 
-        val fallback = mutableListOf(TilePoint(0, 0))
-        repeat(stepCount) { i -> fallback.add(TilePoint(i + 1, 0)) }
-        return fallback
-    }
+                    selectedDirection = endDirection
+                    selectedRoomPoint = nextRoom
+                    break
+                }
 
-    private fun toPlacements(roomPath: List<TilePoint>): List<TilePlacement> {
-        val result = mutableListOf<TilePlacement>()
-        for (index in roomPath.indices) {
-            val currentRoom = roomPath[index]
-            val current = TilePoint(currentRoom.x * 2, currentRoom.z * 2)
-            val previous = if (index > 0) roomPath[index - 1] else null
-            val next = if (index < roomPath.lastIndex) roomPath[index + 1] else null
+                if (selectedDirection == null || selectedRoomPoint == null) {
+                    failed = true
+                    break
+                }
 
-            val fromDir = previous?.let { directionOf(it, currentRoom) }
-            val toDir = next?.let { directionOf(currentRoom, it) }
+                val corridorType = if (selectedDirection == startDirection) {
+                    ArenaStructureType.CORRIDOR
+                } else {
+                    ArenaStructureType.CORNER
+                }
+                val corridorRotation = if (selectedDirection == startDirection) {
+                    straightRotation(startDirection)
+                } else {
+                    cornerRotation(startDirection, selectedDirection)
+                }
 
-            val placement = when {
-                fromDir == null && toDir != null -> TilePlacement(
-                    index * 2,
-                    current,
-                    ArenaStructureType.ENTRANCE,
-                    straightRotation(toDir),
-                    true
-                )
-                fromDir != null && toDir == null -> TilePlacement(
-                    index * 2,
-                    current,
-                    ArenaStructureType.GOAL,
-                    straightRotation(fromDir),
-                    true
-                )
-                fromDir != null && toDir != null && fromDir == toDir -> TilePlacement(
-                    index * 2,
-                    current,
-                    ArenaStructureType.STRAIGHT,
-                    straightRotation(toDir),
-                    true
-                )
-                fromDir != null && toDir != null -> TilePlacement(
-                    index * 2,
-                    current,
-                    ArenaStructureType.CORNER,
-                    cornerRotation(fromDir, toDir),
-                    true
-                )
-                else -> TilePlacement(index * 2, current, ArenaStructureType.STRAIGHT, 0, true)
-            }
-
-            result.add(placement)
-
-            if (next != null) {
-                val corridorDir = directionOf(currentRoom, next)
-                val corridorPoint = TilePoint(currentRoom.x + next.x, currentRoom.z + next.z)
-                result.add(
+                corridors.add(
                     TilePlacement(
-                        index = index * 2 + 1,
+                        index = wave * 2 - 1,
                         point = corridorPoint,
-                        structureType = ArenaStructureType.CORRIDOR,
-                        rotationQuarter = straightRotation(corridorDir),
+                        structureType = corridorType,
+                        rotationQuarter = corridorRotation,
                         isRoom = false
                     )
                 )
+
+                roomPoints.add(selectedRoomPoint)
+                roomDirections.add(selectedDirection)
+                occupied.add(corridorPoint)
+                occupied.add(selectedRoomPoint)
             }
+
+            if (failed) {
+                return@repeat
+            }
+
+            val result = mutableListOf<TilePlacement>()
+            result.add(
+                TilePlacement(
+                    index = 0,
+                    point = roomPoints.first(),
+                    structureType = ArenaStructureType.ENTRANCE,
+                    rotationQuarter = straightRotation(roomDirections.first()),
+                    isRoom = true
+                )
+            )
+
+            for (wave in 1..waves) {
+                result.add(corridors[wave - 1])
+                result.add(
+                    TilePlacement(
+                        index = wave * 2,
+                        point = roomPoints[wave],
+                        structureType = if (wave == waves) ArenaStructureType.GOAL else ArenaStructureType.STRAIGHT,
+                        rotationQuarter = straightRotation(roomDirections[wave]),
+                        isRoom = true
+                    )
+                )
+            }
+
+            return result
         }
 
-        return result.sortedBy { it.index }
+        return buildLinearFallbackPlacements(waves)
+    }
+
+    private fun buildLinearFallbackPlacements(waves: Int): List<TilePlacement> {
+        val result = mutableListOf<TilePlacement>()
+        var roomPoint = TilePoint(0, 0)
+        var index = 0
+        result.add(
+            TilePlacement(
+                index = index,
+                point = roomPoint,
+                structureType = ArenaStructureType.ENTRANCE,
+                rotationQuarter = straightRotation(PathDirection.EAST),
+                isRoom = true
+            )
+        )
+        index += 1
+
+        for (wave in 1..waves) {
+            val corridorPoint = TilePoint(roomPoint.x + PathDirection.EAST.dx, roomPoint.z + PathDirection.EAST.dz)
+            result.add(
+                TilePlacement(
+                    index = index,
+                    point = corridorPoint,
+                    structureType = ArenaStructureType.CORRIDOR,
+                    rotationQuarter = straightRotation(PathDirection.EAST),
+                    isRoom = false
+                )
+            )
+            index += 1
+
+            roomPoint = TilePoint(corridorPoint.x + PathDirection.EAST.dx, corridorPoint.z + PathDirection.EAST.dz)
+            result.add(
+                TilePlacement(
+                    index = index,
+                    point = roomPoint,
+                    structureType = if (wave == waves) ArenaStructureType.GOAL else ArenaStructureType.STRAIGHT,
+                    rotationQuarter = straightRotation(PathDirection.EAST),
+                    isRoom = true
+                )
+            )
+            index += 1
+        }
+
+        return result
     }
 
     private fun directionOf(from: TilePoint, to: TilePoint): PathDirection {
