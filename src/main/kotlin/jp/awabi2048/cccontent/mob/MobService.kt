@@ -2,6 +2,10 @@ package jp.awabi2048.cccontent.mob
 
 import jp.awabi2048.cccontent.mob.type.SparkZombieMobType
 import jp.awabi2048.cccontent.mob.type.ArenaEnhancedZombieMobType
+import jp.awabi2048.cccontent.mob.type.ZombieBowOnlyMobType
+import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
+import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
+import jp.awabi2048.cccontent.mob.type.ZombieShieldOnlyMobType
 import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.Material
@@ -72,6 +76,10 @@ class MobService(private val plugin: JavaPlugin) {
             instances[plugin] = this
         }
         registerMobType(ArenaEnhancedZombieMobType())
+        registerMobType(ZombieLeapOnlyMobType())
+        registerMobType(ZombieBowOnlyMobType())
+        registerMobType(ZombieBowSwapMobType())
+        registerMobType(ZombieShieldOnlyMobType())
         registerMobType(SparkZombieMobType())
     }
 
