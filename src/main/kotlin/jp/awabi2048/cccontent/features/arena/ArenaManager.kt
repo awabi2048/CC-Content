@@ -713,7 +713,9 @@ class ArenaManager(
         session.barrierDefenseMobIds.remove(entityId)
         session.barrierDefenseTargetMobIds.remove(entityId)
         session.barrierDefenseAssaultMobIds.remove(entityId)
-        consumeMob(session, entityId, countKill = true)
+        val killer = event.entity.killer
+        val countKill = killer != null && session.participants.contains(killer.uniqueId)
+        consumeMob(session, entityId, countKill = countKill)
     }
 
     private fun applyArenaMobDrop(event: EntityDeathEvent) {
@@ -2299,7 +2301,7 @@ class ArenaManager(
                 val entity = Bukkit.getEntity(mobId)
                 val invalid = entity == null || entity.isDead || !entity.isValid || entity.type == EntityType.PLAYER || entity.world.name != session.worldName
                 if (invalid) {
-                    consumeMob(session, mobId, countKill = true)
+                    consumeMob(session, mobId, countKill = false)
                 }
             }
         }
