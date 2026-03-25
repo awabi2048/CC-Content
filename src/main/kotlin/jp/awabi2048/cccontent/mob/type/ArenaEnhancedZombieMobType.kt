@@ -5,6 +5,7 @@ import jp.awabi2048.cccontent.mob.MobSpawnContext
 import jp.awabi2048.cccontent.mob.ability.zombie.ZombieBowAbility
 import jp.awabi2048.cccontent.mob.ability.zombie.ZombieLeapAbility
 import jp.awabi2048.cccontent.mob.ability.zombie.ZombieShieldAbility
+import jp.awabi2048.cccontent.mob.ability.zombie.ZombieWeaponSwapAbility
 import org.bukkit.Material
 import org.bukkit.entity.EntityType
 import org.bukkit.inventory.ItemStack
@@ -15,6 +16,7 @@ class ArenaEnhancedZombieMobType : AbilityMobType(
     abilities = listOf(
         ZombieLeapAbility(),
         ZombieShieldAbility(),
+        ZombieWeaponSwapAbility(),
         ZombieBowAbility()
     )
 ) {

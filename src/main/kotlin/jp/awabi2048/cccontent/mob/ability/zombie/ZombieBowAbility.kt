@@ -4,13 +4,14 @@ import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import jp.awabi2048.cccontent.mob.MobService
 import jp.awabi2048.cccontent.mob.ability.MobAbility
 import jp.awabi2048.cccontent.mob.ability.MobAbilityRuntime
-import org.bukkit.Material
 import org.bukkit.Particle
+import org.bukkit.Sound
 import org.bukkit.entity.AbstractArrow
 import org.bukkit.entity.Arrow
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Mob
-import org.bukkit.inventory.ItemStack
+import kotlin.math.asin
+import kotlin.math.atan2
 import kotlin.math.roundToLong
 import kotlin.random.Random
 
@@ -37,11 +38,14 @@ class ZombieBowAbility : MobAbility {
         }
 
         val entity = context.entity
-        val target = resolveTarget(entity, TARGET_SEARCH_RANGE) ?: return
+        val target = resolveTarget(entity) ?: return
 
         val distanceSquared = entity.location.distanceSquared(target.location)
-        if (distanceSquared >= BOW_MODE_MIN_DISTANCE_SQUARED && entity.hasLineOfSight(target)) {
-            ensureMainHand(entity, Material.BOW)
+        if (distanceSquared >= BOW_MODE_MIN_DISTANCE_SQUARED) {
+            faceTowards(entity, target)
+            if (!entity.hasLineOfSight(target)) {
+                return
+            }
             if (Random.nextDouble() < loadSnapshot.abilityExecutionSkipChance) {
                 return
             }
@@ -53,36 +57,24 @@ class ZombieBowAbility : MobAbility {
             }
             return
         }
-
-        ensureMainHand(entity, Material.IRON_SWORD)
     }
 
-    private fun resolveTarget(entity: LivingEntity, maxRange: Double): LivingEntity? {
-        val mobTarget = (entity as? Mob)?.target
-        if (mobTarget is LivingEntity && mobTarget.isValid && !mobTarget.isDead) {
-            if (entity.location.distanceSquared(mobTarget.location) <= maxRange * maxRange) {
-                return mobTarget
-            }
+    private fun resolveTarget(entity: LivingEntity): LivingEntity? {
+        val target = (entity as? Mob)?.target as? LivingEntity ?: return null
+        if (!target.isValid || target.isDead) {
+            return null
         }
-
-        return entity.getNearbyEntities(maxRange, maxRange, maxRange)
-            .asSequence()
-            .filterIsInstance<LivingEntity>()
-            .filter { candidate ->
-                candidate.uniqueId != entity.uniqueId &&
-                    candidate.isValid &&
-                    !candidate.isDead
-            }
-            .minByOrNull { candidate ->
-                candidate.location.distanceSquared(entity.location)
-            }
+        return target
     }
 
-    private fun ensureMainHand(entity: LivingEntity, material: Material) {
-        val equipment = entity.equipment ?: return
-        if (equipment.itemInMainHand.type != material) {
-            equipment.setItemInMainHand(ItemStack(material))
-        }
+    private fun faceTowards(entity: LivingEntity, target: LivingEntity) {
+        val direction = target.eyeLocation.toVector().subtract(entity.eyeLocation.toVector())
+        if (direction.lengthSquared() < 0.0001) return
+
+        val normalized = direction.normalize()
+        val yaw = Math.toDegrees(atan2(-normalized.x, normalized.z)).toFloat()
+        val pitch = Math.toDegrees(-asin(normalized.y)).toFloat()
+        entity.setRotation(yaw, pitch)
     }
 
     private fun shootArrow(context: MobRuntimeContext, entity: LivingEntity, target: LivingEntity) {
@@ -98,11 +90,11 @@ class ZombieBowAbility : MobAbility {
         arrow.isCritical = false
 
         entity.world.spawnParticle(Particle.CRIT, source, 5, 0.08, 0.08, 0.08, 0.02)
+        entity.world.playSound(entity.location, Sound.ENTITY_SKELETON_SHOOT, 1.0f, 1.0f)
         MobService.getInstance(context.plugin)?.recordProjectileLaunch(context.sessionKey)
     }
 
     private companion object {
-        const val TARGET_SEARCH_RANGE = 24.0
         const val BOW_MODE_MIN_DISTANCE_SQUARED = 36.0
         const val BOW_SHOT_COOLDOWN_TICKS = 30L
         const val ARROW_SPEED = 2.0

@@ -3,10 +3,10 @@ package jp.awabi2048.cccontent.mob.ability.zombie
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import jp.awabi2048.cccontent.mob.ability.MobAbility
 import jp.awabi2048.cccontent.mob.ability.MobAbilityRuntime
-import org.bukkit.Particle
-import org.bukkit.Sound
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Mob
+import kotlin.math.asin
+import kotlin.math.atan2
 import kotlin.math.roundToLong
 import kotlin.random.Random
 
@@ -39,41 +39,38 @@ class ZombieLeapAbility : MobAbility {
         val entity = context.entity
         if (!entity.isOnGround) return
 
-        val target = resolveTarget(entity, LEAP_MAX_RANGE) ?: return
+        val target = resolveTarget(entity) ?: return
         val distanceSquared = entity.location.distanceSquared(target.location)
         if (distanceSquared < LEAP_MIN_RANGE_SQUARED || distanceSquared > LEAP_MAX_RANGE_SQUARED) return
+
+        faceTowards(entity, target)
 
         val delta = target.location.toVector().subtract(entity.location.toVector())
         val horizontal = delta.clone().setY(0.0)
         if (horizontal.lengthSquared() < 0.0001) return
 
         entity.velocity = horizontal.normalize().multiply(LEAP_HORIZONTAL_SPEED).setY(LEAP_VERTICAL_SPEED)
-        entity.world.spawnParticle(Particle.CLOUD, entity.location, 14, 0.35, 0.1, 0.35, 0.02)
-        entity.world.playSound(entity.location, Sound.ENTITY_ZOMBIE_ATTACK_IRON_DOOR, 0.7f, 1.1f)
 
         abilityRuntime.leapCooldownTicks =
             (LEAP_COOLDOWN_TICKS * loadSnapshot.abilityCooldownMultiplier).roundToLong().coerceAtLeast(LEAP_COOLDOWN_TICKS)
     }
 
-    private fun resolveTarget(entity: LivingEntity, maxRange: Double): LivingEntity? {
-        val mobTarget = (entity as? Mob)?.target
-        if (mobTarget is LivingEntity && !mobTarget.isDead && mobTarget.isValid) {
-            if (entity.location.distanceSquared(mobTarget.location) <= maxRange * maxRange) {
-                return mobTarget
-            }
+    private fun resolveTarget(entity: LivingEntity): LivingEntity? {
+        val target = (entity as? Mob)?.target as? LivingEntity ?: return null
+        if (!target.isValid || target.isDead) {
+            return null
         }
+        return target
+    }
 
-        return entity.getNearbyEntities(maxRange, maxRange, maxRange)
-            .asSequence()
-            .filterIsInstance<LivingEntity>()
-            .filter { candidate ->
-                candidate.uniqueId != entity.uniqueId &&
-                    candidate.isValid &&
-                    !candidate.isDead
-            }
-            .minByOrNull { candidate ->
-                candidate.location.distanceSquared(entity.location)
-            }
+    private fun faceTowards(entity: LivingEntity, target: LivingEntity) {
+        val direction = target.eyeLocation.toVector().subtract(entity.eyeLocation.toVector())
+        if (direction.lengthSquared() < 0.0001) return
+
+        val normalized = direction.normalize()
+        val yaw = Math.toDegrees(atan2(-normalized.x, normalized.z)).toFloat()
+        val pitch = Math.toDegrees(-asin(normalized.y)).toFloat()
+        entity.setRotation(yaw, pitch)
     }
 
     private companion object {
