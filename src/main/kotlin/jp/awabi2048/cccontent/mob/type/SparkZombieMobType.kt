@@ -23,11 +23,12 @@ class SparkZombieMobType : MobType {
     override val baseEntityType: EntityType = EntityType.ZOMBIE
 
     data class Runtime(
-        var pulseCooldownTicks: Long = 0L
+        var pulseCooldownTicks: Long = 0L,
+        var searchPhaseOffsetSteps: Int = 0
     ) : CustomMobRuntime
 
     override fun createRuntime(context: MobSpawnContext): CustomMobRuntime {
-        return Runtime()
+        return Runtime(searchPhaseOffsetSteps = Random.nextInt(0, SEARCH_PHASE_VARIANTS))
     }
 
     override fun applyDefaultEquipment(context: MobSpawnContext, runtime: CustomMobRuntime?) {
@@ -70,7 +71,7 @@ class SparkZombieMobType : MobType {
         }
 
         val loadSnapshot = context.loadSnapshot
-        if (context.activeMob.tickCount % (10L * loadSnapshot.searchIntervalMultiplier.toLong()) != 0L) {
+        if (!shouldProcessSearchTick(context.activeMob.tickCount, loadSnapshot.searchIntervalMultiplier, mobRuntime.searchPhaseOffsetSteps)) {
             return
         }
         if (Random.nextDouble() < loadSnapshot.abilityExecutionSkipChance) {
@@ -141,5 +142,15 @@ class SparkZombieMobType : MobType {
             0.5,
             0.05
         )
+    }
+
+    private fun shouldProcessSearchTick(tickCount: Long, searchIntervalMultiplier: Int, phaseOffsetSteps: Int): Boolean {
+        val intervalSteps = searchIntervalMultiplier.coerceAtLeast(1).toLong()
+        val currentStep = (tickCount / 10L) + phaseOffsetSteps.toLong()
+        return currentStep % intervalSteps == 0L
+    }
+
+    private companion object {
+        const val SEARCH_PHASE_VARIANTS = 16
     }
 }

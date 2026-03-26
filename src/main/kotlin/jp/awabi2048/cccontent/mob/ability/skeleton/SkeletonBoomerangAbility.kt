@@ -14,10 +14,13 @@ import kotlin.random.Random
 class SkeletonBoomerangAbility : MobAbility {
     override val id: String = "skeleton_boomerang"
 
-    data class Runtime(var cooldownTicks: Long = 0L) : MobAbilityRuntime
+    data class Runtime(
+        var cooldownTicks: Long = 0L,
+        var searchPhaseOffsetSteps: Int = 0
+    ) : MobAbilityRuntime
 
     override fun createRuntime(context: jp.awabi2048.cccontent.mob.MobSpawnContext): MobAbilityRuntime {
-        return Runtime()
+        return Runtime(searchPhaseOffsetSteps = Random.nextInt(0, SEARCH_PHASE_VARIANTS))
     }
 
     override fun onTick(context: MobRuntimeContext, runtime: MobAbilityRuntime?) {
@@ -31,7 +34,7 @@ class SkeletonBoomerangAbility : MobAbility {
         }
 
         val loadSnapshot = context.loadSnapshot
-        if (context.activeMob.tickCount % (10L * loadSnapshot.searchIntervalMultiplier.toLong()) != 0L) {
+        if (!shouldProcessSearchTick(context.activeMob.tickCount, loadSnapshot.searchIntervalMultiplier, abilityRuntime.searchPhaseOffsetSteps)) {
             return
         }
         if (Random.nextDouble() < loadSnapshot.abilityExecutionSkipChance) {
@@ -89,7 +92,14 @@ class SkeletonBoomerangAbility : MobAbility {
         return target
     }
 
+    private fun shouldProcessSearchTick(tickCount: Long, searchIntervalMultiplier: Int, phaseOffsetSteps: Int): Boolean {
+        val intervalSteps = searchIntervalMultiplier.coerceAtLeast(1).toLong()
+        val currentStep = (tickCount / 10L) + phaseOffsetSteps.toLong()
+        return currentStep % intervalSteps == 0L
+    }
+
     private companion object {
+        const val SEARCH_PHASE_VARIANTS = 16
         const val BOOMERANG_COOLDOWN_TICKS = 60L
         const val BOOMERANG_MAX_LIFETIME_TICKS = 60L
         const val BOOMERANG_SPEED_PER_TICK = 3.0

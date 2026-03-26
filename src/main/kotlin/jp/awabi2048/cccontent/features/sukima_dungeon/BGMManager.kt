@@ -7,7 +7,12 @@ import org.bukkit.scheduler.BukkitTask
 import java.util.UUID
 
 object BGMManager {
-    private val activeTasks = mutableMapOf<UUID, BukkitTask>()
+    private data class ActivePlayback(
+        val task: BukkitTask,
+        val soundKey: String
+    )
+
+    private val activeTasks = mutableMapOf<UUID, ActivePlayback>()
     private val bgmConfigs = mutableMapOf<String, BGMConfig>()
 
     data class BGMConfig(val key: String, val duration: Int)
@@ -30,7 +35,6 @@ object BGMManager {
     }
 
     fun play(player: Player, bgmId: String) {
-        stop(player)
         val plugin = CCContent.instance
         var config = bgmConfigs[bgmId]
         if (config == null) {
@@ -45,32 +49,57 @@ object BGMManager {
             plugin.logger.warning("BGM再生時間が不正です: id=$bgmId duration=${config.duration}")
             return
         }
-        
+
+        playLoop(player, config.key, config.duration)
+    }
+
+    fun playLoop(player: Player, soundKey: String, durationSeconds: Int) {
+        stop(player, soundKey)
+        val plugin = CCContent.instance
+        if (durationSeconds <= 0) {
+            plugin.logger.warning("BGM再生時間が不正です: key=$soundKey duration=$durationSeconds")
+            return
+        }
+
         val task = object : org.bukkit.scheduler.BukkitRunnable() {
             override fun run() {
                 if (!player.isOnline) {
-                    stop(player)
+                    stop(player, soundKey)
                     return
                 }
-                
+
                 // プレイヤーにのみ聞こえるように再生
-                player.playSound(player.location, config.key, 1.0f, 1.0f)
+                player.playSound(player.location, soundKey, 1.0f, 1.0f)
             }
-        }.runTaskTimer(plugin, 0L, config.duration * 20L)
-        
-        activeTasks[player.uniqueId] = task
+        }.runTaskTimer(plugin, 0L, durationSeconds * 20L)
+
+        activeTasks[player.uniqueId]?.task?.cancel()
+        activeTasks[player.uniqueId] = ActivePlayback(task, soundKey)
     }
 
     fun stop(player: Player) {
-        activeTasks.remove(player.uniqueId)?.cancel()
-        player.stopSound("") // 全てのサウンドを停止（必要に応じて特定に絞る）
+        val playback = activeTasks.remove(player.uniqueId) ?: return
+        playback.task.cancel()
+        player.stopSound(playback.soundKey)
     }
-    
+
+    fun stop(player: Player, soundKey: String) {
+        val playback = activeTasks[player.uniqueId] ?: return
+        if (playback.soundKey != soundKey) return
+        playback.task.cancel()
+        activeTasks.remove(player.uniqueId)
+        player.stopSound(soundKey)
+    }
+
     fun stopAll() {
-        activeTasks.values.forEach { it.cancel() }
+        val entries = activeTasks.toMap()
+        entries.values.forEach { playback -> playback.task.cancel() }
         activeTasks.clear()
         for (player in Bukkit.getOnlinePlayers()) {
-            player.stopSound("")
+            entries[player.uniqueId]?.let { playback -> player.stopSound(playback.soundKey) }
+            for (config in bgmConfigs.values) {
+                player.stopSound(config.key)
+            }
         }
     }
 }

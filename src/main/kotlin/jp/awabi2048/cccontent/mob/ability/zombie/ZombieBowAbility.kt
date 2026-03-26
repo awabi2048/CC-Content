@@ -25,11 +25,12 @@ class ZombieBowAbility : MobAbility {
     data class Runtime(
         var shotCooldownTicks: Long = 0L,
         var aimTicks: Long = 0L,
-        var lostSightTicks: Long = 0L
+        var lostSightTicks: Long = 0L,
+        var searchPhaseOffsetSteps: Int = 0
     ) : MobAbilityRuntime
 
     override fun createRuntime(context: jp.awabi2048.cccontent.mob.MobSpawnContext): MobAbilityRuntime {
-        return Runtime()
+        return Runtime(searchPhaseOffsetSteps = Random.nextInt(0, SEARCH_PHASE_VARIANTS))
     }
 
     override fun onTick(context: MobRuntimeContext, runtime: MobAbilityRuntime?) {
@@ -44,7 +45,7 @@ class ZombieBowAbility : MobAbility {
         }
 
         val loadSnapshot = context.loadSnapshot
-        if (context.activeMob.tickCount % (10L * loadSnapshot.searchIntervalMultiplier.toLong()) != 0L) {
+        if (!shouldProcessSearchTick(context.activeMob.tickCount, loadSnapshot.searchIntervalMultiplier, abilityRuntime.searchPhaseOffsetSteps)) {
             return
         }
 
@@ -197,7 +198,14 @@ class ZombieBowAbility : MobAbility {
         return damager.uniqueId == attacker.uniqueId
     }
 
+    private fun shouldProcessSearchTick(tickCount: Long, searchIntervalMultiplier: Int, phaseOffsetSteps: Int): Boolean {
+        val intervalSteps = searchIntervalMultiplier.coerceAtLeast(1).toLong()
+        val currentStep = (tickCount / 10L) + phaseOffsetSteps.toLong()
+        return currentStep % intervalSteps == 0L
+    }
+
     private companion object {
+        const val SEARCH_PHASE_VARIANTS = 16
         const val BOW_MODE_MIN_DISTANCE_SQUARED = 36.0
         const val BOW_SHOT_COOLDOWN_TICKS = 30L
         const val AIM_RESET_LOST_SIGHT_TICKS = 20L
