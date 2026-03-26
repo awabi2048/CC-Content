@@ -764,13 +764,10 @@ class ArenaManager(
         }
 
         val targetPlayer = target
-        if (!session.participants.contains(targetPlayer.uniqueId)) return
-
-        val wave = session.mobWaveMap[mob.uniqueId] ?: return
-        if (session.corridorTriggeredWaves.contains(wave)) return
-
-        event.isCancelled = true
-        mob.target = null
+        if (!session.participants.contains(targetPlayer.uniqueId)) {
+            event.isCancelled = true
+            mob.target = selectNearestParticipant(session, mob.location)
+        }
     }
 
     private fun resolveArenaMobAttackerId(event: EntityDamageByEntityEvent): UUID? {
@@ -1412,7 +1409,7 @@ class ArenaManager(
 
         applyMobStats(entity, definition, difficulty, session.difficultyValue, session.questModifiers)
 
-        if (entity is Mob && session.corridorTriggeredWaves.contains(wave)) {
+        if (entity is Mob) {
             entity.target = findNearestParticipant(session, entity.location)
         }
 
