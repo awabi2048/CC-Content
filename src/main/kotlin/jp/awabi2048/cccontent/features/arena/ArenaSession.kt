@@ -61,7 +61,6 @@ data class ArenaSession(
     var barrierDefenseSpawnTask: BukkitTask? = null,
     var barrierDefensePressureTask: BukkitTask? = null,
     var progressBossBar: BossBar? = null,
-    val barrierRestartCorruptedSlots: MutableSet<Int> = mutableSetOf(),
     val barrierDefenseMobIds: MutableSet<UUID> = mutableSetOf(),
     val barrierDefenseTargetMobIds: MutableSet<UUID> = mutableSetOf(),
     val barrierDefenseAssaultMobIds: MutableSet<UUID> = mutableSetOf(),

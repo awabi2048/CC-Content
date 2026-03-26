@@ -45,13 +45,8 @@ import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
-import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.event.inventory.InventoryDragEvent
 import org.bukkit.inventory.ItemStack
-import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.PlayerInventory
-import org.bukkit.inventory.meta.ItemMeta
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
 import org.bukkit.plugin.java.JavaPlugin
@@ -62,7 +57,6 @@ import java.util.Locale
 import java.util.UUID
 import kotlin.math.ceil
 import kotlin.math.floor
-import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
@@ -86,11 +80,6 @@ private data class PendingWorldDeletion(
     val worldName: String,
     val folder: File,
     var attempts: Int = 0
-)
-
-private data class PendingBarrierActivation(
-    val effectTask: BukkitTask,
-    val completionTask: BukkitTask
 )
 
 private data class WaveRange(
@@ -190,7 +179,6 @@ class ArenaManager(
     private val playerToSessionWorld = mutableMapOf<UUID, String>()
     private val mobToSessionWorld = mutableMapOf<UUID, String>()
     private val pendingWorldDeletions = mutableMapOf<String, PendingWorldDeletion>()
-    private val pendingBarrierActivations = mutableMapOf<UUID, PendingBarrierActivation>()
     private val difficultyConfigs = mutableMapOf<String, ArenaDifficultyConfig>()
     private val mobTypeConfigs = mutableMapOf<String, ArenaMobTypeConfig>()
     private val mobDefinitions = mutableMapOf<String, MobDefinition>()
@@ -638,11 +626,6 @@ class ArenaManager(
         playerToSessionWorld.clear()
         mobToSessionWorld.clear()
         mobToDefinitionTypeId.clear()
-        pendingBarrierActivations.values.toList().forEach { pending ->
-            pending.effectTask.cancel()
-            pending.completionTask.cancel()
-        }
-        pendingBarrierActivations.clear()
         processPendingWorldDeletions()
     }
 
@@ -666,8 +649,6 @@ class ArenaManager(
             val world = Bukkit.getWorld(session.worldName) ?: continue
 
             for (participantId in session.participants.toList()) {
-                if (pendingBarrierActivations.containsKey(participantId)) continue
-
                 val player = Bukkit.getPlayer(participantId)
                 if (player == null || !player.isOnline) continue
 
@@ -907,43 +888,6 @@ class ArenaManager(
         }
     }
 
-    fun handleBarrierClick(player: Player, clicked: Location): Boolean {
-        val session = getSession(player) ?: return false
-        if (player.world.name != session.worldName) return false
-
-        val block = clicked.block
-        val core = session.barrierLocation.block
-        if (block.x != core.x || block.y != core.y || block.z != core.z) return false
-
-        return openBarrierRestartMenu(player, session)
-    }
-
-    fun handleBarrierRestartMenuClick(player: Player, inventory: Inventory, slot: Int): Boolean {
-        val session = getSession(player) ?: return false
-        if (player.world.name != session.worldName) return false
-        if (!isBarrierRestartMenu(inventory)) return false
-
-        if (slot != ArenaBarrierRestartLayout.CENTER_SLOT) {
-            return true
-        }
-
-        if (session.barrierRestartCompleted) {
-            return true
-        }
-
-        if (session.barrierRestarting) {
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.barrier.activating", "&e結界石を再起動中です"))
-            return true
-        }
-
-        startBarrierRestartSequence(player, session)
-        return true
-    }
-
-    fun handleBarrierRestartMenuDrag(inventory: Inventory): Boolean {
-        return isBarrierRestartMenu(inventory)
-    }
-
     fun handleDoorClick(player: Player, clicked: Location): Boolean {
         val session = getSession(player) ?: return false
         if (player.world.name != session.worldName) return false
@@ -964,16 +908,6 @@ class ArenaManager(
         return true
     }
 
-    fun isBarrierBlock(location: Location): Boolean {
-        return sessionsByWorld.values.any { session ->
-            val block = session.barrierLocation.block
-            block.world.name == location.world?.name &&
-                block.x == location.blockX &&
-                block.y == location.blockY &&
-                block.z == location.blockZ
-        }
-    }
-
     fun isDoorBlock(location: Location): Boolean {
         return sessionsByWorld.values.any { session -> locateDoorWave(session, location) != null }
     }
@@ -981,8 +915,6 @@ class ArenaManager(
     private fun leavePlayerFromSession(playerId: UUID, reason: String): Boolean {
         val worldName = playerToSessionWorld[playerId] ?: return false
         val session = sessionsByWorld[worldName] ?: return false
-
-        cancelBarrierActivation(playerId)
 
         playerToSessionWorld.remove(playerId)
         session.participants.remove(playerId)
@@ -1039,7 +971,6 @@ class ArenaManager(
         hideSessionProgressBossBar(session)
 
         session.participants.toList().forEach { participantId ->
-            cancelBarrierActivation(participantId)
             playerToSessionWorld.remove(participantId)
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline) {
@@ -1083,7 +1014,6 @@ class ArenaManager(
         session.barrierActive = false
         session.barrierRestarting = false
         session.barrierRestartCompleted = false
-        session.barrierRestartCorruptedSlots.clear()
 
         session.activeMobs.toList().forEach { mobId ->
             mobToSessionWorld.remove(mobId)
@@ -1727,15 +1657,10 @@ class ArenaManager(
         session.waveSpawnTasks.values.forEach { it.cancel() }
         session.waveSpawnTasks.clear()
         session.barrierActive = true
+        startBarrierRestartSequence(session)
     }
 
     private fun initializeBarrierRestartState(session: ArenaSession) {
-        val ratio = (barrierRestartConfig.corruptionRatioBase * session.difficultyScore).coerceAtMost(0.2)
-        val totalSlots = ArenaBarrierRestartLayout.MENU_SLOTS.size
-        val dirtyCount = (totalSlots * ratio).roundToInt().coerceIn(1, totalSlots)
-
-        session.barrierRestartCorruptedSlots.clear()
-        session.barrierRestartCorruptedSlots.addAll(ArenaBarrierRestartLayout.MENU_SLOTS.shuffled(random).take(dirtyCount))
         session.barrierRestarting = false
         session.barrierRestartCompleted = false
         session.barrierRestartStartMillis = 0L
@@ -1756,24 +1681,6 @@ class ArenaManager(
         session.barrierAmbientTask = task
     }
 
-    private fun openBarrierRestartMenu(player: Player, session: ArenaSession): Boolean {
-        if (session.barrierRestarting) {
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.barrier.activating", "&e結界石を再起動中です"))
-            return true
-        }
-
-        val holder = ArenaBarrierRestartMenuHolder(player.uniqueId, session.worldName)
-        val inventory = Bukkit.createInventory(holder, ArenaBarrierRestartLayout.MENU_SIZE, ArenaBarrierRestartLayout.MENU_TITLE)
-        holder.backingInventory = inventory
-        renderBarrierRestartMenu(session, inventory)
-        player.openInventory(inventory)
-        return true
-    }
-
-    private fun isBarrierRestartMenu(inventory: Inventory): Boolean {
-        return inventory.holder is ArenaBarrierRestartMenuHolder
-    }
-
     private fun barrierRestartProgress(session: ArenaSession): Double {
         if (session.barrierRestartCompleted) return 1.0
         if (!session.barrierRestarting) return 0.0
@@ -1782,55 +1689,9 @@ class ArenaManager(
         return (session.barrierRestartProgressMillis.toDouble() / duration.toDouble()).coerceIn(0.0, 1.0)
     }
 
-    private fun renderBarrierRestartMenu(session: ArenaSession, inventory: Inventory) {
-        val headerFooter = createBarrierHeaderFooterPane()
-        val background = createBarrierBackgroundPane()
-
-        for (slot in ArenaBarrierRestartLayout.HEADER_SLOTS) {
-            inventory.setItem(slot, headerFooter)
-        }
-
-        for (slot in ArenaBarrierRestartLayout.FOOTER_SLOTS) {
-            inventory.setItem(slot, headerFooter)
-        }
-
-        for (slot in ArenaBarrierRestartLayout.MENU_SLOTS) {
-            inventory.setItem(slot, background)
-        }
-
-        inventory.setItem(ArenaBarrierRestartLayout.CENTER_SLOT, createBarrierCenterItem(session))
-    }
-
-    private fun createBarrierBackgroundPane(): ItemStack {
-        val item = ItemStack(Material.GRAY_STAINED_GLASS_PANE)
-        val meta = item.itemMeta ?: return item
-        meta.setDisplayName(" ")
-        item.itemMeta = meta
-        return item
-    }
-
-    private fun createBarrierHeaderFooterPane(): ItemStack {
-        val item = ItemStack(Material.BLACK_STAINED_GLASS_PANE)
-        val meta = item.itemMeta ?: return item
-        meta.setDisplayName(" ")
-        item.itemMeta = meta
-        return item
-    }
-
-    private fun createBarrierCenterItem(session: ArenaSession): ItemStack {
-        val item = ItemStack(Material.END_CRYSTAL)
-        val meta = item.itemMeta ?: return item
-        meta.setDisplayName(if (session.barrierRestarting) "§e再起動中です..." else "§d結界石を再起動する")
-        item.itemMeta = meta
-        return item
-    }
-
-    private fun startBarrierRestartSequence(player: Player, session: ArenaSession) {
+    private fun startBarrierRestartSequence(session: ArenaSession) {
         if (session.barrierRestartCompleted) return
-        if (session.barrierRestarting) {
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.barrier.activating", "&e結界石を再起動中です"))
-            return
-        }
+        if (session.barrierRestarting) return
 
         val world = Bukkit.getWorld(session.worldName) ?: return
         val durationMillis = ((barrierRestartConfig.defaultDurationSeconds * session.difficultyScore) * 1000.0)
@@ -1842,7 +1703,6 @@ class ArenaManager(
         session.barrierRestartStartMillis = System.currentTimeMillis()
         session.barrierRestartDurationMillis = durationMillis
         session.barrierRestartProgressMillis = 0L
-        player.closeInventory()
 
         broadcastRawMessage(session, "§c結界石の再起動を開始しました！結界を一時的に解除します！")
 
@@ -1851,10 +1711,7 @@ class ArenaManager(
         playSoundAtBarrier(session, Sound.BLOCK_BEACON_DEACTIVATE, 5.0f, 0.5f)
         spawnBarrierRestartStartParticles(world, session)
 
-        startBarrierDefenseSpawnTask(session)
-        startBarrierDefensePressureTask(session)
         updateSessionProgressBossBar(session)
-        refreshBarrierRestartMenus(session)
 
         session.barrierRestartTask?.cancel()
         scheduleBarrierRestartProgressTick(session)
@@ -1862,10 +1719,9 @@ class ArenaManager(
 
     private fun scheduleBarrierRestartProgressTick(session: ArenaSession) {
         session.barrierRestartTask?.cancel()
-        val delay = calculateBarrierRestartTickDelay(session)
         val task = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             tickBarrierRestartSequence(session)
-        }, delay)
+        }, BARRIER_RESTART_PROGRESS_STEP_TICKS)
         session.barrierRestartTask = task
     }
 
@@ -1878,7 +1734,6 @@ class ArenaManager(
 
         val progress = barrierRestartProgress(activeSession)
         updateSessionProgressBossBar(activeSession)
-        refreshBarrierRestartMenus(activeSession)
 
         if (progress >= 1.0) {
             activeSession.barrierRestartTask = null
@@ -1887,18 +1742,6 @@ class ArenaManager(
         }
 
         scheduleBarrierRestartProgressTick(activeSession)
-    }
-
-    private fun calculateBarrierRestartTickDelay(session: ArenaSession): Long {
-        val pressureCount = session.barrierDefenseAssaultMobIds.count { mobId ->
-            val entity = Bukkit.getEntity(mobId) as? LivingEntity
-            entity != null && entity.isValid && !entity.isDead && entity.world.name == session.worldName
-        }
-        if (pressureCount <= 0) return BARRIER_RESTART_PROGRESS_STEP_TICKS
-
-        val slowdownPercent = max(100, 10 * pressureCount)
-        val factor = 1.0 + slowdownPercent / 100.0
-        return (BARRIER_RESTART_PROGRESS_STEP_TICKS * factor).roundToLong().coerceAtLeast(BARRIER_RESTART_PROGRESS_STEP_TICKS)
     }
 
     private fun startBarrierDefenseSpawnTask(session: ArenaSession) {
@@ -2035,7 +1878,6 @@ class ArenaManager(
         session.barrierAmbientTask = null
 
         cleanupBarrierRestartSession(session, removeDefenseMobs = true, smoke = true)
-        refreshBarrierRestartMenus(session)
 
         playSoundAtBarrier(session, Sound.BLOCK_BEACON_ACTIVATE, 5.0f, 0.5f)
         val world = Bukkit.getWorld(session.worldName) ?: return
@@ -2062,16 +1904,6 @@ class ArenaManager(
                 )
             }, 40L)
         }, 40L)
-    }
-
-    private fun refreshBarrierRestartMenus(session: ArenaSession) {
-        session.participants.forEach { participantId ->
-            val player = Bukkit.getPlayer(participantId) ?: return@forEach
-            if (!player.isOnline || player.world.name != session.worldName) return@forEach
-            val holder = player.openInventory.topInventory.holder as? ArenaBarrierRestartMenuHolder ?: return@forEach
-            if (holder.worldName != session.worldName || holder.ownerId != participantId) return@forEach
-            renderBarrierRestartMenu(session, player.openInventory.topInventory)
-        }
     }
 
     private fun updateSessionProgressBossBar(session: ArenaSession) {
@@ -2170,9 +2002,6 @@ class ArenaManager(
         session.barrierDefenseAssaultMobIds.clear()
 
         hideSessionProgressBossBar(session)
-        if (session.barrierRestartCompleted) {
-            session.barrierRestartCorruptedSlots.clear()
-        }
     }
 
     private fun removeBarrierDefenseMobs(session: ArenaSession, smoke: Boolean) {
@@ -2225,41 +2054,6 @@ class ArenaManager(
         val world = Bukkit.getWorld(session.worldName) ?: return
         val center = session.barrierLocation.clone().add(0.5, 0.5, 0.5)
         world.playSound(center, sound, volume, pitch)
-    }
-
-    private fun startBarrierActivation(player: Player, session: ArenaSession) {
-        val effectTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
-            if (!player.isOnline || player.world.name != session.worldName) return@Runnable
-            val center = session.barrierLocation.clone().add(0.5, 0.8, 0.5)
-            player.world.spawnParticle(Particle.END_ROD, center, 24, 0.35, 0.45, 0.35, 0.01)
-        }, 0L, 10L)
-
-        val completionTask = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
-            val pending = pendingBarrierActivations.remove(player.uniqueId) ?: return@Runnable
-            pending.effectTask.cancel()
-
-            val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
-            if (!activeSession.participants.contains(player.uniqueId)) return@Runnable
-            if (!player.isOnline || player.world.name != session.worldName) return@Runnable
-
-            terminateSession(
-                activeSession,
-                true,
-                messageKey = "arena.messages.session.cleared",
-                fallbackMessage = "&aアリーナクリア！"
-            )
-        }, 200L)
-
-        pendingBarrierActivations[player.uniqueId] = PendingBarrierActivation(
-            effectTask = effectTask,
-            completionTask = completionTask
-        )
-    }
-
-    private fun cancelBarrierActivation(playerId: UUID) {
-        val pending = pendingBarrierActivations.remove(playerId) ?: return
-        pending.effectTask.cancel()
-        pending.completionTask.cancel()
     }
 
     private fun broadcastMessage(
