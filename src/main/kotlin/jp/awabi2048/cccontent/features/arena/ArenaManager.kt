@@ -1089,7 +1089,6 @@ class ArenaManager(
             mobToSessionWorld.remove(mobId)
             mobToDefinitionTypeId.remove(mobId)
             session.mobWaveMap.remove(mobId)
-            session.mobSpawnedAtMillis.remove(mobId)
             mobService.untrack(mobId)
             val entity = Bukkit.getEntity(mobId)
             if (entity != null && entity.isValid && !entity.isDead) {
@@ -1099,7 +1098,6 @@ class ArenaManager(
             session.activeMobs.remove(mobId)
         }
         session.waveMobIds.clear()
-        session.mobSpawnedAtMillis.clear()
 
         val world = Bukkit.getWorld(session.worldName)
         if (world != null) {
@@ -1180,6 +1178,7 @@ class ArenaManager(
             val currentSession = sessionsByWorld[session.worldName] ?: return@Runnable
             if (!currentSession.startedWaves.contains(wave)) return@Runnable
             if (currentSession.waveSpawningStopped.contains(wave)) return@Runnable
+            if (currentSession.clearedWaves.contains(wave)) return@Runnable
 
             val spawnThrottle = mobService.getSpawnThrottle("arena:${currentSession.worldName}")
             val intervalChance = (1.0 / spawnThrottle.intervalMultiplier).coerceIn(0.0, 1.0)
@@ -1187,9 +1186,6 @@ class ArenaManager(
             if (random.nextDouble() > intervalChance) return@Runnable
 
             val maxAlive = currentSession.stageMaxAliveCount.coerceAtLeast(1)
-            if (currentSession.activeMobs.size >= maxAlive) {
-                evictOldestActiveMob(currentSession)
-            }
             if (currentSession.activeMobs.size >= maxAlive) return@Runnable
 
             val world = Bukkit.getWorld(currentSession.worldName) ?: return@Runnable
@@ -1417,7 +1413,6 @@ class ArenaManager(
         session.activeMobs.add(entityId)
         session.waveMobIds.getOrPut(wave) { mutableSetOf() }.add(entityId)
         session.mobWaveMap[entityId] = wave
-        session.mobSpawnedAtMillis[entityId] = System.currentTimeMillis()
         mobToSessionWorld[entityId] = session.worldName
         mobToDefinitionTypeId[entityId] = definition.typeId
     }
@@ -1475,7 +1470,6 @@ class ArenaManager(
         mobToSessionWorld.remove(mobId)
         mobToDefinitionTypeId.remove(mobId)
         val wave = session.mobWaveMap.remove(mobId)
-        session.mobSpawnedAtMillis.remove(mobId)
         if (wave != null) {
             session.waveMobIds[wave]?.remove(mobId)
         }
@@ -1584,28 +1578,6 @@ class ArenaManager(
 
         playSound(session, Sound.BLOCK_IRON_DOOR_OPEN, 1.0f, 0.8f)
         plugin.logger.info("[Arena] door animation start: world=${session.worldName} target_wave=$targetWave")
-    }
-
-    private fun evictOldestActiveMob(session: ArenaSession): Boolean {
-        val oldestMobId = session.activeMobs
-            .minByOrNull { mobId -> session.mobSpawnedAtMillis[mobId] ?: Long.MIN_VALUE }
-            ?: return false
-
-        session.activeMobs.remove(oldestMobId)
-        val wave = session.mobWaveMap.remove(oldestMobId)
-        if (wave != null) {
-            session.waveMobIds[wave]?.remove(oldestMobId)
-        }
-        session.mobSpawnedAtMillis.remove(oldestMobId)
-        mobToSessionWorld.remove(oldestMobId)
-        mobToDefinitionTypeId.remove(oldestMobId)
-        mobService.untrack(oldestMobId)
-        val entity = Bukkit.getEntity(oldestMobId)
-        if (entity != null && entity.isValid && !entity.isDead) {
-            spawnMobDisappearSmoke(entity.location)
-            entity.remove()
-        }
-        return true
     }
 
     private fun calculateStageMaxAliveCount(
@@ -1720,7 +1692,6 @@ class ArenaManager(
 
             session.activeMobs.remove(mobId)
             session.mobWaveMap.remove(mobId)
-            session.mobSpawnedAtMillis.remove(mobId)
             mobToSessionWorld.remove(mobId)
             mobToDefinitionTypeId.remove(mobId)
             mobService.untrack(mobId)
