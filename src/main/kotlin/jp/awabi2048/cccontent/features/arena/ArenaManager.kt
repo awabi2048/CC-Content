@@ -1605,7 +1605,6 @@ class ArenaManager(
 
     private fun onCorridorOpened(session: ArenaSession, wave: Int) {
         if (!session.corridorOpenAnnouncements.add(wave)) return
-        broadcastMessage(session, "arena.messages.door.corridor_opened", "&aWave {wave} への通路が解放されました", "wave" to wave)
         playSound(session, Sound.BLOCK_IRON_DOOR_OPEN, 1.0f, 1.2f)
     }
 

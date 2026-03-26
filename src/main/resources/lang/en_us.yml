@@ -358,6 +358,12 @@ custom_items:
         zombie_bow_swap: "Swap Zombie"
         zombie_shield_only: "Shield Zombie"
         spark_zombie: "Spark Zombie"
+        skeleton_fast_arrow: "Fast Arrow Skeleton"
+        skeleton_rapid_shot: "Rapid Shot Skeleton"
+        skeleton_effect_arrow: "Effect Arrow Skeleton"
+        skeleton_curve_shot: "Curved Shot Skeleton"
+        skeleton_shield_only: "Shield Skeleton"
+        skeleton_boomerang: "Boomerang Skeleton"
     marker:
       current_mode: '&f§l| §7Current Mode §a{mode}'
       mode_changed: '&7Placement mode changed to §a{mode}§7.'
