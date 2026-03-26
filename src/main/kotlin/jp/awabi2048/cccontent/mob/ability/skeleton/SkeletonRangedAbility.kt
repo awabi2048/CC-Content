@@ -1,8 +1,8 @@
-package jp.awabi2048.cccontent.mob.ability.zombie
+package jp.awabi2048.cccontent.mob.ability.skeleton
 
+import jp.awabi2048.cccontent.mob.MobAttackContext
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import jp.awabi2048.cccontent.mob.MobService
-import jp.awabi2048.cccontent.mob.MobAttackContext
 import jp.awabi2048.cccontent.mob.ability.MobAbility
 import jp.awabi2048.cccontent.mob.ability.MobAbilityRuntime
 import org.bukkit.Material
@@ -12,21 +12,34 @@ import org.bukkit.entity.AbstractArrow
 import org.bukkit.entity.Arrow
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Mob
+import org.bukkit.entity.TippedArrow
 import org.bukkit.event.entity.EntityDamageByEntityEvent
+import org.bukkit.potion.PotionEffect
+import org.bukkit.potion.PotionEffectType
 import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.roundToLong
 import kotlin.math.sqrt
 import kotlin.random.Random
 
-class ZombieBowAbility : MobAbility {
-    override val id: String = "zombie_bow"
+class SkeletonRangedAbility(
+    override val id: String,
+    private val arrowSpeedMultiplier: Double = 1.0,
+    private val intervalMultiplier: Double = 1.0,
+    private val effectArrowChance: Double = 0.0
+) : MobAbility {
 
     data class Runtime(
         var shotCooldownTicks: Long = 0L,
         var aimTicks: Long = 0L,
         var lostSightTicks: Long = 0L
     ) : MobAbilityRuntime
+
+    private data class EffectArrowSpec(
+        val type: PotionEffectType,
+        val durationTicks: Int,
+        val amplifier: Int
+    )
 
     override fun createRuntime(context: jp.awabi2048.cccontent.mob.MobSpawnContext): MobAbilityRuntime {
         return Runtime()
@@ -55,16 +68,8 @@ class ZombieBowAbility : MobAbility {
         }
 
         val distanceSquared = entity.location.distanceSquared(target.location)
-        if (distanceSquared < BOW_MODE_MIN_DISTANCE_SQUARED) {
-            if (isHoldingBow(entity)) {
-                faceTowards(entity, target)
-                retreatFromTarget(entity, target)
-            }
-            resetAimState(abilityRuntime)
-            return
-        }
-
         faceTowards(entity, target)
+
         if (!entity.hasLineOfSight(target)) {
             abilityRuntime.lostSightTicks += 10L
             if (abilityRuntime.lostSightTicks >= AIM_RESET_LOST_SIGHT_TICKS) {
@@ -89,9 +94,9 @@ class ZombieBowAbility : MobAbility {
         }
 
         shootArrow(context, entity, target, distanceSquared)
+        val baseCooldown = (BOW_SHOT_COOLDOWN_TICKS * intervalMultiplier).roundToLong().coerceAtLeast(8L)
         abilityRuntime.shotCooldownTicks =
-            (BOW_SHOT_COOLDOWN_TICKS * loadSnapshot.abilityCooldownMultiplier).roundToLong()
-                .coerceAtLeast(BOW_SHOT_COOLDOWN_TICKS)
+            (baseCooldown * loadSnapshot.abilityCooldownMultiplier).roundToLong().coerceAtLeast(baseCooldown)
         abilityRuntime.aimTicks = 0L
     }
 
@@ -100,7 +105,7 @@ class ZombieBowAbility : MobAbility {
             return
         }
         val mainHandType = context.entity.equipment?.itemInMainHand?.type ?: return
-        if (mainHandType == Material.BOW) {
+        if (mainHandType == Material.BOW || mainHandType == Material.CROSSBOW) {
             context.event.damage = 0.0
         }
     }
@@ -129,11 +134,12 @@ class ZombieBowAbility : MobAbility {
     }
 
     private fun calculateRequiredAimTicks(distanceSquared: Double): Long {
-        return when {
+        val base = when {
             distanceSquared < 100.0 -> 10L
             distanceSquared < 256.0 -> 20L
             else -> 30L
         }
+        return (base * intervalMultiplier).roundToLong().coerceAtLeast(6L)
     }
 
     private fun shootArrow(context: MobRuntimeContext, entity: LivingEntity, target: LivingEntity, distanceSquared: Double) {
@@ -142,6 +148,7 @@ class ZombieBowAbility : MobAbility {
         val predictionScale = (TARGET_PREDICTION_BASE + distance * TARGET_PREDICTION_DISTANCE_SCALE)
             .coerceIn(0.25, 0.75)
         val predictedTarget = target.eyeLocation.add(target.velocity.clone().multiply(predictionScale))
+
         val direction = predictedTarget.toVector().subtract(source.toVector())
         direction.y += distance * GRAVITY_COMPENSATION_PER_BLOCK
         if (direction.lengthSquared() < 0.0001) return
@@ -151,15 +158,45 @@ class ZombieBowAbility : MobAbility {
         direction.y += Random.nextDouble(-spread * 0.6, spread * 0.6)
         direction.z += Random.nextDouble(-spread, spread)
 
-        val arrow = entity.launchProjectile(Arrow::class.java)
-        arrow.shooter = entity
-        arrow.velocity = direction.normalize().multiply(calculateArrowSpeed(distance))
-        arrow.pickupStatus = AbstractArrow.PickupStatus.DISALLOWED
-        arrow.isCritical = false
+        val arrowSpeed = calculateArrowSpeed(distance) * arrowSpeedMultiplier
+        val effectSpec = if (Random.nextDouble() < effectArrowChance) buildEffectArrowSpec() else null
+        val projectile = if (effectSpec != null) {
+            entity.launchProjectile(TippedArrow::class.java).apply {
+                shooter = entity
+                addCustomEffect(
+                    PotionEffect(effectSpec.type, effectSpec.durationTicks, effectSpec.amplifier, false, true, true),
+                    true
+                )
+            }
+        } else {
+            entity.launchProjectile(Arrow::class.java).apply {
+                shooter = entity
+            }
+        }
+        projectile.velocity = direction.normalize().multiply(arrowSpeed)
+        projectile.pickupStatus = AbstractArrow.PickupStatus.DISALLOWED
+        projectile.isCritical = false
+        if (effectSpec != null) {
+            MobService.getInstance(context.plugin)?.markSkeletonEffectArrow(
+                projectile,
+                effectSpec.type.name,
+                effectSpec.amplifier,
+                effectSpec.durationTicks
+            )
+        }
 
         entity.world.spawnParticle(Particle.CRIT, source, 5, 0.08, 0.08, 0.08, 0.02)
         entity.world.playSound(entity.location, Sound.ENTITY_SKELETON_SHOOT, 1.0f, 1.0f)
         MobService.getInstance(context.plugin)?.recordProjectileLaunch(context.sessionKey)
+    }
+
+    private fun buildEffectArrowSpec(): EffectArrowSpec {
+        val effectType = when (Random.nextInt(3)) {
+            0 -> PotionEffectType.POISON
+            1 -> PotionEffectType.WITHER
+            else -> PotionEffectType.SLOWNESS
+        }
+        return EffectArrowSpec(effectType, EFFECT_ARROW_DURATION_TICKS, 0)
     }
 
     private fun calculateArrowSpeed(distance: Double): Double {
@@ -178,32 +215,21 @@ class ZombieBowAbility : MobAbility {
         }
     }
 
-    private fun isHoldingBow(entity: LivingEntity): Boolean {
-        return entity.equipment?.itemInMainHand?.type == Material.BOW
-    }
-
-    private fun retreatFromTarget(entity: LivingEntity, target: LivingEntity) {
-        val retreatDirection = entity.location.toVector().subtract(target.location.toVector()).setY(0.0)
-        if (retreatDirection.lengthSquared() < 0.0001) {
-            return
-        }
-
-        val retreatVelocity = retreatDirection.normalize().multiply(RETREAT_SPEED)
-        entity.velocity = entity.velocity.setX(retreatVelocity.x).setZ(retreatVelocity.z)
-    }
-
     private fun isDirectMeleeAttack(event: EntityDamageByEntityEvent, attacker: LivingEntity): Boolean {
         val damager = event.damager as? LivingEntity ?: return false
         return damager.uniqueId == attacker.uniqueId
     }
 
-    private companion object {
-        const val BOW_MODE_MIN_DISTANCE_SQUARED = 36.0
-        const val BOW_SHOT_COOLDOWN_TICKS = 30L
-        const val AIM_RESET_LOST_SIGHT_TICKS = 20L
-        const val TARGET_PREDICTION_BASE = 0.3
-        const val TARGET_PREDICTION_DISTANCE_SCALE = 0.015
-        const val GRAVITY_COMPENSATION_PER_BLOCK = 0.03
-        const val RETREAT_SPEED = 0.22
+    companion object {
+        const val DEFAULT_EFFECT_ARROW_CHANCE = 0.25
+        const val DEFAULT_RAPID_INTERVAL_MULTIPLIER = 0.70
+        const val DEFAULT_FAST_ARROW_SPEED_MULTIPLIER = 1.35
+
+        private const val BOW_SHOT_COOLDOWN_TICKS = 30L
+        private const val AIM_RESET_LOST_SIGHT_TICKS = 20L
+        private const val TARGET_PREDICTION_BASE = 0.3
+        private const val TARGET_PREDICTION_DISTANCE_SCALE = 0.015
+        private const val GRAVITY_COMPENSATION_PER_BLOCK = 0.03
+        private const val EFFECT_ARROW_DURATION_TICKS = 200
     }
 }

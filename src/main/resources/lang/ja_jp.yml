@@ -988,6 +988,12 @@ custom_items:
         zombie_bow_swap: '換装ゾンビ'
         zombie_shield_only: '盾ゾンビ'
         spark_zombie: 'スパークゾンビ'
+        skeleton_fast_arrow: '高速矢スケルトン'
+        skeleton_rapid_shot: '速射スケルトン'
+        skeleton_effect_arrow: '効果矢スケルトン'
+        skeleton_curve_shot: '曲射スケルトン'
+        skeleton_shield_only: '盾スケルトン'
+        skeleton_boomerang: '骨投擲スケルトン'
     marker:
       current_mode: '&f§l| §7現在のモード §a{mode}'
       mode_changed: '&7設置モードを §a{mode} §7に変更しました。'

@@ -20,6 +20,67 @@ skeleton_basic:
   equipment:
     main_hand: BOW
 
+skeleton_fast_arrow_basic:
+  type: skeleton_fast_arrow
+  health: 20.0
+  attack: 4.0
+  movement_speed: 0.23
+  armor: 0.0
+  scale: 1.0
+  equipment:
+    main_hand: BOW
+
+skeleton_rapid_shot_basic:
+  type: skeleton_rapid_shot
+  health: 20.0
+  attack: 4.0
+  movement_speed: 0.23
+  armor: 0.0
+  scale: 1.0
+  equipment:
+    main_hand: BOW
+
+skeleton_effect_arrow_basic:
+  type: skeleton_effect_arrow
+  health: 20.0
+  attack: 4.0
+  movement_speed: 0.23
+  armor: 0.0
+  scale: 1.0
+  equipment:
+    main_hand: BOW
+
+skeleton_curve_shot_basic:
+  type: skeleton_curve_shot
+  health: 20.0
+  attack: 4.0
+  movement_speed: 0.23
+  armor: 0.0
+  scale: 1.0
+  equipment:
+    main_hand: BOW
+
+skeleton_shield_basic:
+  type: skeleton_shield_only
+  health: 24.0
+  attack: 5.0
+  movement_speed: 0.23
+  armor: 3.0
+  scale: 1.0
+  equipment:
+    main_hand: STONE_SWORD
+    off_hand: SHIELD
+
+skeleton_boomerang_basic:
+  type: skeleton_boomerang
+  health: 22.0
+  attack: 4.0
+  movement_speed: 0.24
+  armor: 1.0
+  scale: 1.0
+  equipment:
+    main_hand: BONE
+
 zombie_heavy:
   type: ZOMBIE
   health: 25.0
