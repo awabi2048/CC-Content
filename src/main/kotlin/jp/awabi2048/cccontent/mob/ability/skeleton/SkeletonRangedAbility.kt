@@ -32,7 +32,8 @@ class SkeletonRangedAbility(
     data class Runtime(
         var shotCooldownTicks: Long = 0L,
         var aimTicks: Long = 0L,
-        var lostSightTicks: Long = 0L
+        var lostSightTicks: Long = 0L,
+        var searchPhaseOffsetSteps: Int = 0
     ) : MobAbilityRuntime
 
     private data class EffectArrowSpec(
@@ -42,7 +43,7 @@ class SkeletonRangedAbility(
     )
 
     override fun createRuntime(context: jp.awabi2048.cccontent.mob.MobSpawnContext): MobAbilityRuntime {
-        return Runtime()
+        return Runtime(searchPhaseOffsetSteps = Random.nextInt(0, SEARCH_PHASE_VARIANTS))
     }
 
     override fun onTick(context: MobRuntimeContext, runtime: MobAbilityRuntime?) {
@@ -57,7 +58,7 @@ class SkeletonRangedAbility(
         }
 
         val loadSnapshot = context.loadSnapshot
-        if (context.activeMob.tickCount % (10L * loadSnapshot.searchIntervalMultiplier.toLong()) != 0L) {
+        if (!shouldProcessSearchTick(context.activeMob.tickCount, loadSnapshot.searchIntervalMultiplier, abilityRuntime.searchPhaseOffsetSteps)) {
             return
         }
 
@@ -220,10 +221,17 @@ class SkeletonRangedAbility(
         return damager.uniqueId == attacker.uniqueId
     }
 
+    private fun shouldProcessSearchTick(tickCount: Long, searchIntervalMultiplier: Int, phaseOffsetSteps: Int): Boolean {
+        val intervalSteps = searchIntervalMultiplier.coerceAtLeast(1).toLong()
+        val currentStep = (tickCount / 10L) + phaseOffsetSteps.toLong()
+        return currentStep % intervalSteps == 0L
+    }
+
     companion object {
         const val DEFAULT_EFFECT_ARROW_CHANCE = 0.25
         const val DEFAULT_RAPID_INTERVAL_MULTIPLIER = 0.70
         const val DEFAULT_FAST_ARROW_SPEED_MULTIPLIER = 1.35
+        private const val SEARCH_PHASE_VARIANTS = 16
 
         private const val BOW_SHOT_COOLDOWN_TICKS = 30L
         private const val AIM_RESET_LOST_SIGHT_TICKS = 20L
