@@ -7,6 +7,7 @@ import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeLoader
 import jp.awabi2048.cccontent.features.arena.generator.ArenaDoorAnimationPlacement
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
 import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestModifiers
+import jp.awabi2048.cccontent.features.sukima_dungeon.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
@@ -178,6 +179,8 @@ class ArenaManager(
         const val POSITION_RESTORE_LOOKBACK_MILLIS = 10_000L
         const val POSITION_HISTORY_RETENTION_MILLIS = 12_000L
         const val POSITION_HISTORY_MAX_SAMPLES = 24
+        const val ARENA_BGM_SOUND_KEY = "kota_server:ost_4.arena"
+        const val ARENA_BGM_LOOP_SECONDS = 164
     }
 
     private val random = kotlin.random.Random.Default
@@ -993,6 +996,7 @@ class ArenaManager(
 
         val player = Bukkit.getPlayer(playerId)
         if (player != null && player.isOnline) {
+            BGMManager.stop(player, ARENA_BGM_SOUND_KEY)
             session.progressBossBar?.let { player.hideBossBar(it) }
             val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
             val destination = if (returnLocation?.world != null) returnLocation else fallback
@@ -1042,6 +1046,7 @@ class ArenaManager(
             playerToSessionWorld.remove(participantId)
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline) {
+                BGMManager.stop(player, ARENA_BGM_SOUND_KEY)
                 val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
                 val destination = if (session.returnLocations[participantId]?.world != null) {
                     session.returnLocations[participantId]
@@ -1339,6 +1344,9 @@ class ArenaManager(
         if (!session.enteredWaves.add(wave)) return
 
         session.fallbackWave = wave.coerceIn(1, session.waves)
+        if (wave == 1) {
+            startArenaBgm(session)
+        }
 
         val mobType = mobTypeConfigs[session.mobTypeId]
         val difficulty = difficultyConfigs[session.difficultyId]
@@ -2302,6 +2310,14 @@ class ArenaManager(
         session.participants.forEach { participantId ->
             val player = Bukkit.getPlayer(participantId) ?: return@forEach
             player.playSound(player.location, sound, volume, pitch)
+        }
+    }
+
+    private fun startArenaBgm(session: ArenaSession) {
+        session.participants.forEach { participantId ->
+            val player = Bukkit.getPlayer(participantId) ?: return@forEach
+            if (!player.isOnline || player.world.name != session.worldName) return@forEach
+            BGMManager.playLoop(player, ARENA_BGM_SOUND_KEY, ARENA_BGM_LOOP_SECONDS)
         }
     }
 
