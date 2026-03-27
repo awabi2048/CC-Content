@@ -10,7 +10,8 @@ data class ArenaDailyQuestEntry(
     val missionTypeId: String,
     val difficultyScore: Double,
     val difficultyId: String,
-    val themeId: String
+    val themeId: String,
+    val maxParticipants: Int = 6
 )
 
 data class ArenaDailyQuestSet(

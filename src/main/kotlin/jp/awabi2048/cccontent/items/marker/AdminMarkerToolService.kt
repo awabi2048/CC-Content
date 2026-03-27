@@ -102,6 +102,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             modes = listOf(
                 MarkerToolMode("mob", "arena.marker.mob", "modes.mob", "§cモブ", Particle.FLAME, Color.fromRGB(255, 96, 96)),
                 MarkerToolMode("entrance", "arena.marker.entrance", "modes.entrance", "§a入口", Particle.HAPPY_VILLAGER, Color.fromRGB(96, 255, 128)),
+                MarkerToolMode("join_area", "arena.marker.join_area", "modes.join_area", "§f参加エリア", Particle.END_ROD, Color.fromRGB(240, 240, 240)),
                 MarkerToolMode("door_block", "arena.marker.door_block", "modes.door_block", "§e扉", Particle.WAX_OFF, Color.fromRGB(255, 224, 96)),
                 MarkerToolMode("barrier_core", "arena.marker.barrier_core", "modes.barrier_core", "§b結界核", Particle.END_ROD, Color.fromRGB(96, 224, 255)),
                 MarkerToolMode("barrier_point", "arena.marker.barrier_point", "modes.barrier_point", "§3結界起動点", Particle.GLOW, Color.fromRGB(128, 200, 255))
