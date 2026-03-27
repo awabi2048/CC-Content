@@ -89,6 +89,37 @@ skeleton_boomerang_basic:
   equipment:
     main_hand: BONE
 
+skeleton_curve_backstep_basic:
+  type: skeleton_curve_backstep
+  health: 20.0
+  attack: 4.0
+  movement_speed: 0.24
+  armor: 1.0
+  scale: 1.0
+  equipment:
+    main_hand: BOW
+
+skeleton_bow_shield_basic:
+  type: skeleton_bow_shield
+  health: 24.0
+  attack: 4.0
+  movement_speed: 0.22
+  armor: 4.0
+  scale: 1.0
+  equipment:
+    main_hand: BOW
+    off_hand: SHIELD
+
+skeleton_weapon_throw_close_basic:
+  type: skeleton_weapon_throw_close
+  health: 22.0
+  attack: 5.0
+  movement_speed: 0.24
+  armor: 1.0
+  scale: 1.0
+  equipment:
+    main_hand: STONE_SWORD
+
 zombie_heavy:
   type: ZOMBIE
   health: 30.0

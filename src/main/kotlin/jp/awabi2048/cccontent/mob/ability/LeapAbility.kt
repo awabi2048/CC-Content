@@ -4,6 +4,8 @@ import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import org.bukkit.Bukkit
 import org.bukkit.Sound
 import org.bukkit.entity.LivingEntity
+import org.bukkit.entity.Mob
+import org.bukkit.entity.Player
 import java.util.UUID
 import kotlin.math.roundToLong
 import kotlin.random.Random
@@ -75,6 +77,8 @@ class LeapAbility(
 
         val entity = context.entity
         if (entity.isOnGround) {
+            val landingTarget = runtime.postLeapTargetId?.let { Bukkit.getEntity(it) as? LivingEntity }
+            redirectToPlayerOnLanding(entity, landingTarget)
             runtime.postLeapFaceTicks = 0L
             runtime.postLeapTargetId = null
             return
@@ -92,7 +96,19 @@ class LeapAbility(
         runtime.postLeapFaceTicks = (runtime.postLeapFaceTicks - 10L).coerceAtLeast(0L)
     }
 
+    private fun redirectToPlayerOnLanding(entity: LivingEntity, target: LivingEntity?) {
+        val mob = entity as? Mob ?: return
+        val playerTarget = target as? Player ?: return
+        if (!playerTarget.isValid || playerTarget.isDead || playerTarget.world.uid != mob.world.uid) {
+            return
+        }
+
+        mob.target = playerTarget
+        mob.pathfinder.moveTo(playerTarget.location, LANDING_CHASE_SPEED)
+    }
+
     private companion object {
         const val SEARCH_PHASE_VARIANTS = 16
+        const val LANDING_CHASE_SPEED = 1.2
     }
 }

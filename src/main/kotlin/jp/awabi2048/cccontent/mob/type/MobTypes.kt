@@ -1,16 +1,15 @@
 package jp.awabi2048.cccontent.mob.type
 
-import jp.awabi2048.cccontent.mob.CustomMobRuntime
-import jp.awabi2048.cccontent.mob.MobSpawnContext
 import jp.awabi2048.cccontent.mob.ability.BoomerangAbility
+import jp.awabi2048.cccontent.mob.ability.BackstepAbility
 import jp.awabi2048.cccontent.mob.ability.CurveShotAbility
 import jp.awabi2048.cccontent.mob.ability.LeapAbility
 import jp.awabi2048.cccontent.mob.ability.RangedAttackAbility
 import jp.awabi2048.cccontent.mob.ability.ShieldAbility
+import jp.awabi2048.cccontent.mob.ability.WeaponThrowAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponSwapAbility
 import org.bukkit.Material
 import org.bukkit.entity.EntityType
-import org.bukkit.inventory.ItemStack
 
 class ArenaEnhancedZombieMobType : EquipmentMobType(
     id = "arena_enhanced_zombie",
@@ -135,4 +134,36 @@ class SkeletonBoomerangMobType : EquipmentMobType(
     baseEntityType = EntityType.SKELETON,
     abilities = listOf(BoomerangAbility(id = "skeleton_boomerang")),
     defaultMainHand = Material.BONE
+)
+
+class SkeletonCurveBackstepMobType : EquipmentMobType(
+    id = "skeleton_curve_backstep",
+    baseEntityType = EntityType.SKELETON,
+    abilities = listOf(
+        CurveShotAbility(id = "skeleton_curve_backstep_curve"),
+        BackstepAbility(
+            id = "skeleton_curve_backstep_backstep",
+            cooldownTicks = 20L
+        )
+    ),
+    defaultMainHand = Material.BOW
+)
+
+class SkeletonBowShieldMobType : EquipmentMobType(
+    id = "skeleton_bow_shield",
+    baseEntityType = EntityType.SKELETON,
+    abilities = listOf(
+        ShieldAbility(id = "skeleton_bow_shield", breakDisablesShieldPermanently = true)
+    ),
+    defaultMainHand = Material.BOW,
+    defaultOffHand = Material.SHIELD
+)
+
+class SkeletonWeaponThrowCloseMobType : EquipmentMobType(
+    id = "skeleton_weapon_throw_close",
+    baseEntityType = EntityType.SKELETON,
+    abilities = listOf(
+        WeaponThrowAbility(id = "skeleton_weapon_throw_close")
+    ),
+    defaultMainHand = Material.STONE_SWORD
 )

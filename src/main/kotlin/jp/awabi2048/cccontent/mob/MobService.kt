@@ -5,13 +5,17 @@ import jp.awabi2048.cccontent.mob.type.SkeletonBoomerangMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonCurveShotMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonEffectArrowMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonFastArrowMobType
+import jp.awabi2048.cccontent.mob.type.SkeletonBowShieldMobType
+import jp.awabi2048.cccontent.mob.type.SkeletonCurveBackstepMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonRapidShotMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonShieldMobType
+import jp.awabi2048.cccontent.mob.type.SkeletonWeaponThrowCloseMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieShieldOnlyMobType
 import jp.awabi2048.cccontent.mob.ability.BoomerangService
+import jp.awabi2048.cccontent.mob.ability.ThrownWeaponService
 import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.Material
@@ -21,10 +25,14 @@ import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.AbstractArrow
+import org.bukkit.entity.Ageable
 import org.bukkit.entity.LivingEntity
+import org.bukkit.entity.Zombie
 import org.bukkit.event.entity.EntityDamageByEntityEvent
-import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.entity.EntityDeathEvent
+import org.bukkit.event.entity.EntityPickupItemEvent
+import org.bukkit.event.entity.EntityShootBowEvent
+import org.bukkit.event.entity.ProjectileHitEvent
 import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.bukkit.potion.PotionEffect
@@ -100,6 +108,9 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(SkeletonCurveShotMobType())
         registerMobType(SkeletonShieldMobType())
         registerMobType(SkeletonBoomerangMobType())
+        registerMobType(SkeletonCurveBackstepMobType())
+        registerMobType(SkeletonBowShieldMobType())
+        registerMobType(SkeletonWeaponThrowCloseMobType())
     }
 
     fun registerMobType(mobType: MobType) {
@@ -238,6 +249,7 @@ class MobService(private val plugin: JavaPlugin) {
         val sessionKey = resolveSessionKey(options, world.name)
 
         val entity = world.spawnEntity(location, mobType.baseEntityType) as? LivingEntity ?: return null
+        enforceStrictSpawnState(entity)
         markEntity(entity, definition, mobType, options)
         applyDefinitionStats(entity, definition)
 
@@ -278,6 +290,8 @@ class MobService(private val plugin: JavaPlugin) {
     }
 
     fun handleProjectileEffects(event: EntityDamageByEntityEvent) {
+        ThrownWeaponService.getInstance(plugin).handleProjectileDamage(event)
+
         val target = event.entity as? LivingEntity ?: return
         val arrow = event.damager as? AbstractArrow ?: return
         val container = arrow.persistentDataContainer
@@ -308,6 +322,14 @@ class MobService(private val plugin: JavaPlugin) {
             activeMob.runtime
         )
         addCpuNanos(activeMob.sessionKey, System.nanoTime() - startedAt)
+    }
+
+    fun handleProjectileHit(event: ProjectileHitEvent) {
+        ThrownWeaponService.getInstance(plugin).handleProjectileHit(event)
+    }
+
+    fun handleEntityPickupItem(event: EntityPickupItemEvent) {
+        ThrownWeaponService.getInstance(plugin).handleItemPickup(event)
     }
 
     fun startTickTask(intervalTicks: Long = 10L) {
@@ -349,6 +371,7 @@ class MobService(private val plugin: JavaPlugin) {
         activeMobs.clear()
         sessionLoadMetrics.clear()
         BoomerangService.getInstance(plugin).shutdown()
+        ThrownWeaponService.getInstance(plugin).shutdown()
         synchronized(instances) {
             instances.remove(plugin)
         }
@@ -554,6 +577,23 @@ class MobService(private val plugin: JavaPlugin) {
         entity.getAttribute(Attribute.ARMOR)?.baseValue = definition.armor
         entity.getAttribute(Attribute.SCALE)?.baseValue = definition.scale
         entity.health = definition.health
+    }
+
+    private fun enforceStrictSpawnState(entity: LivingEntity) {
+        if (entity.passengers.isNotEmpty()) {
+            entity.passengers.toList().forEach { passenger ->
+                entity.removePassenger(passenger)
+                passenger.remove()
+            }
+        }
+        if (entity.isInsideVehicle) {
+            entity.leaveVehicle()
+        }
+
+        when (entity) {
+            is Zombie -> entity.isBaby = false
+            is Ageable -> entity.setAdult()
+        }
     }
 
     private fun applyDefinitionEquipment(entity: LivingEntity, definition: MobDefinition, onlyIfEmpty: Boolean) {

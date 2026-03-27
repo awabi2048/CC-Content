@@ -183,6 +183,7 @@ class ArenaManager(
         const val ACTION_MARKER_CENTER_Y_OFFSET = -0.25
         const val BARRIER_MARKER_HOLD_TICKS = 60
         const val MIDDLE_RING_MAX_ANGULAR_VELOCITY = 0.14
+        const val MOB_TOKEN_DROP_CHANCE = 0.25
 
         fun defaultSwitchBeats(loopBeats: Int): List<Int> {
             val safeLoopBeats = loopBeats.coerceAtLeast(1)
@@ -853,6 +854,9 @@ class ArenaManager(
     }
 
     private fun createMobTokenDrop(killer: Player, mobTypeId: String): ItemStack? {
+        if (random.nextDouble() >= MOB_TOKEN_DROP_CHANCE) {
+            return null
+        }
         val fullId = "arena.mob_token_${sanitizeMobTypeId(mobTypeId)}"
         return CustomItemManager.createItemForPlayer(fullId, killer, 1)
     }
