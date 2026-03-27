@@ -219,11 +219,18 @@ class ArenaQuestService(
                 return@Runnable
             }
 
+            val inviteQuestTitle = "${missionDisplayName(quest.missionTypeId)} ＠${themeDisplayName(player, quest.themeId)}"
+            val inviteQuestLore = buildQuestLore(quest)
+
             when (val result = arenaManager.startSession(
                 player,
                 quest.difficultyId,
                 quest.themeId,
-                difficultyScore = quest.difficultyScore
+                difficultyScore = quest.difficultyScore,
+                enableMultiplayerJoin = true,
+                inviteQuestTitle = inviteQuestTitle,
+                inviteQuestLore = inviteQuestLore,
+                maxParticipants = quest.maxParticipants
             )) {
                 is ArenaStartResult.Success -> {
                     activeQuests[player.uniqueId] = ArenaActiveQuestRecord(dateKey, quest.index, quest)
@@ -380,7 +387,8 @@ class ArenaQuestService(
                 missionTypeId = missionType.id,
                 difficultyScore = score,
                 difficultyId = resolvedDifficultyId,
-                themeId = themeId
+                themeId = themeId,
+                maxParticipants = 6
             )
         }
 
@@ -417,7 +425,8 @@ class ArenaQuestService(
                     "mission_type_id" to quest.missionTypeId,
                     "difficulty_score" to quest.difficultyScore,
                     "difficulty_id" to quest.difficultyId,
-                    "theme_id" to quest.themeId
+                    "theme_id" to quest.themeId,
+                    "max_participants" to quest.maxParticipants
                 )
             }
         )
@@ -452,15 +461,17 @@ class ArenaQuestService(
             val difficultyScore = map["difficulty_score"]?.toString()?.toDoubleOrNull() ?: return@mapNotNull null
             val difficultyId = map["difficulty_id"]?.toString()?.trim().orEmpty()
             val themeId = map["theme_id"]?.toString()?.trim().orEmpty()
+            val maxParticipants = map["max_participants"]?.toString()?.toIntOrNull() ?: 6
 
-            validateStoredQuest(index, missionTypeId, difficultyScore, difficultyId, themeId)
+            validateStoredQuest(index, missionTypeId, difficultyScore, difficultyId, themeId, maxParticipants)
 
             ArenaDailyQuestEntry(
                 index = index,
                 missionTypeId = missionTypeId,
                 difficultyScore = difficultyScore,
                 difficultyId = difficultyId,
-                themeId = themeId
+                themeId = themeId,
+                maxParticipants = maxParticipants
             )
         }.sortedBy { it.index }
 
@@ -482,7 +493,8 @@ class ArenaQuestService(
         missionTypeId: String,
         difficultyScore: Double,
         difficultyId: String,
-        themeId: String
+        themeId: String,
+        maxParticipants: Int
     ) {
         if (index < 0) {
             throw IllegalStateException("クエストindexが不正です: $index")
@@ -501,6 +513,10 @@ class ArenaQuestService(
 
         if (!difficulty.difficultyRange.contains(difficultyScore)) {
             throw IllegalStateException("difficulty_score が範囲外です: id=$difficultyId score=$difficultyScore range=${difficulty.difficultyRange}")
+        }
+
+        if (maxParticipants !in 1..6) {
+            throw IllegalStateException("max_participants が不正です: $maxParticipants")
         }
     }
 

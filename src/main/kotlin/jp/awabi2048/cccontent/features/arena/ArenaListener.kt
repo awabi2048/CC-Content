@@ -7,6 +7,7 @@ import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
 import org.bukkit.event.entity.PlayerDeathEvent
+import org.bukkit.event.player.PlayerAnimationEvent
 import org.bukkit.event.player.PlayerQuitEvent
 
 class ArenaListener(private val arenaManager: ArenaManager) : Listener {
@@ -27,12 +28,18 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    fun onPlayerAnimation(event: PlayerAnimationEvent) {
+        arenaManager.handleMultiplayerInviteSwing(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
     fun onEntityTarget(event: EntityTargetLivingEntityEvent) {
         arenaManager.handleMobTarget(event)
     }
 
     @EventHandler
     fun onPlayerQuit(event: PlayerQuitEvent) {
+        arenaManager.handleInviteTargetUnavailable(event.player)
         arenaManager.stopSession(
             event.player,
             ArenaI18n.text(event.player, "arena.messages.session.ended_by_logout", "&cログアウトしたためアリーナを終了しました")
@@ -41,6 +48,7 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
 
     @EventHandler
     fun onPlayerDeath(event: PlayerDeathEvent) {
+        arenaManager.handleInviteTargetUnavailable(event.player)
         arenaManager.stopSession(
             event.player,
             ArenaI18n.text(event.player, "arena.messages.session.ended_by_death", "&c死亡したためアリーナを終了しました")

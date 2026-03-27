@@ -21,8 +21,11 @@ import jp.awabi2048.cccontent.util.OageMessageSender
 import jp.awabi2048.cccontent.world.WorldSettingsHelper
 import net.kyori.adventure.bossbar.BossBar
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.event.HoverEvent
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.Color
+import org.bukkit.FluidCollisionMode
 import org.bukkit.GameRule
 import org.bukkit.Location
 import org.bukkit.Material
@@ -39,6 +42,7 @@ import org.bukkit.entity.Entity
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.Ageable
 import org.bukkit.entity.LivingEntity
+import org.bukkit.entity.Marker
 import org.bukkit.entity.Mob
 import org.bukkit.entity.Player
 import org.bukkit.entity.Projectile
@@ -48,6 +52,8 @@ import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
+import org.bukkit.event.player.PlayerAnimationEvent
+import org.bukkit.event.player.PlayerAnimationType
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.PlayerInventory
 import org.bukkit.potion.PotionEffect
@@ -184,6 +190,13 @@ class ArenaManager(
         const val BARRIER_MARKER_HOLD_TICKS = 60
         const val MIDDLE_RING_MAX_ANGULAR_VELOCITY = 0.14
         const val MOB_TOKEN_DROP_CHANCE = 0.25
+        const val MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT = 45
+        const val MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT = 16.0
+        const val MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT = 6
+        const val MULTIPLAYER_STAGE_INTRO_SOUND_REPEAT = 5
+        const val MULTIPLAYER_STAGE_INTRO_SOUND_INTERVAL_TICKS = 10L
+        const val MULTIPLAYER_STAGE_INTRO_TELEPORT_EXTRA_DELAY_TICKS = 20L
+        const val MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS = 5L
 
         fun defaultSwitchBeats(loopBeats: Int): List<Int> {
             val safeLoopBeats = loopBeats.coerceAtLeast(1)
@@ -193,12 +206,15 @@ class ArenaManager(
     }
 
     private val random = kotlin.random.Random.Default
+    private val legacySerializer = LegacyComponentSerializer.legacySection()
     private val themeLoader = ArenaThemeLoader(plugin)
     private val stageGenerator = ArenaStageGenerator()
     private val sessionsByWorld = mutableMapOf<String, ArenaSession>()
     private val playerToSessionWorld = mutableMapOf<UUID, String>()
     private val mobToSessionWorld = mutableMapOf<UUID, String>()
     private val pendingWorldDeletions = mutableMapOf<String, PendingWorldDeletion>()
+    private val invitedPlayerLocks = mutableMapOf<UUID, String>()
+    private val inviteSwingCooldownUntilTick = mutableMapOf<UUID, Long>()
     private val difficultyConfigs = mutableMapOf<String, ArenaDifficultyConfig>()
     private val mobDefinitions = mutableMapOf<String, MobDefinition>()
     private val knownMobTypeIds = mutableSetOf<String>()
@@ -207,6 +223,8 @@ class ArenaManager(
     private var playerMonitorTask: BukkitTask? = null
     private var actionMarkerTask: BukkitTask? = null
     private var barrierRestartConfig = BarrierRestartConfig(30, 0.05)
+    private var multiplayerJoinGraceSeconds = MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT
+    private var multiplayerJoinMarkerSearchRadius = MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
     private var actionMarkerHoldTicks = 80
     private var actionMarkerColorTransitionTicks = 16
     private var doorAnimationTotalTicks = DOOR_ANIMATION_TOTAL_TICKS_DEFAULT
@@ -263,6 +281,14 @@ class ArenaManager(
             defaultDurationSeconds = config.getInt("arena.barrier_restart.default_duration_seconds", 30).coerceAtLeast(1),
             corruptionRatioBase = config.getDouble("arena.barrier_restart.corruption_ratio_base", 0.05).coerceAtLeast(0.0)
         )
+        multiplayerJoinGraceSeconds = config.getInt(
+            "arena.multiplayer.join_grace_seconds",
+            MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT
+        ).coerceAtLeast(1)
+        multiplayerJoinMarkerSearchRadius = config.getDouble(
+            "arena.multiplayer.join_marker_search_radius",
+            MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
+        ).coerceAtLeast(1.0)
         doorAnimationTotalTicks = config.getInt("arena.door_animation.total_ticks", DOOR_ANIMATION_TOTAL_TICKS_DEFAULT)
             .coerceAtLeast(1)
         sharedWaveMaxAlive = config.getInt("arena.mob_spawn.system_max_alive", SHARED_WAVE_MAX_ALIVE_DEFAULT)
@@ -452,7 +478,11 @@ class ArenaManager(
         difficultyId: String,
         requestedTheme: String?,
         questModifiers: ArenaQuestModifiers = ArenaQuestModifiers.NONE,
-        difficultyScore: Double? = null
+        difficultyScore: Double? = null,
+        enableMultiplayerJoin: Boolean = false,
+        inviteQuestTitle: String? = null,
+        inviteQuestLore: List<String> = emptyList(),
+        maxParticipants: Int = MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT
     ): ArenaStartResult {
         if (playerToSessionWorld.containsKey(target.uniqueId)) {
             return ArenaStartResult.Error(
@@ -493,58 +523,131 @@ class ArenaManager(
             )
         }
 
+        val joinAreaMarkers = if (enableMultiplayerJoin) {
+            findNearbyJoinAreaMarkers(target.location, multiplayerJoinMarkerSearchRadius)
+        } else {
+            emptyList()
+        }
+        if (enableMultiplayerJoin && joinAreaMarkers.isEmpty()) {
+            return ArenaStartResult.Error(
+                "arena.messages.command.start_error.join_area_not_found",
+                "&c開始待機エリアの参加マーカーが近くに存在しないため開始できません"
+            )
+        }
+
         val world = createArenaWorld() ?: return ArenaStartResult.Error(
             "arena.messages.command.start_error.world_create_failed",
             "&cアリーナ用ワールド作成に失敗しました"
         )
 
-        return try {
-            val returnLocation = target.location.clone()
-            val origin = Location(world, 0.0, 64.0, 0.0)
-            val stage = stageGenerator.build(world, origin, theme, difficulty.waves, random)
-            val session = ArenaSession(
-                ownerPlayerId = target.uniqueId,
-                worldName = world.name,
-                themeId = theme.id,
-                difficultyId = difficulty.id,
-                difficultyValue = difficulty.difficultyValue,
-                difficultyScore = difficultyScore ?: difficulty.difficultyValue,
-                waves = difficulty.waves,
-                questModifiers = questModifiers,
-                participants = mutableSetOf(target.uniqueId),
-                returnLocations = mutableMapOf(target.uniqueId to returnLocation),
-                playerSpawn = stage.playerSpawn,
-                entranceLocation = stage.entranceLocation,
-                stageBounds = stage.stageBounds,
-                roomBounds = stage.roomBounds,
-                corridorBounds = stage.corridorBounds,
-                roomMobSpawns = stage.roomMobSpawns,
-                corridorDoorBlocks = stage.corridorDoorBlocks,
-                doorAnimationPlacements = stage.doorAnimationPlacements,
-                barrierLocation = stage.barrierLocation,
-                barrierPointLocations = stage.barrierPointLocations,
-                participantSpawnProtectionUntilMillis = System.currentTimeMillis() + 4000L
-            )
-            sessionsByWorld[world.name] = session
-            playerToSessionWorld[target.uniqueId] = world.name
-            initializeActionMarkers(session)
-            initializeBarrierRestartState(session)
-            startBarrierAmbientTask(session)
-            val now = System.currentTimeMillis()
-            session.participantLocationHistory[target.uniqueId] = ArrayDeque<TimedPlayerLocation>().apply {
-                addLast(TimedPlayerLocation(now, stage.entranceLocation.clone()))
-            }
-            session.participantLastSampleMillis[target.uniqueId] = now
+        val sanitizedMaxParticipants = maxParticipants.coerceIn(1, MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
+        val returnLocation = target.location.clone()
+        val origin = Location(world, 0.0, 64.0, 0.0)
+        val now = System.currentTimeMillis()
 
-            session.participants.forEach { participantId ->
-                val participant = Bukkit.getPlayer(participantId) ?: return@forEach
-                if (!participant.isOnline) return@forEach
-                val spawnLocation = stage.entranceLocation.clone()
-                applyStageStartFacingYaw(session, spawnLocation)
-                participant.teleport(spawnLocation)
+        val placeholderLocation = Location(world, 0.0, 64.0, 0.0)
+        val placeholderBounds = ArenaBounds(0, 0, 0, 0, 0, 0)
+        val session = ArenaSession(
+            ownerPlayerId = target.uniqueId,
+            worldName = world.name,
+            themeId = theme.id,
+            difficultyId = difficulty.id,
+            difficultyValue = difficulty.difficultyValue,
+            difficultyScore = difficultyScore ?: difficulty.difficultyValue,
+            waves = difficulty.waves,
+            questModifiers = questModifiers,
+            maxParticipants = sanitizedMaxParticipants,
+            participants = mutableSetOf(target.uniqueId),
+            returnLocations = mutableMapOf(target.uniqueId to returnLocation),
+            playerSpawn = placeholderLocation.clone(),
+            entranceLocation = placeholderLocation.clone(),
+            stageBounds = placeholderBounds,
+            roomBounds = mutableMapOf(),
+            corridorBounds = mutableMapOf(),
+            roomMobSpawns = mutableMapOf(),
+            corridorDoorBlocks = mutableMapOf(),
+            doorAnimationPlacements = mutableMapOf(),
+            barrierLocation = placeholderLocation.clone(),
+            barrierPointLocations = mutableListOf(),
+            joinAreaMarkerLocations = joinAreaMarkers.map { it.clone() }.toMutableList(),
+            participantSpawnProtectionUntilMillis = if (enableMultiplayerJoin) Long.MAX_VALUE else now + 4000L,
+            multiplayerJoinEnabled = enableMultiplayerJoin,
+            joinGraceStartMillis = if (enableMultiplayerJoin) now else 0L,
+            joinGraceDurationMillis = if (enableMultiplayerJoin) multiplayerJoinGraceSeconds * 1000L else 0L,
+            joinGraceEndMillis = if (enableMultiplayerJoin) now + (multiplayerJoinGraceSeconds * 1000L) else 0L,
+            inviteQuestTitle = inviteQuestTitle,
+            inviteQuestLore = inviteQuestLore,
+            stageGenerationCompleted = !enableMultiplayerJoin
+        )
+
+        sessionsByWorld[world.name] = session
+        playerToSessionWorld[target.uniqueId] = world.name
+
+        return try {
+            if (enableMultiplayerJoin) {
+                target.showBossBar(getOrCreateJoinCountdownBossBar(session, target.uniqueId))
+                target.sendMessage(
+                    ArenaI18n.text(
+                        target,
+                        "arena.messages.multiplayer.invite_window_started",
+                        "&e左クリックで近くのプレイヤーを招待してください（{seconds}秒）",
+                        "seconds" to multiplayerJoinGraceSeconds
+                    )
+                )
+                target.sendMessage(
+                    ArenaI18n.text(
+                        target,
+                        "arena.messages.multiplayer.wait_area_hint",
+                        "&7招待したプレイヤーと開始待機エリアに入ると待機状態になります"
+                    )
+                )
+
+                Bukkit.getScheduler().runTask(plugin, Runnable {
+                    val active = sessionsByWorld[session.worldName]
+                    if (active !== session) return@Runnable
+
+                    try {
+                        val built = stageGenerator.build(world, origin, theme, difficulty.waves, random)
+                        applyStageBuildResult(session, built)
+                        initializeActionMarkers(session)
+                        initializeBarrierRestartState(session)
+                        startBarrierAmbientTask(session)
+                        initializeWavePipeline(session, theme, difficulty)
+                        updateSessionProgressBossBar(session)
+                        session.stageGenerationCompleted = true
+                    } catch (e: Exception) {
+                        if (e is ArenaStageBuildException) {
+                            plugin.logger.severe("[Arena] ステージの生成に失敗しました: ${e.message}")
+                            e.printStackTrace()
+                        }
+                        terminateSession(
+                            session,
+                            false,
+                            messageKey = "arena.messages.command.start_error.stage_build_failed",
+                            fallbackMessage = "&cステージの生成に失敗しました"
+                        )
+                    }
+                })
+            } else {
+                val stage = stageGenerator.build(world, origin, theme, difficulty.waves, random)
+                applyStageBuildResult(session, stage)
+                initializeActionMarkers(session)
+                initializeBarrierRestartState(session)
+                startBarrierAmbientTask(session)
+                session.stageGenerationCompleted = true
+
+                session.participants.forEach { participantId ->
+                    val participant = Bukkit.getPlayer(participantId) ?: return@forEach
+                    if (!participant.isOnline) return@forEach
+                    val spawnLocation = session.entranceLocation.clone()
+                    applyStageStartFacingYaw(session, spawnLocation)
+                    participant.teleport(spawnLocation)
+                }
+                requestArenaBgmMode(session, ArenaBgmMode.NORMAL)
+                setDoorActionMarkersReadySilently(session, 1)
+                initializeWavePipeline(session, theme, difficulty)
+                updateSessionProgressBossBar(session)
             }
-            requestArenaBgmMode(session, ArenaBgmMode.NORMAL)
-            setDoorActionMarkersReadySilently(session, 1)
             target.sendMessage(
                 ArenaI18n.text(
                     target,
@@ -556,9 +659,6 @@ class ArenaManager(
                     "waves" to difficulty.waves
                 )
             )
-
-            initializeWavePipeline(session, theme, difficulty)
-            updateSessionProgressBossBar(session)
             ArenaStartResult.Success(theme.id, difficulty.waves, difficulty.id, difficulty.display)
         } catch (e: Exception) {
             if (e is ArenaStageBuildException) {
@@ -566,11 +666,7 @@ class ArenaManager(
                 e.printStackTrace()
             }
             val failedSession = sessionsByWorld[world.name]
-            if (failedSession != null) {
-                terminateSession(failedSession, false)
-            } else {
-                tryDeleteWorld(world)
-            }
+            if (failedSession != null) terminateSession(failedSession, false) else tryDeleteWorld(world)
             ArenaStartResult.Error(
                 "arena.messages.command.start_error.stage_build_failed",
                 "&c{message}",
@@ -609,6 +705,8 @@ class ArenaManager(
         playerToSessionWorld.clear()
         mobToSessionWorld.clear()
         mobToDefinitionTypeId.clear()
+        invitedPlayerLocks.clear()
+        inviteSwingCooldownUntilTick.clear()
         processPendingWorldDeletions()
     }
 
@@ -623,8 +721,83 @@ class ArenaManager(
         return playerToSessionWorld.keys.mapNotNull { uuid -> Bukkit.getPlayer(uuid)?.name }.toSet()
     }
 
+    fun handleInviteTargetUnavailable(player: Player) {
+        val worldName = invitedPlayerLocks[player.uniqueId] ?: return
+        val session = sessionsByWorld[worldName] ?: run {
+            invitedPlayerLocks.remove(player.uniqueId)
+            player.isGlowing = false
+            return
+        }
+
+        session.invitedParticipants.remove(player.uniqueId)
+        session.invitedAtMillis.remove(player.uniqueId)
+        session.waitingParticipants.remove(player.uniqueId)
+        session.waitingNotifiedParticipants.remove(player.uniqueId)
+        hideJoinCountdownBossBar(session, player.uniqueId)
+        releaseInvitedPlayerLock(player.uniqueId)
+    }
+
+    private fun applyStageBuildResult(session: ArenaSession, stage: jp.awabi2048.cccontent.features.arena.generator.ArenaStageBuildResult) {
+        session.playerSpawn = stage.playerSpawn.clone()
+        session.entranceLocation = stage.entranceLocation.clone()
+        session.stageBounds = stage.stageBounds
+        session.roomBounds.clear()
+        session.roomBounds.putAll(stage.roomBounds)
+        session.corridorBounds.clear()
+        session.corridorBounds.putAll(stage.corridorBounds)
+        session.roomMobSpawns.clear()
+        session.roomMobSpawns.putAll(stage.roomMobSpawns)
+        session.corridorDoorBlocks.clear()
+        session.corridorDoorBlocks.putAll(stage.corridorDoorBlocks)
+        session.doorAnimationPlacements.clear()
+        session.doorAnimationPlacements.putAll(stage.doorAnimationPlacements)
+        session.barrierLocation = stage.barrierLocation.clone()
+        session.barrierPointLocations.clear()
+        session.barrierPointLocations.addAll(stage.barrierPointLocations.map { it.clone() })
+
+        val now = System.currentTimeMillis()
+        session.participantLocationHistory[session.ownerPlayerId] = ArrayDeque<TimedPlayerLocation>().apply {
+            addLast(TimedPlayerLocation(now, session.entranceLocation.clone()))
+        }
+        session.participantLastSampleMillis[session.ownerPlayerId] = now
+    }
+
+    private fun releaseInvitedPlayerLock(playerId: UUID) {
+        invitedPlayerLocks.remove(playerId)
+        val player = Bukkit.getPlayer(playerId)
+        if (player != null && player.isOnline) {
+            player.isGlowing = false
+        }
+    }
+
+    private fun hideJoinCountdownBossBar(session: ArenaSession, playerId: UUID) {
+        val bossBar = session.joinCountdownBossBars.remove(playerId) ?: return
+        val player = Bukkit.getPlayer(playerId)
+        if (player != null && player.isOnline) {
+            player.hideBossBar(bossBar)
+        }
+    }
+
+    private fun clearMultiplayerRecruitmentState(session: ArenaSession) {
+        val ownerId = session.ownerPlayerId
+        hideJoinCountdownBossBar(session, ownerId)
+
+        session.invitedParticipants.toList().forEach { invitedId ->
+            hideJoinCountdownBossBar(session, invitedId)
+            releaseInvitedPlayerLock(invitedId)
+        }
+
+        session.invitedAtMillis.clear()
+        session.waitingNotifiedParticipants.clear()
+        session.waitingParticipants.clear()
+        session.invitedParticipants.clear()
+    }
+
     private fun monitorParticipantPositions() {
         for (session in sessionsByWorld.values.toList()) {
+            if (session.multiplayerJoinEnabled) {
+                continue
+            }
             val now = System.currentTimeMillis()
             if (now < session.participantSpawnProtectionUntilMillis) {
                 continue
@@ -708,6 +881,153 @@ class ArenaManager(
         val attackerMobId = resolveArenaMobAttackerId(event) ?: return
         val attackerWorld = mobToSessionWorld[attackerMobId] ?: return
         if (damagedWorld != attackerWorld) return
+    }
+
+    fun handleMultiplayerInviteSwing(event: PlayerAnimationEvent) {
+        if (event.animationType != PlayerAnimationType.ARM_SWING) {
+            return
+        }
+
+        val owner = event.player
+        val session = getSession(owner) ?: return
+        if (!session.multiplayerJoinEnabled) return
+        if (session.ownerPlayerId != owner.uniqueId) return
+
+        val currentTick = Bukkit.getCurrentTick().toLong()
+        val cooldownUntil = inviteSwingCooldownUntilTick[owner.uniqueId] ?: Long.MIN_VALUE
+        if (currentTick < cooldownUntil) {
+            return
+        }
+        inviteSwingCooldownUntilTick[owner.uniqueId] = currentTick + MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS
+
+        if (System.currentTimeMillis() >= session.joinGraceEndMillis) {
+            owner.sendMessage(
+                ArenaI18n.text(
+                    owner,
+                    "arena.messages.multiplayer.invite_window_closed",
+                    "&c募集時間は終了しました"
+                )
+            )
+            return
+        }
+
+        val maxDistance = (owner.getAttribute(Attribute.ENTITY_INTERACTION_RANGE)?.value ?: 3.0).coerceAtLeast(1.0)
+        val eyeLocation = owner.eyeLocation
+        val hit = owner.world.rayTrace(
+            eyeLocation,
+            eyeLocation.direction,
+            maxDistance,
+            FluidCollisionMode.NEVER,
+            true,
+            0.2
+        ) { candidate ->
+            candidate is Player && candidate.uniqueId != owner.uniqueId
+        }
+        val invited = hit?.hitEntity as? Player ?: return
+
+        trySendMultiplayerInvite(owner, invited, session)
+    }
+
+    private fun trySendMultiplayerInvite(owner: Player, invited: Player, session: ArenaSession) {
+        val currentInvitableCount = 1 + session.invitedParticipants.size
+        if (currentInvitableCount >= session.maxParticipants) {
+            owner.sendMessage(
+                ArenaI18n.text(
+                    owner,
+                    "arena.messages.multiplayer.invite_failed_full",
+                    "&cこのクエストの最大参加人数に達しているため招待できません"
+                )
+            )
+            return
+        }
+
+        if (playerToSessionWorld.containsKey(invited.uniqueId)) {
+            owner.sendMessage(
+                ArenaI18n.text(
+                    owner,
+                    "arena.messages.multiplayer.invite_failed_in_session",
+                    "&c{player} はすでに別のアリーナに参加しています",
+                    "player" to invited.name
+                )
+            )
+            return
+        }
+
+        if (invited.world.uid != owner.world.uid) {
+            owner.sendMessage(
+                ArenaI18n.text(
+                    owner,
+                    "arena.messages.multiplayer.invite_failed_world",
+                    "&c同じワールド内のプレイヤーのみ招待できます"
+                )
+            )
+            return
+        }
+
+        val lockedWorld = invitedPlayerLocks[invited.uniqueId]
+        if (lockedWorld != null && lockedWorld != session.worldName) {
+            owner.sendMessage(
+                ArenaI18n.text(
+                    owner,
+                    "arena.messages.multiplayer.invite_failed_already_locked",
+                    "&c{player} はすでに他の招待を受けています",
+                    "player" to invited.name
+                )
+            )
+            return
+        }
+
+        if (!session.invitedParticipants.add(invited.uniqueId)) {
+            owner.sendMessage(
+                ArenaI18n.text(
+                    owner,
+                    "arena.messages.multiplayer.already_invited",
+                    "&e{player} はすでに招待済みです",
+                    "player" to invited.name
+                )
+            )
+            return
+        }
+
+        session.returnLocations.putIfAbsent(invited.uniqueId, invited.location.clone())
+        invitedPlayerLocks[invited.uniqueId] = session.worldName
+        invited.isGlowing = true
+        session.invitedAtMillis[invited.uniqueId] = System.currentTimeMillis()
+        invited.showBossBar(getOrCreateJoinCountdownBossBar(session, invited.uniqueId))
+        owner.sendMessage(
+            ArenaI18n.text(
+                owner,
+                "arena.messages.multiplayer.invite_sent",
+                "&a{player} に招待を送信しました",
+                "player" to invited.name
+            )
+        )
+        invited.sendMessage(buildInviteMessageComponent(owner.name, session))
+    }
+
+    private fun buildInviteMessageComponent(ownerName: String, session: ArenaSession): Component {
+        val questTitle = session.inviteQuestTitle
+        if (questTitle.isNullOrBlank()) {
+            return legacySerializer.deserialize(
+                "§8§l«§c§lArena§8§l» §7${ownerName}さんがあなたをアリーナに招待しました！"
+            )
+        }
+
+        val hoverText = if (session.inviteQuestLore.isEmpty()) {
+            "§7説明はありません"
+        } else {
+            session.inviteQuestLore.joinToString("\n")
+        }
+
+        val prefix = legacySerializer.deserialize("§8§l«§c§lArena§8§l» §7${ownerName}さんがあなたをクエスト§e")
+        val questPart = legacySerializer.deserialize("§e【${questTitle}】")
+            .hoverEvent(HoverEvent.showText(legacySerializer.deserialize(hoverText)))
+        val suffix = legacySerializer.deserialize("§7に招待しました！")
+
+        return Component.empty()
+            .append(prefix)
+            .append(questPart)
+            .append(suffix)
     }
 
     fun handleMobTarget(event: EntityTargetLivingEntityEvent) {
@@ -924,12 +1244,19 @@ class ArenaManager(
         val session = sessionsByWorld[worldName] ?: return false
 
         playerToSessionWorld.remove(playerId)
+        inviteSwingCooldownUntilTick.remove(playerId)
         session.participants.remove(playerId)
         val returnLocation = session.returnLocations.remove(playerId)
         session.playerNotifiedWaves.remove(playerId)
         session.participantLocationHistory.remove(playerId)
         session.participantLastSampleMillis.remove(playerId)
         session.actionMarkerHoldStates.remove(playerId)
+        session.invitedParticipants.remove(playerId)
+        session.invitedAtMillis.remove(playerId)
+        session.waitingParticipants.remove(playerId)
+        session.waitingNotifiedParticipants.remove(playerId)
+        hideJoinCountdownBossBar(session, playerId)
+        releaseInvitedPlayerLock(playerId)
 
         val player = Bukkit.getPlayer(playerId)
         if (player != null && player.isOnline) {
@@ -976,9 +1303,11 @@ class ArenaManager(
         session.transitionTasks.clear()
         cleanupBarrierRestartSession(session, removeDefenseMobs = true, smoke = false)
         hideSessionProgressBossBar(session)
+        clearMultiplayerRecruitmentState(session)
 
         session.participants.toList().forEach { participantId ->
             playerToSessionWorld.remove(participantId)
+            inviteSwingCooldownUntilTick.remove(participantId)
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline) {
                 stopArenaBgmForPlayer(player)
@@ -1011,6 +1340,20 @@ class ArenaManager(
         session.playerNotifiedWaves.clear()
         session.participantLocationHistory.clear()
         session.participantLastSampleMillis.clear()
+        session.invitedParticipants.clear()
+        session.invitedAtMillis.clear()
+        session.waitingParticipants.clear()
+        session.waitingNotifiedParticipants.clear()
+        session.joinCountdownBossBars.clear()
+        session.joinAreaMarkerLocations.clear()
+        session.multiplayerJoinEnabled = false
+        session.multiplayerJoinFinalizeStarted = false
+        session.multiplayerJoinIntroStarted = false
+        session.joinGraceStartMillis = 0L
+        session.joinGraceDurationMillis = 0L
+        session.joinGraceEndMillis = 0L
+        session.stageGenerationCompleted = true
+        session.stageGenerationWaitTitleShown = false
         session.corridorTriggeredWaves.clear()
         session.openedCorridors.clear()
         session.corridorOpenAnnouncements.clear()
@@ -2667,6 +3010,266 @@ class ArenaManager(
             )
             session.actionMarkers[marker.id] = marker
         }
+
+    }
+
+    private fun updateMultiplayerJoinStates() {
+        val now = System.currentTimeMillis()
+        sessionsByWorld.values.toList().forEach { session ->
+            if (!session.multiplayerJoinEnabled) {
+                return@forEach
+            }
+
+            val owner = Bukkit.getPlayer(session.ownerPlayerId)
+            if (owner == null || !owner.isOnline) {
+                terminateSession(
+                    session,
+                    false,
+                    messageKey = "arena.messages.multiplayer.cancelled_owner_offline",
+                    fallbackMessage = "&cオーナーが不在のためマルチ参加募集を終了しました"
+                )
+                return@forEach
+            }
+
+            updateJoinCountdownBossBars(session, now)
+            updateWaitingParticipants(session)
+
+            if (!session.multiplayerJoinFinalizeStarted && now >= session.joinGraceEndMillis) {
+                session.multiplayerJoinFinalizeStarted = true
+            }
+
+            if (!session.multiplayerJoinFinalizeStarted) {
+                return@forEach
+            }
+
+            if (!session.stageGenerationCompleted) {
+                if (!session.stageGenerationWaitTitleShown) {
+                    val waiters = session.waitingParticipants
+                        .mapNotNull { Bukkit.getPlayer(it) }
+                        .filter { it.isOnline }
+                    waiters.forEach { waitingPlayer ->
+                        waitingPlayer.sendTitle("§7アリーナを準備中...", "", 0, 60, 0)
+                    }
+                    session.stageGenerationWaitTitleShown = true
+                }
+                return@forEach
+            }
+
+            if (!session.multiplayerJoinIntroStarted) {
+                finalizeMultiplayerJoin(session)
+            }
+        }
+    }
+
+    private fun updateJoinCountdownBossBars(session: ArenaSession, nowMillis: Long) {
+        val owner = Bukkit.getPlayer(session.ownerPlayerId)
+        if (owner != null && owner.isOnline) {
+            val ownerRemaining = (session.joinGraceEndMillis - nowMillis).coerceAtLeast(0L)
+            val ownerProgress = if (session.joinGraceDurationMillis <= 0L) {
+                0.0f
+            } else {
+                (ownerRemaining.toDouble() / session.joinGraceDurationMillis.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
+            }
+            val ownerBar = getOrCreateJoinCountdownBossBar(session, owner.uniqueId)
+            ownerBar.name(Component.text("§7アリーナを準備中... §8(§b残り ${formatRemainingSeconds(ownerRemaining)}秒§8)"))
+            ownerBar.progress(ownerProgress)
+            owner.showBossBar(ownerBar)
+        }
+
+        session.invitedParticipants.forEach { invitedId ->
+            val invited = Bukkit.getPlayer(invitedId) ?: return@forEach
+            if (!invited.isOnline) return@forEach
+
+            val invitedAt = session.invitedAtMillis[invitedId] ?: nowMillis
+            val invitedEnd = invitedAt + session.joinGraceDurationMillis
+            val remaining = (invitedEnd - nowMillis).coerceAtLeast(0L)
+            val progress = if (session.joinGraceDurationMillis <= 0L) {
+                0.0f
+            } else {
+                (remaining.toDouble() / session.joinGraceDurationMillis.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
+            }
+            val bar = getOrCreateJoinCountdownBossBar(session, invitedId)
+            bar.name(Component.text("§7アリーナを準備中... §8(§b残り ${formatRemainingSeconds(remaining)}秒§8)"))
+            bar.progress(progress)
+            invited.showBossBar(bar)
+        }
+    }
+
+    private fun getOrCreateJoinCountdownBossBar(session: ArenaSession, playerId: UUID): BossBar {
+        return session.joinCountdownBossBars.getOrPut(playerId) {
+            BossBar.bossBar(Component.text("§7アリーナを準備中... §8(§b残り 0.0秒§8)"), 1.0f, BossBar.Color.BLUE, BossBar.Overlay.PROGRESS)
+        }
+    }
+
+    private fun formatRemainingSeconds(remainingMillis: Long): String {
+        val tenths = (remainingMillis.coerceAtLeast(0L) / 100L).toDouble() / 10.0
+        return String.format(Locale.US, "%.1f", tenths)
+    }
+
+    private fun updateWaitingParticipants(session: ArenaSession) {
+        val ownerId = session.ownerPlayerId
+        val candidateIds = linkedSetOf<UUID>()
+        candidateIds += ownerId
+        candidateIds += session.invitedParticipants
+
+        val waitingNow = candidateIds
+            .asSequence()
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .filter { it.isOnline }
+            .filter { player ->
+                session.joinAreaMarkerLocations.any { markerLocation ->
+                    isInsideJoinArea(markerLocation, player.location)
+                }
+            }
+            .map { it.uniqueId }
+            .toSet()
+
+        val entered = waitingNow - session.waitingParticipants
+        session.waitingParticipants.clear()
+        session.waitingParticipants.addAll(waitingNow)
+
+        entered.forEach { playerId ->
+            if (!session.waitingNotifiedParticipants.add(playerId)) return@forEach
+            val player = Bukkit.getPlayer(playerId) ?: return@forEach
+            player.sendMessage(
+                ArenaI18n.text(
+                    player,
+                    "arena.messages.multiplayer.waiting_entered",
+                    "&a開始待機エリアに入りました。猶予終了まで待機してください"
+                )
+            )
+        }
+    }
+
+    private fun finalizeMultiplayerJoin(session: ArenaSession) {
+        val owner = Bukkit.getPlayer(session.ownerPlayerId)
+        if (owner == null || !owner.isOnline) {
+            terminateSession(
+                session,
+                false,
+                messageKey = "arena.messages.multiplayer.cancelled_owner_offline",
+                fallbackMessage = "&cオーナーが不在のためマルチ参加募集を終了しました"
+            )
+            return
+        }
+
+        if (!session.waitingParticipants.contains(session.ownerPlayerId)) {
+            terminateSession(
+                session,
+                false,
+                messageKey = "arena.messages.multiplayer.cancelled_owner_not_waiting",
+                fallbackMessage = "&cオーナーが開始待機エリアにいないため開始を中止しました"
+            )
+            return
+        }
+
+        val participants = session.waitingParticipants
+            .asSequence()
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .filter { it.isOnline }
+            .filter { !playerToSessionWorld.containsKey(it.uniqueId) || playerToSessionWorld[it.uniqueId] == session.worldName }
+            .toList()
+
+        if (participants.none { it.uniqueId == session.ownerPlayerId }) {
+            terminateSession(
+                session,
+                false,
+                messageKey = "arena.messages.multiplayer.cancelled_owner_not_waiting",
+                fallbackMessage = "&cオーナーが開始待機エリアにいないため開始を中止しました"
+            )
+            return
+        }
+
+        participants.forEach { player ->
+            session.participants.add(player.uniqueId)
+            playerToSessionWorld[player.uniqueId] = session.worldName
+            session.returnLocations.putIfAbsent(player.uniqueId, player.location.clone())
+        }
+        clearMultiplayerRecruitmentState(session)
+        session.multiplayerJoinEnabled = false
+        session.joinGraceEndMillis = 0L
+
+        startMultiplayerStageIntro(session, participants)
+    }
+
+    private fun startMultiplayerStageIntro(session: ArenaSession, participants: List<Player>) {
+        if (session.multiplayerJoinIntroStarted) {
+            return
+        }
+        session.multiplayerJoinIntroStarted = true
+
+        participants.forEach { player ->
+            player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 120, 0, false, false, false))
+            player.sendMessage(
+                ArenaI18n.text(
+                    player,
+                    "arena.messages.multiplayer.stage_intro",
+                    "&6ステージ転送を開始します..."
+                )
+            )
+        }
+
+        repeat(MULTIPLAYER_STAGE_INTRO_SOUND_REPEAT) { index ->
+            Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+                participants.forEach { player ->
+                    if (player.isOnline) {
+                        player.playSound(player.location, "minecraft:item.armor.equip_netherite", 1.0f, 0.5f)
+                    }
+                }
+            }, index * MULTIPLAYER_STAGE_INTRO_SOUND_INTERVAL_TICKS)
+        }
+
+        val teleportDelay =
+            MULTIPLAYER_STAGE_INTRO_SOUND_REPEAT * MULTIPLAYER_STAGE_INTRO_SOUND_INTERVAL_TICKS +
+                MULTIPLAYER_STAGE_INTRO_TELEPORT_EXTRA_DELAY_TICKS
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            val world = Bukkit.getWorld(session.worldName) ?: return@Runnable
+            val now = System.currentTimeMillis()
+
+            participants.forEach { player ->
+                if (!player.isOnline) return@forEach
+                val spawnLocation = session.entranceLocation.clone().apply {
+                    this.world = world
+                }
+                applyStageStartFacingYaw(session, spawnLocation)
+                player.teleport(spawnLocation)
+                session.participantLocationHistory[player.uniqueId] = ArrayDeque<TimedPlayerLocation>().apply {
+                    addLast(TimedPlayerLocation(now, spawnLocation.clone()))
+                }
+                session.participantLastSampleMillis[player.uniqueId] = now
+            }
+
+            session.participantSpawnProtectionUntilMillis = System.currentTimeMillis() + 4000L
+            requestArenaBgmMode(session, ArenaBgmMode.NORMAL)
+            setDoorActionMarkersReadySilently(session, 1)
+        }, teleportDelay)
+    }
+
+    private fun findNearbyJoinAreaMarkers(origin: Location, radius: Double): List<Location> {
+        val world = origin.world ?: return emptyList()
+        return world.getNearbyEntities(origin, radius, radius, radius)
+            .asSequence()
+            .filterIsInstance<Marker>()
+            .filter { marker -> marker.scoreboardTags.contains("arena.marker.join_area") }
+            .map { it.location.clone() }
+            .toList()
+    }
+
+    private fun isInsideJoinArea(markerLocation: Location, playerLocation: Location): Boolean {
+        val markerWorld = markerLocation.world ?: return false
+        if (playerLocation.world?.uid != markerWorld.uid) return false
+
+        val blockX = markerLocation.blockX
+        val blockY = markerLocation.blockY
+        val blockZ = markerLocation.blockZ
+
+        val x = playerLocation.x
+        val y = playerLocation.y
+        val z = playerLocation.z
+
+        return x >= blockX && x < blockX + 1.0 &&
+            z >= blockZ && z < blockZ + 1.0 &&
+            y >= blockY && y < blockY + 0.125
     }
 
     private fun updateActionMarkers() {
@@ -2998,6 +3601,7 @@ class ArenaManager(
 
         if (actionMarkerTask == null) {
             actionMarkerTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+                updateMultiplayerJoinStates()
                 updateActionMarkers()
                 updateArenaBgmTransitions()
             }, 1L, 1L)
