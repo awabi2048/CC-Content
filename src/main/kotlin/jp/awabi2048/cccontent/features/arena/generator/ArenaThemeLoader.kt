@@ -14,11 +14,38 @@ data class ArenaTheme(
     val id: String,
     val path: String,
     val iconMaterial: Material,
+    val mobSpawnConfig: ArenaThemeMobSpawnConfig,
     val orientation: ArenaStructureOrientation,
     val gridPitch: Int,
     val staticStructures: Map<ArenaStructureType, List<ArenaStaticStructureVariant>>,
     val animatedStructures: Map<ArenaStructureType, List<ArenaAnimatedStructureVariant>>
 )
+
+data class ArenaThemeWaveRange(
+    val minInclusive: Int,
+    val maxInclusive: Int?
+) {
+    fun contains(wave: Int): Boolean {
+        if (wave < minInclusive) return false
+        return maxInclusive == null || wave <= maxInclusive
+    }
+}
+
+data class ArenaThemeWeightedMobEntry(
+    val mobId: String,
+    val weight: Int,
+    val waveRange: ArenaThemeWaveRange
+)
+
+data class ArenaThemeMobSpawnConfig(
+    val maxSummonCount: Int,
+    val clearMobCount: Int,
+    val weightedMobs: List<ArenaThemeWeightedMobEntry>
+) {
+    fun candidatesForWave(wave: Int): List<ArenaThemeWeightedMobEntry> {
+        return weightedMobs.filter { it.waveRange.contains(wave) }
+    }
+}
 
 data class ArenaStructureOrientation(
     val entranceExit: ArenaPathDirection,
@@ -63,6 +90,7 @@ enum class ArenaStructureType(val keyword: String, val supportsAnimation: Boolea
 class ArenaThemeLoader(private val plugin: JavaPlugin) {
     private data class ParsedThemeConfig(
         val iconMaterial: Material,
+        val mobSpawnConfig: ArenaThemeMobSpawnConfig,
         val orientation: ArenaStructureOrientation
     )
 
@@ -176,6 +204,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 id = themeId,
                 path = folder.name,
                 iconMaterial = parsedThemeConfig.iconMaterial,
+                mobSpawnConfig = parsedThemeConfig.mobSpawnConfig,
                 orientation = parsedThemeConfig.orientation,
                 gridPitch = gridPitch,
                 staticStructures = loaded.staticStructures,
@@ -221,6 +250,54 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             return null
         }
 
+        val maxSummonCount = section.getInt("max_summon_count", 1).coerceAtLeast(1)
+        val clearMobCount = section.getInt("clear_mob_count", 1).coerceAtLeast(1)
+        val mobsSection = section.getConfigurationSection("mobs")
+        if (mobsSection == null) {
+            val warning = "[Arena] theme.yml の mobs セクションが見つからないためスキップ: theme=$themeId"
+            plugin.logger.warning(warning)
+            warnings.add(warning)
+            return null
+        }
+        val weightedMobs = mutableListOf<ArenaThemeWeightedMobEntry>()
+        for (mobId in mobsSection.getKeys(false)) {
+            val id = mobId.trim()
+            if (id.isEmpty()) {
+                val warning = "[Arena] theme.yml の mobs ID が空のためスキップ: theme=$themeId"
+                plugin.logger.warning(warning)
+                warnings.add(warning)
+                continue
+            }
+            val weight = mobsSection.getInt("$mobId.weight", 0)
+            if (weight <= 0) {
+                val warning = "[Arena] theme.yml の mobs.weight は1以上である必要があります: theme=$themeId mob=$id"
+                plugin.logger.warning(warning)
+                warnings.add(warning)
+                continue
+            }
+            val waveText = mobsSection.getString("$mobId.wave", "1..") ?: "1.."
+            val waveRange = parseWaveRange(waveText)
+            if (waveRange == null) {
+                val warning = "[Arena] theme.yml の mobs.wave が不正です: theme=$themeId mob=$id wave=$waveText"
+                plugin.logger.warning(warning)
+                warnings.add(warning)
+                continue
+            }
+            weightedMobs.add(
+                ArenaThemeWeightedMobEntry(
+                    mobId = id,
+                    weight = weight,
+                    waveRange = waveRange
+                )
+            )
+        }
+        if (weightedMobs.isEmpty()) {
+            val warning = "[Arena] theme.yml の有効な mobs 定義が1件もないためスキップ: theme=$themeId"
+            plugin.logger.warning(warning)
+            warnings.add(warning)
+            return null
+        }
+
         val orientationSection = section.getConfigurationSection("orientation")
         if (orientationSection == null) {
             val warning = "[Arena] theme.yml の orientation が見つからないためスキップ: theme=$themeId"
@@ -252,6 +329,11 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
 
         return ParsedThemeConfig(
             iconMaterial = iconMaterial,
+            mobSpawnConfig = ArenaThemeMobSpawnConfig(
+                maxSummonCount = maxSummonCount,
+                clearMobCount = clearMobCount,
+                weightedMobs = weightedMobs
+            ),
             orientation = ArenaStructureOrientation(
                 entranceExit = entranceExit,
                 cornerEntry = cornerEntry,
@@ -284,6 +366,23 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             return null
         }
         return direction
+    }
+
+    private fun parseWaveRange(text: String): ArenaThemeWaveRange? {
+        val exact = Regex("^(\\d+)$")
+        exact.matchEntire(text.trim())?.let {
+            val value = it.groupValues[1].toIntOrNull() ?: return null
+            if (value <= 0) return null
+            return ArenaThemeWaveRange(value, value)
+        }
+
+        val range = Regex("^(\\d+)\\.\\.(\\d+)?$")
+        val matched = range.matchEntire(text.trim()) ?: return null
+        val min = matched.groupValues[1].toIntOrNull() ?: return null
+        val max = matched.groupValues[2].takeIf { it.isNotBlank() }?.toIntOrNull()
+        if (min <= 0) return null
+        if (max != null && max < min) return null
+        return ArenaThemeWaveRange(min, max)
     }
 
     private fun loadStructures(folder: File, warnings: MutableList<String>): LoadedThemeStructures {

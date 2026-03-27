@@ -75,12 +75,12 @@ class ArenaCommand(
     }
 
     private fun handleStart(sender: CommandSender, args: Array<out String>): Boolean {
-        if (args.size < 4) {
+        if (args.size < 3) {
             sender.sendMessage(
                 ArenaI18n.text(
                     sender,
                     "arena.messages.command.usage.start",
-                    "&c使用法: /arenaa start <player|@s> <mob_type> <difficulty_id> [theme]"
+                    "&c使用法: /arenaa start <player|@s> <difficulty_id> [theme]"
                 )
             )
             return true
@@ -95,9 +95,8 @@ class ArenaCommand(
             return true
         }
 
-        val mobTypeId = args[2]
-        val difficultyId = args[3]
-        val theme = args.getOrNull(4)
+        val difficultyId = args[2]
+        val theme = args.getOrNull(3)
         val manager = arenaManagerProvider()
         if (manager == null) {
             sender.sendMessage("§cArena feature は初期化に失敗したため利用できません")
@@ -105,15 +104,15 @@ class ArenaCommand(
             return true
         }
 
-        when (val result = manager.startSession(target, mobTypeId, difficultyId, theme)) {
+        when (val result = manager.startSession(target, difficultyId, theme)) {
             is ArenaStartResult.Success -> {
                 sender.sendMessage(
                     ArenaI18n.text(
                         sender,
                         "arena.messages.command.start_success",
-                        "&a{player} のアリーナを開始しました (mob_type={mob_type}, difficulty={difficulty}, theme={theme}, waves={waves})",
+                        "&a{player} のアリーナを開始しました (difficulty={difficulty}, theme={theme}, waves={waves})",
                         "player" to target.name,
-                        "mob_type" to result.mobTypeId,
+                        "mob_type" to result.themeId,
                         "difficulty" to result.difficultyDisplay,
                         "theme" to result.themeId,
                         "waves" to result.waves
@@ -210,7 +209,7 @@ class ArenaCommand(
     private fun showUsage(sender: CommandSender) {
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.header", "&6=== Arena 管理コマンド ==="))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.menu", "&f/arenaa menu"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s> <mob_type> <difficulty_id> [theme]"))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s> <difficulty_id> [theme]"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop", "&f/arenaa stop <player>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.theme", "&f/arenaa theme list"))
     }
@@ -234,15 +233,11 @@ class ArenaCommand(
                 else -> emptyList()
             }
             3 -> when (args[0].lowercase()) {
-                "start" -> arenaManagerProvider()?.getMobTypeIds()?.filter { it.startsWith(args[2], ignoreCase = true) } ?: emptyList()
+                "start" -> arenaManagerProvider()?.getDifficultyIds()?.filter { it.startsWith(args[2], ignoreCase = true) } ?: emptyList()
                 else -> emptyList()
             }
             4 -> when (args[0].lowercase()) {
-                "start" -> arenaManagerProvider()?.getDifficultyIds()?.filter { it.startsWith(args[3], ignoreCase = true) } ?: emptyList()
-                else -> emptyList()
-            }
-            5 -> when (args[0].lowercase()) {
-                "start" -> arenaManagerProvider()?.getThemeIds()?.filter { it.startsWith(args[4], ignoreCase = true) } ?: emptyList()
+                "start" -> arenaManagerProvider()?.getThemeIds()?.filter { it.startsWith(args[3], ignoreCase = true) } ?: emptyList()
                 else -> emptyList()
             }
             else -> emptyList()

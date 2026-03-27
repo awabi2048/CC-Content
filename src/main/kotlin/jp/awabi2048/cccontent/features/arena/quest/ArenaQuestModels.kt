@@ -7,11 +7,10 @@ import java.util.UUID
 
 data class ArenaDailyQuestEntry(
     val index: Int,
-    val mobTypeId: String,
+    val missionTypeId: String,
     val difficultyScore: Double,
     val difficultyId: String,
-    val themeId: String,
-    val charactorId: String
+    val themeId: String
 )
 
 data class ArenaDailyQuestSet(
@@ -44,26 +43,36 @@ data class ArenaDifficultyDefinition(
     val display: String
 )
 
-data class ArenaQuestCharactorDefinition(
+enum class ArenaQuestMissionType(
     val id: String,
     val displayName: String,
-    val weight: Int,
-    val spawnIntervalMultiplier: Double,
-    val maxSummonCountMultiplier: Double,
-    val clearMobCountMultiplier: Double,
-    val mobHealthMultiplier: Double,
-    val mobAttackMultiplier: Double
+    val missionGuideHints: List<String>
 ) {
-    fun toModifiers(): ArenaQuestModifiers {
-        return ArenaQuestModifiers(
-            charactorId = id,
-            displayName = displayName,
-            spawnIntervalMultiplier = spawnIntervalMultiplier,
-            maxSummonCountMultiplier = maxSummonCountMultiplier,
-            clearMobCountMultiplier = clearMobCountMultiplier,
-            mobHealthMultiplier = mobHealthMultiplier,
-            mobAttackMultiplier = mobAttackMultiplier
-        )
+    BARRIER_RESTART(
+        id = "barrier_restart",
+        displayName = "結界石の再起動",
+        missionGuideHints = listOf("§7結界石を再起動しに行こう（仮）")
+    ),
+    BARRIER_DEPLOY(
+        id = "barrier_deploy",
+        displayName = "結界石の展開",
+        missionGuideHints = listOf("§7結界石を展開して安全を確保しよう（仮）")
+    ),
+    SWEEP(
+        id = "sweep",
+        displayName = "掃討",
+        missionGuideHints = listOf("§7たくさん湧いているので倒そう（仮）")
+    ),
+    BOSS(
+        id = "boss",
+        displayName = "ボス",
+        missionGuideHints = listOf("§7ボスがいて困るので倒そう（仮）")
+    );
+
+    companion object {
+        private val BY_ID = entries.associateBy { it.id }
+
+        fun fromId(id: String): ArenaQuestMissionType? = BY_ID[id]
     }
 }
 

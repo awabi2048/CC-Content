@@ -1079,3 +1079,20 @@ custom_items:
       name: '§a培養済み酵母（モック）'
       lore:
         - '§7発酵GUIの酵母スロット用（効果なし）'
+
+arena:
+  theme:
+    test:
+      name: テスト
+    cave:
+      name: 洞窟
+    mineshaft:
+      name: 廃坑
+    library:
+      name: 図書館
+    ruins:
+      name: 遺跡
+    see_of_trees:
+      name: 樹海
+    maze:
+      name: 立体迷宮

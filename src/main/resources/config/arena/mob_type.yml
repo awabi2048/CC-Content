@@ -1,27 +1,2 @@
-zombie:
-  structure: "zombie_arena" # 使用するストラクチャー名（structures/arena/zombie_arena.yml ）
-  icon_material: ZOMBIE_HEAD # アイコンに使用するマテリアル
-  max_summon_count: 10 # ステージ全体で同時に存在できるモブ数の基準値
-  clear_mob_count: 20 # ウェーブクリア扱いとするモブの討伐数
-  mobs: # config/mob_definition.yml に記述されたモブのidを参照
-    zombie_plain:
-      weight: 10
-      wave: 1..
-    zombie_basic:
-      weight: 8
-      wave: 1.. # 最小値1, 最大値なし
-    zombie_heavy:
-      weight: 6
-      wave: 3..5
-    zombie_leap_only:
-      weight: 14
-      wave: 1..
-    zombie_bow_only:
-      weight: 10
-      wave: 2..
-    zombie_bow_swap:
-      weight: 14
-      wave: 3..
-    zombie_shield_only:
-      weight: 12
-      wave: 2..
+# 廃止: モブ種別単位の設定は利用しません。
+# モブスポーン設定は config/arena/theme.yml の各テーマに移行してください。
