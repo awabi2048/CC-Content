@@ -20,6 +20,7 @@ import jp.awabi2048.cccontent.world.WorldSettingsHelper
 import net.kyori.adventure.bossbar.BossBar
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
+import org.bukkit.Color
 import org.bukkit.GameRule
 import org.bukkit.Location
 import org.bukkit.Material
@@ -56,9 +57,11 @@ import java.io.File
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.ceil
+import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import kotlin.math.sin
 
 sealed class ArenaStartResult {
     data class Success(
@@ -170,6 +173,15 @@ class ArenaManager(
         const val POSITION_HISTORY_MAX_SAMPLES = 24
         const val ARENA_BGM_SOUND_KEY = "kota_server:ost_4.arena"
         const val ARENA_BGM_LOOP_SECONDS = 164
+        const val ACTION_MARKER_RADIUS = 1.0
+        const val ACTION_MARKER_RADIUS_SQUARED = ACTION_MARKER_RADIUS * ACTION_MARKER_RADIUS
+        const val ACTION_MARKER_OUTER_RING_RADIUS = 1.0
+        const val ACTION_MARKER_OUTER_RING_HEIGHT = 0.3
+        const val ACTION_MARKER_INNER_RING_RADIUS = 0.75
+        const val ACTION_MARKER_INNER_RING_HEIGHT = 0.0
+        const val ACTION_MARKER_MIDDLE_RING_RADIUS = 0.875
+        const val ACTION_MARKER_MIDDLE_RING_HEIGHT = 0.15
+        const val ACTION_MARKER_PROGRESS_BAR_TEXT = "❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙"
     }
 
     private val random = kotlin.random.Random.Default
@@ -186,7 +198,10 @@ class ArenaManager(
     private val mobToDefinitionTypeId = mutableMapOf<UUID, String>()
     private var maintenanceTask: BukkitTask? = null
     private var playerMonitorTask: BukkitTask? = null
+    private var actionMarkerTask: BukkitTask? = null
     private var barrierRestartConfig = BarrierRestartConfig(30, 0.05)
+    private var actionMarkerHoldTicks = 40
+    private var actionMarkerColorTransitionTicks = 16
     private var doorAnimationTotalTicks = DOOR_ANIMATION_TOTAL_TICKS_DEFAULT
     private var sharedWaveMaxAlive = SHARED_WAVE_MAX_ALIVE_DEFAULT
     private var dropConfig = ArenaDropConfig(
@@ -551,6 +566,7 @@ class ArenaManager(
             )
             sessionsByWorld[world.name] = session
             playerToSessionWorld[target.uniqueId] = world.name
+            initializeActionMarkers(session)
             initializeBarrierRestartState(session)
             startBarrierAmbientTask(session)
             val now = System.currentTimeMillis()
@@ -613,6 +629,8 @@ class ArenaManager(
         maintenanceTask = null
         playerMonitorTask?.cancel()
         playerMonitorTask = null
+        actionMarkerTask?.cancel()
+        actionMarkerTask = null
 
         sessionsByWorld.values.toList().forEach { session ->
             terminateSession(
@@ -912,6 +930,27 @@ class ArenaManager(
         return sessionsByWorld.values.any { session -> locateDoorWave(session, location) != null }
     }
 
+    fun activateDoorActionMarkers(worldName: String, wave: Int): Int {
+        val session = sessionsByWorld[worldName] ?: return 0
+        val currentTick = Bukkit.getCurrentTick().toLong()
+        var changed = 0
+        session.actionMarkers.values
+            .asSequence()
+            .filter { it.type == ArenaActionMarkerType.DOOR_TOGGLE && it.wave == wave }
+            .forEach { marker ->
+                if (transitionActionMarkerState(marker, ArenaActionMarkerState.READY, currentTick)) {
+                    changed += 1
+                }
+            }
+        return changed
+    }
+
+    fun activateBarrierActionMarker(worldName: String): Boolean {
+        val session = sessionsByWorld[worldName] ?: return false
+        val marker = session.actionMarkers.values.firstOrNull { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE } ?: return false
+        return transitionActionMarkerState(marker, ArenaActionMarkerState.READY, Bukkit.getCurrentTick().toLong())
+    }
+
     private fun leavePlayerFromSession(playerId: UUID, reason: String): Boolean {
         val worldName = playerToSessionWorld[playerId] ?: return false
         val session = sessionsByWorld[worldName] ?: return false
@@ -922,10 +961,12 @@ class ArenaManager(
         session.playerNotifiedWaves.remove(playerId)
         session.participantLocationHistory.remove(playerId)
         session.participantLastSampleMillis.remove(playerId)
+        session.actionMarkerHoldStates.remove(playerId)
 
         val player = Bukkit.getPlayer(playerId)
         if (player != null && player.isOnline) {
             BGMManager.stop(player, ARENA_BGM_SOUND_KEY)
+            clearActionMarkerProgressSubtitle(player)
             session.progressBossBar?.let { player.hideBossBar(it) }
             val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
             val destination = if (returnLocation?.world != null) returnLocation else fallback
@@ -975,6 +1016,7 @@ class ArenaManager(
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline) {
                 BGMManager.stop(player, ARENA_BGM_SOUND_KEY)
+                clearActionMarkerProgressSubtitle(player)
                 val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
                 val destination = if (session.returnLocations[participantId]?.world != null) {
                     session.returnLocations[participantId]
@@ -1010,6 +1052,8 @@ class ArenaManager(
         session.enteredWaves.clear()
         session.waveSpawningStopped.clear()
         session.animatingDoorWaves.clear()
+        session.actionMarkers.clear()
+        session.actionMarkerHoldStates.clear()
         session.stageStarted = false
         session.barrierActive = false
         session.barrierRestarting = false
@@ -2150,6 +2194,198 @@ class ArenaManager(
         pendingWorldDeletions.putIfAbsent(worldName, PendingWorldDeletion(worldName, folder))
     }
 
+    private fun initializeActionMarkers(session: ArenaSession) {
+        val world = Bukkit.getWorld(session.worldName) ?: return
+        val markers = mutableMapOf<UUID, ArenaActionMarker>()
+
+        for ((wave, locations) in session.corridorDoorBlocks) {
+            locations.forEach { location ->
+                val marker = ArenaActionMarker(
+                    id = UUID.randomUUID(),
+                    type = ArenaActionMarkerType.DOOR_TOGGLE,
+                    center = location.clone().apply { this.world = world },
+                    holdTicksRequired = actionMarkerHoldTicks,
+                    wave = wave
+                )
+                markers[marker.id] = marker
+            }
+        }
+
+        val barrierMarker = ArenaActionMarker(
+            id = UUID.randomUUID(),
+            type = ArenaActionMarkerType.BARRIER_ACTIVATE,
+            center = session.barrierLocation.clone().apply { this.world = world },
+            holdTicksRequired = actionMarkerHoldTicks
+        )
+        markers[barrierMarker.id] = barrierMarker
+
+        session.actionMarkers.clear()
+        session.actionMarkers.putAll(markers)
+        session.actionMarkerHoldStates.clear()
+    }
+
+    private fun updateActionMarkers() {
+        val currentTick = Bukkit.getCurrentTick().toLong()
+        sessionsByWorld.values.forEach { session ->
+            val world = Bukkit.getWorld(session.worldName) ?: return@forEach
+            if (session.actionMarkers.isEmpty()) return@forEach
+
+            val participants = session.participants
+                .asSequence()
+                .mapNotNull { Bukkit.getPlayer(it) }
+                .filter { it.isOnline && it.world.uid == world.uid }
+                .toList()
+            if (participants.isEmpty()) return@forEach
+
+            session.actionMarkers.values.forEach { marker ->
+                val color = resolveActionMarkerDisplayColor(marker, currentTick)
+                participants.forEach { player ->
+                    renderActionMarkerParticles(player, marker.center, color)
+                }
+            }
+
+            participants.forEach { player ->
+                updateActionMarkerHoldState(session, player, currentTick)
+            }
+
+            session.actionMarkerHoldStates.keys.retainAll(session.participants)
+        }
+    }
+
+    private fun updateActionMarkerHoldState(session: ArenaSession, player: Player, currentTick: Long) {
+        val marker = findHoldableActionMarker(session, player.location)
+        if (!player.isSneaking || marker == null) {
+            resetActionMarkerHoldState(session, player.uniqueId, clearSubtitle = true)
+            return
+        }
+
+        val holdState = session.actionMarkerHoldStates.getOrPut(player.uniqueId) { ArenaActionMarkerHoldState() }
+        if (holdState.markerId != marker.id) {
+            holdState.markerId = marker.id
+            holdState.heldTicks = 0
+        }
+
+        holdState.heldTicks = (holdState.heldTicks + 1).coerceAtMost(marker.holdTicksRequired)
+        val ratio = holdState.heldTicks.toDouble() / marker.holdTicksRequired.toDouble()
+        player.sendTitle("", buildActionMarkerProgressSubtitle(ratio), 0, 5, 0)
+
+        if (holdState.heldTicks >= marker.holdTicksRequired) {
+            transitionActionMarkerState(marker, ArenaActionMarkerState.RUNNING, currentTick)
+            resetActionMarkerHoldState(session, player.uniqueId, clearSubtitle = true)
+        }
+    }
+
+    private fun findHoldableActionMarker(session: ArenaSession, location: Location): ArenaActionMarker? {
+        val worldUid = location.world?.uid ?: return null
+        return session.actionMarkers.values
+            .asSequence()
+            .filter { it.state == ArenaActionMarkerState.READY }
+            .filter { it.center.world?.uid == worldUid }
+            .filter { marker ->
+                val dx = location.x - marker.center.x
+                val dz = location.z - marker.center.z
+                (dx * dx) + (dz * dz) <= ACTION_MARKER_RADIUS_SQUARED
+            }
+            .minByOrNull { marker ->
+                val dx = location.x - marker.center.x
+                val dz = location.z - marker.center.z
+                (dx * dx) + (dz * dz)
+            }
+    }
+
+    private fun resetActionMarkerHoldState(session: ArenaSession, playerId: UUID, clearSubtitle: Boolean) {
+        val previous = session.actionMarkerHoldStates.remove(playerId)
+        if (!clearSubtitle || previous == null) return
+        val player = Bukkit.getPlayer(playerId) ?: return
+        if (!player.isOnline) return
+        clearActionMarkerProgressSubtitle(player)
+    }
+
+    private fun clearActionMarkerProgressSubtitle(player: Player) {
+        player.sendTitle("", "", 0, 0, 0)
+    }
+
+    private fun buildActionMarkerProgressSubtitle(ratio: Double): String {
+        val normalized = ratio.coerceIn(0.0, 1.0)
+        val total = ACTION_MARKER_PROGRESS_BAR_TEXT.length
+        val filled = (normalized * total).toInt().coerceIn(0, total)
+        val done = ACTION_MARKER_PROGRESS_BAR_TEXT.substring(0, filled)
+        val remaining = ACTION_MARKER_PROGRESS_BAR_TEXT.substring(filled)
+        return "§a$done§7$remaining"
+    }
+
+    private fun transitionActionMarkerState(marker: ArenaActionMarker, target: ArenaActionMarkerState, currentTick: Long): Boolean {
+        if (marker.state == target) return false
+        val currentColor = resolveActionMarkerDisplayColor(marker, currentTick)
+        marker.state = target
+        marker.colorTransitionFrom = currentColor
+        marker.colorTransitionTo = marker.colorFor(target)
+        marker.colorTransitionStartTick = currentTick
+        return true
+    }
+
+    private fun resolveActionMarkerDisplayColor(marker: ArenaActionMarker, currentTick: Long): Color {
+        val durationTicks = actionMarkerColorTransitionTicks.coerceAtLeast(1)
+        val elapsed = (currentTick - marker.colorTransitionStartTick).coerceAtLeast(0L)
+        if (elapsed >= durationTicks) {
+            return marker.colorTransitionTo
+        }
+
+        val ratio = elapsed.toDouble() / durationTicks.toDouble()
+        return blendColor(marker.colorTransitionFrom, marker.colorTransitionTo, ratio)
+    }
+
+    private fun blendColor(from: Color, to: Color, ratio: Double): Color {
+        val clampedRatio = ratio.coerceIn(0.0, 1.0)
+        val red = (from.red + (to.red - from.red) * clampedRatio).roundToInt().coerceIn(0, 255)
+        val green = (from.green + (to.green - from.green) * clampedRatio).roundToInt().coerceIn(0, 255)
+        val blue = (from.blue + (to.blue - from.blue) * clampedRatio).roundToInt().coerceIn(0, 255)
+        return Color.fromRGB(red, green, blue)
+    }
+
+    private fun renderActionMarkerParticles(player: Player, center: Location, color: Color) {
+        val world = center.world ?: return
+        if (player.world.uid != world.uid) return
+
+        val outerDust = Particle.DustOptions(color, 0.5f)
+        val innerDust = Particle.DustOptions(color, 0.5f)
+        val middleDust = Particle.DustOptions(color, 0.75f)
+
+        drawActionMarkerRing(player, center, ACTION_MARKER_OUTER_RING_RADIUS, ACTION_MARKER_OUTER_RING_HEIGHT, 32, outerDust)
+        drawActionMarkerRing(player, center, ACTION_MARKER_INNER_RING_RADIUS, ACTION_MARKER_INNER_RING_HEIGHT, 24, innerDust)
+        drawActionMarkerEightPoints(player, center, middleDust)
+    }
+
+    private fun drawActionMarkerRing(
+        player: Player,
+        center: Location,
+        radius: Double,
+        yOffset: Double,
+        points: Int,
+        dust: Particle.DustOptions
+    ) {
+        if (center.world == null) return
+        val safePoints = points.coerceAtLeast(8)
+        for (index in 0 until safePoints) {
+            val angle = (2.0 * Math.PI * index.toDouble()) / safePoints.toDouble()
+            val x = center.x + cos(angle) * radius
+            val y = center.y + yOffset
+            val z = center.z + sin(angle) * radius
+            player.spawnParticle(Particle.DUST, x, y, z, 1, 0.0, 0.0, 0.0, 0.0, dust)
+        }
+    }
+
+    private fun drawActionMarkerEightPoints(player: Player, center: Location, dust: Particle.DustOptions) {
+        if (center.world == null) return
+        for (index in 0 until 8) {
+            val angle = (2.0 * Math.PI * index.toDouble()) / 8.0
+            val x = center.x + cos(angle) * ACTION_MARKER_MIDDLE_RING_RADIUS
+            val y = center.y + ACTION_MARKER_MIDDLE_RING_HEIGHT
+            val z = center.z + sin(angle) * ACTION_MARKER_MIDDLE_RING_RADIUS
+            player.spawnParticle(Particle.DUST, x, y, z, 1, 0.0, 0.0, 0.0, 0.0, dust)
+        }
+    }
+
     private fun startMaintenanceTask() {
         if (maintenanceTask != null) return
         maintenanceTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
@@ -2161,6 +2397,12 @@ class ArenaManager(
             playerMonitorTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
                 monitorParticipantPositions()
             }, 5L, 5L)
+        }
+
+        if (actionMarkerTask == null) {
+            actionMarkerTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+                updateActionMarkers()
+            }, 1L, 1L)
         }
     }
 
