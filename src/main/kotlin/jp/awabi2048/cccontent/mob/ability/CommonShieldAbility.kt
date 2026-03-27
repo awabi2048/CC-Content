@@ -15,13 +15,15 @@ abstract class CommonShieldAbility(
     private val meleeBlockChance: Double = 0.5,
     private val frontDotThreshold: Double = 0.2,
     private val shieldBreakDamageThreshold: Double = 8.0,
-    private val shieldDownTicks: Long = 80L
+    private val shieldDownTicks: Long = 80L,
+    private val breakDisablesShieldPermanently: Boolean = false
 ) : MobAbility {
     override val id: String = abilityId
 
     data class Runtime(
         var blockCooldownTicks: Long = 0L,
-        var shieldDownTicks: Long = 0L
+        var shieldDownTicks: Long = 0L,
+        var shieldBroken: Boolean = false
     ) : MobAbilityRuntime
 
     override fun createRuntime(context: jp.awabi2048.cccontent.mob.MobSpawnContext): MobAbilityRuntime {
@@ -42,6 +44,7 @@ abstract class CommonShieldAbility(
         if (!context.isCombatActive()) return
 
         val abilityRuntime = runtime as? Runtime ?: return
+        if (abilityRuntime.shieldBroken) return
         val event = context.event
         if (event.isCancelled) return
         val target = resolveTarget(context.entity) ?: return
@@ -106,7 +109,13 @@ abstract class CommonShieldAbility(
             return
         }
 
-        runtime.shieldDownTicks = shieldDownTicks
+        if (breakDisablesShieldPermanently) {
+            runtime.shieldDownTicks = 0L
+            runtime.shieldBroken = true
+            context.entity.equipment?.setItemInOffHand(null)
+        } else {
+            runtime.shieldDownTicks = shieldDownTicks
+        }
         context.entity.world.playSound(context.entity.location, Sound.ITEM_SHIELD_BREAK, 0.9f, 1.0f)
     }
 

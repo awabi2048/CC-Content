@@ -159,7 +159,7 @@ class ArenaManager(
     private val mobService: MobService = MobService(plugin)
 ) {
     private companion object {
-        const val DOOR_ANIMATION_START_DELAY_TICKS = 40L
+        const val DOOR_ANIMATION_START_DELAY_TICKS = 10L
         const val DOOR_ANIMATION_TOTAL_TICKS_DEFAULT = 60
         const val SHARED_WAVE_MAX_ALIVE_DEFAULT = 128
         const val BARRIER_RESTART_PROGRESS_STEP_TICKS = 5L
@@ -181,6 +181,7 @@ class ArenaManager(
         const val ACTION_MARKER_INNER_RING_HEIGHT = 0.0
         const val ACTION_MARKER_MIDDLE_RING_RADIUS = 0.875
         const val ACTION_MARKER_MIDDLE_RING_HEIGHT = 0.15
+        const val ACTION_MARKER_CENTER_Y_OFFSET = -0.25
         const val ACTION_MARKER_PROGRESS_BAR_TEXT = "❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙❙"
     }
 
@@ -580,6 +581,7 @@ class ArenaManager(
                 if (!participant.isOnline) return@forEach
                 participant.teleport(stage.entranceLocation)
             }
+            setDoorActionMarkersReadySilently(session, 1)
             target.sendMessage(
                 ArenaI18n.text(
                     target,
@@ -743,8 +745,6 @@ class ArenaManager(
         val attackerMobId = resolveArenaMobAttackerId(event) ?: return
         val attackerWorld = mobToSessionWorld[attackerMobId] ?: return
         if (damagedWorld != attackerWorld) return
-
-        event.isCancelled = true
     }
 
     fun handleMobTarget(event: EntityTargetLivingEntityEvent) {
@@ -906,32 +906,9 @@ class ArenaManager(
         }
     }
 
-    fun handleDoorClick(player: Player, clicked: Location): Boolean {
-        val session = getSession(player) ?: return false
-        if (player.world.name != session.worldName) return false
-
-        val wave = locateDoorWave(session, clicked) ?: return false
-        player.playSound(player.location, Sound.BLOCK_IRON_DOOR_OPEN, 0.8f, 1.0f)
-        if (wave != 1) return true
-        if (session.stageStarted) {
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.stage.already_started", "&eステージはすでに開始しています"))
-            return true
-        }
-        if (session.animatingDoorWaves.contains(wave)) {
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.door.animating", "&e開扉中です"))
-            return true
-        }
-
-        startDoorAnimation(session, wave)
-        return true
-    }
-
-    fun isDoorBlock(location: Location): Boolean {
-        return sessionsByWorld.values.any { session -> locateDoorWave(session, location) != null }
-    }
-
     fun activateDoorActionMarkers(worldName: String, wave: Int): Int {
         val session = sessionsByWorld[worldName] ?: return 0
+        ensureDoorActionMarkersForTargetWave(session, wave)
         val currentTick = Bukkit.getCurrentTick().toLong()
         var changed = 0
         session.actionMarkers.values
@@ -939,16 +916,35 @@ class ArenaManager(
             .filter { it.type == ArenaActionMarkerType.DOOR_TOGGLE && it.wave == wave }
             .forEach { marker ->
                 if (transitionActionMarkerState(marker, ArenaActionMarkerState.READY, currentTick)) {
+                    playActionMarkerReadyEffect(session, marker)
                     changed += 1
                 }
             }
         return changed
     }
 
+    private fun setDoorActionMarkersReadySilently(session: ArenaSession, wave: Int) {
+        ensureDoorActionMarkersForTargetWave(session, wave)
+        session.actionMarkers.values
+            .asSequence()
+            .filter { it.type == ArenaActionMarkerType.DOOR_TOGGLE && it.wave == wave }
+            .forEach { marker ->
+                marker.state = ArenaActionMarkerState.READY
+                val color = marker.colorFor(ArenaActionMarkerState.READY)
+                marker.colorTransitionFrom = color
+                marker.colorTransitionTo = color
+                marker.colorTransitionStartTick = Bukkit.getCurrentTick().toLong()
+            }
+    }
+
     fun activateBarrierActionMarker(worldName: String): Boolean {
         val session = sessionsByWorld[worldName] ?: return false
         val marker = session.actionMarkers.values.firstOrNull { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE } ?: return false
-        return transitionActionMarkerState(marker, ArenaActionMarkerState.READY, Bukkit.getCurrentTick().toLong())
+        val transitioned = transitionActionMarkerState(marker, ArenaActionMarkerState.READY, Bukkit.getCurrentTick().toLong())
+        if (transitioned) {
+            playActionMarkerReadyEffect(session, marker)
+        }
+        return transitioned
     }
 
     private fun leavePlayerFromSession(playerId: UUID, reason: String): Boolean {
@@ -1321,6 +1317,8 @@ class ArenaManager(
             startWave(session, wave, mobType, difficulty)
         }
 
+        ensureDoorActionMarkersForTargetWave(session, wave + 1)
+
         val previousWave = wave - 1
         if (previousWave <= 0) return
 
@@ -1483,7 +1481,7 @@ class ArenaManager(
             return
         }
 
-        startDoorAnimation(session, wave + 1)
+        activateDoorActionMarkers(session.worldName, wave + 1)
     }
 
     private fun startDoorAnimation(session: ArenaSession, targetWave: Int) {
@@ -1602,17 +1600,6 @@ class ArenaManager(
     private fun onCorridorOpened(session: ArenaSession, wave: Int) {
         if (!session.corridorOpenAnnouncements.add(wave)) return
         playSound(session, Sound.BLOCK_IRON_DOOR_OPEN, 1.0f, 1.2f)
-    }
-
-    private fun locateDoorWave(session: ArenaSession, clicked: Location): Int? {
-        return session.corridorDoorBlocks.entries.firstOrNull { (_, markers) ->
-            markers.any { marker ->
-                marker.world?.name == clicked.world?.name &&
-                    marker.blockX == clicked.blockX &&
-                    marker.blockY == clicked.blockY &&
-                    marker.blockZ == clicked.blockZ
-            }
-        }?.key
     }
 
     private fun rebalanceTargetsForWave(session: ArenaSession, wave: Int) {
@@ -1990,14 +1977,14 @@ class ArenaManager(
             val nextWave = clearedWave + 1
             if (nextWave <= session.waves && !session.startedWaves.contains(nextWave)) {
                 bossBar.name(Component.text("§7- §6Wave $clearedWave §7- §bCLEAR"))
-                bossBar.color(BossBar.Color.RED)
+                bossBar.color(BossBar.Color.GREEN)
                 bossBar.progress(1.0f)
                 return
             }
 
             val waveLabel = if (clearedWave >= session.waves) "Last Wave" else "Wave $clearedWave"
             bossBar.name(Component.text("§7- §6$waveLabel §7- §bCLEAR"))
-            bossBar.color(BossBar.Color.RED)
+            bossBar.color(BossBar.Color.GREEN)
             bossBar.progress(1.0f)
             return
         }
@@ -2198,23 +2185,13 @@ class ArenaManager(
         val world = Bukkit.getWorld(session.worldName) ?: return
         val markers = mutableMapOf<UUID, ArenaActionMarker>()
 
-        for ((wave, locations) in session.corridorDoorBlocks) {
-            locations.forEach { location ->
-                val marker = ArenaActionMarker(
-                    id = UUID.randomUUID(),
-                    type = ArenaActionMarkerType.DOOR_TOGGLE,
-                    center = location.clone().apply { this.world = world },
-                    holdTicksRequired = actionMarkerHoldTicks,
-                    wave = wave
-                )
-                markers[marker.id] = marker
-            }
-        }
-
         val barrierMarker = ArenaActionMarker(
             id = UUID.randomUUID(),
             type = ArenaActionMarkerType.BARRIER_ACTIVATE,
-            center = session.barrierLocation.clone().apply { this.world = world },
+            center = session.barrierLocation.clone().apply {
+                this.world = world
+                y += ACTION_MARKER_CENTER_Y_OFFSET
+            },
             holdTicksRequired = actionMarkerHoldTicks
         )
         markers[barrierMarker.id] = barrierMarker
@@ -2222,6 +2199,29 @@ class ArenaManager(
         session.actionMarkers.clear()
         session.actionMarkers.putAll(markers)
         session.actionMarkerHoldStates.clear()
+    }
+
+    private fun ensureDoorActionMarkersForTargetWave(session: ArenaSession, targetWave: Int) {
+        if (targetWave <= 0 || targetWave > session.waves) return
+        if (session.actionMarkers.values.any { it.type == ArenaActionMarkerType.DOOR_TOGGLE && it.wave == targetWave }) {
+            return
+        }
+
+        val world = Bukkit.getWorld(session.worldName) ?: return
+        val locations = session.corridorDoorBlocks[targetWave].orEmpty()
+        locations.forEach { location ->
+            val marker = ArenaActionMarker(
+                id = UUID.randomUUID(),
+                type = ArenaActionMarkerType.DOOR_TOGGLE,
+                center = location.clone().apply {
+                    this.world = world
+                    y += ACTION_MARKER_CENTER_Y_OFFSET
+                },
+                holdTicksRequired = actionMarkerHoldTicks,
+                wave = targetWave
+            )
+            session.actionMarkers[marker.id] = marker
+        }
     }
 
     private fun updateActionMarkers() {
@@ -2263,6 +2263,12 @@ class ArenaManager(
         if (holdState.markerId != marker.id) {
             holdState.markerId = marker.id
             holdState.heldTicks = 0
+            holdState.startSoundPlayed = false
+        }
+
+        if (!holdState.startSoundPlayed) {
+            playActionMarkerStartSound(player, marker)
+            holdState.startSoundPlayed = true
         }
 
         holdState.heldTicks = (holdState.heldTicks + 1).coerceAtMost(marker.holdTicksRequired)
@@ -2271,7 +2277,21 @@ class ArenaManager(
 
         if (holdState.heldTicks >= marker.holdTicksRequired) {
             transitionActionMarkerState(marker, ArenaActionMarkerState.RUNNING, currentTick)
+            playActionMarkerCompleteSound(session, marker)
+            onActionMarkerTriggered(session, marker)
             resetActionMarkerHoldState(session, player.uniqueId, clearSubtitle = true)
+        }
+    }
+
+    private fun onActionMarkerTriggered(session: ArenaSession, marker: ArenaActionMarker) {
+        when (marker.type) {
+            ArenaActionMarkerType.DOOR_TOGGLE -> {
+                val targetWave = marker.wave ?: return
+                startDoorAnimation(session, targetWave)
+            }
+            ArenaActionMarkerType.BARRIER_ACTIVATE -> {
+                // base only
+            }
         }
     }
 
@@ -2343,13 +2363,66 @@ class ArenaManager(
         return Color.fromRGB(red, green, blue)
     }
 
+    private fun adjustMiddlePointColor(color: Color): Color {
+        val hsb = java.awt.Color.RGBtoHSB(color.red, color.green, color.blue, null)
+        val shiftedHue = (hsb[0] + 0.01f) % 1.0f
+        val softenedSaturation = (hsb[1] * 0.70f).coerceIn(0.0f, 1.0f)
+        val softenedBrightness = (hsb[2] * 0.98f).coerceIn(0.0f, 1.0f)
+        val rgb = java.awt.Color.HSBtoRGB(shiftedHue, softenedSaturation, softenedBrightness)
+        val red = (rgb shr 16) and 0xFF
+        val green = (rgb shr 8) and 0xFF
+        val blue = rgb and 0xFF
+        return Color.fromRGB(red, green, blue)
+    }
+
+    private fun playActionMarkerReadyEffect(session: ArenaSession, marker: ArenaActionMarker) {
+        val world = marker.center.world ?: return
+        val participants = session.participants
+            .asSequence()
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .filter { it.isOnline && it.world.uid == world.uid }
+            .toList()
+
+        if (participants.isEmpty()) return
+
+        participants.forEach { player ->
+            player.spawnParticle(
+                Particle.END_ROD,
+                marker.center.x,
+                marker.center.y,
+                marker.center.z,
+                100,
+                0.3,
+                3.0,
+                0.3,
+                0.1
+            )
+            player.playSound(player.location, Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 1.0f)
+        }
+    }
+
+    private fun playActionMarkerStartSound(player: Player, marker: ArenaActionMarker) {
+        player.playSound(marker.center, Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.7f, 1.2f)
+    }
+
+    private fun playActionMarkerCompleteSound(session: ArenaSession, marker: ArenaActionMarker) {
+        val world = marker.center.world ?: return
+        session.participants
+            .asSequence()
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .filter { it.isOnline && it.world.uid == world.uid }
+            .forEach { player ->
+                player.playSound(marker.center, Sound.BLOCK_IRON_DOOR_OPEN, 0.9f, 1.15f)
+            }
+    }
+
     private fun renderActionMarkerParticles(player: Player, center: Location, color: Color) {
         val world = center.world ?: return
         if (player.world.uid != world.uid) return
 
         val outerDust = Particle.DustOptions(color, 0.5f)
         val innerDust = Particle.DustOptions(color, 0.5f)
-        val middleDust = Particle.DustOptions(color, 0.75f)
+        val middleDust = Particle.DustOptions(adjustMiddlePointColor(color), 0.75f)
 
         drawActionMarkerRing(player, center, ACTION_MARKER_OUTER_RING_RADIUS, ACTION_MARKER_OUTER_RING_HEIGHT, 32, outerDust)
         drawActionMarkerRing(player, center, ACTION_MARKER_INNER_RING_RADIUS, ACTION_MARKER_INNER_RING_HEIGHT, 24, innerDust)

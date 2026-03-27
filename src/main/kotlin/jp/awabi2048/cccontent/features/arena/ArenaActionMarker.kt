@@ -40,5 +40,6 @@ data class ArenaActionMarker(
 
 data class ArenaActionMarkerHoldState(
     var markerId: UUID? = null,
-    var heldTicks: Int = 0
+    var heldTicks: Int = 0,
+    var startSoundPlayed: Boolean = false
 )

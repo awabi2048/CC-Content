@@ -125,10 +125,10 @@ class ArenaStageGenerator {
         roomPlacements.forEachIndexed { roomIndex, roomPlacement ->
             val bounds = placementBoundsByIndex[roomPlacement.index] ?: return@forEachIndexed
             roomBounds[roomIndex] = bounds
+            val markers = findMarkers(world, bounds)
+            val templateName = selectedByPlacementIndex[roomPlacement.index]?.baseTemplate?.name ?: "unknown"
 
             if (roomIndex > 0) {
-                val markers = findMarkers(world, bounds)
-                val templateName = selectedByPlacementIndex[roomPlacement.index]?.baseTemplate?.name ?: "unknown"
                 if (markers.mobSpawns.isEmpty()) {
                     validationIssues.add(
                         ArenaStageValidationIssue(
@@ -140,6 +140,31 @@ class ArenaStageGenerator {
                     roomMobSpawns[roomIndex] = markers.mobSpawns
                 }
             }
+
+            val targetWave = when (roomPlacement.structureType) {
+                ArenaStructureType.ENTRANCE -> 1
+                ArenaStructureType.STRAIGHT -> roomIndex + 1
+                else -> null
+            }
+
+            if (targetWave != null && targetWave in 1..waves) {
+                val doorBlocks = markers.doorBlocks
+                if (doorBlocks.size != 1) {
+                    val reason = if (doorBlocks.isEmpty()) {
+                        "arena.marker.door_block"
+                    } else {
+                        "arena.marker.door_block(single_required)"
+                    }
+                    validationIssues.add(
+                        ArenaStageValidationIssue(
+                            structureName = templateName,
+                            missingMarkers = listOf(reason)
+                        )
+                    )
+                } else {
+                    corridorDoorBlocks[targetWave] = listOf(doorBlocks.first())
+                }
+            }
         }
 
         placements.filter { !it.isRoom }.forEach { corridorPlacement ->
@@ -147,19 +172,6 @@ class ArenaStageGenerator {
             if (targetWave !in 1..waves) return@forEach
             val bounds = placementBoundsByIndex[corridorPlacement.index] ?: return@forEach
             corridorBounds[targetWave] = bounds
-
-            val markers = findMarkers(world, bounds)
-            val templateName = selectedByPlacementIndex[corridorPlacement.index]?.baseTemplate?.name ?: "unknown"
-            if (markers.doorBlocks.isEmpty()) {
-                validationIssues.add(
-                    ArenaStageValidationIssue(
-                        structureName = templateName,
-                        missingMarkers = listOf("arena.marker.door_block")
-                    )
-                )
-            } else {
-                corridorDoorBlocks[targetWave] = markers.doorBlocks
-            }
         }
 
         val finalRoomBounds = placementBoundsByIndex[roomPlacements.last().index]
