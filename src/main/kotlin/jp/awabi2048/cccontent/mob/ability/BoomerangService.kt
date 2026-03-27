@@ -1,4 +1,4 @@
-package jp.awabi2048.cccontent.mob.ability.skeleton
+package jp.awabi2048.cccontent.mob.ability
 
 import org.bukkit.Bukkit
 import org.bukkit.FluidCollisionMode
@@ -13,7 +13,7 @@ import org.bukkit.util.Vector
 import java.util.UUID
 import java.util.WeakHashMap
 
-class SkeletonBoomerangService private constructor(private val plugin: JavaPlugin) {
+class BoomerangService private constructor(private val plugin: JavaPlugin) {
     data class LaunchSpec(
         val ownerId: UUID,
         val targetId: UUID,
@@ -42,13 +42,13 @@ class SkeletonBoomerangService private constructor(private val plugin: JavaPlugi
     )
 
     companion object {
-        private val instances = WeakHashMap<JavaPlugin, SkeletonBoomerangService>()
+        private val instances = WeakHashMap<JavaPlugin, BoomerangService>()
         private const val RETURN_START_DISTANCE = 16.0
         private const val RETURN_CATCH_DISTANCE_SQUARED = 1.44
 
-        fun getInstance(plugin: JavaPlugin): SkeletonBoomerangService {
+        fun getInstance(plugin: JavaPlugin): BoomerangService {
             synchronized(instances) {
-                return instances.getOrPut(plugin) { SkeletonBoomerangService(plugin) }
+                return instances.getOrPut(plugin) { BoomerangService(plugin) }
             }
         }
     }

@@ -9,8 +9,8 @@ import org.bukkit.entity.Projectile
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import kotlin.random.Random
 
-abstract class CommonShieldAbility(
-    private val abilityId: String,
+class ShieldAbility(
+    override val id: String,
     private val blockCooldownTicks: Long = 100L,
     private val meleeBlockChance: Double = 0.5,
     private val frontDotThreshold: Double = 0.2,
@@ -18,8 +18,6 @@ abstract class CommonShieldAbility(
     private val shieldDownTicks: Long = 80L,
     private val breakDisablesShieldPermanently: Boolean = false
 ) : MobAbility {
-    override val id: String = abilityId
-
     data class Runtime(
         var blockCooldownTicks: Long = 0L,
         var shieldDownTicks: Long = 0L,
@@ -129,11 +127,7 @@ abstract class CommonShieldAbility(
         return facing.normalize().dot(toAttacker.normalize()) >= frontDotThreshold
     }
 
-    private fun blockDamage(
-        entity: LivingEntity,
-        event: EntityDamageByEntityEvent,
-        consumeCooldown: Boolean
-    ) {
+    private fun blockDamage(entity: LivingEntity, event: EntityDamageByEntityEvent, consumeCooldown: Boolean) {
         event.damage = 0.0
         event.isCancelled = true
 

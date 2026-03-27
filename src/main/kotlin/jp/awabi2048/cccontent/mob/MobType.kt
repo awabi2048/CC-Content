@@ -23,6 +23,8 @@ interface MobType {
     fun onDamaged(context: MobDamagedContext, runtime: CustomMobRuntime?) {}
 
     fun onDeath(context: MobDeathContext, runtime: CustomMobRuntime?) {}
+
+    fun onShootBow(context: MobShootBowContext, runtime: CustomMobRuntime?) {}
 }
 
 data class VanillaMobType(

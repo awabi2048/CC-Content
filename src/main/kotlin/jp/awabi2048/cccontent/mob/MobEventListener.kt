@@ -31,6 +31,6 @@ class MobEventListener(private val mobService: MobService) : Listener {
 
     @EventHandler(ignoreCancelled = true)
     fun onShootBow(event: EntityShootBowEvent) {
-        mobService.handleCurveShot(event)
+        mobService.handleShootBow(event)
     }
 }

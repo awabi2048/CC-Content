@@ -164,13 +164,3 @@ zombie_shield_only:
   equipment:
     chestplate: IRON_CHESTPLATE
 
-spark_zombie_basic:
-  type: spark_zombie
-  health: 28.0
-  attack: 6.0
-  movement_speed: 0.24
-  armor: 6.0
-  scale: 1.0
-  equipment:
-    chestplate: CHAINMAIL_CHESTPLATE
-    boots: CHAINMAIL_BOOTS

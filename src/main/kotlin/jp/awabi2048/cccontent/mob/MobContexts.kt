@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent.mob
 import org.bukkit.entity.LivingEntity
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityDeathEvent
+import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
 
@@ -152,4 +153,22 @@ data class MobDeathContext(
 
     val sessionKey: String
         get() = activeMob.sessionKey
+}
+
+data class MobShootBowContext(
+    val plugin: JavaPlugin,
+    val entity: LivingEntity,
+    val activeMob: ActiveMob,
+    val event: EntityShootBowEvent,
+    val loadSnapshot: MobLoadSnapshot
+) {
+    val definition: MobDefinition
+        get() = activeMob.definition
+
+    val sessionKey: String
+        get() = activeMob.sessionKey
+
+    fun isCombatActive(): Boolean {
+        return activeMob.isCombatActive()
+    }
 }

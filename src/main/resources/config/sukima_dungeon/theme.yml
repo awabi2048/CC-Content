@@ -22,10 +22,6 @@ themes:
         weight: 8
         min_dist: 0
         max_dist: 60
-      - id: spark_zombie_basic
-        weight: 4
-        min_dist: 20
-        max_dist: 90
   mineshaft:
     icon: CHEST_MINECART
     path: mineshaft
@@ -65,10 +61,6 @@ themes:
         weight: 3
         min_dist: 40
         max_dist: 1000
-      - id: spark_zombie_basic
-        weight: 6
-        min_dist: 20
-        max_dist: 90
   see_of_trees:
     icon: MOSS_BLOCK
     path: see_of_trees
@@ -91,7 +83,3 @@ themes:
         weight: 8
         min_dist: 0
         max_dist: 60
-      - id: spark_zombie_basic
-        weight: 6
-        min_dist: 20
-        max_dist: 90

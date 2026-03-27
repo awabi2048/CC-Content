@@ -1,19 +1,15 @@
-package jp.awabi2048.cccontent.mob.ability.skeleton
+package jp.awabi2048.cccontent.mob.ability
 
 import jp.awabi2048.cccontent.mob.MobDeathContext
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
-import jp.awabi2048.cccontent.mob.ability.MobAbility
-import jp.awabi2048.cccontent.mob.ability.MobAbilityRuntime
 import org.bukkit.Particle
 import org.bukkit.Sound
-import org.bukkit.entity.LivingEntity
-import org.bukkit.entity.Mob
 import kotlin.math.roundToLong
 import kotlin.random.Random
 
-class SkeletonBoomerangAbility : MobAbility {
-    override val id: String = "skeleton_boomerang"
-
+class BoomerangAbility(
+    override val id: String = "boomerang"
+) : MobAbility {
     data class Runtime(
         var cooldownTicks: Long = 0L,
         var searchPhaseOffsetSteps: Int = 0
@@ -34,7 +30,7 @@ class SkeletonBoomerangAbility : MobAbility {
         }
 
         val loadSnapshot = context.loadSnapshot
-        if (!shouldProcessSearchTick(context.activeMob.tickCount, loadSnapshot.searchIntervalMultiplier, abilityRuntime.searchPhaseOffsetSteps)) {
+        if (!MobAbilityUtils.shouldProcessSearchTick(context.activeMob.tickCount, loadSnapshot.searchIntervalMultiplier, abilityRuntime.searchPhaseOffsetSteps)) {
             return
         }
         if (Random.nextDouble() < loadSnapshot.abilityExecutionSkipChance) {
@@ -42,7 +38,7 @@ class SkeletonBoomerangAbility : MobAbility {
         }
 
         val entity = context.entity
-        val target = resolveTarget(entity) ?: return
+        val target = MobAbilityUtils.resolveTarget(entity) ?: return
         if (target.world.uid != entity.world.uid) {
             return
         }
@@ -53,14 +49,14 @@ class SkeletonBoomerangAbility : MobAbility {
             return
         }
 
-        val service = SkeletonBoomerangService.getInstance(context.plugin)
+        val service = BoomerangService.getInstance(context.plugin)
         if (service.hasActive(entity.uniqueId)) {
             return
         }
 
         val velocityPerTick = delta.normalize().multiply(BOOMERANG_SPEED_PER_TICK)
         val launched = service.launch(
-            SkeletonBoomerangService.LaunchSpec(
+            BoomerangService.LaunchSpec(
                 ownerId = entity.uniqueId,
                 targetId = target.uniqueId,
                 start = entity.eyeLocation.add(entity.location.direction.clone().multiply(0.35)),
@@ -81,21 +77,7 @@ class SkeletonBoomerangAbility : MobAbility {
     }
 
     override fun onDeath(context: MobDeathContext, runtime: MobAbilityRuntime?) {
-        SkeletonBoomerangService.getInstance(context.plugin).cancelByOwner(context.entity.uniqueId)
-    }
-
-    private fun resolveTarget(entity: LivingEntity): LivingEntity? {
-        val target = (entity as? Mob)?.target as? LivingEntity ?: return null
-        if (!target.isValid || target.isDead) {
-            return null
-        }
-        return target
-    }
-
-    private fun shouldProcessSearchTick(tickCount: Long, searchIntervalMultiplier: Int, phaseOffsetSteps: Int): Boolean {
-        val intervalSteps = searchIntervalMultiplier.coerceAtLeast(1).toLong()
-        val currentStep = (tickCount / 10L) + phaseOffsetSteps.toLong()
-        return currentStep % intervalSteps == 0L
+        BoomerangService.getInstance(context.plugin).cancelByOwner(context.entity.uniqueId)
     }
 
     private companion object {

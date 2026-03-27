@@ -307,7 +307,7 @@ class CCCommand(
 
                §f/ccc summon <mob_definition_id> <x> <y> <z>
                §7  - 共通 mob_definition からモブを召喚します
-               §7  - 例: /ccc summon spark_zombie_basic ~ ~ ~
+               §7  - 例: /ccc summon zombie_leap_only ~ ~ ~
 
                §f/ccc clear_block_placement_data
                §7  - プレイヤー設置ブロック判定データを削除します

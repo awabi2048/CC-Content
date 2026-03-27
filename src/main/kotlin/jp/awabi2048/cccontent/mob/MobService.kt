@@ -1,6 +1,5 @@
 package jp.awabi2048.cccontent.mob
 
-import jp.awabi2048.cccontent.mob.type.SparkZombieMobType
 import jp.awabi2048.cccontent.mob.type.ArenaEnhancedZombieMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonBoomerangMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonCurveShotMobType
@@ -12,7 +11,7 @@ import jp.awabi2048.cccontent.mob.type.ZombieBowOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieShieldOnlyMobType
-import jp.awabi2048.cccontent.mob.ability.skeleton.SkeletonBoomerangService
+import jp.awabi2048.cccontent.mob.ability.BoomerangService
 import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.Material
@@ -23,7 +22,6 @@ import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.AbstractArrow
 import org.bukkit.entity.LivingEntity
-import org.bukkit.entity.Mob
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.entity.EntityDeathEvent
@@ -31,34 +29,16 @@ import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
-import org.bukkit.FluidCollisionMode
-import org.bukkit.util.Vector
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import java.io.File
-import java.util.Locale
 import java.util.UUID
 import java.util.WeakHashMap
-import kotlin.math.abs
-import kotlin.math.atan
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.min
-import kotlin.math.sin
-import kotlin.math.sqrt
-import kotlin.random.Random
 
 class MobService(private val plugin: JavaPlugin) {
     companion object {
         private val instances = WeakHashMap<JavaPlugin, MobService>()
-        private const val CURVE_SHOT_CHANCE = 0.70
-        private const val CURVE_FORCE_DISTANCE = 12.0
-        private const val CURVE_MAX_LAUNCH_ANGLE_DEGREES = 30.0
-        private const val CURVE_ARROW_GRAVITY_PER_TICK = 0.05
-        private const val CURVE_MAX_SIM_TICKS = 80
-        private const val CURVE_HIT_TOLERANCE_SQUARED = 1.2
-        private const val CURVE_DROP_ABORT_DISTANCE = 8.0
 
         fun getInstance(plugin: JavaPlugin): MobService? {
             synchronized(instances) {
@@ -114,7 +94,6 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(ZombieBowOnlyMobType())
         registerMobType(ZombieBowSwapMobType())
         registerMobType(ZombieShieldOnlyMobType())
-        registerMobType(SparkZombieMobType())
         registerMobType(SkeletonFastArrowMobType())
         registerMobType(SkeletonRapidShotMobType())
         registerMobType(SkeletonEffectArrowMobType())
@@ -313,90 +292,22 @@ class MobService(private val plugin: JavaPlugin) {
         target.addPotionEffect(PotionEffect(effectType, durationTicks, amplifier, false, true, true))
     }
 
-    fun handleCurveShot(event: EntityShootBowEvent) {
+    fun handleShootBow(event: EntityShootBowEvent) {
         val shooter = event.entity as? LivingEntity ?: return
         val activeMob = activeMobs[shooter.uniqueId] ?: return
-        if (activeMob.mobType.id != "skeleton_curve_shot") {
-            return
-        }
-
-        fun debugLog(
-            replaced: Boolean,
-            reason: String,
-            source: Vector?,
-            target: Vector?,
-            velocity: Vector?,
-            forcedByDistance: Boolean,
-            clampedToMaxAngle: Boolean
-        ) {
-            val horizontalDistance = if (source != null && target != null) {
-                target.clone().subtract(source).setY(0.0).length()
-            } else {
-                -1.0
-            }
-            val angle = if (velocity != null) launchAngleDegrees(velocity) else Double.NaN
-            val speed = velocity?.length() ?: Double.NaN
-            plugin.logger.info(
-                "[CurveShotDebug] mob=skeleton_curve_shot replaced=$replaced reason=$reason " +
-                    "forced_by_distance=$forcedByDistance clamped_to_30deg=$clampedToMaxAngle " +
-                    "angle=${"%.2f".format(Locale.US, angle)} speed=${"%.3f".format(Locale.US, speed)} " +
-                    "horizontalDistance=${"%.2f".format(Locale.US, horizontalDistance)}"
-            )
-        }
-
-        val arrow = event.projectile as? AbstractArrow
-        if (arrow == null) {
-            debugLog(false, "projectile_not_arrow", null, null, null, forcedByDistance = false, clampedToMaxAngle = false)
-            return
-        }
-        val source = arrow.location.toVector()
-
-        val target = (shooter as? Mob)?.target as? LivingEntity
-        if (target == null) {
-            debugLog(false, "target_missing", source, null, arrow.velocity, forcedByDistance = false, clampedToMaxAngle = false)
-            return
-        }
-        if (!target.isValid || target.isDead || target.world.uid != shooter.world.uid) {
-            debugLog(false, "target_invalid", source, null, arrow.velocity, forcedByDistance = false, clampedToMaxAngle = false)
-            return
-        }
-
-        val targetPosition = target.eyeLocation.toVector()
-        val horizontalDistance = targetPosition.clone().subtract(source).setY(0.0).length()
-        val forcedByDistance = horizontalDistance >= CURVE_FORCE_DISTANCE
-        if (!forcedByDistance && Random.nextDouble() >= CURVE_SHOT_CHANCE) {
-            debugLog(false, "chance_roll_failed", source, targetPosition, arrow.velocity, forcedByDistance = false, clampedToMaxAngle = false)
-            return
-        }
-
-        val speed = arrow.velocity.length().coerceAtLeast(0.1)
-        val curvedResult = computeCurvedVelocity(
-            source = source,
-            target = targetPosition,
-            speed = speed,
-            world = shooter.world,
-            maxLaunchAngleDegrees = CURVE_MAX_LAUNCH_ANGLE_DEGREES
+        val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
+        val startedAt = System.nanoTime()
+        activeMob.mobType.onShootBow(
+            MobShootBowContext(
+                plugin = plugin,
+                entity = shooter,
+                activeMob = activeMob,
+                event = event,
+                loadSnapshot = snapshot
+            ),
+            activeMob.runtime
         )
-        val finalVelocity = when {
-            curvedResult != null -> curvedResult.velocity
-            forcedByDistance -> buildFallbackCurveVelocity(
-                source = source,
-                target = targetPosition,
-                speed = speed,
-                launchAngleDegrees = CURVE_MAX_LAUNCH_ANGLE_DEGREES
-            )
-            else -> null
-        }
-
-        if (finalVelocity == null) {
-            debugLog(false, "curve_solution_not_found", source, targetPosition, arrow.velocity, forcedByDistance, clampedToMaxAngle = false)
-            return
-        }
-
-        val clampedToMaxAngle = (curvedResult?.clamped ?: true) || launchAngleDegrees(finalVelocity) >= CURVE_MAX_LAUNCH_ANGLE_DEGREES - 0.01
-        arrow.velocity = finalVelocity
-        val reason = if (curvedResult == null && forcedByDistance) "curve_forced_fallback" else "curve_replaced"
-        debugLog(true, reason, source, targetPosition, finalVelocity, forcedByDistance, clampedToMaxAngle)
+        addCpuNanos(activeMob.sessionKey, System.nanoTime() - startedAt)
     }
 
     fun startTickTask(intervalTicks: Long = 10L) {
@@ -437,7 +348,7 @@ class MobService(private val plugin: JavaPlugin) {
         tickTask = null
         activeMobs.clear()
         sessionLoadMetrics.clear()
-        SkeletonBoomerangService.getInstance(plugin).shutdown()
+        BoomerangService.getInstance(plugin).shutdown()
         synchronized(instances) {
             instances.remove(plugin)
         }
@@ -691,111 +602,6 @@ class MobService(private val plugin: JavaPlugin) {
 
     private fun ItemStack?.isNullOrAir(): Boolean {
         return this == null || this.type.isAir
-    }
-
-    private data class CurveVelocityResult(
-        val velocity: Vector,
-        val clamped: Boolean
-    )
-
-    private fun computeCurvedVelocity(
-        source: Vector,
-        target: Vector,
-        speed: Double,
-        world: org.bukkit.World,
-        maxLaunchAngleDegrees: Double
-    ): CurveVelocityResult? {
-        val horizontal = target.clone().subtract(source).setY(0.0)
-        val horizontalDistance = horizontal.length()
-        if (horizontalDistance < 0.001) {
-            return null
-        }
-
-        val heightDelta = target.y - source.y
-        val gravity = CURVE_ARROW_GRAVITY_PER_TICK
-        val speedSquared = speed * speed
-        val discriminant = speedSquared * speedSquared - gravity * (gravity * horizontalDistance * horizontalDistance + 2.0 * heightDelta * speedSquared)
-        if (discriminant <= 0.0) {
-            return null
-        }
-
-        val tanTheta = (speedSquared + sqrt(discriminant)) / (gravity * horizontalDistance)
-        val highArcTheta = atan(tanTheta)
-        val maxTheta = Math.toRadians(maxLaunchAngleDegrees)
-        val theta = min(highArcTheta, maxTheta)
-        val cosTheta = cos(theta)
-        if (cosTheta <= 0.0) {
-            return null
-        }
-        val sinTheta = sin(theta)
-
-        val horizontalDirection = horizontal.normalize()
-        val velocity = horizontalDirection.multiply(speed * cosTheta).setY(speed * sinTheta)
-        if (!isCurvePathClear(world, source, velocity, target)) {
-            return null
-        }
-        return CurveVelocityResult(velocity = velocity, clamped = theta < highArcTheta)
-    }
-
-    private fun buildFallbackCurveVelocity(source: Vector, target: Vector, speed: Double, launchAngleDegrees: Double): Vector? {
-        val horizontal = target.clone().subtract(source).setY(0.0)
-        if (horizontal.lengthSquared() < 1.0E-6) {
-            return null
-        }
-        val horizontalDirection = horizontal.normalize()
-        val angleRad = Math.toRadians(launchAngleDegrees)
-        val horizontalSpeed = speed * cos(angleRad)
-        val ySpeed = speed * sin(angleRad)
-        return horizontalDirection.multiply(horizontalSpeed).setY(ySpeed)
-    }
-
-    private fun isCurvePathClear(world: org.bukkit.World, source: Vector, velocity: Vector, target: Vector): Boolean {
-        var previous = source.clone()
-
-        var tick = 1
-        while (tick <= CURVE_MAX_SIM_TICKS) {
-            val time = tick.toDouble()
-            val current = source.clone()
-                .add(velocity.clone().multiply(time))
-                .add(Vector(0.0, -0.5 * CURVE_ARROW_GRAVITY_PER_TICK * time * time, 0.0))
-
-            val segment = current.clone().subtract(previous)
-            val segmentLength = segment.length()
-            if (segmentLength > 0.0) {
-                val blocking = world.rayTraceBlocks(
-                    org.bukkit.Location(world, previous.x, previous.y, previous.z),
-                    segment.normalize(),
-                    segmentLength,
-                    FluidCollisionMode.NEVER,
-                    true
-                )
-                if (blocking != null) {
-                    return false
-                }
-            }
-
-            if (current.distanceSquared(target) <= CURVE_HIT_TOLERANCE_SQUARED) {
-                return true
-            }
-            if (abs(current.y - target.y) <= 1.6 && current.clone().setY(0.0).distanceSquared(target.clone().setY(0.0)) <= 2.0) {
-                return true
-            }
-            if (current.y < source.y - CURVE_DROP_ABORT_DISTANCE) {
-                return false
-            }
-
-            previous = current
-            tick += 1
-        }
-        return false
-    }
-
-    private fun launchAngleDegrees(velocity: Vector): Double {
-        val horizontal = sqrt(velocity.x * velocity.x + velocity.z * velocity.z)
-        if (horizontal < 1.0E-6) {
-            return if (velocity.y >= 0.0) 90.0 else -90.0
-        }
-        return Math.toDegrees(atan2(velocity.y, horizontal))
     }
 
     private fun ensureCommonDefinitionFile(): File {
