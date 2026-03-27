@@ -202,7 +202,7 @@ class ArenaManager(
     private var playerMonitorTask: BukkitTask? = null
     private var actionMarkerTask: BukkitTask? = null
     private var barrierRestartConfig = BarrierRestartConfig(30, 0.05)
-    private var actionMarkerHoldTicks = 40
+    private var actionMarkerHoldTicks = 80
     private var actionMarkerColorTransitionTicks = 16
     private var doorAnimationTotalTicks = DOOR_ANIMATION_TOTAL_TICKS_DEFAULT
     private var sharedWaveMaxAlive = SHARED_WAVE_MAX_ALIVE_DEFAULT
@@ -581,7 +581,9 @@ class ArenaManager(
             session.participants.forEach { participantId ->
                 val participant = Bukkit.getPlayer(participantId) ?: return@forEach
                 if (!participant.isOnline) return@forEach
-                participant.teleport(stage.entranceLocation)
+                val spawnLocation = stage.entranceLocation.clone()
+                applyStageStartFacingYaw(session, spawnLocation)
+                participant.teleport(spawnLocation)
             }
             setDoorActionMarkersReadySilently(session, 1)
             target.sendMessage(
@@ -1144,6 +1146,22 @@ class ArenaManager(
         updateCurrentWave(session)
     }
 
+    private fun applyStageStartFacingYaw(session: ArenaSession, location: Location) {
+        val marker = session.corridorDoorBlocks[1]
+            ?.firstOrNull { it.world?.name == location.world?.name }
+            ?: return
+        val dx = marker.x - location.x
+        val dz = marker.z - location.z
+        val yaw = when {
+            kotlin.math.abs(dx) >= kotlin.math.abs(dz) && dx >= 0.0 -> -90.0f
+            kotlin.math.abs(dx) >= kotlin.math.abs(dz) && dx < 0.0 -> 90.0f
+            dz >= 0.0 -> 0.0f
+            else -> 180.0f
+        }
+        location.yaw = yaw
+        location.pitch = 0.0f
+    }
+
     private fun calculateWaveCount(base: Int, difficulty: ArenaDifficultyConfig, wave: Int, questMultiplier: Double): Int {
         val scaled = base * difficulty.mobCountMultiplier * difficulty.waveScale(wave) * questMultiplier
         return ceil(scaled).toInt().coerceAtLeast(1)
@@ -1154,9 +1172,10 @@ class ArenaManager(
         wave: Int,
         mobType: ArenaMobTypeConfig,
         difficulty: ArenaDifficultyConfig,
-        spawns: List<Location>
+        spawns: List<Location>,
+        intervalScale: Double = 1.0
     ) {
-        val interval = (difficulty.mobSpawnIntervalTicks * session.questModifiers.spawnIntervalMultiplier)
+        val interval = (difficulty.mobSpawnIntervalTicks * session.questModifiers.spawnIntervalMultiplier * intervalScale)
             .roundToLong()
             .coerceAtLeast(1L)
         val task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
@@ -1170,7 +1189,12 @@ class ArenaManager(
             if (random.nextDouble() < spawnThrottle.skipChance) return@Runnable
             if (random.nextDouble() > intervalChance) return@Runnable
 
-            val maxAlive = currentSession.stageMaxAliveCount.coerceAtLeast(1)
+            val maxAliveBase = currentSession.stageMaxAliveCount.coerceAtLeast(1)
+            val maxAlive = if (currentSession.barrierRestarting) {
+                (maxAliveBase * 1.5).roundToInt().coerceAtLeast(maxAliveBase)
+            } else {
+                maxAliveBase
+            }
             if (currentSession.activeMobs.size >= maxAlive) return@Runnable
 
             val world = Bukkit.getWorld(currentSession.worldName) ?: return@Runnable
@@ -1183,6 +1207,18 @@ class ArenaManager(
 
         session.waveSpawnTasks[wave]?.cancel()
         session.waveSpawnTasks[wave] = task
+    }
+
+    private fun restartWaveSpawnLoopWithIntervalScale(session: ArenaSession, wave: Int, intervalScale: Double) {
+        val mobType = mobTypeConfigs[session.mobTypeId] ?: return
+        val difficulty = difficultyConfigs[session.difficultyId] ?: return
+        val spawns = session.roomMobSpawns[wave].orEmpty()
+        if (spawns.isEmpty()) return
+        if (!session.startedWaves.contains(wave)) return
+        if (session.waveSpawningStopped.contains(wave)) return
+        if (session.clearedWaves.contains(wave)) return
+
+        startSpawnLoop(session, wave, mobType, difficulty, spawns, intervalScale)
     }
 
     private fun locateRoom(session: ArenaSession, location: Location): Int? {
@@ -1759,6 +1795,8 @@ class ArenaManager(
         session.barrierRestartDurationMillis = durationMillis
         session.barrierRestartProgressMillis = 0L
 
+        restartWaveSpawnLoopWithIntervalScale(session, session.waves, 0.5)
+
         broadcastRawMessage(session, "§c結界石の再起動を開始しました！結界を一時的に解除します！")
 
         session.barrierAmbientTask?.cancel()
@@ -1934,6 +1972,8 @@ class ArenaManager(
 
         cleanupBarrierRestartSession(session, removeDefenseMobs = true, smoke = true)
         removeRemainingWaveMobs(session)
+        session.lastClearedWaveForBossBar = session.waves
+        updateSessionProgressBossBar(session)
 
         playSoundAtBarrier(session, Sound.BLOCK_BEACON_ACTIVATE, 5.0f, 0.5f)
         val world = Bukkit.getWorld(session.worldName) ?: return
@@ -2048,7 +2088,7 @@ class ArenaManager(
         val target = (session.waveClearTargets[wave] ?: 1).coerceAtLeast(1)
         val progress = (kills.toDouble() / target.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
         val waveLabel = if (wave >= session.waves) "Last Wave" else "Wave $wave"
-        bossBar.name(Component.text("§7- §6$waveLabel §7- §7($kills/§c$target§7)"))
+        bossBar.name(Component.text("§7- §6$waveLabel §7- §8(§7$kills/§c$target§8)"))
         bossBar.color(BossBar.Color.RED)
         bossBar.progress(progress)
     }
@@ -2347,7 +2387,7 @@ class ArenaManager(
         }
 
         if (!holdState.startSoundPlayed) {
-            playActionMarkerStartSound(player, marker)
+            playActionMarkerStartSound(session, marker)
             holdState.startSoundPlayed = true
         }
 
@@ -2533,8 +2573,15 @@ class ArenaManager(
         }
     }
 
-    private fun playActionMarkerStartSound(player: Player, marker: ArenaActionMarker) {
-        player.playSound(marker.center, Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.7f, 1.2f)
+    private fun playActionMarkerStartSound(session: ArenaSession, marker: ArenaActionMarker) {
+        val world = marker.center.world ?: return
+        session.participants
+            .asSequence()
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .filter { it.isOnline && it.world.uid == world.uid }
+            .forEach { player ->
+                player.playSound(marker.center, Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.7f, 1.2f)
+            }
     }
 
     private fun playActionMarkerCompleteSound(session: ArenaSession, marker: ArenaActionMarker) {
@@ -2549,6 +2596,7 @@ class ArenaManager(
             .filter { it.isOnline && it.world.uid == world.uid }
             .forEach { player ->
                 player.playSound(marker.center, completeSound, 0.9f, 1.15f)
+                player.playSound(marker.center, Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 2.0f)
             }
     }
 
