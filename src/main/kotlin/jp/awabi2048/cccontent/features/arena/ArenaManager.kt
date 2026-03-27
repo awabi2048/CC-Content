@@ -126,6 +126,24 @@ private data class BarrierRestartConfig(
     val corruptionRatioBase: Double
 )
 
+private data class ArenaBgmTrackConfig(
+    val soundKey: String,
+    val bpm: Double,
+    val loopBeats: Int,
+    val switchBeats: List<Int>
+) {
+    val beatTicks: Double
+        get() = 1200.0 / bpm
+
+    val loopTicks: Long
+        get() = (beatTicks * loopBeats.toDouble()).roundToLong().coerceAtLeast(1L)
+}
+
+private data class ArenaBgmConfig(
+    val normal: ArenaBgmTrackConfig,
+    val combat: ArenaBgmTrackConfig
+)
+
 class ArenaManager(
     private val plugin: JavaPlugin,
     private val mobService: MobService = MobService(plugin)
@@ -149,8 +167,11 @@ class ArenaManager(
         const val POSITION_RESTORE_LOOKBACK_MILLIS = 10_000L
         const val POSITION_HISTORY_RETENTION_MILLIS = 12_000L
         const val POSITION_HISTORY_MAX_SAMPLES = 24
-        const val ARENA_BGM_SOUND_KEY = "kota_server:ost_4.arena"
-        const val ARENA_BGM_LOOP_SECONDS = 164
+        const val ARENA_BGM_NORMAL_KEY_DEFAULT = "kota_server:ost_3.sukima_dungeon"
+        const val ARENA_BGM_COMBAT_KEY_DEFAULT = "kota_server:ost_4.arena"
+        const val ARENA_BGM_NORMAL_BPM_DEFAULT = 120.0
+        const val ARENA_BGM_COMBAT_BPM_DEFAULT = 140.0
+        const val ARENA_BGM_LOOP_BEATS_DEFAULT = 384
         const val ACTION_MARKER_RADIUS = 1.0
         const val ACTION_MARKER_RADIUS_SQUARED = ACTION_MARKER_RADIUS * ACTION_MARKER_RADIUS
         const val ACTION_MARKER_OUTER_RING_RADIUS = 1.0
@@ -162,6 +183,12 @@ class ArenaManager(
         const val ACTION_MARKER_CENTER_Y_OFFSET = -0.25
         const val BARRIER_MARKER_HOLD_TICKS = 60
         const val MIDDLE_RING_MAX_ANGULAR_VELOCITY = 0.14
+
+        fun defaultSwitchBeats(loopBeats: Int): List<Int> {
+            val safeLoopBeats = loopBeats.coerceAtLeast(1)
+            val beats = (8..safeLoopBeats step 8).toList()
+            return if (beats.isEmpty()) listOf(safeLoopBeats) else beats
+        }
     }
 
     private val random = kotlin.random.Random.Default
@@ -183,6 +210,20 @@ class ArenaManager(
     private var actionMarkerColorTransitionTicks = 16
     private var doorAnimationTotalTicks = DOOR_ANIMATION_TOTAL_TICKS_DEFAULT
     private var sharedWaveMaxAlive = SHARED_WAVE_MAX_ALIVE_DEFAULT
+    private var arenaBgmConfig = ArenaBgmConfig(
+        normal = ArenaBgmTrackConfig(
+            soundKey = ARENA_BGM_NORMAL_KEY_DEFAULT,
+            bpm = ARENA_BGM_NORMAL_BPM_DEFAULT,
+            loopBeats = ARENA_BGM_LOOP_BEATS_DEFAULT,
+            switchBeats = defaultSwitchBeats(ARENA_BGM_LOOP_BEATS_DEFAULT)
+        ),
+        combat = ArenaBgmTrackConfig(
+            soundKey = ARENA_BGM_COMBAT_KEY_DEFAULT,
+            bpm = ARENA_BGM_COMBAT_BPM_DEFAULT,
+            loopBeats = ARENA_BGM_LOOP_BEATS_DEFAULT,
+            switchBeats = defaultSwitchBeats(ARENA_BGM_LOOP_BEATS_DEFAULT)
+        )
+    )
     private var dropConfig = ArenaDropConfig(
         additionalDefaultDrops = emptyList(),
         additionalByMobType = emptyMap(),
@@ -209,6 +250,7 @@ class ArenaManager(
         val dropFile = ensureArenaConfig("config/arena/drop.yml")
 
         loadBarrierRestartConfig()
+        loadArenaBgmConfig()
         loadDifficultyConfigs(difficultyFile)
         loadMobDefinitions()
         loadDropConfig(dropFile)
@@ -224,6 +266,63 @@ class ArenaManager(
             .coerceAtLeast(1)
         sharedWaveMaxAlive = config.getInt("arena.mob_spawn.system_max_alive", SHARED_WAVE_MAX_ALIVE_DEFAULT)
             .coerceAtLeast(1)
+    }
+
+    private fun loadArenaBgmConfig() {
+        val config = CoreConfigManager.get(plugin)
+        arenaBgmConfig = ArenaBgmConfig(
+            normal = parseArenaBgmTrackConfig(
+                config,
+                "arena.bgm.normal",
+                ARENA_BGM_NORMAL_KEY_DEFAULT,
+                ARENA_BGM_NORMAL_BPM_DEFAULT,
+                ARENA_BGM_LOOP_BEATS_DEFAULT
+            ),
+            combat = parseArenaBgmTrackConfig(
+                config,
+                "arena.bgm.combat",
+                ARENA_BGM_COMBAT_KEY_DEFAULT,
+                ARENA_BGM_COMBAT_BPM_DEFAULT,
+                ARENA_BGM_LOOP_BEATS_DEFAULT
+            )
+        )
+    }
+
+    private fun parseArenaBgmTrackConfig(
+        config: FileConfiguration,
+        path: String,
+        defaultSoundKey: String,
+        defaultBpm: Double,
+        defaultLoopBeats: Int
+    ): ArenaBgmTrackConfig {
+        val soundKey = config.getString("$path.key")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: defaultSoundKey
+        val bpm = config.getDouble("$path.bpm", defaultBpm)
+            .coerceAtLeast(1.0)
+        val loopBeats = config.getInt("$path.loop_beats", defaultLoopBeats)
+            .coerceAtLeast(1)
+        val rawSwitchBeats = config.getIntegerList("$path.switch_beats")
+        val switchBeats = rawSwitchBeats
+            .asSequence()
+            .map { it.coerceAtLeast(1) }
+            .filter { it <= loopBeats }
+            .distinct()
+            .sorted()
+            .toList()
+            .ifEmpty { defaultSwitchBeats(loopBeats) }
+
+        if (rawSwitchBeats.isNotEmpty() && switchBeats.isEmpty()) {
+            plugin.logger.warning("[Arena] $path.switch_beats が無効値のみだったためデフォルト値を使用します")
+        }
+
+        return ArenaBgmTrackConfig(
+            soundKey = soundKey,
+            bpm = bpm,
+            loopBeats = loopBeats,
+            switchBeats = switchBeats
+        )
     }
 
     private fun ensureArenaConfig(resourcePath: String): File {
@@ -443,6 +542,7 @@ class ArenaManager(
                 applyStageStartFacingYaw(session, spawnLocation)
                 participant.teleport(spawnLocation)
             }
+            requestArenaBgmMode(session, ArenaBgmMode.NORMAL)
             setDoorActionMarkersReadySilently(session, 1)
             target.sendMessage(
                 ArenaI18n.text(
@@ -829,7 +929,7 @@ class ArenaManager(
 
         val player = Bukkit.getPlayer(playerId)
         if (player != null && player.isOnline) {
-            BGMManager.stop(player, ARENA_BGM_SOUND_KEY)
+            stopArenaBgmForPlayer(player)
             session.progressBossBar?.let { player.hideBossBar(it) }
             val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
             val destination = if (returnLocation?.world != null) returnLocation else fallback
@@ -877,7 +977,7 @@ class ArenaManager(
             playerToSessionWorld.remove(participantId)
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline) {
-                BGMManager.stop(player, ARENA_BGM_SOUND_KEY)
+                stopArenaBgmForPlayer(player)
                 val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
                 val destination = if (session.returnLocations[participantId]?.world != null) {
                     session.returnLocations[participantId]
@@ -995,6 +1095,7 @@ class ArenaManager(
 
         session.lastClearedWaveForBossBar = null
         session.startedWaves.add(wave)
+        requestArenaBgmMode(session, ArenaBgmMode.COMBAT)
         session.waveKillCount.putIfAbsent(wave, 0)
         session.waveClearTargets[wave] = clearTarget
         session.waveMobIds.putIfAbsent(wave, mutableSetOf())
@@ -1217,9 +1318,6 @@ class ArenaManager(
         if (!session.enteredWaves.add(wave)) return
 
         session.fallbackWave = wave.coerceIn(1, session.waves)
-        if (wave == 1) {
-            startArenaBgm(session)
-        }
 
         val theme = themeLoader.getTheme(session.themeId)
         val difficulty = difficultyConfigs[session.difficultyId]
@@ -1976,6 +2074,8 @@ class ArenaManager(
     private fun completeBarrierRestartSequence(session: ArenaSession) {
         if (!session.barrierRestarting) return
 
+        requestArenaBgmMode(session, ArenaBgmMode.STOPPED)
+
         session.barrierRestarting = false
         session.barrierRestartCompleted = true
         stopWaveSpawning(session, session.waves)
@@ -2264,12 +2364,184 @@ class ArenaManager(
         }
     }
 
-    private fun startArenaBgm(session: ArenaSession) {
+    private fun requestArenaBgmMode(session: ArenaSession, targetMode: ArenaBgmMode) {
+        val currentTick = Bukkit.getCurrentTick().toLong()
+        if (targetMode == session.arenaBgmMode && session.arenaBgmSwitchRequest == null) {
+            return
+        }
+
+        if (session.arenaBgmMode == ArenaBgmMode.STOPPED) {
+            if (targetMode == ArenaBgmMode.STOPPED) {
+                session.arenaBgmSwitchRequest = null
+                return
+            }
+            startArenaBgmMode(session, targetMode, currentTick)
+            return
+        }
+
+        if (targetMode == session.arenaBgmMode) {
+            session.arenaBgmSwitchRequest = null
+            return
+        }
+
+        val request = buildArenaBgmSwitchRequest(session, targetMode, currentTick) ?: return
+        session.arenaBgmSwitchRequest = request
+    }
+
+    private fun buildArenaBgmSwitchRequest(
+        session: ArenaSession,
+        targetMode: ArenaBgmMode,
+        requestedAtTick: Long
+    ): ArenaBgmSwitchRequest? {
+        val currentTrack = arenaBgmTrackForMode(session.arenaBgmMode) ?: return null
+        val currentAbsoluteBeat = currentAbsoluteBeatAtTick(session, currentTrack, requestedAtTick)
+        val currentLoopBeats = currentTrack.loopBeats.toLong().coerceAtLeast(1L)
+        val currentLoopBeat = (((currentAbsoluteBeat - 1L) % currentLoopBeats) + 1L).toInt()
+        val nextSwitchBeat = currentTrack.switchBeats.firstOrNull { it > currentLoopBeat }
+            ?: currentTrack.switchBeats.first()
+        val currentLoopIndex = (currentAbsoluteBeat - 1L) / currentLoopBeats
+        val executeAtAbsoluteBeat = if (nextSwitchBeat > currentLoopBeat) {
+            (currentLoopIndex * currentLoopBeats) + nextSwitchBeat.toLong()
+        } else {
+            ((currentLoopIndex + 1L) * currentLoopBeats) + nextSwitchBeat.toLong()
+        }
+
+        return ArenaBgmSwitchRequest(
+            targetMode = targetMode,
+            requestedAtTick = requestedAtTick,
+            executeAtAbsoluteBeat = executeAtAbsoluteBeat
+        )
+    }
+
+    private fun updateArenaBgmTransitions() {
+        val currentTick = Bukkit.getCurrentTick().toLong()
+        sessionsByWorld.values.forEach { session ->
+            updateArenaCombatBgmRequest(session)
+            processArenaBgmSwitchRequest(session, currentTick)
+        }
+    }
+
+    private fun updateArenaCombatBgmRequest(session: ArenaSession) {
+        if (session.arenaBgmSwitchRequest != null) return
+        val hasTargetingMob = hasMobTargetingParticipants(session)
+        if (session.arenaBgmMode == ArenaBgmMode.COMBAT) {
+            if (hasTargetingMob) {
+                session.arenaCombatHadTargetingMob = true
+                return
+            }
+            if (!session.arenaCombatHadTargetingMob) return
+            requestArenaBgmMode(session, ArenaBgmMode.NORMAL)
+        } else if (session.arenaBgmMode == ArenaBgmMode.NORMAL && hasTargetingMob) {
+            requestArenaBgmMode(session, ArenaBgmMode.COMBAT)
+        }
+    }
+
+    private fun hasMobTargetingParticipants(session: ArenaSession): Boolean {
+        val participantIds = session.participants
+        if (participantIds.isEmpty()) return false
+
+        val trackedMobIds = sequence {
+            yieldAll(session.activeMobs)
+            yieldAll(session.barrierDefenseMobIds)
+        }
+
+        return trackedMobIds.any { mobId ->
+            val mob = Bukkit.getEntity(mobId) as? Mob ?: return@any false
+            if (!mob.isValid || mob.isDead || mob.world.name != session.worldName) {
+                return@any false
+            }
+            val target = mob.target as? Player ?: return@any false
+            participantIds.contains(target.uniqueId)
+        }
+    }
+
+    private fun processArenaBgmSwitchRequest(session: ArenaSession, currentTick: Long) {
+        val request = session.arenaBgmSwitchRequest ?: return
+
+        if (session.arenaBgmMode == ArenaBgmMode.STOPPED) {
+            session.arenaBgmSwitchRequest = null
+            if (request.targetMode != ArenaBgmMode.STOPPED) {
+                startArenaBgmMode(session, request.targetMode, currentTick)
+            }
+            return
+        }
+
+        val currentTrack = arenaBgmTrackForMode(session.arenaBgmMode) ?: return
+        val absoluteBeatNow = currentAbsoluteBeatAtTick(session, currentTrack, currentTick)
+        if (absoluteBeatNow < request.executeAtAbsoluteBeat) {
+            return
+        }
+
+        session.arenaBgmSwitchRequest = null
+        if (request.targetMode == ArenaBgmMode.STOPPED) {
+            stopArenaBgm(session)
+            return
+        }
+        if (request.targetMode == session.arenaBgmMode) {
+            return
+        }
+
+        startArenaBgmMode(session, request.targetMode, currentTick)
+    }
+
+    private fun currentAbsoluteBeatAtTick(
+        session: ArenaSession,
+        track: ArenaBgmTrackConfig,
+        tick: Long
+    ): Long {
+        val elapsedTicks = (tick - session.arenaBgmPlaybackStartTick).coerceAtLeast(0L)
+        return floor(elapsedTicks.toDouble() / track.beatTicks).toLong() + 1L
+    }
+
+    private fun startArenaBgmMode(session: ArenaSession, mode: ArenaBgmMode, startTick: Long) {
+        val track = arenaBgmTrackForMode(mode) ?: return
         session.participants.forEach { participantId ->
             val player = Bukkit.getPlayer(participantId) ?: return@forEach
             if (!player.isOnline || player.world.name != session.worldName) return@forEach
-            BGMManager.playLoop(player, ARENA_BGM_SOUND_KEY, ARENA_BGM_LOOP_SECONDS)
+            BGMManager.playLoopTicks(player, track.soundKey, track.loopTicks)
         }
+        session.arenaBgmMode = mode
+        session.arenaBgmPlaybackStartTick = startTick
+        session.arenaCombatHadTargetingMob = false
+        session.arenaBgmSwitchRequest = null
+    }
+
+    private fun stopArenaBgm(session: ArenaSession) {
+        session.participants.forEach { participantId ->
+            val player = Bukkit.getPlayer(participantId) ?: return@forEach
+            if (!player.isOnline || player.world.name != session.worldName) return@forEach
+            stopArenaBgmForPlayer(player)
+        }
+        session.arenaBgmMode = ArenaBgmMode.STOPPED
+        session.arenaBgmPlaybackStartTick = 0L
+        session.arenaCombatHadTargetingMob = false
+        session.arenaBgmSwitchRequest = null
+    }
+
+    private fun stopArenaBgmPlaybackOnly(session: ArenaSession) {
+        session.participants.forEach { participantId ->
+            val player = Bukkit.getPlayer(participantId) ?: return@forEach
+            if (!player.isOnline || player.world.name != session.worldName) return@forEach
+            stopArenaBgmForPlayer(player)
+        }
+    }
+
+    private fun stopArenaBgmForPlayer(player: Player) {
+        arenaBgmKeys().forEach { soundKey ->
+            BGMManager.stop(player, soundKey)
+        }
+    }
+
+    private fun arenaBgmTrackForMode(mode: ArenaBgmMode): ArenaBgmTrackConfig? {
+        return when (mode) {
+            ArenaBgmMode.NORMAL -> arenaBgmConfig.normal
+            ArenaBgmMode.COMBAT -> arenaBgmConfig.combat
+            ArenaBgmMode.STOPPED -> null
+        }
+    }
+
+    private fun arenaBgmKeys(): Set<String> {
+        return setOf(arenaBgmConfig.normal.soundKey, arenaBgmConfig.combat.soundKey)
     }
 
     private fun createArenaWorld(): World? {
@@ -2723,6 +2995,7 @@ class ArenaManager(
         if (actionMarkerTask == null) {
             actionMarkerTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
                 updateActionMarkers()
+                updateArenaBgmTransitions()
             }, 1L, 1L)
         }
     }

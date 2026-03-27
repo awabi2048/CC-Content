@@ -25,6 +25,18 @@ data class TimedPlayerLocation(
     val location: Location
 )
 
+enum class ArenaBgmMode {
+    NORMAL,
+    COMBAT,
+    STOPPED
+}
+
+data class ArenaBgmSwitchRequest(
+    val targetMode: ArenaBgmMode,
+    val requestedAtTick: Long,
+    val executeAtAbsoluteBeat: Long
+)
+
 data class ArenaSession(
     val ownerPlayerId: UUID,
     val worldName: String,
@@ -90,6 +102,10 @@ data class ArenaSession(
     val animatingDoorWaves: MutableSet<Int> = mutableSetOf(),
     val actionMarkers: MutableMap<UUID, ArenaActionMarker> = mutableMapOf(),
     val actionMarkerHoldStates: MutableMap<UUID, ArenaActionMarkerHoldState> = mutableMapOf(),
+    var arenaBgmMode: ArenaBgmMode = ArenaBgmMode.STOPPED,
+    var arenaBgmPlaybackStartTick: Long = 0L,
+    var arenaCombatHadTargetingMob: Boolean = false,
+    var arenaBgmSwitchRequest: ArenaBgmSwitchRequest? = null,
     val transitionTasks: MutableList<BukkitTask> = mutableListOf(),
     val waveSpawnTasks: MutableMap<Int, BukkitTask> = mutableMapOf()
 )

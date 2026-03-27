@@ -54,7 +54,6 @@ object BGMManager {
     }
 
     fun playLoop(player: Player, soundKey: String, durationSeconds: Int) {
-        stop(player, soundKey)
         val plugin = CCContent.instance
         if (durationSeconds <= 0) {
             plugin.logger.warning("BGM再生時間が不正です: key=$soundKey duration=$durationSeconds")
@@ -73,8 +72,28 @@ object BGMManager {
             }
         }.runTaskTimer(plugin, 0L, durationSeconds * 20L)
 
-        activeTasks[player.uniqueId]?.task?.cancel()
-        activeTasks[player.uniqueId] = ActivePlayback(task, soundKey)
+        replaceActivePlayback(player, task, soundKey)
+    }
+
+    fun playLoopTicks(player: Player, soundKey: String, loopTicks: Long) {
+        val plugin = CCContent.instance
+        if (loopTicks <= 0L) {
+            plugin.logger.warning("BGM再生tickが不正です: key=$soundKey loopTicks=$loopTicks")
+            return
+        }
+
+        val task = object : org.bukkit.scheduler.BukkitRunnable() {
+            override fun run() {
+                if (!player.isOnline) {
+                    stop(player, soundKey)
+                    return
+                }
+
+                player.playSound(player.location, soundKey, 1.0f, 1.0f)
+            }
+        }.runTaskTimer(plugin, 0L, loopTicks)
+
+        replaceActivePlayback(player, task, soundKey)
     }
 
     fun stop(player: Player) {
@@ -89,6 +108,14 @@ object BGMManager {
         playback.task.cancel()
         activeTasks.remove(player.uniqueId)
         player.stopSound(soundKey)
+    }
+
+    private fun replaceActivePlayback(player: Player, task: BukkitTask, soundKey: String) {
+        activeTasks.remove(player.uniqueId)?.let { current ->
+            current.task.cancel()
+            player.stopSound(current.soundKey)
+        }
+        activeTasks[player.uniqueId] = ActivePlayback(task, soundKey)
     }
 
     fun stopAll() {
