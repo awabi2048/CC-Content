@@ -115,6 +115,7 @@ arena:
   multiplayer:
     join_grace_seconds: 45
     join_marker_search_radius: 16.0
+    stage_build_steps_per_tick: 1
   mob_spawn:
     system_max_alive: 128
   door_animation:

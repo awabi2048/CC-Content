@@ -1,11 +1,14 @@
 package jp.awabi2048.cccontent.features.arena.generator
 
 import jp.awabi2048.cccontent.features.arena.ArenaBounds
+import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.World
 import org.bukkit.block.structure.Mirror
 import org.bukkit.block.structure.StructureRotation
 import org.bukkit.entity.Marker
+import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.scheduler.BukkitTask
 import kotlin.math.floor
 import kotlin.random.Random
 
@@ -63,6 +66,42 @@ private data class SelectedStructureVariant(
 )
 
 class ArenaStageGenerator {
+    private enum class BuildPhase {
+        PLACE_STRUCTURES,
+        SCAN_ROOMS,
+        SCAN_CORRIDORS,
+        FINALIZE,
+        COMPLETE
+    }
+
+    private data class BuildJob(
+        val world: World,
+        val origin: Location,
+        val theme: ArenaTheme,
+        val waves: Int,
+        val random: Random,
+        val placements: List<TilePlacement>,
+        val placementBoundsByIndex: MutableMap<Int, ArenaBounds> = mutableMapOf(),
+        val selectedByPlacementIndex: MutableMap<Int, SelectedStructureVariant> = mutableMapOf(),
+        val placementOriginByIndex: MutableMap<Int, Location> = mutableMapOf(),
+        val validationIssues: MutableList<ArenaStageValidationIssue> = mutableListOf(),
+        var previousPlacement: TilePlacement? = null,
+        var stageBounds: ArenaBounds? = null,
+        val roomBounds: MutableMap<Int, ArenaBounds> = mutableMapOf(),
+        val corridorBounds: MutableMap<Int, ArenaBounds> = mutableMapOf(),
+        val roomMobSpawns: MutableMap<Int, List<Location>> = mutableMapOf(),
+        val corridorDoorBlocks: MutableMap<Int, List<Location>> = mutableMapOf(),
+        var entranceLocation: Location? = null,
+        var barrierLocation: Location? = null,
+        var barrierPointLocations: List<Location> = emptyList(),
+        var doorAnimationPlacements: Map<Int, List<ArenaDoorAnimationPlacement>> = emptyMap(),
+        var placementCursor: Int = 0,
+        var roomCursor: Int = 0,
+        var corridorCursor: Int = 0,
+        var phase: BuildPhase = BuildPhase.PLACE_STRUCTURES,
+        var result: ArenaStageBuildResult? = null
+    )
+
     fun build(
         world: World,
         origin: Location,
@@ -70,178 +109,266 @@ class ArenaStageGenerator {
         waves: Int,
         random: Random = Random.Default
     ): ArenaStageBuildResult {
+        val job = createBuildJob(world, origin, theme, waves, random)
+        while (job.phase != BuildPhase.COMPLETE) {
+            stepBuildJob(job)
+        }
+        return job.result ?: error("[Arena] ステージ生成結果が未確定です")
+    }
+
+    fun buildIncrementally(
+        plugin: JavaPlugin,
+        world: World,
+        origin: Location,
+        theme: ArenaTheme,
+        waves: Int,
+        random: Random = Random.Default,
+        stepsPerTick: Int = 1,
+        onComplete: (Result<ArenaStageBuildResult>) -> Unit
+    ): BukkitTask {
+        val job = createBuildJob(world, origin, theme, waves, random)
+        val safeStepsPerTick = stepsPerTick.coerceAtLeast(1)
+        lateinit var task: BukkitTask
+        task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+            try {
+                repeat(safeStepsPerTick) {
+                    if (job.phase == BuildPhase.COMPLETE) return@repeat
+                    stepBuildJob(job)
+                }
+
+                if (job.phase == BuildPhase.COMPLETE) {
+                    task.cancel()
+                    onComplete(Result.success(job.result ?: error("[Arena] ステージ生成結果が未確定です")))
+                }
+            } catch (throwable: Throwable) {
+                task.cancel()
+                onComplete(Result.failure(throwable))
+            }
+        }, 1L, 1L)
+        return task
+    }
+
+    private fun createBuildJob(
+        world: World,
+        origin: Location,
+        theme: ArenaTheme,
+        waves: Int,
+        random: Random
+    ): BuildJob {
         val placements = generateAlternatingPlacements(waves, random, theme.orientation).sortedBy { it.index }
-        val gridPitch = theme.gridPitch
-        val placementBoundsByIndex = mutableMapOf<Int, ArenaBounds>()
-        val selectedByPlacementIndex = mutableMapOf<Int, SelectedStructureVariant>()
-        val placementOriginByIndex = mutableMapOf<Int, Location>()
-        val validationIssues = mutableListOf<ArenaStageValidationIssue>()
-        var previousPlacement: TilePlacement? = null
-
-        for (placement in placements) {
-            val base = locationForTile(origin, placement.point, gridPitch)
-            val selected = pickStructureVariant(theme, placement, random)
-                ?: error("[Arena] 構造テンプレートが見つかりません: type=${placement.structureType}")
-            val template = selected.baseTemplate
-
-            val geometry = if (previousPlacement == null) {
-                computeFirstPlacementGeometry(base, gridPitch, template.size, placement.rotationQuarter)
-            } else {
-                val previous = previousPlacement ?: error("[Arena] 直前配置が見つかりません")
-                val previousBounds = placementBoundsByIndex[previous.index]
-                    ?: error("[Arena] 直前配置の境界情報が見つかりません: index=${previous.index}")
-                computeConnectedPlacementGeometry(
-                    world = world,
-                    previousPlacement = previous,
-                    currentPlacement = placement,
-                    previousBounds = previousBounds,
-                    currentSize = template.size,
-                    currentRotationQuarter = placement.rotationQuarter
-                )
-            }
-
-            placeStructure(template, placement.rotationQuarter, geometry.origin)
-            placementBoundsByIndex[placement.index] = geometry.bounds
-            selectedByPlacementIndex[placement.index] = selected
-            placementOriginByIndex[placement.index] = geometry.origin.clone()
-            previousPlacement = placement
-        }
-
-        val roomBounds = mutableMapOf<Int, ArenaBounds>()
-        val corridorBounds = mutableMapOf<Int, ArenaBounds>()
-        val roomMobSpawns = mutableMapOf<Int, List<Location>>()
-        val corridorDoorBlocks = mutableMapOf<Int, List<Location>>()
-        val allBounds = placementBoundsByIndex.values
-        require(allBounds.isNotEmpty()) { "[Arena] ステージ境界を計算できません" }
-        val stageBounds = ArenaBounds(
-            minX = allBounds.minOf { it.minX },
-            maxX = allBounds.maxOf { it.maxX },
-            minY = allBounds.minOf { it.minY },
-            maxY = allBounds.maxOf { it.maxY },
-            minZ = allBounds.minOf { it.minZ },
-            maxZ = allBounds.maxOf { it.maxZ }
+        return BuildJob(
+            world = world,
+            origin = origin,
+            theme = theme,
+            waves = waves,
+            random = random,
+            placements = placements
         )
+    }
 
-        val roomPlacements = placements.filter { it.isRoom }.sortedBy { it.index }
-        roomPlacements.forEachIndexed { roomIndex, roomPlacement ->
-            val bounds = placementBoundsByIndex[roomPlacement.index] ?: return@forEachIndexed
-            roomBounds[roomIndex] = bounds
-            val markers = findMarkers(world, bounds)
-            val templateName = selectedByPlacementIndex[roomPlacement.index]?.baseTemplate?.name ?: "unknown"
+    private fun stepBuildJob(job: BuildJob) {
+        when (job.phase) {
+            BuildPhase.PLACE_STRUCTURES -> processPlaceStructure(job)
+            BuildPhase.SCAN_ROOMS -> processScanRoom(job)
+            BuildPhase.SCAN_CORRIDORS -> processScanCorridor(job)
+            BuildPhase.FINALIZE -> processFinalize(job)
+            BuildPhase.COMPLETE -> return
+        }
+    }
 
-            if (roomIndex > 0) {
-                if (markers.mobSpawns.isEmpty()) {
-                    validationIssues.add(
-                        ArenaStageValidationIssue(
-                            structureName = templateName,
-                            missingMarkers = listOf("arena.marker.mob")
-                        )
+    private fun processPlaceStructure(job: BuildJob) {
+        val placement = job.placements.getOrNull(job.placementCursor) ?: run {
+            val allBounds = job.placementBoundsByIndex.values
+            require(allBounds.isNotEmpty()) { "[Arena] ステージ境界を計算できません" }
+            job.stageBounds = ArenaBounds(
+                minX = allBounds.minOf { it.minX },
+                maxX = allBounds.maxOf { it.maxX },
+                minY = allBounds.minOf { it.minY },
+                maxY = allBounds.maxOf { it.maxY },
+                minZ = allBounds.minOf { it.minZ },
+                maxZ = allBounds.maxOf { it.maxZ }
+            )
+            job.phase = BuildPhase.SCAN_ROOMS
+            return
+        }
+
+        val base = locationForTile(job.origin, placement.point, job.theme.gridPitch)
+        val selected = pickStructureVariant(job.theme, placement, job.random)
+            ?: error("[Arena] 構造テンプレートが見つかりません: type=${placement.structureType}")
+        val template = selected.baseTemplate
+
+        val geometry = if (job.previousPlacement == null) {
+            computeFirstPlacementGeometry(base, job.theme.gridPitch, template.size, placement.rotationQuarter)
+        } else {
+            val previous = job.previousPlacement ?: error("[Arena] 直前配置が見つかりません")
+            val previousBounds = job.placementBoundsByIndex[previous.index]
+                ?: error("[Arena] 直前配置の境界情報が見つかりません: index=${previous.index}")
+            computeConnectedPlacementGeometry(
+                world = job.world,
+                previousPlacement = previous,
+                currentPlacement = placement,
+                previousBounds = previousBounds,
+                currentSize = template.size,
+                currentRotationQuarter = placement.rotationQuarter
+            )
+        }
+
+        placeStructure(template, placement.rotationQuarter, geometry.origin)
+        job.placementBoundsByIndex[placement.index] = geometry.bounds
+        job.selectedByPlacementIndex[placement.index] = selected
+        job.placementOriginByIndex[placement.index] = geometry.origin.clone()
+        job.previousPlacement = placement
+        job.placementCursor += 1
+    }
+
+    private fun processScanRoom(job: BuildJob) {
+        val roomPlacements = job.placements.filter { it.isRoom }.sortedBy { it.index }
+        val roomPlacement = roomPlacements.getOrNull(job.roomCursor) ?: run {
+            job.phase = BuildPhase.SCAN_CORRIDORS
+            return
+        }
+
+        val roomIndex = job.roomCursor
+        val bounds = job.placementBoundsByIndex[roomPlacement.index] ?: run {
+            job.roomCursor += 1
+            return
+        }
+        job.roomBounds[roomIndex] = bounds
+        val markers = findMarkers(job.world, bounds)
+        val templateName = job.selectedByPlacementIndex[roomPlacement.index]?.baseTemplate?.name ?: "unknown"
+
+        if (roomIndex > 0) {
+            if (markers.mobSpawns.isEmpty()) {
+                job.validationIssues.add(
+                    ArenaStageValidationIssue(
+                        structureName = templateName,
+                        missingMarkers = listOf("arena.marker.mob")
                     )
-                } else {
-                    roomMobSpawns[roomIndex] = markers.mobSpawns
-                }
-            }
-
-            val targetWave = when (roomPlacement.structureType) {
-                ArenaStructureType.ENTRANCE -> 1
-                ArenaStructureType.STRAIGHT -> roomIndex + 1
-                else -> null
-            }
-
-            if (targetWave != null && targetWave in 1..waves) {
-                val doorBlocks = markers.doorBlocks
-                if (doorBlocks.size != 1) {
-                    val reason = if (doorBlocks.isEmpty()) {
-                        "arena.marker.door_block"
-                    } else {
-                        "arena.marker.door_block(single_required)"
-                    }
-                    validationIssues.add(
-                        ArenaStageValidationIssue(
-                            structureName = templateName,
-                            missingMarkers = listOf(reason)
-                        )
-                    )
-                } else {
-                    corridorDoorBlocks[targetWave] = listOf(doorBlocks.first())
-                }
+                )
+            } else {
+                job.roomMobSpawns[roomIndex] = markers.mobSpawns
             }
         }
 
-        placements.filter { !it.isRoom }.forEach { corridorPlacement ->
-            val targetWave = (corridorPlacement.index + 1) / 2
-            if (targetWave !in 1..waves) return@forEach
-            val bounds = placementBoundsByIndex[corridorPlacement.index] ?: return@forEach
-            corridorBounds[targetWave] = bounds
+        val targetWave = when (roomPlacement.structureType) {
+            ArenaStructureType.ENTRANCE -> 1
+            ArenaStructureType.STRAIGHT -> roomIndex + 1
+            else -> null
         }
 
-        val finalRoomBounds = placementBoundsByIndex[roomPlacements.last().index]
+        if (targetWave != null && targetWave in 1..job.waves) {
+            val doorBlocks = markers.doorBlocks
+            if (doorBlocks.size != 1) {
+                val reason = if (doorBlocks.isEmpty()) {
+                    "arena.marker.door_block"
+                } else {
+                    "arena.marker.door_block(single_required)"
+                }
+                job.validationIssues.add(
+                    ArenaStageValidationIssue(
+                        structureName = templateName,
+                        missingMarkers = listOf(reason)
+                    )
+                )
+            } else {
+                job.corridorDoorBlocks[targetWave] = listOf(doorBlocks.first())
+            }
+        }
+
+        job.roomCursor += 1
+    }
+
+    private fun processScanCorridor(job: BuildJob) {
+        val corridorPlacements = job.placements.filter { !it.isRoom }
+        val corridorPlacement = corridorPlacements.getOrNull(job.corridorCursor) ?: run {
+            job.phase = BuildPhase.FINALIZE
+            return
+        }
+
+        val targetWave = (corridorPlacement.index + 1) / 2
+        if (targetWave in 1..job.waves) {
+            val bounds = job.placementBoundsByIndex[corridorPlacement.index]
+            if (bounds != null) {
+                job.corridorBounds[targetWave] = bounds
+            }
+        }
+        job.corridorCursor += 1
+    }
+
+    private fun processFinalize(job: BuildJob) {
+        val roomPlacements = job.placements.filter { it.isRoom }.sortedBy { it.index }
+        val finalRoomPlacement = roomPlacements.lastOrNull() ?: error("[Arena] 最終部屋が見つかりません")
+        val finalRoomBounds = job.placementBoundsByIndex[finalRoomPlacement.index]
             ?: error("[Arena] 最終部屋の境界が見つかりません")
-        val finalMarkers = findMarkers(world, finalRoomBounds)
+        val finalMarkers = findMarkers(job.world, finalRoomBounds)
         if (finalMarkers.barrierCores.size != 1) {
             val reason = if (finalMarkers.barrierCores.isEmpty()) {
                 "arena.marker.barrier_core"
             } else {
                 "arena.marker.barrier_core(single_required)"
             }
-            validationIssues.add(
+            job.validationIssues.add(
                 ArenaStageValidationIssue(
-                    structureName = selectedByPlacementIndex[roomPlacements.last().index]?.baseTemplate?.name ?: "unknown",
+                    structureName = job.selectedByPlacementIndex[finalRoomPlacement.index]?.baseTemplate?.name ?: "unknown",
                     missingMarkers = listOf(reason)
                 )
             )
         }
         if (finalMarkers.barrierPoints.isEmpty()) {
-            validationIssues.add(
+            job.validationIssues.add(
                 ArenaStageValidationIssue(
-                    structureName = selectedByPlacementIndex[roomPlacements.last().index]?.baseTemplate?.name ?: "unknown",
+                    structureName = job.selectedByPlacementIndex[finalRoomPlacement.index]?.baseTemplate?.name ?: "unknown",
                     missingMarkers = listOf("arena.marker.barrier_point")
                 )
             )
         }
 
-        val firstRoomBounds = placementBoundsByIndex[roomPlacements.first().index]
+        val firstRoomPlacement = roomPlacements.firstOrNull() ?: error("[Arena] 開始部屋が見つかりません")
+        val firstRoomBounds = job.placementBoundsByIndex[firstRoomPlacement.index]
             ?: error("[Arena] 開始部屋の境界が見つかりません")
-        val firstRoomMarkers = findMarkers(world, firstRoomBounds)
+        val firstRoomMarkers = findMarkers(job.world, firstRoomBounds)
         val entranceLocation = firstRoomMarkers.entrance
         if (entranceLocation == null) {
-            validationIssues.add(
+            job.validationIssues.add(
                 ArenaStageValidationIssue(
-                    structureName = selectedByPlacementIndex[roomPlacements.first().index]?.baseTemplate?.name ?: "unknown",
+                    structureName = job.selectedByPlacementIndex[firstRoomPlacement.index]?.baseTemplate?.name ?: "unknown",
                     missingMarkers = listOf("arena.marker.entrance")
                 )
             )
         }
 
-        val doorAnimationPlacements = buildDoorAnimationPlacements(
-            placements = placements,
-            waves = waves,
-            selectedByPlacementIndex = selectedByPlacementIndex,
-            placementOriginByIndex = placementOriginByIndex
+        job.doorAnimationPlacements = buildDoorAnimationPlacements(
+            placements = job.placements,
+            waves = job.waves,
+            selectedByPlacementIndex = job.selectedByPlacementIndex,
+            placementOriginByIndex = job.placementOriginByIndex
         )
 
-        if (validationIssues.isNotEmpty()) {
-            throw ArenaStageBuildException(validationIssues)
+        if (job.validationIssues.isNotEmpty()) {
+            throw ArenaStageBuildException(job.validationIssues)
         }
 
         val resolvedEntranceLocation = entranceLocation ?: error("[Arena] 開始部屋の entrance マーカーが見つかりません")
         val resolvedBarrierLocation = finalMarkers.barrierCores.firstOrNull()
             ?: error("[Arena] 最終部屋の barrier_core マーカーが見つかりません")
         val resolvedBarrierPoints = finalMarkers.barrierPoints
-        val playerSpawn = resolvedEntranceLocation.clone()
 
-        return ArenaStageBuildResult(
-            playerSpawn = playerSpawn,
+        job.entranceLocation = resolvedEntranceLocation
+        job.barrierLocation = resolvedBarrierLocation
+        job.barrierPointLocations = resolvedBarrierPoints
+        job.result = ArenaStageBuildResult(
+            playerSpawn = resolvedEntranceLocation.clone(),
             entranceLocation = resolvedEntranceLocation,
-            stageBounds = stageBounds,
-            roomBounds = roomBounds,
-            corridorBounds = corridorBounds,
-            roomMobSpawns = roomMobSpawns,
-            corridorDoorBlocks = corridorDoorBlocks,
-            doorAnimationPlacements = doorAnimationPlacements,
+            stageBounds = job.stageBounds ?: error("[Arena] ステージ境界が見つかりません"),
+            roomBounds = job.roomBounds,
+            corridorBounds = job.corridorBounds,
+            roomMobSpawns = job.roomMobSpawns,
+            corridorDoorBlocks = job.corridorDoorBlocks,
+            doorAnimationPlacements = job.doorAnimationPlacements,
             barrierLocation = resolvedBarrierLocation,
             barrierPointLocations = resolvedBarrierPoints
         )
+        job.phase = BuildPhase.COMPLETE
     }
 
     private fun generateAlternatingPlacements(

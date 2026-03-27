@@ -225,6 +225,7 @@ class ArenaManager(
     private var barrierRestartConfig = BarrierRestartConfig(30, 0.05)
     private var multiplayerJoinGraceSeconds = MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT
     private var multiplayerJoinMarkerSearchRadius = MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
+    private var multiplayerStageBuildStepsPerTick = 1
     private var actionMarkerHoldTicks = 80
     private var actionMarkerColorTransitionTicks = 16
     private var doorAnimationTotalTicks = DOOR_ANIMATION_TOTAL_TICKS_DEFAULT
@@ -289,6 +290,9 @@ class ArenaManager(
             "arena.multiplayer.join_marker_search_radius",
             MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
         ).coerceAtLeast(1.0)
+        multiplayerStageBuildStepsPerTick = config
+            .getInt("arena.multiplayer.stage_build_steps_per_tick", 1)
+            .coerceAtLeast(1)
         doorAnimationTotalTicks = config.getInt("arena.door_animation.total_ticks", DOOR_ANIMATION_TOTAL_TICKS_DEFAULT)
             .coerceAtLeast(1)
         sharedWaveMaxAlive = config.getInt("arena.mob_spawn.system_max_alive", SHARED_WAVE_MAX_ALIVE_DEFAULT)
@@ -602,32 +606,44 @@ class ArenaManager(
                     )
                 )
 
-                Bukkit.getScheduler().runTask(plugin, Runnable {
+                session.stageBuildTask = stageGenerator.buildIncrementally(
+                    plugin = plugin,
+                    world = world,
+                    origin = origin,
+                    theme = theme,
+                    waves = difficulty.waves,
+                    random = random,
+                    stepsPerTick = multiplayerStageBuildStepsPerTick
+                ) { buildResult ->
                     val active = sessionsByWorld[session.worldName]
-                    if (active !== session) return@Runnable
-
-                    try {
-                        val built = stageGenerator.build(world, origin, theme, difficulty.waves, random)
-                        applyStageBuildResult(session, built)
-                        initializeActionMarkers(session)
-                        initializeBarrierRestartState(session)
-                        startBarrierAmbientTask(session)
-                        initializeWavePipeline(session, theme, difficulty)
-                        updateSessionProgressBossBar(session)
-                        session.stageGenerationCompleted = true
-                    } catch (e: Exception) {
-                        if (e is ArenaStageBuildException) {
-                            plugin.logger.severe("[Arena] ステージの生成に失敗しました: ${e.message}")
-                            e.printStackTrace()
-                        }
-                        terminateSession(
-                            session,
-                            false,
-                            messageKey = "arena.messages.command.start_error.stage_build_failed",
-                            fallbackMessage = "&cステージの生成に失敗しました"
-                        )
+                    if (active !== session) {
+                        return@buildIncrementally
                     }
-                })
+                    session.stageBuildTask = null
+
+                    buildResult
+                        .onSuccess { built ->
+                            applyStageBuildResult(session, built)
+                            initializeActionMarkers(session)
+                            initializeBarrierRestartState(session)
+                            startBarrierAmbientTask(session)
+                            initializeWavePipeline(session, theme, difficulty)
+                            updateSessionProgressBossBar(session)
+                            session.stageGenerationCompleted = true
+                        }
+                        .onFailure { throwable ->
+                            if (throwable is ArenaStageBuildException) {
+                                plugin.logger.severe("[Arena] ステージの生成に失敗しました: ${throwable.message}")
+                                throwable.printStackTrace()
+                            }
+                            terminateSession(
+                                session,
+                                false,
+                                messageKey = "arena.messages.command.start_error.stage_build_failed",
+                                fallbackMessage = "&cステージの生成に失敗しました"
+                            )
+                        }
+                }
             } else {
                 val stage = stageGenerator.build(world, origin, theme, difficulty.waves, random)
                 applyStageBuildResult(session, stage)
@@ -729,12 +745,7 @@ class ArenaManager(
             return
         }
 
-        session.invitedParticipants.remove(player.uniqueId)
-        session.invitedAtMillis.remove(player.uniqueId)
-        session.waitingParticipants.remove(player.uniqueId)
-        session.waitingNotifiedParticipants.remove(player.uniqueId)
-        hideJoinCountdownBossBar(session, player.uniqueId)
-        releaseInvitedPlayerLock(player.uniqueId)
+        removeInvitedParticipant(session, player.uniqueId)
     }
 
     private fun applyStageBuildResult(session: ArenaSession, stage: jp.awabi2048.cccontent.features.arena.generator.ArenaStageBuildResult) {
@@ -791,6 +802,37 @@ class ArenaManager(
         session.waitingNotifiedParticipants.clear()
         session.waitingParticipants.clear()
         session.invitedParticipants.clear()
+    }
+
+    private fun removeInvitedParticipant(session: ArenaSession, invitedId: UUID) {
+        session.invitedParticipants.remove(invitedId)
+        session.invitedAtMillis.remove(invitedId)
+        session.waitingParticipants.remove(invitedId)
+        session.waitingNotifiedParticipants.remove(invitedId)
+        hideJoinCountdownBossBar(session, invitedId)
+        releaseInvitedPlayerLock(invitedId)
+    }
+
+    private fun declineInvitedParticipant(session: ArenaSession, invited: Player) {
+        removeInvitedParticipant(session, invited.uniqueId)
+        invited.sendMessage(
+            ArenaI18n.text(
+                invited,
+                "arena.messages.multiplayer.declined_self",
+                "&e招待を辞退しました"
+            )
+        )
+        val owner = Bukkit.getPlayer(session.ownerPlayerId)
+        if (owner != null && owner.isOnline) {
+            owner.sendMessage(
+                ArenaI18n.text(
+                    owner,
+                    "arena.messages.multiplayer.declined_notify_owner",
+                    "&e{player} が招待を辞退しました",
+                    "player" to invited.name
+                )
+            )
+        }
     }
 
     private fun monitorParticipantPositions() {
@@ -888,32 +930,63 @@ class ArenaManager(
             return
         }
 
-        val owner = event.player
-        val session = getSession(owner) ?: return
-        if (!session.multiplayerJoinEnabled) return
-        if (session.ownerPlayerId != owner.uniqueId) return
-
+        val player = event.player
         val currentTick = Bukkit.getCurrentTick().toLong()
-        val cooldownUntil = inviteSwingCooldownUntilTick[owner.uniqueId] ?: Long.MIN_VALUE
+        val cooldownUntil = inviteSwingCooldownUntilTick[player.uniqueId] ?: Long.MIN_VALUE
         if (currentTick < cooldownUntil) {
             return
         }
-        inviteSwingCooldownUntilTick[owner.uniqueId] = currentTick + MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS
 
-        if (System.currentTimeMillis() >= session.joinGraceEndMillis) {
-            owner.sendMessage(
-                ArenaI18n.text(
-                    owner,
-                    "arena.messages.multiplayer.invite_window_closed",
-                    "&c募集時間は終了しました"
+        val ownerSession = getSession(player)
+        if (ownerSession != null && ownerSession.multiplayerJoinEnabled && ownerSession.ownerPlayerId == player.uniqueId) {
+            inviteSwingCooldownUntilTick[player.uniqueId] = currentTick + MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS
+
+            if (System.currentTimeMillis() >= ownerSession.joinGraceEndMillis) {
+                player.sendMessage(
+                    ArenaI18n.text(
+                        player,
+                        "arena.messages.multiplayer.invite_window_closed",
+                        "&c募集時間は終了しました"
+                    )
                 )
-            )
+                return
+            }
+
+            val invited = rayTraceTargetPlayer(player) ?: return
+            trySendMultiplayerInvite(player, invited, ownerSession)
             return
         }
 
-        val maxDistance = (owner.getAttribute(Attribute.ENTITY_INTERACTION_RANGE)?.value ?: 3.0).coerceAtLeast(1.0)
-        val eyeLocation = owner.eyeLocation
-        val hit = owner.world.rayTrace(
+        val lockedWorld = invitedPlayerLocks[player.uniqueId] ?: return
+        val invitedSession = sessionsByWorld[lockedWorld] ?: run {
+            invitedPlayerLocks.remove(player.uniqueId)
+            player.isGlowing = false
+            return
+        }
+        if (!invitedSession.multiplayerJoinEnabled) {
+            return
+        }
+        if (!invitedSession.invitedParticipants.contains(player.uniqueId)) {
+            return
+        }
+
+        val owner = Bukkit.getPlayer(invitedSession.ownerPlayerId) ?: return
+        if (!owner.isOnline || owner.world.uid != player.world.uid) {
+            return
+        }
+
+        inviteSwingCooldownUntilTick[player.uniqueId] = currentTick + MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS
+        val target = rayTraceTargetPlayer(player) ?: return
+        if (target.uniqueId != owner.uniqueId) {
+            return
+        }
+        declineInvitedParticipant(invitedSession, player)
+    }
+
+    private fun rayTraceTargetPlayer(source: Player): Player? {
+        val maxDistance = (source.getAttribute(Attribute.ENTITY_INTERACTION_RANGE)?.value ?: 3.0).coerceAtLeast(1.0)
+        val eyeLocation = source.eyeLocation
+        val hit = source.world.rayTrace(
             eyeLocation,
             eyeLocation.direction,
             maxDistance,
@@ -921,11 +994,9 @@ class ArenaManager(
             true,
             0.2
         ) { candidate ->
-            candidate is Player && candidate.uniqueId != owner.uniqueId
+            candidate is Player && candidate.uniqueId != source.uniqueId
         }
-        val invited = hit?.hitEntity as? Player ?: return
-
-        trySendMultiplayerInvite(owner, invited, session)
+        return hit?.hitEntity as? Player
     }
 
     private fun trySendMultiplayerInvite(owner: Player, invited: Player, session: ArenaSession) {
@@ -1003,6 +1074,13 @@ class ArenaManager(
             )
         )
         invited.sendMessage(buildInviteMessageComponent(owner.name, session))
+        invited.sendMessage(
+            ArenaI18n.text(
+                invited,
+                "arena.messages.multiplayer.invited_decline_hint",
+                "&7辞退する場合は、招待者を左クリックしてください"
+            )
+        )
     }
 
     private fun buildInviteMessageComponent(ownerName: String, session: ArenaSession): Component {
@@ -1243,6 +1321,11 @@ class ArenaManager(
         val worldName = playerToSessionWorld[playerId] ?: return false
         val session = sessionsByWorld[worldName] ?: return false
 
+        if (session.ownerPlayerId == playerId) {
+            session.stageBuildTask?.cancel()
+            session.stageBuildTask = null
+        }
+
         playerToSessionWorld.remove(playerId)
         inviteSwingCooldownUntilTick.remove(playerId)
         session.participants.remove(playerId)
@@ -1301,6 +1384,8 @@ class ArenaManager(
         session.waveSpawnTasks.clear()
         session.transitionTasks.forEach { it.cancel() }
         session.transitionTasks.clear()
+        session.stageBuildTask?.cancel()
+        session.stageBuildTask = null
         cleanupBarrierRestartSession(session, removeDefenseMobs = true, smoke = false)
         hideSessionProgressBossBar(session)
         clearMultiplayerRecruitmentState(session)
@@ -1354,6 +1439,7 @@ class ArenaManager(
         session.joinGraceEndMillis = 0L
         session.stageGenerationCompleted = true
         session.stageGenerationWaitTitleShown = false
+        session.stageBuildTask = null
         session.corridorTriggeredWaves.clear()
         session.openedCorridors.clear()
         session.corridorOpenAnnouncements.clear()
@@ -3125,6 +3211,7 @@ class ArenaManager(
             .toSet()
 
         val entered = waitingNow - session.waitingParticipants
+        val exited = session.waitingParticipants - waitingNow
         session.waitingParticipants.clear()
         session.waitingParticipants.addAll(waitingNow)
 
@@ -3136,6 +3223,18 @@ class ArenaManager(
                     player,
                     "arena.messages.multiplayer.waiting_entered",
                     "&a開始待機エリアに入りました。猶予終了まで待機してください"
+                )
+            )
+        }
+
+        exited.forEach { playerId ->
+            session.waitingNotifiedParticipants.remove(playerId)
+            val player = Bukkit.getPlayer(playerId) ?: return@forEach
+            player.sendMessage(
+                ArenaI18n.text(
+                    player,
+                    "arena.messages.multiplayer.waiting_exited",
+                    "§c待機エリアから退出しました。この開始までにこのエリアにいないと、アリーナに参加できません！"
                 )
             )
         }

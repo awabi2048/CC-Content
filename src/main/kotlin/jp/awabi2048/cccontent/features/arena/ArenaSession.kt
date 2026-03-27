@@ -71,6 +71,7 @@ data class ArenaSession(
     var inviteQuestLore: List<String> = emptyList(),
     var stageGenerationCompleted: Boolean = true,
     var stageGenerationWaitTitleShown: Boolean = false,
+    var stageBuildTask: BukkitTask? = null,
     var currentWave: Int = 0,
     var fallbackWave: Int = 1,
     var stageStarted: Boolean = false,
