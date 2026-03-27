@@ -7,8 +7,6 @@ import jp.awabi2048.cccontent.features.arena.ArenaStartResult
 import jp.awabi2048.cccontent.features.arena.event.ArenaDailyQuestGeneratedEvent
 import jp.awabi2048.cccontent.features.arena.event.ArenaQuestStartRequestEvent
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
-import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestModifiers
-import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestCharactorDefinition
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -48,7 +46,6 @@ class ArenaQuestService(
     private val activeQuests = mutableMapOf<UUID, ArenaActiveQuestRecord>()
     private var difficultyDefinitions: List<ArenaDifficultyDefinition> = emptyList()
     private var difficultyDisplayMap: Map<String, ArenaDifficultyDefinition> = emptyMap()
-    private var charactorDefinitions: Map<String, ArenaQuestCharactorDefinition> = emptyMap()
     private var generateCount: Int = QUEST_SLOT_LIMIT
 
     fun initialize() {
@@ -208,8 +205,6 @@ class ArenaQuestService(
             return
         }
 
-        val charactor = charactorDefinition(quest.charactorId)
-
         player.closeInventory()
         player.sendMessage(
             ArenaI18n.text(
@@ -226,11 +221,9 @@ class ArenaQuestService(
 
             when (val result = arenaManager.startSession(
                 player,
-                quest.mobTypeId,
                 quest.difficultyId,
                 quest.themeId,
-                charactor.toModifiers(),
-                quest.difficultyScore
+                difficultyScore = quest.difficultyScore
             )) {
                 is ArenaStartResult.Success -> {
                     activeQuests[player.uniqueId] = ArenaActiveQuestRecord(dateKey, quest.index, quest)
@@ -254,14 +247,13 @@ class ArenaQuestService(
     }
 
     private fun validateArenaSources() {
-        val mobTypeIds = arenaManager.getMobTypeIds().map { it.trim() }.filter { it.isNotBlank() }.sorted()
-        if (mobTypeIds.isEmpty()) {
-            throw IllegalStateException("mob_type が0件のためアリーナクエストを生成できません")
-        }
-
         val themeIds = arenaManager.getThemeIds().map { it.trim() }.filter { it.isNotBlank() }.sorted()
         if (themeIds.isEmpty()) {
             throw IllegalStateException("theme が0件のためアリーナクエストを生成できません")
+        }
+
+        if (ArenaQuestMissionType.entries.isEmpty()) {
+            throw IllegalStateException("ミッション定義が0件のためアリーナクエストを生成できません")
         }
 
         if (generateCount > QUEST_SLOT_LIMIT) {
@@ -272,20 +264,11 @@ class ArenaQuestService(
             throw IllegalStateException("アリーナクエスト生成数が不正です: $generateCount")
         }
 
-        if (charactorDefinitions.size != 3) {
-            throw IllegalStateException("quest_charactor_config が不完全です")
-        }
-
-        val totalWeight = charactorDefinitions.values.sumOf { it.weight.coerceAtLeast(0) }
-        if (totalWeight <= 0) {
-            throw IllegalStateException("quest_charactor_config の重み合計が不正です")
-        }
     }
 
     private fun refreshDefinitions() {
         loadGenerationConfig()
         loadDifficultyDefinitions()
-        loadCharactorDefinitions()
         validateArenaSources()
     }
 
@@ -302,39 +285,6 @@ class ArenaQuestService(
             throw IllegalStateException("arena.quest.generate_count がメニュー枠を超えています: $configured > $QUEST_SLOT_LIMIT")
         }
         generateCount = configured
-    }
-
-    private fun loadCharactorDefinitions() {
-        val coreConfig = currentCoreConfig()
-        val section = coreConfig.getConfigurationSection("arena.quest_charactor_config")
-            ?: throw IllegalStateException("arena.quest_charactor_config が見つかりません")
-
-        val supported = listOf(
-            createCharactorDefinition(coreConfig, "none", "特になし"),
-            createCharactorDefinition(coreConfig, "legion", "大群"),
-            createCharactorDefinition(coreConfig, "elite", "少数精鋭")
-        )
-
-        val names = supported.associateBy { it.id }
-        if (names.size != supported.size) {
-            throw IllegalStateException("quest_charactor_config に重複IDがあります")
-        }
-
-        supported.forEach { definition ->
-            if (!section.contains(definition.id)) {
-                throw IllegalStateException("quest_charactor_config.${definition.id} が見つかりません")
-            }
-            if (definition.weight <= 0) {
-                throw IllegalStateException("quest_charactor_config.${definition.id}.weight が不正です: ${definition.weight}")
-            }
-            validatePositiveMultiplier("quest_charactor_config.${definition.id}.spawn_interval_multiplier", definition.spawnIntervalMultiplier)
-            validatePositiveMultiplier("quest_charactor_config.${definition.id}.max_summon_count_multiplier", definition.maxSummonCountMultiplier)
-            validatePositiveMultiplier("quest_charactor_config.${definition.id}.clear_mob_count_multiplier", definition.clearMobCountMultiplier)
-            validatePositiveMultiplier("quest_charactor_config.${definition.id}.mob_stats_multiplier.health", definition.mobHealthMultiplier)
-            validatePositiveMultiplier("quest_charactor_config.${definition.id}.mob_stats_multiplier.attack", definition.mobAttackMultiplier)
-        }
-
-        charactorDefinitions = names
     }
 
     private fun loadDifficultyDefinitions() {
@@ -380,43 +330,6 @@ class ArenaQuestService(
         difficultyDisplayMap = difficultyDefinitions.associateBy { it.id }
     }
 
-    private fun createCharactorDefinition(
-        coreConfig: FileConfiguration,
-        id: String,
-        displayName: String
-    ): ArenaQuestCharactorDefinition {
-        val basePath = "arena.quest_charactor_config.$id"
-        val requiredKeys = listOf(
-            "$basePath.weight",
-            "$basePath.spawn_interval_multiplier",
-            "$basePath.max_summon_count_multiplier",
-            "$basePath.clear_mob_count_multiplier",
-            "$basePath.mob_stats_multiplier.health",
-            "$basePath.mob_stats_multiplier.attack"
-        )
-        requiredKeys.forEach { path ->
-            if (!coreConfig.contains(path)) {
-                throw IllegalStateException("$path が見つかりません")
-            }
-        }
-        return ArenaQuestCharactorDefinition(
-            id = id,
-            displayName = displayName,
-            weight = coreConfig.getInt("$basePath.weight"),
-            spawnIntervalMultiplier = coreConfig.getDouble("$basePath.spawn_interval_multiplier"),
-            maxSummonCountMultiplier = coreConfig.getDouble("$basePath.max_summon_count_multiplier"),
-            clearMobCountMultiplier = coreConfig.getDouble("$basePath.clear_mob_count_multiplier"),
-            mobHealthMultiplier = coreConfig.getDouble("$basePath.mob_stats_multiplier.health"),
-            mobAttackMultiplier = coreConfig.getDouble("$basePath.mob_stats_multiplier.attack")
-        )
-    }
-
-    private fun validatePositiveMultiplier(path: String, value: Double) {
-        if (value <= 0.0) {
-            throw IllegalStateException("$path が不正です: $value")
-        }
-    }
-
     private fun ensureDirectories() {
         if (!baseDir.exists()) {
             baseDir.mkdirs()
@@ -451,25 +364,23 @@ class ArenaQuestService(
     }
 
     private fun generateQuestSet(dateKey: String): ArenaDailyQuestSet {
-        val mobTypeIds = arenaManager.getMobTypeIds().map { it.trim() }.filter { it.isNotBlank() }.sorted()
         val themeIds = arenaManager.getThemeIds().map { it.trim() }.filter { it.isNotBlank() }.sorted()
+        val missionTypes = ArenaQuestMissionType.entries
         val random = Random(dateKey.toEpochSeed())
 
         val quests = (0 until generateCount).map { index ->
-            val mobTypeId = mobTypeIds.random(random)
             val themeId = themeIds.random(random)
+            val missionType = missionTypes.random(random)
             val difficulty = difficultyDefinitions.random(random)
-            val charactor = selectCharactor(random)
             val score = randomDifficultyScore(difficulty, random)
             val resolvedDifficultyId = resolveDifficultyId(score) ?: difficulty.id
 
             ArenaDailyQuestEntry(
                 index = index,
-                mobTypeId = mobTypeId,
+                missionTypeId = missionType.id,
                 difficultyScore = score,
                 difficultyId = resolvedDifficultyId,
-                themeId = themeId,
-                charactorId = charactor.id
+                themeId = themeId
             )
         }
 
@@ -477,41 +388,6 @@ class ArenaQuestService(
             dateKey = dateKey,
             generatedAtMillis = dateKey.toEpochSeed().toLong(),
             quests = quests
-        )
-    }
-
-    private fun selectCharactor(random: Random): ArenaQuestCharactorDefinition {
-        val candidates = charactorDefinitions.values.sortedBy { it.id }
-        val totalWeight = candidates.sumOf { it.weight.coerceAtLeast(0) }
-        if (totalWeight <= 0) {
-            return ArenaQuestCharactorDefinition(
-                id = "none",
-                displayName = "特になし",
-                weight = 1,
-                spawnIntervalMultiplier = 1.0,
-                maxSummonCountMultiplier = 1.0,
-                clearMobCountMultiplier = 1.0,
-                mobHealthMultiplier = 1.0,
-                mobAttackMultiplier = 1.0
-            )
-        }
-
-        var roll = random.nextInt(totalWeight)
-        for (candidate in candidates) {
-            roll -= candidate.weight.coerceAtLeast(0)
-            if (roll < 0) {
-                return candidate
-            }
-        }
-        return candidates.lastOrNull() ?: charactorDefinitions["none"] ?: ArenaQuestCharactorDefinition(
-            id = "none",
-            displayName = "特になし",
-            weight = 1,
-            spawnIntervalMultiplier = 1.0,
-            maxSummonCountMultiplier = 1.0,
-            clearMobCountMultiplier = 1.0,
-            mobHealthMultiplier = 1.0,
-            mobAttackMultiplier = 1.0
         )
     }
 
@@ -528,11 +404,6 @@ class ArenaQuestService(
         return difficultyDefinitions.firstOrNull { it.difficultyRange.contains(score) }?.id
     }
 
-    private fun charactorDefinition(charactorId: String): ArenaQuestCharactorDefinition {
-        return charactorDefinitions[charactorId]
-            ?: throw IllegalStateException("charactor_id が不正です: $charactorId")
-    }
-
     private fun saveQuestSet(questSet: ArenaDailyQuestSet) {
         val file = File(questDir, "${questSet.dateKey}.yml")
         val config = YamlConfiguration()
@@ -543,11 +414,10 @@ class ArenaQuestService(
             questSet.quests.map { quest ->
                 linkedMapOf(
                     "index" to quest.index,
-                    "mob_type_id" to quest.mobTypeId,
+                    "mission_type_id" to quest.missionTypeId,
                     "difficulty_score" to quest.difficultyScore,
                     "difficulty_id" to quest.difficultyId,
-                    "theme_id" to quest.themeId,
-                    "charactor_id" to quest.charactorId
+                    "theme_id" to quest.themeId
                 )
             }
         )
@@ -578,21 +448,19 @@ class ArenaQuestService(
 
         val quests = questMaps.mapNotNull { map ->
             val index = map["index"]?.toString()?.toIntOrNull() ?: return@mapNotNull null
-            val mobTypeId = map["mob_type_id"]?.toString()?.trim().orEmpty()
+            val missionTypeId = map["mission_type_id"]?.toString()?.trim().orEmpty()
             val difficultyScore = map["difficulty_score"]?.toString()?.toDoubleOrNull() ?: return@mapNotNull null
             val difficultyId = map["difficulty_id"]?.toString()?.trim().orEmpty()
             val themeId = map["theme_id"]?.toString()?.trim().orEmpty()
-            val charactorId = map["charactor_id"]?.toString()?.trim().orEmpty()
 
-            validateStoredQuest(index, mobTypeId, difficultyScore, difficultyId, themeId, charactorId)
+            validateStoredQuest(index, missionTypeId, difficultyScore, difficultyId, themeId)
 
             ArenaDailyQuestEntry(
                 index = index,
-                mobTypeId = mobTypeId,
+                missionTypeId = missionTypeId,
                 difficultyScore = difficultyScore,
                 difficultyId = difficultyId,
-                themeId = themeId,
-                charactorId = charactorId
+                themeId = themeId
             )
         }.sortedBy { it.index }
 
@@ -611,18 +479,17 @@ class ArenaQuestService(
 
     private fun validateStoredQuest(
         index: Int,
-        mobTypeId: String,
+        missionTypeId: String,
         difficultyScore: Double,
         difficultyId: String,
-        themeId: String,
-        charactorId: String
+        themeId: String
     ) {
         if (index < 0) {
             throw IllegalStateException("クエストindexが不正です: $index")
         }
 
-        if (mobTypeId.isBlank() || !arenaManager.getMobTypeIds().contains(mobTypeId)) {
-            throw IllegalStateException("mob_type_id が不正です: $mobTypeId")
+        if (missionTypeId.isBlank() || ArenaQuestMissionType.fromId(missionTypeId) == null) {
+            throw IllegalStateException("mission_type_id が不正です: $missionTypeId")
         }
 
         if (themeId.isBlank() || !arenaManager.getThemeIds().contains(themeId)) {
@@ -635,17 +502,18 @@ class ArenaQuestService(
         if (!difficulty.difficultyRange.contains(difficultyScore)) {
             throw IllegalStateException("difficulty_score が範囲外です: id=$difficultyId score=$difficultyScore range=${difficulty.difficultyRange}")
         }
-
-        if (charactorId.isBlank() || !charactorDefinitions.containsKey(charactorId)) {
-            throw IllegalStateException("charactor_id が不正です: $charactorId")
-        }
     }
 
     private fun ensureQuestSet(dateKey: String): ArenaDailyQuestSet {
         questCache[dateKey]?.let { return it }
         val file = File(questDir, "$dateKey.yml")
         val set = if (file.exists()) {
-            loadQuestSet(dateKey)
+            try {
+                loadQuestSet(dateKey)
+            } catch (e: Exception) {
+                plugin.logger.warning("[Arena] 旧形式または不正なクエストを再生成します: date=$dateKey message=${e.message}")
+                generateAndSave(dateKey)
+            }
         } else {
             generateAndSave(dateKey)
         }
@@ -674,13 +542,13 @@ class ArenaQuestService(
 
         val playerData = getPlayerData(player.uniqueId)
 
-        renderQuestSlots(inventory, player.uniqueId, questSet)
+        renderQuestSlots(player, inventory, player.uniqueId, questSet)
         inventory.setItem(ArenaQuestLayout.MENU_PLAYER_SLOT, createPlayerHead(player, playerData))
         inventory.setItem(ArenaQuestLayout.MENU_INFO_SLOT, createInfoItem())
         inventory.setItem(ArenaQuestLayout.MENU_REFRESH_SLOT, createRefreshItem())
     }
 
-    private fun renderQuestSlots(inventory: Inventory, playerId: UUID, questSet: ArenaDailyQuestSet) {
+    private fun renderQuestSlots(player: Player, inventory: Inventory, playerId: UUID, questSet: ArenaDailyQuestSet) {
         for ((position, slot) in ArenaQuestLayout.MENU_QUEST_SLOTS.withIndex()) {
             val quest = questSet.quests.getOrNull(position)
             if (quest == null) {
@@ -688,14 +556,14 @@ class ArenaQuestService(
                 continue
             }
 
-            inventory.setItem(slot, createQuestItem(quest, isQuestCompleted(playerId, questSet.dateKey, quest.index)))
+            inventory.setItem(slot, createQuestItem(player, quest, isQuestCompleted(playerId, questSet.dateKey, quest.index)))
         }
     }
 
-    private fun renderConfirmMenu(inventory: Inventory, quest: ArenaDailyQuestEntry) {
+    private fun renderConfirmMenu(player: Player, inventory: Inventory, quest: ArenaDailyQuestEntry) {
         fillConfirmBackground(inventory)
         inventory.setItem(ArenaQuestLayout.CONFIRM_OK_SLOT, createActionItem(Material.LIME_WOOL, "§aOK", listOf("§7このクエストを開始します")))
-        inventory.setItem(ArenaQuestLayout.CONFIRM_QUEST_SLOT, createQuestSummaryItem(quest))
+        inventory.setItem(ArenaQuestLayout.CONFIRM_QUEST_SLOT, createQuestSummaryItem(player, quest))
         inventory.setItem(ArenaQuestLayout.CONFIRM_CANCEL_SLOT, createActionItem(Material.RED_WOOL, "§cキャンセル", listOf("§7クエスト開始を取り消します")))
     }
 
@@ -706,7 +574,7 @@ class ArenaQuestService(
         val holder = ArenaQuestConfirmHolder(player.uniqueId, dateKey, questIndex)
         val inventory = Bukkit.createInventory(holder, ArenaQuestLayout.CONFIRM_SIZE, ArenaQuestLayout.CONFIRM_TITLE)
         holder.backingInventory = inventory
-        renderConfirmMenu(inventory, quest)
+        renderConfirmMenu(player, inventory, quest)
         player.openInventory(inventory)
         return true
     }
@@ -755,20 +623,21 @@ class ArenaQuestService(
         return item
     }
 
-    private fun createQuestItem(quest: ArenaDailyQuestEntry, isCompleted: Boolean): ItemStack {
+    private fun createQuestItem(player: Player, quest: ArenaDailyQuestEntry, isCompleted: Boolean): ItemStack {
         val item = ItemStack(Material.ROTTEN_FLESH)
         val meta = item.itemMeta ?: return item
-        meta.setDisplayName(if (isCompleted) "§a§mクエスト: ${formatQuestMobName(quest.mobTypeId)}" else "§aクエスト: ${formatQuestMobName(quest.mobTypeId)}")
-        meta.lore = buildQuestLore(quest, showActionText = true, isCompleted = isCompleted)
+        val title = "${missionDisplayName(quest.missionTypeId)} ＠${themeDisplayName(player, quest.themeId)}"
+        meta.setDisplayName(if (isCompleted) "§a§m$title" else "§a$title")
+        meta.lore = buildQuestLore(quest)
         item.itemMeta = meta
         return item
     }
 
-    private fun createQuestSummaryItem(quest: ArenaDailyQuestEntry): ItemStack {
+    private fun createQuestSummaryItem(player: Player, quest: ArenaDailyQuestEntry): ItemStack {
         return createActionItem(
             Material.ROTTEN_FLESH,
-            "§aクエスト: ${formatQuestMobName(quest.mobTypeId)}",
-            buildQuestLore(quest, showActionText = false, isCompleted = false)
+            "§a${missionDisplayName(quest.missionTypeId)} ＠${themeDisplayName(player, quest.themeId)}",
+            buildQuestLore(quest)
         )
     }
 
@@ -807,18 +676,18 @@ class ArenaQuestService(
         )
     }
 
-    private fun buildQuestLore(quest: ArenaDailyQuestEntry, showActionText: Boolean, isCompleted: Boolean): List<String> {
-        val charactor = charactorDefinition(quest.charactorId)
-        val lore = mutableListOf(
-            "§8§m――――――――――――――――――――",
-            "§f│ §7出現モブ §e${formatQuestMobName(quest.mobTypeId)}",
-            "§f│ §7特徴 ${charactorColor(quest.charactorId)}${charactor.displayName}",
-            "§f│ §7難易度 ${difficultyDisplay(quest.difficultyId)}",
-            "§8§m――――――――――――――――――――"
-        )
-        if (showActionText) {
-            lore += if (isCompleted) "§a§n完了済み" else "§e§nクリックしてこのクエストを受注する"
-        }
+    private fun buildQuestLore(quest: ArenaDailyQuestEntry): List<String> {
+        val mission = ArenaQuestMissionType.fromId(quest.missionTypeId)
+            ?: ArenaQuestMissionType.SWEEP
+        val strategyMemo = "§eおねがいします！"
+        val lore = mutableListOf<String>()
+        lore += "§8§m――――――――――――――――――――"
+        lore += "§f§l❙ §7ミッション内容"
+        lore += mission.missionGuideHints
+        lore += "§f§l❙ §7難易度§r ${difficultyDisplay(quest.difficultyId)}"
+        lore += "§8§m――――――――――――――――――――"
+        lore += "§f§l❙ §7メモ§r $strategyMemo"
+        lore += "§8§m――――――――――――――――――――"
         return lore
     }
 
@@ -830,33 +699,12 @@ class ArenaQuestService(
         return difficultyDisplayMap[difficultyId]?.display ?: difficultyId
     }
 
-    private fun formatQuestMobName(mobTypeId: String): String {
-        val normalized = mobTypeId.lowercase()
-        return when (normalized) {
-            "zombie" -> "ゾンビ"
-            "skeleton" -> "スケルトン"
-            "creeper" -> "クリーパー"
-            "spider" -> "スパイダー"
-            "enderman" -> "エンダーマン"
-            "slime" -> "スライム"
-            "witch" -> "ウィッチ"
-            "blaze" -> "ブレイズ"
-            "husk" -> "ハスク"
-            "drowned" -> "ドラウンド"
-            "piglin" -> "ピグリン"
-            "wither_skeleton" -> "ウィザースケルトン"
-            "magma_cube" -> "マグマキューブ"
-            "guardian" -> "ガーディアン"
-            else -> mobTypeId.replace('_', ' ')
-        }
+    private fun missionDisplayName(missionTypeId: String): String {
+        return ArenaQuestMissionType.fromId(missionTypeId)?.displayName ?: missionTypeId
     }
 
-    private fun charactorColor(charactorId: String): String {
-        return when (charactorId) {
-            "legion" -> "§a"
-            "elite" -> "§b"
-            else -> "§7"
-        }
+    private fun themeDisplayName(player: Player, themeId: String): String {
+        return ArenaI18n.text(player, "arena.theme.$themeId.name", themeId)
     }
 
     private fun isQuestCompleted(playerId: UUID, dateKey: String, questIndex: Int): Boolean {
@@ -923,7 +771,4 @@ class ArenaQuestService(
         return min..max
     }
 
-    private fun formatDifficultyScore(score: Double): String {
-        return String.format(java.util.Locale.ROOT, "%.2f", score)
-    }
 }

@@ -1,6 +1,15 @@
 # テーマIDごとに向きを定義します。
 # theme_id:
 #   icon: STONE
+#   max_summon_count: 10
+#   clear_mob_count: 20
+#   mobs: # config/mob_definition.yml の id を指定
+#     zombie_basic:
+#       weight: 10
+#       wave: 1..
+#     skeleton_basic:
+#       weight: 6
+#       wave: 2..5
 #   orientation:
 #     entrance_exit: north
 #     corner_entry: north

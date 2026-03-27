@@ -51,7 +51,6 @@ class ArenaSessionEndedEvent(
     val ownerPlayerId: UUID,
     val worldName: String,
     val themeId: String,
-    val mobTypeId: String,
     val difficultyId: String,
     val difficultyValue: Double,
     val waves: Int,
