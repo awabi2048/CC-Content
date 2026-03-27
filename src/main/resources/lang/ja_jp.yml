@@ -1008,6 +1008,7 @@ custom_items:
         entrance: '&a入口'
         door_block: '&e扉'
         barrier_core: '&b結界核'
+        barrier_point: '&3結界起動点'
     messages:
       command:
         no_permission: '&c権限がありません'

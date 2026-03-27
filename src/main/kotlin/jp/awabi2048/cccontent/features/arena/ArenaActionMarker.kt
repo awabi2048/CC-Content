@@ -25,7 +25,8 @@ data class ArenaActionMarker(
     var state: ArenaActionMarkerState = ArenaActionMarkerState.PRE_ACTIVATED,
     var colorTransitionFrom: Color = ArenaActionMarkerState.PRE_ACTIVATED.defaultColor,
     var colorTransitionTo: Color = ArenaActionMarkerState.PRE_ACTIVATED.defaultColor,
-    var colorTransitionStartTick: Long = 0L
+    var colorTransitionStartTick: Long = 0L,
+    var middleRingAngleRadians: Double = 0.0
 ) {
     init {
         val initialColor = colorFor(state)

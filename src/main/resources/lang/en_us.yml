@@ -378,6 +378,7 @@ custom_items:
         entrance: '&aEntrance'
         door_block: '&eDoor'
         barrier_core: '&bBarrier Core'
+        barrier_point: '&3Barrier Point'
     messages:
       command:
         no_permission: '&cYou do not have permission'

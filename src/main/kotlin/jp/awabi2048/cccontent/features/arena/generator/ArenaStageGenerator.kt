@@ -46,7 +46,8 @@ data class ArenaStageBuildResult(
     val roomMobSpawns: Map<Int, List<Location>>,
     val corridorDoorBlocks: Map<Int, List<Location>>,
     val doorAnimationPlacements: Map<Int, List<ArenaDoorAnimationPlacement>>,
-    val barrierLocation: Location
+    val barrierLocation: Location,
+    val barrierPointLocations: List<Location>
 )
 
 data class ArenaDoorAnimationPlacement(
@@ -177,12 +178,24 @@ class ArenaStageGenerator {
         val finalRoomBounds = placementBoundsByIndex[roomPlacements.last().index]
             ?: error("[Arena] 最終部屋の境界が見つかりません")
         val finalMarkers = findMarkers(world, finalRoomBounds)
-        val barrierLocation = finalMarkers.barrierCore
-        if (barrierLocation == null) {
+        if (finalMarkers.barrierCores.size != 1) {
+            val reason = if (finalMarkers.barrierCores.isEmpty()) {
+                "arena.marker.barrier_core"
+            } else {
+                "arena.marker.barrier_core(single_required)"
+            }
             validationIssues.add(
                 ArenaStageValidationIssue(
                     structureName = selectedByPlacementIndex[roomPlacements.last().index]?.baseTemplate?.name ?: "unknown",
-                    missingMarkers = listOf("arena.marker.barrier_core")
+                    missingMarkers = listOf(reason)
+                )
+            )
+        }
+        if (finalMarkers.barrierPoints.isEmpty()) {
+            validationIssues.add(
+                ArenaStageValidationIssue(
+                    structureName = selectedByPlacementIndex[roomPlacements.last().index]?.baseTemplate?.name ?: "unknown",
+                    missingMarkers = listOf("arena.marker.barrier_point")
                 )
             )
         }
@@ -212,7 +225,9 @@ class ArenaStageGenerator {
         }
 
         val resolvedEntranceLocation = entranceLocation ?: error("[Arena] 開始部屋の entrance マーカーが見つかりません")
-        val resolvedBarrierLocation = barrierLocation ?: error("[Arena] 最終部屋の barrier_core マーカーが見つかりません")
+        val resolvedBarrierLocation = finalMarkers.barrierCores.firstOrNull()
+            ?: error("[Arena] 最終部屋の barrier_core マーカーが見つかりません")
+        val resolvedBarrierPoints = finalMarkers.barrierPoints
         val playerSpawn = resolvedEntranceLocation.clone()
 
         return ArenaStageBuildResult(
@@ -224,7 +239,8 @@ class ArenaStageGenerator {
             roomMobSpawns = roomMobSpawns,
             corridorDoorBlocks = corridorDoorBlocks,
             doorAnimationPlacements = doorAnimationPlacements,
-            barrierLocation = resolvedBarrierLocation
+            barrierLocation = resolvedBarrierLocation,
+            barrierPointLocations = resolvedBarrierPoints
         )
     }
 
@@ -652,7 +668,8 @@ class ArenaStageGenerator {
         val mobSpawns: List<Location>,
         val entrance: Location?,
         val doorBlocks: List<Location>,
-        val barrierCore: Location?
+        val barrierCores: List<Location>,
+        val barrierPoints: List<Location>
     )
 
     private fun findMarkers(world: World, bounds: ArenaBounds): TileMarkers {
@@ -671,7 +688,8 @@ class ArenaStageGenerator {
         val mobs = mutableListOf<Location>()
         var entrance: Location? = null
         val doorBlocks = mutableListOf<Location>()
-        var barrier: Location? = null
+        val barrierCores = mutableListOf<Location>()
+        val barrierPoints = mutableListOf<Location>()
 
         for (cx in minChunkX..maxChunkX) {
             for (cz in minChunkZ..maxChunkZ) {
@@ -695,14 +713,17 @@ class ArenaStageGenerator {
                             doorBlocks.add(loc.clone())
                         }
                         if (entity.scoreboardTags.contains("arena.marker.barrier_core")) {
-                            barrier = loc.clone()
+                            barrierCores.add(loc.clone())
+                        }
+                        if (entity.scoreboardTags.contains("arena.marker.barrier_point")) {
+                            barrierPoints.add(loc.clone())
                         }
                     }
                 }
             }
         }
 
-        return TileMarkers(mobs, entrance, doorBlocks, barrier)
+        return TileMarkers(mobs, entrance, doorBlocks, barrierCores, barrierPoints)
     }
 
     private fun locationForTile(origin: Location, point: TilePoint, gridPitch: Int): Location {

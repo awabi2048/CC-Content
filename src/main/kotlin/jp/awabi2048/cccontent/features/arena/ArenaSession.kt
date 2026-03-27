@@ -46,6 +46,7 @@ data class ArenaSession(
     val corridorDoorBlocks: Map<Int, List<Location>>,
     val doorAnimationPlacements: Map<Int, List<ArenaDoorAnimationPlacement>>,
     val barrierLocation: Location,
+    val barrierPointLocations: List<Location>,
     var participantSpawnProtectionUntilMillis: Long = 0L,
     var currentWave: Int = 0,
     var fallbackWave: Int = 1,
