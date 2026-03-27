@@ -139,6 +139,12 @@ class ArenaManager(
         const val BARRIER_DEFENSE_TARGET_RATIO = 1.0 / 3.0
         const val BARRIER_DEFENSE_PRESSURE_RADIUS = 4.5
         const val BARRIER_DEFENSE_PRESSURE_RADIUS_SQUARED = BARRIER_DEFENSE_PRESSURE_RADIUS * BARRIER_DEFENSE_PRESSURE_RADIUS
+        const val BARRIER_RESTART_POINT_DAMAGE_RADIUS = 4.0
+        const val BARRIER_RESTART_POINT_DAMAGE_RADIUS_SQUARED = BARRIER_RESTART_POINT_DAMAGE_RADIUS * BARRIER_RESTART_POINT_DAMAGE_RADIUS
+        const val BARRIER_RESTART_POINT_DAMAGE_MAX_RATIO = 0.25
+        const val BARRIER_RESTART_EFFECT_INTERVAL_TICKS = 5L
+        const val BARRIER_RESTART_DAMAGE_INTERVAL_TICKS = 20L
+        const val BARRIER_RESTART_BEAM_POINTS = 24
         const val POSITION_SAMPLE_INTERVAL_MILLIS = 1000L
         const val POSITION_RESTORE_LOOKBACK_MILLIS = 10_000L
         const val POSITION_HISTORY_RETENTION_MILLIS = 12_000L
@@ -154,7 +160,7 @@ class ArenaManager(
         const val ACTION_MARKER_MIDDLE_RING_RADIUS = 0.875
         const val ACTION_MARKER_MIDDLE_RING_HEIGHT = 0.15
         const val ACTION_MARKER_CENTER_Y_OFFSET = -0.25
-        const val BARRIER_MARKER_HOLD_TICKS = 80
+        const val BARRIER_MARKER_HOLD_TICKS = 60
         const val MIDDLE_RING_MAX_ANGULAR_VELOCITY = 0.14
     }
 
@@ -1041,7 +1047,9 @@ class ArenaManager(
             if (random.nextDouble() > intervalChance) return@Runnable
 
             val maxAliveBase = currentSession.stageMaxAliveCount.coerceAtLeast(1)
-            val maxAlive = if (currentSession.barrierRestarting) {
+            val maxAlive = if (currentSession.barrierRestarting && wave == currentSession.waves) {
+                (maxAliveBase * 2.0).roundToInt().coerceAtLeast(maxAliveBase)
+            } else if (currentSession.barrierRestarting) {
                 (maxAliveBase * 1.5).roundToInt().coerceAtLeast(maxAliveBase)
             } else {
                 maxAliveBase
@@ -1197,7 +1205,7 @@ class ArenaManager(
             "§7- §6Wave $wave §7-"
         }
         player.sendTitle("", title, 10, 50, 10)
-        player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.2f)
+        player.playSound(player.location, Sound.ENTITY_WITHER_SPAWN, 1.0f, 1.0f)
     }
 
     private fun processRoomProgress(session: ArenaSession, player: Player, room: Int) {
@@ -1614,6 +1622,14 @@ class ArenaManager(
         session.barrierRestartStartMillis = 0L
         session.barrierRestartDurationMillis = 0L
         session.barrierRestartProgressMillis = 0L
+        session.barrierRestartActivationTask?.cancel()
+        session.barrierRestartActivationTask = null
+        session.barrierRestartEffectTask?.cancel()
+        session.barrierRestartEffectTask = null
+        session.barrierRestartDamageTask?.cancel()
+        session.barrierRestartDamageTask = null
+        session.barrierRestartActivationQueue.clear()
+        session.barrierRestartActivatedPoints.clear()
         session.barrierDefenseTargetMobIds.clear()
         session.barrierDefenseAssaultMobIds.clear()
     }
@@ -1660,6 +1676,10 @@ class ArenaManager(
         session.barrierAmbientTask = null
         playSoundAtBarrier(session, Sound.BLOCK_BEACON_DEACTIVATE, 5.0f, 0.5f)
         spawnBarrierRestartStartParticles(world, session)
+        setupBarrierRestartActivationQueue(session, world)
+        startBarrierRestartActivationTask(session)
+        startBarrierRestartEffectTask(session)
+        startBarrierRestartDamageTask(session)
 
         updateSessionProgressBossBar(session)
 
@@ -1692,6 +1712,140 @@ class ArenaManager(
         }
 
         scheduleBarrierRestartProgressTick(activeSession)
+    }
+
+    private fun setupBarrierRestartActivationQueue(session: ArenaSession, world: World) {
+        val markerPoints = session.actionMarkers.values
+            .asSequence()
+            .filter { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }
+            .map { marker -> marker.center.clone().apply { this.world = world } }
+            .toMutableList()
+
+        val points = if (markerPoints.isNotEmpty()) {
+            markerPoints
+        } else {
+            session.barrierPointLocations
+                .map { location -> location.clone().apply { this.world = world } }
+                .toMutableList()
+        }
+
+        points.shuffle(random)
+        session.barrierRestartActivationQueue.clear()
+        session.barrierRestartActivationQueue.addAll(points)
+        session.barrierRestartActivatedPoints.clear()
+    }
+
+    private fun startBarrierRestartActivationTask(session: ArenaSession) {
+        session.barrierRestartActivationTask?.cancel()
+
+        val queueSize = session.barrierRestartActivationQueue.size
+        if (queueSize <= 0) {
+            session.barrierRestartActivationTask = null
+            return
+        }
+
+        val intervalTicks = ((session.barrierRestartDurationMillis.toDouble() / queueSize.toDouble()) / 50.0)
+            .roundToLong()
+            .coerceAtLeast(1L)
+
+        val task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+            val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
+            if (!activeSession.barrierRestarting) {
+                activeSession.barrierRestartActivationTask?.cancel()
+                activeSession.barrierRestartActivationTask = null
+                return@Runnable
+            }
+            activateNextBarrierRestartPoint(activeSession)
+            if (activeSession.barrierRestartActivationQueue.isEmpty()) {
+                activeSession.barrierRestartActivationTask?.cancel()
+                activeSession.barrierRestartActivationTask = null
+            }
+        }, 0L, intervalTicks)
+
+        session.barrierRestartActivationTask = task
+    }
+
+    private fun activateNextBarrierRestartPoint(session: ArenaSession) {
+        if (session.barrierRestartActivationQueue.isEmpty()) return
+        val point = session.barrierRestartActivationQueue.removeAt(0)
+        session.barrierRestartActivatedPoints.add(point)
+
+        val world = Bukkit.getWorld(session.worldName) ?: return
+        world.spawnParticle(Particle.OMINOUS_SPAWNING, point, 20, 0.5, 0.5, 0.5, 0.1)
+        world.spawnParticle(Particle.REVERSE_PORTAL, point, 100, 1.0, 1.0, 1.0, 5.0)
+
+        val participants = session.participants
+            .asSequence()
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .filter { it.isOnline && it.world.uid == world.uid }
+            .toList()
+
+        participants.forEach { player ->
+            player.playSound(point, Sound.BLOCK_ENDER_CHEST_OPEN, 0.9f, 0.5f)
+            player.playSound(point, Sound.ENTITY_ILLUSIONER_MIRROR_MOVE, 0.9f, 0.5f)
+        }
+    }
+
+    private fun startBarrierRestartEffectTask(session: ArenaSession) {
+        session.barrierRestartEffectTask?.cancel()
+        val task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+            val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
+            if (!activeSession.barrierRestarting) return@Runnable
+            renderBarrierRestartEffects(activeSession)
+        }, 0L, BARRIER_RESTART_EFFECT_INTERVAL_TICKS)
+        session.barrierRestartEffectTask = task
+    }
+
+    private fun renderBarrierRestartEffects(session: ArenaSession) {
+        if (session.barrierRestartActivatedPoints.isEmpty()) return
+        val world = Bukkit.getWorld(session.worldName) ?: return
+        val core = session.barrierLocation.clone().apply { this.world = world }.add(0.5, 1.0, 0.5)
+
+        session.barrierRestartActivatedPoints.forEach { point ->
+            val origin = point.clone().apply { this.world = world }
+            world.spawnParticle(Particle.OMINOUS_SPAWNING, origin, 10, 0.5, 0.5, 0.5, 0.1)
+            drawBarrierRestartLinkBeam(world, origin.clone().add(0.0, 0.25, 0.0), core)
+        }
+    }
+
+    private fun drawBarrierRestartLinkBeam(world: World, from: Location, to: Location) {
+        val points = BARRIER_RESTART_BEAM_POINTS.coerceAtLeast(4)
+        for (index in 0..points) {
+            val t = index.toDouble() / points.toDouble()
+            val x = from.x + (to.x - from.x) * t
+            val y = from.y + (to.y - from.y) * t
+            val z = from.z + (to.z - from.z) * t
+            world.spawnParticle(Particle.END_ROD, x, y, z, 1, 0.0, 0.0, 0.0, 0.0)
+        }
+    }
+
+    private fun startBarrierRestartDamageTask(session: ArenaSession) {
+        session.barrierRestartDamageTask?.cancel()
+        val task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+            val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
+            if (!activeSession.barrierRestarting) return@Runnable
+            applyBarrierRestartPointDamage(activeSession)
+        }, BARRIER_RESTART_DAMAGE_INTERVAL_TICKS, BARRIER_RESTART_DAMAGE_INTERVAL_TICKS)
+        session.barrierRestartDamageTask = task
+    }
+
+    private fun applyBarrierRestartPointDamage(session: ArenaSession) {
+        if (session.barrierRestartActivatedPoints.isEmpty()) return
+        val world = Bukkit.getWorld(session.worldName) ?: return
+
+        world.entities
+            .asSequence()
+            .filterIsInstance<Mob>()
+            .filter { it.isValid && !it.isDead }
+            .forEach { mob ->
+                val withinRange = session.barrierRestartActivatedPoints.any { point ->
+                    mob.location.distanceSquared(point) < BARRIER_RESTART_POINT_DAMAGE_RADIUS_SQUARED
+                }
+                if (!withinRange) return@forEach
+                val maxHealth = mob.getAttribute(Attribute.MAX_HEALTH)?.value?.coerceAtLeast(1.0) ?: return@forEach
+                val damageAmount = (maxHealth * BARRIER_RESTART_POINT_DAMAGE_MAX_RATIO).coerceAtLeast(0.001)
+                mob.damage(damageAmount)
+            }
     }
 
     private fun startBarrierDefenseSpawnTask(session: ArenaSession) {
@@ -1824,6 +1978,7 @@ class ArenaManager(
 
         session.barrierRestarting = false
         session.barrierRestartCompleted = true
+        stopWaveSpawning(session, session.waves)
 
         session.barrierRestartTask?.cancel()
         session.barrierRestartTask = null
@@ -1834,6 +1989,7 @@ class ArenaManager(
 
         cleanupBarrierRestartSession(session, removeDefenseMobs = true, smoke = true)
         removeRemainingWaveMobs(session)
+        removeAllMobsInArenaWorld(session, smoke = true)
         session.lastClearedWaveForBossBar = session.waves
         updateSessionProgressBossBar(session)
 
@@ -1879,6 +2035,30 @@ class ArenaManager(
         }
 
         session.waveMobIds.values.forEach { it.clear() }
+    }
+
+    private fun removeAllMobsInArenaWorld(session: ArenaSession, smoke: Boolean) {
+        val world = Bukkit.getWorld(session.worldName) ?: return
+        world.entities
+            .asSequence()
+            .filterIsInstance<Mob>()
+            .filter { it.isValid && !it.isDead }
+            .forEach { mob ->
+                val mobId = mob.uniqueId
+                session.activeMobs.remove(mobId)
+                session.mobWaveMap.remove(mobId)
+                session.waveMobIds.values.forEach { it.remove(mobId) }
+                session.barrierDefenseMobIds.remove(mobId)
+                session.barrierDefenseTargetMobIds.remove(mobId)
+                session.barrierDefenseAssaultMobIds.remove(mobId)
+                mobToSessionWorld.remove(mobId)
+                mobToDefinitionTypeId.remove(mobId)
+                mobService.untrack(mobId)
+                if (smoke) {
+                    spawnSmoke(mob.location)
+                }
+                mob.remove()
+            }
     }
 
     private fun updateSessionProgressBossBar(session: ArenaSession) {
@@ -1976,6 +2156,12 @@ class ArenaManager(
         session.barrierAmbientTask = null
         session.barrierRestartTask?.cancel()
         session.barrierRestartTask = null
+        session.barrierRestartActivationTask?.cancel()
+        session.barrierRestartActivationTask = null
+        session.barrierRestartEffectTask?.cancel()
+        session.barrierRestartEffectTask = null
+        session.barrierRestartDamageTask?.cancel()
+        session.barrierRestartDamageTask = null
         session.barrierDefenseSpawnTask?.cancel()
         session.barrierDefenseSpawnTask = null
         session.barrierDefensePressureTask?.cancel()
@@ -1987,6 +2173,8 @@ class ArenaManager(
 
         session.barrierDefenseTargetMobIds.clear()
         session.barrierDefenseAssaultMobIds.clear()
+        session.barrierRestartActivationQueue.clear()
+        session.barrierRestartActivatedPoints.clear()
 
         hideSessionProgressBossBar(session)
     }
@@ -2028,9 +2216,18 @@ class ArenaManager(
         world.spawnParticle(Particle.TRIAL_SPAWNER_DETECTION_OMINOUS, center, 150, 3.5, 3.5, 3.5, 0.0)
     }
 
-    private fun playBarrierPointActivatedEffect(session: ArenaSession) {
+    private fun playBarrierPointActivatedEffect(session: ArenaSession, marker: ArenaActionMarker) {
         val world = Bukkit.getWorld(session.worldName) ?: return
         spawnBarrierRestartSuccessParticles(world, session)
+        world.spawnParticle(
+            Particle.TRIAL_SPAWNER_DETECTION_OMINOUS,
+            marker.center,
+            50,
+            1.0,
+            2.0,
+            1.0,
+            0.0
+        )
     }
 
     private fun broadcastRawMessage(session: ArenaSession, message: String) {
@@ -2290,7 +2487,7 @@ class ArenaManager(
                 startDoorAnimation(session, targetWave)
             }
             ArenaActionMarkerType.BARRIER_ACTIVATE -> {
-                playBarrierPointActivatedEffect(session)
+                playBarrierPointActivatedEffect(session, marker)
                 if (!session.startedWaves.contains(session.waves)) return
                 val total = session.actionMarkers.values.count { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }
                 val activated = session.actionMarkers.values.count {
@@ -2432,6 +2629,7 @@ class ArenaManager(
                 0.1
             )
             player.playSound(player.location, Sound.BLOCK_BEACON_ACTIVATE, 0.8f, 1.0f)
+            player.playSound(player.location, Sound.BLOCK_ENDER_CHEST_OPEN, 0.8f, 0.5f)
         }
     }
 
@@ -2458,6 +2656,9 @@ class ArenaManager(
             .filter { it.isOnline && it.world.uid == world.uid }
             .forEach { player ->
                 player.playSound(marker.center, completeSound, 0.9f, 1.15f)
+                if (marker.type == ArenaActionMarkerType.BARRIER_ACTIVATE) {
+                    player.playSound(marker.center, Sound.BLOCK_ENDER_CHEST_OPEN, 0.8f, 0.5f)
+                }
                 player.playSound(marker.center, Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 2.0f)
             }
     }
