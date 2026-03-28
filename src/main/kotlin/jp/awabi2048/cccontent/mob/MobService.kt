@@ -7,12 +7,14 @@ import jp.awabi2048.cccontent.mob.type.SkeletonEffectArrowMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonFastArrowMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonBowShieldMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonCurveBackstepMobType
+import jp.awabi2048.cccontent.mob.type.SkeletonNormalMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonRapidShotMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonShieldMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonWeaponThrowCloseMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
+import jp.awabi2048.cccontent.mob.type.ZombieNormalMobType
 import jp.awabi2048.cccontent.mob.type.ZombieShieldOnlyMobType
 import jp.awabi2048.cccontent.mob.ability.BoomerangService
 import jp.awabi2048.cccontent.mob.ability.ThrownWeaponService
@@ -98,10 +100,12 @@ class MobService(private val plugin: JavaPlugin) {
             instances[plugin] = this
         }
         registerMobType(ArenaEnhancedZombieMobType())
+        registerMobType(ZombieNormalMobType())
         registerMobType(ZombieLeapOnlyMobType())
         registerMobType(ZombieBowOnlyMobType())
         registerMobType(ZombieBowSwapMobType())
         registerMobType(ZombieShieldOnlyMobType())
+        registerMobType(SkeletonNormalMobType())
         registerMobType(SkeletonFastArrowMobType())
         registerMobType(SkeletonRapidShotMobType())
         registerMobType(SkeletonEffectArrowMobType())
