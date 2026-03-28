@@ -124,6 +124,7 @@ data class ArenaSession(
     var arenaBgmPlaybackStartTick: Long = 0L,
     var arenaCombatHadTargetingMob: Boolean = false,
     var arenaBgmSwitchRequest: ArenaBgmSwitchRequest? = null,
+    var arenaWaveStartCombatDelayTask: BukkitTask? = null,
     val transitionTasks: MutableList<BukkitTask> = mutableListOf(),
     val waveSpawnTasks: MutableMap<Int, BukkitTask> = mutableMapOf()
 )

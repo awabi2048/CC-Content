@@ -57,14 +57,14 @@ class BackstepAbility(
             return
         }
         val distanceSquared = entity.location.distanceSquared(target.location)
-        if (distanceSquared <= triggerDistance * triggerDistance) {
-            abilityRuntime.closeRangeTicks += 10L
-        } else {
+        val triggerDistanceSquared = triggerDistance * triggerDistance
+        if (distanceSquared > triggerDistanceSquared) {
             abilityRuntime.closeRangeTicks = 0L
+            return
         }
+        abilityRuntime.closeRangeTicks = triggerDurationTicks
 
         if (abilityRuntime.cooldownTicks > 0L) return
-        if (abilityRuntime.closeRangeTicks < triggerDurationTicks) return
         if (!entity.isOnGround) return
 
         val away = entity.location.toVector().subtract(target.location.toVector()).setY(0.0)

@@ -195,6 +195,7 @@ class ArenaManager(
         const val MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT = 6
         const val MULTIPLAYER_STAGE_INTRO_SOUND_REPEAT = 5
         const val MULTIPLAYER_STAGE_INTRO_SOUND_INTERVAL_TICKS = 10L
+        const val WAVE_START_COMBAT_BGM_DELAY_TICKS = 40L
         const val MULTIPLAYER_STAGE_INTRO_TELEPORT_EXTRA_DELAY_TICKS = 20L
         const val MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS = 5L
 
@@ -226,7 +227,7 @@ class ArenaManager(
     private var multiplayerJoinGraceSeconds = MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT
     private var multiplayerJoinMarkerSearchRadius = MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
     private var multiplayerStageBuildStepsPerTick = 1
-    private var actionMarkerHoldTicks = 80
+    private var actionMarkerHoldTicks = 60
     private var actionMarkerColorTransitionTicks = 16
     private var doorAnimationTotalTicks = DOOR_ANIMATION_TOTAL_TICKS_DEFAULT
     private var sharedWaveMaxAlive = SHARED_WAVE_MAX_ALIVE_DEFAULT
@@ -1206,6 +1207,10 @@ class ArenaManager(
         val entries = mutableListOf<ArenaDropEntry>()
         entries += dropConfig.additionalDefaultDrops
         entries += dropConfig.additionalByMobType[mobTypeId].orEmpty()
+        val categoryTypeId = resolveMobTokenCategoryTypeId(mobTypeId)
+        if (categoryTypeId != mobTypeId) {
+            entries += dropConfig.additionalByMobType[categoryTypeId].orEmpty()
+        }
 
         return entries.mapNotNull { entry ->
             val amount = applyAmountModifiers(entry.baseAmount, lootingLevel)
@@ -1255,8 +1260,22 @@ class ArenaManager(
         if (random.nextDouble() >= MOB_TOKEN_DROP_CHANCE) {
             return null
         }
-        val fullId = "arena.mob_token_${sanitizeMobTypeId(mobTypeId)}"
+        val categoryTypeId = resolveMobTokenCategoryTypeId(mobTypeId)
+        val fullId = "arena.mob_token_${sanitizeMobTypeId(categoryTypeId)}"
         return CustomItemManager.createItemForPlayer(fullId, killer, 1)
+    }
+
+    private fun resolveMobTokenCategoryTypeId(mobTypeId: String): String {
+        val normalized = sanitizeMobTypeId(mobTypeId)
+        return when {
+            normalized.contains("zombie") -> "zombie"
+            normalized.contains("skeleton") -> "skeleton"
+            normalized.contains("creeper") -> "creeper"
+            normalized.contains("piglin") -> "piglin"
+            normalized.contains("wither") -> "wither"
+            normalized.contains("dragon") -> "dragon"
+            else -> normalized
+        }
     }
 
     private fun sanitizeMobTypeId(typeId: String): String {
@@ -1265,7 +1284,11 @@ class ArenaManager(
     }
 
     private fun registerMobTypeTokenItems() {
-        for (typeId in knownMobTypeIds) {
+        val tokenTypeIds = buildSet {
+            addAll(knownMobTypeIds)
+            knownMobTypeIds.forEach { add(resolveMobTokenCategoryTypeId(it)) }
+        }
+        for (typeId in tokenTypeIds) {
             CustomItemManager.register(ArenaMobTokenItem(typeId))
         }
     }
@@ -1528,7 +1551,7 @@ class ArenaManager(
 
         session.lastClearedWaveForBossBar = null
         session.startedWaves.add(wave)
-        requestArenaBgmMode(session, ArenaBgmMode.COMBAT)
+        requestWaveStartCombatBgm(session)
         session.waveKillCount.putIfAbsent(wave, 0)
         session.waveClearTargets[wave] = clearTarget
         session.waveMobIds.putIfAbsent(wave, mutableSetOf())
@@ -2798,6 +2821,10 @@ class ArenaManager(
     }
 
     private fun requestArenaBgmMode(session: ArenaSession, targetMode: ArenaBgmMode) {
+        if (targetMode != ArenaBgmMode.COMBAT) {
+            session.arenaWaveStartCombatDelayTask?.cancel()
+            session.arenaWaveStartCombatDelayTask = null
+        }
         val currentTick = Bukkit.getCurrentTick().toLong()
         if (targetMode == session.arenaBgmMode && session.arenaBgmSwitchRequest == null) {
             return
@@ -2819,6 +2846,20 @@ class ArenaManager(
 
         val request = buildArenaBgmSwitchRequest(session, targetMode, currentTick) ?: return
         session.arenaBgmSwitchRequest = request
+    }
+
+    private fun requestWaveStartCombatBgm(session: ArenaSession) {
+        session.arenaWaveStartCombatDelayTask?.cancel()
+        session.arenaWaveStartCombatDelayTask = null
+        stopArenaBgm(session)
+
+        val delayedTask = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            session.arenaWaveStartCombatDelayTask = null
+            val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
+            startArenaBgmMode(activeSession, ArenaBgmMode.COMBAT, Bukkit.getCurrentTick().toLong())
+        }, WAVE_START_COMBAT_BGM_DELAY_TICKS)
+        session.arenaWaveStartCombatDelayTask = delayedTask
+        session.transitionTasks.add(delayedTask)
     }
 
     private fun buildArenaBgmSwitchRequest(
@@ -2940,6 +2981,8 @@ class ArenaManager(
     }
 
     private fun stopArenaBgm(session: ArenaSession) {
+        session.arenaWaveStartCombatDelayTask?.cancel()
+        session.arenaWaveStartCombatDelayTask = null
         session.participants.forEach { participantId ->
             val player = Bukkit.getPlayer(participantId) ?: return@forEach
             if (!player.isOnline || player.world.name != session.worldName) return@forEach
