@@ -87,9 +87,10 @@ data class ArenaDoorAnimationPlacement(
     val openFrames: List<ArenaStructureTemplate>
 )
 
-private data class SelectedStructureVariant(
+    private data class SelectedStructureVariant(
     val baseTemplate: ArenaStructureTemplate,
-    val animatedVariant: ArenaAnimatedStructureVariant?
+    val animatedVariant: ArenaAnimatedStructureVariant?,
+    val variantKey: String
 )
 
 class ArenaStageGenerator {
@@ -114,6 +115,7 @@ class ArenaStageGenerator {
         val placements: List<TilePlacement>,
         val placementBoundsByIndex: MutableMap<Int, ArenaBounds> = mutableMapOf(),
         val selectedByPlacementIndex: MutableMap<Int, SelectedStructureVariant> = mutableMapOf(),
+        val lastSelectedVariantKeyByType: MutableMap<ArenaStructureType, String> = mutableMapOf(),
         val placementOriginByIndex: MutableMap<Int, Location> = mutableMapOf(),
         val connectionProfilesByPlacementIndex: MutableMap<Int, ConnectionMarkerProfile> = mutableMapOf(),
         val connectionProfileCache: MutableMap<ConnectionProfileCacheKey, ConnectionMarkerProfile> = mutableMapOf(),
@@ -226,7 +228,7 @@ class ArenaStageGenerator {
         }
 
         val base = locationForTile(job.origin, placement.point, job.theme.gridPitch)
-        val selected = pickStructureVariant(job.theme, placement, job.random)
+        val selected = pickStructureVariant(job, placement)
             ?: error("[Arena] 構造テンプレートが見つかりません: type=${placement.structureType}")
         val template = selected.baseTemplate
         val connectionProfile = job.connectionProfileCache.getOrPut(
@@ -302,6 +304,7 @@ class ArenaStageGenerator {
         placeStructure(template, placement.rotationQuarter, geometry.origin)
         job.placementBoundsByIndex[placement.index] = geometry.bounds
         job.selectedByPlacementIndex[placement.index] = selected
+        job.lastSelectedVariantKeyByType[placement.structureType] = selected.variantKey
         job.placementOriginByIndex[placement.index] = geometry.origin.clone()
         job.connectionProfilesByPlacementIndex[placement.index] = connectionProfile
         job.previousPlacement = placement
@@ -693,27 +696,41 @@ class ArenaStageGenerator {
         return (to.ordinal - from.ordinal).mod(4)
     }
 
-    private fun pickStructureVariant(
-        theme: ArenaTheme,
-        placement: TilePlacement,
-        random: Random
-    ): SelectedStructureVariant? {
+    private fun pickStructureVariant(job: BuildJob, placement: TilePlacement): SelectedStructureVariant? {
+        val theme = job.theme
+        val random = job.random
+        val lastVariantKey = job.lastSelectedVariantKeyByType[placement.structureType]
+
         return if (placement.structureType.supportsAnimation) {
-            theme.animatedStructures[placement.structureType]
-                ?.randomOrNull(random)
+            val variants = theme.animatedStructures[placement.structureType].orEmpty()
+            val filtered = if (variants.size > 1 && !lastVariantKey.isNullOrBlank()) {
+                variants.filter { (it.variation ?: it.closedTemplate.name) != lastVariantKey }
+            } else {
+                variants
+            }
+            val candidates = if (filtered.isNotEmpty()) filtered else variants
+            candidates.randomOrNull(random)
                 ?.let { variant ->
                     SelectedStructureVariant(
                         baseTemplate = variant.closedTemplate,
-                        animatedVariant = variant
+                        animatedVariant = variant,
+                        variantKey = variant.variation ?: variant.closedTemplate.name
                     )
                 }
         } else {
-            theme.staticStructures[placement.structureType]
-                ?.randomOrNull(random)
+            val variants = theme.staticStructures[placement.structureType].orEmpty()
+            val filtered = if (variants.size > 1 && !lastVariantKey.isNullOrBlank()) {
+                variants.filter { (it.variation ?: it.template.name) != lastVariantKey }
+            } else {
+                variants
+            }
+            val candidates = if (filtered.isNotEmpty()) filtered else variants
+            candidates.randomOrNull(random)
                 ?.let { variant ->
                     SelectedStructureVariant(
                         baseTemplate = variant.template,
-                        animatedVariant = null
+                        animatedVariant = null,
+                        variantKey = variant.variation ?: variant.template.name
                     )
                 }
         }

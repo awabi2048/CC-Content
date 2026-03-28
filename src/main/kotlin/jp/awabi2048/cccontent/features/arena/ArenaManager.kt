@@ -16,6 +16,7 @@ import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
 import jp.awabi2048.cccontent.mob.MobDefinition
 import jp.awabi2048.cccontent.mob.MobService
 import jp.awabi2048.cccontent.mob.MobSpawnOptions
+import jp.awabi2048.cccontent.mob.ability.PeriodicCobwebAbility
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import jp.awabi2048.cccontent.util.OageMessageSender
 import jp.awabi2048.cccontent.world.WorldSettingsHelper
@@ -46,13 +47,17 @@ import org.bukkit.entity.Marker
 import org.bukkit.entity.Mob
 import org.bukkit.entity.Player
 import org.bukkit.entity.Projectile
+import org.bukkit.entity.Shulker
 import org.bukkit.entity.Zombie
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
+import org.bukkit.event.block.BlockBreakEvent
+import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.player.PlayerAnimationEvent
+import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerAnimationType
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.PlayerInventory
@@ -150,6 +155,15 @@ private data class ArenaBgmConfig(
     val combat: ArenaBgmTrackConfig
 )
 
+private data class ArenaLobbyConfig(
+    val worldName: String,
+    val x: Double,
+    val y: Double,
+    val z: Double,
+    val yaw: Float,
+    val pitch: Float
+)
+
 class ArenaManager(
     private val plugin: JavaPlugin,
     private val mobService: MobService = MobService(plugin)
@@ -189,7 +203,7 @@ class ArenaManager(
         const val ACTION_MARKER_CENTER_Y_OFFSET = -0.25
         const val BARRIER_MARKER_HOLD_TICKS = 60
         const val MIDDLE_RING_MAX_ANGULAR_VELOCITY = 0.14
-        const val MOB_TOKEN_DROP_CHANCE = 0.25
+        const val MOB_TOKEN_DROP_CHANCE = 0.05
         const val MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT = 45
         const val MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT = 16.0
         const val MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT = 6
@@ -198,6 +212,11 @@ class ArenaManager(
         const val WAVE_START_COMBAT_BGM_DELAY_TICKS = 40L
         const val MULTIPLAYER_STAGE_INTRO_TELEPORT_EXTRA_DELAY_TICKS = 20L
         const val MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS = 5L
+        const val DOWN_REVIVE_HOLD_SECONDS_DEFAULT = 3
+        const val DOWN_REVIVE_RADIUS_DEFAULT = 2.5
+        const val DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT = 2L
+        const val REVIVE_LINK_TIMEOUT_TICKS = 200L
+        const val DOWNED_PLAYER_WALK_SPEED = 0.1f
 
         fun defaultSwitchBeats(loopBeats: Int): List<Int> {
             val safeLoopBeats = loopBeats.coerceAtLeast(1)
@@ -227,6 +246,10 @@ class ArenaManager(
     private var multiplayerJoinGraceSeconds = MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT
     private var multiplayerJoinMarkerSearchRadius = MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
     private var multiplayerStageBuildStepsPerTick = 1
+    private var downReviveHoldSeconds = DOWN_REVIVE_HOLD_SECONDS_DEFAULT
+    private var downReviveRadius = DOWN_REVIVE_RADIUS_DEFAULT
+    private var downShulkerFollowIntervalTicks = DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT
+    private var arenaLobbyConfig: ArenaLobbyConfig? = null
     private var actionMarkerHoldTicks = 60
     private var actionMarkerColorTransitionTicks = 16
     private var doorAnimationTotalTicks = DOOR_ANIMATION_TOTAL_TICKS_DEFAULT
@@ -294,10 +317,36 @@ class ArenaManager(
         multiplayerStageBuildStepsPerTick = config
             .getInt("arena.multiplayer.stage_build_steps_per_tick", 1)
             .coerceAtLeast(1)
+        downReviveHoldSeconds = config
+            .getInt("arena.down.revive_hold_seconds", DOWN_REVIVE_HOLD_SECONDS_DEFAULT)
+            .coerceAtLeast(1)
+        downReviveRadius = config
+            .getDouble("arena.down.revive_radius", DOWN_REVIVE_RADIUS_DEFAULT)
+            .coerceAtLeast(1.0)
+        downShulkerFollowIntervalTicks = config
+            .getLong("arena.down.shulker_follow_interval_ticks", DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT)
+            .coerceAtLeast(1L)
+        arenaLobbyConfig = loadArenaLobbyConfig(config)
         doorAnimationTotalTicks = config.getInt("arena.door_animation.total_ticks", DOOR_ANIMATION_TOTAL_TICKS_DEFAULT)
             .coerceAtLeast(1)
         sharedWaveMaxAlive = config.getInt("arena.mob_spawn.system_max_alive", SHARED_WAVE_MAX_ALIVE_DEFAULT)
             .coerceAtLeast(1)
+    }
+
+    private fun loadArenaLobbyConfig(config: FileConfiguration): ArenaLobbyConfig? {
+        val worldName = config.getString("arena.lobby.world")?.trim().orEmpty()
+        if (worldName.isBlank()) {
+            return null
+        }
+
+        return ArenaLobbyConfig(
+            worldName = worldName,
+            x = config.getDouble("arena.lobby.x", 0.0),
+            y = config.getDouble("arena.lobby.y", 64.0),
+            z = config.getDouble("arena.lobby.z", 0.0),
+            yaw = config.getDouble("arena.lobby.yaw", 0.0).toFloat(),
+            pitch = config.getDouble("arena.lobby.pitch", 0.0).toFloat()
+        )
     }
 
     private fun loadArenaBgmConfig() {
@@ -908,6 +957,99 @@ class ArenaManager(
         consumeMob(session, entityId, countKill = countKill)
     }
 
+    fun handleParticipantDamage(event: EntityDamageEvent) {
+        val player = event.entity as? Player ?: return
+        val session = getSession(player) ?: return
+        if (!session.participants.contains(player.uniqueId)) return
+
+        if (isPlayerDowned(session, player.uniqueId)) {
+            event.isCancelled = true
+            return
+        }
+
+        if (!isMultiplayerSession(session)) {
+            return
+        }
+
+        val finalHealth = player.health - event.finalDamage
+        if (finalHealth > 0.0) {
+            return
+        }
+
+        if (!hasOtherAliveNonDownParticipant(session, player.uniqueId)) {
+            return
+        }
+
+        event.isCancelled = true
+        setPlayerDown(session, player)
+    }
+
+    fun handleDownedPlayerAttack(event: EntityDamageByEntityEvent) {
+        val target = event.entity as? LivingEntity ?: return
+        if (target is Player) return
+
+        val attacker = resolveDamagerPlayer(event) ?: return
+        val session = getSession(attacker) ?: return
+        if (!isPlayerDowned(session, attacker.uniqueId)) {
+            return
+        }
+
+        event.isCancelled = true
+    }
+
+    fun handleParticipantFriendlyFire(event: EntityDamageByEntityEvent) {
+        val damaged = event.entity as? Player ?: return
+        val attacker = resolveDamagerPlayer(event) ?: return
+
+        val damagedSession = getSession(damaged) ?: return
+        val attackerSession = getSession(attacker) ?: return
+        if (damagedSession.worldName != attackerSession.worldName) {
+            return
+        }
+        if (!damagedSession.participants.contains(damaged.uniqueId)) {
+            return
+        }
+        if (!attackerSession.participants.contains(attacker.uniqueId)) {
+            return
+        }
+
+        if (event.damager is Player && attacker.uniqueId != damaged.uniqueId) {
+            handleReviveTargetSelection(attackerSession, attacker, damaged)
+        }
+
+        event.isCancelled = true
+    }
+
+    fun handleArenaBlockBreak(event: BlockBreakEvent) {
+        val worldName = event.block.world.name
+        if (!sessionsByWorld.containsKey(worldName)) {
+            return
+        }
+
+        if (event.block.type == Material.COBWEB && PeriodicCobwebAbility.consumeArenaPlacedCobweb(event.block)) {
+            return
+        }
+
+        event.isCancelled = true
+    }
+
+    fun handleArenaBlockPlace(event: BlockPlaceEvent) {
+        val worldName = event.block.world.name
+        if (!sessionsByWorld.containsKey(worldName)) {
+            return
+        }
+        event.isCancelled = true
+    }
+
+    fun handleArenaInteract(event: PlayerInteractEvent) {
+        val clicked = event.clickedBlock ?: return
+        val worldName = clicked.world.name
+        if (!sessionsByWorld.containsKey(worldName)) {
+            return
+        }
+        event.isCancelled = true
+    }
+
     fun handleMobFallDamage(event: EntityDamageEvent) {
         if (event.cause != EntityDamageEvent.DamageCause.FALL) return
         val entity = event.entity as? LivingEntity ?: return
@@ -932,6 +1074,11 @@ class ArenaManager(
         }
 
         val player = event.player
+        val session = getSession(player)
+        if (session != null && trySelectReviveTargetBySwing(session, player)) {
+            return
+        }
+
         val currentTick = Bukkit.getCurrentTick().toLong()
         val cooldownUntil = inviteSwingCooldownUntilTick[player.uniqueId] ?: Long.MIN_VALUE
         if (currentTick < cooldownUntil) {
@@ -998,6 +1145,26 @@ class ArenaManager(
             candidate is Player && candidate.uniqueId != source.uniqueId
         }
         return hit?.hitEntity as? Player
+    }
+
+    private fun trySelectReviveTargetBySwing(session: ArenaSession, player: Player): Boolean {
+        if (!session.participants.contains(player.uniqueId)) {
+            return false
+        }
+        if (isPlayerDowned(session, player.uniqueId)) {
+            return false
+        }
+
+        val target = rayTraceTargetPlayer(player) ?: return false
+        if (!session.participants.contains(target.uniqueId)) {
+            return false
+        }
+        if (!isPlayerDowned(session, target.uniqueId)) {
+            return false
+        }
+
+        handleReviveTargetSelection(session, player, target)
+        return true
     }
 
     private fun trySendMultiplayerInvite(owner: Player, invited: Player, session: ArenaSession) {
@@ -1125,7 +1292,7 @@ class ArenaManager(
         }
 
         val targetPlayer = target
-        if (!session.participants.contains(targetPlayer.uniqueId)) {
+        if (!session.participants.contains(targetPlayer.uniqueId) || isPlayerDowned(session, targetPlayer.uniqueId)) {
             event.isCancelled = true
             mob.target = selectNearestParticipant(session, mob.location)
         }
@@ -1146,6 +1313,17 @@ class ArenaManager(
         return null
     }
 
+    private fun resolveDamagerPlayer(event: EntityDamageByEntityEvent): Player? {
+        val damager = event.damager
+        if (damager is Player) {
+            return damager
+        }
+        if (damager is Projectile) {
+            return damager.shooter as? Player
+        }
+        return null
+    }
+
     private fun selectNearestParticipant(session: ArenaSession, origin: Location): Player? {
         val world = Bukkit.getWorld(session.worldName) ?: return null
         return session.participants
@@ -1154,11 +1332,389 @@ class ArenaManager(
                 player.isOnline &&
                     player.world.name == world.name &&
                     !player.isDead &&
-                    player.gameMode != org.bukkit.GameMode.SPECTATOR
+                    player.gameMode != org.bukkit.GameMode.SPECTATOR &&
+                    !isPlayerDowned(session, player.uniqueId)
             }
             .minByOrNull { player ->
                 player.location.distanceSquared(origin)
             }
+    }
+
+    private fun isMultiplayerSession(session: ArenaSession): Boolean {
+        return session.participants.size > 1
+    }
+
+    private fun isPlayerDowned(session: ArenaSession, playerId: UUID): Boolean {
+        return session.downedPlayers.containsKey(playerId)
+    }
+
+    private fun hasOtherAliveNonDownParticipant(session: ArenaSession, excludedPlayerId: UUID): Boolean {
+        val world = Bukkit.getWorld(session.worldName) ?: return false
+        return session.participants
+            .asSequence()
+            .filter { it != excludedPlayerId }
+            .filter { !session.downedPlayers.containsKey(it) }
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .any { participant ->
+                participant.isOnline &&
+                    !participant.isDead &&
+                    participant.world.uid == world.uid
+            }
+    }
+
+    private fun setPlayerDown(session: ArenaSession, player: Player) {
+        if (session.downedPlayers.containsKey(player.uniqueId)) {
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        session.downedPlayers[player.uniqueId] = ArenaDownedPlayerState(
+            downedAtMillis = now,
+            bleedoutAtMillis = Long.MAX_VALUE
+        )
+        session.reviveHoldStates[player.uniqueId] = ArenaReviveHoldState()
+        session.downedOriginalWalkSpeeds.putIfAbsent(player.uniqueId, player.walkSpeed)
+
+        player.health = 1.0
+        player.fireTicks = 0
+        player.fallDistance = 0.0f
+        player.walkSpeed = DOWNED_PLAYER_WALK_SPEED
+
+        syncDownedShulker(session, player, forceTeleport = true)
+        retargetMobsFromDownedPlayers(session)
+
+        player.sendMessage(
+            ArenaI18n.text(
+                player,
+                "arena.messages.down.entered",
+                "&cダウンしました。生存者の蘇生を待ってください"
+            )
+        )
+
+        session.participants
+            .asSequence()
+            .filter { it != player.uniqueId }
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .filter { it.isOnline && it.world.name == session.worldName }
+            .forEach { participant ->
+                participant.sendMessage("§c${player.name}さんがダウンしました！蘇生が必要です！")
+            }
+    }
+
+    private fun recoverDownedPlayer(session: ArenaSession, downed: Player, revivedBy: Player?) {
+        clearDownedState(session, downed.uniqueId)
+
+        val maxHealth = downed.getAttribute(Attribute.MAX_HEALTH)?.value ?: 20.0
+        val targetHealth = (maxHealth * 0.5).coerceAtLeast(1.0)
+        downed.health = targetHealth.coerceAtMost(maxHealth)
+        downed.noDamageTicks = 20
+
+        downed.sendMessage(
+            ArenaI18n.text(
+                downed,
+                "arena.messages.down.recovered",
+                "&a蘇生されました！"
+            )
+        )
+
+        if (revivedBy != null && revivedBy.uniqueId != downed.uniqueId) {
+            revivedBy.sendMessage(
+                ArenaI18n.text(
+                    revivedBy,
+                    "arena.messages.down.revive_success",
+                    "&a{player} を蘇生しました",
+                    "player" to downed.name
+                )
+            )
+        }
+    }
+
+    private fun updateDownedPlayers(currentTick: Long) {
+        for (session in sessionsByWorld.values) {
+            if (session.downedPlayers.isEmpty()) {
+                continue
+            }
+
+            retargetMobsFromDownedPlayers(session)
+
+            val shouldFollowShulker = currentTick % downShulkerFollowIntervalTicks == 0L
+
+            for (downedId in session.downedPlayers.keys.toList()) {
+                val downed = Bukkit.getPlayer(downedId)
+                if (downed == null || !downed.isOnline || downed.world.name != session.worldName) {
+                    clearDownedState(session, downedId)
+                    continue
+                }
+
+                if (shouldFollowShulker) {
+                    syncDownedShulker(session, downed, forceTeleport = false)
+                }
+
+                // ダウンは仕様として無制限のため、時間経過による離脱は行わない
+            }
+
+            updateReviveHoldStates(session)
+        }
+    }
+
+    private fun updateReviveHoldStates(session: ArenaSession) {
+        if (session.downedPlayers.isEmpty()) {
+            session.reviveHoldStates.clear()
+            session.reviveTargetByReviver.clear()
+            session.reviveBossBarsByDowned.values.forEach { hideReviveBossBarFromAll(session, it) }
+            session.reviveBossBarsByDowned.clear()
+            return
+        }
+
+        val reviveRadiusSquared = downReviveRadius * downReviveRadius
+        val requiredTicks = downReviveHoldSeconds * 20
+        val currentTick = Bukkit.getCurrentTick().toLong()
+
+        for (downedId in session.downedPlayers.keys.toList()) {
+            val downed = Bukkit.getPlayer(downedId)
+            if (downed == null || !downed.isOnline || downed.world.name != session.worldName) {
+                clearReviveBindingForDowned(session, downedId)
+                continue
+            }
+
+            val holdState = session.reviveHoldStates.getOrPut(downedId) { ArenaReviveHoldState() }
+            val reviverId = holdState.reviverPlayerId
+            if (reviverId == null) {
+                holdState.heldTicks = 0
+                hideReviveBossBar(session, downedId)
+                continue
+            }
+
+            if (holdState.heldTicks <= 0 && currentTick - holdState.linkedAtTick >= REVIVE_LINK_TIMEOUT_TICKS) {
+                clearReviveBindingForDowned(session, downedId)
+                continue
+            }
+
+            if (session.reviveTargetByReviver[reviverId] != downedId) {
+                clearReviveBindingForDowned(session, downedId)
+                continue
+            }
+
+            val reviver = Bukkit.getPlayer(reviverId)
+            if (
+                reviver == null ||
+                !reviver.isOnline ||
+                reviver.world.uid != downed.world.uid ||
+                !session.participants.contains(reviverId) ||
+                isPlayerDowned(session, reviverId)
+            ) {
+                clearReviveBindingForDowned(session, downedId)
+                continue
+            }
+
+            val inRange = reviver.location.distanceSquared(downed.location) <= reviveRadiusSquared
+            if (reviver.isSneaking && inRange) {
+                holdState.heldTicks += 1
+                holdState.lastProgressTick = currentTick
+            } else {
+                holdState.heldTicks = 0
+            }
+
+            val progress = (holdState.heldTicks.toFloat() / requiredTicks.toFloat()).coerceIn(0.0f, 1.0f)
+            updateReviveBossBar(session, downed, reviver, progress)
+
+            if (holdState.heldTicks < requiredTicks) {
+                continue
+            }
+
+            recoverDownedPlayer(session, downed, reviver)
+        }
+    }
+
+    private fun handleReviveTargetSelection(session: ArenaSession, reviver: Player, target: Player) {
+        if (!session.participants.contains(reviver.uniqueId)) {
+            return
+        }
+        if (!session.participants.contains(target.uniqueId)) {
+            return
+        }
+        if (!isPlayerDowned(session, target.uniqueId)) {
+            return
+        }
+        if (isPlayerDowned(session, reviver.uniqueId)) {
+            return
+        }
+        if (reviver.world.uid != target.world.uid) {
+            return
+        }
+
+        clearReviveBindingByReviver(session, reviver.uniqueId)
+        clearReviveBindingForDowned(session, target.uniqueId)
+
+        val holdState = session.reviveHoldStates.getOrPut(target.uniqueId) { ArenaReviveHoldState() }
+        val currentTick = Bukkit.getCurrentTick().toLong()
+        holdState.reviverPlayerId = reviver.uniqueId
+        holdState.heldTicks = 0
+        holdState.linkedAtTick = currentTick
+        holdState.lastProgressTick = currentTick
+        session.reviveTargetByReviver[reviver.uniqueId] = target.uniqueId
+
+        updateReviveBossBar(session, target, reviver, 0.0f)
+    }
+
+    private fun updateReviveBossBar(session: ArenaSession, downed: Player, reviver: Player, progress: Float) {
+        val bossBars = session.reviveBossBarsByDowned.getOrPut(downed.uniqueId) {
+            ArenaReviveBossBars(
+                downedPlayerBar = BossBar.bossBar(Component.empty(), 0.0f, BossBar.Color.BLUE, BossBar.Overlay.PROGRESS),
+                reviverPlayerBar = BossBar.bossBar(Component.empty(), 0.0f, BossBar.Color.BLUE, BossBar.Overlay.PROGRESS)
+            )
+        }
+        bossBars.downedPlayerBar.name(legacySerializer.deserialize("§7${reviver.name}さんが蘇生中..."))
+        bossBars.reviverPlayerBar.name(legacySerializer.deserialize("§7${downed.name}さんを蘇生中..."))
+        bossBars.downedPlayerBar.progress(progress.coerceIn(0.0f, 1.0f))
+        bossBars.reviverPlayerBar.progress(progress.coerceIn(0.0f, 1.0f))
+
+        if (downed.isOnline) {
+            downed.showBossBar(bossBars.downedPlayerBar)
+            downed.hideBossBar(bossBars.reviverPlayerBar)
+        }
+        if (reviver.isOnline) {
+            reviver.showBossBar(bossBars.reviverPlayerBar)
+            reviver.hideBossBar(bossBars.downedPlayerBar)
+        }
+
+        session.participants
+            .asSequence()
+            .filter { it != downed.uniqueId && it != reviver.uniqueId }
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .filter { it.isOnline }
+            .forEach {
+                it.hideBossBar(bossBars.downedPlayerBar)
+                it.hideBossBar(bossBars.reviverPlayerBar)
+            }
+    }
+
+    private fun hideReviveBossBar(session: ArenaSession, downedId: UUID) {
+        val bossBars = session.reviveBossBarsByDowned.remove(downedId) ?: return
+        hideReviveBossBarFromAll(session, bossBars)
+    }
+
+    private fun hideReviveBossBarFromAll(session: ArenaSession, bossBars: ArenaReviveBossBars) {
+        session.participants
+            .asSequence()
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .filter { it.isOnline }
+            .forEach {
+                it.hideBossBar(bossBars.downedPlayerBar)
+                it.hideBossBar(bossBars.reviverPlayerBar)
+            }
+    }
+
+    private fun clearReviveBindingByReviver(session: ArenaSession, reviverId: UUID) {
+        val downedId = session.reviveTargetByReviver.remove(reviverId) ?: return
+        val holdState = session.reviveHoldStates[downedId] ?: return
+        if (holdState.reviverPlayerId == reviverId) {
+            holdState.reviverPlayerId = null
+            holdState.heldTicks = 0
+            hideReviveBossBar(session, downedId)
+        }
+    }
+
+    private fun clearReviveBindingForDowned(session: ArenaSession, downedId: UUID) {
+        val holdState = session.reviveHoldStates[downedId]
+        val reviverId = holdState?.reviverPlayerId
+        if (reviverId != null) {
+            session.reviveTargetByReviver.remove(reviverId)
+        }
+        holdState?.reviverPlayerId = null
+        holdState?.heldTicks = 0
+        hideReviveBossBar(session, downedId)
+    }
+
+    private fun retargetMobsFromDownedPlayers(session: ArenaSession) {
+        session.activeMobs.forEach { mobId ->
+            val mob = Bukkit.getEntity(mobId) as? Mob ?: return@forEach
+            val target = mob.target as? Player ?: return@forEach
+            if (!isPlayerDowned(session, target.uniqueId)) {
+                return@forEach
+            }
+            mob.target = selectNearestParticipant(session, mob.location)
+        }
+    }
+
+    private fun syncDownedShulker(session: ArenaSession, downed: Player, forceTeleport: Boolean) {
+        val downState = session.downedPlayers[downed.uniqueId] ?: return
+        val anchor = downed.location.block.location.add(0.5, 1.0, 0.5)
+        val world = anchor.world ?: return
+
+        val shulker = downState.shulkerEntityId
+            ?.let { Bukkit.getEntity(it) as? Shulker }
+            ?.takeIf { it.isValid && !it.isDead }
+            ?: (world.spawnEntity(anchor, EntityType.SHULKER) as Shulker).also { spawned ->
+                configureDownedShulker(spawned)
+                downState.shulkerEntityId = spawned.uniqueId
+            }
+
+        if (forceTeleport || shulker.location.distanceSquared(anchor) > 0.01) {
+            shulker.teleport(anchor)
+        }
+
+        ejectAlivePassengersFromDownedShulker(session, shulker)
+    }
+
+    private fun configureDownedShulker(shulker: Shulker) {
+        shulker.setAI(false)
+        shulker.setGravity(false)
+        shulker.isInvulnerable = true
+        shulker.isInvisible = true
+        shulker.isSilent = true
+        shulker.isPersistent = true
+        shulker.addScoreboardTag("arena.down.shulker")
+    }
+
+    private fun ejectAlivePassengersFromDownedShulker(session: ArenaSession, shulker: Shulker) {
+        val baseBlockLocation = shulker.location.block.location
+        val ejectLocation = baseBlockLocation.clone().add(1.5, 0.0, 0.5)
+
+        shulker.passengers.toList().forEach { passenger ->
+            val passengerPlayer = passenger as? Player ?: run {
+                shulker.removePassenger(passenger)
+                return@forEach
+            }
+            if (!session.participants.contains(passengerPlayer.uniqueId) || isPlayerDowned(session, passengerPlayer.uniqueId)) {
+                return@forEach
+            }
+            shulker.removePassenger(passengerPlayer)
+            val destination = if (ejectLocation.block.isPassable) {
+                ejectLocation
+            } else {
+                ejectLocation.clone().add(0.0, 1.0, 0.0)
+            }
+            passengerPlayer.teleport(destination)
+        }
+    }
+
+    private fun clearDownedState(session: ArenaSession, playerId: UUID) {
+        clearReviveBindingForDowned(session, playerId)
+        val downState = session.downedPlayers.remove(playerId)
+        session.reviveHoldStates.remove(playerId)
+        restoreDownedWalkSpeed(session, playerId)
+
+        val shulker = downState?.shulkerEntityId?.let { Bukkit.getEntity(it) as? Shulker }
+        if (shulker != null && shulker.isValid && !shulker.isDead) {
+            shulker.remove()
+        }
+        downState?.shulkerEntityId = null
+    }
+
+    private fun restoreDownedWalkSpeed(session: ArenaSession, playerId: UUID) {
+        val originalSpeed = session.downedOriginalWalkSpeeds.remove(playerId) ?: return
+        val player = Bukkit.getPlayer(playerId) ?: return
+        if (!player.isOnline) {
+            return
+        }
+        player.walkSpeed = originalSpeed
+    }
+
+    private fun resolveLobbyLocation(): Location? {
+        val config = arenaLobbyConfig ?: return null
+        val world = Bukkit.getWorld(config.worldName) ?: return null
+        return Location(world, config.x, config.y, config.z, config.yaw, config.pitch)
     }
 
     private fun applyArenaMobDrop(event: EntityDeathEvent) {
@@ -1267,15 +1823,17 @@ class ArenaManager(
 
     private fun resolveMobTokenCategoryTypeId(mobTypeId: String): String {
         val normalized = sanitizeMobTypeId(mobTypeId)
-        return when {
-            normalized.contains("zombie") -> "zombie"
-            normalized.contains("skeleton") -> "skeleton"
-            normalized.contains("creeper") -> "creeper"
-            normalized.contains("piglin") -> "piglin"
-            normalized.contains("wither") -> "wither"
-            normalized.contains("dragon") -> "dragon"
-            else -> normalized
+        val baseEntityType = mobService.resolveMobType(normalized)?.baseEntityType
+        if (baseEntityType != null) {
+            return sanitizeMobTypeId(baseEntityType.name)
         }
+
+        val fallbackEntityType = runCatching { EntityType.valueOf(normalized.uppercase(Locale.ROOT)) }.getOrNull()
+        if (fallbackEntityType != null) {
+            return sanitizeMobTypeId(fallbackEntityType.name)
+        }
+
+        return normalized
     }
 
     private fun sanitizeMobTypeId(typeId: String): String {
@@ -1285,7 +1843,6 @@ class ArenaManager(
 
     private fun registerMobTypeTokenItems() {
         val tokenTypeIds = buildSet {
-            addAll(knownMobTypeIds)
             knownMobTypeIds.forEach { add(resolveMobTokenCategoryTypeId(it)) }
         }
         for (typeId in tokenTypeIds) {
@@ -1340,7 +1897,7 @@ class ArenaManager(
         return changed
     }
 
-    private fun leavePlayerFromSession(playerId: UUID, reason: String): Boolean {
+    private fun leavePlayerFromSession(playerId: UUID, reason: String, destinationOverride: Location? = null): Boolean {
         val worldName = playerToSessionWorld[playerId] ?: return false
         val session = sessionsByWorld[worldName] ?: return false
 
@@ -1357,6 +1914,12 @@ class ArenaManager(
         session.participantLocationHistory.remove(playerId)
         session.participantLastSampleMillis.remove(playerId)
         session.actionMarkerHoldStates.remove(playerId)
+        session.arenaBgmModeByParticipant.remove(playerId)
+        session.arenaBgmPlaybackStartTickByParticipant.remove(playerId)
+        session.arenaCombatHadTargetingMobByParticipant.remove(playerId)
+        session.arenaBgmSwitchRequestByParticipant.remove(playerId)
+        clearReviveBindingByReviver(session, playerId)
+        clearDownedState(session, playerId)
         session.invitedParticipants.remove(playerId)
         session.invitedAtMillis.remove(playerId)
         session.waitingParticipants.remove(playerId)
@@ -1369,7 +1932,8 @@ class ArenaManager(
             stopArenaBgmForPlayer(player)
             session.progressBossBar?.let { player.hideBossBar(it) }
             val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
-            val destination = if (returnLocation?.world != null) returnLocation else fallback
+            val destination = destinationOverride
+                ?: if (returnLocation?.world != null) returnLocation else fallback
             if (destination != null) {
                 player.teleport(destination)
             }
@@ -1412,6 +1976,9 @@ class ArenaManager(
         cleanupBarrierRestartSession(session, removeDefenseMobs = true, smoke = false)
         hideSessionProgressBossBar(session)
         clearMultiplayerRecruitmentState(session)
+        session.downedPlayers.keys.toList().forEach { downedId ->
+            clearDownedState(session, downedId)
+        }
 
         session.participants.toList().forEach { participantId ->
             playerToSessionWorld.remove(participantId)
@@ -1448,6 +2015,16 @@ class ArenaManager(
         session.playerNotifiedWaves.clear()
         session.participantLocationHistory.clear()
         session.participantLastSampleMillis.clear()
+        session.downedPlayers.clear()
+        session.reviveHoldStates.clear()
+        session.reviveTargetByReviver.clear()
+        session.reviveBossBarsByDowned.values.forEach { hideReviveBossBarFromAll(session, it) }
+        session.reviveBossBarsByDowned.clear()
+        session.arenaBgmModeByParticipant.clear()
+        session.arenaBgmPlaybackStartTickByParticipant.clear()
+        session.arenaCombatHadTargetingMobByParticipant.clear()
+        session.arenaBgmSwitchRequestByParticipant.clear()
+        session.downedOriginalWalkSpeeds.clear()
         session.invitedParticipants.clear()
         session.invitedAtMillis.clear()
         session.waitingParticipants.clear()
@@ -2592,16 +3169,13 @@ class ArenaManager(
                 OageMessageSender.send(player, "結界の再起動を確認しました！転送します！", plugin)
             }
 
-            Bukkit.getScheduler().runTaskLater(plugin, Runnable {
-                val currentSession = sessionsByWorld[session.worldName] ?: return@Runnable
-                terminateSession(
-                    currentSession,
-                    true,
-                    messageKey = "arena.messages.session.cleared",
-                    fallbackMessage = "&aアリーナクリア！"
-                )
-            }, 40L)
-        }, 40L)
+            terminateSession(
+                activeSession,
+                true,
+                messageKey = "arena.messages.session.cleared",
+                fallbackMessage = "&aアリーナクリア！"
+            )
+        }, 200L)
     }
 
     private fun removeRemainingWaveMobs(session: ArenaSession) {
@@ -2854,37 +3428,23 @@ class ArenaManager(
             session.arenaWaveStartCombatDelayTask = null
         }
         val currentTick = Bukkit.getCurrentTick().toLong()
-        if (targetMode == session.arenaBgmMode && session.arenaBgmSwitchRequest == null) {
-            return
+        session.participants.forEach { participantId ->
+            requestArenaBgmModeForParticipant(session, participantId, targetMode, currentTick)
         }
-
-        if (session.arenaBgmMode == ArenaBgmMode.STOPPED) {
-            if (targetMode == ArenaBgmMode.STOPPED) {
-                session.arenaBgmSwitchRequest = null
-                return
-            }
-            startArenaBgmMode(session, targetMode, currentTick)
-            return
-        }
-
-        if (targetMode == session.arenaBgmMode) {
-            session.arenaBgmSwitchRequest = null
-            return
-        }
-
-        val request = buildArenaBgmSwitchRequest(session, targetMode, currentTick) ?: return
-        session.arenaBgmSwitchRequest = request
     }
 
     private fun requestWaveStartCombatBgm(session: ArenaSession) {
         session.arenaWaveStartCombatDelayTask?.cancel()
         session.arenaWaveStartCombatDelayTask = null
 
-        if (session.arenaBgmMode == ArenaBgmMode.COMBAT && session.arenaBgmSwitchRequest == null) {
+        val participantModes = session.participants.map { participantArenaBgmMode(session, it) }
+        val allStopped = participantModes.all { it == ArenaBgmMode.STOPPED }
+        val allCombat = participantModes.all { it == ArenaBgmMode.COMBAT }
+        if (allCombat) {
             return
         }
 
-        if (session.arenaBgmMode != ArenaBgmMode.STOPPED) {
+        if (!allStopped) {
             requestArenaBgmMode(session, ArenaBgmMode.COMBAT)
             return
         }
@@ -2892,19 +3452,51 @@ class ArenaManager(
         val delayedTask = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             session.arenaWaveStartCombatDelayTask = null
             val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
-            startArenaBgmMode(activeSession, ArenaBgmMode.COMBAT, Bukkit.getCurrentTick().toLong())
+            requestArenaBgmMode(activeSession, ArenaBgmMode.COMBAT)
         }, WAVE_START_COMBAT_BGM_DELAY_TICKS)
         session.arenaWaveStartCombatDelayTask = delayedTask
         session.transitionTasks.add(delayedTask)
     }
 
+    private fun requestArenaBgmModeForParticipant(
+        session: ArenaSession,
+        participantId: UUID,
+        targetMode: ArenaBgmMode,
+        currentTick: Long
+    ) {
+        val currentMode = participantArenaBgmMode(session, participantId)
+        val currentRequest = session.arenaBgmSwitchRequestByParticipant[participantId]
+        if (targetMode == currentMode && currentRequest == null) {
+            return
+        }
+
+        if (currentMode == ArenaBgmMode.STOPPED) {
+            if (targetMode == ArenaBgmMode.STOPPED) {
+                session.arenaBgmSwitchRequestByParticipant.remove(participantId)
+                return
+            }
+            startArenaBgmMode(session, participantId, targetMode, currentTick)
+            return
+        }
+
+        if (targetMode == currentMode) {
+            session.arenaBgmSwitchRequestByParticipant.remove(participantId)
+            return
+        }
+
+        val request = buildArenaBgmSwitchRequest(session, participantId, targetMode, currentTick) ?: return
+        session.arenaBgmSwitchRequestByParticipant[participantId] = request
+    }
+
     private fun buildArenaBgmSwitchRequest(
         session: ArenaSession,
+        participantId: UUID,
         targetMode: ArenaBgmMode,
         requestedAtTick: Long
     ): ArenaBgmSwitchRequest? {
-        val currentTrack = arenaBgmTrackForMode(session.arenaBgmMode) ?: return null
-        val currentAbsoluteBeat = currentAbsoluteBeatAtTick(session, currentTrack, requestedAtTick)
+        val currentMode = participantArenaBgmMode(session, participantId)
+        val currentTrack = arenaBgmTrackForMode(currentMode) ?: return null
+        val currentAbsoluteBeat = currentAbsoluteBeatAtTick(session, participantId, currentTrack, requestedAtTick)
         val currentLoopBeats = currentTrack.loopBeats.toLong().coerceAtLeast(1L)
         val currentLoopBeat = (((currentAbsoluteBeat - 1L) % currentLoopBeats) + 1L).toInt()
         val nextSwitchBeat = currentTrack.switchBeats.firstOrNull { it > currentLoopBeat }
@@ -2926,29 +3518,38 @@ class ArenaManager(
     private fun updateArenaBgmTransitions() {
         val currentTick = Bukkit.getCurrentTick().toLong()
         sessionsByWorld.values.forEach { session ->
-            updateArenaCombatBgmRequest(session)
-            processArenaBgmSwitchRequest(session, currentTick)
+            session.participants.forEach { participantId ->
+                if (isPlayerDowned(session, participantId)) {
+                    session.arenaBgmSwitchRequestByParticipant.remove(participantId)
+                    return@forEach
+                }
+                updateArenaCombatBgmRequest(session, participantId, currentTick)
+                processArenaBgmSwitchRequest(session, participantId, currentTick)
+            }
         }
     }
 
-    private fun updateArenaCombatBgmRequest(session: ArenaSession) {
-        if (session.arenaBgmSwitchRequest != null) return
-        val hasTargetingMob = hasMobTargetingParticipants(session)
-        if (session.arenaBgmMode == ArenaBgmMode.COMBAT) {
+    private fun updateArenaCombatBgmRequest(session: ArenaSession, participantId: UUID, currentTick: Long) {
+        if (session.arenaBgmSwitchRequestByParticipant[participantId] != null) return
+        val hasTargetingMob = hasMobTargetingParticipant(session, participantId)
+        val currentMode = participantArenaBgmMode(session, participantId)
+        if (currentMode == ArenaBgmMode.COMBAT) {
             if (hasTargetingMob) {
-                session.arenaCombatHadTargetingMob = true
+                session.arenaCombatHadTargetingMobByParticipant[participantId] = true
                 return
             }
-            if (!session.arenaCombatHadTargetingMob) return
-            requestArenaBgmMode(session, ArenaBgmMode.NORMAL)
-        } else if (session.arenaBgmMode == ArenaBgmMode.NORMAL && hasTargetingMob) {
-            requestArenaBgmMode(session, ArenaBgmMode.COMBAT)
+            if (session.arenaCombatHadTargetingMobByParticipant[participantId] != true) return
+            requestArenaBgmModeForParticipant(session, participantId, ArenaBgmMode.NORMAL, currentTick)
+        } else if (currentMode == ArenaBgmMode.NORMAL && hasTargetingMob) {
+            requestArenaBgmModeForParticipant(session, participantId, ArenaBgmMode.COMBAT, currentTick)
         }
     }
 
-    private fun hasMobTargetingParticipants(session: ArenaSession): Boolean {
-        val participantIds = session.participants
-        if (participantIds.isEmpty()) return false
+    private fun hasMobTargetingParticipant(session: ArenaSession, participantId: UUID): Boolean {
+        if (!session.participants.contains(participantId)) return false
+        if (isPlayerDowned(session, participantId)) return false
+        val participant = Bukkit.getPlayer(participantId) ?: return false
+        if (!participant.isOnline || participant.isDead || participant.world.name != session.worldName) return false
 
         val trackedMobIds = sequence {
             yieldAll(session.activeMobs)
@@ -2961,73 +3562,84 @@ class ArenaManager(
                 return@any false
             }
             val target = mob.target as? Player ?: return@any false
-            participantIds.contains(target.uniqueId)
+            target.uniqueId == participantId && target.isOnline && !target.isDead && target.world.name == session.worldName
         }
     }
 
-    private fun processArenaBgmSwitchRequest(session: ArenaSession, currentTick: Long) {
-        val request = session.arenaBgmSwitchRequest ?: return
+    private fun processArenaBgmSwitchRequest(session: ArenaSession, participantId: UUID, currentTick: Long) {
+        val request = session.arenaBgmSwitchRequestByParticipant[participantId] ?: return
+        val currentMode = participantArenaBgmMode(session, participantId)
 
-        if (session.arenaBgmMode == ArenaBgmMode.STOPPED) {
-            session.arenaBgmSwitchRequest = null
+        if (currentMode == ArenaBgmMode.STOPPED) {
+            session.arenaBgmSwitchRequestByParticipant.remove(participantId)
             if (request.targetMode != ArenaBgmMode.STOPPED) {
-                startArenaBgmMode(session, request.targetMode, currentTick)
+                startArenaBgmMode(session, participantId, request.targetMode, currentTick)
             }
             return
         }
 
-        val currentTrack = arenaBgmTrackForMode(session.arenaBgmMode) ?: return
-        val absoluteBeatNow = currentAbsoluteBeatAtTick(session, currentTrack, currentTick)
+        val currentTrack = arenaBgmTrackForMode(currentMode) ?: return
+        val absoluteBeatNow = currentAbsoluteBeatAtTick(session, participantId, currentTrack, currentTick)
         if (absoluteBeatNow < request.executeAtAbsoluteBeat) {
             return
         }
 
-        session.arenaBgmSwitchRequest = null
+        session.arenaBgmSwitchRequestByParticipant.remove(participantId)
         if (request.targetMode == ArenaBgmMode.STOPPED) {
-            stopArenaBgm(session)
+            stopArenaBgmForParticipant(session, participantId)
             return
         }
-        if (request.targetMode == session.arenaBgmMode) {
+        if (request.targetMode == currentMode) {
             return
         }
 
-        startArenaBgmMode(session, request.targetMode, currentTick)
+        startArenaBgmMode(session, participantId, request.targetMode, currentTick)
     }
 
     private fun currentAbsoluteBeatAtTick(
         session: ArenaSession,
+        participantId: UUID,
         track: ArenaBgmTrackConfig,
         tick: Long
     ): Long {
-        val elapsedTicks = (tick - session.arenaBgmPlaybackStartTick).coerceAtLeast(0L)
+        val startTick = session.arenaBgmPlaybackStartTickByParticipant[participantId] ?: 0L
+        val elapsedTicks = (tick - startTick).coerceAtLeast(0L)
         return floor(elapsedTicks.toDouble() / track.beatTicks).toLong() + 1L
     }
 
-    private fun startArenaBgmMode(session: ArenaSession, mode: ArenaBgmMode, startTick: Long) {
+    private fun startArenaBgmMode(session: ArenaSession, participantId: UUID, mode: ArenaBgmMode, startTick: Long) {
         val track = arenaBgmTrackForMode(mode) ?: return
-        session.participants.forEach { participantId ->
-            val player = Bukkit.getPlayer(participantId) ?: return@forEach
-            if (!player.isOnline || player.world.name != session.worldName) return@forEach
+        val player = Bukkit.getPlayer(participantId)
+        if (player != null && player.isOnline && player.world.name == session.worldName) {
             BGMManager.playLoopTicks(player, track.soundKey, track.loopTicks)
         }
-        session.arenaBgmMode = mode
-        session.arenaBgmPlaybackStartTick = startTick
-        session.arenaCombatHadTargetingMob = false
-        session.arenaBgmSwitchRequest = null
+        session.arenaBgmModeByParticipant[participantId] = mode
+        session.arenaBgmPlaybackStartTickByParticipant[participantId] = startTick
+        session.arenaCombatHadTargetingMobByParticipant[participantId] = false
+        session.arenaBgmSwitchRequestByParticipant.remove(participantId)
     }
 
     private fun stopArenaBgm(session: ArenaSession) {
         session.arenaWaveStartCombatDelayTask?.cancel()
         session.arenaWaveStartCombatDelayTask = null
         session.participants.forEach { participantId ->
-            val player = Bukkit.getPlayer(participantId) ?: return@forEach
-            if (!player.isOnline || player.world.name != session.worldName) return@forEach
+            stopArenaBgmForParticipant(session, participantId)
+        }
+    }
+
+    private fun stopArenaBgmForParticipant(session: ArenaSession, participantId: UUID) {
+        val player = Bukkit.getPlayer(participantId)
+        if (player != null && player.isOnline && player.world.name == session.worldName) {
             stopArenaBgmForPlayer(player)
         }
-        session.arenaBgmMode = ArenaBgmMode.STOPPED
-        session.arenaBgmPlaybackStartTick = 0L
-        session.arenaCombatHadTargetingMob = false
-        session.arenaBgmSwitchRequest = null
+        session.arenaBgmModeByParticipant[participantId] = ArenaBgmMode.STOPPED
+        session.arenaBgmPlaybackStartTickByParticipant[participantId] = 0L
+        session.arenaCombatHadTargetingMobByParticipant[participantId] = false
+        session.arenaBgmSwitchRequestByParticipant.remove(participantId)
+    }
+
+    private fun participantArenaBgmMode(session: ArenaSession, participantId: UUID): ArenaBgmMode {
+        return session.arenaBgmModeByParticipant[participantId] ?: ArenaBgmMode.STOPPED
     }
 
     private fun stopArenaBgmPlaybackOnly(session: ArenaSession) {
@@ -3459,7 +4071,7 @@ class ArenaManager(
             val participants = session.participants
                 .asSequence()
                 .mapNotNull { Bukkit.getPlayer(it) }
-                .filter { it.isOnline && it.world.uid == world.uid }
+                .filter { it.isOnline && it.world.uid == world.uid && !isPlayerDowned(session, it.uniqueId) }
                 .toList()
             if (participants.isEmpty()) return@forEach
 
@@ -3476,7 +4088,9 @@ class ArenaManager(
                 updateActionMarkerHoldState(session, player, currentTick)
             }
 
-            session.actionMarkerHoldStates.keys.retainAll(session.participants)
+            session.actionMarkerHoldStates.entries.removeIf { entry ->
+                !session.participants.contains(entry.key) || isPlayerDowned(session, entry.key)
+            }
         }
     }
 
@@ -3779,7 +4393,9 @@ class ArenaManager(
 
         if (actionMarkerTask == null) {
             actionMarkerTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+                val currentTick = Bukkit.getCurrentTick().toLong()
                 updateMultiplayerJoinStates()
+                updateDownedPlayers(currentTick)
                 updateActionMarkers()
                 updateArenaBgmTransitions()
             }, 1L, 1L)
