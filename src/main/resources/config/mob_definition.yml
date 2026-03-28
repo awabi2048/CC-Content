@@ -177,3 +177,59 @@ zombie_heavy_shield:
   armor: 8.5
   scale: 1.0
 
+spider_plain:
+  type: spider_plain
+  health: 16.0
+  attack: 3.5
+  movement_speed: 0.30
+  armor: 0.0
+  scale: 1.0
+
+spider_stealth:
+  type: spider_stealth
+  health: 18.0
+  attack: 4.0
+  movement_speed: 0.32
+  armor: 1.0
+  scale: 0.8
+
+spider_broodmother:
+  type: spider_broodmother
+  health: 40.0
+  attack: 7.0
+  movement_speed: 0.27
+  armor: 6.0
+  scale: 1.5
+
+spider_broodling:
+  type: spider_broodling
+  health: 8.0
+  attack: 2.0
+  movement_speed: 0.18
+  armor: 0.0
+  scale: 0.5
+
+spider_swift:
+  type: spider_swift
+  health: 20.0
+  attack: 4.8
+  movement_speed: 0.35
+  armor: 1.5
+  scale: 1.0
+
+spider_venom_frenzy:
+  type: spider_venom_frenzy
+  health: 24.0
+  attack: 5.8
+  movement_speed: 0.34
+  armor: 2.5
+  scale: 1.2
+
+spider_ferocious:
+  type: spider_ferocious
+  health: 26.0
+  attack: 6.2
+  movement_speed: 0.33
+  armor: 3.0
+  scale: 1.2
+

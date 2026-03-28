@@ -4,17 +4,26 @@ import jp.awabi2048.cccontent.mob.CustomMobRuntime
 import jp.awabi2048.cccontent.mob.MobSpawnContext
 import jp.awabi2048.cccontent.mob.ability.BoomerangAbility
 import jp.awabi2048.cccontent.mob.ability.BackstepAbility
+import jp.awabi2048.cccontent.mob.ability.ClimbingLeapAbility
 import jp.awabi2048.cccontent.mob.ability.CurveShotAbility
 import jp.awabi2048.cccontent.mob.ability.LeapAbility
+import jp.awabi2048.cccontent.mob.ability.LinearProjectileAbility
+import jp.awabi2048.cccontent.mob.ability.PeriodicCobwebAbility
 import jp.awabi2048.cccontent.mob.ability.RangedAttackAbility
+import jp.awabi2048.cccontent.mob.ability.RandomInvisibilityAbility
 import jp.awabi2048.cccontent.mob.ability.ShieldAbility
+import jp.awabi2048.cccontent.mob.ability.SplitOnDeathAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponThrowAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponSwapAbility
+import org.bukkit.Color
+import org.bukkit.Particle
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.Material
 import org.bukkit.entity.EntityType
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
+import org.bukkit.potion.PotionEffect
+import org.bukkit.potion.PotionEffectType
 import kotlin.random.Random
 
 class ArenaEnhancedZombieMobType : EquipmentMobType(
@@ -224,6 +233,172 @@ class SkeletonWeaponThrowCloseMobType : EquipmentMobType(
     }
 }
 
+class SpiderPlainMobType : EquipmentMobType(
+    id = "spider_plain",
+    baseEntityType = EntityType.SPIDER,
+    abilities = emptyList()
+)
+
+class SpiderStealthMobType : EquipmentMobType(
+    id = "spider_stealth",
+    baseEntityType = EntityType.SPIDER,
+    abilities = listOf(
+        RandomInvisibilityAbility(
+            id = "spider_stealth_invisibility",
+            spawnChance = 0.12,
+            damagedChance = 0.16,
+            durationTicks = 60
+        ),
+        LeapAbility(
+            id = "spider_stealth_leap",
+            cooldownTicks = 75L,
+            minRangeSquared = 9.0,
+            maxRange = 7.0,
+            horizontalSpeed = 1.0,
+            verticalSpeed = 0.5
+        )
+    )
+)
+
+class SpiderBroodmotherMobType : EquipmentMobType(
+    id = "spider_broodmother",
+    baseEntityType = EntityType.SPIDER,
+    abilities = listOf(
+        PeriodicCobwebAbility(
+            id = "spider_broodmother_cobweb",
+            cycleTicks = 100L,
+            webLifetimeTicks = 100L,
+            radius = 3,
+            maxWebsPerCycle = 8
+        ),
+        SplitOnDeathAbility(
+            id = "spider_broodmother_split",
+            childDefinitionId = "spider_broodling",
+            splitCount = 4,
+            healthMultiplier = 0.5,
+            attackMultiplier = 0.5,
+            speedMultiplier = 0.5,
+            spawnRadius = 1.2
+        )
+    )
+)
+
+class SpiderBroodlingMobType : EquipmentMobType(
+    id = "spider_broodling",
+    baseEntityType = EntityType.SPIDER,
+    abilities = emptyList()
+)
+
+class SpiderSwiftMobType : EquipmentMobType(
+    id = "spider_swift",
+    baseEntityType = EntityType.SPIDER,
+    abilities = listOf(
+        LeapAbility(
+            id = "spider_swift_leap",
+            cooldownTicks = 70L,
+            minRangeSquared = 9.0,
+            maxRange = 8.0,
+            horizontalSpeed = 1.05,
+            verticalSpeed = 0.52
+        ),
+        ClimbingLeapAbility(
+            id = "spider_swift_climbing_leap",
+            cooldownTicks = 60L,
+            minRangeSquared = 4.0,
+            maxRange = 6.0,
+            horizontalSpeed = 1.05,
+            verticalSpeed = 0.6
+        )
+    )
+)
+
+class SpiderVenomFrenzyMobType : EquipmentMobType(
+    id = "spider_venom_frenzy",
+    baseEntityType = EntityType.CAVE_SPIDER,
+    abilities = listOf(
+        LinearProjectileAbility(
+            id = "spider_venom_projectile",
+            cooldownTicks = 160L,
+            minRange = 3.0,
+            maxRange = 16.0,
+            speedBlocksPerSecond = 1.0,
+            maxTravelDistance = 16.0,
+            damageMultiplier = 1.0,
+            trailRenderer = { location ->
+                val world = location.world
+                if (world != null) {
+                    world.spawnParticle(
+                        Particle.DUST,
+                        location,
+                        1,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        Particle.DustOptions(Color.fromRGB(26, 90, 26), 1.0f)
+                    )
+                    world.spawnParticle(Particle.ITEM_SLIME, location, 1, 0.05, 0.05, 0.05, 0.0)
+                }
+            },
+            onHit = { _, target ->
+                target.addPotionEffect(PotionEffect(PotionEffectType.POISON, 100, 0, false, true, true))
+            }
+        ),
+        LeapAbility(
+            id = "spider_venom_leap",
+            cooldownTicks = 80L,
+            minRangeSquared = 9.0,
+            maxRange = 7.0,
+            horizontalSpeed = 0.95,
+            verticalSpeed = 0.5
+        )
+    )
+)
+
+class SpiderFerociousMobType : EquipmentMobType(
+    id = "spider_ferocious",
+    baseEntityType = EntityType.SPIDER,
+    abilities = listOf(
+        LinearProjectileAbility(
+            id = "spider_web_projectile",
+            cooldownTicks = 120L,
+            minRange = 2.5,
+            maxRange = 14.0,
+            speedBlocksPerSecond = 0.75,
+            maxTravelDistance = 14.0,
+            damageMultiplier = 0.8,
+            trailRenderer = { location ->
+                val world = location.world
+                if (world != null) {
+                    world.spawnParticle(
+                        Particle.DUST,
+                        location,
+                        1,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        Particle.DustOptions(Color.WHITE, 1.5f)
+                    )
+                }
+            },
+            onHit = { _, target ->
+                target.addPotionEffect(PotionEffect(PotionEffectType.SLOWNESS, 80, 0, false, true, true))
+                resolveMiningFatigueEffectType()?.let { miningFatigue ->
+                    target.addPotionEffect(PotionEffect(miningFatigue, 80, 0, false, true, true))
+                }
+            }
+        ),
+        BackstepAbility(
+            id = "spider_ferocious_backstep",
+            cooldownTicks = 40L,
+            triggerDistance = 2.8,
+            horizontalSpeed = 1.05,
+            verticalSpeed = 0.4
+        )
+    )
+)
+
 private fun applyGlintBow(mainHand: ItemStack?) {
     val item = mainHand ?: return
     if (item.type != Material.BOW) return
@@ -233,6 +408,11 @@ private fun applyGlintBow(mainHand: ItemStack?) {
     val meta = item.itemMeta ?: return
     meta.addItemFlags(ItemFlag.HIDE_ENCHANTS)
     item.itemMeta = meta
+}
+
+private fun resolveMiningFatigueEffectType(): PotionEffectType? {
+    return PotionEffectType.getByName("MINING_FATIGUE")
+        ?: PotionEffectType.getByName("SLOW_DIGGING")
 }
 
 private fun randomGoldenTool(): Material {

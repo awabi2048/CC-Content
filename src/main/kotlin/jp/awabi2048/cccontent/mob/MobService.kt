@@ -11,6 +11,13 @@ import jp.awabi2048.cccontent.mob.type.SkeletonNormalMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonRapidShotMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonShieldMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonWeaponThrowCloseMobType
+import jp.awabi2048.cccontent.mob.type.SpiderBroodlingMobType
+import jp.awabi2048.cccontent.mob.type.SpiderBroodmotherMobType
+import jp.awabi2048.cccontent.mob.type.SpiderFerociousMobType
+import jp.awabi2048.cccontent.mob.type.SpiderPlainMobType
+import jp.awabi2048.cccontent.mob.type.SpiderStealthMobType
+import jp.awabi2048.cccontent.mob.type.SpiderSwiftMobType
+import jp.awabi2048.cccontent.mob.type.SpiderVenomFrenzyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
@@ -115,6 +122,13 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(SkeletonCurveBackstepMobType())
         registerMobType(SkeletonBowShieldMobType())
         registerMobType(SkeletonWeaponThrowCloseMobType())
+        registerMobType(SpiderPlainMobType())
+        registerMobType(SpiderStealthMobType())
+        registerMobType(SpiderBroodmotherMobType())
+        registerMobType(SpiderBroodlingMobType())
+        registerMobType(SpiderSwiftMobType())
+        registerMobType(SpiderVenomFrenzyMobType())
+        registerMobType(SpiderFerociousMobType())
     }
 
     fun registerMobType(mobType: MobType) {

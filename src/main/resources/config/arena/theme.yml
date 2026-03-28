@@ -60,3 +60,64 @@ ruins:
     straight_entry: south
     corridor_entry: south
     goal_entry: west
+
+desert_temple:
+  icon: STONE
+  max_summon_count: 10
+  clear_mob_count: 20
+  mobs:
+    zombie_plain:
+      weight: 8
+      wave: 1..
+    zombie_leap_only:
+      weight: 9
+      wave: 1..
+    zombie_shield_only:
+      weight: 7
+      wave: 3..
+    zombie_bow_only:
+      weight: 7
+      wave: 2..
+    zombie_bow_swap:
+      weight: 8
+      wave: 3..
+    skeleton_basic:
+      weight: 8
+      wave: 1..
+    skeleton_rapid_shot_basic:
+      weight: 7
+      wave: 2..
+    skeleton_curve_backstep_basic:
+      weight: 6
+      wave: 3..
+    skeleton_bow_shield_basic:
+      weight: 6
+      wave: 3..
+    skeleton_weapon_throw_close_basic:
+      weight: 7
+      wave: 2..
+    spider_plain:
+      weight: 8
+      wave: 1..
+    spider_stealth:
+      weight: 7
+      wave: 2..
+    spider_swift:
+      weight: 7
+      wave: 2..
+    spider_ferocious:
+      weight: 6
+      wave: 3..
+    spider_venom_frenzy:
+      weight: 5
+      wave: 4..
+    spider_broodmother:
+      weight: 3
+      wave: 5..
+  orientation:
+    entrance_exit: south
+    corner_entry: north
+    corner_exit: west
+    straight_entry: east
+    corridor_entry: north
+    goal_entry: east
