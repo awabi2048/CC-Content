@@ -6,6 +6,7 @@ import org.bukkit.Location
 import org.bukkit.World
 import org.bukkit.block.structure.Mirror
 import org.bukkit.block.structure.StructureRotation
+import org.bukkit.entity.EntityType
 import org.bukkit.entity.Marker
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
@@ -25,6 +26,32 @@ private data class TilePlacement(
 private data class PlacementGeometry(
     val origin: Location,
     val bounds: ArenaBounds
+)
+
+private data class ConnectionProfileCacheKey(
+    val templateName: String,
+    val rotationQuarter: Int
+)
+
+private data class RotatedConnectionMarker(
+    val blockX: Int,
+    val blockY: Int,
+    val blockZ: Int
+)
+
+private data class RawConnectionMarker(
+    val side: ArenaPathDirection,
+    val blockX: Int,
+    val blockY: Int,
+    val blockZ: Int
+)
+
+private data class ConnectionMarkerProfile(
+    val sideMarkers: Map<ArenaPathDirection, List<RotatedConnectionMarker>>,
+    val widthX: Int,
+    val widthZ: Int,
+    val markerCount: Int,
+    val issues: List<String>
 )
 
 data class ArenaStageValidationIssue(
@@ -66,6 +93,10 @@ private data class SelectedStructureVariant(
 )
 
 class ArenaStageGenerator {
+    companion object {
+        private const val CONNECTION_MARKER_TAG = "arena.marker.connection"
+    }
+
     private enum class BuildPhase {
         PLACE_STRUCTURES,
         SCAN_ROOMS,
@@ -84,6 +115,8 @@ class ArenaStageGenerator {
         val placementBoundsByIndex: MutableMap<Int, ArenaBounds> = mutableMapOf(),
         val selectedByPlacementIndex: MutableMap<Int, SelectedStructureVariant> = mutableMapOf(),
         val placementOriginByIndex: MutableMap<Int, Location> = mutableMapOf(),
+        val connectionProfilesByPlacementIndex: MutableMap<Int, ConnectionMarkerProfile> = mutableMapOf(),
+        val connectionProfileCache: MutableMap<ConnectionProfileCacheKey, ConnectionMarkerProfile> = mutableMapOf(),
         val validationIssues: MutableList<ArenaStageValidationIssue> = mutableListOf(),
         var previousPlacement: TilePlacement? = null,
         var stageBounds: ArenaBounds? = null,
@@ -196,6 +229,28 @@ class ArenaStageGenerator {
         val selected = pickStructureVariant(job.theme, placement, job.random)
             ?: error("[Arena] 構造テンプレートが見つかりません: type=${placement.structureType}")
         val template = selected.baseTemplate
+        val connectionProfile = job.connectionProfileCache.getOrPut(
+            ConnectionProfileCacheKey(template.name, placement.rotationQuarter)
+        ) {
+            buildConnectionMarkerProfile(template, placement.rotationQuarter)
+        }
+
+        if (connectionProfile.markerCount == 0) {
+            job.validationIssues.add(
+                ArenaStageValidationIssue(
+                    structureName = template.name,
+                    missingMarkers = listOf(CONNECTION_MARKER_TAG)
+                )
+            )
+        }
+        if (connectionProfile.issues.isNotEmpty()) {
+            job.validationIssues.add(
+                ArenaStageValidationIssue(
+                    structureName = template.name,
+                    missingMarkers = connectionProfile.issues
+                )
+            )
+        }
 
         val geometry = if (job.previousPlacement == null) {
             computeFirstPlacementGeometry(base, job.theme.gridPitch, template.size, placement.rotationQuarter)
@@ -203,20 +258,52 @@ class ArenaStageGenerator {
             val previous = job.previousPlacement ?: error("[Arena] 直前配置が見つかりません")
             val previousBounds = job.placementBoundsByIndex[previous.index]
                 ?: error("[Arena] 直前配置の境界情報が見つかりません: index=${previous.index}")
-            computeConnectedPlacementGeometry(
-                world = job.world,
-                previousPlacement = previous,
-                currentPlacement = placement,
-                previousBounds = previousBounds,
-                currentSize = template.size,
-                currentRotationQuarter = placement.rotationQuarter
-            )
+            val previousTemplateName = job.selectedByPlacementIndex[previous.index]?.baseTemplate?.name
+                ?: "unknown"
+            val previousConnectionProfile = job.connectionProfilesByPlacementIndex[previous.index]
+                ?: error("[Arena] 直前配置の接続マーカー情報が見つかりません: index=${previous.index}")
+            try {
+                val connectedGeometry = computeConnectedPlacementGeometry(
+                    world = job.world,
+                    previousPlacement = previous,
+                    currentPlacement = placement,
+                    previousBounds = previousBounds,
+                    currentSize = template.size,
+                    currentRotationQuarter = placement.rotationQuarter,
+                    previousTemplateName = previousTemplateName,
+                    currentTemplateName = template.name,
+                    previousConnectionProfile = previousConnectionProfile,
+                    currentConnectionProfile = connectionProfile
+                )
+                val collidedPlacement = findCollidedPlacementIndex(
+                    candidate = connectedGeometry.bounds,
+                    existing = job.placementBoundsByIndex,
+                    exceptPlacementIndex = previous.index
+                )
+                if (collidedPlacement != null) {
+                    error(
+                        "$CONNECTION_MARKER_TAG(collision collidedWith=$collidedPlacement " +
+                            "candidate=${boundsSummary(connectedGeometry.bounds)})"
+                    )
+                }
+                connectedGeometry
+            } catch (e: IllegalStateException) {
+                throw ArenaStageBuildException(
+                    listOf(
+                        ArenaStageValidationIssue(
+                            structureName = template.name,
+                            missingMarkers = listOf(e.message ?: "$CONNECTION_MARKER_TAG(connection_failed)")
+                        )
+                    )
+                )
+            }
         }
 
         placeStructure(template, placement.rotationQuarter, geometry.origin)
         job.placementBoundsByIndex[placement.index] = geometry.bounds
         job.selectedByPlacementIndex[placement.index] = selected
         job.placementOriginByIndex[placement.index] = geometry.origin.clone()
+        job.connectionProfilesByPlacementIndex[placement.index] = connectionProfile
         job.previousPlacement = placement
         job.placementCursor += 1
     }
@@ -724,35 +811,87 @@ class ArenaStageGenerator {
         currentPlacement: TilePlacement,
         previousBounds: ArenaBounds,
         currentSize: ArenaStructureSize,
-        currentRotationQuarter: Int
+        currentRotationQuarter: Int,
+        previousTemplateName: String,
+        currentTemplateName: String,
+        previousConnectionProfile: ConnectionMarkerProfile,
+        currentConnectionProfile: ConnectionMarkerProfile
     ): PlacementGeometry {
         val direction = directionOf(previousPlacement.point, currentPlacement.point)
         val (currentWidthX, currentWidthZ) = rotatedFootprint(currentSize, currentRotationQuarter)
-        val previousCenterX2 = previousBounds.minX + previousBounds.maxX + 1
-        val previousCenterZ2 = previousBounds.minZ + previousBounds.maxZ + 1
+        val previousSide = direction
+        val currentSide = direction.opposite()
+        val previousSideUnrotated = toUnrotatedDirection(previousSide, previousPlacement.rotationQuarter)
+        val currentSideUnrotated = toUnrotatedDirection(currentSide, currentRotationQuarter)
+        val connectionContext =
+            "from=${previousTemplateName}(index=${previousPlacement.index},type=${previousPlacement.structureType.keyword}) " +
+                "to=${currentTemplateName}(index=${currentPlacement.index},type=${currentPlacement.structureType.keyword}) " +
+                "worldDirection=${direction.token} fromWorldSide=${previousSide.token} toWorldSide=${currentSide.token} " +
+                "fromUnrotatedSide=${previousSideUnrotated.token} toUnrotatedSide=${currentSideUnrotated.token}"
+        val previousDetected = sideDetectedCoordinates(previousConnectionProfile, previousSide)
+        val currentDetected = sideDetectedCoordinates(currentConnectionProfile, currentSide)
+        val previousMarkers = previousConnectionProfile.sideMarkers[previousSide].orEmpty()
+        val currentMarkers = currentConnectionProfile.sideMarkers[currentSide].orEmpty()
 
-        val minX: Int
-        val minZ: Int
-        when (direction) {
-            ArenaPathDirection.EAST -> {
-                minX = previousBounds.maxX + 1
-                minZ = centeredMin(previousCenterZ2, currentWidthZ)
-            }
-            ArenaPathDirection.WEST -> {
-                minX = previousBounds.minX - currentWidthX
-                minZ = centeredMin(previousCenterZ2, currentWidthZ)
-            }
-            ArenaPathDirection.SOUTH -> {
-                minX = centeredMin(previousCenterX2, currentWidthX)
-                minZ = previousBounds.maxZ + 1
-            }
-            ArenaPathDirection.NORTH -> {
-                minX = centeredMin(previousCenterX2, currentWidthX)
-                minZ = previousBounds.minZ - currentWidthZ
-            }
+        if (previousMarkers.isEmpty()) {
+            error("$CONNECTION_MARKER_TAG(previous_${previousSideUnrotated.token}_missing detected=$previousDetected $connectionContext)")
+        }
+        if (currentMarkers.isEmpty()) {
+            error("$CONNECTION_MARKER_TAG(current_${currentSideUnrotated.token}_missing detected=$currentDetected $connectionContext)")
         }
 
-        val footprintMin = Location(world, minX.toDouble(), previousBounds.minY.toDouble(), minZ.toDouble())
+        if (previousMarkers.size > 1) {
+            error(
+                "$CONNECTION_MARKER_TAG(previous_${previousSideUnrotated.token}_multiple detected=${previousMarkers.size} points=$previousDetected $connectionContext)"
+            )
+        }
+        if (currentMarkers.size > 1) {
+            error(
+                "$CONNECTION_MARKER_TAG(current_${currentSideUnrotated.token}_multiple detected=${currentMarkers.size} points=$currentDetected $connectionContext)"
+            )
+        }
+
+        val previousMarker = previousMarkers.first()
+        val currentMarker = currentMarkers.first()
+        val targetBlockX = previousBounds.minX + previousMarker.blockX + direction.dx
+        val targetBlockY = previousBounds.minY + previousMarker.blockY
+        val targetBlockZ = previousBounds.minZ + previousMarker.blockZ + direction.dz
+        val minX = targetBlockX - currentMarker.blockX
+        val minY = targetBlockY - currentMarker.blockY
+        val minZ = targetBlockZ - currentMarker.blockZ
+        val previousWorldBlockX = previousBounds.minX + previousMarker.blockX
+        val previousWorldBlockY = previousBounds.minY + previousMarker.blockY
+        val previousWorldBlockZ = previousBounds.minZ + previousMarker.blockZ
+        val currentWorldBlockX = minX + currentMarker.blockX
+        val currentWorldBlockY = minY + currentMarker.blockY
+        val currentWorldBlockZ = minZ + currentMarker.blockZ
+
+        if (
+            currentWorldBlockX != targetBlockX ||
+            currentWorldBlockY != targetBlockY ||
+            currentWorldBlockZ != targetBlockZ
+        ) {
+            error(
+                "$CONNECTION_MARKER_TAG(anchor_mismatch expected=(x=$targetBlockX,y=$targetBlockY,z=$targetBlockZ) " +
+                    "actual=(x=$currentWorldBlockX,y=$currentWorldBlockY,z=$currentWorldBlockZ) $connectionContext)"
+            )
+        }
+
+        val expectedPreviousConnectedX = previousWorldBlockX + direction.dx
+        val expectedPreviousConnectedY = previousWorldBlockY
+        val expectedPreviousConnectedZ = previousWorldBlockZ + direction.dz
+        if (
+            currentWorldBlockX != expectedPreviousConnectedX ||
+            currentWorldBlockY != expectedPreviousConnectedY ||
+            currentWorldBlockZ != expectedPreviousConnectedZ
+        ) {
+            error(
+                "$CONNECTION_MARKER_TAG(adjacent_mismatch previous=(x=$previousWorldBlockX,y=$previousWorldBlockY,z=$previousWorldBlockZ) " +
+                    "current=(x=$currentWorldBlockX,y=$currentWorldBlockY,z=$currentWorldBlockZ) direction=${direction.token} $connectionContext)"
+            )
+        }
+
+        val footprintMin = Location(world, minX.toDouble(), minY.toDouble(), minZ.toDouble())
         val rotation = toRotation(currentRotationQuarter)
         val (rotationOffsetX, rotationOffsetZ) = placementOffset(currentSize, rotation)
         val placeOrigin = footprintMin.clone().add(rotationOffsetX, 0.0, rotationOffsetZ)
@@ -760,8 +899,160 @@ class ArenaStageGenerator {
         return PlacementGeometry(placeOrigin, bounds)
     }
 
-    private fun centeredMin(referenceCenter2: Int, width: Int): Int {
-        return floor((referenceCenter2 - width) / 2.0).toInt()
+    private fun buildConnectionMarkerProfile(
+        template: ArenaStructureTemplate,
+        rotationQuarter: Int
+    ): ConnectionMarkerProfile {
+        val size = template.size
+        val (widthX, widthZ) = rotatedFootprint(size, rotationQuarter)
+        val sideMarkers = mutableMapOf(
+            ArenaPathDirection.NORTH to mutableListOf<RotatedConnectionMarker>(),
+            ArenaPathDirection.EAST to mutableListOf<RotatedConnectionMarker>(),
+            ArenaPathDirection.SOUTH to mutableListOf<RotatedConnectionMarker>(),
+            ArenaPathDirection.WEST to mutableListOf<RotatedConnectionMarker>()
+        )
+        val rawResult = buildRawConnectionMarkers(template)
+        val issues = mutableListOf<String>()
+        issues += rawResult.issues
+
+        rawResult.markers.forEach { rawMarker ->
+            val (rotatedX, rotatedZ) = rotatePoint(
+                rawMarker.blockX.toDouble(),
+                rawMarker.blockZ.toDouble(),
+                size,
+                rotationQuarter
+            )
+            val rotatedBlockX = floor(rotatedX).toInt()
+            val rotatedBlockZ = floor(rotatedZ).toInt()
+            val rotatedSide = rawMarker.side.rotateClockwise(rotationQuarter)
+            val rotatedMarker = RotatedConnectionMarker(
+                blockX = rotatedBlockX,
+                blockY = rawMarker.blockY,
+                blockZ = rotatedBlockZ
+            )
+            val sideList = sideMarkers[rotatedSide] ?: return@forEach
+            sideList.add(rotatedMarker)
+            if (sideList.size > 1) {
+                issues.add("$CONNECTION_MARKER_TAG(multiple_points side=${rotatedSide.token} count=${sideList.size})")
+            }
+        }
+
+        return ConnectionMarkerProfile(
+            sideMarkers = sideMarkers.mapValues { it.value.toList() },
+            widthX = widthX,
+            widthZ = widthZ,
+            markerCount = rawResult.markerCount,
+            issues = issues.distinct()
+        )
+    }
+
+    private data class RawConnectionMarkerResult(
+        val markers: List<RawConnectionMarker>,
+        val markerCount: Int,
+        val issues: List<String>
+    )
+
+    private fun buildRawConnectionMarkers(template: ArenaStructureTemplate): RawConnectionMarkerResult {
+        val size = template.size
+        val sideMarkers = mutableMapOf(
+            ArenaPathDirection.NORTH to mutableListOf<RawConnectionMarker>(),
+            ArenaPathDirection.EAST to mutableListOf<RawConnectionMarker>(),
+            ArenaPathDirection.SOUTH to mutableListOf<RawConnectionMarker>(),
+            ArenaPathDirection.WEST to mutableListOf<RawConnectionMarker>()
+        )
+        val issues = mutableListOf<String>()
+        var markerCount = 0
+
+        template.structure.entities.forEach { entity ->
+            if (entity.type != EntityType.MARKER) return@forEach
+            if (!entity.scoreboardTags.contains(CONNECTION_MARKER_TAG)) return@forEach
+            markerCount += 1
+
+            val blockX = floor(entity.location.x).toInt()
+            val blockY = floor(entity.location.y).toInt()
+            val blockZ = floor(entity.location.z).toInt()
+            val touchedSides = mutableListOf<ArenaPathDirection>()
+            if (blockX == 0) touchedSides.add(ArenaPathDirection.WEST)
+            if (blockX == size.x - 1) touchedSides.add(ArenaPathDirection.EAST)
+            if (blockZ == 0) touchedSides.add(ArenaPathDirection.NORTH)
+            if (blockZ == size.z - 1) touchedSides.add(ArenaPathDirection.SOUTH)
+
+            if (touchedSides.isEmpty()) {
+                issues.add("$CONNECTION_MARKER_TAG(non_boundary x=$blockX z=$blockZ)")
+                return@forEach
+            }
+            if (touchedSides.size != 1) {
+                issues.add(
+                    "$CONNECTION_MARKER_TAG(ambiguous_boundary sides=${touchedSides.joinToString { it.token }} x=$blockX z=$blockZ)"
+                )
+                return@forEach
+            }
+
+            val marker = RawConnectionMarker(
+                side = touchedSides.first(),
+                blockX = blockX,
+                blockY = blockY,
+                blockZ = blockZ
+            )
+            val sideList = sideMarkers[marker.side] ?: return@forEach
+            sideList.add(marker)
+            if (sideList.size > 1) {
+                issues.add("$CONNECTION_MARKER_TAG(multiple_points side=${marker.side.token} count=${sideList.size})")
+            }
+        }
+
+        return RawConnectionMarkerResult(
+            markers = sideMarkers.values.flatten(),
+            markerCount = markerCount,
+            issues = issues.distinct()
+        )
+    }
+
+    private fun rotatePoint(
+        x: Double,
+        z: Double,
+        size: ArenaStructureSize,
+        rotationQuarter: Int
+    ): Pair<Double, Double> {
+        return when (rotationQuarter.mod(4)) {
+            1 -> (size.z - 1).toDouble() - z to x
+            2 -> (size.x - 1).toDouble() - x to (size.z - 1).toDouble() - z
+            3 -> z to (size.x - 1).toDouble() - x
+            else -> x to z
+        }
+    }
+
+    private fun toUnrotatedDirection(direction: ArenaPathDirection, rotationQuarter: Int): ArenaPathDirection {
+        return direction.rotateClockwise(-rotationQuarter)
+    }
+
+    private fun sideDetectedCoordinates(profile: ConnectionMarkerProfile, side: ArenaPathDirection): String {
+        val markers = profile.sideMarkers[side].orEmpty()
+            .sortedWith(compareBy<RotatedConnectionMarker> { it.blockY }.thenBy { it.blockX }.thenBy { it.blockZ })
+        if (markers.isEmpty()) return "[]"
+        return markers.joinToString(prefix = "[", postfix = "]") { marker ->
+            "(x=${marker.blockX},y=${marker.blockY},z=${marker.blockZ})"
+        }
+    }
+
+    private fun findCollidedPlacementIndex(
+        candidate: ArenaBounds,
+        existing: Map<Int, ArenaBounds>,
+        exceptPlacementIndex: Int
+    ): Int? {
+        return existing.entries.firstOrNull { (placementIndex, bounds) ->
+            placementIndex != exceptPlacementIndex && boundsOverlap(candidate, bounds)
+        }?.key
+    }
+
+    private fun boundsOverlap(a: ArenaBounds, b: ArenaBounds): Boolean {
+        return a.minX <= b.maxX && a.maxX >= b.minX &&
+            a.minY <= b.maxY && a.maxY >= b.minY &&
+            a.minZ <= b.maxZ && a.maxZ >= b.minZ
+    }
+
+    private fun boundsSummary(bounds: ArenaBounds): String {
+        return "(min=${bounds.minX},${bounds.minY},${bounds.minZ} max=${bounds.maxX},${bounds.maxY},${bounds.maxZ})"
     }
 
     private fun placementOffset(size: ArenaStructureSize, rotation: StructureRotation): Pair<Double, Double> {

@@ -377,6 +377,7 @@ custom_items:
         mob: '&cMob'
         entrance: '&aEntrance'
         join_area: '&fJoin Area'
+        connection: '&6Connection'
         door_block: '&eDoor'
         barrier_core: '&bBarrier Core'
         barrier_point: '&3Barrier Point'
