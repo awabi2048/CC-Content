@@ -426,6 +426,11 @@ custom_items:
         stage_intro: '&6Starting stage transfer...'
         cancelled_owner_offline: '&cMultiplayer recruitment ended because the owner is offline'
         cancelled_owner_not_waiting: '&cStart canceled because the owner is not in the waiting area'
+      down:
+        entered: '&cYou are downed. Wait for a teammate to revive you'
+        recovered: '&aYou have been revived!'
+        revive_success: '&aYou revived {player}'
+        timeout: '&cBleedout time expired. Teleporting to lobby'
       barrier:
         cannot_break: '&cThe barrier core cannot be broken'
         cannot_place_on: '&cYou cannot place blocks on the barrier core'

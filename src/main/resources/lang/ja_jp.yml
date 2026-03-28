@@ -1056,6 +1056,11 @@ custom_items:
         stage_intro: '&6ステージ転送を開始します...'
         cancelled_owner_offline: '&cオーナーが不在のためマルチ参加募集を終了しました'
         cancelled_owner_not_waiting: '&cオーナーが開始待機エリアにいないため開始を中止しました'
+      down:
+        entered: '&cダウンしました。生存者の蘇生を待ってください'
+        recovered: '&a蘇生されました！'
+        revive_success: '&a{player} を蘇生しました'
+        timeout: '&cダウン時間切れです。ロビーへ転送されます'
       barrier:
         cannot_break: '&c結界石は破壊できません'
         cannot_place_on: '&c結界石の上には設置できません'

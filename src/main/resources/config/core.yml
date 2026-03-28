@@ -116,6 +116,17 @@ arena:
     join_grace_seconds: 45
     join_marker_search_radius: 16.0
     stage_build_steps_per_tick: 1
+  down:
+    revive_hold_seconds: 3
+    revive_radius: 2.5
+    shulker_follow_interval_ticks: 2
+  lobby:
+    world: ""
+    x: 0.0
+    y: 64.0
+    z: 0.0
+    yaw: 0.0
+    pitch: 0.0
   mob_spawn:
     system_max_alive: 128
   door_animation:

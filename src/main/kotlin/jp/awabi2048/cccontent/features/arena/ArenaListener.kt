@@ -6,8 +6,11 @@ import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
+import org.bukkit.event.block.BlockBreakEvent
+import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.player.PlayerAnimationEvent
+import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerQuitEvent
 
 class ArenaListener(private val arenaManager: ArenaManager) : Listener {
@@ -19,11 +22,23 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
 
     @EventHandler(ignoreCancelled = true)
     fun onEntityDamage(event: EntityDamageEvent) {
+        arenaManager.handleParticipantDamage(event)
+        if (event.isCancelled) {
+            return
+        }
         arenaManager.handleMobFallDamage(event)
     }
 
     @EventHandler(ignoreCancelled = true)
     fun onEntityDamageByEntity(event: EntityDamageByEntityEvent) {
+        arenaManager.handleParticipantFriendlyFire(event)
+        if (event.isCancelled) {
+            return
+        }
+        arenaManager.handleDownedPlayerAttack(event)
+        if (event.isCancelled) {
+            return
+        }
         arenaManager.handleMobFriendlyFire(event)
     }
 
@@ -35,6 +50,21 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     @EventHandler(ignoreCancelled = true)
     fun onEntityTarget(event: EntityTargetLivingEntityEvent) {
         arenaManager.handleMobTarget(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onBlockBreak(event: BlockBreakEvent) {
+        arenaManager.handleArenaBlockBreak(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onBlockPlace(event: BlockPlaceEvent) {
+        arenaManager.handleArenaBlockPlace(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onPlayerInteract(event: PlayerInteractEvent) {
+        arenaManager.handleArenaInteract(event)
     }
 
     @EventHandler

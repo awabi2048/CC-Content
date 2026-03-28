@@ -126,14 +126,14 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
 
         private fun resolveItemModel(typeId: String): NamespacedKey {
             val normalized = sanitizeMobTypeId(typeId)
-            return when {
-                normalized.contains("skeleton") -> NamespacedKey.minecraft("skeleton_skull")
-                normalized.contains("zombie") -> NamespacedKey.minecraft("zombie_head")
-                normalized.contains("creeper") -> NamespacedKey.minecraft("creeper_head")
-                normalized.contains("piglin") -> NamespacedKey.minecraft("piglin_head")
-                normalized.contains("wither") -> NamespacedKey.minecraft("wither_skeleton_skull")
-                normalized.contains("dragon") -> NamespacedKey.minecraft("dragon_head")
-                else -> NamespacedKey.minecraft("player_head")
+            return when (normalized) {
+                "skeleton" -> NamespacedKey.minecraft("skeleton_skull")
+                "zombie" -> NamespacedKey.minecraft("zombie_head")
+                "creeper" -> NamespacedKey.minecraft("creeper_head")
+                "piglin" -> NamespacedKey.minecraft("piglin_head")
+                "wither_skeleton" -> NamespacedKey.minecraft("wither_skeleton_skull")
+                "ender_dragon" -> NamespacedKey.minecraft("dragon_head")
+                else -> NamespacedKey.minecraft("poisonous_potato")
             }
         }
     }

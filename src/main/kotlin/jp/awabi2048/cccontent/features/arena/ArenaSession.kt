@@ -37,6 +37,24 @@ data class ArenaBgmSwitchRequest(
     val executeAtAbsoluteBeat: Long
 )
 
+data class ArenaDownedPlayerState(
+    val downedAtMillis: Long,
+    var bleedoutAtMillis: Long,
+    var shulkerEntityId: UUID? = null
+)
+
+data class ArenaReviveHoldState(
+    var reviverPlayerId: UUID? = null,
+    var heldTicks: Int = 0,
+    var linkedAtTick: Long = 0L,
+    var lastProgressTick: Long = 0L
+)
+
+data class ArenaReviveBossBars(
+    val downedPlayerBar: BossBar,
+    val reviverPlayerBar: BossBar
+)
+
 data class ArenaSession(
     val ownerPlayerId: UUID,
     val worldName: String,
@@ -107,6 +125,15 @@ data class ArenaSession(
     val playerNotifiedWaves: MutableMap<UUID, MutableSet<Int>> = mutableMapOf(),
     val participantLocationHistory: MutableMap<UUID, ArrayDeque<TimedPlayerLocation>> = mutableMapOf(),
     val participantLastSampleMillis: MutableMap<UUID, Long> = mutableMapOf(),
+    val downedPlayers: MutableMap<UUID, ArenaDownedPlayerState> = mutableMapOf(),
+    val reviveHoldStates: MutableMap<UUID, ArenaReviveHoldState> = mutableMapOf(),
+    val reviveTargetByReviver: MutableMap<UUID, UUID> = mutableMapOf(),
+    val reviveBossBarsByDowned: MutableMap<UUID, ArenaReviveBossBars> = mutableMapOf(),
+    val arenaBgmModeByParticipant: MutableMap<UUID, ArenaBgmMode> = mutableMapOf(),
+    val arenaBgmPlaybackStartTickByParticipant: MutableMap<UUID, Long> = mutableMapOf(),
+    val arenaCombatHadTargetingMobByParticipant: MutableMap<UUID, Boolean> = mutableMapOf(),
+    val arenaBgmSwitchRequestByParticipant: MutableMap<UUID, ArenaBgmSwitchRequest?> = mutableMapOf(),
+    val downedOriginalWalkSpeeds: MutableMap<UUID, Float> = mutableMapOf(),
     val invitedParticipants: MutableSet<UUID> = mutableSetOf(),
     val invitedAtMillis: MutableMap<UUID, Long> = mutableMapOf(),
     val waitingParticipants: MutableSet<UUID> = mutableSetOf(),

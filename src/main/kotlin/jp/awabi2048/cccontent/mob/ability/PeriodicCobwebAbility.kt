@@ -3,6 +3,8 @@ package jp.awabi2048.cccontent.mob.ability
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import org.bukkit.Location
 import org.bukkit.Material
+import org.bukkit.block.Block
+import java.util.UUID
 import kotlin.random.Random
 
 class PeriodicCobwebAbility(
@@ -13,6 +15,23 @@ class PeriodicCobwebAbility(
     private val maxWebsPerCycle: Int = 8
 ) : MobAbility {
 
+    companion object {
+        private val arenaPlacedCobwebs: MutableSet<ArenaBlockPos> = mutableSetOf()
+
+        fun consumeArenaPlacedCobweb(block: Block): Boolean {
+            val key = ArenaBlockPos(block.world.uid, block.x, block.y, block.z)
+            return arenaPlacedCobwebs.remove(key)
+        }
+
+        private fun registerArenaCobweb(pos: BlockPos, worldUid: UUID) {
+            arenaPlacedCobwebs.add(ArenaBlockPos(worldUid, pos.x, pos.y, pos.z))
+        }
+
+        private fun unregisterArenaCobweb(pos: BlockPos, worldUid: UUID) {
+            arenaPlacedCobwebs.remove(ArenaBlockPos(worldUid, pos.x, pos.y, pos.z))
+        }
+    }
+
     data class Runtime(
         var cycleCooldownTicks: Long = 0L,
         val activeWebs: MutableMap<BlockPos, Long> = mutableMapOf()
@@ -20,6 +39,13 @@ class PeriodicCobwebAbility(
 
     data class BlockPos(
         val worldName: String,
+        val x: Int,
+        val y: Int,
+        val z: Int
+    )
+
+    data class ArenaBlockPos(
+        val worldUid: UUID,
         val x: Int,
         val y: Int,
         val z: Int
@@ -44,7 +70,12 @@ class PeriodicCobwebAbility(
         }
 
         abilityRuntime.cycleCooldownTicks = cycleTicks.coerceAtLeast(1L)
-        placeCobwebs(context.entity.location, abilityRuntime, nowTick)
+        placeCobwebs(
+            origin = context.entity.location,
+            runtime = abilityRuntime,
+            nowTick = nowTick,
+            trackArenaCobweb = context.featureId.startsWith("arena")
+        )
     }
 
     private fun restoreExpiredWebs(
@@ -62,12 +93,18 @@ class PeriodicCobwebAbility(
                 if (block.type == Material.COBWEB) {
                     block.type = Material.AIR
                 }
+                unregisterArenaCobweb(pos, world.uid)
             }
             iterator.remove()
         }
     }
 
-    private fun placeCobwebs(origin: Location, runtime: Runtime, nowTick: Long) {
+    private fun placeCobwebs(
+        origin: Location,
+        runtime: Runtime,
+        nowTick: Long,
+        trackArenaCobweb: Boolean
+    ) {
         val world = origin.world ?: return
         val centerX = origin.blockX
         val centerY = origin.blockY
@@ -98,6 +135,9 @@ class PeriodicCobwebAbility(
             if (block.type != Material.AIR) return@repeat
             block.type = Material.COBWEB
             runtime.activeWebs[pos] = nowTick + webLifetimeTicks.coerceAtLeast(1L)
+            if (trackArenaCobweb) {
+                registerArenaCobweb(pos, world.uid)
+            }
         }
     }
 }
