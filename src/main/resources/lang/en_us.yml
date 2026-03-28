@@ -352,7 +352,6 @@ custom_items:
       mob_names:
         zombie: "Zombie"
         skeleton: "Skeleton"
-        arena_enhanced_zombie: "Enhanced Zombie"
         zombie_leap_only: "Leaper Zombie"
         zombie_bow_only: "Archer Zombie"
         zombie_bow_swap: "Swap Zombie"

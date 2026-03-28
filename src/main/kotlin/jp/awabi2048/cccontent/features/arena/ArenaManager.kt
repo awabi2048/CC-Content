@@ -1884,10 +1884,38 @@ class ArenaManager(
     }
 
     private fun enforceAdultMob(entity: LivingEntity) {
+        val vehicle = entity.vehicle
+        if (vehicle != null) {
+            entity.leaveVehicle()
+            if (entity is Zombie && vehicle.type == EntityType.CHICKEN && vehicle.isValid) {
+                vehicle.remove()
+            }
+        }
+
         when (entity) {
-            is Zombie -> entity.isBaby = false
+            is Zombie -> {
+                entity.isBaby = false
+                cleanupNearbyChickenMounts(entity)
+            }
             is Ageable -> entity.setAdult()
         }
+    }
+
+    private fun cleanupNearbyChickenMounts(zombie: Zombie) {
+        zombie.getNearbyEntities(1.5, 1.5, 1.5)
+            .asSequence()
+            .filter { it.type == EntityType.CHICKEN }
+            .forEach { chicken ->
+                if (chicken.passengers.any { passenger -> passenger.uniqueId == zombie.uniqueId }) {
+                    chicken.passengers.toList().forEach { passenger ->
+                        chicken.removePassenger(passenger)
+                        if (passenger.uniqueId != zombie.uniqueId) {
+                            passenger.remove()
+                        }
+                    }
+                    chicken.remove()
+                }
+            }
     }
 
     private fun spawnMobAppearParticles(world: World, location: Location) {
@@ -2851,7 +2879,15 @@ class ArenaManager(
     private fun requestWaveStartCombatBgm(session: ArenaSession) {
         session.arenaWaveStartCombatDelayTask?.cancel()
         session.arenaWaveStartCombatDelayTask = null
-        stopArenaBgm(session)
+
+        if (session.arenaBgmMode == ArenaBgmMode.COMBAT && session.arenaBgmSwitchRequest == null) {
+            return
+        }
+
+        if (session.arenaBgmMode != ArenaBgmMode.STOPPED) {
+            requestArenaBgmMode(session, ArenaBgmMode.COMBAT)
+            return
+        }
 
         val delayedTask = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             session.arenaWaveStartCombatDelayTask = null

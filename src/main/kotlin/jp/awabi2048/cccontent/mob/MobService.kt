@@ -1,6 +1,14 @@
 package jp.awabi2048.cccontent.mob
 
-import jp.awabi2048.cccontent.mob.type.ArenaEnhancedZombieMobType
+import jp.awabi2048.cccontent.mob.type.HuskBowOnlyMobType
+import jp.awabi2048.cccontent.mob.type.HuskBowSwapMobType
+import jp.awabi2048.cccontent.mob.type.HuskLeapOnlyMobType
+import jp.awabi2048.cccontent.mob.type.HuskNormalMobType
+import jp.awabi2048.cccontent.mob.type.HuskShieldOnlyMobType
+import jp.awabi2048.cccontent.mob.type.HuskWeakeningAuraMobType
+import jp.awabi2048.cccontent.mob.type.SilverfishBigPoisonMobType
+import jp.awabi2048.cccontent.mob.type.SilverfishPlainMobType
+import jp.awabi2048.cccontent.mob.type.SkeletonPlainMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonBoomerangMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonCurveShotMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonEffectArrowMobType
@@ -106,13 +114,19 @@ class MobService(private val plugin: JavaPlugin) {
         synchronized(instances) {
             instances[plugin] = this
         }
-        registerMobType(ArenaEnhancedZombieMobType())
         registerMobType(ZombieNormalMobType())
         registerMobType(ZombieLeapOnlyMobType())
         registerMobType(ZombieBowOnlyMobType())
         registerMobType(ZombieBowSwapMobType())
         registerMobType(ZombieShieldOnlyMobType())
+        registerMobType(HuskNormalMobType())
+        registerMobType(HuskLeapOnlyMobType())
+        registerMobType(HuskBowOnlyMobType())
+        registerMobType(HuskBowSwapMobType())
+        registerMobType(HuskShieldOnlyMobType())
+        registerMobType(HuskWeakeningAuraMobType())
         registerMobType(SkeletonNormalMobType())
+        registerMobType(SkeletonPlainMobType())
         registerMobType(SkeletonFastArrowMobType())
         registerMobType(SkeletonRapidShotMobType())
         registerMobType(SkeletonEffectArrowMobType())
@@ -129,6 +143,8 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(SpiderSwiftMobType())
         registerMobType(SpiderVenomFrenzyMobType())
         registerMobType(SpiderFerociousMobType())
+        registerMobType(SilverfishPlainMobType())
+        registerMobType(SilverfishBigPoisonMobType())
     }
 
     fun registerMobType(mobType: MobType) {
@@ -286,7 +302,11 @@ class MobService(private val plugin: JavaPlugin) {
 
         mobType.applyDefaultEquipment(spawnContext, runtime)
         mobType.onSpawn(spawnContext, runtime)
-        applyDefinitionEquipment(entity, definition, onlyIfEmpty = !mobType.isCustom)
+        applyDefinitionEquipment(entity, definition, onlyIfEmpty = true)
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            if (!entity.isValid || entity.isDead) return@Runnable
+            enforceStrictSpawnState(entity)
+        }, 1L)
         return entity
     }
 
@@ -604,14 +624,38 @@ class MobService(private val plugin: JavaPlugin) {
                 passenger.remove()
             }
         }
-        if (entity.isInsideVehicle) {
+        val vehicle = entity.vehicle
+        if (vehicle != null) {
             entity.leaveVehicle()
+            if (entity is Zombie && vehicle.type == EntityType.CHICKEN && vehicle.isValid) {
+                vehicle.remove()
+            }
         }
 
         when (entity) {
-            is Zombie -> entity.isBaby = false
+            is Zombie -> {
+                entity.isBaby = false
+                cleanupNearbyChickenMounts(entity)
+            }
             is Ageable -> entity.setAdult()
         }
+    }
+
+    private fun cleanupNearbyChickenMounts(zombie: Zombie) {
+        zombie.getNearbyEntities(1.5, 1.5, 1.5)
+            .asSequence()
+            .filter { it.type == EntityType.CHICKEN }
+            .forEach { chicken ->
+                if (chicken.passengers.any { passenger -> passenger.uniqueId == zombie.uniqueId }) {
+                    chicken.passengers.toList().forEach { passenger ->
+                        chicken.removePassenger(passenger)
+                        if (passenger.uniqueId != zombie.uniqueId) {
+                            passenger.remove()
+                        }
+                    }
+                    chicken.remove()
+                }
+            }
     }
 
     private fun applyDefinitionEquipment(entity: LivingEntity, definition: MobDefinition, onlyIfEmpty: Boolean) {
