@@ -982,7 +982,6 @@ custom_items:
       mob_names:
         zombie: 'ゾンビ'
         skeleton: 'スケルトン'
-        arena_enhanced_zombie: '強化ゾンビ'
         zombie_leap_only: '跳躍ゾンビ'
         zombie_bow_only: '弓ゾンビ'
         zombie_bow_swap: '換装ゾンビ'
