@@ -34,7 +34,7 @@ enum class ArenaBgmMode {
 data class ArenaBgmSwitchRequest(
     val targetMode: ArenaBgmMode,
     val requestedAtTick: Long,
-    val executeAtAbsoluteBeat: Long,
+    val strictNextBoundary: Boolean = false,
     val targetDriven: Boolean = false
 )
 
