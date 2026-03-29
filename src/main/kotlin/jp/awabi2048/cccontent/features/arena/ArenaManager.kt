@@ -245,6 +245,7 @@ class ArenaManager(
         const val MULTIPLAYER_STAGE_INTRO_SOUND_REPEAT = 5
         const val MULTIPLAYER_STAGE_INTRO_SOUND_INTERVAL_TICKS = 10L
         const val WAVE_START_COMBAT_BGM_DELAY_TICKS = 0L
+        const val ENTRANCE_BGM_START_DELAY_TICKS = 30L
         const val MULTIPLAYER_STAGE_INTRO_TELEPORT_EXTRA_DELAY_TICKS = 20L
         const val MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS = 5L
         const val WAVE_CATCHUP_TELEPORT_DELAY_MILLIS = 30_000L
@@ -2610,15 +2611,6 @@ class ArenaManager(
         val spawns = session.roomMobSpawns[wave].orEmpty()
         val candidates = selectSpawnCandidates(theme, wave)
         val isFinalWaveBarrierObjective = wave == session.waves && hasBarrierActivationObjective(session)
-        plugin.logger.info(
-            "[Arena][DEBUG] wave開始: world=${session.worldName} theme=${theme.id} wave=$wave spawns=${spawns.size} candidates=${candidates.size}"
-        )
-        plugin.logger.info(
-            "[Arena][DEBUG] wave候補詳細: world=${session.worldName} wave=$wave candidates=${candidates.joinToString { candidate ->
-                val range = candidate.waveRange.maxInclusive?.let { "${candidate.waveRange.minInclusive}..$it" } ?: "${candidate.waveRange.minInclusive}.."
-                "${candidate.mobId}($range)"
-            }}"
-        )
         if (candidates.isEmpty()) {
             plugin.logger.severe(
                 "[Arena] 開始不能ウェーブを検出: world=${session.worldName} theme=${theme.id} wave=$wave"
@@ -2700,15 +2692,9 @@ class ArenaManager(
             val spawnThrottle = mobService.getSpawnThrottle("arena:${currentSession.worldName}")
             val intervalChance = (1.0 / spawnThrottle.intervalMultiplier).coerceIn(0.0, 1.0)
             if (random.nextDouble() < spawnThrottle.skipChance) {
-                plugin.logger.info(
-                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave reason=throttle_skip chance=${spawnThrottle.skipChance}"
-                )
                 return@Runnable
             }
             if (random.nextDouble() > intervalChance) {
-                plugin.logger.info(
-                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave reason=interval_throttle intervalChance=$intervalChance"
-                )
                 return@Runnable
             }
 
@@ -2721,43 +2707,24 @@ class ArenaManager(
                 maxAliveBase
             }
             if (currentSession.activeMobs.size >= maxAlive) {
-                plugin.logger.info(
-                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave reason=max_alive active=${currentSession.activeMobs.size} max=$maxAlive"
-                )
                 return@Runnable
             }
 
             val world = Bukkit.getWorld(currentSession.worldName) ?: return@Runnable
             val spawnPoint = selectSpawnPoint(spawns) ?: run {
-                plugin.logger.info(
-                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave reason=no_spawn_point"
-                )
                 return@Runnable
             }
             val spawnCandidates = selectSpawnCandidates(theme, wave)
             val candidates = filterSpawnCandidatesByLocation(spawnCandidates, spawnPoint)
             if (candidates.isEmpty()) {
-                plugin.logger.info(
-                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave spawn=${spawnPoint.blockX},${spawnPoint.blockY},${spawnPoint.blockZ} block=${spawnPoint.block.type} reason=no_candidate matched=${spawnCandidates.joinToString { it.mobId }}"
-                )
                 return@Runnable
             }
             val weightedMob = selectWeightedMob(candidates) ?: run {
-                plugin.logger.info(
-                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave spawn=${spawnPoint.blockX},${spawnPoint.blockY},${spawnPoint.blockZ} block=${spawnPoint.block.type} reason=no_weighted_candidate"
-                )
                 return@Runnable
             }
             val definition = mobDefinitions[weightedMob.mobId] ?: run {
-                plugin.logger.info(
-                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave mob=${weightedMob.mobId} reason=definition_missing"
-                )
                 return@Runnable
             }
-
-            plugin.logger.info(
-                "[Arena][DEBUG] spawn attempt: world=${currentSession.worldName} wave=$wave mob=${weightedMob.mobId} spawn=${spawnPoint.blockX},${spawnPoint.blockY},${spawnPoint.blockZ} block=${spawnPoint.block.type}"
-            )
 
             spawnMob(world, currentSession, wave, spawnPoint, definition, difficulty)
         }, interval, interval)
@@ -3060,13 +3027,7 @@ class ArenaManager(
     ): List<ArenaThemeWeightedMobEntry> {
         return candidates.filter { entry ->
             val definition = mobDefinitions[entry.mobId] ?: return@filter false
-            val allowed = canSpawnAt(definition, spawnPoint)
-            if (!allowed) {
-                plugin.logger.info(
-                    "[Arena][DEBUG] spawn条件不一致: mob=${entry.mobId} type=${definition.typeId} conditions=${definition.spawnConditions.joinToString { it.name }} spawn=${spawnPoint.blockX},${spawnPoint.blockY},${spawnPoint.blockZ} block=${spawnPoint.block.type}"
-                )
-            }
-            allowed
+            canSpawnAt(definition, spawnPoint)
         }
     }
 
@@ -3117,9 +3078,6 @@ class ArenaManager(
         definition: MobDefinition,
         difficulty: ArenaDifficultyConfig
     ) {
-        plugin.logger.info(
-            "[Arena][DEBUG] spawn entity: world=${session.worldName} wave=$wave mob=${definition.id} type=${definition.typeId} spawn=${spawn.blockX},${spawn.blockY},${spawn.blockZ}"
-        )
         val entity = mobService.spawn(
             definition,
             spawn,
@@ -3129,12 +3087,7 @@ class ArenaManager(
                 combatActiveProvider = { true },
                 metadata = mapOf("world" to session.worldName, "wave" to wave.toString())
             )
-        ) ?: run {
-            plugin.logger.info(
-                "[Arena][DEBUG] spawn failed: world=${session.worldName} wave=$wave mob=${definition.id} type=${definition.typeId}"
-            )
-            return
-        }
+        ) ?: return
         entity.removeWhenFarAway = false
         entity.canPickupItems = false
         enforceAdultMob(entity)
@@ -4255,6 +4208,23 @@ class ArenaManager(
         targetDriven: Boolean = false,
         strictNextBoundary: Boolean = false
     ) {
+        val currentMode = participantArenaBgmMode(session, participantId)
+        val currentRequest = session.arenaBgmSwitchRequestByParticipant[participantId]
+
+        if (currentRequest != null &&
+            currentRequest.targetMode == targetMode &&
+            currentRequest.targetDriven == targetDriven &&
+            currentRequest.strictNextBoundary == strictNextBoundary
+        ) {
+            return
+        }
+
+        if (currentMode == targetMode && currentRequest == null) {
+            return
+        }
+
+        if (targetDriven && targetMode == ArenaBgmMode.NORMAL && isWaveInProgress(session)) return
+
         session.arenaBgmSwitchRequestByParticipant[participantId] = ArenaBgmSwitchRequest(
             targetMode = targetMode,
             requestedAtTick = currentTick,
@@ -4293,7 +4263,6 @@ class ArenaManager(
 
         val desiredMode = if (hasTargetingMob) ArenaBgmMode.COMBAT else ArenaBgmMode.NORMAL
         val currentRequest = session.arenaBgmSwitchRequestByParticipant[participantId]
-
         if (hasTargetingMob) {
             session.arenaCombatHadTargetingMobByParticipant[participantId] = true
         }
@@ -4307,6 +4276,8 @@ class ArenaManager(
         if (currentRequest == null && currentMode != desiredMode && !canTriggerTargetDrivenBgmSwitch(session, participantId, now)) {
             return
         }
+
+        if (desiredMode == ArenaBgmMode.NORMAL && isWaveInProgress(session)) return
 
         requestArenaBgmModeForParticipant(
             session,
@@ -4352,7 +4323,6 @@ class ArenaManager(
     private fun processArenaBgmSwitchRequest(session: ArenaSession, participantId: UUID, currentTick: Long) {
         val request = session.arenaBgmSwitchRequestByParticipant[participantId] ?: return
         val currentMode = participantArenaBgmMode(session, participantId)
-
         if (currentMode == ArenaBgmMode.STOPPED) {
             session.arenaBgmSwitchRequestByParticipant.remove(participantId)
             if (request.targetMode != ArenaBgmMode.STOPPED) {
