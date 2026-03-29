@@ -144,6 +144,8 @@ data class ArenaSession(
     val arenaBgmTargetingStateChangedAtMillisByParticipant: MutableMap<UUID, Long> = mutableMapOf(),
     val downedOriginalWalkSpeeds: MutableMap<UUID, Float> = mutableMapOf(),
     val invitedParticipants: MutableSet<UUID> = mutableSetOf(),
+    val sidebarParticipantOrder: MutableList<UUID> = mutableListOf(),
+    val sidebarParticipantNames: MutableMap<UUID, String> = mutableMapOf(),
     val waitingParticipants: MutableSet<UUID> = mutableSetOf(),
     val waitingNotifiedParticipants: MutableSet<UUID> = mutableSetOf(),
     val waitingSubtitleNextTickByPlayer: MutableMap<UUID, Long> = mutableMapOf(),
