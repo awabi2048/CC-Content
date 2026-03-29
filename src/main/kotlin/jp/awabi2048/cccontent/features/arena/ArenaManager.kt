@@ -43,6 +43,7 @@ import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.block.structure.Mirror
 import org.bukkit.block.structure.StructureRotation
+import org.bukkit.block.data.Waterlogged
 import org.bukkit.entity.Entity
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.Ageable
@@ -244,6 +245,7 @@ class ArenaManager(
         const val MULTIPLAYER_STAGE_INTRO_SOUND_REPEAT = 5
         const val MULTIPLAYER_STAGE_INTRO_SOUND_INTERVAL_TICKS = 10L
         const val WAVE_START_COMBAT_BGM_DELAY_TICKS = 0L
+        const val ENTRANCE_BGM_START_DELAY_TICKS = 30L
         const val MULTIPLAYER_STAGE_INTRO_TELEPORT_EXTRA_DELAY_TICKS = 20L
         const val MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS = 5L
         const val WAVE_CATCHUP_TELEPORT_DELAY_MILLIS = 30_000L
@@ -2689,8 +2691,12 @@ class ArenaManager(
 
             val spawnThrottle = mobService.getSpawnThrottle("arena:${currentSession.worldName}")
             val intervalChance = (1.0 / spawnThrottle.intervalMultiplier).coerceIn(0.0, 1.0)
-            if (random.nextDouble() < spawnThrottle.skipChance) return@Runnable
-            if (random.nextDouble() > intervalChance) return@Runnable
+            if (random.nextDouble() < spawnThrottle.skipChance) {
+                return@Runnable
+            }
+            if (random.nextDouble() > intervalChance) {
+                return@Runnable
+            }
 
             val maxAliveBase = currentSession.stageMaxAliveCount.coerceAtLeast(1)
             val maxAlive = if (currentSession.barrierRestarting && wave == currentSession.waves) {
@@ -2700,13 +2706,25 @@ class ArenaManager(
             } else {
                 maxAliveBase
             }
-            if (currentSession.activeMobs.size >= maxAlive) return@Runnable
+            if (currentSession.activeMobs.size >= maxAlive) {
+                return@Runnable
+            }
 
             val world = Bukkit.getWorld(currentSession.worldName) ?: return@Runnable
-            val spawnPoint = selectSpawnPoint(spawns) ?: return@Runnable
-            val candidates = filterSpawnCandidatesByLocation(selectSpawnCandidates(theme, wave), spawnPoint)
-            val weightedMob = selectWeightedMob(candidates) ?: return@Runnable
-            val definition = mobDefinitions[weightedMob.mobId] ?: return@Runnable
+            val spawnPoint = selectSpawnPoint(spawns) ?: run {
+                return@Runnable
+            }
+            val spawnCandidates = selectSpawnCandidates(theme, wave)
+            val candidates = filterSpawnCandidatesByLocation(spawnCandidates, spawnPoint)
+            if (candidates.isEmpty()) {
+                return@Runnable
+            }
+            val weightedMob = selectWeightedMob(candidates) ?: run {
+                return@Runnable
+            }
+            val definition = mobDefinitions[weightedMob.mobId] ?: run {
+                return@Runnable
+            }
 
             spawnMob(world, currentSession, wave, spawnPoint, definition, difficulty)
         }, interval, interval)
@@ -3030,13 +3048,11 @@ class ArenaManager(
             return true
         }
 
-        val feetBlock = spawnPoint.clone().add(0.0, 0.5, 0.0).block
-        if (feetBlock.type == Material.WATER || feetBlock.isLiquid) {
-            return true
+        if (block.type == Material.LIGHT) {
+            return (block.blockData as? Waterlogged)?.isWaterlogged == true
         }
 
-        val headBlock = spawnPoint.clone().add(0.0, 1.0, 0.0).block
-        return headBlock.type == Material.WATER || headBlock.isLiquid
+        return false
     }
 
     private fun selectWeightedMob(candidates: List<ArenaThemeWeightedMobEntry>): ArenaThemeWeightedMobEntry? {
@@ -4192,6 +4208,23 @@ class ArenaManager(
         targetDriven: Boolean = false,
         strictNextBoundary: Boolean = false
     ) {
+        val currentMode = participantArenaBgmMode(session, participantId)
+        val currentRequest = session.arenaBgmSwitchRequestByParticipant[participantId]
+
+        if (currentRequest != null &&
+            currentRequest.targetMode == targetMode &&
+            currentRequest.targetDriven == targetDriven &&
+            currentRequest.strictNextBoundary == strictNextBoundary
+        ) {
+            return
+        }
+
+        if (currentMode == targetMode && currentRequest == null) {
+            return
+        }
+
+        if (targetDriven && targetMode == ArenaBgmMode.NORMAL && isWaveInProgress(session)) return
+
         session.arenaBgmSwitchRequestByParticipant[participantId] = ArenaBgmSwitchRequest(
             targetMode = targetMode,
             requestedAtTick = currentTick,
@@ -4230,7 +4263,6 @@ class ArenaManager(
 
         val desiredMode = if (hasTargetingMob) ArenaBgmMode.COMBAT else ArenaBgmMode.NORMAL
         val currentRequest = session.arenaBgmSwitchRequestByParticipant[participantId]
-
         if (hasTargetingMob) {
             session.arenaCombatHadTargetingMobByParticipant[participantId] = true
         }
@@ -4244,6 +4276,8 @@ class ArenaManager(
         if (currentRequest == null && currentMode != desiredMode && !canTriggerTargetDrivenBgmSwitch(session, participantId, now)) {
             return
         }
+
+        if (desiredMode == ArenaBgmMode.NORMAL && isWaveInProgress(session)) return
 
         requestArenaBgmModeForParticipant(
             session,
@@ -4289,7 +4323,6 @@ class ArenaManager(
     private fun processArenaBgmSwitchRequest(session: ArenaSession, participantId: UUID, currentTick: Long) {
         val request = session.arenaBgmSwitchRequestByParticipant[participantId] ?: return
         val currentMode = participantArenaBgmMode(session, participantId)
-
         if (currentMode == ArenaBgmMode.STOPPED) {
             session.arenaBgmSwitchRequestByParticipant.remove(participantId)
             if (request.targetMode != ArenaBgmMode.STOPPED) {
