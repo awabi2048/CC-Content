@@ -347,7 +347,7 @@ custom_items:
     mob_token:
       display_format: "§6{mob} Head"
       lore:
-        - "§7Head of a monster that appears in the arena"
+        - "§7An item dropped by a monster that appears in the arena"
         - "§7Exchange it for rewards in the arena lobby!"
       mob_names:
         zombie: "Zombie"
@@ -363,6 +363,12 @@ custom_items:
         skeleton_curve_shot: "Curved Shot Skeleton"
         skeleton_shield_only: "Shield Skeleton"
         skeleton_boomerang: "Boomerang Skeleton"
+      drop_names:
+        husk: "Husk Tunic"
+        iron_golem: "Golem Core"
+        guardian: "Guardian Scale"
+        silverfish: "Silverfish Shell"
+        spider: "Spider Claw"
     theme:
       ruins:
         name: "Ruins"

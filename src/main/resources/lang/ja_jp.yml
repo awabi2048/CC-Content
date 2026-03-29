@@ -961,6 +961,44 @@ custom_items:
         - '§7最大3種類のアイテムを大量に格納できます。'
         - '§7手に持って§eShiftを2回§7でメニューを開きます。'
         - '§7§eShift+スクロール§7で使用対象を切り替えます。'
+  arena:
+    ticket:
+      name: '§6アリーナチケット'
+      lore:
+        - '§7アリーナへの参加チケット'
+    medal:
+      name: '§6アリーナメダル'
+      lore:
+        - '§7アリーナでの戦いの証'
+    prize:
+      name: '§6アリーナ報酬箱'
+      lore:
+        - '§7アリーナでの勝利報酬'
+    mob_token:
+      display_format: '§6{mob}の頭'
+      lore:
+        - '§7アリーナに出現するモンスターが落としたアイテム'
+        - '§7アリーナロビーで報酬と交換しよう！'
+      mob_names:
+        zombie: 'ゾンビ'
+        skeleton: 'スケルトン'
+        zombie_leap_only: '跳躍ゾンビ'
+        zombie_bow_only: '弓ゾンビ'
+        zombie_bow_swap: '換装ゾンビ'
+        zombie_shield_only: '盾ゾンビ'
+        spark_zombie: 'スパークゾンビ'
+        skeleton_fast_arrow: '高速矢スケルトン'
+        skeleton_rapid_shot: '速射スケルトン'
+        skeleton_effect_arrow: '効果矢スケルトン'
+        skeleton_curve_shot: '曲射スケルトン'
+        skeleton_shield_only: '盾スケルトン'
+        skeleton_boomerang: '骨投擲スケルトン'
+      drop_names:
+        husk: 'ハスクのかたびら'
+        iron_golem: 'ゴーレムのコア'
+        guardian: 'ガーディアンのうろこ'
+        silverfish: 'シルバーフィッシュの殻'
+        spider: 'クモのハサミ'
 arena:
   ticket:
     name: '§6アリーナチケット'
@@ -977,7 +1015,7 @@ arena:
   mob_token:
     display_format: '§6{mob}の頭'
     lore:
-      - '§7アリーナに出現するモンスターのヘッド'
+      - '§7アリーナに出現するモンスターが落としたアイテム'
       - '§7アリーナロビーで報酬と交換しよう！'
     mob_names:
       zombie: 'ゾンビ'
@@ -993,6 +1031,12 @@ arena:
       skeleton_curve_shot: '曲射スケルトン'
       skeleton_shield_only: '盾スケルトン'
       skeleton_boomerang: '骨投擲スケルトン'
+    drop_names:
+      husk: 'ハスクのかたびら'
+      iron_golem: 'ゴーレムのコア'
+      guardian: 'ガーディアンのうろこ'
+      silverfish: 'シルバーフィッシュの殻'
+      spider: 'クモのハサミ'
   theme:
     ruins:
       name: '遺跡'

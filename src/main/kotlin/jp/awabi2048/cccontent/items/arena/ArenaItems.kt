@@ -96,10 +96,17 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
         val item = ItemStack(Material.POISONOUS_POTATO, amount.coerceAtLeast(1))
         val meta = item.itemMeta ?: return item
+        val normalizedTypeId = normalizeTokenCategoryTypeId(mobTypeId)
+        val usesHeadDisplayName = usesHeadDisplayName(normalizedTypeId)
+        val mobNamePath = if (usesHeadDisplayName) {
+            "custom_items.arena.mob_token.mob_names.$normalizedTypeId"
+        } else {
+            "custom_items.arena.mob_token.drop_names.$normalizedTypeId"
+        }
         val mobName = CustomItemI18n.text(
             player,
-            "custom_items.arena.mob_token.mob_names.${sanitizeMobTypeId(mobTypeId)}",
-            mobTypeId.lowercase(Locale.ROOT)
+            mobNamePath,
+            normalizedTypeId
         )
         val displayFormat = CustomItemI18n.text(
             player,
@@ -109,10 +116,16 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
         val localizedLore = CustomItemI18n.list(
             player,
             "custom_items.arena.mob_token.lore",
-            listOf("§7アリーナに出現するモンスターのヘッド", "§7アリーナロビーで報酬と交換しよう！")
+            listOf("§7アリーナに出現するモンスターが落としたアイテム", "§7アリーナロビーで報酬と交換しよう！")
         )
 
-        meta.displayName(Component.text(displayFormat.replace("{mob}", mobName)))
+        val resolvedDisplayName = if (usesHeadDisplayName) {
+            displayFormat.replace("{mob}", mobName)
+        } else {
+            mobName
+        }
+        val decoratedDisplayName = if (resolvedDisplayName.startsWith("§6")) resolvedDisplayName else "§6$resolvedDisplayName"
+        meta.displayName(Component.text(decoratedDisplayName))
         meta.lore(localizedLore.map { Component.text(it) })
         meta.persistentDataContainer.set(arenaItemKey, PersistentDataType.STRING, id)
         item.itemMeta = meta
@@ -124,8 +137,23 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
             return typeId.trim().lowercase(Locale.ROOT).replace(Regex("[^a-z0-9_]+"), "_")
         }
 
-        private fun resolveItemModel(typeId: String): NamespacedKey {
+        private fun normalizeTokenCategoryTypeId(typeId: String): String {
             val normalized = sanitizeMobTypeId(typeId)
+            return when (normalized) {
+                "cave_spider" -> "spider"
+                else -> normalized
+            }
+        }
+
+        private fun usesHeadDisplayName(typeId: String): Boolean {
+            return when (typeId) {
+                "skeleton", "zombie", "creeper", "piglin", "wither_skeleton", "ender_dragon" -> true
+                else -> false
+            }
+        }
+
+        private fun resolveItemModel(typeId: String): NamespacedKey {
+            val normalized = normalizeTokenCategoryTypeId(typeId)
             return when (normalized) {
                 "skeleton" -> NamespacedKey.minecraft("skeleton_skull")
                 "zombie" -> NamespacedKey.minecraft("zombie_head")
@@ -133,6 +161,11 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
                 "piglin" -> NamespacedKey.minecraft("piglin_head")
                 "wither_skeleton" -> NamespacedKey.minecraft("wither_skeleton_skull")
                 "ender_dragon" -> NamespacedKey.minecraft("dragon_head")
+                "husk" -> NamespacedKey.minecraft("leather_chestplate")
+                "iron_golem" -> NamespacedKey.minecraft("resin_clump")
+                "guardian" -> NamespacedKey.minecraft("prismarine_shard")
+                "silverfish" -> NamespacedKey.minecraft("blue_egg")
+                "spider" -> NamespacedKey.minecraft("disc_fragment_5")
                 else -> NamespacedKey.minecraft("poisonous_potato")
             }
         }
