@@ -443,6 +443,21 @@ custom_items:
         revive_success: '&aYou revived {player}'
         timeout: '&cBleedout time expired. Teleporting to lobby'
         game_over: '&cEverything went dark...!\n&7Game over. Teleporting to lobby'
+      oage:
+        stage_start:
+          - '§fWe have arrived on site! Please take care of us!'
+        wave_cleared:
+          - 'It seems safe for now! Let's regroup and move on to the next wave!'
+        wave_clear_wait:
+          - 'If you approach the marker in front of the door, we may figure something out!'
+        final_wave_start:
+          - 'The object in the center is the barrier stone! Activating all the surrounding markers will start the restart!'
+        barrier_restart_remaining_2_3:
+          - 'The restart is going smoothly! Please hang in there!'
+        barrier_restart_remaining_1_3:
+          - 'Just a little more...!'
+        barrier_restart_complete:
+          - 'The barrier stone restart is complete!'
       barrier:
         cannot_break: '&cThe barrier core cannot be broken'
         cannot_place_on: '&cYou cannot place blocks on the barrier core'

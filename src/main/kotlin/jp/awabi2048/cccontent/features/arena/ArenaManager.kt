@@ -817,6 +817,7 @@ class ArenaManager(
                     playStageEntrySoundsLater(participant)
                 }
                 setDoorActionMarkersReadySilently(session, 1)
+                broadcastStageStartMessage(session)
                 initializeWavePipeline(session, theme, difficulty)
                 updateSessionProgressBossBar(session)
                 onCompleted?.invoke(elapsedMillisSince(startedAtNanos))
@@ -2451,6 +2452,9 @@ class ArenaManager(
         session.waveEnteredAtMillis.clear()
         session.playerWaveCatchupDeadlineMillis.clear()
         session.waveSpawningStopped.clear()
+        session.oageAnnouncements.clear()
+        session.waveClearReminderTasks.values.forEach { it.cancel() }
+        session.waveClearReminderTasks.clear()
         session.animatingDoorWaves.clear()
         session.actionMarkers.clear()
         session.actionMarkerHoldStates.clear()
@@ -2607,6 +2611,16 @@ class ArenaManager(
         if (wave <= 0 || wave > session.waves) return
         if (session.startedWaves.contains(wave)) return
         if (session.clearedWaves.contains(wave)) return
+
+        session.waveClearReminderTasks.remove(wave - 1)?.cancel()
+
+        if (wave == session.waves && session.oageAnnouncements.add("final_wave_start")) {
+            broadcastOageMessage(
+                session,
+                "arena.messages.oage.final_wave_start",
+                listOf("真ん中のものが結界石です！周囲のマーカーをすべて活性化させると再起動が始まります！")
+            )
+        }
 
         val spawns = session.roomMobSpawns[wave].orEmpty()
         val candidates = selectSpawnCandidates(theme, wave)
@@ -3230,6 +3244,16 @@ class ArenaManager(
         updateSessionProgressBossBar(session)
         playSound(session, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.25f)
 
+        broadcastOageMessage(
+            session,
+            "arena.messages.oage.wave_cleared",
+            listOf("ひとまず安全ですね！態勢を整えて次のウェーブに進みましょう！")
+        )
+
+        if (wave < session.waves) {
+            scheduleWaveClearReminder(session, wave)
+        }
+
         if (session.clearedWaves.size >= session.waves) {
             onAllWavesCleared(session)
             return
@@ -3552,6 +3576,7 @@ class ArenaManager(
 
     private fun tickBarrierRestartSequence(session: ArenaSession) {
         val activeSession = sessionsByWorld[session.worldName] ?: return
+        if (activeSession !== session) return
         if (!activeSession.barrierRestarting) return
 
         activeSession.barrierRestartProgressMillis = (activeSession.barrierRestartProgressMillis + BARRIER_RESTART_PROGRESS_STEP_MILLIS)
@@ -3559,6 +3584,7 @@ class ArenaManager(
 
         val progress = barrierRestartProgress(activeSession)
         updateSessionProgressBossBar(activeSession)
+        sendBarrierRestartOageMessages(activeSession, progress)
 
         if (progress >= 1.0) {
             activeSession.barrierRestartTask = null
@@ -3854,7 +3880,11 @@ class ArenaManager(
         playSoundAtBarrier(session, Sound.BLOCK_BEACON_ACTIVATE, 5.0f, 0.5f)
         val world = Bukkit.getWorld(session.worldName) ?: return
         spawnBarrierRestartSuccessParticles(world, session)
-        broadcastRawMessage(session, ArenaI18n.text(null, "arena.messages.barrier.restart_success", "§a結界石の再起動に成功しました！"))
+        broadcastOageMessage(
+            session,
+            "arena.messages.oage.barrier_restart_complete",
+            listOf("結界石の再起動、完了しました！")
+        )
         arenaQuestService?.recordBarrierRestart(session.participants)
 
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
@@ -4124,6 +4154,71 @@ class ArenaManager(
         session.participants.forEach { participantId ->
             val player = Bukkit.getPlayer(participantId) ?: return@forEach
             player.sendMessage(ArenaI18n.text(player, key, fallback, *placeholders))
+        }
+    }
+
+    private fun broadcastOageMessage(
+        session: ArenaSession,
+        key: String,
+        fallback: List<String>,
+        vararg placeholders: Pair<String, Any?>
+    ) {
+        session.participants.forEach { participantId ->
+            val player = Bukkit.getPlayer(participantId) ?: return@forEach
+            if (!player.isOnline || player.world.name != session.worldName) return@forEach
+
+            val message = ArenaI18n.stringList(player, key, fallback, *placeholders).randomOrNull() ?: return@forEach
+            OageMessageSender.send(player, "§f「$message」", plugin)
+        }
+    }
+
+    private fun broadcastStageStartMessage(session: ArenaSession) {
+        if (!session.oageAnnouncements.add("stage_start")) return
+        broadcastOageMessage(
+            session,
+            "arena.messages.oage.stage_start",
+            listOf("現地に到着しました！おねがいしますね！")
+        )
+    }
+
+    private fun scheduleWaveClearReminder(session: ArenaSession, wave: Int) {
+        if (wave <= 0 || wave >= session.waves) return
+
+        session.waveClearReminderTasks.remove(wave)?.cancel()
+        val task = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
+            if (activeSession !== session) return@Runnable
+            activeSession.waveClearReminderTasks.remove(wave)
+            if (!activeSession.clearedWaves.contains(wave)) return@Runnable
+            if (activeSession.startedWaves.contains(wave + 1)) return@Runnable
+
+            broadcastOageMessage(
+                activeSession,
+                "arena.messages.oage.wave_clear_wait",
+                listOf("扉の前のマーカーに近づくと、何かわかりそうです！")
+            )
+        }, 5L * 60L * 20L)
+
+        session.waveClearReminderTasks[wave] = task
+    }
+
+    private fun sendBarrierRestartOageMessages(session: ArenaSession, progress: Double) {
+        val remaining = (1.0 - progress).coerceIn(0.0, 1.0)
+
+        if (remaining <= (2.0 / 3.0) && session.oageAnnouncements.add("barrier_restart_remaining_2_3")) {
+            broadcastOageMessage(
+                session,
+                "arena.messages.oage.barrier_restart_remaining_2_3",
+                listOf("再起動は順調です！持ちこたえてくださいー！")
+            )
+        }
+
+        if (remaining <= (1.0 / 3.0) && session.oageAnnouncements.add("barrier_restart_remaining_1_3")) {
+            broadcastOageMessage(
+                session,
+                "arena.messages.oage.barrier_restart_remaining_1_3",
+                listOf("あとちょっとです...！")
+            )
         }
     }
 
@@ -5107,6 +5202,7 @@ class ArenaManager(
 
             session.participantSpawnProtectionUntilMillis = System.currentTimeMillis() + 4000L
             setDoorActionMarkersReadySilently(session, 1)
+            broadcastStageStartMessage(session)
         }, teleportDelay)
     }
 

@@ -1095,6 +1095,21 @@ arena:
       game_over: "&c目の前がまっくらになった...！\n&7おあげちゃんが救出中..."
       participant_died: '&4{player}さんが死亡しました...'
       needs_revive: '&c{player}さんがダウンしました！蘇生が必要です！'
+    oage:
+      stage_start:
+        - '§f現地に到着しました！おねがいしますね！'
+      wave_cleared:
+        - 'ひとまず安全ですね！態勢を整えて次のウェーブに進みましょう！'
+      wave_clear_wait:
+        - '扉の前のマーカーに近づくと、何かわかりそうです！'
+      final_wave_start:
+        - '真ん中のものが結界石です！周囲のマーカーをすべて活性化させると再起動が始まります！'
+      barrier_restart_remaining_2_3:
+        - '再起動は順調です！持ちこたえてくださいー！'
+      barrier_restart_remaining_1_3:
+        - 'あとちょっとです...！'
+      barrier_restart_complete:
+        - '結界石の再起動、完了しました！'
     barrier:
       cannot_break: '&c結界石は破壊できません'
       cannot_place_on: '&c結界石の上には設置できません'
