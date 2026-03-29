@@ -1186,7 +1186,7 @@ arena:
       open_hint: 'Shift長押しで扉を開く'
       corridor_opened_notice: '&3次のウェーブへの道が開かれました...'
     wave:
-      title: '&6Wave {wave}'
+      title: '§7- §6Wave {wave} §7-'
       last_title: '&7- §6Last Wave §7-'
       player_advanced: '§7{player} さんが §6Wave {wave}§7 に突入しました！'
     mock:

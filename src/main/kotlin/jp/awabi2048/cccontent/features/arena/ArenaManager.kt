@@ -215,7 +215,9 @@ class ArenaManager(
         const val BARRIER_RESTART_POINT_DAMAGE_MAX_RATIO = 0.25
         const val BARRIER_RESTART_EFFECT_INTERVAL_TICKS = 5L
         const val BARRIER_RESTART_DAMAGE_INTERVAL_TICKS = 20L
+        const val BARRIER_RESTART_BEAM_BLINK_INTERVAL_TICKS = 50L
         const val BARRIER_RESTART_BEAM_POINTS = 24
+        const val ENTRANCE_NORMAL_BGM_START_DELAY_TICKS = 10L
         const val POSITION_SAMPLE_INTERVAL_MILLIS = 1000L
         const val POSITION_RESTORE_LOOKBACK_MILLIS = 10_000L
         const val POSITION_HISTORY_RETENTION_MILLIS = 12_000L
@@ -3204,6 +3206,7 @@ class ArenaManager(
         val wave = session.mobWaveMap.remove(mobId)
         if (wave != null) {
             session.waveMobIds[wave]?.remove(mobId)
+            tryQueueWaveClearedMessage(session, wave)
         }
 
         if (!countKill || wave == null) {
@@ -3243,12 +3246,7 @@ class ArenaManager(
         stopWaveSpawning(session, wave)
         updateSessionProgressBossBar(session)
         playSound(session, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.25f)
-
-        broadcastOageMessage(
-            session,
-            "arena.messages.oage.wave_cleared",
-            listOf("ひとまず安全ですね！態勢を整えて次のウェーブに進みましょう！")
-        )
+        tryQueueWaveClearedMessage(session, wave)
 
         if (wave < session.waves) {
             scheduleWaveClearReminder(session, wave)
@@ -3260,6 +3258,55 @@ class ArenaManager(
         }
 
         activateDoorActionMarkers(session.worldName, wave + 1)
+    }
+
+    private fun tryQueueWaveClearedMessage(session: ArenaSession, wave: Int) {
+        if (!session.clearedWaves.contains(wave)) return
+
+        val trackedMobIds = session.waveMobIds[wave].orEmpty()
+        val aliveMobIds = trackedMobIds
+            .asSequence()
+            .mapNotNull { mobId -> Bukkit.getEntity(mobId) as? Mob }
+            .filter { mob ->
+                mob.isValid &&
+                    !mob.isDead &&
+                    mob.world.name == session.worldName
+            }
+            .map { mob -> mob.uniqueId }
+            .toMutableSet()
+
+        if (aliveMobIds.isNotEmpty()) {
+            session.waveMobIds[wave] = aliveMobIds
+            return
+        }
+
+        if (trackedMobIds.isNotEmpty()) {
+            session.waveMobIds.remove(wave)
+        }
+
+        if (session.oageAnnouncements.contains("wave_cleared_room_empty_$wave")) return
+        session.pendingWaveClearedAnnouncements.add(wave)
+    }
+
+    private fun tryBroadcastPendingWaveClearedMessageOnNormalBgm(session: ArenaSession) {
+        val pendingWave = session.pendingWaveClearedAnnouncements
+            .asSequence()
+            .filter { wave -> session.clearedWaves.contains(wave) }
+            .minOrNull()
+            ?: return
+
+        val announcementKey = "wave_cleared_room_empty_$pendingWave"
+        if (!session.oageAnnouncements.add(announcementKey)) {
+            session.pendingWaveClearedAnnouncements.remove(pendingWave)
+            return
+        }
+        session.pendingWaveClearedAnnouncements.remove(pendingWave)
+
+        broadcastOageMessage(
+            session,
+            "arena.messages.oage.wave_cleared",
+            listOf("ひとまず安全ですね！態勢を整えて次のウェーブに進みましょう！")
+        )
     }
 
     private fun hasBarrierActivationObjective(session: ArenaSession): Boolean {
@@ -3280,7 +3327,7 @@ class ArenaManager(
             if (placements.isEmpty()) {
                 activeSession.animatingDoorWaves.remove(targetWave)
                 if (targetWave == 1) {
-                    scheduleStartEntranceNormalBgm(activeSession)
+                    scheduleStartEntranceNormalBgm(activeSession, ENTRANCE_NORMAL_BGM_START_DELAY_TICKS)
                 }
                 updateCurrentWave(activeSession)
                 return@delayedStart
@@ -3329,7 +3376,7 @@ class ArenaManager(
                     }
                     currentSession.animatingDoorWaves.remove(targetWave)
                     if (targetWave == 1) {
-                        scheduleStartEntranceNormalBgm(currentSession)
+                        scheduleStartEntranceNormalBgm(currentSession, ENTRANCE_NORMAL_BGM_START_DELAY_TICKS)
                     }
                     updateCurrentWave(currentSession)
                     taskRef[0]?.cancel()
@@ -3649,7 +3696,14 @@ class ArenaManager(
     private fun activateNextBarrierRestartPoint(session: ArenaSession) {
         if (session.barrierRestartActivationQueue.isEmpty()) return
         val point = session.barrierRestartActivationQueue.removeAt(0)
-        session.barrierRestartActivatedPoints.add(point)
+        val activatedAtTick = Bukkit.getCurrentTick().toLong()
+        session.barrierRestartActivatedPoints.add(
+            ArenaBarrierRestartActivatedPoint(
+                location = point,
+                activatedAtTick = activatedAtTick,
+                nextRenderTick = activatedAtTick + BARRIER_RESTART_BEAM_BLINK_INTERVAL_TICKS
+            )
+        )
 
         val world = Bukkit.getWorld(session.worldName) ?: return
         world.spawnParticle(Particle.OMINOUS_SPAWNING, point, 20, 0.5, 0.5, 0.5, 0.1)
@@ -3664,6 +3718,7 @@ class ArenaManager(
         participants.forEach { player ->
             player.playSound(point, Sound.BLOCK_ENDER_CHEST_OPEN, 0.9f, 0.5f)
             player.playSound(point, Sound.ENTITY_ILLUSIONER_MIRROR_MOVE, 0.9f, 0.5f)
+            player.playSound(point, "minecraft:entity.warden.sonic_boom", 0.9f, 0.75f)
         }
     }
 
@@ -3681,9 +3736,17 @@ class ArenaManager(
         if (session.barrierRestartActivatedPoints.isEmpty()) return
         val world = Bukkit.getWorld(session.worldName) ?: return
         val core = session.barrierLocation.clone().apply { this.world = world }.add(0.5, 1.0, 0.5)
+        val currentTick = Bukkit.getCurrentTick().toLong()
 
-        session.barrierRestartActivatedPoints.forEach { point ->
-            val origin = point.clone().apply { this.world = world }
+        session.barrierRestartActivatedPoints.forEach { pointState ->
+            if (currentTick < pointState.nextRenderTick) {
+                return@forEach
+            }
+            while (currentTick >= pointState.nextRenderTick) {
+                pointState.nextRenderTick += BARRIER_RESTART_BEAM_BLINK_INTERVAL_TICKS
+            }
+
+            val origin = pointState.location.clone().apply { this.world = world }
             world.spawnParticle(Particle.OMINOUS_SPAWNING, origin, 10, 0.5, 0.5, 0.5, 0.1)
             drawBarrierRestartLinkBeam(world, origin.clone().add(0.0, 0.25, 0.0), core)
         }
@@ -3696,7 +3759,10 @@ class ArenaManager(
             val x = from.x + (to.x - from.x) * t
             val y = from.y + (to.y - from.y) * t
             val z = from.z + (to.z - from.z) * t
-            world.spawnParticle(Particle.END_ROD, x, y, z, 1, 0.0, 0.0, 0.0, 0.0)
+            val jitterX = x + random.nextDouble(-0.1, 0.1)
+            val jitterY = y + random.nextDouble(-0.1, 0.1)
+            val jitterZ = z + random.nextDouble(-0.1, 0.1)
+            world.spawnParticle(Particle.END_ROD, jitterX, jitterY, jitterZ, 1, 0.0, 0.0, 0.0, 0.0)
         }
     }
 
@@ -3720,7 +3786,7 @@ class ArenaManager(
             .filter { it.isValid && !it.isDead }
             .forEach { mob ->
                 val withinRange = session.barrierRestartActivatedPoints.any { point ->
-                    mob.location.distanceSquared(point) < BARRIER_RESTART_POINT_DAMAGE_RADIUS_SQUARED
+                    mob.location.distanceSquared(point.location) < BARRIER_RESTART_POINT_DAMAGE_RADIUS_SQUARED
                 }
                 if (!withinRange) return@forEach
                 val maxHealth = mob.getAttribute(Attribute.MAX_HEALTH)?.value?.coerceAtLeast(1.0) ?: return@forEach
@@ -4243,7 +4309,7 @@ class ArenaManager(
         playSound(session, key, 1.0f, pitch)
     }
 
-    private fun scheduleStartEntranceNormalBgm(session: ArenaSession) {
+    private fun scheduleStartEntranceNormalBgm(session: ArenaSession, delayTicks: Long = 0L) {
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
             activeSession.participants.forEach { participantId ->
@@ -4253,7 +4319,7 @@ class ArenaManager(
                 player.sendTitle("", "§7« §6$themeName §7»", 10, 60, 10)
             }
             requestArenaBgmMode(activeSession, ArenaBgmMode.NORMAL)
-        }, 0L)
+        }, delayTicks.coerceAtLeast(0L))
     }
 
     private fun requestArenaBgmMode(session: ArenaSession, targetMode: ArenaBgmMode, strictNextBoundary: Boolean = false) {
@@ -4508,6 +4574,9 @@ class ArenaManager(
         val hasTargetingMob = hasMobTargetingParticipant(session, participantId)
         session.arenaBgmTargetingStateByParticipant[participantId] = hasTargetingMob
         session.arenaBgmTargetingStateChangedAtMillisByParticipant[participantId] = System.currentTimeMillis()
+        if (mode == ArenaBgmMode.NORMAL) {
+            tryBroadcastPendingWaveClearedMessageOnNormalBgm(session)
+        }
     }
 
     private fun stopArenaBgm(session: ArenaSession) {

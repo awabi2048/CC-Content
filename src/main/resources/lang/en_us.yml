@@ -491,7 +491,7 @@ custom_items:
         corridor_opened_subtitle: '&aThe next corridor has opened'
         open_hint: 'Hold Shift to open the door'
       wave:
-        title: '&6Wave {wave}'
+        title: '§7- §6Wave {wave} §7-'
         player_advanced: '§7{player} has entered §6Wave {wave}§7!'
       mock:
         door_animation_start: '&7{message}'

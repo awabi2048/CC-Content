@@ -58,6 +58,12 @@ data class ArenaReviveBossBars(
     val reviverPlayerBar: BossBar
 )
 
+data class ArenaBarrierRestartActivatedPoint(
+    val location: Location,
+    val activatedAtTick: Long,
+    var nextRenderTick: Long
+)
+
 data class ArenaSession(
     val ownerPlayerId: UUID,
     val worldName: String,
@@ -116,7 +122,7 @@ data class ArenaSession(
     val barrierDefenseTargetMobIds: MutableSet<UUID> = mutableSetOf(),
     val barrierDefenseAssaultMobIds: MutableSet<UUID> = mutableSetOf(),
     val barrierRestartActivationQueue: MutableList<Location> = mutableListOf(),
-    val barrierRestartActivatedPoints: MutableList<Location> = mutableListOf(),
+    val barrierRestartActivatedPoints: MutableList<ArenaBarrierRestartActivatedPoint> = mutableListOf(),
     val startedWaves: MutableSet<Int> = mutableSetOf(),
     val clearedWaves: MutableSet<Int> = mutableSetOf(),
     val activeMobs: MutableSet<UUID> = mutableSetOf(),
@@ -124,6 +130,7 @@ data class ArenaSession(
     val waveKillCount: MutableMap<Int, Int> = mutableMapOf(),
     var totalKillCount: Int = 0,
     val waveClearTargets: MutableMap<Int, Int> = mutableMapOf(),
+    val pendingWaveClearedAnnouncements: MutableSet<Int> = mutableSetOf(),
     var lastClearedWaveForBossBar: Int? = null,
     var stageMaxAliveCount: Int = 1,
     val mobWaveMap: MutableMap<UUID, Int> = mutableMapOf(),
