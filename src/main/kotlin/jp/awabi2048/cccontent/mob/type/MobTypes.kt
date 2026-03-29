@@ -8,6 +8,7 @@ import jp.awabi2048.cccontent.mob.ability.BoomerangAbility
 import jp.awabi2048.cccontent.mob.ability.BackstepAbility
 import jp.awabi2048.cccontent.mob.ability.ClimbingLeapAbility
 import jp.awabi2048.cccontent.mob.ability.CurveShotAbility
+import jp.awabi2048.cccontent.mob.ability.GuardianBeamAbility
 import jp.awabi2048.cccontent.mob.ability.LeapAbility
 import jp.awabi2048.cccontent.mob.ability.LinearProjectileAbility
 import jp.awabi2048.cccontent.mob.ability.MeleeKnockbackBoostAbility
@@ -23,6 +24,7 @@ import jp.awabi2048.cccontent.mob.ability.WeaponThrowAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponSwapAbility
 import org.bukkit.Color
 import org.bukkit.Particle
+import org.bukkit.Sound
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.Material
 import org.bukkit.entity.EntityType
@@ -182,6 +184,136 @@ class IronGolemMagnetMobType : EquipmentMobType(
         PlayerTargetAssistAbility(id = "iron_golem_magnet_target_assist"),
         ProjectileAndFireImmunityAbility(id = "iron_golem_magnet_immunity"),
         ArmorMagnetPullAbility(id = "iron_golem_magnet_pull")
+    )
+)
+
+class GuardianNormalMobType : EquipmentMobType(
+    id = "guardian_normal",
+    baseEntityType = EntityType.GUARDIAN,
+    abilities = listOf(
+        GuardianBeamAbility(
+            id = "guardian_normal_beam",
+            cooldownTicks = 90L,
+            chargeTicks = 30L,
+            minRange = 2.0,
+            maxRange = 16.0,
+            directDamageMultiplier = 1.0,
+            directBonusDamage = 1.5,
+            explosionRadius = 0.0,
+            directKnockback = 1.5,
+            splashKnockback = 0.0,
+            chargePulseIntervalTicks = 0L
+        )
+    )
+)
+
+class GuardianSmallMobType : EquipmentMobType(
+    id = "guardian_small",
+    baseEntityType = EntityType.GUARDIAN,
+    abilities = listOf(
+        GuardianBeamAbility(
+            id = "guardian_small_beam",
+            cooldownTicks = 70L,
+            chargeTicks = 24L,
+            minRange = 2.0,
+            maxRange = 14.0,
+            directDamageMultiplier = 0.75,
+            directBonusDamage = 1.0,
+            explosionRadius = 0.0,
+            directKnockback = 1.25,
+            splashKnockback = 0.0,
+            chargePulseIntervalTicks = 0L
+        )
+    )
+)
+
+class GuardianBeamBurstMobType : EquipmentMobType(
+    id = "guardian_beam_burst",
+    baseEntityType = EntityType.GUARDIAN,
+    abilities = listOf(
+        GuardianBeamAbility(
+            id = "guardian_burst_beam",
+            cooldownTicks = 105L,
+            chargeTicks = 35L,
+            minRange = 2.0,
+            maxRange = 18.0,
+            directDamageMultiplier = 1.1,
+            directBonusDamage = 3.0,
+            explosionRadius = 3.6,
+            directKnockback = 2.3,
+            splashKnockback = 1.2,
+            splashVerticalBoost = 0.26,
+            chargePulseIntervalTicks = 0L,
+            decorationIntervalTicks = 10L,
+            decorationEffect = GuardianBeamAbility.centeredBoxDecorationEffect(
+                Color.fromRGB(220, 40, 40),
+                Color.fromRGB(255, 255, 255),
+                0.55,
+                0.85,
+                0.55,
+                particleCount = 24,
+                size = 1.2f
+            ),
+            impactParticle = Particle.EXPLOSION_EMITTER,
+            impactParticleCount = 1,
+            impactTargetParticles = GuardianBeamAbility.dustTransitionEffect(
+                Color.fromRGB(220, 40, 40),
+                Color.fromRGB(255, 255, 255),
+                1.35f
+            )
+        )
+    )
+)
+
+class GuardianDrainMobType : EquipmentMobType(
+    id = "guardian_drain",
+    baseEntityType = EntityType.GUARDIAN,
+    abilities = listOf(
+        GuardianBeamAbility(
+            id = "guardian_drain_beam",
+            cooldownTicks = 95L,
+            chargeTicks = 40L,
+            minRange = 2.0,
+            maxRange = 16.0,
+            directDamageMultiplier = 0.8,
+            directBonusDamage = 1.5,
+            explosionRadius = 0.0,
+            directKnockback = 1.5,
+            splashKnockback = 0.0,
+            chargePulseIntervalTicks = 30L,
+            chargePulseDamage = 3.0,
+            chargePulseSelfHeal = 2.0,
+            chargeDebuffType = PotionEffectType.WEAKNESS,
+            chargeDebuffDurationTicks = 60,
+            chargeDebuffAmplifier = 0,
+            chargePulseSound = Sound.ENTITY_GUARDIAN_ATTACK,
+            decorationIntervalTicks = 10L,
+            decorationEffect = GuardianBeamAbility.centeredBoxDecorationEffect(
+                Color.fromRGB(0, 110, 150),
+                Color.fromRGB(255, 255, 255),
+                0.55,
+                0.85,
+                0.55,
+                particleCount = 24,
+                size = 1.2f
+            ),
+            activationSound = Sound.ENTITY_GUARDIAN_DEATH,
+            activationSoundPitch = 2.0f,
+            activationSoundOnlyFirst = true,
+            activationTargetParticles = { location ->
+                location.world.spawnParticle(Particle.WARPED_SPORE, location, 100, 0.55, 0.45, 0.55, 0.02)
+                location.world.spawnParticle(
+                    Particle.DUST_COLOR_TRANSITION,
+                    location,
+                    18,
+                    0.45,
+                    0.45,
+                    0.45,
+                    0.0,
+                    Particle.DustTransition(Color.fromRGB(0, 110, 150), Color.fromRGB(255, 255, 255), 1.25f)
+                )
+            }
+        )
     )
 )
 

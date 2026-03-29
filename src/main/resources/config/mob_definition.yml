@@ -310,3 +310,43 @@ iron_golem_magnet:
   armor: 8.0
   scale: 1.0
 
+guardian_normal:
+  type: guardian_normal
+  health: 30.0
+  attack: 7.0
+  movement_speed: 0.28
+  armor: 6.0
+  scale: 1.0
+  spawn_conditions:
+    - WATER_ONLY
+
+guardian_small:
+  type: guardian_small
+  health: 16.0
+  attack: 4.0
+  movement_speed: 0.34
+  armor: 2.0
+  scale: 0.75
+  spawn_conditions:
+    - WATER_ONLY
+
+guardian_beam_burst:
+  type: guardian_beam_burst
+  health: 42.0
+  attack: 9.0
+  movement_speed: 0.24
+  armor: 8.0
+  scale: 1.5
+  spawn_conditions:
+    - WATER_ONLY
+
+guardian_drain:
+  type: guardian_drain
+  health: 36.0
+  attack: 6.0
+  movement_speed: 0.26
+  armor: 7.0
+  scale: 1.2
+  spawn_conditions:
+    - WATER_ONLY
+

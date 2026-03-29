@@ -6,6 +6,10 @@ import jp.awabi2048.cccontent.mob.type.HuskLeapOnlyMobType
 import jp.awabi2048.cccontent.mob.type.HuskNormalMobType
 import jp.awabi2048.cccontent.mob.type.HuskShieldOnlyMobType
 import jp.awabi2048.cccontent.mob.type.HuskWeakeningAuraMobType
+import jp.awabi2048.cccontent.mob.type.GuardianBeamBurstMobType
+import jp.awabi2048.cccontent.mob.type.GuardianDrainMobType
+import jp.awabi2048.cccontent.mob.type.GuardianNormalMobType
+import jp.awabi2048.cccontent.mob.type.GuardianSmallMobType
 import jp.awabi2048.cccontent.mob.type.IronGolemMagnetMobType
 import jp.awabi2048.cccontent.mob.type.IronGolemNormalMobType
 import jp.awabi2048.cccontent.mob.type.SilverfishBigPoisonMobType
@@ -151,6 +155,10 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(SilverfishBigPoisonMobType())
         registerMobType(IronGolemNormalMobType())
         registerMobType(IronGolemMagnetMobType())
+        registerMobType(GuardianNormalMobType())
+        registerMobType(GuardianSmallMobType())
+        registerMobType(GuardianBeamBurstMobType())
+        registerMobType(GuardianDrainMobType())
     }
 
     fun registerMobType(mobType: MobType) {
@@ -265,6 +273,7 @@ class MobService(private val plugin: JavaPlugin) {
             }
 
             val equipment = parseEquipment(mobId, mobSection, logPrefix)
+            val spawnConditions = parseSpawnConditions(mobId, mobSection, logPrefix)
             loaded[mobId] = MobDefinition(
                 id = mobId,
                 typeId = resolvedType.id,
@@ -273,10 +282,41 @@ class MobService(private val plugin: JavaPlugin) {
                 movementSpeed = mobSection.getDouble("movement_speed", 0.23).coerceAtLeast(0.01),
                 armor = mobSection.getDouble("armor", 0.0).coerceAtLeast(0.0),
                 scale = mobSection.getDouble("scale", 1.0).coerceAtLeast(0.1),
-                equipment = equipment
+                equipment = equipment,
+                spawnConditions = spawnConditions
             )
         }
         return loaded
+    }
+
+    private fun parseSpawnConditions(
+        mobId: String,
+        section: ConfigurationSection,
+        logPrefix: String
+    ): Set<MobSpawnCondition> {
+        val values = section.getStringList("spawn_conditions")
+        if (values.isEmpty()) {
+            return emptySet()
+        }
+
+        val parsed = mutableSetOf<MobSpawnCondition>()
+        values.forEach { raw ->
+            val normalized = raw.trim().uppercase()
+            if (normalized.isEmpty()) {
+                return@forEach
+            }
+
+            val condition = try {
+                MobSpawnCondition.valueOf(normalized)
+            } catch (_: IllegalArgumentException) {
+                plugin.logger.warning("$logPrefix mob_definition.yml の spawn_conditions が不正です: $mobId condition=$raw")
+                null
+            }
+            if (condition != null) {
+                parsed.add(condition)
+            }
+        }
+        return parsed
     }
 
     fun spawn(definition: MobDefinition, location: Location, options: MobSpawnOptions): LivingEntity? {
