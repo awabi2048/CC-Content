@@ -22,8 +22,8 @@ class ArenaCommand(
         }
 
         if (!featureEnabledProvider()) {
-            sender.sendMessage("§cArena feature は初期化に失敗したため利用できません")
-            featureFailureReasonProvider()?.let { sender.sendMessage("§7理由: $it") }
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable", "§cArena feature は初期化に失敗したため利用できません"))
+            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "§7理由: {reason}", "reason" to it)) }
             return true
         }
 
@@ -47,26 +47,26 @@ class ArenaCommand(
     private fun handleMenu(sender: CommandSender): Boolean {
         val player = sender as? Player
         if (player == null) {
-            sender.sendMessage("§cこのコマンドはプレイヤーのみ実行できます")
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.player_only", "§cこのコマンドはプレイヤーのみ実行できます"))
             return true
         }
 
         if (!featureEnabledProvider()) {
-            sender.sendMessage("§cArena feature は初期化に失敗したため利用できません")
-            featureFailureReasonProvider()?.let { sender.sendMessage("§7理由: $it") }
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable", "§cArena feature は初期化に失敗したため利用できません"))
+            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "§7理由: {reason}", "reason" to it)) }
             return true
         }
 
         val manager = arenaManagerProvider()
         if (manager == null) {
-            sender.sendMessage("§cArena feature は初期化に失敗したため利用できません")
-            featureFailureReasonProvider()?.let { sender.sendMessage("§7理由: $it") }
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable", "§cArena feature は初期化に失敗したため利用できません"))
+            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "§7理由: {reason}", "reason" to it)) }
             return true
         }
 
         val service = questService
         if (service == null) {
-            sender.sendMessage("§cアリーナメニューを開けませんでした")
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.menu_open_failed", "§cアリーナメニューを開けませんでした"))
             return true
         }
 
@@ -88,8 +88,8 @@ class ArenaCommand(
 
         val manager = arenaManagerProvider()
         if (manager == null) {
-            sender.sendMessage("§cArena feature は初期化に失敗したため利用できません")
-            featureFailureReasonProvider()?.let { sender.sendMessage("§7理由: $it") }
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable", "§cArena feature は初期化に失敗したため利用できません"))
+            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "§7理由: {reason}", "reason" to it)) }
             return true
         }
 

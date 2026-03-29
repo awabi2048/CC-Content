@@ -185,11 +185,17 @@ class CCContent : JavaPlugin(), Listener {
                 arenaManager = ArenaManager(this, sharedMobService)
                 arenaManager.initialize(featureInitLogger)
                 arenaQuestService = ArenaQuestService(this, arenaManager)
+                arenaManager.setQuestService(arenaQuestService)
                 arenaQuestService?.initialize()
                 arenaFeatureReady = true
             } catch (e: Exception) {
                 runCatching { arenaQuestService?.shutdown() }
-                runCatching { if (::arenaManager.isInitialized) arenaManager.shutdown() }
+                runCatching {
+                    if (::arenaManager.isInitialized) {
+                        arenaManager.setQuestService(null)
+                        arenaManager.shutdown()
+                    }
+                }
                 arenaQuestService = null
                 arenaFeatureReady = false
                 arenaFeatureFailureReason = e.message?.takeIf { it.isNotBlank() }
@@ -325,6 +331,9 @@ class CCContent : JavaPlugin(), Listener {
                 breweryFeature.shutdown()
             }
             arenaQuestService?.shutdown()
+            if (::arenaManager.isInitialized) {
+                arenaManager.setQuestService(null)
+            }
             arenaQuestService = null
             if (::arenaManager.isInitialized) {
                 arenaManager.shutdown()
@@ -771,6 +780,7 @@ class CCContent : JavaPlugin(), Listener {
      * プラグインを再起動相当に再初期化
      */
     private fun reloadConfiguration() {
+        ArenaI18n.clearCache()
         stopPlugin()
         startPlugin()
     }
