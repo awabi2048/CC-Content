@@ -27,6 +27,7 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.Color
 import org.bukkit.FluidCollisionMode
+import org.bukkit.GameMode
 import org.bukkit.GameRule
 import org.bukkit.Location
 import org.bukkit.Material
@@ -56,8 +57,12 @@ import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPlaceEvent
+import org.bukkit.event.block.Action
+import org.bukkit.event.Event
 import org.bukkit.event.player.PlayerAnimationEvent
 import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.event.player.PlayerInteractEntityEvent
+import org.bukkit.event.entity.EntityMountEvent
 import org.bukkit.event.player.PlayerAnimationType
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.PlayerInventory
@@ -105,6 +110,8 @@ private data class ArenaDifficultyConfig(
     val waveMultiplier: Double,
     val waves: Int,
     val display: String,
+    val reviveMaxPerPlayer: Int,
+    val reviveTimeLimitSeconds: Int,
     val mobStatsMaxHealth: Double,
     val mobStatsMaxAttack: Double,
     val mobStatsMaxMovementSpeed: Double,
@@ -141,7 +148,7 @@ private data class ArenaBgmTrackConfig(
     val soundKey: String,
     val bpm: Double,
     val loopBeats: Int,
-    val switchBeats: List<Int>
+    val switchIntervalBeats: Int
 ) {
     val beatTicks: Double
         get() = 1200.0 / bpm
@@ -192,6 +199,8 @@ class ArenaManager(
         const val ARENA_BGM_NORMAL_BPM_DEFAULT = 120.0
         const val ARENA_BGM_COMBAT_BPM_DEFAULT = 140.0
         const val ARENA_BGM_LOOP_BEATS_DEFAULT = 384
+        const val ARENA_BGM_SWITCH_INTERVAL_BEATS_DEFAULT = 8
+        const val ARENA_BGM_TARGET_STATE_SWITCH_THRESHOLD_SECONDS_DEFAULT = 10
         const val ACTION_MARKER_RADIUS = 1.0
         const val ACTION_MARKER_RADIUS_SQUARED = ACTION_MARKER_RADIUS * ACTION_MARKER_RADIUS
         const val ACTION_MARKER_OUTER_RING_RADIUS = 1.0
@@ -212,16 +221,15 @@ class ArenaManager(
         const val WAVE_START_COMBAT_BGM_DELAY_TICKS = 40L
         const val MULTIPLAYER_STAGE_INTRO_TELEPORT_EXTRA_DELAY_TICKS = 20L
         const val MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS = 5L
+        const val WAVE_CATCHUP_TELEPORT_DELAY_MILLIS = 30_000L
         const val DOWN_REVIVE_HOLD_SECONDS_DEFAULT = 3
         const val DOWN_REVIVE_RADIUS_DEFAULT = 2.5
         const val DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT = 2L
         const val REVIVE_LINK_TIMEOUT_TICKS = 200L
         const val DOWNED_PLAYER_WALK_SPEED = 0.1f
 
-        fun defaultSwitchBeats(loopBeats: Int): List<Int> {
-            val safeLoopBeats = loopBeats.coerceAtLeast(1)
-            val beats = (8..safeLoopBeats step 8).toList()
-            return if (beats.isEmpty()) listOf(safeLoopBeats) else beats
+        fun defaultSwitchIntervalBeats(): Int {
+            return ARENA_BGM_SWITCH_INTERVAL_BEATS_DEFAULT
         }
     }
 
@@ -254,18 +262,21 @@ class ArenaManager(
     private var actionMarkerColorTransitionTicks = 16
     private var doorAnimationTotalTicks = DOOR_ANIMATION_TOTAL_TICKS_DEFAULT
     private var sharedWaveMaxAlive = SHARED_WAVE_MAX_ALIVE_DEFAULT
+    private var arenaDoorAnimationSoundKey = "minecraft:block.iron_door.open"
+    private var arenaDoorAnimationSoundPitch = 1.0f
+    private var arenaBgmTargetStateSwitchThresholdMillis = ARENA_BGM_TARGET_STATE_SWITCH_THRESHOLD_SECONDS_DEFAULT * 1000L
     private var arenaBgmConfig = ArenaBgmConfig(
         normal = ArenaBgmTrackConfig(
             soundKey = ARENA_BGM_NORMAL_KEY_DEFAULT,
             bpm = ARENA_BGM_NORMAL_BPM_DEFAULT,
             loopBeats = ARENA_BGM_LOOP_BEATS_DEFAULT,
-            switchBeats = defaultSwitchBeats(ARENA_BGM_LOOP_BEATS_DEFAULT)
+            switchIntervalBeats = defaultSwitchIntervalBeats()
         ),
         combat = ArenaBgmTrackConfig(
             soundKey = ARENA_BGM_COMBAT_KEY_DEFAULT,
             bpm = ARENA_BGM_COMBAT_BPM_DEFAULT,
             loopBeats = ARENA_BGM_LOOP_BEATS_DEFAULT,
-            switchBeats = defaultSwitchBeats(ARENA_BGM_LOOP_BEATS_DEFAULT)
+            switchIntervalBeats = defaultSwitchIntervalBeats()
         )
     )
     private var dropConfig = ArenaDropConfig(
@@ -329,6 +340,21 @@ class ArenaManager(
         arenaLobbyConfig = loadArenaLobbyConfig(config)
         doorAnimationTotalTicks = config.getInt("arena.door_animation.total_ticks", DOOR_ANIMATION_TOTAL_TICKS_DEFAULT)
             .coerceAtLeast(1)
+        arenaDoorAnimationSoundKey = config
+            .getString("arena.door_animation.sound.key", "minecraft:block.iron_door.open")
+            ?.trim()
+            .orEmpty()
+            .ifBlank { "minecraft:block.iron_door.open" }
+        arenaDoorAnimationSoundPitch = config
+            .getDouble("arena.door_animation.sound.pitch", 1.0)
+            .toFloat()
+            .coerceIn(0.5f, 2.0f)
+        arenaBgmTargetStateSwitchThresholdMillis = config
+            .getLong(
+                "arena.bgm.target_state_switch_threshold_seconds",
+                ARENA_BGM_TARGET_STATE_SWITCH_THRESHOLD_SECONDS_DEFAULT.toLong()
+            )
+            .coerceAtLeast(0L) * 1000L
         sharedWaveMaxAlive = config.getInt("arena.mob_spawn.system_max_alive", SHARED_WAVE_MAX_ALIVE_DEFAULT)
             .coerceAtLeast(1)
     }
@@ -384,25 +410,14 @@ class ArenaManager(
             .coerceAtLeast(1.0)
         val loopBeats = config.getInt("$path.loop_beats", defaultLoopBeats)
             .coerceAtLeast(1)
-        val rawSwitchBeats = config.getIntegerList("$path.switch_beats")
-        val switchBeats = rawSwitchBeats
-            .asSequence()
-            .map { it.coerceAtLeast(1) }
-            .filter { it <= loopBeats }
-            .distinct()
-            .sorted()
-            .toList()
-            .ifEmpty { defaultSwitchBeats(loopBeats) }
-
-        if (rawSwitchBeats.isNotEmpty() && switchBeats.isEmpty()) {
-            plugin.logger.warning("[Arena] $path.switch_beats が無効値のみだったためデフォルト値を使用します")
-        }
+        val switchIntervalBeats = config.getInt("$path.switch_interval_beats", defaultSwitchIntervalBeats())
+            .coerceAtLeast(1)
 
         return ArenaBgmTrackConfig(
             soundKey = soundKey,
             bpm = bpm,
             loopBeats = loopBeats,
-            switchBeats = switchBeats
+            switchIntervalBeats = switchIntervalBeats
         )
     }
 
@@ -436,6 +451,9 @@ class ArenaManager(
             val waveMultiplier = section.getDouble("wave_multiplier", 0.0)
             val waves = section.getInt("wave", 5).coerceAtLeast(1)
             val display = section.getString("display", difficultyId) ?: difficultyId
+            val reviveMaxPerPlayerRaw = section.getInt("revive_max_per_player", -1)
+            val reviveMaxPerPlayer = if (reviveMaxPerPlayerRaw <= 0) Int.MAX_VALUE else reviveMaxPerPlayerRaw
+            val reviveTimeLimitSeconds = section.getInt("revive_time_limit_seconds", 0).coerceAtLeast(0)
             val mobStatsMaxHealth = section.getDouble("mob_stats_max_health", 20.0).coerceAtLeast(1.0)
             val mobStatsMaxAttack = section.getDouble("mob_stats_max_attack", 1.0).coerceAtLeast(0.0)
             val mobStatsMaxMovementSpeed = section.getDouble("mob_stats_max_movement_speed", 0.23).coerceAtLeast(0.01)
@@ -450,6 +468,8 @@ class ArenaManager(
                 waveMultiplier = waveMultiplier,
                 waves = waves,
                 display = display,
+                reviveMaxPerPlayer = reviveMaxPerPlayer,
+                reviveTimeLimitSeconds = reviveTimeLimitSeconds,
                 mobStatsMaxHealth = mobStatsMaxHealth,
                 mobStatsMaxAttack = mobStatsMaxAttack,
                 mobStatsMaxMovementSpeed = mobStatsMaxMovementSpeed,
@@ -531,6 +551,7 @@ class ArenaManager(
         target: Player,
         difficultyId: String,
         requestedTheme: String?,
+        initialParticipants: List<Player> = emptyList(),
         questModifiers: ArenaQuestModifiers = ArenaQuestModifiers.NONE,
         difficultyScore: Double? = null,
         enableMultiplayerJoin: Boolean = false,
@@ -538,11 +559,15 @@ class ArenaManager(
         inviteQuestLore: List<String> = emptyList(),
         maxParticipants: Int = MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT
     ): ArenaStartResult {
-        if (playerToSessionWorld.containsKey(target.uniqueId)) {
+        val participantPlayers = (listOf(target) + initialParticipants)
+            .distinctBy { it.uniqueId }
+
+        val alreadyInSession = participantPlayers.firstOrNull { playerToSessionWorld.containsKey(it.uniqueId) }
+        if (alreadyInSession != null) {
             return ArenaStartResult.Error(
                 "arena.messages.command.start_error.already_in_session",
                 "&c{player} はすでにアリーナセッション中です",
-                arrayOf("player" to target.name)
+                arrayOf("player" to alreadyInSession.name)
             )
         }
 
@@ -595,7 +620,16 @@ class ArenaManager(
         )
 
         val sanitizedMaxParticipants = maxParticipants.coerceIn(1, MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
-        val returnLocation = target.location.clone()
+        if (participantPlayers.size > sanitizedMaxParticipants) {
+            return ArenaStartResult.Error(
+                "arena.messages.command.start_error.too_many_participants",
+                "&c参加人数が上限を超えています ({count}/{max})",
+                arrayOf("count" to participantPlayers.size, "max" to sanitizedMaxParticipants)
+            )
+        }
+
+        val returnLocations = participantPlayers.associate { it.uniqueId to it.location.clone() }.toMutableMap()
+        val originalGameModes = participantPlayers.associate { it.uniqueId to it.gameMode }.toMutableMap()
         val origin = Location(world, 0.0, 64.0, 0.0)
         val now = System.currentTimeMillis()
 
@@ -611,8 +645,9 @@ class ArenaManager(
             waves = difficulty.waves,
             questModifiers = questModifiers,
             maxParticipants = sanitizedMaxParticipants,
-            participants = mutableSetOf(target.uniqueId),
-            returnLocations = mutableMapOf(target.uniqueId to returnLocation),
+            participants = participantPlayers.mapTo(mutableSetOf()) { it.uniqueId },
+            returnLocations = returnLocations,
+            originalGameModes = originalGameModes,
             playerSpawn = placeholderLocation.clone(),
             entranceLocation = placeholderLocation.clone(),
             stageBounds = placeholderBounds,
@@ -631,11 +666,15 @@ class ArenaManager(
             joinGraceEndMillis = if (enableMultiplayerJoin) now + (multiplayerJoinGraceSeconds * 1000L) else 0L,
             inviteQuestTitle = inviteQuestTitle,
             inviteQuestLore = inviteQuestLore,
-            stageGenerationCompleted = !enableMultiplayerJoin
+            stageGenerationCompleted = !enableMultiplayerJoin,
+            reviveMaxPerPlayer = difficulty.reviveMaxPerPlayer,
+            reviveTimeLimitSeconds = difficulty.reviveTimeLimitSeconds
         )
 
         sessionsByWorld[world.name] = session
-        playerToSessionWorld[target.uniqueId] = world.name
+        participantPlayers.forEach { participant ->
+            playerToSessionWorld[participant.uniqueId] = world.name
+        }
 
         return try {
             if (enableMultiplayerJoin) {
@@ -644,15 +683,7 @@ class ArenaManager(
                     ArenaI18n.text(
                         target,
                         "arena.messages.multiplayer.invite_window_started",
-                        "&e左クリックで近くのプレイヤーを招待してください（{seconds}秒）",
-                        "seconds" to multiplayerJoinGraceSeconds
-                    )
-                )
-                target.sendMessage(
-                    ArenaI18n.text(
-                        target,
-                        "arena.messages.multiplayer.wait_area_hint",
-                        "&7招待したプレイヤーと開始待機エリアに入ると待機状態になります"
+                        "&7アリーナセッションを開始します…\n左クリックで他のプレイヤーを招待できます。招待メンバーはリフトで待機すると、一緒に入場できます"
                     )
                 )
 
@@ -708,8 +739,9 @@ class ArenaManager(
                     val spawnLocation = session.entranceLocation.clone()
                     applyStageStartFacingYaw(session, spawnLocation)
                     participant.teleport(spawnLocation)
+                    applySessionGameMode(session, participant)
+                    playStageEntrySoundsLater(participant)
                 }
-                requestArenaBgmMode(session, ArenaBgmMode.NORMAL)
                 setDoorActionMarkersReadySilently(session, 1)
                 initializeWavePipeline(session, theme, difficulty)
                 updateSessionProgressBossBar(session)
@@ -749,6 +781,16 @@ class ArenaManager(
         val player = Bukkit.getPlayer(playerId)
         val localizedReason = reason ?: ArenaI18n.text(player, "arena.messages.session.ended", "&cアリーナセッションが終了しました")
         return leavePlayerFromSession(playerId, localizedReason)
+    }
+
+    fun notifyParticipantDeath(player: Player) {
+        val session = getSession(player) ?: return
+        session.participants
+            .asSequence()
+            .filter { it != player.uniqueId }
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .filter { it.isOnline && it.world.name == session.worldName }
+            .forEach { it.sendMessage("§4${player.name}さんが死亡しました...") }
     }
 
     fun shutdown() {
@@ -848,17 +890,17 @@ class ArenaManager(
             releaseInvitedPlayerLock(invitedId)
         }
 
-        session.invitedAtMillis.clear()
         session.waitingNotifiedParticipants.clear()
         session.waitingParticipants.clear()
+        session.waitingSubtitleNextTickByPlayer.clear()
         session.invitedParticipants.clear()
     }
 
     private fun removeInvitedParticipant(session: ArenaSession, invitedId: UUID) {
         session.invitedParticipants.remove(invitedId)
-        session.invitedAtMillis.remove(invitedId)
         session.waitingParticipants.remove(invitedId)
         session.waitingNotifiedParticipants.remove(invitedId)
+        session.waitingSubtitleNextTickByPlayer.remove(invitedId)
         hideJoinCountdownBossBar(session, invitedId)
         releaseInvitedPlayerLock(invitedId)
     }
@@ -903,14 +945,7 @@ class ArenaManager(
                 val location = player.location
                 val currentWave = session.currentWave.coerceAtLeast(1)
                 if (location.world?.name != world.name || !session.stageBounds.contains(location.x, location.y, location.z)) {
-                    if (location.world?.name != world.name) {
-                        stopSessionById(
-                            participantId,
-                            ArenaI18n.text(player, "arena.messages.session.ended_by_warp", "&cワープしたため死亡扱いでアリーナを終了しました")
-                        )
-                    } else {
-                        teleportToRecentValidPosition(player, session, world, currentWave, applyBlindness = true)
-                    }
+                    teleportToLatestDoorMarker(player, session, world, currentWave)
                     continue
                 }
 
@@ -929,6 +964,7 @@ class ArenaManager(
                         teleportToCurrentWavePosition(player, session, world, applyBlindness = true)
                         continue
                     }
+                    clearPreviousRoomMobTargetsOnCorridorEntry(session, corridorWave)
                     if (corridorWave == currentWave) {
                         if (session.startedWaves.contains(corridorWave) &&
                             (corridorWave <= 1 || session.clearedWaves.contains(corridorWave - 1)) &&
@@ -939,9 +975,34 @@ class ArenaManager(
                     }
                 }
 
-                recordParticipantValidLocation(session, participantId, location)
+                processWaveCatchupIfNeeded(session, player, world, now)
+                recordParticipantValidLocation(session, participantId, player.location)
             }
         }
+    }
+
+    private fun clearPreviousRoomMobTargetsOnCorridorEntry(session: ArenaSession, corridorWave: Int) {
+        val previousWave = corridorWave - 1
+        if (previousWave <= 0) return
+        if (!session.clearedWaves.contains(previousWave)) return
+        val previousRoomBounds = session.roomBounds[previousWave] ?: return
+
+        session.waveMobIds[previousWave]
+            .orEmpty()
+            .asSequence()
+            .mapNotNull { Bukkit.getEntity(it) as? Mob }
+            .filter { it.isValid && !it.isDead }
+            .filter { mob ->
+                val mobLocation = mob.location
+                mobLocation.world?.name == session.worldName &&
+                    previousRoomBounds.contains(mobLocation.x, mobLocation.y, mobLocation.z)
+            }
+            .forEach { mob ->
+                val target = mob.target as? Player
+                if (target != null && session.participants.contains(target.uniqueId)) {
+                    mob.target = null
+                }
+            }
     }
 
     fun handleMobDeath(event: EntityDeathEvent) {
@@ -977,6 +1038,10 @@ class ArenaManager(
         }
 
         if (!hasOtherAliveNonDownParticipant(session, player.uniqueId)) {
+            return
+        }
+
+        if (!canBeRevived(session, player.uniqueId)) {
             return
         }
 
@@ -1026,11 +1091,9 @@ class ArenaManager(
             return
         }
 
-        if (event.block.type == Material.COBWEB && PeriodicCobwebAbility.consumeArenaPlacedCobweb(event.block)) {
-            return
+        if (event.block.type == Material.COBWEB) {
+            PeriodicCobwebAbility.consumeArenaPlacedCobweb(event.block)
         }
-
-        event.isCancelled = true
     }
 
     fun handleArenaBlockPlace(event: BlockPlaceEvent) {
@@ -1047,7 +1110,56 @@ class ArenaManager(
         if (!sessionsByWorld.containsKey(worldName)) {
             return
         }
+        if (event.action != Action.RIGHT_CLICK_BLOCK) {
+            return
+        }
+        if (!clicked.type.isInteractable) {
+            return
+        }
         event.isCancelled = true
+        event.setUseInteractedBlock(Event.Result.DENY)
+        event.setUseItemInHand(Event.Result.DEFAULT)
+    }
+
+    fun handleArenaInteractEntity(event: PlayerInteractEntityEvent) {
+        val player = event.player
+        val session = getSession(player) ?: return
+        if (!session.participants.contains(player.uniqueId)) return
+        if (isPlayerDowned(session, player.uniqueId)) return
+
+        val shulker = event.rightClicked as? Shulker ?: return
+        val downedId = findDownedPlayerIdByShulker(session, shulker.uniqueId) ?: return
+        val downed = Bukkit.getPlayer(downedId) ?: return
+        if (!downed.isOnline || downed.world.uid != player.world.uid) return
+
+        handleReviveTargetSelection(session, player, downed)
+        event.isCancelled = true
+    }
+
+    fun handleArenaEntityMount(event: EntityMountEvent) {
+        val player = event.entity as? Player ?: return
+        val shulker = event.mount as? Shulker ?: return
+        val session = getSession(player) ?: return
+        if (!session.participants.contains(player.uniqueId)) return
+        if (isPlayerDowned(session, player.uniqueId)) return
+        val downedId = findDownedPlayerIdByShulker(session, shulker.uniqueId) ?: return
+        if (downedId == player.uniqueId) return
+
+        event.isCancelled = true
+        Bukkit.getScheduler().runTask(plugin, Runnable {
+            if (shulker.passengers.contains(player)) {
+                shulker.removePassenger(player)
+            }
+            val base = shulker.location.block.location.add(1.5, 0.0, 0.5)
+            val destination = if (base.block.isPassable) base else base.clone().add(0.0, 1.0, 0.0)
+            player.teleport(destination)
+        })
+    }
+
+    private fun findDownedPlayerIdByShulker(session: ArenaSession, shulkerId: UUID): UUID? {
+        return session.downedPlayers.entries
+            .firstOrNull { it.value.shulkerEntityId == shulkerId }
+            ?.key
     }
 
     fun handleMobFallDamage(event: EntityDamageEvent) {
@@ -1155,16 +1267,44 @@ class ArenaManager(
             return false
         }
 
-        val target = rayTraceTargetPlayer(player) ?: return false
-        if (!session.participants.contains(target.uniqueId)) {
-            return false
-        }
-        if (!isPlayerDowned(session, target.uniqueId)) {
-            return false
-        }
+        val target = resolveReviveTargetByRayTrace(session, player) ?: return false
 
         handleReviveTargetSelection(session, player, target)
         return true
+    }
+
+    private fun resolveReviveTargetByRayTrace(session: ArenaSession, source: Player): Player? {
+        val maxDistance = (source.getAttribute(Attribute.ENTITY_INTERACTION_RANGE)?.value ?: 3.0).coerceAtLeast(1.0)
+        val eyeLocation = source.eyeLocation
+        val hit = source.world.rayTrace(
+            eyeLocation,
+            eyeLocation.direction,
+            maxDistance,
+            FluidCollisionMode.NEVER,
+            true,
+            0.2
+        ) { candidate ->
+            when (candidate) {
+                is Player -> candidate.uniqueId != source.uniqueId
+                is Shulker -> true
+                else -> false
+            }
+        }
+        val entity = hit?.hitEntity ?: return null
+        return when (entity) {
+            is Player -> {
+                if (!session.participants.contains(entity.uniqueId)) return null
+                if (!isPlayerDowned(session, entity.uniqueId)) return null
+                entity
+            }
+            is Shulker -> {
+                val downedId = findDownedPlayerIdByShulker(session, entity.uniqueId) ?: return null
+                val downed = Bukkit.getPlayer(downedId) ?: return null
+                if (!downed.isOnline) return null
+                downed
+            }
+            else -> null
+        }
     }
 
     private fun trySendMultiplayerInvite(owner: Player, invited: Player, session: ArenaSession) {
@@ -1231,7 +1371,6 @@ class ArenaManager(
         session.returnLocations.putIfAbsent(invited.uniqueId, invited.location.clone())
         invitedPlayerLocks[invited.uniqueId] = session.worldName
         invited.isGlowing = true
-        session.invitedAtMillis[invited.uniqueId] = System.currentTimeMillis()
         invited.showBossBar(getOrCreateJoinCountdownBossBar(session, invited.uniqueId))
         owner.sendMessage(
             ArenaI18n.text(
@@ -1348,6 +1487,18 @@ class ArenaManager(
         return session.downedPlayers.containsKey(playerId)
     }
 
+    private fun reviveCount(session: ArenaSession, playerId: UUID): Int {
+        return session.reviveCountByPlayer[playerId] ?: 0
+    }
+
+    private fun canBeRevived(session: ArenaSession, playerId: UUID): Boolean {
+        val maxCount = session.reviveMaxPerPlayer
+        if (maxCount == Int.MAX_VALUE) {
+            return true
+        }
+        return reviveCount(session, playerId) < maxCount
+    }
+
     private fun hasOtherAliveNonDownParticipant(session: ArenaSession, excludedPlayerId: UUID): Boolean {
         val world = Bukkit.getWorld(session.worldName) ?: return false
         return session.participants
@@ -1368,9 +1519,14 @@ class ArenaManager(
         }
 
         val now = System.currentTimeMillis()
+        val reviveDeadline = if (session.reviveTimeLimitSeconds > 0) {
+            now + session.reviveTimeLimitSeconds * 1000L
+        } else {
+            Long.MAX_VALUE
+        }
         session.downedPlayers[player.uniqueId] = ArenaDownedPlayerState(
             downedAtMillis = now,
-            bleedoutAtMillis = Long.MAX_VALUE
+            bleedoutAtMillis = reviveDeadline
         )
         session.reviveHoldStates[player.uniqueId] = ArenaReviveHoldState()
         session.downedOriginalWalkSpeeds.putIfAbsent(player.uniqueId, player.walkSpeed)
@@ -1379,6 +1535,7 @@ class ArenaManager(
         player.fireTicks = 0
         player.fallDistance = 0.0f
         player.walkSpeed = DOWNED_PLAYER_WALK_SPEED
+        player.playSound(player.location, Sound.BLOCK_ANVIL_LAND, 1.0f, 0.75f)
 
         syncDownedShulker(session, player, forceTeleport = true)
         retargetMobsFromDownedPlayers(session)
@@ -1402,7 +1559,8 @@ class ArenaManager(
     }
 
     private fun recoverDownedPlayer(session: ArenaSession, downed: Player, revivedBy: Player?) {
-        clearDownedState(session, downed.uniqueId)
+        clearDownedState(session, downed.uniqueId, playInterruptedSound = false)
+        session.reviveCountByPlayer[downed.uniqueId] = reviveCount(session, downed.uniqueId) + 1
 
         val maxHealth = downed.getAttribute(Attribute.MAX_HEALTH)?.value ?: 20.0
         val targetHealth = (maxHealth * 0.5).coerceAtLeast(1.0)
@@ -1418,6 +1576,8 @@ class ArenaManager(
         )
 
         if (revivedBy != null && revivedBy.uniqueId != downed.uniqueId) {
+            downed.playSound(downed.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f)
+            revivedBy.playSound(revivedBy.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f)
             revivedBy.sendMessage(
                 ArenaI18n.text(
                     revivedBy,
@@ -1430,7 +1590,7 @@ class ArenaManager(
     }
 
     private fun updateDownedPlayers(currentTick: Long) {
-        for (session in sessionsByWorld.values) {
+        for (session in sessionsByWorld.values.toList()) {
             if (session.downedPlayers.isEmpty()) {
                 continue
             }
@@ -1446,11 +1606,27 @@ class ArenaManager(
                     continue
                 }
 
+                val downState = session.downedPlayers[downedId]
+                if (downState != null && downState.bleedoutAtMillis != Long.MAX_VALUE && System.currentTimeMillis() >= downState.bleedoutAtMillis) {
+                    val now = System.currentTimeMillis()
+                    val timeoutExecuteAt = downState.timeoutExecuteAtMillis
+                    if (timeoutExecuteAt == null) {
+                        downed.playSound(downed.location, Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0f, 0.75f)
+                        downed.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 40, 0, false, false, false))
+                        clearReviveBindingForDowned(session, downedId, playInterruptedSound = false)
+                        downState.timeoutExecuteAtMillis = now + 1000L
+                    } else if (now >= timeoutExecuteAt) {
+                        stopSessionById(
+                            downedId,
+                            ArenaI18n.text(downed, "arena.messages.down.timeout", "&cダウン時間切れです。ロビーへ転送されます")
+                        )
+                    }
+                    continue
+                }
+
                 if (shouldFollowShulker) {
                     syncDownedShulker(session, downed, forceTeleport = false)
                 }
-
-                // ダウンは仕様として無制限のため、時間経過による離脱は行わない
             }
 
             updateReviveHoldStates(session)
@@ -1508,6 +1684,11 @@ class ArenaManager(
             }
 
             val inRange = reviver.location.distanceSquared(downed.location) <= reviveRadiusSquared
+            if (!inRange) {
+                clearReviveBindingForDowned(session, downedId)
+                continue
+            }
+
             if (reviver.isSneaking && inRange) {
                 holdState.heldTicks += 1
                 holdState.lastProgressTick = currentTick
@@ -1555,6 +1736,8 @@ class ArenaManager(
         session.reviveTargetByReviver[reviver.uniqueId] = target.uniqueId
 
         updateReviveBossBar(session, target, reviver, 0.0f)
+        target.playSound(target.location, Sound.ENTITY_ARROW_HIT_PLAYER, 1.0f, 0.9f)
+        reviver.playSound(reviver.location, Sound.ENTITY_ARROW_HIT_PLAYER, 1.0f, 0.9f)
     }
 
     private fun updateReviveBossBar(session: ArenaSession, downed: Player, reviver: Player, progress: Float) {
@@ -1595,9 +1778,8 @@ class ArenaManager(
     }
 
     private fun hideReviveBossBarFromAll(session: ArenaSession, bossBars: ArenaReviveBossBars) {
-        session.participants
+        Bukkit.getOnlinePlayers()
             .asSequence()
-            .mapNotNull { Bukkit.getPlayer(it) }
             .filter { it.isOnline }
             .forEach {
                 it.hideBossBar(bossBars.downedPlayerBar)
@@ -1607,23 +1789,34 @@ class ArenaManager(
 
     private fun clearReviveBindingByReviver(session: ArenaSession, reviverId: UUID) {
         val downedId = session.reviveTargetByReviver.remove(reviverId) ?: return
-        val holdState = session.reviveHoldStates[downedId] ?: return
-        if (holdState.reviverPlayerId == reviverId) {
+        val holdState = session.reviveHoldStates[downedId]
+        if (holdState != null && holdState.reviverPlayerId == reviverId) {
             holdState.reviverPlayerId = null
             holdState.heldTicks = 0
-            hideReviveBossBar(session, downedId)
         }
+        hideReviveBossBar(session, downedId)
     }
 
-    private fun clearReviveBindingForDowned(session: ArenaSession, downedId: UUID) {
+    private fun clearReviveBindingForDowned(session: ArenaSession, downedId: UUID, playInterruptedSound: Boolean = true) {
         val holdState = session.reviveHoldStates[downedId]
         val reviverId = holdState?.reviverPlayerId
+        val hadLink = reviverId != null
         if (reviverId != null) {
             session.reviveTargetByReviver.remove(reviverId)
         }
         holdState?.reviverPlayerId = null
         holdState?.heldTicks = 0
         hideReviveBossBar(session, downedId)
+        if (playInterruptedSound && hadLink) {
+            val downed = Bukkit.getPlayer(downedId)
+            val reviver = reviverId?.let { Bukkit.getPlayer(it) }
+            if (downed != null && downed.isOnline) {
+                downed.playSound(downed.location, Sound.UI_BUTTON_CLICK, 1.0f, 0.5f)
+            }
+            if (reviver != null && reviver.isOnline) {
+                reviver.playSound(reviver.location, Sound.UI_BUTTON_CLICK, 1.0f, 0.5f)
+            }
+        }
     }
 
     private fun retargetMobsFromDownedPlayers(session: ArenaSession) {
@@ -1689,8 +1882,8 @@ class ArenaManager(
         }
     }
 
-    private fun clearDownedState(session: ArenaSession, playerId: UUID) {
-        clearReviveBindingForDowned(session, playerId)
+    private fun clearDownedState(session: ArenaSession, playerId: UUID, playInterruptedSound: Boolean = true) {
+        clearReviveBindingForDowned(session, playerId, playInterruptedSound)
         val downState = session.downedPlayers.remove(playerId)
         session.reviveHoldStates.remove(playerId)
         restoreDownedWalkSpeed(session, playerId)
@@ -1715,6 +1908,34 @@ class ArenaManager(
         val config = arenaLobbyConfig ?: return null
         val world = Bukkit.getWorld(config.worldName) ?: return null
         return Location(world, config.x, config.y, config.z, config.yaw, config.pitch)
+    }
+
+    private fun applySessionGameMode(session: ArenaSession, player: Player) {
+        session.originalGameModes.putIfAbsent(player.uniqueId, player.gameMode)
+        if (player.gameMode != GameMode.ADVENTURE) {
+            player.gameMode = GameMode.ADVENTURE
+        }
+    }
+
+    private fun restoreSessionGameMode(session: ArenaSession, player: Player) {
+        val original = session.originalGameModes.remove(player.uniqueId) ?: return
+        if (player.gameMode != original) {
+            player.gameMode = original
+        }
+    }
+
+    private fun playStageEntrySounds(player: Player) {
+        player.playSound(player.location, Sound.ENTITY_ILLUSIONER_MIRROR_MOVE, 1.0f, 0.75f)
+        player.playSound(player.location, Sound.BLOCK_FIRE_EXTINGUISH, 1.0f, 1.25f)
+    }
+
+    private fun playStageEntrySoundsLater(player: Player) {
+        val playerId = player.uniqueId
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            val onlinePlayer = Bukkit.getPlayer(playerId) ?: return@Runnable
+            if (!onlinePlayer.isOnline) return@Runnable
+            playStageEntrySounds(onlinePlayer)
+        }, 20L)
     }
 
     private fun applyArenaMobDrop(event: EntityDeathEvent) {
@@ -1864,6 +2085,14 @@ class ArenaManager(
                     changed += 1
                 }
             }
+        if (changed > 0) {
+            session.participants.forEach { participantId ->
+                val player = Bukkit.getPlayer(participantId) ?: return@forEach
+                if (player.isOnline && player.world.name == session.worldName) {
+                    player.sendMessage("§3次のウェーブへの道が開かれました...")
+                }
+            }
+        }
         return changed
     }
 
@@ -1918,18 +2147,24 @@ class ArenaManager(
         session.arenaBgmPlaybackStartTickByParticipant.remove(playerId)
         session.arenaCombatHadTargetingMobByParticipant.remove(playerId)
         session.arenaBgmSwitchRequestByParticipant.remove(playerId)
+        session.arenaBgmTargetingStateByParticipant.remove(playerId)
+        session.arenaBgmTargetingStateChangedAtMillisByParticipant.remove(playerId)
+        session.arenaLastTargetDrivenSwitchAtMillisByParticipant.remove(playerId)
+        session.playerWaveCatchupDeadlineMillis.remove(playerId)
         clearReviveBindingByReviver(session, playerId)
         clearDownedState(session, playerId)
+        session.reviveCountByPlayer.remove(playerId)
         session.invitedParticipants.remove(playerId)
-        session.invitedAtMillis.remove(playerId)
         session.waitingParticipants.remove(playerId)
         session.waitingNotifiedParticipants.remove(playerId)
+        session.waitingSubtitleNextTickByPlayer.remove(playerId)
         hideJoinCountdownBossBar(session, playerId)
         releaseInvitedPlayerLock(playerId)
 
         val player = Bukkit.getPlayer(playerId)
         if (player != null && player.isOnline) {
             stopArenaBgmForPlayer(player)
+            restoreSessionGameMode(session, player)
             session.progressBossBar?.let { player.hideBossBar(it) }
             val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
             val destination = destinationOverride
@@ -1986,6 +2221,7 @@ class ArenaManager(
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline) {
                 stopArenaBgmForPlayer(player)
+                restoreSessionGameMode(session, player)
                 val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
                 val destination = if (session.returnLocations[participantId]?.world != null) {
                     session.returnLocations[participantId]
@@ -2012,6 +2248,7 @@ class ArenaManager(
 
         session.participants.clear()
         session.returnLocations.clear()
+        session.originalGameModes.clear()
         session.playerNotifiedWaves.clear()
         session.participantLocationHistory.clear()
         session.participantLastSampleMillis.clear()
@@ -2020,15 +2257,19 @@ class ArenaManager(
         session.reviveTargetByReviver.clear()
         session.reviveBossBarsByDowned.values.forEach { hideReviveBossBarFromAll(session, it) }
         session.reviveBossBarsByDowned.clear()
+        session.reviveCountByPlayer.clear()
         session.arenaBgmModeByParticipant.clear()
         session.arenaBgmPlaybackStartTickByParticipant.clear()
         session.arenaCombatHadTargetingMobByParticipant.clear()
         session.arenaBgmSwitchRequestByParticipant.clear()
+        session.arenaBgmTargetingStateByParticipant.clear()
+        session.arenaBgmTargetingStateChangedAtMillisByParticipant.clear()
+        session.arenaLastTargetDrivenSwitchAtMillisByParticipant.clear()
         session.downedOriginalWalkSpeeds.clear()
         session.invitedParticipants.clear()
-        session.invitedAtMillis.clear()
         session.waitingParticipants.clear()
         session.waitingNotifiedParticipants.clear()
+        session.waitingSubtitleNextTickByPlayer.clear()
         session.joinCountdownBossBars.clear()
         session.joinAreaMarkerLocations.clear()
         session.multiplayerJoinEnabled = false
@@ -2044,6 +2285,8 @@ class ArenaManager(
         session.openedCorridors.clear()
         session.corridorOpenAnnouncements.clear()
         session.enteredWaves.clear()
+        session.waveEnteredAtMillis.clear()
+        session.playerWaveCatchupDeadlineMillis.clear()
         session.waveSpawningStopped.clear()
         session.animatingDoorWaves.clear()
         session.actionMarkers.clear()
@@ -2236,6 +2479,12 @@ class ArenaManager(
         }
     }
 
+    private fun teleportToLatestDoorMarker(player: Player, session: ArenaSession, world: World, currentWave: Int) {
+        val latestWave = latestEnteredWave(session) ?: currentWave.coerceIn(1, session.waves)
+        teleportToNearestDoorMarkerForWave(player, session, world, latestWave)
+        player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 15, 0, false, false, false))
+    }
+
     private fun teleportToRecentValidPosition(
         player: Player,
         session: ArenaSession,
@@ -2327,7 +2576,7 @@ class ArenaManager(
         return Location(world, centerX, centerY, centerZ)
     }
 
-    private fun notifyWaveEntryIfNeeded(session: ArenaSession, player: Player, wave: Int) {
+    private fun notifyWaveEntryIfNeeded(session: ArenaSession, player: Player, wave: Int, playWitherSpawn: Boolean) {
         if (session.clearedWaves.contains(wave)) return
 
         val notified = session.playerNotifiedWaves.getOrPut(player.uniqueId) { mutableSetOf() }
@@ -2338,17 +2587,49 @@ class ArenaManager(
         } else {
             "§7- §6Wave $wave §7-"
         }
-        player.sendTitle("", title, 10, 50, 10)
-        player.playSound(player.location, Sound.ENTITY_WITHER_SPAWN, 1.0f, 1.0f)
+        if (wave >= session.waves) {
+            player.sendTitle(title, "", 10, 50, 10)
+        } else {
+            player.sendTitle("", title, 10, 50, 10)
+        }
+        if (playWitherSpawn) {
+            player.playSound(player.location, Sound.ENTITY_WITHER_SPAWN, 1.0f, 1.0f)
+        }
     }
 
     private fun processRoomProgress(session: ArenaSession, player: Player, room: Int) {
-        notifyWaveEntryIfNeeded(session, player, room)
-        handleWaveRoomEntry(session, room)
+        val firstEntrant = !session.enteredWaves.contains(room)
+        notifyWaveEntryIfNeeded(session, player, room, playWitherSpawn = firstEntrant)
+        if (firstEntrant) {
+            handleWaveRoomEntry(session, player, room)
+            return
+        }
+
+        if (session.startedWaves.contains(room) && !session.clearedWaves.contains(room)) {
+            requestWaveStartCombatBgmForParticipant(session, player.uniqueId, Bukkit.getCurrentTick().toLong())
+        }
     }
 
-    private fun handleWaveRoomEntry(session: ArenaSession, wave: Int) {
+    private fun handleWaveRoomEntry(session: ArenaSession, entrant: Player, wave: Int) {
         if (!session.enteredWaves.add(wave)) return
+
+        val now = System.currentTimeMillis()
+        session.waveEnteredAtMillis[wave] = now
+
+        val catchupTargets = findPlayersInPreviousWaveOrEarlierRooms(session, wave, excludePlayerId = entrant.uniqueId)
+        catchupTargets.forEach { target ->
+            target.sendMessage(
+                ArenaI18n.text(
+                    target,
+                    "arena.messages.wave.player_advanced",
+                    "§7{player} さんが §6Wave {wave}§7 に突入しました！",
+                    "player" to entrant.name,
+                    "wave" to wave
+                )
+            )
+            target.playSound(target.location, Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 2.0f)
+            session.playerWaveCatchupDeadlineMillis[target.uniqueId] = now + WAVE_CATCHUP_TELEPORT_DELAY_MILLIS
+        }
 
         session.fallbackWave = wave.coerceIn(1, session.waves)
 
@@ -2365,6 +2646,74 @@ class ArenaManager(
 
         stopWaveSpawning(session, previousWave)
         removeWaveMobs(session, previousWave)
+    }
+
+    private fun findPlayersInPreviousWaveOrEarlierRooms(
+        session: ArenaSession,
+        wave: Int,
+        excludePlayerId: UUID
+    ): List<Player> {
+        if (wave <= 1) return emptyList()
+        val world = Bukkit.getWorld(session.worldName) ?: return emptyList()
+        return session.participants
+            .asSequence()
+            .filter { it != excludePlayerId }
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .filter { it.isOnline && it.world.uid == world.uid }
+            .filter { isPlayerInPreviousWaveOrEarlierRoom(session, it.location, wave) }
+            .toList()
+    }
+
+    private fun isPlayerInPreviousWaveOrEarlierRoom(session: ArenaSession, location: Location, wave: Int): Boolean {
+        val previousWave = (wave - 1).coerceAtLeast(1)
+        val room = locateRoom(session, location) ?: return false
+        return room <= previousWave
+    }
+
+    private fun latestEnteredWave(session: ArenaSession): Int? {
+        return session.waveEnteredAtMillis.maxByOrNull { it.value }?.key
+    }
+
+    private fun hasPendingWaveCatchup(session: ArenaSession, player: Player): Boolean {
+        session.playerWaveCatchupDeadlineMillis[player.uniqueId] ?: return false
+        val latestWave = latestEnteredWave(session) ?: return false
+        if (!isPlayerInPreviousWaveOrEarlierRoom(session, player.location, latestWave)) {
+            session.playerWaveCatchupDeadlineMillis.remove(player.uniqueId)
+            return false
+        }
+        return true
+    }
+
+    private fun processWaveCatchupIfNeeded(session: ArenaSession, player: Player, world: World, now: Long) {
+        val deadline = session.playerWaveCatchupDeadlineMillis[player.uniqueId] ?: return
+        val latestWave = latestEnteredWave(session) ?: run {
+            session.playerWaveCatchupDeadlineMillis.remove(player.uniqueId)
+            return
+        }
+        if (!isPlayerInPreviousWaveOrEarlierRoom(session, player.location, latestWave)) {
+            session.playerWaveCatchupDeadlineMillis.remove(player.uniqueId)
+            return
+        }
+        if (now < deadline) {
+            return
+        }
+
+        teleportToNearestDoorMarkerForWave(player, session, world, latestWave)
+        session.playerWaveCatchupDeadlineMillis.remove(player.uniqueId)
+    }
+
+    private fun teleportToNearestDoorMarkerForWave(player: Player, session: ArenaSession, world: World, wave: Int) {
+        val location = player.location
+        val nearest = session.corridorDoorBlocks[wave]
+            .orEmpty()
+            .asSequence()
+            .map { marker -> marker.clone().apply { this.world = world } }
+            .minByOrNull { marker -> marker.distanceSquared(location) }
+
+        val destination = nearest ?: currentWavePosition(session, world)
+        destination.yaw = location.yaw
+        destination.pitch = location.pitch
+        player.teleport(destination)
     }
 
     private fun stopWaveSpawning(session: ArenaSession, wave: Int) {
@@ -2545,6 +2894,8 @@ class ArenaManager(
             return
         }
 
+        playSound(session, Sound.ENTITY_ARROW_HIT_PLAYER, 1.0f, 1.0f)
+
         updateSessionProgressBossBar(session)
     }
 
@@ -2555,6 +2906,7 @@ class ArenaManager(
         session.lastClearedWaveForBossBar = wave
         stopWaveSpawning(session, wave)
         updateSessionProgressBossBar(session)
+        playSound(session, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.25f)
 
         if (session.clearedWaves.size >= session.waves) {
             onAllWavesCleared(session)
@@ -2581,6 +2933,9 @@ class ArenaManager(
             val placements = activeSession.doorAnimationPlacements[targetWave].orEmpty()
             if (placements.isEmpty()) {
                 activeSession.animatingDoorWaves.remove(targetWave)
+                if (targetWave == 1) {
+                    scheduleStartEntranceNormalBgm(activeSession)
+                }
                 updateCurrentWave(activeSession)
                 return@delayedStart
             }
@@ -2601,20 +2956,42 @@ class ArenaManager(
                     if (targetFrame <= 0) return@forEachIndexed
                     val lastFrame = lastAppliedFrameByPlacement[placementIndex]
                     if (lastFrame == targetFrame) return@forEachIndexed
-                    applyDoorAnimationFrame(placement, targetFrame)
+                    val applied = runCatching {
+                        applyDoorAnimationFrame(placement, targetFrame)
+                    }.onFailure { throwable ->
+                        plugin.logger.warning(
+                            "[Arena] ドアアニメフレーム適用に失敗: world=${currentSession.worldName} wave=$targetWave frame=$targetFrame error=${throwable.message}"
+                        )
+                    }.isSuccess
+                    if (!applied) return@forEachIndexed
                     lastAppliedFrameByPlacement[placementIndex] = targetFrame
                 }
 
                 if (elapsedTicks >= doorAnimationTotalTicks) {
+                    placements.forEachIndexed { placementIndex, placement ->
+                        val lastFrame = placement.openFrames.size
+                        if (lastFrame <= 0) return@forEachIndexed
+                        val alreadyApplied = lastAppliedFrameByPlacement[placementIndex] ?: 0
+                        if (alreadyApplied >= lastFrame) return@forEachIndexed
+                        runCatching {
+                            applyDoorAnimationFrame(placement, lastFrame)
+                        }.onFailure { throwable ->
+                            plugin.logger.warning(
+                                "[Arena] ドアアニメ最終フレーム適用に失敗: world=${currentSession.worldName} wave=$targetWave error=${throwable.message}"
+                            )
+                        }
+                    }
                     currentSession.animatingDoorWaves.remove(targetWave)
+                    if (targetWave == 1) {
+                        scheduleStartEntranceNormalBgm(currentSession)
+                    }
                     updateCurrentWave(currentSession)
                     taskRef[0]?.cancel()
                     return@animationTick
                 }
 
                 if (elapsedTicks % 10 == 0) {
-                    val pitch = (0.8f + elapsedTicks / 100.0f).coerceAtMost(1.4f)
-                    playSound(currentSession, Sound.BLOCK_IRON_DOOR_OPEN, 0.85f, pitch)
+                    playDoorAnimationSound(currentSession)
                 }
             }, 0L, 1L)
             taskRef[0] = animationTask
@@ -2629,10 +3006,8 @@ class ArenaManager(
         onCorridorOpened(session, targetWave)
         if (targetWave == 1 && !session.stageStarted) {
             session.stageStarted = true
-            playSound(session, Sound.BLOCK_IRON_DOOR_OPEN, 1.0f, 1.0f)
         }
-
-        playSound(session, Sound.BLOCK_IRON_DOOR_OPEN, 1.0f, 0.8f)
+        playDoorAnimationSound(session)
         plugin.logger.info("[Arena] door animation start: world=${session.worldName} target_wave=$targetWave")
     }
 
@@ -2683,7 +3058,6 @@ class ArenaManager(
 
     private fun onCorridorOpened(session: ArenaSession, wave: Int) {
         if (!session.corridorOpenAnnouncements.add(wave)) return
-        playSound(session, Sound.BLOCK_IRON_DOOR_OPEN, 1.0f, 1.2f)
     }
 
     private fun rebalanceTargetsForWave(session: ArenaSession, wave: Int) {
@@ -3135,7 +3509,7 @@ class ArenaManager(
     private fun completeBarrierRestartSequence(session: ArenaSession) {
         if (!session.barrierRestarting) return
 
-        requestArenaBgmMode(session, ArenaBgmMode.STOPPED)
+        requestArenaBgmMode(session, ArenaBgmMode.STOPPED, strictNextBoundary = true)
 
         session.barrierRestarting = false
         session.barrierRestartCompleted = true
@@ -3233,7 +3607,11 @@ class ArenaManager(
         session.participants.forEach { participantId ->
             val player = Bukkit.getPlayer(participantId) ?: return@forEach
             if (player.isOnline && world != null && player.world.name == world.name) {
-                player.showBossBar(bossBar)
+                if (hasPendingWaveCatchup(session, player)) {
+                    player.hideBossBar(bossBar)
+                } else {
+                    player.showBossBar(bossBar)
+                }
             }
         }
 
@@ -3398,9 +3776,11 @@ class ArenaManager(
     }
 
     private fun playSoundAtBarrier(session: ArenaSession, sound: Sound, volume: Float, pitch: Float) {
-        val world = Bukkit.getWorld(session.worldName) ?: return
-        val center = session.barrierLocation.clone().add(0.5, 0.5, 0.5)
-        world.playSound(center, sound, volume, pitch)
+        session.participants.forEach { participantId ->
+            val player = Bukkit.getPlayer(participantId) ?: return@forEach
+            if (!player.isOnline || player.world.name != session.worldName) return@forEach
+            player.playSound(player.location, sound, volume, pitch)
+        }
     }
 
     private fun broadcastMessage(
@@ -3422,14 +3802,35 @@ class ArenaManager(
         }
     }
 
-    private fun requestArenaBgmMode(session: ArenaSession, targetMode: ArenaBgmMode) {
+    private fun playSound(session: ArenaSession, soundKey: String, volume: Float, pitch: Float) {
+        session.participants.forEach { participantId ->
+            val player = Bukkit.getPlayer(participantId) ?: return@forEach
+            player.playSound(player.location, soundKey, volume, pitch)
+        }
+    }
+
+    private fun playDoorAnimationSound(session: ArenaSession) {
+        val theme = themeLoader.getTheme(session.themeId)
+        val key = theme?.doorOpenSound?.key ?: arenaDoorAnimationSoundKey
+        val pitch = theme?.doorOpenSound?.pitch ?: arenaDoorAnimationSoundPitch
+        playSound(session, key, 1.0f, pitch)
+    }
+
+    private fun scheduleStartEntranceNormalBgm(session: ArenaSession) {
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
+            requestArenaBgmMode(activeSession, ArenaBgmMode.NORMAL)
+        }, 20L)
+    }
+
+    private fun requestArenaBgmMode(session: ArenaSession, targetMode: ArenaBgmMode, strictNextBoundary: Boolean = false) {
         if (targetMode != ArenaBgmMode.COMBAT) {
             session.arenaWaveStartCombatDelayTask?.cancel()
             session.arenaWaveStartCombatDelayTask = null
         }
         val currentTick = Bukkit.getCurrentTick().toLong()
         session.participants.forEach { participantId ->
-            requestArenaBgmModeForParticipant(session, participantId, targetMode, currentTick)
+            requestArenaBgmModeForParticipant(session, participantId, targetMode, currentTick, strictNextBoundary = strictNextBoundary)
         }
     }
 
@@ -3437,32 +3838,37 @@ class ArenaManager(
         session.arenaWaveStartCombatDelayTask?.cancel()
         session.arenaWaveStartCombatDelayTask = null
 
-        val participantModes = session.participants.map { participantArenaBgmMode(session, it) }
-        val allStopped = participantModes.all { it == ArenaBgmMode.STOPPED }
-        val allCombat = participantModes.all { it == ArenaBgmMode.COMBAT }
-        if (allCombat) {
-            return
-        }
-
-        if (!allStopped) {
-            requestArenaBgmMode(session, ArenaBgmMode.COMBAT)
-            return
-        }
-
         val delayedTask = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             session.arenaWaveStartCombatDelayTask = null
             val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
-            requestArenaBgmMode(activeSession, ArenaBgmMode.COMBAT)
+            val currentTick = Bukkit.getCurrentTick().toLong()
+            activeSession.participants.forEach { participantId ->
+                requestWaveStartCombatBgmForParticipant(activeSession, participantId, currentTick)
+            }
         }, WAVE_START_COMBAT_BGM_DELAY_TICKS)
         session.arenaWaveStartCombatDelayTask = delayedTask
         session.transitionTasks.add(delayedTask)
+    }
+
+    private fun requestWaveStartCombatBgmForParticipant(session: ArenaSession, participantId: UUID, currentTick: Long) {
+        val currentMode = participantArenaBgmMode(session, participantId)
+        if (currentMode == ArenaBgmMode.COMBAT && session.arenaBgmSwitchRequestByParticipant[participantId] == null) {
+            return
+        }
+
+        if (currentMode == ArenaBgmMode.STOPPED) {
+            startArenaBgmMode(session, participantId, ArenaBgmMode.NORMAL, currentTick)
+        }
+        requestArenaBgmModeForParticipant(session, participantId, ArenaBgmMode.COMBAT, currentTick)
     }
 
     private fun requestArenaBgmModeForParticipant(
         session: ArenaSession,
         participantId: UUID,
         targetMode: ArenaBgmMode,
-        currentTick: Long
+        currentTick: Long,
+        targetDriven: Boolean = false,
+        strictNextBoundary: Boolean = false
     ) {
         val currentMode = participantArenaBgmMode(session, participantId)
         val currentRequest = session.arenaBgmSwitchRequestByParticipant[participantId]
@@ -3484,7 +3890,14 @@ class ArenaManager(
             return
         }
 
-        val request = buildArenaBgmSwitchRequest(session, participantId, targetMode, currentTick) ?: return
+        val request = buildArenaBgmSwitchRequest(
+            session,
+            participantId,
+            targetMode,
+            currentTick,
+            targetDriven,
+            strictNextBoundary
+        ) ?: return
         session.arenaBgmSwitchRequestByParticipant[participantId] = request
     }
 
@@ -3492,26 +3905,27 @@ class ArenaManager(
         session: ArenaSession,
         participantId: UUID,
         targetMode: ArenaBgmMode,
-        requestedAtTick: Long
+        requestedAtTick: Long,
+        targetDriven: Boolean,
+        strictNextBoundary: Boolean
     ): ArenaBgmSwitchRequest? {
         val currentMode = participantArenaBgmMode(session, participantId)
         val currentTrack = arenaBgmTrackForMode(currentMode) ?: return null
         val currentAbsoluteBeat = currentAbsoluteBeatAtTick(session, participantId, currentTrack, requestedAtTick)
-        val currentLoopBeats = currentTrack.loopBeats.toLong().coerceAtLeast(1L)
-        val currentLoopBeat = (((currentAbsoluteBeat - 1L) % currentLoopBeats) + 1L).toInt()
-        val nextSwitchBeat = currentTrack.switchBeats.firstOrNull { it > currentLoopBeat }
-            ?: currentTrack.switchBeats.first()
-        val currentLoopIndex = (currentAbsoluteBeat - 1L) / currentLoopBeats
-        val executeAtAbsoluteBeat = if (nextSwitchBeat > currentLoopBeat) {
-            (currentLoopIndex * currentLoopBeats) + nextSwitchBeat.toLong()
+        val multiplier = if (targetDriven) 4L else 1L
+        val switchInterval = (currentTrack.switchIntervalBeats.toLong().coerceAtLeast(1L) * multiplier).coerceAtLeast(1L)
+        val beatOffset = (currentAbsoluteBeat - 1L).mod(switchInterval)
+        val executeAtAbsoluteBeat = if (beatOffset == 0L) {
+            if (strictNextBoundary) currentAbsoluteBeat + switchInterval else currentAbsoluteBeat
         } else {
-            ((currentLoopIndex + 1L) * currentLoopBeats) + nextSwitchBeat.toLong()
+            currentAbsoluteBeat + (switchInterval - beatOffset)
         }
 
         return ArenaBgmSwitchRequest(
             targetMode = targetMode,
             requestedAtTick = requestedAtTick,
-            executeAtAbsoluteBeat = executeAtAbsoluteBeat
+            executeAtAbsoluteBeat = executeAtAbsoluteBeat,
+            targetDriven = targetDriven
         )
     }
 
@@ -3531,18 +3945,51 @@ class ArenaManager(
 
     private fun updateArenaCombatBgmRequest(session: ArenaSession, participantId: UUID, currentTick: Long) {
         if (session.arenaBgmSwitchRequestByParticipant[participantId] != null) return
+
+        val now = System.currentTimeMillis()
         val hasTargetingMob = hasMobTargetingParticipant(session, participantId)
+        session.arenaBgmTargetingStateByParticipant[participantId] = hasTargetingMob
+        session.arenaBgmTargetingStateChangedAtMillisByParticipant.putIfAbsent(participantId, now)
+
         val currentMode = participantArenaBgmMode(session, participantId)
-        if (currentMode == ArenaBgmMode.COMBAT) {
-            if (hasTargetingMob) {
-                session.arenaCombatHadTargetingMobByParticipant[participantId] = true
-                return
-            }
-            if (session.arenaCombatHadTargetingMobByParticipant[participantId] != true) return
-            requestArenaBgmModeForParticipant(session, participantId, ArenaBgmMode.NORMAL, currentTick)
-        } else if (currentMode == ArenaBgmMode.NORMAL && hasTargetingMob) {
-            requestArenaBgmModeForParticipant(session, participantId, ArenaBgmMode.COMBAT, currentTick)
+        if (hasTargetingMob) {
+            session.arenaCombatHadTargetingMobByParticipant[participantId] = true
         }
+
+        if (hasTargetingMob) {
+            if (currentMode == ArenaBgmMode.NORMAL && canTriggerTargetDrivenBgmSwitch(session, participantId, now)) {
+                requestArenaBgmModeForParticipant(
+                    session,
+                    participantId,
+                    ArenaBgmMode.COMBAT,
+                    currentTick,
+                    targetDriven = true
+                )
+            }
+            return
+        }
+
+        if (currentMode == ArenaBgmMode.COMBAT) {
+            if (!canTriggerTargetDrivenBgmSwitch(session, participantId, now)) return
+            requestArenaBgmModeForParticipant(
+                session,
+                participantId,
+                ArenaBgmMode.NORMAL,
+                currentTick,
+                targetDriven = true
+            )
+        }
+    }
+
+    private fun canTriggerTargetDrivenBgmSwitch(session: ArenaSession, participantId: UUID, nowMillis: Long): Boolean {
+        val lastSwitchAt = session.arenaLastTargetDrivenSwitchAtMillisByParticipant[participantId] ?: return true
+        return nowMillis - lastSwitchAt >= arenaBgmTargetStateSwitchThresholdMillis
+    }
+
+    private fun isWaveInProgress(session: ArenaSession): Boolean {
+        val wave = session.currentWave.coerceIn(1, session.waves)
+        if (!session.startedWaves.contains(wave)) return false
+        return !session.clearedWaves.contains(wave)
     }
 
     private fun hasMobTargetingParticipant(session: ArenaSession, participantId: UUID): Boolean {
@@ -3585,15 +4032,50 @@ class ArenaManager(
         }
 
         session.arenaBgmSwitchRequestByParticipant.remove(participantId)
-        if (request.targetMode == ArenaBgmMode.STOPPED) {
+        val resolvedTargetMode = resolveBgmTargetModeBeforeSwitch(
+            session,
+            participantId,
+            currentMode,
+            request.targetMode,
+            request.targetDriven
+        )
+        if (resolvedTargetMode == ArenaBgmMode.STOPPED) {
             stopArenaBgmForParticipant(session, participantId)
             return
         }
-        if (request.targetMode == currentMode) {
+        if (resolvedTargetMode == currentMode) {
             return
         }
 
-        startArenaBgmMode(session, participantId, request.targetMode, currentTick)
+        startArenaBgmMode(session, participantId, resolvedTargetMode, currentTick)
+        if (request.targetDriven) {
+            session.arenaLastTargetDrivenSwitchAtMillisByParticipant[participantId] = System.currentTimeMillis()
+        }
+    }
+
+    private fun resolveBgmTargetModeBeforeSwitch(
+        session: ArenaSession,
+        participantId: UUID,
+        currentMode: ArenaBgmMode,
+        requestedTargetMode: ArenaBgmMode,
+        targetDriven: Boolean
+    ): ArenaBgmMode {
+        if (!targetDriven) {
+            return requestedTargetMode
+        }
+        if (currentMode == ArenaBgmMode.STOPPED) {
+            return requestedTargetMode
+        }
+        if (requestedTargetMode == ArenaBgmMode.STOPPED) {
+            return ArenaBgmMode.STOPPED
+        }
+
+        val hasTargetingMob = hasMobTargetingParticipant(session, participantId)
+        return when {
+            hasTargetingMob -> ArenaBgmMode.COMBAT
+            currentMode == ArenaBgmMode.COMBAT -> ArenaBgmMode.NORMAL
+            else -> ArenaBgmMode.NORMAL
+        }
     }
 
     private fun currentAbsoluteBeatAtTick(
@@ -3617,6 +4099,9 @@ class ArenaManager(
         session.arenaBgmPlaybackStartTickByParticipant[participantId] = startTick
         session.arenaCombatHadTargetingMobByParticipant[participantId] = false
         session.arenaBgmSwitchRequestByParticipant.remove(participantId)
+        val hasTargetingMob = hasMobTargetingParticipant(session, participantId)
+        session.arenaBgmTargetingStateByParticipant[participantId] = hasTargetingMob
+        session.arenaBgmTargetingStateChangedAtMillisByParticipant[participantId] = System.currentTimeMillis()
     }
 
     private fun stopArenaBgm(session: ArenaSession) {
@@ -3636,6 +4121,9 @@ class ArenaManager(
         session.arenaBgmPlaybackStartTickByParticipant[participantId] = 0L
         session.arenaCombatHadTargetingMobByParticipant[participantId] = false
         session.arenaBgmSwitchRequestByParticipant.remove(participantId)
+        session.arenaBgmTargetingStateByParticipant.remove(participantId)
+        session.arenaBgmTargetingStateChangedAtMillisByParticipant.remove(participantId)
+        session.arenaLastTargetDrivenSwitchAtMillisByParticipant.remove(participantId)
     }
 
     private fun participantArenaBgmMode(session: ArenaSession, participantId: UUID): ArenaBgmMode {
@@ -3857,9 +4345,7 @@ class ArenaManager(
             val invited = Bukkit.getPlayer(invitedId) ?: return@forEach
             if (!invited.isOnline) return@forEach
 
-            val invitedAt = session.invitedAtMillis[invitedId] ?: nowMillis
-            val invitedEnd = invitedAt + session.joinGraceDurationMillis
-            val remaining = (invitedEnd - nowMillis).coerceAtLeast(0L)
+            val remaining = (session.joinGraceEndMillis - nowMillis).coerceAtLeast(0L)
             val progress = if (session.joinGraceDurationMillis <= 0L) {
                 0.0f
             } else {
@@ -3907,25 +4393,31 @@ class ArenaManager(
         session.waitingParticipants.addAll(waitingNow)
 
         entered.forEach { playerId ->
-            if (!session.waitingNotifiedParticipants.add(playerId)) return@forEach
-            val player = Bukkit.getPlayer(playerId) ?: return@forEach
-            player.sendMessage(
-                ArenaI18n.text(
-                    player,
-                    "arena.messages.multiplayer.waiting_entered",
-                    "&a開始待機エリアに入りました。猶予終了まで待機してください"
-                )
-            )
+            session.waitingNotifiedParticipants.add(playerId)
+        }
+
+        val currentTick = Bukkit.getCurrentTick().toLong()
+        val withinGrace = System.currentTimeMillis() < session.joinGraceEndMillis
+        if (withinGrace) {
+            waitingNow.forEach { playerId ->
+                val nextTick = session.waitingSubtitleNextTickByPlayer[playerId] ?: 0L
+                if (currentTick < nextTick) return@forEach
+                val player = Bukkit.getPlayer(playerId) ?: return@forEach
+                if (!player.isOnline) return@forEach
+                player.sendTitle("", "§7参加待機中", 0, 25, 5)
+                session.waitingSubtitleNextTickByPlayer[playerId] = currentTick + 20L
+            }
         }
 
         exited.forEach { playerId ->
             session.waitingNotifiedParticipants.remove(playerId)
+            session.waitingSubtitleNextTickByPlayer.remove(playerId)
             val player = Bukkit.getPlayer(playerId) ?: return@forEach
             player.sendMessage(
                 ArenaI18n.text(
                     player,
                     "arena.messages.multiplayer.waiting_exited",
-                    "§c待機エリアから退出しました。この開始までにこのエリアにいないと、アリーナに参加できません！"
+                    "§cリフトから降りました。参加する場合は乗って待機してください！"
                 )
             )
         }
@@ -3974,6 +4466,7 @@ class ArenaManager(
             session.participants.add(player.uniqueId)
             playerToSessionWorld[player.uniqueId] = session.worldName
             session.returnLocations.putIfAbsent(player.uniqueId, player.location.clone())
+            session.originalGameModes.putIfAbsent(player.uniqueId, player.gameMode)
         }
         clearMultiplayerRecruitmentState(session)
         session.multiplayerJoinEnabled = false
@@ -4023,6 +4516,8 @@ class ArenaManager(
                 }
                 applyStageStartFacingYaw(session, spawnLocation)
                 player.teleport(spawnLocation)
+                applySessionGameMode(session, player)
+                playStageEntrySoundsLater(player)
                 session.participantLocationHistory[player.uniqueId] = ArrayDeque<TimedPlayerLocation>().apply {
                     addLast(TimedPlayerLocation(now, spawnLocation.clone()))
                 }
@@ -4030,7 +4525,6 @@ class ArenaManager(
             }
 
             session.participantSpawnProtectionUntilMillis = System.currentTimeMillis() + 4000L
-            requestArenaBgmMode(session, ArenaBgmMode.NORMAL)
             setDoorActionMarkersReadySilently(session, 1)
         }, teleportDelay)
     }
@@ -4096,7 +4590,22 @@ class ArenaManager(
 
     private fun updateActionMarkerHoldState(session: ArenaSession, player: Player, currentTick: Long) {
         val marker = findHoldableActionMarker(session, player.location)
+        if (marker?.type == ArenaActionMarkerType.DOOR_TOGGLE) {
+            player.sendActionBar(
+                Component.text(
+                    ArenaI18n.text(
+                        player,
+                        "arena.messages.door.open_hint",
+                        "Shift長押しで扉を開く"
+                    )
+                )
+            )
+        }
         if (!player.isSneaking || marker == null) {
+            val holdState = session.actionMarkerHoldStates[player.uniqueId]
+            if (!player.isSneaking && holdState != null && holdState.heldTicks >= 20) {
+                player.playSound(player.location, Sound.BLOCK_BEACON_DEACTIVATE, 1.0f, 2.0f)
+            }
             resetActionMarkerHoldState(session, player.uniqueId, currentTick)
             return
         }

@@ -1038,10 +1038,10 @@ custom_items:
           stage_build_failed: '&c{message}'
           join_area_not_found: '&c開始待機エリアの参加マーカーが近くに存在しないため開始できません'
       multiplayer:
-        invite_window_started: '&e左クリックで近くのプレイヤーを招待してください（{seconds}秒）'
+        invite_window_started: '&7アリーナセッションを開始します…\n左クリックで他のプレイヤーを招待できます。招待メンバーはリフトで待機すると、一緒に入場できます'
         wait_area_hint: '&7招待したプレイヤーと開始待機エリアに入ると待機状態になります'
         waiting_entered: '&a開始待機エリアに入りました。猶予終了まで待機してください'
-        waiting_exited: '§c待機エリアから退出しました。この開始までにこのエリアにいないと、アリーナに参加できません！'
+        waiting_exited: '§cリフトから降りました。参加する場合は乗って待機してください！'
         invite_sent: '&a{player} に招待を送信しました'
         invited: '&6{owner} からアリーナ招待が届きました。開始待機エリアに入ってください'
         invited_decline_hint: '&7辞退する場合は、招待者を左クリックしてください'
@@ -1086,8 +1086,10 @@ custom_items:
         animating: '&e開扉中です'
         corridor_opened: '&aWave {wave} への通路が解放されました'
         corridor_opened_subtitle: '&a次の通路が開きました'
+        open_hint: 'Shift長押しで扉を開く'
       wave:
         title: '&6Wave {wave}'
+        player_advanced: '§7{player} さんが §6Wave {wave}§7 に突入しました！'
       mock:
         door_animation_start: '&7{message}'
         corridor_door_reinstall: '&7{message}'

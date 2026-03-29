@@ -9,8 +9,10 @@ import org.bukkit.event.entity.EntityTargetLivingEntityEvent
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.PlayerDeathEvent
+import org.bukkit.event.entity.EntityMountEvent
 import org.bukkit.event.player.PlayerAnimationEvent
 import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.event.player.PlayerInteractEntityEvent
 import org.bukkit.event.player.PlayerQuitEvent
 
 class ArenaListener(private val arenaManager: ArenaManager) : Listener {
@@ -67,6 +69,16 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
         arenaManager.handleArenaInteract(event)
     }
 
+    @EventHandler(ignoreCancelled = true)
+    fun onPlayerInteractEntity(event: PlayerInteractEntityEvent) {
+        arenaManager.handleArenaInteractEntity(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityMount(event: EntityMountEvent) {
+        arenaManager.handleArenaEntityMount(event)
+    }
+
     @EventHandler
     fun onPlayerQuit(event: PlayerQuitEvent) {
         arenaManager.handleInviteTargetUnavailable(event.player)
@@ -78,6 +90,7 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
 
     @EventHandler
     fun onPlayerDeath(event: PlayerDeathEvent) {
+        arenaManager.notifyParticipantDeath(event.player)
         arenaManager.handleInviteTargetUnavailable(event.player)
         arenaManager.stopSession(
             event.player,

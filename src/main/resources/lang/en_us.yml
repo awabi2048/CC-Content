@@ -408,10 +408,10 @@ custom_items:
           stage_build_failed: '&c{message}'
           join_area_not_found: '&cCannot start because no join area marker exists nearby'
       multiplayer:
-        invite_window_started: '&eLeft-click nearby players to invite them ({seconds}s)'
+        invite_window_started: '&7Starting arena session...\nLeft-click to invite other players. Invited members can enter together by waiting on the lift'
         wait_area_hint: '&7Invited players enter waiting state by standing in the join area with the owner'
         waiting_entered: '&aYou entered the waiting area. Stay here until the grace time ends'
-        waiting_exited: '&cYou left the waiting area. You cannot join this arena unless you are in this area before start!'
+        waiting_exited: '&cYou stepped off the lift. Stay on it if you want to join!'
         invite_sent: '&aInvitation sent to {player}'
         invited: '&6You were invited to arena by {owner}. Please enter the waiting area'
         invited_decline_hint: '&7To decline, left-click the inviter'
@@ -456,8 +456,10 @@ custom_items:
         animating: '&eDoor is opening'
         corridor_opened: '&aCorridor to Wave {wave} is now open'
         corridor_opened_subtitle: '&aThe next corridor has opened'
+        open_hint: 'Hold Shift to open the door'
       wave:
         title: '&6Wave {wave}'
+        player_advanced: '§7{player} has entered §6Wave {wave}§7!'
       mock:
         door_animation_start: '&7{message}'
         corridor_door_reinstall: '&7{message}'

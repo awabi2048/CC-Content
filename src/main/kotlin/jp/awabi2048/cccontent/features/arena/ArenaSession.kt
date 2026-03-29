@@ -34,13 +34,15 @@ enum class ArenaBgmMode {
 data class ArenaBgmSwitchRequest(
     val targetMode: ArenaBgmMode,
     val requestedAtTick: Long,
-    val executeAtAbsoluteBeat: Long
+    val executeAtAbsoluteBeat: Long,
+    val targetDriven: Boolean = false
 )
 
 data class ArenaDownedPlayerState(
     val downedAtMillis: Long,
     var bleedoutAtMillis: Long,
-    var shulkerEntityId: UUID? = null
+    var shulkerEntityId: UUID? = null,
+    var timeoutExecuteAtMillis: Long? = null
 )
 
 data class ArenaReviveHoldState(
@@ -67,6 +69,7 @@ data class ArenaSession(
     var maxParticipants: Int = 6,
     val participants: MutableSet<UUID>,
     val returnLocations: MutableMap<UUID, Location>,
+    val originalGameModes: MutableMap<UUID, org.bukkit.GameMode> = mutableMapOf(),
     var playerSpawn: Location,
     var entranceLocation: Location,
     var stageBounds: ArenaBounds,
@@ -129,28 +132,32 @@ data class ArenaSession(
     val reviveHoldStates: MutableMap<UUID, ArenaReviveHoldState> = mutableMapOf(),
     val reviveTargetByReviver: MutableMap<UUID, UUID> = mutableMapOf(),
     val reviveBossBarsByDowned: MutableMap<UUID, ArenaReviveBossBars> = mutableMapOf(),
+    val reviveCountByPlayer: MutableMap<UUID, Int> = mutableMapOf(),
+    val reviveMaxPerPlayer: Int = Int.MAX_VALUE,
+    val reviveTimeLimitSeconds: Int = 0,
     val arenaBgmModeByParticipant: MutableMap<UUID, ArenaBgmMode> = mutableMapOf(),
     val arenaBgmPlaybackStartTickByParticipant: MutableMap<UUID, Long> = mutableMapOf(),
     val arenaCombatHadTargetingMobByParticipant: MutableMap<UUID, Boolean> = mutableMapOf(),
     val arenaBgmSwitchRequestByParticipant: MutableMap<UUID, ArenaBgmSwitchRequest?> = mutableMapOf(),
+    val arenaLastTargetDrivenSwitchAtMillisByParticipant: MutableMap<UUID, Long> = mutableMapOf(),
+    val arenaBgmTargetingStateByParticipant: MutableMap<UUID, Boolean> = mutableMapOf(),
+    val arenaBgmTargetingStateChangedAtMillisByParticipant: MutableMap<UUID, Long> = mutableMapOf(),
     val downedOriginalWalkSpeeds: MutableMap<UUID, Float> = mutableMapOf(),
     val invitedParticipants: MutableSet<UUID> = mutableSetOf(),
-    val invitedAtMillis: MutableMap<UUID, Long> = mutableMapOf(),
     val waitingParticipants: MutableSet<UUID> = mutableSetOf(),
     val waitingNotifiedParticipants: MutableSet<UUID> = mutableSetOf(),
+    val waitingSubtitleNextTickByPlayer: MutableMap<UUID, Long> = mutableMapOf(),
     val joinCountdownBossBars: MutableMap<UUID, BossBar> = mutableMapOf(),
     val corridorTriggeredWaves: MutableSet<Int> = mutableSetOf(),
     val openedCorridors: MutableSet<Int> = mutableSetOf(),
     val corridorOpenAnnouncements: MutableSet<Int> = mutableSetOf(),
     val enteredWaves: MutableSet<Int> = mutableSetOf(),
+    val waveEnteredAtMillis: MutableMap<Int, Long> = mutableMapOf(),
+    val playerWaveCatchupDeadlineMillis: MutableMap<UUID, Long> = mutableMapOf(),
     val waveSpawningStopped: MutableSet<Int> = mutableSetOf(),
     val animatingDoorWaves: MutableSet<Int> = mutableSetOf(),
     val actionMarkers: MutableMap<UUID, ArenaActionMarker> = mutableMapOf(),
     val actionMarkerHoldStates: MutableMap<UUID, ArenaActionMarkerHoldState> = mutableMapOf(),
-    var arenaBgmMode: ArenaBgmMode = ArenaBgmMode.STOPPED,
-    var arenaBgmPlaybackStartTick: Long = 0L,
-    var arenaCombatHadTargetingMob: Boolean = false,
-    var arenaBgmSwitchRequest: ArenaBgmSwitchRequest? = null,
     var arenaWaveStartCombatDelayTask: BukkitTask? = null,
     val transitionTasks: MutableList<BukkitTask> = mutableListOf(),
     val waveSpawnTasks: MutableMap<Int, BukkitTask> = mutableMapOf()
