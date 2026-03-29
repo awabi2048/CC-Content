@@ -80,23 +80,12 @@ class ArenaCommand(
                 ArenaI18n.text(
                     sender,
                     "arena.messages.command.usage.start",
-                    "&c使用法: /arenaa start <player|@s> <difficulty_id> [theme]"
+                    "&c使用法: /arenaa start <player|@s|@near> <difficulty_id> [theme]"
                 )
             )
             return true
         }
 
-        val target = when (args[1]) {
-            "@s" -> sender as? Player
-            else -> Bukkit.getPlayer(args[1])
-        }
-        if (target == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found", "&c対象プレイヤーが見つかりません"))
-            return true
-        }
-
-        val difficultyId = args[2]
-        val theme = args.getOrNull(3)
         val manager = arenaManagerProvider()
         if (manager == null) {
             sender.sendMessage("§cArena feature は初期化に失敗したため利用できません")
@@ -104,7 +93,39 @@ class ArenaCommand(
             return true
         }
 
-        when (val result = manager.startSession(target, difficultyId, theme)) {
+        val (target, initialParticipants) = when (args[1].lowercase()) {
+            "@s" -> {
+                val self = sender as? Player
+                if (self == null) {
+                    sender.sendMessage("§c@s はプレイヤーのみ使用できます")
+                    return true
+                }
+                self to emptyList()
+            }
+            "@near" -> {
+                val self = sender as? Player
+                if (self == null) {
+                    sender.sendMessage("§c@near はプレイヤーのみ使用できます")
+                    return true
+                }
+                val nearbyPlayers = (self.getNearbyEntities(16.0, 16.0, 16.0)
+                    .mapNotNull { it as? Player } + self)
+                    .distinctBy { it.uniqueId }
+                self to nearbyPlayers
+            }
+            else -> {
+                val player = Bukkit.getPlayer(args[1])
+                if (player == null) {
+                    sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found", "&c対象プレイヤーが見つかりません"))
+                    return true
+                }
+                player to emptyList()
+            }
+        }
+        val difficultyId = args[2]
+        val theme = args.getOrNull(3)
+
+        when (val result = manager.startSession(target, difficultyId, theme, initialParticipants = initialParticipants)) {
             is ArenaStartResult.Success -> {
                 sender.sendMessage(
                     ArenaI18n.text(
@@ -209,7 +230,7 @@ class ArenaCommand(
     private fun showUsage(sender: CommandSender) {
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.header", "&6=== Arena 管理コマンド ==="))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.menu", "&f/arenaa menu"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s> <difficulty_id> [theme]"))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s|@near> <difficulty_id> [theme]"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop", "&f/arenaa stop <player>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.theme", "&f/arenaa theme list"))
     }
@@ -227,7 +248,7 @@ class ArenaCommand(
             1 -> listOf("menu", "start", "stop", "theme").filter { it.startsWith(args[0], ignoreCase = true) }
             2 -> when (args[0].lowercase()) {
                 "menu" -> emptyList()
-                "start" -> listOf("@s") + Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], ignoreCase = true) }
+                "start" -> listOf("@s", "@near") + Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], ignoreCase = true) }
                 "stop" -> arenaManagerProvider()?.getActiveSessionPlayerNames()?.filter { it.startsWith(args[1], ignoreCase = true) } ?: emptyList()
                 "theme" -> listOf("list").filter { it.startsWith(args[1], ignoreCase = true) }
                 else -> emptyList()

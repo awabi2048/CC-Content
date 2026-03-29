@@ -4,6 +4,8 @@ easy:
   mob_count_multiplier: 0.8 # モブの最大召喚数／ウェーブクリア扱いとするモブの討伐数にかかる倍率
   wave_multiplier: 0.03 # モブ召喚数・ステータスに`1 + %wave_multiplier% * %wave%`を乗算
   wave: 5 # ステージ全体での基礎ウェーブ数
+  revive_max_per_player: 1 # 1人あたりの蘇生可能回数（0以下で無制限）
+  revive_time_limit_seconds: 30 # ダウン後に蘇生できる制限時間（秒、0で無制限）
   display: "§c★§7☆☆"
   mob_stats_max_health: 26.0
   mob_stats_max_attack: 6.5

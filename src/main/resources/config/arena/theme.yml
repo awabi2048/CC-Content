@@ -10,6 +10,9 @@
 #     skeleton_basic:
 #       weight: 6
 #       wave: 2..5
+#   door_open_sound:
+#     key: minecraft:block.iron_door.open
+#     pitch: 1.0
 #   orientation:
 #     entrance_exit: north
 #     corner_entry: north
@@ -22,6 +25,9 @@ ruins:
   icon: STONE
   max_summon_count: 10
   clear_mob_count: 20
+  door_open_sound:
+    key: minecraft:block.iron_door.open
+    pitch: 1.0
   mobs:
     zombie_normal:
       weight: 8
@@ -68,6 +74,9 @@ desert_temple:
   icon: STONE
   max_summon_count: 10
   clear_mob_count: 20
+  door_open_sound:
+    key: minecraft:block.iron_door.open
+    pitch: 1.0
   mobs:
     husk_normal:
       weight: 8
@@ -136,3 +145,79 @@ desert_temple:
     straight_entry: east
     corridor_entry: north
     goal_entry: east
+
+ocean_monument:
+  icon: STONE
+  max_summon_count: 10
+  clear_mob_count: 20
+  door_open_sound:
+    key: minecraft:block.iron_door.open
+    pitch: 1.0
+  mobs:
+    husk_normal:
+      weight: 8
+      wave: 1..
+    husk_light_leap:
+      weight: 9
+      wave: 1..
+    husk_heavy_shield:
+      weight: 7
+      wave: 3..
+    husk_archer:
+      weight: 7
+      wave: 2..
+    husk_archer_swap:
+      weight: 8
+      wave: 3..
+    husk_weakening_aura:
+      weight: 6
+      wave: 3..
+    skeleton_normal:
+      weight: 8
+      wave: 1..
+    skeleton_plain:
+      weight: 7
+      wave: 1..
+    skeleton_rapid:
+      weight: 7
+      wave: 2..
+    skeleton_curve_backstep:
+      weight: 6
+      wave: 3..
+    skeleton_heavy_bow_shield:
+      weight: 6
+      wave: 3..
+    skeleton_throw_close:
+      weight: 7
+      wave: 2..
+    silverfish_plain:
+      weight: 10
+      wave: 2..
+    silverfish_big_poison:
+      weight: 5
+      wave: 4..
+    spider_plain:
+      weight: 8
+      wave: 1..
+    spider_stealth:
+      weight: 7
+      wave: 2..
+    spider_swift:
+      weight: 7
+      wave: 2..
+    spider_ferocious:
+      weight: 6
+      wave: 3..
+    spider_venom_frenzy:
+      weight: 5
+      wave: 4..
+    spider_broodmother:
+      weight: 3
+      wave: 5..
+  orientation:
+    entrance_exit: north
+    corner_entry: south
+    corner_exit: east
+    straight_entry: south
+    corridor_entry: south
+    goal_entry: west

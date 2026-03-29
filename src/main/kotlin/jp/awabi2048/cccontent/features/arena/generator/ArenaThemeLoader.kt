@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.arena.generator
 
+import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -15,10 +16,16 @@ data class ArenaTheme(
     val path: String,
     val iconMaterial: Material,
     val mobSpawnConfig: ArenaThemeMobSpawnConfig,
+    val doorOpenSound: ArenaThemeDoorOpenSound,
     val orientation: ArenaStructureOrientation,
     val gridPitch: Int,
     val staticStructures: Map<ArenaStructureType, List<ArenaStaticStructureVariant>>,
     val animatedStructures: Map<ArenaStructureType, List<ArenaAnimatedStructureVariant>>
+)
+
+data class ArenaThemeDoorOpenSound(
+    val key: String,
+    val pitch: Float
 )
 
 data class ArenaThemeWaveRange(
@@ -91,6 +98,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
     private data class ParsedThemeConfig(
         val iconMaterial: Material,
         val mobSpawnConfig: ArenaThemeMobSpawnConfig,
+        val doorOpenSound: ArenaThemeDoorOpenSound,
         val orientation: ArenaStructureOrientation
     )
 
@@ -205,6 +213,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 path = folder.name,
                 iconMaterial = parsedThemeConfig.iconMaterial,
                 mobSpawnConfig = parsedThemeConfig.mobSpawnConfig,
+                doorOpenSound = parsedThemeConfig.doorOpenSound,
                 orientation = parsedThemeConfig.orientation,
                 gridPitch = gridPitch,
                 staticStructures = loaded.staticStructures,
@@ -250,8 +259,22 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             return null
         }
 
+        val coreConfig = CoreConfigManager.get(plugin)
         val maxSummonCount = section.getInt("max_summon_count", 1).coerceAtLeast(1)
         val clearMobCount = section.getInt("clear_mob_count", 1).coerceAtLeast(1)
+        val defaultDoorSoundKey = coreConfig
+            .getString("arena.door_animation.sound.key", "minecraft:block.iron_door.open")
+            ?.trim()
+            .orEmpty()
+            .ifBlank { "minecraft:block.iron_door.open" }
+        val defaultDoorSoundPitch = coreConfig
+            .getDouble("arena.door_animation.sound.pitch", 1.0)
+            .toFloat()
+            .coerceIn(0.5f, 2.0f)
+        val doorSoundSection = section.getConfigurationSection("door_open_sound")
+        val doorSoundKey = doorSoundSection?.getString("key")?.trim().orEmpty().ifBlank { defaultDoorSoundKey }
+        val doorSoundPitch = (doorSoundSection?.getDouble("pitch", defaultDoorSoundPitch.toDouble())
+            ?: defaultDoorSoundPitch.toDouble()).toFloat().coerceIn(0.5f, 2.0f)
         val mobsSection = section.getConfigurationSection("mobs")
         if (mobsSection == null) {
             val warning = "[Arena] theme.yml の mobs セクションが見つからないためスキップ: theme=$themeId"
@@ -333,6 +356,10 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 maxSummonCount = maxSummonCount,
                 clearMobCount = clearMobCount,
                 weightedMobs = weightedMobs
+            ),
+            doorOpenSound = ArenaThemeDoorOpenSound(
+                key = doorSoundKey,
+                pitch = doorSoundPitch
             ),
             orientation = ArenaStructureOrientation(
                 entranceExit = entranceExit,
