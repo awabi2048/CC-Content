@@ -1006,6 +1006,7 @@ custom_items:
         mob: '&cモブ'
         entrance: '&a入口'
         join_area: '&f参加エリア'
+        lobby: '&bロビー'
         connection: '&6接続部'
         door_block: '&e扉'
         barrier_core: '&b結界核'
@@ -1037,6 +1038,7 @@ custom_items:
           world_create_failed: '&cアリーナ用ワールド作成に失敗しました'
           stage_build_failed: '&c{message}'
           join_area_not_found: '&c開始待機エリアの参加マーカーが近くに存在しないため開始できません'
+          lobby_marker_not_found: '&cロビーマーカーが見つからないため開始できません'
       multiplayer:
         invite_window_started: '&7アリーナセッションを開始します…\n左クリックで他のプレイヤーを招待できます。招待メンバーはリフトで待機すると、一緒に入場できます'
         wait_area_hint: '&7招待したプレイヤーと開始待機エリアに入ると待機状態になります'
@@ -1061,6 +1063,7 @@ custom_items:
         recovered: '&a蘇生されました！'
         revive_success: '&a{player} を蘇生しました'
         timeout: '&cダウン時間切れです。ロビーへ転送されます'
+        game_over: "&c目の前がまっくらになった...！\n&7おあげちゃんが救出中..."
       barrier:
         cannot_break: '&c結界石は破壊できません'
         cannot_place_on: '&c結界石の上には設置できません'

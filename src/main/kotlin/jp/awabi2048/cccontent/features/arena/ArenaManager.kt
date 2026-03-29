@@ -187,15 +187,6 @@ private data class ArenaBgmConfig(
     val combat: ArenaBgmTrackConfig
 )
 
-private data class ArenaLobbyConfig(
-    val worldName: String,
-    val x: Double,
-    val y: Double,
-    val z: Double,
-    val yaw: Float,
-    val pitch: Float
-)
-
 class ArenaManager(
     private val plugin: JavaPlugin,
     private val mobService: MobService = MobService(plugin)
@@ -257,8 +248,11 @@ class ArenaManager(
         const val DOWN_REVIVE_HOLD_SECONDS_DEFAULT = 3
         const val DOWN_REVIVE_RADIUS_DEFAULT = 2.5
         const val DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT = 2L
+        const val DOWN_GAME_OVER_BLINDNESS_TICKS = 200
+        const val DOWN_GAME_OVER_RETURN_DELAY_MILLIS = 8000L
         const val REVIVE_LINK_TIMEOUT_TICKS = 200L
         const val DOWNED_PLAYER_WALK_SPEED = 0.1f
+        const val DOWNED_GAME_OVER_WALK_SPEED = 0.0f
         const val ARENA_SIDEBAR_OBJECTIVE_NAME = "arena"
         const val ARENA_SIDEBAR_MAX_LINES = 15
 
@@ -300,7 +294,6 @@ class ArenaManager(
     private var downReviveHoldSeconds = DOWN_REVIVE_HOLD_SECONDS_DEFAULT
     private var downReviveRadius = DOWN_REVIVE_RADIUS_DEFAULT
     private var downShulkerFollowIntervalTicks = DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT
-    private var arenaLobbyConfig: ArenaLobbyConfig? = null
     private var actionMarkerHoldTicks = 60
     private var actionMarkerColorTransitionTicks = 16
     private var doorAnimationTotalTicks = DOOR_ANIMATION_TOTAL_TICKS_DEFAULT
@@ -386,7 +379,6 @@ class ArenaManager(
         downShulkerFollowIntervalTicks = config
             .getLong("arena.down.shulker_follow_interval_ticks", DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT)
             .coerceAtLeast(1L)
-        arenaLobbyConfig = loadArenaLobbyConfig(config)
         doorAnimationTotalTicks = config.getInt("arena.door_animation.total_ticks", DOOR_ANIMATION_TOTAL_TICKS_DEFAULT)
             .coerceAtLeast(1)
         arenaDoorAnimationSoundKey = config
@@ -415,22 +407,6 @@ class ArenaManager(
         cleanupBlocksPerTick = config
             .getInt("arena.world_pool.cleanup_blocks_per_tick", ARENA_CLEANUP_BLOCKS_PER_TICK_DEFAULT)
             .coerceAtLeast(1)
-    }
-
-    private fun loadArenaLobbyConfig(config: FileConfiguration): ArenaLobbyConfig? {
-        val worldName = config.getString("arena.lobby.world")?.trim().orEmpty()
-        if (worldName.isBlank()) {
-            return null
-        }
-
-        return ArenaLobbyConfig(
-            worldName = worldName,
-            x = config.getDouble("arena.lobby.x", 0.0),
-            y = config.getDouble("arena.lobby.y", 64.0),
-            z = config.getDouble("arena.lobby.z", 0.0),
-            yaw = config.getDouble("arena.lobby.yaw", 0.0).toFloat(),
-            pitch = config.getDouble("arena.lobby.pitch", 0.0).toFloat()
-        )
     }
 
     private fun loadArenaBgmConfig() {
@@ -687,6 +663,14 @@ class ArenaManager(
             ))
         }
 
+        val lobbyMarkers = findLoadedLobbyMarkers(target.world)
+        if (lobbyMarkers.isEmpty()) {
+            return completed(ArenaStartResult.Error(
+                "arena.messages.command.start_error.lobby_marker_not_found",
+                "&cロビーマーカーが見つからないため開始できません"
+            ))
+        }
+
         val sanitizedMaxParticipants = maxParticipants.coerceIn(1, MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
         if (participantPlayers.size > sanitizedMaxParticipants) {
             return completed(ArenaStartResult.Error(
@@ -732,6 +716,7 @@ class ArenaManager(
             barrierLocation = placeholderLocation.clone(),
             barrierPointLocations = mutableListOf(),
             joinAreaMarkerLocations = joinAreaMarkers.map { it.clone() }.toMutableList(),
+            lobbyMarkerLocations = lobbyMarkers.map { it.clone() }.toMutableList(),
             participantSpawnProtectionUntilMillis = if (enableMultiplayerJoin) Long.MAX_VALUE else now + 4000L,
             multiplayerJoinEnabled = enableMultiplayerJoin,
             joinGraceStartMillis = if (enableMultiplayerJoin) now else 0L,
@@ -861,10 +846,25 @@ class ArenaManager(
         return leavePlayerFromSession(player.uniqueId, reason)
     }
 
+    fun stopSessionToLobby(player: Player, reason: String = ArenaI18n.text(player, "arena.messages.session.ended", "&cアリーナセッションが終了しました")): Boolean {
+        val session = getSession(player)
+        val destination = if (session != null) resolveSessionLobbyLocation(session) else null
+        return leavePlayerFromSession(player.uniqueId, reason, destination)
+    }
+
     fun stopSessionById(playerId: UUID, reason: String? = null): Boolean {
         val player = Bukkit.getPlayer(playerId)
         val localizedReason = reason ?: ArenaI18n.text(player, "arena.messages.session.ended", "&cアリーナセッションが終了しました")
         return leavePlayerFromSession(playerId, localizedReason)
+    }
+
+    fun stopSessionToLobbyById(playerId: UUID, reason: String? = null): Boolean {
+        val player = Bukkit.getPlayer(playerId)
+        val localizedReason = reason ?: ArenaI18n.text(player, "arena.messages.session.ended", "&cアリーナセッションが終了しました")
+        val worldName = playerToSessionWorld[playerId]
+        val session = worldName?.let { sessionsByWorld[it] }
+        val destination = if (session != null) resolveSessionLobbyLocation(session) else null
+        return leavePlayerFromSession(playerId, localizedReason, destination)
     }
 
     fun notifyParticipantDeath(player: Player) {
@@ -1119,24 +1119,23 @@ class ArenaManager(
             return
         }
 
-        if (!isMultiplayerSession(session)) {
-            return
-        }
-
         val finalHealth = player.health - event.finalDamage
         if (finalHealth > 0.0) {
             return
         }
 
-        if (!hasOtherAliveNonDownParticipant(session, player.uniqueId)) {
-            return
-        }
-
-        if (!canBeRevived(session, player.uniqueId)) {
-            return
-        }
-
         event.isCancelled = true
+
+        if (!isMultiplayerSession(session) ||
+            !hasOtherAliveNonDownParticipant(session, player.uniqueId) ||
+            !canBeRevived(session, player.uniqueId)
+        ) {
+            setPlayerDown(session, player, reviveDisabled = true)
+            notifyParticipantDeath(player)
+            handleInviteTargetUnavailable(player)
+            return
+        }
+
         setPlayerDown(session, player)
     }
 
@@ -1605,20 +1604,23 @@ class ArenaManager(
             }
     }
 
-    private fun setPlayerDown(session: ArenaSession, player: Player) {
+    private fun setPlayerDown(session: ArenaSession, player: Player, reviveDisabled: Boolean = false) {
         if (session.downedPlayers.containsKey(player.uniqueId)) {
             return
         }
 
         val now = System.currentTimeMillis()
-        val reviveDeadline = if (session.reviveTimeLimitSeconds > 0) {
+        val reviveDeadline = if (reviveDisabled) {
+            now
+        } else if (session.reviveTimeLimitSeconds > 0) {
             now + session.reviveTimeLimitSeconds * 1000L
         } else {
             Long.MAX_VALUE
         }
         session.downedPlayers[player.uniqueId] = ArenaDownedPlayerState(
             downedAtMillis = now,
-            bleedoutAtMillis = reviveDeadline
+            bleedoutAtMillis = reviveDeadline,
+            reviveDisabled = reviveDisabled
         )
         session.reviveHoldStates[player.uniqueId] = ArenaReviveHoldState()
         session.downedOriginalWalkSpeeds.putIfAbsent(player.uniqueId, player.walkSpeed)
@@ -1626,28 +1628,30 @@ class ArenaManager(
         player.health = 1.0
         player.fireTicks = 0
         player.fallDistance = 0.0f
-        player.walkSpeed = DOWNED_PLAYER_WALK_SPEED
+        player.walkSpeed = if (reviveDisabled) DOWNED_GAME_OVER_WALK_SPEED else DOWNED_PLAYER_WALK_SPEED
         player.playSound(player.location, Sound.BLOCK_ANVIL_LAND, 1.0f, 0.75f)
 
         syncDownedShulker(session, player, forceTeleport = true)
         retargetMobsFromDownedPlayers(session)
 
-        player.sendMessage(
-            ArenaI18n.text(
-                player,
-                "arena.messages.down.entered",
-                "&cダウンしました。生存者の蘇生を待ってください"
+        if (!reviveDisabled) {
+            player.sendMessage(
+                ArenaI18n.text(
+                    player,
+                    "arena.messages.down.entered",
+                    "&cダウンしました。生存者の蘇生を待ってください"
+                )
             )
-        )
 
-        session.participants
-            .asSequence()
-            .filter { it != player.uniqueId }
-            .mapNotNull { Bukkit.getPlayer(it) }
-            .filter { it.isOnline && it.world.name == session.worldName }
-            .forEach { participant ->
-                participant.sendMessage("§c${player.name}さんがダウンしました！蘇生が必要です！")
-            }
+            session.participants
+                .asSequence()
+                .filter { it != player.uniqueId }
+                .mapNotNull { Bukkit.getPlayer(it) }
+                .filter { it.isOnline && it.world.name == session.worldName }
+                .forEach { participant ->
+                    participant.sendMessage("§c${player.name}さんがダウンしました！蘇生が必要です！")
+                }
+        }
     }
 
     private fun recoverDownedPlayer(session: ArenaSession, downed: Player, revivedBy: Player?) {
@@ -1699,25 +1703,50 @@ class ArenaManager(
                 }
 
                 val downState = session.downedPlayers[downedId]
+                if (shouldFollowShulker) {
+                    syncDownedShulker(session, downed, forceTeleport = false)
+                }
                 if (downState != null && downState.bleedoutAtMillis != Long.MAX_VALUE && System.currentTimeMillis() >= downState.bleedoutAtMillis) {
                     val now = System.currentTimeMillis()
                     val timeoutExecuteAt = downState.timeoutExecuteAtMillis
                     if (timeoutExecuteAt == null) {
                         downed.playSound(downed.location, Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0f, 0.75f)
-                        downed.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 40, 0, false, false, false))
+                        val blindnessTicks = if (downState.reviveDisabled) {
+                            DOWN_GAME_OVER_BLINDNESS_TICKS
+                        } else {
+                            40
+                        }
+                        val executeDelayMillis = if (downState.reviveDisabled) {
+                            DOWN_GAME_OVER_RETURN_DELAY_MILLIS
+                        } else {
+                            1000L
+                        }
+                        if (downState.reviveDisabled) {
+                            stopArenaBgmForPlayer(downed)
+                        }
+                        downed.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, blindnessTicks, 0, false, false, false))
+                        if (downState.reviveDisabled) {
+                            downed.sendMessage(
+                                ArenaI18n.text(
+                                    downed,
+                                    "arena.messages.down.game_over",
+                                    "&c目の前がまっくらになった...！\n&7おあげちゃんが救出中..."
+                                )
+                            )
+                        }
                         clearReviveBindingForDowned(session, downedId, playInterruptedSound = false)
-                        downState.timeoutExecuteAtMillis = now + 1000L
+                        downState.timeoutExecuteAtMillis = now + executeDelayMillis
                     } else if (now >= timeoutExecuteAt) {
-                        stopSessionById(
-                            downedId,
-                            ArenaI18n.text(downed, "arena.messages.down.timeout", "&cダウン時間切れです。ロビーへ転送されます")
-                        )
+                        if (downState.reviveDisabled) {
+                            stopSessionToLobbyById(downedId, "")
+                        } else {
+                            stopSessionById(
+                                downedId,
+                                ArenaI18n.text(downed, "arena.messages.down.timeout", "&cダウン時間切れです。ロビーへ転送されます")
+                            )
+                        }
                     }
                     continue
-                }
-
-                if (shouldFollowShulker) {
-                    syncDownedShulker(session, downed, forceTeleport = false)
                 }
             }
 
@@ -1742,6 +1771,12 @@ class ArenaManager(
             val downed = Bukkit.getPlayer(downedId)
             if (downed == null || !downed.isOnline || downed.world.name != session.worldName) {
                 clearReviveBindingForDowned(session, downedId)
+                continue
+            }
+
+            val downState = session.downedPlayers[downedId]
+            if (downState?.reviveDisabled == true) {
+                clearReviveBindingForDowned(session, downedId, playInterruptedSound = false)
                 continue
             }
 
@@ -1806,7 +1841,8 @@ class ArenaManager(
         if (!session.participants.contains(target.uniqueId)) {
             return
         }
-        if (!isPlayerDowned(session, target.uniqueId)) {
+        val targetDownState = session.downedPlayers[target.uniqueId] ?: return
+        if (targetDownState.reviveDisabled) {
             return
         }
         if (isPlayerDowned(session, reviver.uniqueId)) {
@@ -1996,10 +2032,12 @@ class ArenaManager(
         player.walkSpeed = originalSpeed
     }
 
-    private fun resolveLobbyLocation(): Location? {
-        val config = arenaLobbyConfig ?: return null
-        val world = Bukkit.getWorld(config.worldName) ?: return null
-        return Location(world, config.x, config.y, config.z, config.yaw, config.pitch)
+    private fun resolveSessionLobbyLocation(session: ArenaSession): Location? {
+        if (session.lobbyMarkerLocations.isEmpty()) {
+            return null
+        }
+        val selected = session.lobbyMarkerLocations[random.nextInt(session.lobbyMarkerLocations.size)]
+        return selected.clone()
     }
 
     private fun applySessionGameMode(session: ArenaSession, player: Player) {
@@ -2265,7 +2303,10 @@ class ArenaManager(
             if (destination != null) {
                 player.teleport(destination)
             }
-            player.sendMessage(reason)
+            player.removePotionEffect(PotionEffectType.BLINDNESS)
+            if (reason.isNotBlank()) {
+                player.sendMessage(reason)
+            }
         }
 
         if (session.participants.isEmpty()) {
@@ -2375,6 +2416,7 @@ class ArenaManager(
         session.waitingSubtitleNextTickByPlayer.clear()
         session.joinCountdownBossBars.clear()
         session.joinAreaMarkerLocations.clear()
+        session.lobbyMarkerLocations.clear()
         session.multiplayerJoinEnabled = false
         session.multiplayerJoinFinalizeStarted = false
         session.multiplayerJoinIntroStarted = false
@@ -5018,6 +5060,14 @@ class ArenaManager(
             .filterIsInstance<Marker>()
             .filter { marker -> marker.scoreboardTags.contains("arena.marker.join_area") }
             .map { it.location.clone() }
+            .toList()
+    }
+
+    private fun findLoadedLobbyMarkers(world: World): List<Location> {
+        return world.getEntitiesByClass(Marker::class.java)
+            .asSequence()
+            .filter { marker -> marker.scoreboardTags.contains("arena.marker.lobby") }
+            .map { marker -> marker.location.clone() }
             .toList()
     }
 

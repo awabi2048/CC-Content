@@ -376,6 +376,7 @@ custom_items:
         mob: '&cMob'
         entrance: '&aEntrance'
         join_area: '&fJoin Area'
+        lobby: '&bLobby'
         connection: '&6Connection'
         door_block: '&eDoor'
         barrier_core: '&bBarrier Core'
@@ -407,6 +408,7 @@ custom_items:
           world_create_failed: '&cFailed to create arena world'
           stage_build_failed: '&c{message}'
           join_area_not_found: '&cCannot start because no join area marker exists nearby'
+          lobby_marker_not_found: '&cCannot start because no lobby marker exists in loaded chunks'
       multiplayer:
         invite_window_started: '&7Starting arena session...\nLeft-click to invite other players. Invited members can enter together by waiting on the lift'
         wait_area_hint: '&7Invited players enter waiting state by standing in the join area with the owner'
@@ -431,6 +433,7 @@ custom_items:
         recovered: '&aYou have been revived!'
         revive_success: '&aYou revived {player}'
         timeout: '&cBleedout time expired. Teleporting to lobby'
+        game_over: '&cEverything went dark...!\n&7Game over. Teleporting to lobby'
       barrier:
         cannot_break: '&cThe barrier core cannot be broken'
         cannot_place_on: '&cYou cannot place blocks on the barrier core'

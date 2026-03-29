@@ -42,7 +42,8 @@ data class ArenaDownedPlayerState(
     val downedAtMillis: Long,
     var bleedoutAtMillis: Long,
     var shulkerEntityId: UUID? = null,
-    var timeoutExecuteAtMillis: Long? = null
+    var timeoutExecuteAtMillis: Long? = null,
+    val reviveDisabled: Boolean = false
 )
 
 data class ArenaReviveHoldState(
@@ -81,6 +82,7 @@ data class ArenaSession(
     var barrierLocation: Location,
     val barrierPointLocations: MutableList<Location>,
     val joinAreaMarkerLocations: MutableList<Location> = mutableListOf(),
+    val lobbyMarkerLocations: MutableList<Location> = mutableListOf(),
     var participantSpawnProtectionUntilMillis: Long = 0L,
     var multiplayerJoinEnabled: Boolean = false,
     var multiplayerJoinFinalizeStarted: Boolean = false,

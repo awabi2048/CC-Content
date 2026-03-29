@@ -90,6 +90,8 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
 
     @EventHandler
     fun onPlayerDeath(event: PlayerDeathEvent) {
+        if (arenaManager.getSession(event.player) == null) return
+        event.deathMessage = null
         arenaManager.notifyParticipantDeath(event.player)
         arenaManager.handleInviteTargetUnavailable(event.player)
         arenaManager.stopSession(
