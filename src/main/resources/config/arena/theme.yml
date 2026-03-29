@@ -62,6 +62,12 @@ ruins:
     skeleton_throw_close:
       weight: 7
       wave: 2..
+    iron_golem_normal:
+      weight: 2
+      wave: 4..
+    iron_golem_magnet:
+      weight: 2
+      wave: 5..
   orientation:
     entrance_exit: north
     corner_entry: south
@@ -137,6 +143,12 @@ desert_temple:
       wave: 4..
     spider_broodmother:
       weight: 3
+      wave: 5..
+    iron_golem_normal:
+      weight: 3
+      wave: 4..
+    iron_golem_magnet:
+      weight: 2
       wave: 5..
   orientation:
     entrance_exit: south

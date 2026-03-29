@@ -3,7 +3,9 @@ package jp.awabi2048.cccontent.mob
 import org.bukkit.entity.LivingEntity
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
+import org.bukkit.event.entity.EntityCombustEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
+import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.entity.ProjectileHitEvent
@@ -24,6 +26,21 @@ class MobEventListener(private val mobService: MobService) : Listener {
         if (attacker != null) {
             mobService.handleAttack(event, attacker)
         }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityGenericDamage(event: EntityDamageEvent) {
+        if (event is EntityDamageByEntityEvent) {
+            return
+        }
+        val damaged = event.entity as? LivingEntity ?: return
+        mobService.handleDamaged(event, damaged)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityCombust(event: EntityCombustEvent) {
+        val entity = event.entity as? LivingEntity ?: return
+        mobService.handleCombust(event, entity)
     }
 
     @EventHandler

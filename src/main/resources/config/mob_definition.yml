@@ -294,3 +294,19 @@ silverfish_big_poison:
   armor: 1.0
   scale: 1.5
 
+iron_golem_normal:
+  type: iron_golem_normal
+  health: 80.0
+  attack: 12.0
+  movement_speed: 0.25
+  armor: 10.0
+  scale: 1.0
+
+iron_golem_magnet:
+  type: iron_golem_magnet
+  health: 72.0
+  attack: 10.0
+  movement_speed: 0.25
+  armor: 8.0
+  scale: 1.0
+

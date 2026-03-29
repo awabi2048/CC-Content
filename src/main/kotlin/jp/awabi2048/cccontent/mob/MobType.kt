@@ -22,7 +22,11 @@ interface MobType {
 
     fun onDamaged(context: MobDamagedContext, runtime: CustomMobRuntime?) {}
 
+    fun onGenericDamaged(context: MobGenericDamagedContext, runtime: CustomMobRuntime?) {}
+
     fun onDeath(context: MobDeathContext, runtime: CustomMobRuntime?) {}
+
+    fun onCombust(context: MobCombustContext, runtime: CustomMobRuntime?) {}
 
     fun onShootBow(context: MobShootBowContext, runtime: CustomMobRuntime?) {}
 }
