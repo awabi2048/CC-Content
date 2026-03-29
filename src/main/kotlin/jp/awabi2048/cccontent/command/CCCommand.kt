@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.command
 
 import org.bukkit.Location
+import org.bukkit.World
 import org.bukkit.command.Command
 import org.bukkit.command.BlockCommandSender
 import org.bukkit.command.CommandExecutor
@@ -10,6 +11,7 @@ import org.bukkit.entity.Entity
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Player
 import org.bukkit.util.Vector
+import kotlin.math.max
 
 /**
  * /cc-content メインコマンド
@@ -23,7 +25,11 @@ class CCCommand(
     private val onSummonMob: ((String, Location) -> LivingEntity?)? = null,
     private val onBatchBreakDebug: ((Player, String, Int, Int, Boolean) -> Boolean)? = null,
     private val onBlastMineDebug: ((Player, Double, Int, Boolean, Double) -> Boolean)? = null,
-    private val onUpdateDay: ((String?) -> Boolean)? = null
+    private val onUpdateDay: ((String?) -> Boolean)? = null,
+    private val onCreateVoidWorldDebug: ((Player) -> World?)? = null,
+    private val onCloneVoidWorldDebug: ((Player) -> World?)? = null,
+    private val onDeleteVoidWorldDebug: ((Player) -> Boolean)? = null,
+    private val isDebugVoidWorld: ((World) -> Boolean)? = null
 ) : CommandExecutor, TabCompleter {
     
     override fun onCommand(
@@ -125,7 +131,7 @@ class CCCommand(
         }
 
         if (args.size < 2) {
-            sender.sendMessage("§c使用法: /ccc debug <mine_all|cut_all|blast_mine> ...")
+            sender.sendMessage("§c使用法: /ccc debug <mine_all|cut_all|blast_mine|create_void_world|clone_void_world|delete_void_world> ...")
             return false
         }
 
@@ -134,11 +140,88 @@ class CCCommand(
         return when (mode) {
             "mine_all", "cut_all" -> handleBatchBreakDebug(sender, player, args)
             "blast_mine" -> handleBlastMineDebug(sender, player, args)
+            "create_void_world" -> handleCreateVoidWorldDebug(sender, player, args)
+            "clone_void_world" -> handleCloneVoidWorldDebug(sender, player, args)
+            "delete_void_world" -> handleDeleteVoidWorldDebug(sender, player, args)
             else -> {
-                sender.sendMessage("§cmodeは mine_all, cut_all, または blast_mine を指定してください")
+                sender.sendMessage("§cmodeは mine_all, cut_all, blast_mine, create_void_world, clone_void_world, または delete_void_world を指定してください")
                 false
             }
         }
+    }
+
+    private fun handleCreateVoidWorldDebug(sender: CommandSender, player: Player, args: Array<String>): Boolean {
+        if (onCreateVoidWorldDebug == null) {
+            sender.sendMessage("§cデバッグ機能が利用できません")
+            return false
+        }
+
+        if (args.size != 2) {
+            sender.sendMessage("§c使用法: /ccc debug create_void_world")
+            return false
+        }
+
+        val startedAt = System.nanoTime()
+        val world = onCreateVoidWorldDebug.invoke(player)
+        if (world == null) {
+            sender.sendMessage("§cボイドワールドの生成に失敗しました (${elapsedMs(startedAt)} ms)")
+            return false
+        }
+
+        player.teleport(world.spawnLocation)
+        sender.sendMessage("§aボイドワールドを生成しました: ${world.name} (${elapsedMs(startedAt)} ms)")
+        return true
+    }
+
+    private fun handleCloneVoidWorldDebug(sender: CommandSender, player: Player, args: Array<String>): Boolean {
+        if (onCloneVoidWorldDebug == null) {
+            sender.sendMessage("§cデバッグ機能が利用できません")
+            return false
+        }
+
+        if (args.size != 2) {
+            sender.sendMessage("§c使用法: /ccc debug clone_void_world")
+            return false
+        }
+
+        val startedAt = System.nanoTime()
+        val world = onCloneVoidWorldDebug.invoke(player)
+        if (world == null) {
+            sender.sendMessage("§cボイドワールドの複製に失敗しました (${elapsedMs(startedAt)} ms)")
+            return false
+        }
+
+        player.teleport(world.spawnLocation)
+        sender.sendMessage("§aボイドワールドを複製しました: ${world.name} (${elapsedMs(startedAt)} ms)")
+        return true
+    }
+
+    private fun handleDeleteVoidWorldDebug(sender: CommandSender, player: Player, args: Array<String>): Boolean {
+        if (onDeleteVoidWorldDebug == null || isDebugVoidWorld == null) {
+            sender.sendMessage("§cデバッグ機能が利用できません")
+            return false
+        }
+
+        if (args.size != 2) {
+            sender.sendMessage("§c使用法: /ccc debug delete_void_world")
+            return false
+        }
+
+        val world = player.world
+        if (!isDebugVoidWorld.invoke(world)) {
+            sender.sendMessage("§c現在のワールドはデバッグ用ボイドワールドではありません")
+            return false
+        }
+
+        val startedAt = System.nanoTime()
+        val result = onDeleteVoidWorldDebug.invoke(player)
+        if (!result) {
+            sender.sendMessage("§cボイドワールドの削除に失敗しました (${elapsedMs(startedAt)} ms)")
+            return false
+        }
+
+        sender.sendMessage("§aボイドワールドを削除しました: ${world.name} (${elapsedMs(startedAt)} ms)")
+        return true
     }
 
     private fun handleBatchBreakDebug(sender: CommandSender, player: Player, args: Array<String>): Boolean {
@@ -315,8 +398,17 @@ class CCCommand(
               §f/ccc debug <mine_all|cut_all> <delay> <max_chain> <auto_collect>
               §7  - MineAll/CutAll のデバッグ設定を適用します
 
-               §f/ccc debug blast_mine <radius> <delay> <auto_collect> <loss_rate>
-               §7  - BlastMine のデバッグ設定を適用します
+                §f/ccc debug blast_mine <radius> <delay> <auto_collect> <loss_rate>
+                §7  - BlastMine のデバッグ設定を適用します
+
+                §f/ccc debug create_void_world
+                §7  - アリーナと同じボイドワールドを生成してそこへ移動します
+
+                §f/ccc debug clone_void_world
+                §7  - テンプレートからボイドワールドを複製してそこへ移動します
+
+                §f/ccc debug delete_void_world
+                §7  - 現在のデバッグ用ボイドワールドを削除します
 
                §f/ccc update_day [arena]
                §7  - 日付更新処理を実行します
@@ -356,7 +448,7 @@ class CCCommand(
               }
                "debug" -> {
                    when (args.size) {
-                     2 -> listOf("mine_all", "cut_all", "blast_mine").filter { it.startsWith(args[1].lowercase()) }
+                      2 -> listOf("mine_all", "cut_all", "blast_mine", "create_void_world", "clone_void_world", "delete_void_world").filter { it.startsWith(args[1].lowercase()) }
                      3 -> {
                          when (args[1].lowercase()) {
                              "mine_all", "cut_all" -> listOf("0", "1", "2", "3", "5").filter { it.startsWith(args[2]) }
@@ -481,5 +573,9 @@ class CCCommand(
 
     private fun formatCoord(value: Double): String {
         return String.format(java.util.Locale.ROOT, "%.2f", value)
+    }
+
+    private fun elapsedMs(startedAtNanos: Long): Long {
+        return max(0L, (System.nanoTime() - startedAtNanos) / 1_000_000L)
     }
 }

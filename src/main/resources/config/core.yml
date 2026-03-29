@@ -118,6 +118,11 @@ arena:
     join_marker_search_radius: 16.0
     invite_auto_decline_distance: 16.0
     stage_build_steps_per_tick: 1
+  session:
+    max_concurrent: 3
+  world_pool:
+    size: 3
+    cleanup_blocks_per_tick: 300
   down:
     revive_hold_seconds: 3
     revive_radius: 2.5

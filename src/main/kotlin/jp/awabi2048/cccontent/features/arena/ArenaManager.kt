@@ -104,6 +104,29 @@ private data class PendingWorldDeletion(
     var attempts: Int = 0
 )
 
+private enum class ArenaPoolWorldState {
+    READY,
+    IN_USE,
+    CLEANING,
+    BROKEN
+}
+
+private data class ArenaWorldCleanupVolume(
+    val bounds: ArenaBounds,
+    var x: Int = bounds.minX,
+    var y: Int = bounds.minY,
+    var z: Int = bounds.minZ
+)
+
+private data class ArenaWorldCleanupJob(
+    val worldName: String,
+    val volumes: ArrayDeque<ArenaWorldCleanupVolume>,
+    val totalBlocks: Long,
+    var processedBlocks: Long,
+    val startedAtMillis: Long,
+    var lastProgressLogAtMillis: Long
+)
+
 private data class ArenaDifficultyConfig(
     val id: String,
     val difficultyRange: ClosedFloatingPointRange<Double>,
@@ -178,6 +201,13 @@ class ArenaManager(
     private val mobService: MobService = MobService(plugin)
 ) {
     private companion object {
+        const val DEBUG_VOID_WORLD_MARKER_FILE_NAME = ".cc-debug-void-world"
+        const val DEBUG_VOID_TEMPLATE_MARKER_FILE_NAME = ".cc-debug-void-template"
+        const val DEBUG_VOID_WORLD_TEMPLATE_NAME = "arena.debug.template"
+        const val ARENA_POOL_WORLD_NAME_PREFIX = "arena.pool"
+        const val ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT = 3
+        const val ARENA_POOL_SIZE_DEFAULT = 3
+        const val ARENA_CLEANUP_BLOCKS_PER_TICK_DEFAULT = 300
         const val DOOR_ANIMATION_START_DELAY_TICKS = 10L
         const val DOOR_ANIMATION_TOTAL_TICKS_DEFAULT = 60
         const val SHARED_WAVE_MAX_ALIVE_DEFAULT = 128
@@ -245,6 +275,9 @@ class ArenaManager(
     private val playerToSessionWorld = mutableMapOf<UUID, String>()
     private val mobToSessionWorld = mutableMapOf<UUID, String>()
     private val pendingWorldDeletions = mutableMapOf<String, PendingWorldDeletion>()
+    private val readyArenaWorldNames = ArrayDeque<String>()
+    private val arenaWorldStates = mutableMapOf<String, ArenaPoolWorldState>()
+    private val cleanupWorldJobs = ArrayDeque<ArenaWorldCleanupJob>()
     private val invitedPlayerLocks = mutableMapOf<UUID, String>()
     private val inviteSwingCooldownUntilTick = mutableMapOf<UUID, Long>()
     private val arenaSidebarPlayers = mutableSetOf<UUID>()
@@ -261,6 +294,9 @@ class ArenaManager(
     private var multiplayerJoinMarkerSearchRadius = MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
     private var multiplayerInviteAutoDeclineDistance = MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
     private var multiplayerStageBuildStepsPerTick = 1
+    private var maxConcurrentSessions = ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT
+    private var arenaPoolSize = ARENA_POOL_SIZE_DEFAULT
+    private var cleanupBlocksPerTick = ARENA_CLEANUP_BLOCKS_PER_TICK_DEFAULT
     private var downReviveHoldSeconds = DOWN_REVIVE_HOLD_SECONDS_DEFAULT
     private var downReviveRadius = DOWN_REVIVE_RADIUS_DEFAULT
     private var downShulkerFollowIntervalTicks = DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT
@@ -297,6 +333,8 @@ class ArenaManager(
     fun initialize(featureInitLogger: FeatureInitializationLogger? = null) {
         loadBattleConfigs()
         themeLoader.load(featureInitLogger)
+        ensureDebugVoidWorldBootstrap()
+        prepareArenaWorldPoolAtStartup()
         startMaintenanceTask()
     }
 
@@ -367,6 +405,15 @@ class ArenaManager(
             )
             .coerceAtLeast(0L) * 1000L
         sharedWaveMaxAlive = config.getInt("arena.mob_spawn.system_max_alive", SHARED_WAVE_MAX_ALIVE_DEFAULT)
+            .coerceAtLeast(1)
+        maxConcurrentSessions = config
+            .getInt("arena.session.max_concurrent", ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT)
+            .coerceAtLeast(1)
+        arenaPoolSize = config
+            .getInt("arena.world_pool.size", ARENA_POOL_SIZE_DEFAULT)
+            .coerceAtLeast(maxConcurrentSessions)
+        cleanupBlocksPerTick = config
+            .getInt("arena.world_pool.cleanup_blocks_per_tick", ARENA_CLEANUP_BLOCKS_PER_TICK_DEFAULT)
             .coerceAtLeast(1)
     }
 
@@ -568,35 +615,50 @@ class ArenaManager(
         enableMultiplayerJoin: Boolean = false,
         inviteQuestTitle: String? = null,
         inviteQuestLore: List<String> = emptyList(),
-        maxParticipants: Int = MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT
+        maxParticipants: Int = MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT,
+        onCompleted: ((Long) -> Unit)? = null
     ): ArenaStartResult {
+        val startedAtNanos = System.nanoTime()
+        fun completed(result: ArenaStartResult): ArenaStartResult {
+            onCompleted?.invoke(elapsedMillisSince(startedAtNanos))
+            return result
+        }
+
         val participantPlayers = (listOf(target) + initialParticipants)
             .distinctBy { it.uniqueId }
 
         val alreadyInSession = participantPlayers.firstOrNull { playerToSessionWorld.containsKey(it.uniqueId) }
         if (alreadyInSession != null) {
-            return ArenaStartResult.Error(
+            return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.already_in_session",
                 "&c{player} はすでにアリーナセッション中です",
                 arrayOf("player" to alreadyInSession.name)
-            )
+            ))
+        }
+
+        if (sessionsByWorld.size >= maxConcurrentSessions) {
+            return completed(ArenaStartResult.Error(
+                "arena.messages.command.start_error.concurrent_limit_reached",
+                "&c同時セッション上限に達しています ({current}/{max})",
+                arrayOf("current" to sessionsByWorld.size, "max" to maxConcurrentSessions)
+            ))
         }
 
         val difficulty = difficultyConfigs[difficultyId]
-            ?: return ArenaStartResult.Error(
+            ?: return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.difficulty_not_found",
                 "&cdifficulty が見つかりません: {difficulty}",
                 arrayOf("difficulty" to difficultyId)
-            )
+            ))
 
         val theme = if (requestedTheme.isNullOrBlank()) {
             themeLoader.getRandomTheme(random)
         } else {
             themeLoader.getTheme(requestedTheme)
-        } ?: return ArenaStartResult.Error(
+        } ?: return completed(ArenaStartResult.Error(
             "arena.messages.command.start_error.theme_not_found",
             "&c有効なテーマが見つかりません"
-        )
+        ))
 
         val undefinedWave = (1..difficulty.waves).firstOrNull { wave ->
             selectSpawnCandidates(theme, wave).isEmpty()
@@ -606,11 +668,11 @@ class ArenaManager(
                 "[Arena] セッション開始失敗: themeスポーン未定義ウェーブがあります " +
                     "theme=${theme.id} difficulty=$difficultyId wave=$undefinedWave"
             )
-            return ArenaStartResult.Error(
+            return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.undefined_wave_spawn",
                 "&ctheme '{theme}' は wave {wave} のスポーンが未定義です",
                 arrayOf("theme" to theme.id, "mob_type" to theme.id, "wave" to undefinedWave)
-            )
+            ))
         }
 
         val joinAreaMarkers = if (enableMultiplayerJoin) {
@@ -619,25 +681,25 @@ class ArenaManager(
             emptyList()
         }
         if (enableMultiplayerJoin && joinAreaMarkers.isEmpty()) {
-            return ArenaStartResult.Error(
+            return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.join_area_not_found",
                 "&c開始待機エリアの参加マーカーが近くに存在しないため開始できません"
-            )
+            ))
         }
-
-        val world = createArenaWorld() ?: return ArenaStartResult.Error(
-            "arena.messages.command.start_error.world_create_failed",
-            "&cアリーナ用ワールド作成に失敗しました"
-        )
 
         val sanitizedMaxParticipants = maxParticipants.coerceIn(1, MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
         if (participantPlayers.size > sanitizedMaxParticipants) {
-            return ArenaStartResult.Error(
+            return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.too_many_participants",
                 "&c参加人数が上限を超えています ({count}/{max})",
                 arrayOf("count" to participantPlayers.size, "max" to sanitizedMaxParticipants)
-            )
+            ))
         }
+
+        val world = acquireArenaPoolWorld() ?: return completed(ArenaStartResult.Error(
+            "arena.messages.command.start_error.pool_world_unavailable",
+            "&cアリーナワールド準備中のため開始できません"
+        ))
 
         val returnLocations = participantPlayers.associate { it.uniqueId to it.location.clone() }.toMutableMap()
         val originalGameModes = participantPlayers.associate { it.uniqueId to it.gameMode }.toMutableMap()
@@ -688,6 +750,7 @@ class ArenaManager(
         participantPlayers.forEach { participant ->
             playerToSessionWorld[participant.uniqueId] = world.name
         }
+        logArenaPoolState("セッション開始", world.name)
 
         return try {
             if (enableMultiplayerJoin) {
@@ -724,6 +787,7 @@ class ArenaManager(
                             initializeWavePipeline(session, theme, difficulty)
                             updateSessionProgressBossBar(session)
                             session.stageGenerationCompleted = true
+                            onCompleted?.invoke(elapsedMillisSince(startedAtNanos))
                         }
                         .onFailure { throwable ->
                             if (throwable is ArenaStageBuildException) {
@@ -736,6 +800,7 @@ class ArenaManager(
                                 messageKey = "arena.messages.command.start_error.stage_build_failed",
                                 fallbackMessage = "&cステージの生成に失敗しました"
                             )
+                            onCompleted?.invoke(elapsedMillisSince(startedAtNanos))
                         }
                 }
             } else {
@@ -758,6 +823,7 @@ class ArenaManager(
                 setDoorActionMarkersReadySilently(session, 1)
                 initializeWavePipeline(session, theme, difficulty)
                 updateSessionProgressBossBar(session)
+                onCompleted?.invoke(elapsedMillisSince(startedAtNanos))
             }
             target.sendMessage(
                 ArenaI18n.text(
@@ -777,7 +843,12 @@ class ArenaManager(
                 e.printStackTrace()
             }
             val failedSession = sessionsByWorld[world.name]
-            if (failedSession != null) terminateSession(failedSession, false) else tryDeleteWorld(world)
+            if (failedSession != null) {
+                terminateSession(failedSession, false)
+            } else {
+                markArenaWorldBroken(world.name)
+            }
+            onCompleted?.invoke(elapsedMillisSince(startedAtNanos))
             ArenaStartResult.Error(
                 "arena.messages.command.start_error.stage_build_failed",
                 "&c{message}",
@@ -826,6 +897,9 @@ class ArenaManager(
         playerToSessionWorld.clear()
         mobToSessionWorld.clear()
         mobToDefinitionTypeId.clear()
+        cleanupWorldJobs.clear()
+        readyArenaWorldNames.clear()
+        arenaWorldStates.clear()
         clearAllArenaSidebars()
         invitedPlayerLocks.clear()
         inviteSwingCooldownUntilTick.clear()
@@ -2339,12 +2413,120 @@ class ArenaManager(
         }
         session.waveMobIds.clear()
 
-        val world = Bukkit.getWorld(session.worldName)
-        if (world != null) {
-            tryDeleteWorld(world)
-        } else {
-            queueWorldDeletion(session.worldName, File(Bukkit.getWorldContainer(), session.worldName))
+        enqueueArenaWorldCleanup(session)
+    }
+
+    private fun enqueueArenaWorldCleanup(session: ArenaSession) {
+        val worldName = session.worldName
+        if (!worldName.startsWith("$ARENA_POOL_WORLD_NAME_PREFIX.")) {
+            val legacyWorld = Bukkit.getWorld(worldName)
+            if (legacyWorld != null) {
+                tryDeleteWorld(legacyWorld)
+            } else {
+                queueWorldDeletion(worldName, File(Bukkit.getWorldContainer(), worldName))
+            }
+            return
         }
+
+        val world = Bukkit.getWorld(worldName)
+        if (world == null) {
+            markArenaWorldBroken(worldName)
+            logArenaPoolState("セッション終了", worldName)
+            return
+        }
+
+        cleanupNonPlayerEntities(world)
+
+        val cleanupBounds = collectCleanupBounds(session)
+        if (cleanupBounds.isEmpty()) {
+            markArenaWorldReady(worldName)
+            logArenaPoolState("セッション終了", worldName)
+            return
+        }
+
+        val totalBlocks = calculateCleanupBlocks(cleanupBounds)
+        val now = System.currentTimeMillis()
+        val volumes = ArrayDeque(cleanupBounds.map { ArenaWorldCleanupVolume(it) })
+        cleanupWorldJobs.addLast(
+            ArenaWorldCleanupJob(
+                worldName = worldName,
+                volumes = volumes,
+                totalBlocks = totalBlocks,
+                processedBlocks = 0L,
+                startedAtMillis = now,
+                lastProgressLogAtMillis = now
+            )
+        )
+        arenaWorldStates[worldName] = ArenaPoolWorldState.CLEANING
+        logArenaPoolState("セッション終了", worldName)
+        val estimatedSeconds = estimateCleanupSeconds(totalBlocks)
+        plugin.logger.info(
+            "[Arena] クリーンアップ開始: world=$worldName blocks=$totalBlocks " +
+                "estimated=${formatSeconds(estimatedSeconds)}s budget=${cleanupBlocksPerTick}/tick"
+        )
+    }
+
+    private fun collectCleanupBounds(session: ArenaSession): List<ArenaBounds> {
+        val bounds = linkedMapOf<String, ArenaBounds>()
+        session.roomBounds.values.forEach { value ->
+            bounds[boundsKey(value)] = value
+        }
+        session.corridorBounds.values.forEach { value ->
+            bounds[boundsKey(value)] = value
+        }
+        if (bounds.isEmpty()) {
+            bounds[boundsKey(session.stageBounds)] = session.stageBounds
+        }
+        return bounds.values.toList()
+    }
+
+    private fun boundsKey(bounds: ArenaBounds): String {
+        return "${bounds.minX}:${bounds.maxX}:${bounds.minY}:${bounds.maxY}:${bounds.minZ}:${bounds.maxZ}"
+    }
+
+    private fun cleanupNonPlayerEntities(world: World) {
+        world.entities.toList().forEach { entity ->
+            if (entity.type == EntityType.PLAYER) {
+                return@forEach
+            }
+            if (!entity.isDead && entity.isValid) {
+                entity.remove()
+            }
+        }
+    }
+
+    private fun calculateCleanupBlocks(boundsList: List<ArenaBounds>): Long {
+        return boundsList.sumOf { bounds ->
+            val width = (bounds.maxX - bounds.minX + 1).toLong().coerceAtLeast(0L)
+            val height = (bounds.maxY - bounds.minY + 1).toLong().coerceAtLeast(0L)
+            val depth = (bounds.maxZ - bounds.minZ + 1).toLong().coerceAtLeast(0L)
+            width * height * depth
+        }
+    }
+
+    private fun estimateCleanupSeconds(totalBlocks: Long): Double {
+        val blocksPerSecond = cleanupBlocksPerTick.toDouble() * 20.0
+        if (blocksPerSecond <= 0.0) return 0.0
+        return totalBlocks.toDouble() / blocksPerSecond
+    }
+
+    private fun formatSeconds(seconds: Double): String {
+        return String.format(Locale.US, "%.1f", seconds.coerceAtLeast(0.0))
+    }
+
+    private fun formatPercent(value: Double): String {
+        return String.format(Locale.US, "%.1f", value.coerceIn(0.0, 100.0))
+    }
+
+    private fun logArenaPoolState(event: String, worldName: String? = null) {
+        val ready = arenaWorldStates.values.count { it == ArenaPoolWorldState.READY }
+        val inUse = arenaWorldStates.values.count { it == ArenaPoolWorldState.IN_USE }
+        val cleaning = arenaWorldStates.values.count { it == ArenaPoolWorldState.CLEANING }
+        val broken = arenaWorldStates.values.count { it == ArenaPoolWorldState.BROKEN }
+        val target = if (worldName != null) " world=$worldName" else ""
+        plugin.logger.info(
+            "[Arena] $event:$target pool={ready=$ready, in_use=$inUse, cleaning=$cleaning, broken=$broken, queue=${cleanupWorldJobs.size}}"
+        )
     }
 
     private fun initializeWavePipeline(
@@ -4185,12 +4367,200 @@ class ArenaManager(
         return setOf(arenaBgmConfig.normal.soundKey, arenaBgmConfig.combat.soundKey)
     }
 
-    private fun createArenaWorld(): World? {
-        val worldName = "arena.${UUID.randomUUID()}"
+    private fun prepareArenaWorldPoolAtStartup() {
+        readyArenaWorldNames.clear()
+        cleanupWorldJobs.clear()
+        arenaWorldStates.clear()
+
+        val names = (1..arenaPoolSize).map { "$ARENA_POOL_WORLD_NAME_PREFIX.$it" }
+        names.forEach { worldName ->
+            if (resetArenaPoolWorld(worldName)) {
+                markArenaWorldReady(worldName)
+            } else {
+                markArenaWorldBroken(worldName)
+            }
+        }
+
+        plugin.logger.info("[Arena] ワールドプール初期化: ready=${readyArenaWorldNames.size} / total=${names.size}")
+    }
+
+    private fun resetArenaPoolWorld(worldName: String): Boolean {
+        val loadedWorld = Bukkit.getWorld(worldName)
+        if (loadedWorld != null && !Bukkit.unloadWorld(loadedWorld, false)) {
+            plugin.logger.warning("[Arena] プールワールドのアンロードに失敗しました: $worldName")
+            return false
+        }
+
+        val worldFolder = worldFolder(worldName)
+        if (worldFolder.exists() && !deleteDirectory(worldFolder)) {
+            plugin.logger.warning("[Arena] プールワールドフォルダ削除に失敗しました: $worldName")
+            return false
+        }
+
+        val created = createArenaWorld(worldName)
+        if (created == null) {
+            plugin.logger.warning("[Arena] プールワールド生成に失敗しました: $worldName")
+            return false
+        }
+
+        cleanupNonPlayerEntities(created)
+        return true
+    }
+
+    private fun acquireArenaPoolWorld(): World? {
+        val worldName = readyArenaWorldNames.removeFirstOrNull() ?: return null
+        arenaWorldStates[worldName] = ArenaPoolWorldState.IN_USE
+        val world = Bukkit.getWorld(worldName)
+        if (world != null) {
+            return world
+        }
+        markArenaWorldBroken(worldName)
+        return null
+    }
+
+    private fun markArenaWorldReady(worldName: String) {
+        cleanupWorldJobs.removeAll { it.worldName == worldName }
+        readyArenaWorldNames.remove(worldName)
+        if (Bukkit.getWorld(worldName) == null) {
+            arenaWorldStates[worldName] = ArenaPoolWorldState.BROKEN
+            return
+        }
+        readyArenaWorldNames.addLast(worldName)
+        arenaWorldStates[worldName] = ArenaPoolWorldState.READY
+    }
+
+    private fun markArenaWorldBroken(worldName: String) {
+        readyArenaWorldNames.remove(worldName)
+        cleanupWorldJobs.removeAll { it.worldName == worldName }
+        arenaWorldStates[worldName] = ArenaPoolWorldState.BROKEN
+    }
+
+    private fun createArenaWorld(worldName: String = "arena.${UUID.randomUUID()}"): World? {
         val creator = WorldCreator(worldName)
         creator.generator(VoidChunkGenerator())
         val world = creator.createWorld()
-        world?.apply {
+        world?.let { configureArenaVoidWorld(it) }
+        return world
+    }
+
+    fun createDebugVoidWorld(): World? {
+        val world = createArenaWorld() ?: return null
+        if (!markDebugVoidWorld(world)) {
+            plugin.logger.warning("[Arena] デバッグ用ボイドワールドのマーカー作成に失敗しました: ${world.name}")
+            tryDeleteWorld(world)
+            return null
+        }
+        return world
+    }
+
+    fun cloneDebugVoidWorld(): World? {
+        val templateFolder = ensureDebugVoidWorldTemplate() ?: return null
+        val cloneWorldName = "arena.debug.clone.${UUID.randomUUID()}"
+        val cloneFolder = worldFolder(cloneWorldName)
+        if (cloneFolder.exists()) {
+            return null
+        }
+
+        if (!templateFolder.copyRecursively(cloneFolder, overwrite = false)) {
+            plugin.logger.warning("[Arena] デバッグ用ボイドワールドの複製に失敗しました: ${templateFolder.name} -> $cloneWorldName")
+            return null
+        }
+
+        removeMarkerFile(cloneFolder, DEBUG_VOID_TEMPLATE_MARKER_FILE_NAME)
+        removeMarkerFile(cloneFolder, "uid.dat")
+        val world = createArenaWorld(cloneWorldName) ?: run {
+            deleteDirectory(cloneFolder)
+            return null
+        }
+        if (!markDebugVoidWorld(world)) {
+            plugin.logger.warning("[Arena] 複製ワールドのマーカー作成に失敗しました: ${world.name}")
+            tryDeleteWorld(world)
+            return null
+        }
+        return world
+    }
+
+    fun ensureDebugVoidWorldBootstrap() {
+        ensureDebugVoidWorldTemplate() ?: return
+        if (hasDebugVoidWorldOnDisk() || hasDebugVoidWorldLoaded()) {
+            return
+        }
+
+        createDebugVoidWorld() ?: plugin.logger.warning("[Arena] 起動時のデバッグ用ボイドワールド生成に失敗しました")
+    }
+
+    fun isDebugVoidWorld(world: World): Boolean {
+        return world.worldFolder.resolve(DEBUG_VOID_WORLD_MARKER_FILE_NAME).isFile
+    }
+
+    private fun ensureDebugVoidWorldTemplate(): File? {
+        val templateWorld = Bukkit.getWorld(DEBUG_VOID_WORLD_TEMPLATE_NAME)
+        if (templateWorld != null) {
+            Bukkit.unloadWorld(templateWorld.name, false)
+            return templateWorld.worldFolder
+        }
+
+        val templateFolder = worldFolder(DEBUG_VOID_WORLD_TEMPLATE_NAME)
+        if (templateFolder.exists()) {
+            if (!templateFolder.resolve(DEBUG_VOID_TEMPLATE_MARKER_FILE_NAME).isFile) {
+                markTemplateMarker(templateFolder)
+            }
+            return templateFolder
+        }
+
+        val created = createArenaWorld(DEBUG_VOID_WORLD_TEMPLATE_NAME) ?: return null
+        if (!markTemplateMarker(created.worldFolder)) {
+            plugin.logger.warning("[Arena] デバッグテンプレートのマーカー作成に失敗しました: ${created.name}")
+        }
+        Bukkit.unloadWorld(created, false)
+        return templateFolder
+    }
+
+    private fun hasDebugVoidWorldLoaded(): Boolean {
+        return Bukkit.getWorlds().any { isDebugVoidWorld(it) }
+    }
+
+    private fun hasDebugVoidWorldOnDisk(): Boolean {
+        return worldContainer().listFiles()?.any { candidate ->
+            candidate.isDirectory && candidate.resolve(DEBUG_VOID_WORLD_MARKER_FILE_NAME).isFile
+        } == true
+    }
+
+    fun deleteDebugVoidWorld(world: World): Boolean {
+        if (!isDebugVoidWorld(world)) {
+            return false
+        }
+        if (sessionsByWorld.containsKey(world.name)) {
+            return false
+        }
+        tryDeleteWorld(world)
+        return true
+    }
+
+    private fun markTemplateMarker(folder: File): Boolean {
+        return runCatching {
+            val markerFile = folder.resolve(DEBUG_VOID_TEMPLATE_MARKER_FILE_NAME)
+            if (!markerFile.exists()) {
+                markerFile.createNewFile()
+            } else {
+                true
+            }
+        }.getOrDefault(false)
+    }
+
+    private fun markDebugVoidWorld(world: World): Boolean {
+        return runCatching {
+            val markerFile = world.worldFolder.resolve(DEBUG_VOID_WORLD_MARKER_FILE_NAME)
+            if (!markerFile.exists()) {
+                markerFile.createNewFile()
+            } else {
+                true
+            }
+        }.getOrDefault(false)
+    }
+
+    private fun configureArenaVoidWorld(world: World) {
+        world.apply {
             setGameRule(GameRule.MAX_ENTITY_CRAMMING, 0)
             setGameRule(GameRule.DO_MOB_SPAWNING, false)
             setGameRule(GameRule.DO_TILE_DROPS, false)
@@ -4201,7 +4571,22 @@ class ArenaManager(
             time = 6000
             WorldSettingsHelper.applyDistanceSettings(plugin, this, "arena.world_settings")
         }
-        return world
+    }
+
+    private fun removeMarkerFile(folder: File, fileName: String) {
+        runCatching { folder.resolve(fileName).delete() }
+    }
+
+    private fun worldFolder(worldName: String): File {
+        return File(worldContainer(), worldName)
+    }
+
+    private fun worldContainer(): File {
+        return Bukkit.getWorldContainer()
+    }
+
+    private fun elapsedMillisSince(startedAtNanos: Long): Long {
+        return ((System.nanoTime() - startedAtNanos) / 1_000_000L).coerceAtLeast(0L)
     }
 
     private fun tryDeleteWorld(world: World) {
@@ -5230,11 +5615,81 @@ class ArenaManager(
                 updateDownedPlayers(currentTick)
                 updateActionMarkers()
                 updateArenaBgmTransitions()
+                processArenaWorldCleanupQueue()
                 if (currentTick % 5L == 0L) {
                     updateArenaSidebars()
                 }
             }, 1L, 1L)
         }
+    }
+
+    private fun processArenaWorldCleanupQueue() {
+        var budget = cleanupBlocksPerTick
+        while (budget > 0) {
+            val job = cleanupWorldJobs.firstOrNull() ?: return
+            val now = System.currentTimeMillis()
+            val world = Bukkit.getWorld(job.worldName)
+            if (world == null) {
+                cleanupWorldJobs.removeFirstOrNull()
+                markArenaWorldBroken(job.worldName)
+                continue
+            }
+
+            val volume = job.volumes.firstOrNull()
+            if (volume == null) {
+                cleanupWorldJobs.removeFirstOrNull()
+                val elapsedMillis = (now - job.startedAtMillis).coerceAtLeast(0L)
+                plugin.logger.info(
+                    "[Arena] クリーンアップ完了: world=${job.worldName} blocks=${job.processedBlocks}/${job.totalBlocks} elapsed=${elapsedMillis}ms"
+                )
+                markArenaWorldReady(job.worldName)
+                logArenaPoolState("クリーンアップ完了", job.worldName)
+                continue
+            }
+
+            val block = world.getBlockAt(volume.x, volume.y, volume.z)
+            if (block.type != Material.AIR) {
+                block.setType(Material.AIR, false)
+            }
+            job.processedBlocks += 1L
+            budget -= 1
+
+            if (!advanceCleanupCursor(volume)) {
+                job.volumes.removeFirstOrNull()
+            }
+
+            if (now - job.lastProgressLogAtMillis >= 30_000L) {
+                val elapsedSeconds = (now - job.startedAtMillis).coerceAtLeast(0L).toDouble() / 1000.0
+                val progress = if (job.totalBlocks <= 0L) 100.0 else (job.processedBlocks.toDouble() * 100.0 / job.totalBlocks.toDouble())
+                val remainingBlocks = (job.totalBlocks - job.processedBlocks).coerceAtLeast(0L)
+                val rate = if (elapsedSeconds <= 0.0) 0.0 else job.processedBlocks.toDouble() / elapsedSeconds
+                val remainingSeconds = if (rate <= 0.0) estimateCleanupSeconds(remainingBlocks) else remainingBlocks.toDouble() / rate
+                plugin.logger.info(
+                    "[Arena] クリーンアップ進捗: world=${job.worldName} progress=${formatPercent(progress)}% " +
+                        "processed=${job.processedBlocks}/${job.totalBlocks} elapsed=${formatSeconds(elapsedSeconds)}s " +
+                        "remaining=${formatSeconds(remainingSeconds)}s"
+                )
+                job.lastProgressLogAtMillis = now
+            }
+        }
+    }
+
+    private fun advanceCleanupCursor(volume: ArenaWorldCleanupVolume): Boolean {
+        if (volume.z < volume.bounds.maxZ) {
+            volume.z += 1
+            return true
+        }
+        volume.z = volume.bounds.minZ
+        if (volume.y < volume.bounds.maxY) {
+            volume.y += 1
+            return true
+        }
+        volume.y = volume.bounds.minY
+        if (volume.x < volume.bounds.maxX) {
+            volume.x += 1
+            return true
+        }
+        return false
     }
 
     private fun reconcileActiveMobs() {
