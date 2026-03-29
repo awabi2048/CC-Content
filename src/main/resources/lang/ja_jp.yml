@@ -993,6 +993,15 @@ arena:
       skeleton_curve_shot: '曲射スケルトン'
       skeleton_shield_only: '盾スケルトン'
       skeleton_boomerang: '骨投擲スケルトン'
+  theme:
+    ruins:
+      name: '遺跡'
+    desert_temple:
+      name: '砂漠の寺院'
+    ocean_monument:
+      name: '海底神殿'
+    natura:
+      name: '繁茂した洞窟'
   marker:
     current_mode: '&f§l| §7現在のモード §a{mode}'
     mode_changed: '&7設置モードを §a{mode} §7に変更しました。'

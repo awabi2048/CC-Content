@@ -363,6 +363,15 @@ custom_items:
         skeleton_curve_shot: "Curved Shot Skeleton"
         skeleton_shield_only: "Shield Skeleton"
         skeleton_boomerang: "Boomerang Skeleton"
+    theme:
+      ruins:
+        name: "Ruins"
+      desert_temple:
+        name: "Desert Temple"
+      ocean_monument:
+        name: "Ocean Monument"
+      natura:
+        name: "Lush Cave"
     marker:
       current_mode: '&f§l| §7Current Mode §a{mode}'
       mode_changed: '&7Placement mode changed to §a{mode}§7.'
