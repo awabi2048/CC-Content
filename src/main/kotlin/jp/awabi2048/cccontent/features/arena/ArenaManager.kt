@@ -15,6 +15,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerat
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
 import jp.awabi2048.cccontent.mob.MobDefinition
+import jp.awabi2048.cccontent.mob.MobSpawnCondition
 import jp.awabi2048.cccontent.mob.MobService
 import jp.awabi2048.cccontent.mob.MobSpawnOptions
 import jp.awabi2048.cccontent.mob.ability.PeriodicCobwebAbility
@@ -2703,7 +2704,8 @@ class ArenaManager(
 
             val world = Bukkit.getWorld(currentSession.worldName) ?: return@Runnable
             val spawnPoint = selectSpawnPoint(spawns) ?: return@Runnable
-            val weightedMob = selectWeightedMob(selectSpawnCandidates(theme, wave)) ?: return@Runnable
+            val candidates = filterSpawnCandidatesByLocation(selectSpawnCandidates(theme, wave), spawnPoint)
+            val weightedMob = selectWeightedMob(candidates) ?: return@Runnable
             val definition = mobDefinitions[weightedMob.mobId] ?: return@Runnable
 
             spawnMob(world, currentSession, wave, spawnPoint, definition, difficulty)
@@ -2999,6 +3001,42 @@ class ArenaManager(
         return theme.mobSpawnConfig
             .candidatesForWave(wave)
             .filter { mobDefinitions.containsKey(it.mobId) }
+    }
+
+    private fun filterSpawnCandidatesByLocation(
+        candidates: List<ArenaThemeWeightedMobEntry>,
+        spawnPoint: Location
+    ): List<ArenaThemeWeightedMobEntry> {
+        return candidates.filter { entry ->
+            val definition = mobDefinitions[entry.mobId] ?: return@filter false
+            canSpawnAt(definition, spawnPoint)
+        }
+    }
+
+    private fun canSpawnAt(definition: MobDefinition, spawnPoint: Location): Boolean {
+        if (definition.spawnConditions.isEmpty()) {
+            return true
+        }
+        return definition.spawnConditions.all { condition ->
+            when (condition) {
+                MobSpawnCondition.WATER_ONLY -> isWaterSpawnPoint(spawnPoint)
+            }
+        }
+    }
+
+    private fun isWaterSpawnPoint(spawnPoint: Location): Boolean {
+        val block = spawnPoint.block
+        if (block.type == Material.WATER || block.isLiquid) {
+            return true
+        }
+
+        val feetBlock = spawnPoint.clone().add(0.0, 0.5, 0.0).block
+        if (feetBlock.type == Material.WATER || feetBlock.isLiquid) {
+            return true
+        }
+
+        val headBlock = spawnPoint.clone().add(0.0, 1.0, 0.0).block
+        return headBlock.type == Material.WATER || headBlock.isLiquid
     }
 
     private fun selectWeightedMob(candidates: List<ArenaThemeWeightedMobEntry>): ArenaThemeWeightedMobEntry? {
@@ -3739,7 +3777,8 @@ class ArenaManager(
         if (random.nextDouble() > intervalChance) return
 
         val spawnPoint = selectSpawnPoint(spawnPoints) ?: return
-        val weightedMob = selectWeightedMob(selectSpawnCandidates(theme, session.waves)) ?: return
+        val candidates = filterSpawnCandidatesByLocation(selectSpawnCandidates(theme, session.waves), spawnPoint)
+        val weightedMob = selectWeightedMob(candidates) ?: return
         val definition = mobDefinitions[weightedMob.mobId] ?: return
 
         val entity = mobService.spawn(

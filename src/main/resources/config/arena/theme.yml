@@ -184,6 +184,18 @@ ocean_monument:
     husk_weakening_aura:
       weight: 6
       wave: 3..
+    guardian_normal:
+      weight: 8
+      wave: 2..
+    guardian_small:
+      weight: 6
+      wave: 2..
+    guardian_drain:
+      weight: 5
+      wave: 3..
+    guardian_beam_burst:
+      weight: 3
+      wave: 4..
     skeleton_normal:
       weight: 8
       wave: 1..
