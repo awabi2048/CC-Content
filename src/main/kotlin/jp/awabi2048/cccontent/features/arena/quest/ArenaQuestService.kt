@@ -77,6 +77,22 @@ class ArenaQuestService(
         return openMenu(player, currentDateKey())
     }
 
+    fun recordMobKill(playerId: UUID, amount: Int = 1) {
+        if (amount <= 0) return
+        val playerData = getPlayerData(playerId)
+        playerData.addMobKillCount(amount)
+        savePlayerData(playerId)
+    }
+
+    fun recordBarrierRestart(playerIds: Collection<UUID>, amount: Int = 1) {
+        if (amount <= 0) return
+        playerIds.forEach { playerId ->
+            val playerData = getPlayerData(playerId)
+            playerData.addBarrierRestartCount(amount)
+            savePlayerData(playerId)
+        }
+    }
+
     private fun openMenu(player: Player, dateKey: String): Boolean {
         return try {
             val questSet = ensureQuestSet(dateKey)
@@ -89,7 +105,7 @@ class ArenaQuestService(
         } catch (e: Exception) {
             plugin.logger.warning("[Arena] アリーナメニューの表示に失敗しました: date=$dateKey message=${e.message}")
             e.printStackTrace()
-            player.sendMessage("§cアリーナメニューを開けませんでした: ${e.message ?: "unknown"}")
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed_detail", "§cアリーナメニューを開けませんでした: {message}", "message" to (e.message ?: "unknown")))
             false
         }
     }
@@ -105,7 +121,7 @@ class ArenaQuestService(
 
         val questIndex = ArenaQuestLayout.questIndexForSlot(rawSlot) ?: return true
         val questSet = getQuestSet(holder.dateKey) ?: run {
-            player.sendMessage("§cアリーナクエストを開けませんでした")
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed", "§cアリーナクエストを開けませんでした"))
             return true
         }
         val quest = questSet.quests.getOrNull(questIndex) ?: return true
@@ -113,12 +129,12 @@ class ArenaQuestService(
         playUiClick(player)
 
         if (isQuestCompleted(player.uniqueId, holder.dateKey, quest.index)) {
-            player.sendMessage("§eこのクエストはすでに完了済みです")
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.quest.already_completed", "§eこのクエストはすでに完了済みです"))
             return true
         }
 
         if (!openConfirmMenu(player, holder.dateKey, quest.index)) {
-            player.sendMessage("§cアリーナクエストを開けませんでした")
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed", "§cアリーナクエストを開けませんでした"))
         }
         return true
     }
@@ -137,7 +153,7 @@ class ArenaQuestService(
             ArenaQuestLayout.CONFIRM_CANCEL_SLOT -> {
                 playUiClick(player)
                 if (!openMenu(player, holder.dateKey)) {
-                    player.sendMessage("§cアリーナメニューを開けませんでした")
+                    player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed", "§cアリーナメニューを開けませんでした"))
                 }
                 true
             }
@@ -185,23 +201,23 @@ class ArenaQuestService(
 
     private fun startQuest(player: Player, dateKey: String, questIndex: Int) {
         val questSet = getQuestSet(dateKey) ?: run {
-            player.sendMessage("§cアリーナクエストが見つかりません")
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.quest.not_found", "§cアリーナクエストが見つかりません"))
             return
         }
         val quest = questSet.quests.getOrNull(questIndex) ?: run {
-            player.sendMessage("§cアリーナクエストが見つかりません")
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.quest.not_found", "§cアリーナクエストが見つかりません"))
             return
         }
 
         if (isQuestCompleted(player.uniqueId, dateKey, quest.index)) {
-            player.sendMessage("§eこのクエストはすでに完了済みです")
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.quest.already_completed", "§eこのクエストはすでに完了済みです"))
             return
         }
 
         val requestEvent = ArenaQuestStartRequestEvent(player, dateKey, quest)
         Bukkit.getPluginManager().callEvent(requestEvent)
         if (requestEvent.isCancelled) {
-            player.sendMessage("§cクエスト開始はキャンセルされました")
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.quest.start_cancelled", "§cクエスト開始はキャンセルされました"))
             return
         }
 
@@ -219,8 +235,8 @@ class ArenaQuestService(
                 return@Runnable
             }
 
-            val inviteQuestTitle = "${missionDisplayName(quest.missionTypeId)} ＠${themeDisplayName(player, quest.themeId)}"
-            val inviteQuestLore = buildQuestLore(quest)
+            val inviteQuestTitle = "${missionDisplayName(quest.missionTypeId)}＠${themeDisplayName(player, quest.themeId)}"
+            val inviteQuestLore = buildQuestConfirmLore(player, quest)
 
             when (val result = arenaManager.startSession(
                 player,
@@ -237,7 +253,7 @@ class ArenaQuestService(
                 }
                 is ArenaStartResult.Error -> {
                     if (result.messageKey == "arena.messages.command.start_error.stage_build_failed") {
-                        player.sendMessage("§cステージの生成に失敗しました。スタッフに報告してください。(STRUCTURE_ERROR)")
+                        player.sendMessage(ArenaI18n.text(player, "arena.messages.quest.stage_build_failed_internal", "§cステージの生成に失敗しました。スタッフに報告してください。(STRUCTURE_ERROR)"))
                     } else {
                         player.sendMessage(
                             ArenaI18n.text(
@@ -372,12 +388,11 @@ class ArenaQuestService(
 
     private fun generateQuestSet(dateKey: String): ArenaDailyQuestSet {
         val themeIds = arenaManager.getThemeIds().map { it.trim() }.filter { it.isNotBlank() }.sorted()
-        val missionTypes = ArenaQuestMissionType.entries
         val random = Random(dateKey.toEpochSeed())
 
         val quests = (0 until generateCount).map { index ->
             val themeId = themeIds.random(random)
-            val missionType = missionTypes.random(random)
+            val missionType = ArenaQuestMissionType.BARRIER_RESTART
             val difficulty = difficultyDefinitions.random(random)
             val score = randomDifficultyScore(difficulty, random)
             val resolvedDifficultyId = resolveDifficultyId(score) ?: difficulty.id
@@ -578,9 +593,9 @@ class ArenaQuestService(
 
     private fun renderConfirmMenu(player: Player, inventory: Inventory, quest: ArenaDailyQuestEntry) {
         fillConfirmBackground(inventory)
-        inventory.setItem(ArenaQuestLayout.CONFIRM_OK_SLOT, createActionItem(Material.LIME_WOOL, "§aOK", listOf("§7このクエストを開始します")))
+        inventory.setItem(ArenaQuestLayout.CONFIRM_OK_SLOT, createActionItem(Material.LIME_WOOL, ArenaI18n.text(player, "arena.ui.confirm.ok_name", "§aOK"), ArenaI18n.stringList(player, "arena.ui.confirm.ok_lore", listOf("§7このクエストを開始します"))))
         inventory.setItem(ArenaQuestLayout.CONFIRM_QUEST_SLOT, createQuestSummaryItem(player, quest))
-        inventory.setItem(ArenaQuestLayout.CONFIRM_CANCEL_SLOT, createActionItem(Material.RED_WOOL, "§cキャンセル", listOf("§7クエスト開始を取り消します")))
+        inventory.setItem(ArenaQuestLayout.CONFIRM_CANCEL_SLOT, createActionItem(Material.RED_WOOL, ArenaI18n.text(player, "arena.ui.confirm.cancel_name", "§cキャンセル"), ArenaI18n.stringList(player, "arena.ui.confirm.cancel_lore", listOf("§7クエスト開始を取り消します"))))
     }
 
     private fun openConfirmMenu(player: Player, dateKey: String, questIndex: Int): Boolean {
@@ -640,10 +655,16 @@ class ArenaQuestService(
     }
 
     private fun createQuestItem(player: Player, quest: ArenaDailyQuestEntry, isCompleted: Boolean): ItemStack {
-        val item = ItemStack(Material.ROTTEN_FLESH)
+        val item = ItemStack(themeIconMaterial(quest.themeId))
         val meta = item.itemMeta ?: return item
-        val title = "${missionDisplayName(quest.missionTypeId)} ＠${themeDisplayName(player, quest.themeId)}"
-        meta.setDisplayName(if (isCompleted) "§a§m$title" else "§a$title")
+        val title = "${missionDisplayName(quest.missionTypeId)}＠${themeDisplayName(player, quest.themeId)}"
+        meta.setDisplayName(
+            if (isCompleted) {
+                ArenaI18n.text(player, "arena.ui.quest.completed_item_name", "§a§m{quest}", "quest" to title)
+            } else {
+                ArenaI18n.text(player, "arena.ui.quest.item_name", "§a{quest}", "quest" to title)
+            }
+        )
         meta.lore = buildQuestLore(quest)
         item.itemMeta = meta
         return item
@@ -651,21 +672,27 @@ class ArenaQuestService(
 
     private fun createQuestSummaryItem(player: Player, quest: ArenaDailyQuestEntry): ItemStack {
         return createActionItem(
-            Material.ROTTEN_FLESH,
-            "§a${missionDisplayName(quest.missionTypeId)} ＠${themeDisplayName(player, quest.themeId)}",
-            buildQuestLore(quest)
+            themeIconMaterial(quest.themeId),
+            ArenaI18n.text(player, "arena.ui.quest.item_name", "§a{quest}", "quest" to "${missionDisplayName(quest.missionTypeId)}＠${themeDisplayName(player, quest.themeId)}"),
+            buildQuestConfirmLore(player, quest)
         )
+    }
+
+    private fun themeIconMaterial(themeId: String): Material {
+        return arenaManager.getTheme(themeId)?.iconMaterial ?: Material.ROTTEN_FLESH
     }
 
     private fun createPlayerHead(player: Player, playerData: ArenaPlayerQuestData): ItemStack {
         val item = ItemStack(Material.PLAYER_HEAD)
         val meta = item.itemMeta as? SkullMeta ?: return item
         meta.owningPlayer = player
-        meta.setDisplayName("§6${player.name}")
+        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.player.name_format", "§6{player}", "player" to player.name))
         meta.lore = listOf(
-            "§8§m――――――――――――――――――――",
-            "§f| §7累計クエストクリア §e${playerData.totalClearCount}回",
-            "§8§m――――――――――――――――――――"
+            ArenaI18n.text(player, "arena.ui.separator", "§8§m――――――――――――――――――――"),
+            ArenaI18n.text(player, "arena.ui.player.mob_kills", "§f❙ §7倒したモブ §e{count} 体", "count" to playerData.totalMobKillCount),
+            ArenaI18n.text(player, "arena.ui.separator", "§8§m――――――――――――――――――――"),
+            ArenaI18n.text(player, "arena.ui.player.barrier_restarts", "§f❙ §7結界石を再起動した回数 §e{count} 回", "count" to playerData.barrierRestartCount),
+            ArenaI18n.text(player, "arena.ui.separator", "§8§m――――――――――――――――――――")
         )
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
         item.itemMeta = meta
@@ -675,40 +702,65 @@ class ArenaQuestService(
     private fun createInfoItem(): ItemStack {
         return createActionItem(
             Material.BOOK,
-            "§bInfo",
-            listOf(
-                "§7ここにはダミー説明を表示します",
-                "§7アリーナクエストの一覧を確認できます",
-                "§7更新は /ccc update_day で実行します"
-            )
+            ArenaI18n.text(null, "arena.ui.info_title", "§bInfo"),
+            buildInfoLore()
         )
     }
 
     private fun createRefreshItem(): ItemStack {
         return createActionItem(
-            Material.CLOCK,
-            "§a§l再生成",
-            listOf("§7モック実装です", "§7現在は何もしません")
+            Material.BEDROCK,
+            ArenaI18n.text(null, "arena.ui.coming_soon", "§7Coming Soon!"),
+            emptyList()
         )
     }
 
     private fun buildQuestLore(quest: ArenaDailyQuestEntry): List<String> {
-        val mission = ArenaQuestMissionType.fromId(quest.missionTypeId)
-            ?: ArenaQuestMissionType.SWEEP
-        val strategyMemo = "§eおねがいします！"
+        val mission = ArenaQuestMissionType.fromId(quest.missionTypeId) ?: ArenaQuestMissionType.BARRIER_RESTART
         val lore = mutableListOf<String>()
-        lore += "§8§m――――――――――――――――――――"
-        lore += "§f§l❙ §7ミッション内容"
-        lore += mission.missionGuideHints
-        lore += "§f§l❙ §7難易度§r ${difficultyDisplay(quest.difficultyId)}"
-        lore += "§8§m――――――――――――――――――――"
-        lore += "§f§l❙ §7メモ§r $strategyMemo"
-        lore += "§8§m――――――――――――――――――――"
+        lore += ArenaI18n.text(null, "arena.ui.separator", "§8§m――――――――――――――――――――")
+        lore += ArenaI18n.text(null, "arena.ui.quest.mission_title", "§f❙ §7ミッション内容")
+        lore += missionGuideHints(mission)
+        lore += ""
+        lore += ArenaI18n.text(null, "arena.ui.quest.difficulty_title", "§f❙ §7難易度")
+        lore += ArenaI18n.text(null, "arena.ui.quest.difficulty_value", "§7{difficulty}", "difficulty" to difficultyDisplay(quest.difficultyId))
+        lore += ArenaI18n.text(null, "arena.ui.separator", "§8§m――――――――――――――――――――")
         return lore
+    }
+
+    private fun buildQuestConfirmLore(player: Player, quest: ArenaDailyQuestEntry): List<String> {
+        val mission = ArenaQuestMissionType.fromId(quest.missionTypeId) ?: ArenaQuestMissionType.BARRIER_RESTART
+        val memo = randomQuestMemo(player)
+        val lore = mutableListOf<String>()
+        lore += ArenaI18n.text(player, "arena.ui.separator", "§8§m――――――――――――――――――――")
+        lore += ArenaI18n.text(player, "arena.ui.quest.mission_title", "§f❙ §7ミッション内容")
+        lore += missionGuideHints(mission, player)
+        lore += ""
+        lore += ArenaI18n.text(player, "arena.ui.quest.difficulty_title", "§f❙ §7難易度")
+        lore += ArenaI18n.text(player, "arena.ui.quest.difficulty_value", "§7{difficulty}", "difficulty" to difficultyDisplay(quest.difficultyId))
+        lore += ArenaI18n.text(player, "arena.ui.separator", "§8§m――――――――――――――――――――")
+        lore += ArenaI18n.text(player, "arena.ui.quest.memo_title", "§f❙ §7メモ")
+        lore += memo
+        lore += ArenaI18n.text(player, "arena.ui.separator", "§8§m――――――――――――――――――――")
+        return lore
+    }
+
+    private fun buildInfoLore(): List<String> {
+        val lines = ArenaI18n.stringList(null, "arena.ui.info.lines", listOf("§71日1回、§e24時§7にクエストが更新されます"))
+        return listOf(
+            ArenaI18n.text(null, "arena.ui.separator", "§8§m――――――――――――――――――――"),
+            *lines.toTypedArray(),
+            ArenaI18n.text(null, "arena.ui.separator", "§8§m――――――――――――――――――――")
+        )
     }
 
     private fun playUiClick(player: Player) {
         player.playSound(player.location, "minecraft:ui.button.click", 0.8f, 2.0f)
+    }
+
+    private fun randomQuestMemo(player: Player): String {
+        val memos = ArenaI18n.stringList(player, "arena.quest.memo_choices", listOf("§eがんばってください！"))
+        return memos.randomOrNull() ?: "§eがんばってください！"
     }
 
     private fun difficultyDisplay(difficultyId: String): String {
@@ -716,7 +768,12 @@ class ArenaQuestService(
     }
 
     private fun missionDisplayName(missionTypeId: String): String {
-        return ArenaQuestMissionType.fromId(missionTypeId)?.displayName ?: missionTypeId
+        val mission = ArenaQuestMissionType.fromId(missionTypeId) ?: return missionTypeId
+        return ArenaI18n.text(null, mission.displayNameKey, mission.id)
+    }
+
+    private fun missionGuideHints(mission: ArenaQuestMissionType, player: Player? = null): List<String> {
+        return ArenaI18n.stringList(player, mission.missionGuideHintsKey, listOf("§7${mission.id}"))
     }
 
     private fun themeDisplayName(player: Player, themeId: String): String {
@@ -745,6 +802,8 @@ class ArenaQuestService(
         val file = File(playerDir, "$playerId.yml")
         val config = YamlConfiguration()
         config.set("arena.total_clear_count", data.totalClearCount)
+        config.set("arena.total_mob_kill_count", data.totalMobKillCount)
+        config.set("arena.barrier_restart_count", data.barrierRestartCount)
         val completedSection = linkedMapOf<String, List<Int>>()
         data.completedByDate.toSortedMap().forEach { (dateKey, indices) ->
             completedSection[dateKey] = indices.toList().sorted()
@@ -756,6 +815,8 @@ class ArenaQuestService(
     private fun loadPlayerData(file: File): ArenaPlayerQuestData {
         val config = YamlConfiguration.loadConfiguration(file)
         val totalClearCount = config.getInt("arena.total_clear_count", 0).coerceAtLeast(0)
+        val totalMobKillCount = config.getInt("arena.total_mob_kill_count", 0).coerceAtLeast(0)
+        val barrierRestartCount = config.getInt("arena.barrier_restart_count", 0).coerceAtLeast(0)
         val completedByDate = mutableMapOf<String, MutableSet<Int>>()
         val rawCompleted = config.getConfigurationSection("arena.completed")
         rawCompleted?.getKeys(false)?.forEach { dateKey ->
@@ -765,6 +826,8 @@ class ArenaQuestService(
 
         return ArenaPlayerQuestData(
             totalClearCount = totalClearCount,
+            totalMobKillCount = totalMobKillCount,
+            barrierRestartCount = barrierRestartCount,
             completedByDate = completedByDate
         )
     }

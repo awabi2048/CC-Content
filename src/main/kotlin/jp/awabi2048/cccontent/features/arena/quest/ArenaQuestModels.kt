@@ -4,6 +4,7 @@ import org.bukkit.Bukkit
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import java.util.UUID
+import jp.awabi2048.cccontent.features.arena.ArenaI18n
 
 data class ArenaDailyQuestEntry(
     val index: Int,
@@ -22,6 +23,8 @@ data class ArenaDailyQuestSet(
 
 data class ArenaPlayerQuestData(
     var totalClearCount: Int = 0,
+    var totalMobKillCount: Int = 0,
+    var barrierRestartCount: Int = 0,
     val completedByDate: MutableMap<String, MutableSet<Int>> = mutableMapOf()
 ) {
     fun isCompleted(dateKey: String, questIndex: Int): Boolean {
@@ -36,6 +39,16 @@ data class ArenaPlayerQuestData(
         totalClearCount += 1
         return true
     }
+
+    fun addMobKillCount(amount: Int = 1) {
+        if (amount <= 0) return
+        totalMobKillCount += amount
+    }
+
+    fun addBarrierRestartCount(amount: Int = 1) {
+        if (amount <= 0) return
+        barrierRestartCount += amount
+    }
 }
 
 data class ArenaDifficultyDefinition(
@@ -46,28 +59,28 @@ data class ArenaDifficultyDefinition(
 
 enum class ArenaQuestMissionType(
     val id: String,
-    val displayName: String,
-    val missionGuideHints: List<String>
+    val displayNameKey: String,
+    val missionGuideHintsKey: String
 ) {
     BARRIER_RESTART(
         id = "barrier_restart",
-        displayName = "結界石の再起動",
-        missionGuideHints = listOf("§7結界石を再起動しに行こう（仮）")
+        displayNameKey = "arena.quest.mission.barrier_restart.name",
+        missionGuideHintsKey = "arena.quest.mission.barrier_restart.hints"
     ),
     BARRIER_DEPLOY(
         id = "barrier_deploy",
-        displayName = "結界石の展開",
-        missionGuideHints = listOf("§7結界石を展開して安全を確保しよう（仮）")
+        displayNameKey = "arena.quest.mission.barrier_deploy.name",
+        missionGuideHintsKey = "arena.quest.mission.barrier_deploy.hints"
     ),
     SWEEP(
         id = "sweep",
-        displayName = "掃討",
-        missionGuideHints = listOf("§7たくさん湧いているので倒そう（仮）")
+        displayNameKey = "arena.quest.mission.sweep.name",
+        missionGuideHintsKey = "arena.quest.mission.sweep.hints"
     ),
     BOSS(
         id = "boss",
-        displayName = "ボス",
-        missionGuideHints = listOf("§7ボスがいて困るので倒そう（仮）")
+        displayNameKey = "arena.quest.mission.boss.name",
+        missionGuideHintsKey = "arena.quest.mission.boss.hints"
     );
 
     companion object {
@@ -109,8 +122,11 @@ object ArenaQuestLayout {
     const val MENU_SIZE = 54
     const val CONFIRM_SIZE = 45
 
-    const val MENU_TITLE = "§0§lアリーナメニュー"
-    const val CONFIRM_TITLE = "§0§lアリーナ確認"
+    val MENU_TITLE: String
+        get() = ArenaI18n.text(null, "arena.ui.menu_title", "§8アリーナ掲示板")
+
+    val CONFIRM_TITLE: String
+        get() = ArenaI18n.text(null, "arena.ui.confirm_title", "§8参加確認")
 
     val MENU_QUEST_SLOTS = listOf(19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34)
     const val MENU_PLAYER_SLOT = 47

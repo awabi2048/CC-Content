@@ -19,6 +19,10 @@ object ArenaI18n {
         cache.clear()
     }
 
+    fun clearCache() {
+        cache.clear()
+    }
+
     fun text(sender: CommandSender?, key: String, fallback: String, vararg placeholders: Pair<String, Any?>): String {
         return text(sender as? Player, key, fallback, *placeholders)
     }
@@ -32,6 +36,24 @@ object ArenaI18n {
             value = value.replace("{$placeholderKey}", placeholderValue?.toString() ?: "null")
         }
         return value.replace('&', '§')
+    }
+
+    fun stringList(player: Player?, key: String, fallback: List<String>, vararg placeholders: Pair<String, Any?>): List<String> {
+        val locale = resolveLocale(player)
+        val primary = getConfig(locale)?.getStringList(key).orEmpty()
+        val fallbackValue = if (locale != DEFAULT_LOCALE) getConfig(DEFAULT_LOCALE)?.getStringList(key).orEmpty() else emptyList()
+        val values = when {
+            primary.isNotEmpty() -> primary
+            fallbackValue.isNotEmpty() -> fallbackValue
+            else -> fallback
+        }
+        return values.map { line ->
+            var value = line
+            for ((placeholderKey, placeholderValue) in placeholders) {
+                value = value.replace("{$placeholderKey}", placeholderValue?.toString() ?: "null")
+            }
+            value.replace('&', '§')
+        }
     }
 
     private fun resolveLocale(player: Player?): String {

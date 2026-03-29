@@ -961,141 +961,266 @@ custom_items:
         - '§7最大3種類のアイテムを大量に格納できます。'
         - '§7手に持って§eShiftを2回§7でメニューを開きます。'
         - '§7§eShift+スクロール§7で使用対象を切り替えます。'
-  arena:
-    ticket:
-      name: '§6アリーナチケット'
-      lore:
-        - '§7アリーナへの参加チケット'
-    medal:
-      name: '§6アリーナメダル'
-      lore:
-        - '§7アリーナでの戦いの証'
-    prize:
-      name: '§6アリーナ報酬箱'
-      lore:
-        - '§7アリーナでの勝利報酬'
-    mob_token:
-      display_format: '§6{mob}の頭'
-      lore:
-        - '§7アリーナに出現するモンスターのヘッド'
-        - '§7アリーナロビーで報酬と交換しよう！'
-      mob_names:
-        zombie: 'ゾンビ'
-        skeleton: 'スケルトン'
-        zombie_leap_only: '跳躍ゾンビ'
-        zombie_bow_only: '弓ゾンビ'
-        zombie_bow_swap: '換装ゾンビ'
-        zombie_shield_only: '盾ゾンビ'
-        spark_zombie: 'スパークゾンビ'
-        skeleton_fast_arrow: '高速矢スケルトン'
-        skeleton_rapid_shot: '速射スケルトン'
-        skeleton_effect_arrow: '効果矢スケルトン'
-        skeleton_curve_shot: '曲射スケルトン'
-        skeleton_shield_only: '盾スケルトン'
-        skeleton_boomerang: '骨投擲スケルトン'
-    marker:
-      current_mode: '&f§l| §7現在のモード §a{mode}'
-      mode_changed: '&7設置モードを §a{mode} §7に変更しました。'
-      placed: '&b[Marker] {mode} §fマーカーを設置しました。'
-      removed: '&b[Marker] {mode} §fマーカーを削除しました。'
+arena:
+  ticket:
+    name: '§6アリーナチケット'
+    lore:
+      - '§7アリーナへの参加チケット'
+  medal:
+    name: '§6アリーナメダル'
+    lore:
+      - '§7アリーナでの戦いの証'
+  prize:
+    name: '§6アリーナ報酬箱'
+    lore:
+      - '§7アリーナでの勝利報酬'
+  mob_token:
+    display_format: '§6{mob}の頭'
+    lore:
+      - '§7アリーナに出現するモンスターのヘッド'
+      - '§7アリーナロビーで報酬と交換しよう！'
+    mob_names:
+      zombie: 'ゾンビ'
+      skeleton: 'スケルトン'
+      zombie_leap_only: '跳躍ゾンビ'
+      zombie_bow_only: '弓ゾンビ'
+      zombie_bow_swap: '換装ゾンビ'
+      zombie_shield_only: '盾ゾンビ'
+      spark_zombie: 'スパークゾンビ'
+      skeleton_fast_arrow: '高速矢スケルトン'
+      skeleton_rapid_shot: '速射スケルトン'
+      skeleton_effect_arrow: '効果矢スケルトン'
+      skeleton_curve_shot: '曲射スケルトン'
+      skeleton_shield_only: '盾スケルトン'
+      skeleton_boomerang: '骨投擲スケルトン'
+  marker:
+    current_mode: '&f§l| §7現在のモード §a{mode}'
+    mode_changed: '&7設置モードを §a{mode} §7に変更しました。'
+    placed: '&b[Marker] {mode} §fマーカーを設置しました。'
+    removed: '&b[Marker] {mode} §fマーカーを削除しました。'
+    usage:
+      place: '&e右クリック(ブロック)§7 クリック面の外側にマーカーを設置'
+      delete: '&eShift + 右クリック§7 視線上のマーカーを削除'
+      switch: '&eFキー§7 次のモードへ変更'
+    modes:
+      mob: '&cモブ'
+      entrance: '&a入口'
+      join_area: '&f参加エリア'
+      lobby: '&bロビー'
+      connection: '&6接続部'
+      door_block: '&e扉'
+      barrier_core: '&b結界核'
+      barrier_point: '&3結界起動点'
+  messages:
+    command:
+      no_permission: '&c権限がありません'
+      target_not_found: '&c対象プレイヤーが見つかりません'
+      feature_unavailable: '&cArena feature は初期化に失敗したため利用できません'
+      feature_unavailable_reason: '&7理由: {reason}'
+      player_only: '&cこのコマンドはプレイヤーのみ実行できます'
+      menu_open_failed: '&cアリーナメニューを開けませんでした'
+      menu_open_failed_detail: '&cアリーナメニューを開けませんでした: {message}'
+      start_success: '&a{player} のアリーナを開始しました (mob_type={mob_type}, difficulty={difficulty}, theme={theme}, waves={waves})'
+      stop_success: '&a{player} のアリーナを停止しました'
+      stop_not_in_session: '&e{player} はアリーナセッションに参加していません'
+      theme_none: '&e利用可能なテーマがありません'
+      theme_list: '&6[Arena] 利用可能テーマ: {themes}'
       usage:
-        place: '&e右クリック(ブロック)§7 クリック面の外側にマーカーを設置'
-        delete: '&eShift + 右クリック§7 視線上のマーカーを削除'
-        switch: '&eFキー§7 次のモードへ変更'
-      modes:
-        mob: '&cモブ'
-        entrance: '&a入口'
-        join_area: '&f参加エリア'
-        lobby: '&bロビー'
-        connection: '&6接続部'
-        door_block: '&e扉'
-        barrier_core: '&b結界核'
-        barrier_point: '&3結界起動点'
-    messages:
-      command:
-        no_permission: '&c権限がありません'
-        target_not_found: '&c対象プレイヤーが見つかりません'
-        start_success: '&a{player} のアリーナを開始しました (mob_type={mob_type}, difficulty={difficulty}, theme={theme}, waves={waves})'
-        stop_success: '&a{player} のアリーナを停止しました'
-        stop_not_in_session: '&e{player} はアリーナセッションに参加していません'
-        theme_none: '&e利用可能なテーマがありません'
-        theme_list: '&6[Arena] 利用可能テーマ: {themes}'
-        usage:
-          start: '&c使用法: /arenaa start <player|@s> <mob_type> <difficulty> [theme]'
-          stop: '&c使用法: /arenaa stop <player>'
-          theme: '&c使用法: /arenaa theme list'
-        help:
-          header: '&6=== Arena 管理コマンド ==='
-          start: '&f/arenaa start <player|@s> <mob_type> <difficulty> [theme]'
-          stop: '&f/arenaa stop <player>'
-          theme: '&f/arenaa theme list'
-        start_error:
-          already_in_session: '&c{player} はすでにアリーナセッション中です'
-          mob_type_not_found: '&cmob_type が見つかりません: {mob_type}'
-          difficulty_not_found: '&cdifficulty が見つかりません: {difficulty}'
-          undefined_wave_spawn: '&cmob_type ''{mob_type}'' は wave {wave} のスポーンが未定義です'
-          theme_not_found: '&c有効なテーマが見つかりません'
-          world_create_failed: '&cアリーナ用ワールド作成に失敗しました'
-          stage_build_failed: '&c{message}'
-          join_area_not_found: '&c開始待機エリアの参加マーカーが近くに存在しないため開始できません'
-          lobby_marker_not_found: '&cロビーマーカーが見つからないため開始できません'
-      multiplayer:
-        invite_window_started: '&7アリーナセッションを開始します…\n左クリックで他のプレイヤーを招待できます。招待メンバーはリフトで待機すると、一緒に入場できます'
-        wait_area_hint: '&7招待したプレイヤーと開始待機エリアに入ると待機状態になります'
-        waiting_entered: '&a開始待機エリアに入りました。猶予終了まで待機してください'
-        waiting_exited: '§cリフトから降りました。参加する場合は乗って待機してください！'
-        invite_sent: '&a{player} に招待を送信しました'
-        invited: '&6{owner} からアリーナ招待が届きました。開始待機エリアに入ってください'
-        invited_decline_hint: '&7辞退する場合は、招待者を左クリックしてください'
-        already_invited: '&e{player} はすでに招待済みです'
-        invite_window_closed: '&c募集時間は終了しました'
-        invite_failed_world: '&c同じワールド内のプレイヤーのみ招待できます'
-        invite_failed_in_session: '&c{player} はすでに別のアリーナに参加しています'
-        invite_failed_full: '&cこのクエストの最大参加人数に達しているため招待できません'
-        invite_failed_already_locked: '&c{player} はすでに他の招待を受けています'
-        declined_self: '&e招待を辞退しました'
-        declined_notify_owner: '&e{player} が招待を辞退しました'
-        stage_intro: '&6ステージ転送を開始します...'
-        cancelled_owner_offline: '&cオーナーが不在のためマルチ参加募集を終了しました'
-        cancelled_owner_not_waiting: '&cオーナーが開始待機エリアにいないため開始を中止しました'
-      down:
-        entered: '&cダウンしました。生存者の蘇生を待ってください'
-        recovered: '&a蘇生されました！'
-        revive_success: '&a{player} を蘇生しました'
-        timeout: '&cダウン時間切れです。ロビーへ転送されます'
-        game_over: "&c目の前がまっくらになった...！\n&7おあげちゃんが救出中..."
-      barrier:
-        cannot_break: '&c結界石は破壊できません'
-        cannot_place_on: '&c結界石の上には設置できません'
-        not_ready: '&cまだ結界石を再起動できません。全ウェーブをクリアしてください'
-        activating: '&e結界石を再起動中です'
-        ready_subtitle: '&b結界石を右クリックして再起動'
-        activating_title: '&b結界石を再起動中...'
-        activation_complete_title: '&a再起動完了'
-      session:
-        started: '&6[Arena] セッション開始: theme={theme}, mob_type={mob_type}, difficulty={difficulty}, waves={waves}'
-        retry_hint: '&7管理コマンドで mob_type / difficulty / theme を指定して再挑戦できます'
-        cleared: '&aアリーナクリア！'
-        ended: '&cアリーナセッションが終了しました'
-        ended_by_logout: '&cログアウトしたためアリーナを終了しました'
-        ended_by_death: '&c死亡したためアリーナを終了しました'
-        ended_by_warp: '&cワープしたため死亡扱いでアリーナを終了しました'
-        ended_by_shutdown: '&cサーバー停止によりアリーナを終了しました'
-        stopped_by_admin: '&c管理コマンドによりアリーナを停止しました'
-      stage:
-        already_started: '&eステージはすでに開始しています'
-        start_subtitle: '&6ステージ開始'
-      door:
-        animating: '&e開扉中です'
-        corridor_opened: '&aWave {wave} への通路が解放されました'
-        corridor_opened_subtitle: '&a次の通路が開きました'
-        open_hint: 'Shift長押しで扉を開く'
-      wave:
-        title: '&6Wave {wave}'
-        player_advanced: '§7{player} さんが §6Wave {wave}§7 に突入しました！'
-      mock:
-        door_animation_start: '&7{message}'
-        corridor_door_reinstall: '&7{message}'
+        start: '&c使用法: /arenaa start <player|@s> <mob_type> <difficulty> [theme]'
+        stop: '&c使用法: /arenaa stop <player>'
+        theme: '&c使用法: /arenaa theme list'
+      help:
+        header: '&6=== Arena 管理コマンド ==='
+        start: '&f/arenaa start <player|@s> <mob_type> <difficulty> [theme]'
+        stop: '&f/arenaa stop <player>'
+        theme: '&f/arenaa theme list'
+    menu:
+      open_failed: '&cアリーナクエストを開けませんでした'
+      open_failed_detail: '&cアリーナメニューを開けませんでした: {message}'
+      start_error:
+        already_in_session: '&c{player} はすでにアリーナセッション中です'
+        mob_type_not_found: '&cmob_type が見つかりません: {mob_type}'
+        difficulty_not_found: '&cdifficulty が見つかりません: {difficulty}'
+        undefined_wave_spawn: '&cmob_type ''{mob_type}'' は wave {wave} のスポーンが未定義です'
+        theme_not_found: '&c有効なテーマが見つかりません'
+        world_create_failed: '&cアリーナ用ワールド作成に失敗しました'
+        stage_build_failed: '&c{message}'
+        join_area_not_found: '&c開始待機エリアの参加マーカーが近くに存在しないため開始できません'
+        lobby_marker_not_found: '&cロビーマーカーが見つからないため開始できません'
+    quest:
+      already_completed: '&eこのクエストはすでに完了済みです'
+      not_found: '&cアリーナクエストが見つかりません'
+      start_cancelled: '&cクエスト開始はキャンセルされました'
+      stage_build_failed_internal: '&cステージの生成に失敗しました。スタッフに報告してください。(STRUCTURE_ERROR)'
+    multiplayer:
+      invite_window_started: '&7アリーナセッションを開始します…\n左クリックで他のプレイヤーを招待できます。招待メンバーはリフトで待機すると、一緒に入場できます'
+      wait_area_hint: '&7招待したプレイヤーと開始待機エリアに入ると待機状態になります'
+      waiting_entered: '&a開始待機エリアに入りました。猶予終了まで待機してください'
+      waiting_exited: '§cリフトから降りました。参加する場合は乗って待機してください！'
+      waiting_title: '&7参加待機中'
+      stage_wait_title: '&7アリーナを準備中...'
+      invite_sent: '&a{player} に招待を送信しました'
+      invited: '&6{owner} からアリーナ招待が届きました。開始待機エリアに入ってください'
+      invited_decline_hint: '&7辞退する場合は、招待者を左クリックしてください'
+      already_invited: '&e{player} はすでに招待済みです'
+      invite_window_closed: '&c募集時間は終了しました'
+      invite_failed_world: '&c同じワールド内のプレイヤーのみ招待できます'
+      invite_failed_in_session: '&c{player} はすでに別のアリーナに参加しています'
+      invite_failed_full: '&cこのクエストの最大参加人数に達しているため招待できません'
+      invite_failed_already_locked: '&c{player} はすでに他の招待を受けています'
+      declined_self: '&e招待を辞退しました'
+      declined_notify_owner: '&e{player} が招待を辞退しました'
+      stage_intro: '&6ステージ転送を開始します...'
+      cancelled_owner_offline: '&cオーナーが不在のためマルチ参加募集を終了しました'
+      cancelled_owner_not_waiting: '&cオーナーが開始待機エリアにいないため開始を中止しました'
+      invite_message_simple: '§8§l«§c§lArena§8§l» §7{owner}さんがあなたをアリーナに招待しました！'
+      no_description: '&7説明はありません'
+      invite_message_prefix: '§8§l«§c§lArena§8§l» §7{owner}さんがあなたをクエスト§e'
+      invite_message_quest: '§e【{quest}】'
+      invite_message_suffix: '&7に招待しました！'
+    down:
+      entered: '&cダウンしました。生存者の蘇生を待ってください'
+      recovered: '&a蘇生されました！'
+      revive_success: '&a{player} を蘇生しました'
+      timeout: '&cダウン時間切れです。ロビーへ転送されます'
+      game_over: "&c目の前がまっくらになった...！\n&7おあげちゃんが救出中..."
+      participant_died: '&4{player}さんが死亡しました...'
+      needs_revive: '&c{player}さんがダウンしました！蘇生が必要です！'
+    barrier:
+      cannot_break: '&c結界石は破壊できません'
+      cannot_place_on: '&c結界石の上には設置できません'
+      not_ready: '&cまだ結界石を再起動できません。全ウェーブをクリアしてください'
+      activating: '&e結界石を再起動中です'
+      ready_subtitle: '&b結界石を右クリックして再起動'
+      activating_title: '&b結界石を再起動中...'
+      activation_complete_title: '&a再起動完了'
+      restart_started: '&c結界石の再起動を開始しました！結界を一時的に解除します！'
+      restart_success: '&a結界石の再起動に成功しました！'
+      restart_confirmed: '結界の再起動を確認しました！転送します！'
+    session:
+      starting: '&6[Arena] アリーナを開始します...'
+      started: '&6[Arena] セッション開始: theme={theme}, mob_type={mob_type}, difficulty={difficulty}, waves={waves}'
+      retry_hint: '&7管理コマンドで mob_type / difficulty / theme を指定して再挑戦できます'
+      cleared: '&aアリーナクリア！'
+      ended: '&cアリーナセッションが終了しました'
+      ended_by_logout: '&cログアウトしたためアリーナを終了しました'
+      ended_by_death: '&c死亡したためアリーナを終了しました'
+      ended_by_warp: '&cワープしたため死亡扱いでアリーナを終了しました'
+      ended_by_shutdown: '&cサーバー停止によりアリーナを終了しました'
+      stopped_by_admin: '&c管理コマンドによりアリーナを停止しました'
+    stage:
+      already_started: '&eステージはすでに開始しています'
+      start_subtitle: '&6ステージ開始'
+    door:
+      animating: '&e開扉中です'
+      corridor_opened: '&aWave {wave} への通路が解放されました'
+      corridor_opened_subtitle: '&a次の通路が開きました'
+      open_hint: 'Shift長押しで扉を開く'
+      corridor_opened_notice: '&3次のウェーブへの道が開かれました...'
+    wave:
+      title: '&6Wave {wave}'
+      last_title: '&7- §6Last Wave §7-'
+      player_advanced: '§7{player} さんが §6Wave {wave}§7 に突入しました！'
+    mock:
+      door_animation_start: '&7{message}'
+      corridor_door_reinstall: '&7{message}'
+  ui:
+    menu_title: '§8アリーナ掲示板'
+    confirm_title: '§8参加確認'
+    separator: '§8§m――――――――――――――――――――'
+    coming_soon: '§7Coming Soon!'
+    info_title: '§bInfo'
+    info:
+      lines:
+        - '§71日1回、§e24時§7にクエストが更新されます'
+        - '§7みんなで協力して、おあげちゃんを助けてあげましょう'
+        - '§7クエストを達成するとおあげちゃんから§eご褒美§7が貰えるほか、'
+        - 'アリーナのモンスターは§dレアなアイテム§7を落とすことがあります'
+    confirm:
+      ok_name: '§aOK'
+      ok_lore:
+        - '§7このクエストを開始します'
+      cancel_name: '§cキャンセル'
+      cancel_lore:
+        - '§7クエスト開始を取り消します'
+    quest:
+      item_name: '§a{quest}'
+      completed_item_name: '§a§m{quest}'
+      mission_title: '§f❙ §7ミッション内容'
+      difficulty_title: '§f❙ §7難易度'
+      difficulty_value: '§7{difficulty}'
+      memo_title: '§f❙ §7メモ'
+    player:
+      name_format: '§6{player}'
+      mob_kills: '§f❙ §7倒したモブ §e{count} 体'
+      barrier_restarts: '§f❙ §7結界石を再起動した回数 §e{count} 回'
+    recruitment:
+      default_quest_title: 'アリーナクエスト'
+      title: '§6【{questTitle}】'
+      remaining: '§f開始まで §e{seconds} 秒'
+      waiting_participant: '§b✦ {name}'
+      normal_participant: '§7✧ {name}'
+    sidebar:
+      title: '§7« §cARENA §7»'
+      get_ready: '§7§lGet Ready!'
+      participant_line: '§7◯ §b{name} {status}'
+      last_wave: '§7» §6§lLast Wave §7«'
+      wave: '§7» §6§lWave {wave} §7«'
+      clear: '§dCLEAR'
+      status_down: '§eDOWN'
+      status_alive: '§aALIVE'
+      status_preparing: '§dPREPARING'
+      status_dead: '§cDEAD'
+  bossbar:
+    join_countdown: '§7アリーナを準備中... §8(§b残り {seconds}秒§8)'
+    revive:
+      downed: '§7{reviver}さんが蘇生中...'
+      reviver: '§7{downed}さんを蘇生中...'
+    barrier_restart: '§7- §6Last Wave §7- §d再起動中...'
+    wave_clear: '§7- §6Wave {wave} §7- §bCLEAR'
+    last_wave_label: 'Last Wave'
+    wave_label: 'Wave {wave}'
+    wave_clear_dynamic: '§7- §6{waveLabel} §7- §bCLEAR'
+    last_wave_progress: '§7- §6Last Wave §7- §8(§7{activated}/§b{total}§8)'
+    wave_progress: '§7- §6{waveLabel} §7- §8(§7{kills}/§c{target}§8)'
+  quest:
+    memo_choices:
+      - '§eがんばってください！'
+      - '§e安全第一でお願いします！'
+      - '§eみんなで協力しましょう！'
+    mission:
+      barrier_restart:
+        name: '結界石の再起動'
+        hints:
+          - '§fエリアをモンスターから守っている§d結界石§fの調子が悪いみたいです'
+          - '§f現地に行って、結界石を§f§n再起動§fして来てほしいです！'
+      barrier_deploy:
+        name: '結界石の展開'
+        hints:
+          - '§7結界石を展開して安全を確保しよう'
+      sweep:
+        name: '掃討'
+        hints:
+          - '§7たくさん湧いているので倒そう'
+      boss:
+        name: 'ボス'
+        hints:
+          - '§7ボスがいて困るので倒そう'
+    theme:
+      test:
+        name: 'テスト'
+      cave:
+        name: '洞窟'
+      mineshaft:
+        name: '廃坑'
+      library:
+        name: '図書館'
+      ruins:
+        name: '遺跡'
+      see_of_trees:
+        name: '樹海'
+      maze:
+        name: '立体迷宮'
   brewery:
     sample_filter:
       name: '§e蒸留フィルター（試作）'
@@ -1111,19 +1236,3 @@ custom_items:
       lore:
         - '§7発酵GUIの酵母スロット用（効果なし）'
 
-arena:
-  theme:
-    test:
-      name: テスト
-    cave:
-      name: 洞窟
-    mineshaft:
-      name: 廃坑
-    library:
-      name: 図書館
-    ruins:
-      name: 遺跡
-    see_of_trees:
-      name: 樹海
-    maze:
-      name: 立体迷宮

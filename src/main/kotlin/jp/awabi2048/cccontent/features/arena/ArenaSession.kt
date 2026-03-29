@@ -151,6 +151,7 @@ data class ArenaSession(
     val waitingParticipants: MutableSet<UUID> = mutableSetOf(),
     val waitingNotifiedParticipants: MutableSet<UUID> = mutableSetOf(),
     val waitingSubtitleNextTickByPlayer: MutableMap<UUID, Long> = mutableMapOf(),
+    val arenaPreparingUntilMillisByParticipant: MutableMap<UUID, Long> = mutableMapOf(),
     val joinCountdownBossBars: MutableMap<UUID, BossBar> = mutableMapOf(),
     val corridorTriggeredWaves: MutableSet<Int> = mutableSetOf(),
     val openedCorridors: MutableSet<Int> = mutableSetOf(),
