@@ -116,6 +116,7 @@ arena:
   multiplayer:
     join_grace_seconds: 45
     join_marker_search_radius: 16.0
+    invite_auto_decline_distance: 16.0
     stage_build_steps_per_tick: 1
   down:
     revive_hold_seconds: 3

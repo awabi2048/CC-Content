@@ -24,6 +24,7 @@ import net.kyori.adventure.bossbar.BossBar
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.HoverEvent
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+import io.papermc.paper.scoreboard.numbers.NumberFormat
 import org.bukkit.Bukkit
 import org.bukkit.Color
 import org.bukkit.FluidCollisionMode
@@ -70,6 +71,7 @@ import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
+import org.bukkit.scoreboard.DisplaySlot
 import org.bukkit.util.Vector
 import java.io.File
 import java.util.Locale
@@ -227,6 +229,8 @@ class ArenaManager(
         const val DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT = 2L
         const val REVIVE_LINK_TIMEOUT_TICKS = 200L
         const val DOWNED_PLAYER_WALK_SPEED = 0.1f
+        const val ARENA_SIDEBAR_OBJECTIVE_NAME = "arena"
+        const val ARENA_SIDEBAR_MAX_LINES = 15
 
         fun defaultSwitchIntervalBeats(): Int {
             return ARENA_BGM_SWITCH_INTERVAL_BEATS_DEFAULT
@@ -243,6 +247,8 @@ class ArenaManager(
     private val pendingWorldDeletions = mutableMapOf<String, PendingWorldDeletion>()
     private val invitedPlayerLocks = mutableMapOf<UUID, String>()
     private val inviteSwingCooldownUntilTick = mutableMapOf<UUID, Long>()
+    private val arenaSidebarPlayers = mutableSetOf<UUID>()
+    private val arenaSidebarPreviousScoreboards = mutableMapOf<UUID, org.bukkit.scoreboard.Scoreboard>()
     private val difficultyConfigs = mutableMapOf<String, ArenaDifficultyConfig>()
     private val mobDefinitions = mutableMapOf<String, MobDefinition>()
     private val knownMobTypeIds = mutableSetOf<String>()
@@ -253,6 +259,7 @@ class ArenaManager(
     private var barrierRestartConfig = BarrierRestartConfig(30, 0.05)
     private var multiplayerJoinGraceSeconds = MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT
     private var multiplayerJoinMarkerSearchRadius = MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
+    private var multiplayerInviteAutoDeclineDistance = MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
     private var multiplayerStageBuildStepsPerTick = 1
     private var downReviveHoldSeconds = DOWN_REVIVE_HOLD_SECONDS_DEFAULT
     private var downReviveRadius = DOWN_REVIVE_RADIUS_DEFAULT
@@ -324,6 +331,10 @@ class ArenaManager(
         multiplayerJoinMarkerSearchRadius = config.getDouble(
             "arena.multiplayer.join_marker_search_radius",
             MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
+        ).coerceAtLeast(1.0)
+        multiplayerInviteAutoDeclineDistance = config.getDouble(
+            "arena.multiplayer.invite_auto_decline_distance",
+            multiplayerJoinMarkerSearchRadius
         ).coerceAtLeast(1.0)
         multiplayerStageBuildStepsPerTick = config
             .getInt("arena.multiplayer.stage_build_steps_per_tick", 1)
@@ -668,7 +679,9 @@ class ArenaManager(
             inviteQuestLore = inviteQuestLore,
             stageGenerationCompleted = !enableMultiplayerJoin,
             reviveMaxPerPlayer = difficulty.reviveMaxPerPlayer,
-            reviveTimeLimitSeconds = difficulty.reviveTimeLimitSeconds
+            reviveTimeLimitSeconds = difficulty.reviveTimeLimitSeconds,
+            sidebarParticipantOrder = participantPlayers.map { it.uniqueId }.toMutableList(),
+            sidebarParticipantNames = participantPlayers.associate { it.uniqueId to it.name }.toMutableMap()
         )
 
         sessionsByWorld[world.name] = session
@@ -813,6 +826,7 @@ class ArenaManager(
         playerToSessionWorld.clear()
         mobToSessionWorld.clear()
         mobToDefinitionTypeId.clear()
+        clearAllArenaSidebars()
         invitedPlayerLocks.clear()
         inviteSwingCooldownUntilTick.clear()
         processPendingWorldDeletions()
@@ -884,10 +898,12 @@ class ArenaManager(
     private fun clearMultiplayerRecruitmentState(session: ArenaSession) {
         val ownerId = session.ownerPlayerId
         hideJoinCountdownBossBar(session, ownerId)
+        removeArenaSidebar(ownerId)
 
         session.invitedParticipants.toList().forEach { invitedId ->
             hideJoinCountdownBossBar(session, invitedId)
             releaseInvitedPlayerLock(invitedId)
+            removeArenaSidebar(invitedId)
         }
 
         session.waitingNotifiedParticipants.clear()
@@ -903,6 +919,7 @@ class ArenaManager(
         session.waitingSubtitleNextTickByPlayer.remove(invitedId)
         hideJoinCountdownBossBar(session, invitedId)
         releaseInvitedPlayerLock(invitedId)
+        removeArenaSidebar(invitedId)
     }
 
     private fun declineInvitedParticipant(session: ArenaSession, invited: Player) {
@@ -1369,6 +1386,7 @@ class ArenaManager(
         }
 
         session.returnLocations.putIfAbsent(invited.uniqueId, invited.location.clone())
+        session.sidebarParticipantNames.putIfAbsent(invited.uniqueId, invited.name)
         invitedPlayerLocks[invited.uniqueId] = session.worldName
         invited.isGlowing = true
         invited.showBossBar(getOrCreateJoinCountdownBossBar(session, invited.uniqueId))
@@ -2160,6 +2178,7 @@ class ArenaManager(
         session.waitingSubtitleNextTickByPlayer.remove(playerId)
         hideJoinCountdownBossBar(session, playerId)
         releaseInvitedPlayerLock(playerId)
+        removeArenaSidebar(playerId)
 
         val player = Bukkit.getPlayer(playerId)
         if (player != null && player.isOnline) {
@@ -2215,6 +2234,14 @@ class ArenaManager(
             clearDownedState(session, downedId)
         }
 
+        val sidebarCleanupTargets = linkedSetOf<UUID>()
+        sidebarCleanupTargets.addAll(session.participants)
+        sidebarCleanupTargets.addAll(session.invitedParticipants)
+        sidebarCleanupTargets.addAll(session.sidebarParticipantOrder)
+        sidebarCleanupTargets.forEach { playerId ->
+            removeArenaSidebar(playerId)
+        }
+
         session.participants.toList().forEach { participantId ->
             playerToSessionWorld.remove(participantId)
             inviteSwingCooldownUntilTick.remove(participantId)
@@ -2267,6 +2294,8 @@ class ArenaManager(
         session.arenaLastTargetDrivenSwitchAtMillisByParticipant.clear()
         session.downedOriginalWalkSpeeds.clear()
         session.invitedParticipants.clear()
+        session.sidebarParticipantOrder.clear()
+        session.sidebarParticipantNames.clear()
         session.waitingParticipants.clear()
         session.waitingNotifiedParticipants.clear()
         session.waitingSubtitleNextTickByPlayer.clear()
@@ -4296,6 +4325,8 @@ class ArenaManager(
                 return@forEach
             }
 
+            cleanupUnavailableInvitedParticipants(session, owner)
+
             updateJoinCountdownBossBars(session, now)
             updateWaitingParticipants(session)
 
@@ -4322,6 +4353,62 @@ class ArenaManager(
 
             if (!session.multiplayerJoinIntroStarted) {
                 finalizeMultiplayerJoin(session)
+            }
+        }
+    }
+
+    private fun cleanupUnavailableInvitedParticipants(session: ArenaSession, owner: Player) {
+        val maxDistanceSquared = multiplayerInviteAutoDeclineDistance * multiplayerInviteAutoDeclineDistance
+        session.invitedParticipants.toList().forEach { invitedId ->
+            val invited = Bukkit.getPlayer(invitedId)
+            if (invited == null || !invited.isOnline) {
+                removeInvitedParticipant(session, invitedId)
+                owner.sendMessage(
+                    ArenaI18n.text(
+                        owner,
+                        "arena.messages.multiplayer.invite_cancelled_offline",
+                        "&e招待していたプレイヤーがログアウトしたため、招待を自動辞退にしました"
+                    )
+                )
+                return@forEach
+            }
+            if (invited.world.uid != owner.world.uid) {
+                removeInvitedParticipant(session, invitedId)
+                invited.sendMessage(
+                    ArenaI18n.text(
+                        invited,
+                        "arena.messages.multiplayer.invite_auto_declined_far",
+                        "&e招待者から離れたため、招待を自動辞退しました"
+                    )
+                )
+                owner.sendMessage(
+                    ArenaI18n.text(
+                        owner,
+                        "arena.messages.multiplayer.invite_auto_declined_far_owner",
+                        "&e{player} が離れたため、招待を自動辞退にしました",
+                        "player" to invited.name
+                    )
+                )
+                return@forEach
+            }
+
+            if (invited.location.distanceSquared(owner.location) > maxDistanceSquared) {
+                removeInvitedParticipant(session, invitedId)
+                invited.sendMessage(
+                    ArenaI18n.text(
+                        invited,
+                        "arena.messages.multiplayer.invite_auto_declined_far",
+                        "&e招待者から離れたため、招待を自動辞退しました"
+                    )
+                )
+                owner.sendMessage(
+                    ArenaI18n.text(
+                        owner,
+                        "arena.messages.multiplayer.invite_auto_declined_far_owner",
+                        "&e{player} が離れたため、招待を自動辞退にしました",
+                        "player" to invited.name
+                    )
+                )
             }
         }
     }
@@ -4467,7 +4554,17 @@ class ArenaManager(
             playerToSessionWorld[player.uniqueId] = session.worldName
             session.returnLocations.putIfAbsent(player.uniqueId, player.location.clone())
             session.originalGameModes.putIfAbsent(player.uniqueId, player.gameMode)
+            session.sidebarParticipantNames[player.uniqueId] = player.name
         }
+        session.sidebarParticipantOrder.clear()
+        session.sidebarParticipantOrder.add(session.ownerPlayerId)
+        session.sidebarParticipantOrder.addAll(
+            participants
+                .asSequence()
+                .filter { it.uniqueId != session.ownerPlayerId }
+                .map { it.uniqueId }
+                .toList()
+        )
         clearMultiplayerRecruitmentState(session)
         session.multiplayerJoinEnabled = false
         session.joinGraceEndMillis = 0L
@@ -4887,6 +4984,232 @@ class ArenaManager(
         }
     }
 
+    private fun updateArenaSidebars() {
+        val activeViewers = linkedSetOf<UUID>()
+        sessionsByWorld.values.toList().forEach { session ->
+            if (session.multiplayerJoinEnabled) {
+                val viewerIds = linkedSetOf<UUID>()
+                viewerIds += session.ownerPlayerId
+                viewerIds += session.invitedParticipants
+                val lines = buildRecruitmentSidebarLines(session)
+                viewerIds.forEach { playerId ->
+                    val player = Bukkit.getPlayer(playerId) ?: return@forEach
+                    if (!player.isOnline) return@forEach
+                    renderArenaSidebar(player, lines)
+                    activeViewers += playerId
+                }
+                return@forEach
+            }
+
+            val lines = buildBattleSidebarLines(session)
+            session.participants.forEach { playerId ->
+                val player = Bukkit.getPlayer(playerId) ?: return@forEach
+                if (!player.isOnline) return@forEach
+                renderArenaSidebar(player, lines)
+                activeViewers += playerId
+            }
+        }
+
+        (arenaSidebarPlayers - activeViewers).toList().forEach { playerId ->
+            removeArenaSidebar(playerId)
+        }
+    }
+
+    private fun buildRecruitmentSidebarLines(session: ArenaSession): List<String> {
+        val now = System.currentTimeMillis()
+        val remainingSeconds = ((session.joinGraceEndMillis - now).coerceAtLeast(0L) + 999L) / 1000L
+        val questTitle = session.inviteQuestTitle?.takeIf { it.isNotBlank() } ?: "アリーナクエスト"
+
+        val lines = mutableListOf<String>()
+        lines += ""
+        lines += "§6【$questTitle】"
+        lines += ""
+        lines += "§f開始まで §e${remainingSeconds} 秒"
+        lines += ""
+
+        val playerIds = linkedSetOf<UUID>()
+        playerIds += session.ownerPlayerId
+        playerIds += session.invitedParticipants
+        playerIds.forEach { playerId ->
+            val name = Bukkit.getPlayer(playerId)?.name
+                ?: session.sidebarParticipantNames[playerId]
+                ?: "Unknown"
+            val inWaitingArea = session.waitingParticipants.contains(playerId)
+            lines += if (inWaitingArea) {
+                "§b✦ ${name}"
+            } else {
+                "§7✧ ${name}"
+            }
+        }
+        lines += ""
+        return lines
+    }
+
+    private fun buildBattleSidebarLines(session: ArenaSession): List<String> {
+        val inGetReady = !session.stageStarted || session.startedWaves.isEmpty()
+        val sidebarWave = if (inGetReady) null else sidebarDisplayWave(session)
+        val lines = mutableListOf<String>()
+        lines += ""
+        lines += when {
+            inGetReady -> "§7§lGet Ready!"
+            else -> buildWaveSidebarHeader(session, sidebarWave ?: session.currentWave.coerceAtLeast(1))
+        }
+        lines += ""
+
+        val participantOrder = if (session.sidebarParticipantOrder.isNotEmpty()) {
+            session.sidebarParticipantOrder
+        } else {
+            session.participants.toList()
+        }
+
+        participantOrder.forEach { playerId ->
+            val name = Bukkit.getPlayer(playerId)?.name
+                ?: session.sidebarParticipantNames[playerId]
+                ?: "Unknown"
+            val status = resolveSidebarParticipantStatus(session, playerId)
+            lines += "§7◯ §b${name} ${status}"
+        }
+        lines += ""
+        return lines
+    }
+
+    private fun sidebarDisplayWave(session: ArenaSession): Int {
+        val started = session.startedWaves.maxOrNull()
+        return (started ?: session.currentWave).coerceIn(1, session.waves)
+    }
+
+    private fun buildWaveSidebarHeader(session: ArenaSession, wave: Int): String {
+        val base = if (wave >= session.waves) {
+            "§7» §6§lLast Wave §7«"
+        } else {
+            "§7» §6§lWave $wave §7«"
+        }
+        return if (session.clearedWaves.contains(wave)) {
+            "$base §dCLEAR"
+        } else {
+            base
+        }
+    }
+
+    private fun resolveSidebarParticipantStatus(session: ArenaSession, playerId: UUID): String {
+        if (session.downedPlayers.containsKey(playerId)) {
+            return "§eDOWN"
+        }
+
+        val online = Bukkit.getPlayer(playerId)
+        if (
+            session.participants.contains(playerId) &&
+            online != null &&
+            online.isOnline &&
+            !online.isDead &&
+            online.world.name == session.worldName
+        ) {
+            return "§aALIVE"
+        }
+        return "§cDEAD"
+    }
+
+    private fun renderArenaSidebar(player: Player, lines: List<String>) {
+        val manager = Bukkit.getScoreboardManager() ?: return
+        val scoreboard = ensureArenaSidebarScoreboard(player, manager)
+        val objective = scoreboard.getObjective(ARENA_SIDEBAR_OBJECTIVE_NAME) ?: return
+
+        scoreboard.entries.toList().forEach { entry ->
+            scoreboard.resetScores(entry)
+        }
+
+        val visibleLines = lines.take(ARENA_SIDEBAR_MAX_LINES)
+        visibleLines.forEachIndexed { index, line ->
+            val score = visibleLines.size - index
+            applyArenaSidebarLine(scoreboard, objective, index, line, score)
+        }
+        if (player.scoreboard !== scoreboard) {
+            player.scoreboard = scoreboard
+        }
+    }
+
+    private fun ensureArenaSidebarScoreboard(
+        player: Player,
+        manager: org.bukkit.scoreboard.ScoreboardManager
+    ): org.bukkit.scoreboard.Scoreboard {
+        val current = player.scoreboard
+        val existingObjective = current.getObjective(ARENA_SIDEBAR_OBJECTIVE_NAME)
+        if (existingObjective != null) {
+            arenaSidebarPlayers += player.uniqueId
+            return current
+        }
+
+        arenaSidebarPreviousScoreboards.putIfAbsent(player.uniqueId, current)
+        val scoreboard = manager.newScoreboard
+        val objective = scoreboard.registerNewObjective(
+            ARENA_SIDEBAR_OBJECTIVE_NAME,
+            "dummy",
+            legacySerializer.deserialize("§7« §cARENA §7»")
+        )
+        objective.displaySlot = DisplaySlot.SIDEBAR
+        objective.numberFormat(NumberFormat.blank())
+        player.scoreboard = scoreboard
+        arenaSidebarPlayers += player.uniqueId
+        return scoreboard
+    }
+
+    private fun applyArenaSidebarLine(
+        scoreboard: org.bukkit.scoreboard.Scoreboard,
+        objective: org.bukkit.scoreboard.Objective,
+        lineIndex: Int,
+        text: String,
+        score: Int
+    ) {
+        val teamName = "arena_ln_${lineIndex}"
+        val entry = arenaSidebarEntry(lineIndex)
+        val team = scoreboard.getTeam(teamName) ?: scoreboard.registerNewTeam(teamName)
+        if (!team.hasEntry(entry)) {
+            team.addEntry(entry)
+        }
+        team.prefix(legacySerializer.deserialize(text))
+        team.suffix(Component.empty())
+        objective.getScore(entry).score = score
+    }
+
+    private fun arenaSidebarEntry(index: Int): String {
+        return when (index.coerceIn(0, ARENA_SIDEBAR_MAX_LINES - 1)) {
+            0 -> "§0"
+            1 -> "§1"
+            2 -> "§2"
+            3 -> "§3"
+            4 -> "§4"
+            5 -> "§5"
+            6 -> "§6"
+            7 -> "§7"
+            8 -> "§8"
+            9 -> "§9"
+            10 -> "§a"
+            11 -> "§b"
+            12 -> "§c"
+            13 -> "§d"
+            else -> "§e"
+        }
+    }
+
+    private fun removeArenaSidebar(playerId: UUID) {
+        arenaSidebarPlayers.remove(playerId)
+        val previousScoreboard = arenaSidebarPreviousScoreboards.remove(playerId)
+        val player = Bukkit.getPlayer(playerId) ?: return
+        if (!player.isOnline) {
+            return
+        }
+        val manager = Bukkit.getScoreboardManager() ?: return
+        player.scoreboard = previousScoreboard ?: manager.mainScoreboard
+    }
+
+    private fun clearAllArenaSidebars() {
+        arenaSidebarPlayers.toList().forEach { playerId ->
+            removeArenaSidebar(playerId)
+        }
+        arenaSidebarPlayers.clear()
+        arenaSidebarPreviousScoreboards.clear()
+    }
+
     private fun startMaintenanceTask() {
         if (maintenanceTask != null) return
         maintenanceTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
@@ -4907,6 +5230,9 @@ class ArenaManager(
                 updateDownedPlayers(currentTick)
                 updateActionMarkers()
                 updateArenaBgmTransitions()
+                if (currentTick % 5L == 0L) {
+                    updateArenaSidebars()
+                }
             }, 1L, 1L)
         }
     }
