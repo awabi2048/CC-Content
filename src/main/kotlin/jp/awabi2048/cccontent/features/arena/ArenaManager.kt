@@ -43,6 +43,7 @@ import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.block.structure.Mirror
 import org.bukkit.block.structure.StructureRotation
+import org.bukkit.block.data.Waterlogged
 import org.bukkit.entity.Entity
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.Ageable
@@ -2609,6 +2610,15 @@ class ArenaManager(
         val spawns = session.roomMobSpawns[wave].orEmpty()
         val candidates = selectSpawnCandidates(theme, wave)
         val isFinalWaveBarrierObjective = wave == session.waves && hasBarrierActivationObjective(session)
+        plugin.logger.info(
+            "[Arena][DEBUG] wave開始: world=${session.worldName} theme=${theme.id} wave=$wave spawns=${spawns.size} candidates=${candidates.size}"
+        )
+        plugin.logger.info(
+            "[Arena][DEBUG] wave候補詳細: world=${session.worldName} wave=$wave candidates=${candidates.joinToString { candidate ->
+                val range = candidate.waveRange.maxInclusive?.let { "${candidate.waveRange.minInclusive}..$it" } ?: "${candidate.waveRange.minInclusive}.."
+                "${candidate.mobId}($range)"
+            }}"
+        )
         if (candidates.isEmpty()) {
             plugin.logger.severe(
                 "[Arena] 開始不能ウェーブを検出: world=${session.worldName} theme=${theme.id} wave=$wave"
@@ -2689,8 +2699,18 @@ class ArenaManager(
 
             val spawnThrottle = mobService.getSpawnThrottle("arena:${currentSession.worldName}")
             val intervalChance = (1.0 / spawnThrottle.intervalMultiplier).coerceIn(0.0, 1.0)
-            if (random.nextDouble() < spawnThrottle.skipChance) return@Runnable
-            if (random.nextDouble() > intervalChance) return@Runnable
+            if (random.nextDouble() < spawnThrottle.skipChance) {
+                plugin.logger.info(
+                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave reason=throttle_skip chance=${spawnThrottle.skipChance}"
+                )
+                return@Runnable
+            }
+            if (random.nextDouble() > intervalChance) {
+                plugin.logger.info(
+                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave reason=interval_throttle intervalChance=$intervalChance"
+                )
+                return@Runnable
+            }
 
             val maxAliveBase = currentSession.stageMaxAliveCount.coerceAtLeast(1)
             val maxAlive = if (currentSession.barrierRestarting && wave == currentSession.waves) {
@@ -2700,13 +2720,44 @@ class ArenaManager(
             } else {
                 maxAliveBase
             }
-            if (currentSession.activeMobs.size >= maxAlive) return@Runnable
+            if (currentSession.activeMobs.size >= maxAlive) {
+                plugin.logger.info(
+                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave reason=max_alive active=${currentSession.activeMobs.size} max=$maxAlive"
+                )
+                return@Runnable
+            }
 
             val world = Bukkit.getWorld(currentSession.worldName) ?: return@Runnable
-            val spawnPoint = selectSpawnPoint(spawns) ?: return@Runnable
-            val candidates = filterSpawnCandidatesByLocation(selectSpawnCandidates(theme, wave), spawnPoint)
-            val weightedMob = selectWeightedMob(candidates) ?: return@Runnable
-            val definition = mobDefinitions[weightedMob.mobId] ?: return@Runnable
+            val spawnPoint = selectSpawnPoint(spawns) ?: run {
+                plugin.logger.info(
+                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave reason=no_spawn_point"
+                )
+                return@Runnable
+            }
+            val spawnCandidates = selectSpawnCandidates(theme, wave)
+            val candidates = filterSpawnCandidatesByLocation(spawnCandidates, spawnPoint)
+            if (candidates.isEmpty()) {
+                plugin.logger.info(
+                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave spawn=${spawnPoint.blockX},${spawnPoint.blockY},${spawnPoint.blockZ} block=${spawnPoint.block.type} reason=no_candidate matched=${spawnCandidates.joinToString { it.mobId }}"
+                )
+                return@Runnable
+            }
+            val weightedMob = selectWeightedMob(candidates) ?: run {
+                plugin.logger.info(
+                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave spawn=${spawnPoint.blockX},${spawnPoint.blockY},${spawnPoint.blockZ} block=${spawnPoint.block.type} reason=no_weighted_candidate"
+                )
+                return@Runnable
+            }
+            val definition = mobDefinitions[weightedMob.mobId] ?: run {
+                plugin.logger.info(
+                    "[Arena][DEBUG] spawn skip: world=${currentSession.worldName} wave=$wave mob=${weightedMob.mobId} reason=definition_missing"
+                )
+                return@Runnable
+            }
+
+            plugin.logger.info(
+                "[Arena][DEBUG] spawn attempt: world=${currentSession.worldName} wave=$wave mob=${weightedMob.mobId} spawn=${spawnPoint.blockX},${spawnPoint.blockY},${spawnPoint.blockZ} block=${spawnPoint.block.type}"
+            )
 
             spawnMob(world, currentSession, wave, spawnPoint, definition, difficulty)
         }, interval, interval)
@@ -3009,7 +3060,13 @@ class ArenaManager(
     ): List<ArenaThemeWeightedMobEntry> {
         return candidates.filter { entry ->
             val definition = mobDefinitions[entry.mobId] ?: return@filter false
-            canSpawnAt(definition, spawnPoint)
+            val allowed = canSpawnAt(definition, spawnPoint)
+            if (!allowed) {
+                plugin.logger.info(
+                    "[Arena][DEBUG] spawn条件不一致: mob=${entry.mobId} type=${definition.typeId} conditions=${definition.spawnConditions.joinToString { it.name }} spawn=${spawnPoint.blockX},${spawnPoint.blockY},${spawnPoint.blockZ} block=${spawnPoint.block.type}"
+                )
+            }
+            allowed
         }
     }
 
@@ -3030,13 +3087,11 @@ class ArenaManager(
             return true
         }
 
-        val feetBlock = spawnPoint.clone().add(0.0, 0.5, 0.0).block
-        if (feetBlock.type == Material.WATER || feetBlock.isLiquid) {
-            return true
+        if (block.type == Material.LIGHT) {
+            return (block.blockData as? Waterlogged)?.isWaterlogged == true
         }
 
-        val headBlock = spawnPoint.clone().add(0.0, 1.0, 0.0).block
-        return headBlock.type == Material.WATER || headBlock.isLiquid
+        return false
     }
 
     private fun selectWeightedMob(candidates: List<ArenaThemeWeightedMobEntry>): ArenaThemeWeightedMobEntry? {
@@ -3062,6 +3117,9 @@ class ArenaManager(
         definition: MobDefinition,
         difficulty: ArenaDifficultyConfig
     ) {
+        plugin.logger.info(
+            "[Arena][DEBUG] spawn entity: world=${session.worldName} wave=$wave mob=${definition.id} type=${definition.typeId} spawn=${spawn.blockX},${spawn.blockY},${spawn.blockZ}"
+        )
         val entity = mobService.spawn(
             definition,
             spawn,
@@ -3071,7 +3129,12 @@ class ArenaManager(
                 combatActiveProvider = { true },
                 metadata = mapOf("world" to session.worldName, "wave" to wave.toString())
             )
-        ) ?: return
+        ) ?: run {
+            plugin.logger.info(
+                "[Arena][DEBUG] spawn failed: world=${session.worldName} wave=$wave mob=${definition.id} type=${definition.typeId}"
+            )
+            return
+        }
         entity.removeWhenFarAway = false
         entity.canPickupItems = false
         enforceAdultMob(entity)
