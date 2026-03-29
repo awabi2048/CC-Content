@@ -3,14 +3,18 @@ package jp.awabi2048.cccontent.mob.type
 import jp.awabi2048.cccontent.mob.CustomMobRuntime
 import jp.awabi2048.cccontent.mob.MobSpawnContext
 import jp.awabi2048.cccontent.mob.ability.AreaEffectPulseAbility
+import jp.awabi2048.cccontent.mob.ability.ArmorMagnetPullAbility
 import jp.awabi2048.cccontent.mob.ability.BoomerangAbility
 import jp.awabi2048.cccontent.mob.ability.BackstepAbility
 import jp.awabi2048.cccontent.mob.ability.ClimbingLeapAbility
 import jp.awabi2048.cccontent.mob.ability.CurveShotAbility
 import jp.awabi2048.cccontent.mob.ability.LeapAbility
 import jp.awabi2048.cccontent.mob.ability.LinearProjectileAbility
+import jp.awabi2048.cccontent.mob.ability.MeleeKnockbackBoostAbility
 import jp.awabi2048.cccontent.mob.ability.PeriodicCobwebAbility
+import jp.awabi2048.cccontent.mob.ability.PlayerTargetAssistAbility
 import jp.awabi2048.cccontent.mob.ability.PoisonOnMeleeHitAbility
+import jp.awabi2048.cccontent.mob.ability.ProjectileAndFireImmunityAbility
 import jp.awabi2048.cccontent.mob.ability.RangedAttackAbility
 import jp.awabi2048.cccontent.mob.ability.RandomInvisibilityAbility
 import jp.awabi2048.cccontent.mob.ability.ShieldAbility
@@ -159,6 +163,26 @@ class HuskWeakeningAuraMobType : EquipmentMobType(
     ),
     defaultMainHand = Material.STONE_SWORD,
     defaultHelmet = Material.CHAINMAIL_HELMET
+)
+
+class IronGolemNormalMobType : EquipmentMobType(
+    id = "iron_golem_normal",
+    baseEntityType = EntityType.IRON_GOLEM,
+    abilities = listOf(
+        PlayerTargetAssistAbility(id = "iron_golem_normal_target_assist"),
+        ProjectileAndFireImmunityAbility(id = "iron_golem_normal_immunity"),
+        MeleeKnockbackBoostAbility(id = "iron_golem_normal_knockback")
+    )
+)
+
+class IronGolemMagnetMobType : EquipmentMobType(
+    id = "iron_golem_magnet",
+    baseEntityType = EntityType.IRON_GOLEM,
+    abilities = listOf(
+        PlayerTargetAssistAbility(id = "iron_golem_magnet_target_assist"),
+        ProjectileAndFireImmunityAbility(id = "iron_golem_magnet_immunity"),
+        ArmorMagnetPullAbility(id = "iron_golem_magnet_pull")
+    )
 )
 
 class SkeletonPlainMobType : EquipmentMobType(

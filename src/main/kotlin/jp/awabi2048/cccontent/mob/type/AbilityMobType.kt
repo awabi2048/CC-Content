@@ -2,8 +2,10 @@ package jp.awabi2048.cccontent.mob.type
 
 import jp.awabi2048.cccontent.mob.CustomMobRuntime
 import jp.awabi2048.cccontent.mob.MobAttackContext
+import jp.awabi2048.cccontent.mob.MobCombustContext
 import jp.awabi2048.cccontent.mob.MobDamagedContext
 import jp.awabi2048.cccontent.mob.MobDeathContext
+import jp.awabi2048.cccontent.mob.MobGenericDamagedContext
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import jp.awabi2048.cccontent.mob.MobShootBowContext
 import jp.awabi2048.cccontent.mob.MobSpawnContext
@@ -48,9 +50,21 @@ abstract class AbilityMobType(
         }
     }
 
+    override fun onGenericDamaged(context: MobGenericDamagedContext, runtime: CustomMobRuntime?) {
+        forEachAbility(runtime) { ability, abilityRuntime ->
+            ability.onGenericDamaged(context, abilityRuntime)
+        }
+    }
+
     override fun onDeath(context: MobDeathContext, runtime: CustomMobRuntime?) {
         forEachAbility(runtime) { ability, abilityRuntime ->
             ability.onDeath(context, abilityRuntime)
+        }
+    }
+
+    override fun onCombust(context: MobCombustContext, runtime: CustomMobRuntime?) {
+        forEachAbility(runtime) { ability, abilityRuntime ->
+            ability.onCombust(context, abilityRuntime)
         }
     }
 

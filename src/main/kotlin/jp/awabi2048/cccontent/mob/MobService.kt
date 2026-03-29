@@ -6,6 +6,8 @@ import jp.awabi2048.cccontent.mob.type.HuskLeapOnlyMobType
 import jp.awabi2048.cccontent.mob.type.HuskNormalMobType
 import jp.awabi2048.cccontent.mob.type.HuskShieldOnlyMobType
 import jp.awabi2048.cccontent.mob.type.HuskWeakeningAuraMobType
+import jp.awabi2048.cccontent.mob.type.IronGolemMagnetMobType
+import jp.awabi2048.cccontent.mob.type.IronGolemNormalMobType
 import jp.awabi2048.cccontent.mob.type.SilverfishBigPoisonMobType
 import jp.awabi2048.cccontent.mob.type.SilverfishPlainMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonPlainMobType
@@ -46,6 +48,8 @@ import org.bukkit.entity.Ageable
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Zombie
 import org.bukkit.event.entity.EntityDamageByEntityEvent
+import org.bukkit.event.entity.EntityCombustEvent
+import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.entity.EntityShootBowEvent
@@ -145,6 +149,8 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(SpiderFerociousMobType())
         registerMobType(SilverfishPlainMobType())
         registerMobType(SilverfishBigPoisonMobType())
+        registerMobType(IronGolemNormalMobType())
+        registerMobType(IronGolemMagnetMobType())
     }
 
     fun registerMobType(mobType: MobType) {
@@ -448,6 +454,40 @@ class MobService(private val plugin: JavaPlugin) {
                 activeMob = activeMob,
                 event = event,
                 attacker = event.damager as? LivingEntity,
+                loadSnapshot = snapshot
+            ),
+            activeMob.runtime
+        )
+        addCpuNanos(activeMob.sessionKey, System.nanoTime() - startedAt)
+    }
+
+    fun handleDamaged(event: EntityDamageEvent, damaged: LivingEntity) {
+        val activeMob = activeMobs[damaged.uniqueId] ?: return
+        val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
+        val startedAt = System.nanoTime()
+        activeMob.mobType.onGenericDamaged(
+            MobGenericDamagedContext(
+                plugin = plugin,
+                entity = damaged,
+                activeMob = activeMob,
+                event = event,
+                loadSnapshot = snapshot
+            ),
+            activeMob.runtime
+        )
+        addCpuNanos(activeMob.sessionKey, System.nanoTime() - startedAt)
+    }
+
+    fun handleCombust(event: EntityCombustEvent, entity: LivingEntity) {
+        val activeMob = activeMobs[entity.uniqueId] ?: return
+        val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
+        val startedAt = System.nanoTime()
+        activeMob.mobType.onCombust(
+            MobCombustContext(
+                plugin = plugin,
+                entity = entity,
+                activeMob = activeMob,
+                event = event,
                 loadSnapshot = snapshot
             ),
             activeMob.runtime
