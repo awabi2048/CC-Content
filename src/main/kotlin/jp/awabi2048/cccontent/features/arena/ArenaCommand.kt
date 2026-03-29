@@ -125,7 +125,13 @@ class ArenaCommand(
         val difficultyId = args[2]
         val theme = args.getOrNull(3)
 
-        when (val result = manager.startSession(target, difficultyId, theme, initialParticipants = initialParticipants)) {
+        val startedAt = System.nanoTime()
+        when (val result = manager.startSession(
+            target,
+            difficultyId,
+            theme,
+            initialParticipants = initialParticipants
+        )) {
             is ArenaStartResult.Success -> {
                 sender.sendMessage(
                     ArenaI18n.text(
@@ -151,6 +157,7 @@ class ArenaCommand(
                 )
             }
         }
+        sender.sendMessage("§7処理時間: ${((System.nanoTime() - startedAt) / 1_000_000L).coerceAtLeast(0L)} ms")
         return true
     }
 

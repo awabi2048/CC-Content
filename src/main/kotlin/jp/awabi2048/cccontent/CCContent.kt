@@ -78,6 +78,7 @@ import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.entity.Player
 import org.bukkit.event.Listener
 import org.bukkit.event.EventHandler
 import org.bukkit.event.HandlerList
@@ -230,6 +231,30 @@ class CCContent : JavaPlugin(), Listener {
                     null, "arena" -> arenaQuestService?.updateToday() ?: false
                     else -> false
                 }
+            },
+            onCreateVoidWorldDebug = { _: Player ->
+                if (arenaFeatureReady && ::arenaManager.isInitialized) {
+                    arenaManager.createDebugVoidWorld()
+                } else {
+                    null
+                }
+            },
+            onCloneVoidWorldDebug = { _: Player ->
+                if (arenaFeatureReady && ::arenaManager.isInitialized) {
+                    arenaManager.cloneDebugVoidWorld()
+                } else {
+                    null
+                }
+            },
+            onDeleteVoidWorldDebug = { player ->
+                if (arenaFeatureReady && ::arenaManager.isInitialized) {
+                    arenaManager.deleteDebugVoidWorld(player.world)
+                } else {
+                    false
+                }
+            },
+            isDebugVoidWorld = { world ->
+                arenaFeatureReady && ::arenaManager.isInitialized && arenaManager.isDebugVoidWorld(world)
             }
         )
 
