@@ -655,7 +655,7 @@ class ArenaQuestService(
     }
 
     private fun createQuestItem(player: Player, quest: ArenaDailyQuestEntry, isCompleted: Boolean): ItemStack {
-        val item = ItemStack(Material.ROTTEN_FLESH)
+        val item = ItemStack(themeIconMaterial(quest.themeId))
         val meta = item.itemMeta ?: return item
         val title = "${missionDisplayName(quest.missionTypeId)}＠${themeDisplayName(player, quest.themeId)}"
         meta.setDisplayName(
@@ -672,10 +672,14 @@ class ArenaQuestService(
 
     private fun createQuestSummaryItem(player: Player, quest: ArenaDailyQuestEntry): ItemStack {
         return createActionItem(
-            Material.ROTTEN_FLESH,
+            themeIconMaterial(quest.themeId),
             ArenaI18n.text(player, "arena.ui.quest.item_name", "§a{quest}", "quest" to "${missionDisplayName(quest.missionTypeId)}＠${themeDisplayName(player, quest.themeId)}"),
             buildQuestConfirmLore(player, quest)
         )
+    }
+
+    private fun themeIconMaterial(themeId: String): Material {
+        return arenaManager.getTheme(themeId)?.iconMaterial ?: Material.ROTTEN_FLESH
     }
 
     private fun createPlayerHead(player: Player, playerData: ArenaPlayerQuestData): ItemStack {

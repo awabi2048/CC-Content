@@ -251,6 +251,7 @@ class ArenaManager(
         const val DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT = 2L
         const val DOWN_GAME_OVER_BLINDNESS_TICKS = 200
         const val DOWN_GAME_OVER_RETURN_DELAY_MILLIS = 8000L
+        const val MULTIPLAYER_STAGE_INTRO_PREPARING_DURATION_MILLIS = 6000L
         const val REVIVE_LINK_TIMEOUT_TICKS = 200L
         const val DOWNED_PLAYER_WALK_SPEED = 0.1f
         const val DOWNED_GAME_OVER_WALK_SPEED = 0.0f
@@ -266,6 +267,7 @@ class ArenaManager(
     private val legacySerializer = LegacyComponentSerializer.legacySection()
     private val themeLoader = ArenaThemeLoader(plugin)
     private val stageGenerator = ArenaStageGenerator()
+    private val legacyColorPattern = Regex("(?i)§[0-9A-FK-ORX]")
     private val sessionsByWorld = mutableMapOf<String, ArenaSession>()
     private val playerToSessionWorld = mutableMapOf<UUID, String>()
     private val mobToSessionWorld = mutableMapOf<UUID, String>()
@@ -918,6 +920,8 @@ class ArenaManager(
     }
 
     fun getThemeIds(): Set<String> = themeLoader.getThemeIds()
+
+    fun getTheme(themeId: String): ArenaTheme? = themeLoader.getTheme(themeId)
 
     fun getActiveSessionPlayerNames(): Set<String> {
         return playerToSessionWorld.keys.mapNotNull { uuid -> Bukkit.getPlayer(uuid)?.name }.toSet()
@@ -1721,7 +1725,7 @@ class ArenaManager(
                     if (timeoutExecuteAt == null) {
                         downed.playSound(downed.location, Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0f, 0.75f)
                         val blindnessTicks = if (downState.reviveDisabled) {
-                            DOWN_GAME_OVER_BLINDNESS_TICKS
+                            Int.MAX_VALUE
                         } else {
                             40
                         }
@@ -2297,6 +2301,7 @@ class ArenaManager(
         session.waitingParticipants.remove(playerId)
         session.waitingNotifiedParticipants.remove(playerId)
         session.waitingSubtitleNextTickByPlayer.remove(playerId)
+        session.arenaPreparingUntilMillisByParticipant.remove(playerId)
         hideJoinCountdownBossBar(session, playerId)
         releaseInvitedPlayerLock(playerId)
         removeArenaSidebar(playerId)
@@ -2423,6 +2428,7 @@ class ArenaManager(
         session.waitingParticipants.clear()
         session.waitingNotifiedParticipants.clear()
         session.waitingSubtitleNextTickByPlayer.clear()
+        session.arenaPreparingUntilMillisByParticipant.clear()
         session.joinCountdownBossBars.clear()
         session.joinAreaMarkerLocations.clear()
         session.lobbyMarkerLocations.clear()
@@ -4090,6 +4096,12 @@ class ArenaManager(
     private fun scheduleStartEntranceNormalBgm(session: ArenaSession) {
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
+            activeSession.participants.forEach { participantId ->
+                val player = Bukkit.getPlayer(participantId) ?: return@forEach
+                if (!player.isOnline || player.world.name != activeSession.worldName) return@forEach
+                val themeName = ArenaI18n.text(player, "arena.theme.${activeSession.themeId}.name", activeSession.themeId)
+                player.sendTitle("", "§7« §6$themeName §7»", 10, 60, 10)
+            }
             requestArenaBgmMode(activeSession, ArenaBgmMode.NORMAL)
         }, 20L)
     }
@@ -4364,6 +4376,7 @@ class ArenaManager(
         val track = arenaBgmTrackForMode(mode) ?: return
         val player = Bukkit.getPlayer(participantId)
         if (player != null && player.isOnline && player.world.name == session.worldName) {
+            stopArenaBgmForPlayer(player)
             BGMManager.playLoopTicks(player, track.soundKey, track.loopTicks)
         }
         session.arenaBgmModeByParticipant[participantId] = mode
@@ -4926,6 +4939,9 @@ class ArenaManager(
 
         entered.forEach { playerId ->
             session.waitingNotifiedParticipants.add(playerId)
+            Bukkit.getPlayer(playerId)?.takeIf { it.isOnline }?.let { player ->
+                player.playSound(player.location, Sound.ENTITY_ARROW_HIT_PLAYER, 1.0f, 1.0f)
+            }
         }
 
         val currentTick = Bukkit.getCurrentTick().toLong()
@@ -5024,6 +5040,8 @@ class ArenaManager(
         session.multiplayerJoinIntroStarted = true
 
         participants.forEach { player ->
+            session.arenaPreparingUntilMillisByParticipant[player.uniqueId] =
+                System.currentTimeMillis() + MULTIPLAYER_STAGE_INTRO_PREPARING_DURATION_MILLIS
             player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 120, 0, false, false, false))
             player.sendMessage(ArenaI18n.text(player, "arena.messages.multiplayer.stage_intro", "&6ステージ転送を開始します..."))
         }
@@ -5539,7 +5557,15 @@ class ArenaManager(
     }
 
     private fun resolveSidebarParticipantStatus(session: ArenaSession, playerId: UUID): String {
-        if (session.downedPlayers.containsKey(playerId)) {
+        if (isSidebarPreparing(session, playerId)) {
+            return ArenaI18n.text(null, "arena.ui.sidebar.status_preparing", "§dPREPARING")
+        }
+
+        val downState = session.downedPlayers[playerId]
+        if (downState != null) {
+            if (downState.reviveDisabled) {
+                return ArenaI18n.text(null, "arena.ui.sidebar.status_dead", "§cDEAD")
+            }
             return ArenaI18n.text(null, "arena.ui.sidebar.status_down", "§eDOWN")
         }
 
@@ -5556,6 +5582,15 @@ class ArenaManager(
         return ArenaI18n.text(null, "arena.ui.sidebar.status_dead", "§cDEAD")
     }
 
+    private fun isSidebarPreparing(session: ArenaSession, playerId: UUID): Boolean {
+        val preparingUntil = session.arenaPreparingUntilMillisByParticipant[playerId] ?: return false
+        if (System.currentTimeMillis() > preparingUntil) {
+            session.arenaPreparingUntilMillisByParticipant.remove(playerId)
+            return false
+        }
+        return true
+    }
+
     private fun renderArenaSidebar(player: Player, lines: List<String>) {
         val manager = Bukkit.getScoreboardManager() ?: return
         val scoreboard = ensureArenaSidebarScoreboard(player, manager)
@@ -5568,7 +5603,7 @@ class ArenaManager(
         val visibleLines = lines.take(ARENA_SIDEBAR_MAX_LINES)
         visibleLines.forEachIndexed { index, line ->
             val score = visibleLines.size - index
-            applyArenaSidebarLine(scoreboard, objective, index, line, score)
+            applyArenaSidebarLine(scoreboard, objective, index, padArenaSidebarText(line), score)
         }
         if (player.scoreboard !== scoreboard) {
             player.scoreboard = scoreboard
@@ -5616,6 +5651,35 @@ class ArenaManager(
         team.prefix(legacySerializer.deserialize(text))
         team.suffix(Component.empty())
         objective.getScore(entry).score = score
+    }
+
+    private fun padArenaSidebarText(text: String, targetWidth: Int = 20): String {
+        val currentWidth = visibleTextWidth(text)
+        if (currentWidth >= targetWidth) {
+            return text
+        }
+        return text + " ".repeat(targetWidth - currentWidth)
+    }
+
+    private fun visibleTextWidth(text: String): Int {
+        val stripped = legacyColorPattern.replace(text, "")
+        var width = 0
+        var index = 0
+        while (index < stripped.length) {
+            val codePoint = stripped.codePointAt(index)
+            width += if (isHalfWidthCodePoint(codePoint)) 1 else 2
+            index += Character.charCount(codePoint)
+        }
+        return width
+    }
+
+    private fun isHalfWidthCodePoint(codePoint: Int): Boolean {
+        return when {
+            codePoint in 0x20..0x7E -> true
+            codePoint in 0xA1..0xFF -> true
+            Character.isWhitespace(codePoint) -> true
+            else -> false
+        }
     }
 
     private fun arenaSidebarEntry(index: Int): String {

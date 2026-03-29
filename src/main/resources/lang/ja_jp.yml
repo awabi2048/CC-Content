@@ -1169,6 +1169,7 @@ arena:
       clear: '§dCLEAR'
       status_down: '§eDOWN'
       status_alive: '§aALIVE'
+      status_preparing: '§dPREPARING'
       status_dead: '§cDEAD'
   bossbar:
     join_countdown: '§7アリーナを準備中... §8(§b残り {seconds}秒§8)'
