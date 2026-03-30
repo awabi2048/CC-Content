@@ -200,12 +200,6 @@ private data class EntranceLiftTemplate(
     val structure: org.bukkit.structure.Structure
 )
 
-private data class LiftChangedBlock(
-    val x: Int,
-    val y: Int,
-    val z: Int
-)
-
 class ArenaManager(
     private val plugin: JavaPlugin,
     private val mobService: MobService = MobService(plugin)
@@ -276,7 +270,6 @@ class ArenaManager(
         const val ARENA_SIDEBAR_OBJECTIVE_NAME = "arena"
         const val ARENA_SIDEBAR_MAX_LINES = 15
         const val ENTRANCE_LIFT_STRUCTURE_PATH = "structures/arena/lift.nbt"
-        const val ENTRANCE_LIFT_RESET_STRUCTURE_PATH = "structures/arena/lift_reset.nbt"
         const val ENTRANCE_LIFT_INTERVAL_TICKS_DEFAULT = 10L
         const val ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT = 2
         const val ENTRANCE_LIFT_MAX_RISE_BLOCKS_DEFAULT = 6
@@ -318,7 +311,6 @@ class ArenaManager(
     private var entranceLiftTransferRiseBlocks = ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT
     private var entranceLiftMaxRiseBlocks = ENTRANCE_LIFT_MAX_RISE_BLOCKS_DEFAULT
     private var cachedEntranceLiftTemplate: EntranceLiftTemplate? = null
-    private var cachedEntranceLiftResetTemplate: EntranceLiftTemplate? = null
     private var maxConcurrentSessions = ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT
     private var arenaPoolSize = ARENA_POOL_SIZE_DEFAULT
     private var cleanupBlocksPerTick = ARENA_CLEANUP_BLOCKS_PER_TICK_DEFAULT
@@ -373,7 +365,6 @@ class ArenaManager(
         val difficultyFile = ensureArenaConfig("config/arena/difficulty.yml")
         val dropFile = ensureArenaConfig("config/arena/drop.yml")
         cachedEntranceLiftTemplate = null
-        cachedEntranceLiftResetTemplate = null
 
         loadBarrierRestartConfig()
         loadArenaBgmConfig()
@@ -5379,15 +5370,6 @@ class ArenaManager(
             )
             return
         }
-        val liftResetTemplate = resolveEntranceLiftResetTemplate() ?: run {
-            terminateSession(
-                session,
-                false,
-                messageKey = "arena.messages.command.start_error.lift_not_ready",
-                fallbackMessage = "&cリフトの準備ができていないため開始できません"
-            )
-            return
-        }
         if (session.liftMarkerLocations.isEmpty()) {
             terminateSession(
                 session,
@@ -5434,7 +5416,8 @@ class ArenaManager(
             }
 
         val baseLocation = baseMarker.block.location.clone().apply { this.world = introWorld }
-        retainEntranceLiftChunkTickets(session, introWorld, baseLocation, liftTemplate, liftResetTemplate)
+        val maxRise = entranceLiftMaxRiseBlocks
+        retainEntranceLiftChunkTickets(session, introWorld, baseLocation, liftTemplate, maxRise)
 
         data class LiftPlayerUnit(
             val player: Player,
@@ -5444,11 +5427,8 @@ class ArenaManager(
 
         val playerOffsets = buildEntranceLiftSeatOffsets(participants.size)
         var currentRise = 0
-        var previousChangedBlocks: Set<LiftChangedBlock> = emptySet()
-        var previousStructureOrigin: Location? = null
         var peakHoldTicksRemaining = 0L
         var initialLiftPlaced = false
-        val chainBlocks = mutableSetOf<LiftChangedBlock>()
 
         val playerUnits = mutableListOf<LiftPlayerUnit>()
 
@@ -5480,8 +5460,8 @@ class ArenaManager(
             if (activeSession !== session) {
                 session.entranceLiftTask?.cancel()
                 session.entranceLiftTask = null
-                clearTrackedLiftBlocks(introWorld, previousChangedBlocks)
-                clearLiftChainBlocks(introWorld, chainBlocks)
+                clearLiftFootprint(introWorld, baseLocation.clone().add(0.0, currentRise.toDouble(), 0.0), liftTemplate)
+                restoreLiftChainsInRange(introWorld, baseLocation, liftTemplate, baseLocation.blockY, baseLocation.blockY + maxRise)
                 releaseEntranceLiftChunkTickets(session)
                 restorePlayerMovement(originalSpeeds)
                 return@Runnable
@@ -5490,12 +5470,12 @@ class ArenaManager(
             playEntranceLiftTickSound(introWorld, entranceLiftSoundLocation(baseLocation, liftTemplate, currentRise))
 
             if (!initialLiftPlaced) {
-                previousChangedBlocks = placeLiftStructureAndCollectChangedBlocks(introWorld, baseLocation, liftTemplate)
+                restoreLiftChainsInRange(introWorld, baseLocation, liftTemplate, baseLocation.blockY, baseLocation.blockY + maxRise)
+                placeLiftStructure(introWorld, baseLocation, liftTemplate)
                 initialLiftPlaced = true
                 return@Runnable
             }
 
-            val maxRise = entranceLiftMaxRiseBlocks
             val transferRise = entranceLiftTransferRiseBlocks.coerceIn(0, maxRise)
 
             if (!transferred && currentRise >= transferRise) {
@@ -5522,31 +5502,36 @@ class ArenaManager(
                 descending = true
             }
 
+            val oldRise = currentRise
+            val delta = if (descending) -1 else 1
+            currentRise += delta
+
+            if (descending) {
+                val oldTopY = baseLocation.blockY + oldRise + liftTemplate.sizeY - 1
+                clearLiftLayer(introWorld, baseLocation, liftTemplate, oldTopY)
+                val chainMinY = baseLocation.blockY + oldRise + liftTemplate.sizeY - 1
+                val chainMaxY = baseLocation.blockY + oldRise + liftTemplate.sizeY
+                val chainCeiling = baseLocation.blockY + maxRise
+                for (y in chainMinY..chainMaxY) {
+                    if (y <= chainCeiling) {
+                        placeCornerChainsAtY(introWorld, baseLocation, liftTemplate, y)
+                    }
+                }
+            } else {
+                val oldBottomY = baseLocation.blockY + oldRise
+                clearLiftLayer(introWorld, baseLocation, liftTemplate, oldBottomY)
+            }
+
+            val nextOrigin = baseLocation.clone().add(0.0, currentRise.toDouble(), 0.0)
+            placeLiftStructure(introWorld, nextOrigin, liftTemplate)
+
             if (descending && currentRise <= 0) {
-                clearTrackedLiftBlocks(introWorld, previousChangedBlocks)
-                clearLiftChainBlocks(introWorld, chainBlocks)
-                previousChangedBlocks = placeLiftStructureAndCollectChangedBlocks(introWorld, baseLocation, liftResetTemplate)
+                restoreLiftChainsInRange(introWorld, baseLocation, liftTemplate, baseLocation.blockY, baseLocation.blockY + maxRise)
                 session.entranceLiftTask?.cancel()
                 session.entranceLiftTask = null
                 restorePlayerMovement(originalSpeeds)
                 releaseEntranceLiftChunkTickets(session)
                 return@Runnable
-            }
-
-            val delta = if (descending) -1 else 1
-            currentRise += delta
-            val nextOrigin = baseLocation.clone().add(0.0, currentRise.toDouble(), 0.0)
-            clearTrackedLiftBlocksExceptOverlap(
-                introWorld,
-                previousChangedBlocks,
-                previousStructureOrigin,
-                nextOrigin,
-                liftTemplate
-            )
-            previousChangedBlocks = placeLiftStructureAndCollectChangedBlocks(introWorld, nextOrigin, liftTemplate)
-            previousStructureOrigin = nextOrigin.clone()
-            if (descending) {
-                placeLiftCornerChains(introWorld, baseLocation, liftTemplate, currentRise, chainBlocks)
             }
 
             playerUnits.forEach { unit ->
@@ -5591,13 +5576,6 @@ class ArenaManager(
         }
     }
 
-    private fun resolveEntranceLiftResetTemplate(): EntranceLiftTemplate? {
-        cachedEntranceLiftResetTemplate?.let { return it }
-        return resolveLiftTemplate(ENTRANCE_LIFT_RESET_STRUCTURE_PATH)?.also {
-            cachedEntranceLiftResetTemplate = it
-        }
-    }
-
     private fun resolveLiftTemplate(path: String): EntranceLiftTemplate? {
         val file = File(plugin.dataFolder, path)
         if (!file.exists()) {
@@ -5618,12 +5596,11 @@ class ArenaManager(
         )
     }
 
-    private fun placeLiftStructureAndCollectChangedBlocks(
+    private fun placeLiftStructure(
         world: World,
         origin: Location,
         template: EntranceLiftTemplate
-    ): Set<LiftChangedBlock> {
-        val before = snapshotLiftBlocks(world, origin, template)
+    ) {
         template.structure.place(
             origin.clone().apply { this.world = world },
             false,
@@ -5633,59 +5610,20 @@ class ArenaManager(
             1.0f,
             java.util.Random()
         )
-        return collectChangedLiftBlocks(world, origin, template, before)
     }
 
-    private fun clearTrackedLiftBlocksExceptOverlap(
+    private fun clearLiftLayer(
         world: World,
-        previousChangedBlocks: Set<LiftChangedBlock>,
-        previousStructureOrigin: Location?,
-        nextOrigin: Location,
-        template: EntranceLiftTemplate
+        baseLocation: Location,
+        template: EntranceLiftTemplate,
+        y: Int
     ) {
-        if (previousStructureOrigin == null) {
-            // First placement - clear all previous blocks
-            previousChangedBlocks.forEach { pos ->
-                val block = world.getBlockAt(pos.x, pos.y, pos.z)
-                if (block.type != Material.AIR) {
-                    block.setType(Material.AIR, false)
-                }
-            }
-            return
-        }
-
-        val templateSizeX = template.sizeX
-        val templateSizeZ = template.sizeZ
-
-        // Calculate previous structure bounds
-        val prevMinX = previousStructureOrigin?.blockX ?: 0
-        val prevMinY = previousStructureOrigin?.blockY ?: 0
-        val prevMinZ = previousStructureOrigin?.blockZ ?: 0
-        val prevMaxX = prevMinX + templateSizeX - 1
-        val prevMaxY = prevMinY + template.sizeY - 1
-        val prevMaxZ = prevMinZ + templateSizeZ - 1
-
-        // Calculate next structure bounds
-        val nextMinX = nextOrigin.blockX
-        val nextMinY = nextOrigin.blockY
-        val nextMinZ = nextOrigin.blockZ
-        val nextMaxX = nextMinX + templateSizeX - 1
-        val nextMaxY = nextMinY + template.sizeY - 1
-        val nextMaxZ = nextMinZ + templateSizeZ - 1
-
-        // Clear blocks that were in previous structure but not in next structure
-        previousChangedBlocks.forEach { pos ->
-            val x = pos.x
-            val y = pos.y
-            val z = pos.z
-
-            // Check if this position is in the previous structure
-            val inPrev = x in prevMinX..prevMaxX && y in prevMinY..prevMaxY && z in prevMinZ..prevMaxZ
-            // Check if this position is in the next structure
-            val inNext = x in nextMinX..nextMaxX && y in nextMinY..nextMaxY && z in nextMinZ..nextMaxZ
-
-            // If it was in previous but not in next, clear it
-            if (inPrev && !inNext) {
+        val minX = baseLocation.blockX
+        val maxX = minX + template.sizeX - 1
+        val minZ = baseLocation.blockZ
+        val maxZ = minZ + template.sizeZ - 1
+        for (x in minX..maxX) {
+            for (z in minZ..maxZ) {
                 val block = world.getBlockAt(x, y, z)
                 if (block.type != Material.AIR) {
                     block.setType(Material.AIR, false)
@@ -5694,99 +5632,58 @@ class ArenaManager(
         }
     }
 
-    private fun placeLiftCornerChains(
+    private fun clearLiftFootprint(
+        world: World,
+        origin: Location,
+        template: EntranceLiftTemplate
+    ) {
+        val minX = origin.blockX
+        val minY = origin.blockY
+        val minZ = origin.blockZ
+        val maxX = minX + template.sizeX - 1
+        val maxY = minY + template.sizeY - 1
+        val maxZ = minZ + template.sizeZ - 1
+        for (x in minX..maxX) {
+            for (y in minY..maxY) {
+                for (z in minZ..maxZ) {
+                    val block = world.getBlockAt(x, y, z)
+                    if (block.type != Material.AIR) {
+                        block.setType(Material.AIR, false)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun placeCornerChainsAtY(
         world: World,
         baseLocation: Location,
         template: EntranceLiftTemplate,
-        rise: Int,
-        chainBlocks: MutableSet<LiftChangedBlock>
+        y: Int
     ) {
-        val chainMaterial = Material.CHAIN
-        val chainY = baseLocation.blockY + rise + template.sizeY
-
         val corners = listOf(
             Pair(baseLocation.blockX, baseLocation.blockZ),
             Pair(baseLocation.blockX + template.sizeX - 1, baseLocation.blockZ),
             Pair(baseLocation.blockX, baseLocation.blockZ + template.sizeZ - 1),
             Pair(baseLocation.blockX + template.sizeX - 1, baseLocation.blockZ + template.sizeZ - 1)
         )
-
         corners.forEach { (x, z) ->
-            val block = world.getBlockAt(x, chainY, z)
+            val block = world.getBlockAt(x, y, z)
             if (block.type == Material.AIR) {
-                block.setType(chainMaterial, false)
-                chainBlocks.add(LiftChangedBlock(x, chainY, z))
+                block.setType(Material.CHAIN, false)
             }
         }
     }
 
-    private fun clearLiftChainBlocks(world: World, chainBlocks: MutableSet<LiftChangedBlock>) {
-        chainBlocks.forEach { pos ->
-            val block = world.getBlockAt(pos.x, pos.y, pos.z)
-            if (block.type == Material.CHAIN) {
-                block.setType(Material.AIR, false)
-            }
-        }
-        chainBlocks.clear()
-    }
-
-    private fun snapshotLiftBlocks(
+    private fun restoreLiftChainsInRange(
         world: World,
-        origin: Location,
-        template: EntranceLiftTemplate
-    ): Map<LiftChangedBlock, BlockData> {
-        val minX = origin.blockX
-        val minY = origin.blockY
-        val minZ = origin.blockZ
-        val maxX = minX + template.sizeX - 1
-        val maxY = minY + template.sizeY - 1
-        val maxZ = minZ + template.sizeZ - 1
-        val snapshot = LinkedHashMap<LiftChangedBlock, BlockData>()
-        for (x in minX..maxX) {
-            for (y in minY..maxY) {
-                for (z in minZ..maxZ) {
-                    val key = LiftChangedBlock(x, y, z)
-                    snapshot[key] = world.getBlockAt(x, y, z).blockData.clone()
-                }
-            }
-        }
-        return snapshot
-    }
-
-    private fun collectChangedLiftBlocks(
-        world: World,
-        origin: Location,
+        baseLocation: Location,
         template: EntranceLiftTemplate,
-        before: Map<LiftChangedBlock, BlockData>
-    ): Set<LiftChangedBlock> {
-        val minX = origin.blockX
-        val minY = origin.blockY
-        val minZ = origin.blockZ
-        val maxX = minX + template.sizeX - 1
-        val maxY = minY + template.sizeY - 1
-        val maxZ = minZ + template.sizeZ - 1
-        val changed = LinkedHashSet<LiftChangedBlock>()
-        for (x in minX..maxX) {
-            for (y in minY..maxY) {
-                for (z in minZ..maxZ) {
-                    val key = LiftChangedBlock(x, y, z)
-                    val beforeData = before[key] ?: continue
-                    val afterData = world.getBlockAt(x, y, z).blockData
-                    if (beforeData != afterData) {
-                        changed += key
-                    }
-                }
-            }
-        }
-        return changed
-    }
-
-    private fun clearTrackedLiftBlocks(world: World, blocks: Set<LiftChangedBlock>) {
-        blocks.forEach { pos ->
-            val block = world.getBlockAt(pos.x, pos.y, pos.z)
-            if (block.type != Material.AIR) {
-                block.setType(Material.AIR, false)
-            }
+        minY: Int,
+        maxY: Int
+    ) {
+        for (y in minY..maxY) {
+            placeCornerChainsAtY(world, baseLocation, template, y)
         }
     }
 
@@ -5795,12 +5692,12 @@ class ArenaManager(
         world: World,
         baseLocation: Location,
         liftTemplate: EntranceLiftTemplate,
-        liftResetTemplate: EntranceLiftTemplate
+        maxRise: Int
     ) {
         releaseEntranceLiftChunkTickets(session)
 
-        val footprintSizeX = maxOf(liftTemplate.sizeX, liftResetTemplate.sizeX)
-        val footprintSizeZ = maxOf(liftTemplate.sizeZ, liftResetTemplate.sizeZ)
+        val footprintSizeX = liftTemplate.sizeX
+        val footprintSizeZ = liftTemplate.sizeZ
         val minX = baseLocation.blockX
         val minZ = baseLocation.blockZ
         val maxX = minX + footprintSizeX - 1
@@ -5909,9 +5806,7 @@ class ArenaManager(
             return false
         }
         val template = resolveEntranceLiftTemplate() ?: return false
-        val resetTemplate = resolveEntranceLiftResetTemplate() ?: return false
-        return template.sizeX > 0 && template.sizeY > 0 && template.sizeZ > 0 &&
-            resetTemplate.sizeX > 0 && resetTemplate.sizeY > 0 && resetTemplate.sizeZ > 0
+        return template.sizeX > 0 && template.sizeY > 0 && template.sizeZ > 0
     }
 
     private fun findLoadedLobbyMarkers(world: World): List<Location> {
