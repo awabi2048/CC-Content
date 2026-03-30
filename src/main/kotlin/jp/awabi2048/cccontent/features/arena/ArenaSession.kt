@@ -41,6 +41,7 @@ data class ArenaDownedPlayerState(
     val downedAtMillis: Long,
     var bleedoutAtMillis: Long,
     var shulkerEntityId: UUID? = null,
+    var carrierEntityId: UUID? = null,
     var timeoutExecuteAtMillis: Long? = null,
     val reviveDisabled: Boolean = false
 )
@@ -149,6 +150,7 @@ data class ArenaSession(
     val arenaBgmPlaybackStartTickByParticipant: MutableMap<UUID, Long> = mutableMapOf(),
     val arenaBgmSwitchRequestByParticipant: MutableMap<UUID, ArenaBgmSwitchRequest?> = mutableMapOf(),
     val downedOriginalWalkSpeeds: MutableMap<UUID, Float> = mutableMapOf(),
+    val downedOriginalJumpStrengths: MutableMap<UUID, Double> = mutableMapOf(),
     val invitedParticipants: MutableSet<UUID> = mutableSetOf(),
     val sidebarParticipantOrder: MutableList<UUID> = mutableListOf(),
     val sidebarParticipantNames: MutableMap<UUID, String> = mutableMapOf(),
