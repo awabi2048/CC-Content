@@ -228,7 +228,6 @@ class ArenaManager(
         const val ARENA_BGM_COMBAT_BPM_DEFAULT = 140.0
         const val ARENA_BGM_LOOP_BEATS_DEFAULT = 384
         const val ARENA_BGM_SWITCH_INTERVAL_BEATS_DEFAULT = 8
-        const val ARENA_BGM_TARGET_STATE_SWITCH_THRESHOLD_SECONDS_DEFAULT = 10
         const val ACTION_MARKER_RADIUS = 1.0
         const val ACTION_MARKER_RADIUS_SQUARED = ACTION_MARKER_RADIUS * ACTION_MARKER_RADIUS
         const val ACTION_MARKER_OUTER_RING_RADIUS = 1.0
@@ -310,7 +309,6 @@ class ArenaManager(
     private var sharedWaveMaxAlive = SHARED_WAVE_MAX_ALIVE_DEFAULT
     private var arenaDoorAnimationSoundKey = "minecraft:block.iron_door.open"
     private var arenaDoorAnimationSoundPitch = 1.0f
-    private var arenaBgmTargetStateSwitchThresholdMillis = ARENA_BGM_TARGET_STATE_SWITCH_THRESHOLD_SECONDS_DEFAULT * 1000L
     private var arenaQuestService: ArenaQuestService? = null
     private var arenaBgmConfig = ArenaBgmConfig(
         normal = ArenaBgmTrackConfig(
@@ -401,12 +399,6 @@ class ArenaManager(
             .getDouble("arena.door_animation.sound.pitch", 1.0)
             .toFloat()
             .coerceIn(0.5f, 2.0f)
-        arenaBgmTargetStateSwitchThresholdMillis = config
-            .getLong(
-                "arena.bgm.target_state_switch_threshold_seconds",
-                ARENA_BGM_TARGET_STATE_SWITCH_THRESHOLD_SECONDS_DEFAULT.toLong()
-            )
-            .coerceAtLeast(0L) * 1000L
         sharedWaveMaxAlive = config.getInt("arena.mob_spawn.system_max_alive", SHARED_WAVE_MAX_ALIVE_DEFAULT)
             .coerceAtLeast(1)
         maxConcurrentSessions = config
@@ -2326,11 +2318,7 @@ class ArenaManager(
         session.actionMarkerHoldStates.remove(playerId)
         session.arenaBgmModeByParticipant.remove(playerId)
         session.arenaBgmPlaybackStartTickByParticipant.remove(playerId)
-        session.arenaCombatHadTargetingMobByParticipant.remove(playerId)
         session.arenaBgmSwitchRequestByParticipant.remove(playerId)
-        session.arenaBgmTargetingStateByParticipant.remove(playerId)
-        session.arenaBgmTargetingStateChangedAtMillisByParticipant.remove(playerId)
-        session.arenaLastTargetDrivenSwitchAtMillisByParticipant.remove(playerId)
         session.playerWaveCatchupDeadlineMillis.remove(playerId)
         clearReviveBindingByReviver(session, playerId)
         clearDownedState(session, playerId)
@@ -2454,11 +2442,7 @@ class ArenaManager(
         session.reviveCountByPlayer.clear()
         session.arenaBgmModeByParticipant.clear()
         session.arenaBgmPlaybackStartTickByParticipant.clear()
-        session.arenaCombatHadTargetingMobByParticipant.clear()
         session.arenaBgmSwitchRequestByParticipant.clear()
-        session.arenaBgmTargetingStateByParticipant.clear()
-        session.arenaBgmTargetingStateChangedAtMillisByParticipant.clear()
-        session.arenaLastTargetDrivenSwitchAtMillisByParticipant.clear()
         session.downedOriginalWalkSpeeds.clear()
         session.invitedParticipants.clear()
         session.sidebarParticipantOrder.clear()
@@ -4533,7 +4517,6 @@ class ArenaManager(
         participantId: UUID,
         targetMode: ArenaBgmMode,
         currentTick: Long,
-        targetDriven: Boolean = false,
         strictNextBoundary: Boolean = false
     ) {
         val currentMode = participantArenaBgmMode(session, participantId)
@@ -4541,7 +4524,6 @@ class ArenaManager(
 
         if (currentRequest != null &&
             currentRequest.targetMode == targetMode &&
-            currentRequest.targetDriven == targetDriven &&
             currentRequest.strictNextBoundary == strictNextBoundary
         ) {
             return
@@ -4551,13 +4533,10 @@ class ArenaManager(
             return
         }
 
-        if (targetDriven && targetMode == ArenaBgmMode.NORMAL && isWaveInProgress(session)) return
-
         session.arenaBgmSwitchRequestByParticipant[participantId] = ArenaBgmSwitchRequest(
             targetMode = targetMode,
             requestedAtTick = currentTick,
-            strictNextBoundary = strictNextBoundary,
-            targetDriven = targetDriven
+            strictNextBoundary = strictNextBoundary
         )
     }
 
@@ -4576,24 +4555,11 @@ class ArenaManager(
     }
 
     private fun updateArenaCombatBgmRequest(session: ArenaSession, participantId: UUID, currentTick: Long) {
-        val now = System.currentTimeMillis()
-        val hasTargetingMob = hasMobTargetingParticipant(session, participantId)
-        session.arenaBgmTargetingStateByParticipant[participantId] = hasTargetingMob
-        session.arenaBgmTargetingStateChangedAtMillisByParticipant.putIfAbsent(participantId, now)
-
         val currentMode = participantArenaBgmMode(session, participantId)
-        if (currentMode == ArenaBgmMode.STOPPED) {
-            if (hasTargetingMob) {
-                session.arenaCombatHadTargetingMobByParticipant[participantId] = true
-            }
-            return
-        }
+        if (currentMode == ArenaBgmMode.STOPPED) return
 
-        val desiredMode = if (hasTargetingMob) ArenaBgmMode.COMBAT else ArenaBgmMode.NORMAL
+        val desiredMode = if (hasAnyAliveCombatMob(session)) ArenaBgmMode.COMBAT else ArenaBgmMode.NORMAL
         val currentRequest = session.arenaBgmSwitchRequestByParticipant[participantId]
-        if (hasTargetingMob) {
-            session.arenaCombatHadTargetingMobByParticipant[participantId] = true
-        }
 
         if (currentRequest?.targetMode == desiredMode) return
 
@@ -4601,30 +4567,23 @@ class ArenaManager(
             return
         }
 
-        if (currentRequest == null && currentMode != desiredMode && !canTriggerTargetDrivenBgmSwitch(session, participantId, now)) {
-            return
-        }
-
-        if (desiredMode == ArenaBgmMode.NORMAL && isWaveInProgress(session)) return
-
         requestArenaBgmModeForParticipant(
             session,
             participantId,
             desiredMode,
-            currentTick,
-            targetDriven = true
+            currentTick
         )
     }
 
-    private fun canTriggerTargetDrivenBgmSwitch(session: ArenaSession, participantId: UUID, nowMillis: Long): Boolean {
-        val lastSwitchAt = session.arenaLastTargetDrivenSwitchAtMillisByParticipant[participantId] ?: return true
-        return nowMillis - lastSwitchAt >= arenaBgmTargetStateSwitchThresholdMillis
-    }
-
-    private fun isWaveInProgress(session: ArenaSession): Boolean {
-        val wave = session.currentWave.coerceIn(1, session.waves)
-        if (!session.startedWaves.contains(wave)) return false
-        return !session.clearedWaves.contains(wave)
+    private fun hasAnyAliveCombatMob(session: ArenaSession): Boolean {
+        val trackedMobIds = sequence {
+            yieldAll(session.activeMobs)
+            yieldAll(session.barrierDefenseMobIds)
+        }
+        return trackedMobIds.any { mobId ->
+            val mob = Bukkit.getEntity(mobId) as? Mob ?: return@any false
+            mob.isValid && !mob.isDead && mob.world.name == session.worldName
+        }
     }
 
     private fun hasMobTargetingParticipant(session: ArenaSession, participantId: UUID): Boolean {
@@ -4661,8 +4620,7 @@ class ArenaManager(
 
         val currentTrack = arenaBgmTrackForMode(currentMode) ?: return
         val absoluteBeatNow = currentAbsoluteBeatAtTick(session, participantId, currentTrack, currentTick)
-        val switchInterval = (currentTrack.switchIntervalBeats.toLong().coerceAtLeast(1L) * if (request.targetDriven) 4L else 1L)
-            .coerceAtLeast(1L)
+        val switchInterval = currentTrack.switchIntervalBeats.toLong().coerceAtLeast(1L)
         val beatOffset = (absoluteBeatNow - 1L).mod(switchInterval)
         if (beatOffset != 0L) {
             return
@@ -4676,7 +4634,7 @@ class ArenaManager(
         }
 
         session.arenaBgmSwitchRequestByParticipant.remove(participantId)
-        val resolvedTargetMode = resolveBgmTargetModeBeforeSwitch(session, participantId, currentMode, request.targetMode, request.targetDriven)
+        val resolvedTargetMode = request.targetMode
         if (resolvedTargetMode == ArenaBgmMode.STOPPED) {
             stopArenaBgmForParticipant(session, participantId)
             return
@@ -4686,34 +4644,6 @@ class ArenaManager(
         }
 
         startArenaBgmMode(session, participantId, resolvedTargetMode, currentTick)
-        if (request.targetDriven) {
-            session.arenaLastTargetDrivenSwitchAtMillisByParticipant[participantId] = System.currentTimeMillis()
-        }
-    }
-
-    private fun resolveBgmTargetModeBeforeSwitch(
-        session: ArenaSession,
-        participantId: UUID,
-        currentMode: ArenaBgmMode,
-        requestedTargetMode: ArenaBgmMode,
-        targetDriven: Boolean
-    ): ArenaBgmMode {
-        if (!targetDriven) {
-            return requestedTargetMode
-        }
-        if (currentMode == ArenaBgmMode.STOPPED) {
-            return requestedTargetMode
-        }
-        if (requestedTargetMode == ArenaBgmMode.STOPPED) {
-            return ArenaBgmMode.STOPPED
-        }
-
-        val hasTargetingMob = hasMobTargetingParticipant(session, participantId)
-        return when {
-            hasTargetingMob -> ArenaBgmMode.COMBAT
-            currentMode == ArenaBgmMode.COMBAT -> ArenaBgmMode.NORMAL
-            else -> ArenaBgmMode.NORMAL
-        }
     }
 
     private fun currentAbsoluteBeatAtTick(
@@ -4736,11 +4666,7 @@ class ArenaManager(
         }
         session.arenaBgmModeByParticipant[participantId] = mode
         session.arenaBgmPlaybackStartTickByParticipant[participantId] = startTick
-        session.arenaCombatHadTargetingMobByParticipant[participantId] = false
         session.arenaBgmSwitchRequestByParticipant.remove(participantId)
-        val hasTargetingMob = hasMobTargetingParticipant(session, participantId)
-        session.arenaBgmTargetingStateByParticipant[participantId] = hasTargetingMob
-        session.arenaBgmTargetingStateChangedAtMillisByParticipant[participantId] = System.currentTimeMillis()
         if (mode == ArenaBgmMode.NORMAL) {
             tryBroadcastPendingWaveClearedMessageOnNormalBgm(session)
         }
@@ -4761,11 +4687,7 @@ class ArenaManager(
         }
         session.arenaBgmModeByParticipant[participantId] = ArenaBgmMode.STOPPED
         session.arenaBgmPlaybackStartTickByParticipant[participantId] = 0L
-        session.arenaCombatHadTargetingMobByParticipant[participantId] = false
         session.arenaBgmSwitchRequestByParticipant.remove(participantId)
-        session.arenaBgmTargetingStateByParticipant.remove(participantId)
-        session.arenaBgmTargetingStateChangedAtMillisByParticipant.remove(participantId)
-        session.arenaLastTargetDrivenSwitchAtMillisByParticipant.remove(participantId)
     }
 
     private fun participantArenaBgmMode(session: ArenaSession, participantId: UUID): ArenaBgmMode {

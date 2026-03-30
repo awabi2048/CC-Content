@@ -34,8 +34,7 @@ enum class ArenaBgmMode {
 data class ArenaBgmSwitchRequest(
     val targetMode: ArenaBgmMode,
     val requestedAtTick: Long,
-    val strictNextBoundary: Boolean = false,
-    val targetDriven: Boolean = false
+    val strictNextBoundary: Boolean = false
 )
 
 data class ArenaDownedPlayerState(
@@ -147,11 +146,7 @@ data class ArenaSession(
     val reviveTimeLimitSeconds: Int = 0,
     val arenaBgmModeByParticipant: MutableMap<UUID, ArenaBgmMode> = mutableMapOf(),
     val arenaBgmPlaybackStartTickByParticipant: MutableMap<UUID, Long> = mutableMapOf(),
-    val arenaCombatHadTargetingMobByParticipant: MutableMap<UUID, Boolean> = mutableMapOf(),
     val arenaBgmSwitchRequestByParticipant: MutableMap<UUID, ArenaBgmSwitchRequest?> = mutableMapOf(),
-    val arenaLastTargetDrivenSwitchAtMillisByParticipant: MutableMap<UUID, Long> = mutableMapOf(),
-    val arenaBgmTargetingStateByParticipant: MutableMap<UUID, Boolean> = mutableMapOf(),
-    val arenaBgmTargetingStateChangedAtMillisByParticipant: MutableMap<UUID, Long> = mutableMapOf(),
     val downedOriginalWalkSpeeds: MutableMap<UUID, Float> = mutableMapOf(),
     val invitedParticipants: MutableSet<UUID> = mutableSetOf(),
     val sidebarParticipantOrder: MutableList<UUID> = mutableListOf(),
