@@ -1142,18 +1142,30 @@ arena:
     oage:
       stage_start:
         - '§f現地に到着しました！おねがいしますね！'
+      combat_all_engaged:
+        - 'なかなか手強いですね…！'
+      combat_all_calm:
+        - 'いい感じです！この調子でがんばりましょう！'
       wave_cleared:
         - 'ひとまず安全ですね！態勢を整えて次のウェーブに進みましょう！'
+      wave_cleared_full_room:
+        - '今です！行きましょう！'
       wave_clear_wait:
         - '扉の前のマーカーに近づくと、何かわかりそうです！'
       final_wave_start:
         - '真ん中のものが結界石です！周囲のマーカーをすべて活性化させると再起動が始まります！'
+      barrier_restart_started:
+        - '結界解除後はモンスターが寄り付きやすくなります！気をつけて！'
       barrier_restart_remaining_2_3:
         - '再起動は順調です！持ちこたえてくださいー！'
       barrier_restart_remaining_1_3:
         - 'あとちょっとです...！'
-      barrier_restart_complete:
-        - '結界石の再起動、完了しました！'
+      game_over_followup:
+        - 'いま行きます！ちょっと待ってね'
+      participant_died_followup:
+        - 'いま助けに行きますー！'
+      down_with_survivors:
+        - 'お疲れさま！他のみなさんの様子はここからでも確認できますよ！'
     barrier:
       cannot_break: '&c結界石は破壊できません'
       cannot_place_on: '&c結界石の上には設置できません'
