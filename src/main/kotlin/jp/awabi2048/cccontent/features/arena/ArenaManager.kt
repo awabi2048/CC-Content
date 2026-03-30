@@ -1275,19 +1275,24 @@ class ArenaManager(
 
     fun handleArenaEntityMount(event: EntityMountEvent) {
         val player = event.entity as? Player ?: return
-        val shulker = event.mount as? Shulker ?: return
         val session = getSession(player) ?: return
         if (!session.participants.contains(player.uniqueId)) return
-        if (isPlayerDowned(session, player.uniqueId)) return
-        val downedId = findDownedPlayerIdByShulker(session, shulker.uniqueId) ?: return
+
+        val mount = event.mount
+        val shulkerId = (mount as? Shulker)?.uniqueId
+        val carrierId = (mount as? ArmorStand)?.uniqueId
+
+        val downedId = shulkerId?.let { findDownedPlayerIdByShulker(session, it) }
+            ?: carrierId?.let { findDownedPlayerIdByCarrier(session, it) }
+            ?: return
         if (downedId == player.uniqueId) return
 
         event.isCancelled = true
         Bukkit.getScheduler().runTask(plugin, Runnable {
-            if (shulker.passengers.contains(player)) {
-                shulker.removePassenger(player)
+            if (mount.passengers.contains(player)) {
+                mount.removePassenger(player)
             }
-            val base = shulker.location.block.location.add(1.5, 0.0, 0.5)
+            val base = mount.location.block.location.add(1.5, 0.0, 0.5)
             val destination = if (base.block.isPassable) base else base.clone().add(0.0, 1.0, 0.0)
             player.teleport(destination)
         })
@@ -1296,6 +1301,12 @@ class ArenaManager(
     private fun findDownedPlayerIdByShulker(session: ArenaSession, shulkerId: UUID): UUID? {
         return session.downedPlayers.entries
             .firstOrNull { it.value.shulkerEntityId == shulkerId }
+            ?.key
+    }
+
+    private fun findDownedPlayerIdByCarrier(session: ArenaSession, carrierId: UUID): UUID? {
+        return session.downedPlayers.entries
+            .firstOrNull { it.value.carrierEntityId == carrierId }
             ?.key
     }
 
@@ -1671,6 +1682,10 @@ class ArenaManager(
         )
         session.reviveHoldStates[player.uniqueId] = ArenaReviveHoldState()
         session.downedOriginalWalkSpeeds.putIfAbsent(player.uniqueId, player.walkSpeed)
+        player.getAttribute(Attribute.JUMP_STRENGTH)?.let { attr ->
+            session.downedOriginalJumpStrengths.putIfAbsent(player.uniqueId, attr.baseValue)
+            attr.baseValue = 0.0
+        }
 
         player.health = 1.0
         player.fireTicks = 0
@@ -2028,8 +2043,17 @@ class ArenaManager(
 
     private fun syncDownedShulker(session: ArenaSession, downed: Player, forceTeleport: Boolean) {
         val downState = session.downedPlayers[downed.uniqueId] ?: return
-        val anchor = downed.location.block.location.add(0.5, 1.0, 0.5)
+        val loc = downed.location
+        val anchor = Location(loc.world, loc.x, loc.y + 0.8, loc.z, loc.yaw, loc.pitch)
         val world = anchor.world ?: return
+
+        val carrier = downState.carrierEntityId
+            ?.let { Bukkit.getEntity(it) as? ArmorStand }
+            ?.takeIf { it.isValid && !it.isDead }
+            ?: (world.spawnEntity(anchor, EntityType.ARMOR_STAND) as ArmorStand).also { spawned ->
+                configureDownedCarrier(spawned)
+                downState.carrierEntityId = spawned.uniqueId
+            }
 
         val shulker = downState.shulkerEntityId
             ?.let { Bukkit.getEntity(it) as? Shulker }
@@ -2039,11 +2063,25 @@ class ArenaManager(
                 downState.shulkerEntityId = spawned.uniqueId
             }
 
-        if (forceTeleport || shulker.location.distanceSquared(anchor) > 0.01) {
-            shulker.teleport(anchor)
+        if (!carrier.passengers.contains(shulker)) {
+            carrier.addPassenger(shulker)
+        }
+
+        if (forceTeleport || carrier.location.distanceSquared(anchor) > 0.01) {
+            carrier.teleport(anchor)
         }
 
         ejectAlivePassengersFromDownedShulker(session, shulker)
+    }
+
+    private fun configureDownedCarrier(armorStand: ArmorStand) {
+        armorStand.setGravity(false)
+        armorStand.isInvulnerable = true
+        armorStand.isSilent = true
+        armorStand.isPersistent = true
+        armorStand.isVisible = false
+        armorStand.isMarker = true
+        armorStand.addScoreboardTag("arena.down.carrier")
     }
 
     private fun configureDownedShulker(shulker: Shulker) {
@@ -2083,12 +2121,19 @@ class ArenaManager(
         val downState = session.downedPlayers.remove(playerId)
         session.reviveHoldStates.remove(playerId)
         restoreDownedWalkSpeed(session, playerId)
+        restoreDownedJumpStrength(session, playerId)
 
         val shulker = downState?.shulkerEntityId?.let { Bukkit.getEntity(it) as? Shulker }
         if (shulker != null && shulker.isValid && !shulker.isDead) {
             shulker.remove()
         }
         downState?.shulkerEntityId = null
+
+        val carrier = downState?.carrierEntityId?.let { Bukkit.getEntity(it) as? ArmorStand }
+        if (carrier != null && carrier.isValid && !carrier.isDead) {
+            carrier.remove()
+        }
+        downState?.carrierEntityId = null
     }
 
     private fun restoreDownedWalkSpeed(session: ArenaSession, playerId: UUID) {
@@ -2098,6 +2143,13 @@ class ArenaManager(
             return
         }
         player.walkSpeed = originalSpeed
+    }
+
+    private fun restoreDownedJumpStrength(session: ArenaSession, playerId: UUID) {
+        val originalStrength = session.downedOriginalJumpStrengths.remove(playerId) ?: return
+        val player = Bukkit.getPlayer(playerId) ?: return
+        if (!player.isOnline) return
+        player.getAttribute(Attribute.JUMP_STRENGTH)?.baseValue = originalStrength
     }
 
     private fun resolveSessionLobbyLocation(session: ArenaSession): Location? {
@@ -2473,6 +2525,7 @@ class ArenaManager(
         session.arenaBgmPlaybackStartTickByParticipant.clear()
         session.arenaBgmSwitchRequestByParticipant.clear()
         session.downedOriginalWalkSpeeds.clear()
+        session.downedOriginalJumpStrengths.clear()
         session.invitedParticipants.clear()
         session.sidebarParticipantOrder.clear()
         session.sidebarParticipantNames.clear()
