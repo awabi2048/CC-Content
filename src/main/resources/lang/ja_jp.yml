@@ -962,6 +962,18 @@ custom_items:
         - '§7手に持って§eShiftを2回§7でメニューを開きます。'
         - '§7§eShift+スクロール§7で使用対象を切り替えます。'
   arena:
+    structure_marker_tool:
+      name: '§6アリーナ構造マーカーツール'
+      lore:
+        - '§7アリーナ構造用マーカーを設置します'
+    other_marker_tool:
+      name: '§6アリーナ補助マーカーツール'
+      lore:
+        - '§7待機/ロビー用マーカーを設置します'
+    lift_tool:
+      name: '§6アリーナリフト設置ツール'
+      lore:
+        - '§7リフトマーカー専用ツール'
     ticket:
       name: '§6アリーナチケット'
       lore:
@@ -1060,6 +1072,7 @@ arena:
       entrance: '&a入口'
       join_area: '&f参加エリア'
       lobby: '&bロビー'
+      lift: '&dリフト'
       connection: '&6接続部'
       door_block: '&e扉'
       barrier_core: '&b結界核'
@@ -1082,6 +1095,8 @@ arena:
         start: '&c使用法: /arenaa start <player|@s> <mob_type> <difficulty> [theme]'
         stop: '&c使用法: /arenaa stop <player>'
         theme: '&c使用法: /arenaa theme list'
+      start_error:
+        lift_not_ready: '&cリフトの準備ができていないため開始できません'
       help:
         header: '&6=== Arena 管理コマンド ==='
         start: '&f/arenaa start <player|@s> <mob_type> <difficulty> [theme]'
@@ -1110,6 +1125,7 @@ arena:
       wait_area_hint: '&7招待したプレイヤーと開始待機エリアに入ると待機状態になります'
       waiting_entered: '&a開始待機エリアに入りました。猶予終了まで待機してください'
       waiting_exited: '§cリフトから降りました。参加する場合は乗って待機してください！'
+      lift_not_ready_oage: '§f「リフトの準備が出来ていないみたいです！ちょっとまってね！」'
       waiting_title: '&7参加待機中'
       stage_wait_title: '&7アリーナを準備中...'
       invite_sent: '&a{player} に招待を送信しました'

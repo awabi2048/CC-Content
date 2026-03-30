@@ -32,6 +32,7 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import org.bukkit.util.BoundingBox
 import org.bukkit.util.Vector
+import java.io.File
 import java.util.UUID
 import kotlin.math.round
 
@@ -68,11 +69,13 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         private const val DELETE_PREVIEW_DUST_SIZE = 0.75f
         private const val PREVIEW_INTERVAL_TICKS = 2L
         private const val MARKER_PARTICLE_INTERVAL_TICKS = 10L
+        private const val ARENA_LIFT_STRUCTURE_PATH = "structures/arena/lift.nbt"
     }
 
     private val toolIdKey = NamespacedKey(plugin, "admin_marker_tool_type")
     private val modeIdKey = NamespacedKey(plugin, "admin_marker_tool_mode")
     private val lastSwitchTime = mutableMapOf<UUID, Long>()
+    private var cachedArenaLiftSize: Triple<Int, Int, Int>? = null
     private val definitions = listOf(
         MarkerToolDefinition(
             toolId = "sukima_dungeon.marker_tool",
@@ -95,19 +98,38 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             }
         ),
         MarkerToolDefinition(
-            toolId = "arena.marker_tool",
-            displayName = "§6アリーナ管理マーカーツール",
+            toolId = "arena.structure_marker_tool",
+            displayName = "§6アリーナ構造マーカーツール",
             itemModel = NamespacedKey.minecraft("blaze_rod"),
             messageKeyPrefix = "marker",
             modes = listOf(
                 MarkerToolMode("mob", "arena.marker.mob", "modes.mob", "§cモブ", Particle.FLAME, Color.fromRGB(255, 96, 96)),
                 MarkerToolMode("entrance", "arena.marker.entrance", "modes.entrance", "§a入口", Particle.HAPPY_VILLAGER, Color.fromRGB(96, 255, 128)),
-                MarkerToolMode("join_area", "arena.marker.join_area", "modes.join_area", "§f参加エリア", Particle.END_ROD, Color.fromRGB(240, 240, 240)),
-                MarkerToolMode("lobby", "arena.marker.lobby", "modes.lobby", "§bロビー", Particle.SOUL, Color.fromRGB(96, 224, 255)),
                 MarkerToolMode("connection", "arena.marker.connection", "modes.connection", "§6接続部", Particle.CRIT, Color.fromRGB(255, 176, 64)),
                 MarkerToolMode("door_block", "arena.marker.door_block", "modes.door_block", "§e扉", Particle.WAX_OFF, Color.fromRGB(255, 224, 96)),
                 MarkerToolMode("barrier_core", "arena.marker.barrier_core", "modes.barrier_core", "§b結界核", Particle.END_ROD, Color.fromRGB(96, 224, 255)),
                 MarkerToolMode("barrier_point", "arena.marker.barrier_point", "modes.barrier_point", "§3結界起動点", Particle.GLOW, Color.fromRGB(128, 200, 255))
+            ),
+            unavailableMessage = { null }
+        ),
+        MarkerToolDefinition(
+            toolId = "arena.other_marker_tool",
+            displayName = "§6アリーナ補助マーカーツール",
+            itemModel = NamespacedKey.minecraft("blaze_rod"),
+            messageKeyPrefix = "marker",
+            modes = listOf(
+                MarkerToolMode("join_area", "arena.marker.join_area", "modes.join_area", "§f参加エリア", Particle.END_ROD, Color.fromRGB(240, 240, 240)),
+                MarkerToolMode("lobby", "arena.marker.lobby", "modes.lobby", "§bロビー", Particle.SOUL, Color.fromRGB(96, 224, 255))
+            ),
+            unavailableMessage = { null }
+        ),
+        MarkerToolDefinition(
+            toolId = "arena.lift_tool",
+            displayName = "§6アリーナリフト設置ツール",
+            itemModel = NamespacedKey.minecraft("blaze_rod"),
+            messageKeyPrefix = "marker",
+            modes = listOf(
+                MarkerToolMode("lift", "arena.marker.lift", "modes.lift", "§dリフト", Particle.END_ROD, Color.fromRGB(216, 128, 255))
             ),
             unavailableMessage = { null }
         )
@@ -234,14 +256,15 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         fallback: String,
         vararg placeholders: Pair<String, Any?>
     ): String {
-        val fullKey = if (definition.toolId == "arena.marker_tool") {
+        val fullKey = if (definition.toolId.startsWith("arena.")) {
             "arena.${definition.messageKeyPrefix}.$keySuffix"
         } else {
             "${definition.messageKeyPrefix}.$keySuffix"
         }
 
         return when (definition.toolId) {
-            "arena.marker_tool" -> ArenaI18n.text(player, fullKey, fallback, *placeholders)
+            "arena.structure_marker_tool", "arena.other_marker_tool", "arena.lift_tool" ->
+                ArenaI18n.text(player, fullKey, fallback, *placeholders)
             "sukima_dungeon.marker_tool" -> MessageManager.getMessage(
                 player,
                 fullKey,
@@ -358,15 +381,50 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                         }
                         val placementPreview = resolvePlacementPreview(player) ?: continue
                         val mode = getMode(item, definition)
-                        drawDustLocationCubeOutline(placementPreview, 0.5, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
+                        drawPlacementPreview(placementPreview, mode)
                     } else {
                         val preview = resolvePlacementPreview(player) ?: continue
                         val mode = getMode(item, definition)
-                        drawDustLocationCubeOutline(preview, 0.5, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
+                        drawPlacementPreview(preview, mode)
                     }
                 }
             }
         }.runTaskTimer(plugin, PREVIEW_INTERVAL_TICKS, PREVIEW_INTERVAL_TICKS)
+    }
+
+    private fun drawPlacementPreview(location: Location, mode: MarkerToolMode) {
+        if (mode.id == "lift") {
+            val world = location.world ?: return
+            val liftSize = resolveArenaLiftSize()
+            if (liftSize != null) {
+                val minX = location.blockX.toDouble()
+                val minY = location.blockY.toDouble()
+                val minZ = location.blockZ.toDouble()
+                val maxX = minX + liftSize.first.toDouble()
+                val maxY = minY + liftSize.second.toDouble()
+                val maxZ = minZ + liftSize.third.toDouble()
+                drawDustOutline(world, minX, minY, minZ, maxX, maxY, maxZ, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
+                return
+            }
+        }
+        drawDustLocationCubeOutline(location, 0.5, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
+    }
+
+    private fun resolveArenaLiftSize(): Triple<Int, Int, Int>? {
+        cachedArenaLiftSize?.let { return it }
+        val file = File(plugin.dataFolder, ARENA_LIFT_STRUCTURE_PATH)
+        if (!file.exists()) {
+            return null
+        }
+        return runCatching {
+            val structure = org.bukkit.Bukkit.getStructureManager().loadStructure(file)
+            val size = structure.size
+            if (size.blockX <= 0 || size.blockY <= 0 || size.blockZ <= 0) {
+                return null
+            }
+            Triple(size.blockX, size.blockY, size.blockZ)
+        }.getOrNull()
+            ?.also { cachedArenaLiftSize = it }
     }
 
     private fun startMarkerParticleTask() {

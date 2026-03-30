@@ -44,9 +44,11 @@ import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.block.structure.Mirror
 import org.bukkit.block.structure.StructureRotation
 import org.bukkit.block.data.Waterlogged
+import org.bukkit.block.data.BlockData
 import org.bukkit.entity.Entity
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.Ageable
+import org.bukkit.entity.ArmorStand
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Marker
 import org.bukkit.entity.Mob
@@ -57,6 +59,7 @@ import org.bukkit.entity.Zombie
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
+import org.bukkit.event.entity.EntityDismountEvent
 import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
 import org.bukkit.event.block.BlockBreakEvent
@@ -190,6 +193,19 @@ private data class ArenaBgmConfig(
     val combat: ArenaBgmTrackConfig
 )
 
+private data class EntranceLiftTemplate(
+    val sizeX: Int,
+    val sizeY: Int,
+    val sizeZ: Int,
+    val structure: org.bukkit.structure.Structure
+)
+
+private data class LiftChangedBlock(
+    val x: Int,
+    val y: Int,
+    val z: Int
+)
+
 class ArenaManager(
     private val plugin: JavaPlugin,
     private val mobService: MobService = MobService(plugin)
@@ -243,11 +259,8 @@ class ArenaManager(
         const val MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT = 45
         const val MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT = 16.0
         const val MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT = 6
-        const val MULTIPLAYER_STAGE_INTRO_SOUND_REPEAT = 5
-        const val MULTIPLAYER_STAGE_INTRO_SOUND_INTERVAL_TICKS = 10L
         const val WAVE_START_COMBAT_BGM_DELAY_TICKS = 0L
         const val ENTRANCE_BGM_START_DELAY_TICKS = 30L
-        const val MULTIPLAYER_STAGE_INTRO_TELEPORT_EXTRA_DELAY_TICKS = 20L
         const val MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS = 5L
         const val OAGE_FOLLOWUP_DELAY_TICKS = 60L
         const val OAGE_COMBAT_MONITOR_INTERVAL_TICKS = 1200L
@@ -257,12 +270,16 @@ class ArenaManager(
         const val DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT = 2L
         const val DOWN_GAME_OVER_BLINDNESS_TICKS = 200
         const val DOWN_GAME_OVER_RETURN_DELAY_MILLIS = 8000L
-        const val MULTIPLAYER_STAGE_INTRO_PREPARING_DURATION_MILLIS = 6000L
         const val REVIVE_LINK_TIMEOUT_TICKS = 200L
         const val DOWNED_PLAYER_WALK_SPEED = 0.1f
         const val DOWNED_GAME_OVER_WALK_SPEED = 0.0f
         const val ARENA_SIDEBAR_OBJECTIVE_NAME = "arena"
         const val ARENA_SIDEBAR_MAX_LINES = 15
+        const val ENTRANCE_LIFT_STRUCTURE_PATH = "structures/arena/lift.nbt"
+        const val ENTRANCE_LIFT_RESET_STRUCTURE_PATH = "structures/arena/lift_reset.nbt"
+        const val ENTRANCE_LIFT_INTERVAL_TICKS_DEFAULT = 10L
+        const val ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT = 2
+        const val ENTRANCE_LIFT_MAX_RISE_BLOCKS_DEFAULT = 6
 
         fun defaultSwitchIntervalBeats(): Int {
             return ARENA_BGM_SWITCH_INTERVAL_BEATS_DEFAULT
@@ -297,6 +314,11 @@ class ArenaManager(
     private var multiplayerJoinMarkerSearchRadius = MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
     private var multiplayerInviteAutoDeclineDistance = MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
     private var multiplayerStageBuildStepsPerTick = 1
+    private var entranceLiftIntervalTicks = ENTRANCE_LIFT_INTERVAL_TICKS_DEFAULT
+    private var entranceLiftTransferRiseBlocks = ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT
+    private var entranceLiftMaxRiseBlocks = ENTRANCE_LIFT_MAX_RISE_BLOCKS_DEFAULT
+    private var cachedEntranceLiftTemplate: EntranceLiftTemplate? = null
+    private var cachedEntranceLiftResetTemplate: EntranceLiftTemplate? = null
     private var maxConcurrentSessions = ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT
     private var arenaPoolSize = ARENA_POOL_SIZE_DEFAULT
     private var cleanupBlocksPerTick = ARENA_CLEANUP_BLOCKS_PER_TICK_DEFAULT
@@ -350,6 +372,8 @@ class ArenaManager(
     private fun loadBattleConfigs() {
         val difficultyFile = ensureArenaConfig("config/arena/difficulty.yml")
         val dropFile = ensureArenaConfig("config/arena/drop.yml")
+        cachedEntranceLiftTemplate = null
+        cachedEntranceLiftResetTemplate = null
 
         loadBarrierRestartConfig()
         loadArenaBgmConfig()
@@ -379,6 +403,15 @@ class ArenaManager(
         multiplayerStageBuildStepsPerTick = config
             .getInt("arena.multiplayer.stage_build_steps_per_tick", 1)
             .coerceAtLeast(1)
+        entranceLiftIntervalTicks = config
+            .getLong("arena.entrance_lift.interval_ticks", ENTRANCE_LIFT_INTERVAL_TICKS_DEFAULT)
+            .coerceAtLeast(1L)
+        entranceLiftMaxRiseBlocks = config
+            .getInt("arena.entrance_lift.max_rise_blocks", ENTRANCE_LIFT_MAX_RISE_BLOCKS_DEFAULT)
+            .coerceAtLeast(1)
+        entranceLiftTransferRiseBlocks = config
+            .getInt("arena.entrance_lift.transfer_rise_blocks", ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT)
+            .coerceIn(0, entranceLiftMaxRiseBlocks)
         downReviveHoldSeconds = config
             .getInt("arena.down.revive_hold_seconds", DOWN_REVIVE_HOLD_SECONDS_DEFAULT)
             .coerceAtLeast(1)
@@ -658,15 +691,24 @@ class ArenaManager(
             ))
         }
 
-        val joinAreaMarkers = if (enableMultiplayerJoin) {
-            findNearbyJoinAreaMarkers(target.location, multiplayerJoinMarkerSearchRadius)
+        val sanitizedMaxParticipants = maxParticipants.coerceIn(1, MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
+        if (participantPlayers.size > sanitizedMaxParticipants) {
+            return completed(ArenaStartResult.Error(
+                "arena.messages.command.start_error.too_many_participants",
+                "&c参加人数が上限を超えています ({count}/{max})",
+                arrayOf("count" to participantPlayers.size, "max" to sanitizedMaxParticipants)
+            ))
+        }
+
+        val liftMarkers = if (enableMultiplayerJoin) {
+            findNearbyLiftMarkers(target.location, multiplayerJoinMarkerSearchRadius)
         } else {
             emptyList()
         }
-        if (enableMultiplayerJoin && joinAreaMarkers.isEmpty()) {
+        if (enableMultiplayerJoin && !isEntranceLiftReady(liftMarkers)) {
             return completed(ArenaStartResult.Error(
-                "arena.messages.command.start_error.join_area_not_found",
-                "&c開始待機エリアの参加マーカーが近くに存在しないため開始できません"
+                "arena.messages.command.start_error.lift_not_ready",
+                "&cリフトの準備ができていないため開始できません"
             ))
         }
 
@@ -675,15 +717,6 @@ class ArenaManager(
             return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.lobby_marker_not_found",
                 "&cロビーマーカーが見つからないため開始できません"
-            ))
-        }
-
-        val sanitizedMaxParticipants = maxParticipants.coerceIn(1, MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
-        if (participantPlayers.size > sanitizedMaxParticipants) {
-            return completed(ArenaStartResult.Error(
-                "arena.messages.command.start_error.too_many_participants",
-                "&c参加人数が上限を超えています ({count}/{max})",
-                arrayOf("count" to participantPlayers.size, "max" to sanitizedMaxParticipants)
             ))
         }
 
@@ -722,7 +755,8 @@ class ArenaManager(
             doorAnimationPlacements = mutableMapOf(),
             barrierLocation = placeholderLocation.clone(),
             barrierPointLocations = mutableListOf(),
-            joinAreaMarkerLocations = joinAreaMarkers.map { it.clone() }.toMutableList(),
+            joinAreaMarkerLocations = mutableListOf(),
+            liftMarkerLocations = liftMarkers.map { it.clone() }.toMutableList(),
             lobbyMarkerLocations = lobbyMarkers.map { it.clone() }.toMutableList(),
             participantSpawnProtectionUntilMillis = if (enableMultiplayerJoin) Long.MAX_VALUE else now + 4000L,
             multiplayerJoinEnabled = enableMultiplayerJoin,
@@ -2327,6 +2361,7 @@ class ArenaManager(
         session.waitingParticipants.remove(playerId)
         session.waitingNotifiedParticipants.remove(playerId)
         session.waitingSubtitleNextTickByPlayer.remove(playerId)
+        session.entranceLiftLockedParticipants.remove(playerId)
         session.arenaPreparingUntilMillisByParticipant.remove(playerId)
         hideJoinCountdownBossBar(session, playerId)
         releaseInvitedPlayerLock(playerId)
@@ -2380,6 +2415,9 @@ class ArenaManager(
         session.waveSpawnTasks.clear()
         session.transitionTasks.forEach { it.cancel() }
         session.transitionTasks.clear()
+        session.entranceLiftTask?.cancel()
+        session.entranceLiftTask = null
+        releaseEntranceLiftChunkTickets(session)
         session.stageBuildTask?.cancel()
         session.stageBuildTask = null
         cleanupBarrierRestartSession(session, removeDefenseMobs = true, smoke = false)
@@ -2451,9 +2489,13 @@ class ArenaManager(
         session.waitingNotifiedParticipants.clear()
         session.waitingSubtitleNextTickByPlayer.clear()
         session.arenaPreparingUntilMillisByParticipant.clear()
+        session.entranceLiftLockedParticipants.clear()
         session.joinCountdownBossBars.clear()
         session.joinAreaMarkerLocations.clear()
+        session.liftMarkerLocations.clear()
         session.lobbyMarkerLocations.clear()
+        session.entranceLiftChunkTicketWorldName = null
+        session.entranceLiftChunkTicketKeys.clear()
         session.multiplayerJoinEnabled = false
         session.multiplayerJoinFinalizeStarted = false
         session.multiplayerJoinIntroStarted = false
@@ -5205,8 +5247,8 @@ class ArenaManager(
             .mapNotNull { Bukkit.getPlayer(it) }
             .filter { it.isOnline }
             .filter { player ->
-                session.joinAreaMarkerLocations.any { markerLocation ->
-                    isInsideJoinArea(markerLocation, player.location)
+                session.liftMarkerLocations.any { markerLocation ->
+                    isInsideLiftArea(markerLocation, player.location)
                 }
             }
             .map { it.uniqueId }
@@ -5319,59 +5361,557 @@ class ArenaManager(
         }
         session.multiplayerJoinIntroStarted = true
 
-        participants.forEach { player ->
-            session.arenaPreparingUntilMillisByParticipant[player.uniqueId] =
-                System.currentTimeMillis() + MULTIPLAYER_STAGE_INTRO_PREPARING_DURATION_MILLIS
-            player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 120, 0, false, false, false))
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.multiplayer.stage_intro", "&6ステージ転送を開始します..."))
+        val stageWorld = Bukkit.getWorld(session.worldName) ?: run {
+            terminateSession(session, false)
+            return
+        }
+        val owner = participants.firstOrNull { it.uniqueId == session.ownerPlayerId }
+        val introWorld = owner?.world ?: participants.firstOrNull()?.world ?: run {
+            terminateSession(session, false)
+            return
+        }
+        val liftTemplate = resolveEntranceLiftTemplate() ?: run {
+            terminateSession(
+                session,
+                false,
+                messageKey = "arena.messages.command.start_error.lift_not_ready",
+                fallbackMessage = "&cリフトの準備ができていないため開始できません"
+            )
+            return
+        }
+        val liftResetTemplate = resolveEntranceLiftResetTemplate() ?: run {
+            terminateSession(
+                session,
+                false,
+                messageKey = "arena.messages.command.start_error.lift_not_ready",
+                fallbackMessage = "&cリフトの準備ができていないため開始できません"
+            )
+            return
+        }
+        if (session.liftMarkerLocations.isEmpty()) {
+            terminateSession(
+                session,
+                false,
+                messageKey = "arena.messages.command.start_error.lift_not_ready",
+                fallbackMessage = "&cリフトの準備ができていないため開始できません"
+            )
+            return
         }
 
-        repeat(MULTIPLAYER_STAGE_INTRO_SOUND_REPEAT) { index ->
-            Bukkit.getScheduler().runTaskLater(plugin, Runnable {
-                participants.forEach { player ->
-                    if (player.isOnline) {
-                        player.playSound(player.location, "minecraft:item.armor.equip_netherite", 1.0f, 0.5f)
-                    }
-                }
-            }, index * MULTIPLAYER_STAGE_INTRO_SOUND_INTERVAL_TICKS)
+        val referenceLocation = owner
+            ?.takeIf { it.world.uid == introWorld.uid }
+            ?.location
+            ?: participants.firstOrNull { it.world.uid == introWorld.uid }?.location
+            ?: introWorld.spawnLocation
+
+        val availableMarkers = session.liftMarkerLocations
+            .asSequence()
+            .filter { marker -> marker.world?.uid == introWorld.uid }
+            .map { it.clone() }
+            .toList()
+        if (availableMarkers.isEmpty()) {
+            terminateSession(
+                session,
+                false,
+                messageKey = "arena.messages.command.start_error.lift_not_ready",
+                fallbackMessage = "&cリフトの準備ができていないため開始できません"
+            )
+            return
         }
 
-        val teleportDelay =
-            MULTIPLAYER_STAGE_INTRO_SOUND_REPEAT * MULTIPLAYER_STAGE_INTRO_SOUND_INTERVAL_TICKS +
-                MULTIPLAYER_STAGE_INTRO_TELEPORT_EXTRA_DELAY_TICKS
-        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
-            val world = Bukkit.getWorld(session.worldName) ?: return@Runnable
-            val now = System.currentTimeMillis()
-
-            participants.forEach { player ->
-                if (!player.isOnline) return@forEach
-                val spawnLocation = session.entranceLocation.clone().apply {
-                    this.world = world
-                }
-                applyStageStartFacingYaw(session, spawnLocation)
-                player.teleport(spawnLocation)
-                applySessionGameMode(session, player)
-                playStageEntrySoundsLater(player)
-                session.participantLocationHistory[player.uniqueId] = ArrayDeque<TimedPlayerLocation>().apply {
-                    addLast(TimedPlayerLocation(now, spawnLocation.clone()))
-                }
-                session.participantLastSampleMillis[player.uniqueId] = now
+        val baseMarker = availableMarkers
+            .minByOrNull {
+                it.distanceSquared(referenceLocation)
+            }
+            ?: run {
+                terminateSession(
+                    session,
+                    false,
+                    messageKey = "arena.messages.command.start_error.lift_not_ready",
+                    fallbackMessage = "&cリフトの準備ができていないため開始できません"
+                )
+                return
             }
 
-            session.participantSpawnProtectionUntilMillis = System.currentTimeMillis() + 4000L
-            setDoorActionMarkersReadySilently(session, 1)
-            broadcastStageStartMessage(session)
-        }, teleportDelay)
+        val baseLocation = baseMarker.block.location.clone().apply { this.world = introWorld }
+        retainEntranceLiftChunkTickets(session, introWorld, baseLocation, liftTemplate, liftResetTemplate)
+
+        data class LiftPlayerUnit(
+            val player: Player,
+            val offsetX: Double,
+            val offsetZ: Double
+        )
+
+        val playerOffsets = buildEntranceLiftSeatOffsets(participants.size)
+        var currentRise = 0
+        var previousChangedBlocks: Set<LiftChangedBlock> = emptySet()
+        var previousStructureOrigin: Location? = null
+        var peakHoldTicksRemaining = 0L
+        var initialLiftPlaced = false
+        val chainBlocks = mutableSetOf<LiftChangedBlock>()
+
+        val playerUnits = mutableListOf<LiftPlayerUnit>()
+
+        participants.forEachIndexed { index, player ->
+            session.arenaPreparingUntilMillisByParticipant[player.uniqueId] = Long.MAX_VALUE
+            session.entranceLiftLockedParticipants.add(player.uniqueId)
+            player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 120, 0, false, false, false))
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.multiplayer.stage_intro", "&6ステージ転送を開始します..."))
+
+            val offset = playerOffsets[index]
+            playerUnits += LiftPlayerUnit(player, offset.first, offset.second)
+        }
+
+        val originalSpeeds = mutableMapOf<UUID, Pair<Float, Double>>()
+        participants.forEach { player ->
+            val walkSpeed = player.walkSpeed
+            val jumpStrength = player.getAttribute(Attribute.JUMP_STRENGTH)?.value ?: 1.0
+            originalSpeeds[player.uniqueId] = walkSpeed to jumpStrength
+            player.walkSpeed = 0f
+            player.getAttribute(Attribute.JUMP_STRENGTH)?.baseValue = 0.0
+        }
+
+        session.entranceLiftTask?.cancel()
+        var transferred = false
+        var descending = false
+
+        session.entranceLiftTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+            val activeSession = sessionsByWorld[session.worldName]
+            if (activeSession !== session) {
+                session.entranceLiftTask?.cancel()
+                session.entranceLiftTask = null
+                clearTrackedLiftBlocks(introWorld, previousChangedBlocks)
+                clearLiftChainBlocks(introWorld, chainBlocks)
+                releaseEntranceLiftChunkTickets(session)
+                restorePlayerMovement(originalSpeeds)
+                return@Runnable
+            }
+
+            playEntranceLiftTickSound(introWorld, entranceLiftSoundLocation(baseLocation, liftTemplate, currentRise))
+
+            if (!initialLiftPlaced) {
+                previousChangedBlocks = placeLiftStructureAndCollectChangedBlocks(introWorld, baseLocation, liftTemplate)
+                initialLiftPlaced = true
+                return@Runnable
+            }
+
+            val maxRise = entranceLiftMaxRiseBlocks
+            val transferRise = entranceLiftTransferRiseBlocks.coerceIn(0, maxRise)
+
+            if (!transferred && currentRise >= transferRise) {
+                transferred = true
+                teleportLiftParticipantsToStage(session, participants, stageWorld)
+                participants.forEach { player ->
+                    session.arenaPreparingUntilMillisByParticipant.remove(player.uniqueId)
+                    session.entranceLiftLockedParticipants.remove(player.uniqueId)
+                }
+                restorePlayerMovement(originalSpeeds)
+                session.participantSpawnProtectionUntilMillis = System.currentTimeMillis() + 4000L
+                setDoorActionMarkersReadySilently(session, 1)
+                broadcastStageStartMessage(session)
+            }
+
+            if (!descending && currentRise >= maxRise) {
+                if (peakHoldTicksRemaining <= 0L) {
+                    peakHoldTicksRemaining = 40L
+                }
+                peakHoldTicksRemaining -= entranceLiftIntervalTicks.coerceAtLeast(1L)
+                if (peakHoldTicksRemaining > 0L) {
+                    return@Runnable
+                }
+                descending = true
+            }
+
+            if (descending && currentRise <= 0) {
+                clearTrackedLiftBlocks(introWorld, previousChangedBlocks)
+                clearLiftChainBlocks(introWorld, chainBlocks)
+                previousChangedBlocks = placeLiftStructureAndCollectChangedBlocks(introWorld, baseLocation, liftResetTemplate)
+                session.entranceLiftTask?.cancel()
+                session.entranceLiftTask = null
+                restorePlayerMovement(originalSpeeds)
+                releaseEntranceLiftChunkTickets(session)
+                return@Runnable
+            }
+
+            val delta = if (descending) -1 else 1
+            currentRise += delta
+            val nextOrigin = baseLocation.clone().add(0.0, currentRise.toDouble(), 0.0)
+            clearTrackedLiftBlocksExceptOverlap(
+                introWorld,
+                previousChangedBlocks,
+                previousStructureOrigin,
+                nextOrigin,
+                liftTemplate
+            )
+            previousChangedBlocks = placeLiftStructureAndCollectChangedBlocks(introWorld, nextOrigin, liftTemplate)
+            previousStructureOrigin = nextOrigin.clone()
+            if (descending) {
+                placeLiftCornerChains(introWorld, baseLocation, liftTemplate, currentRise, chainBlocks)
+            }
+
+            playerUnits.forEach { unit ->
+                if (!unit.player.isOnline) return@forEach
+                if (unit.player.world.uid != introWorld.uid) return@forEach
+
+                val targetLocation = entranceLiftSeatLocation(baseLocation, liftTemplate, currentRise, unit.offsetX, unit.offsetZ)
+                val synchronizedLocation = targetLocation.clone().apply {
+                    val current = unit.player.location
+                    yaw = current.yaw
+                    pitch = current.pitch
+                }
+                unit.player.teleport(synchronizedLocation)
+            }
+        }, 0L, entranceLiftIntervalTicks)
     }
 
-    private fun findNearbyJoinAreaMarkers(origin: Location, radius: Double): List<Location> {
+    private fun restorePlayerMovement(originalSpeeds: Map<UUID, Pair<Float, Double>>) {
+        originalSpeeds.forEach { (playerId, speeds) ->
+            val player = Bukkit.getPlayer(playerId) ?: return@forEach
+            player.walkSpeed = speeds.first
+            player.getAttribute(Attribute.JUMP_STRENGTH)?.baseValue = speeds.second
+        }
+    }
+
+    private fun entranceLiftSoundLocation(baseLocation: Location, template: EntranceLiftTemplate, rise: Int): Location {
+        return baseLocation.clone().add(
+            template.sizeX.toDouble() / 2.0,
+            rise.toDouble(),
+            template.sizeZ.toDouble() / 2.0
+        )
+    }
+
+    private fun playEntranceLiftTickSound(world: World, location: Location) {
+        world.playSound(location, "minecraft:item.armor.equip_netherite", 1.0f, 0.5f)
+    }
+
+    private fun resolveEntranceLiftTemplate(): EntranceLiftTemplate? {
+        cachedEntranceLiftTemplate?.let { return it }
+        return resolveLiftTemplate(ENTRANCE_LIFT_STRUCTURE_PATH)?.also {
+            cachedEntranceLiftTemplate = it
+        }
+    }
+
+    private fun resolveEntranceLiftResetTemplate(): EntranceLiftTemplate? {
+        cachedEntranceLiftResetTemplate?.let { return it }
+        return resolveLiftTemplate(ENTRANCE_LIFT_RESET_STRUCTURE_PATH)?.also {
+            cachedEntranceLiftResetTemplate = it
+        }
+    }
+
+    private fun resolveLiftTemplate(path: String): EntranceLiftTemplate? {
+        val file = File(plugin.dataFolder, path)
+        if (!file.exists()) {
+            return null
+        }
+        val loaded = runCatching {
+            Bukkit.getStructureManager().loadStructure(file)
+        }.getOrNull() ?: return null
+        val size = loaded.size
+        if (size.blockX <= 0 || size.blockY <= 0 || size.blockZ <= 0) {
+            return null
+        }
+        return EntranceLiftTemplate(
+            sizeX = size.blockX,
+            sizeY = size.blockY,
+            sizeZ = size.blockZ,
+            structure = loaded
+        )
+    }
+
+    private fun placeLiftStructureAndCollectChangedBlocks(
+        world: World,
+        origin: Location,
+        template: EntranceLiftTemplate
+    ): Set<LiftChangedBlock> {
+        val before = snapshotLiftBlocks(world, origin, template)
+        template.structure.place(
+            origin.clone().apply { this.world = world },
+            false,
+            StructureRotation.NONE,
+            Mirror.NONE,
+            0,
+            1.0f,
+            java.util.Random()
+        )
+        return collectChangedLiftBlocks(world, origin, template, before)
+    }
+
+    private fun clearTrackedLiftBlocksExceptOverlap(
+        world: World,
+        previousChangedBlocks: Set<LiftChangedBlock>,
+        previousStructureOrigin: Location?,
+        nextOrigin: Location,
+        template: EntranceLiftTemplate
+    ) {
+        if (previousStructureOrigin == null) {
+            // First placement - clear all previous blocks
+            previousChangedBlocks.forEach { pos ->
+                val block = world.getBlockAt(pos.x, pos.y, pos.z)
+                if (block.type != Material.AIR) {
+                    block.setType(Material.AIR, false)
+                }
+            }
+            return
+        }
+
+        val templateSizeX = template.sizeX
+        val templateSizeZ = template.sizeZ
+
+        // Calculate previous structure bounds
+        val prevMinX = previousStructureOrigin?.blockX ?: 0
+        val prevMinY = previousStructureOrigin?.blockY ?: 0
+        val prevMinZ = previousStructureOrigin?.blockZ ?: 0
+        val prevMaxX = prevMinX + templateSizeX - 1
+        val prevMaxY = prevMinY + template.sizeY - 1
+        val prevMaxZ = prevMinZ + templateSizeZ - 1
+
+        // Calculate next structure bounds
+        val nextMinX = nextOrigin.blockX
+        val nextMinY = nextOrigin.blockY
+        val nextMinZ = nextOrigin.blockZ
+        val nextMaxX = nextMinX + templateSizeX - 1
+        val nextMaxY = nextMinY + template.sizeY - 1
+        val nextMaxZ = nextMinZ + templateSizeZ - 1
+
+        // Clear blocks that were in previous structure but not in next structure
+        previousChangedBlocks.forEach { pos ->
+            val x = pos.x
+            val y = pos.y
+            val z = pos.z
+
+            // Check if this position is in the previous structure
+            val inPrev = x in prevMinX..prevMaxX && y in prevMinY..prevMaxY && z in prevMinZ..prevMaxZ
+            // Check if this position is in the next structure
+            val inNext = x in nextMinX..nextMaxX && y in nextMinY..nextMaxY && z in nextMinZ..nextMaxZ
+
+            // If it was in previous but not in next, clear it
+            if (inPrev && !inNext) {
+                val block = world.getBlockAt(x, y, z)
+                if (block.type != Material.AIR) {
+                    block.setType(Material.AIR, false)
+                }
+            }
+        }
+    }
+
+    private fun placeLiftCornerChains(
+        world: World,
+        baseLocation: Location,
+        template: EntranceLiftTemplate,
+        rise: Int,
+        chainBlocks: MutableSet<LiftChangedBlock>
+    ) {
+        val chainMaterial = Material.CHAIN
+        val chainY = baseLocation.blockY + rise + template.sizeY
+
+        val corners = listOf(
+            Pair(baseLocation.blockX, baseLocation.blockZ),
+            Pair(baseLocation.blockX + template.sizeX - 1, baseLocation.blockZ),
+            Pair(baseLocation.blockX, baseLocation.blockZ + template.sizeZ - 1),
+            Pair(baseLocation.blockX + template.sizeX - 1, baseLocation.blockZ + template.sizeZ - 1)
+        )
+
+        corners.forEach { (x, z) ->
+            val block = world.getBlockAt(x, chainY, z)
+            if (block.type == Material.AIR) {
+                block.setType(chainMaterial, false)
+                chainBlocks.add(LiftChangedBlock(x, chainY, z))
+            }
+        }
+    }
+
+    private fun clearLiftChainBlocks(world: World, chainBlocks: MutableSet<LiftChangedBlock>) {
+        chainBlocks.forEach { pos ->
+            val block = world.getBlockAt(pos.x, pos.y, pos.z)
+            if (block.type == Material.CHAIN) {
+                block.setType(Material.AIR, false)
+            }
+        }
+        chainBlocks.clear()
+    }
+
+    private fun snapshotLiftBlocks(
+        world: World,
+        origin: Location,
+        template: EntranceLiftTemplate
+    ): Map<LiftChangedBlock, BlockData> {
+        val minX = origin.blockX
+        val minY = origin.blockY
+        val minZ = origin.blockZ
+        val maxX = minX + template.sizeX - 1
+        val maxY = minY + template.sizeY - 1
+        val maxZ = minZ + template.sizeZ - 1
+        val snapshot = LinkedHashMap<LiftChangedBlock, BlockData>()
+        for (x in minX..maxX) {
+            for (y in minY..maxY) {
+                for (z in minZ..maxZ) {
+                    val key = LiftChangedBlock(x, y, z)
+                    snapshot[key] = world.getBlockAt(x, y, z).blockData.clone()
+                }
+            }
+        }
+        return snapshot
+    }
+
+    private fun collectChangedLiftBlocks(
+        world: World,
+        origin: Location,
+        template: EntranceLiftTemplate,
+        before: Map<LiftChangedBlock, BlockData>
+    ): Set<LiftChangedBlock> {
+        val minX = origin.blockX
+        val minY = origin.blockY
+        val minZ = origin.blockZ
+        val maxX = minX + template.sizeX - 1
+        val maxY = minY + template.sizeY - 1
+        val maxZ = minZ + template.sizeZ - 1
+        val changed = LinkedHashSet<LiftChangedBlock>()
+        for (x in minX..maxX) {
+            for (y in minY..maxY) {
+                for (z in minZ..maxZ) {
+                    val key = LiftChangedBlock(x, y, z)
+                    val beforeData = before[key] ?: continue
+                    val afterData = world.getBlockAt(x, y, z).blockData
+                    if (beforeData != afterData) {
+                        changed += key
+                    }
+                }
+            }
+        }
+        return changed
+    }
+
+    private fun clearTrackedLiftBlocks(world: World, blocks: Set<LiftChangedBlock>) {
+        blocks.forEach { pos ->
+            val block = world.getBlockAt(pos.x, pos.y, pos.z)
+            if (block.type != Material.AIR) {
+                block.setType(Material.AIR, false)
+            }
+        }
+    }
+
+    private fun retainEntranceLiftChunkTickets(
+        session: ArenaSession,
+        world: World,
+        baseLocation: Location,
+        liftTemplate: EntranceLiftTemplate,
+        liftResetTemplate: EntranceLiftTemplate
+    ) {
+        releaseEntranceLiftChunkTickets(session)
+
+        val footprintSizeX = maxOf(liftTemplate.sizeX, liftResetTemplate.sizeX)
+        val footprintSizeZ = maxOf(liftTemplate.sizeZ, liftResetTemplate.sizeZ)
+        val minX = baseLocation.blockX
+        val minZ = baseLocation.blockZ
+        val maxX = minX + footprintSizeX - 1
+        val maxZ = minZ + footprintSizeZ - 1
+
+        for (x in minX..maxX) {
+            for (z in minZ..maxZ) {
+                val chunkX = x shr 4
+                val chunkZ = z shr 4
+                if (world.addPluginChunkTicket(chunkX, chunkZ, plugin)) {
+                    world.getChunkAt(chunkX, chunkZ).load(true)
+                }
+                session.entranceLiftChunkTicketKeys += encodeChunkKey(chunkX, chunkZ)
+            }
+        }
+        session.entranceLiftChunkTicketWorldName = world.name
+    }
+
+    private fun releaseEntranceLiftChunkTickets(session: ArenaSession) {
+        val worldName = session.entranceLiftChunkTicketWorldName ?: return
+        val world = Bukkit.getWorld(worldName)
+        if (world != null) {
+            session.entranceLiftChunkTicketKeys.forEach { key ->
+                val chunkX = decodeChunkKeyX(key)
+                val chunkZ = decodeChunkKeyZ(key)
+                world.removePluginChunkTicket(chunkX, chunkZ, plugin)
+            }
+        }
+        session.entranceLiftChunkTicketKeys.clear()
+        session.entranceLiftChunkTicketWorldName = null
+    }
+
+    private fun encodeChunkKey(chunkX: Int, chunkZ: Int): Long {
+        return (chunkX.toLong() shl 32) or (chunkZ.toLong() and 0xffffffffL)
+    }
+
+    private fun decodeChunkKeyX(key: Long): Int {
+        return (key shr 32).toInt()
+    }
+
+    private fun decodeChunkKeyZ(key: Long): Int {
+        return key.toInt()
+    }
+
+    private fun buildEntranceLiftSeatOffsets(size: Int): List<Pair<Double, Double>> {
+        if (size <= 1) return listOf(0.0 to 0.0)
+        val spacing = 0.55
+        val side = kotlin.math.ceil(kotlin.math.sqrt(size.toDouble())).toInt().coerceAtLeast(1)
+        val center = (side - 1) / 2.0
+        return buildList {
+            for (index in 0 until size) {
+                val row = index / side
+                val col = index % side
+                val x = (col - center) * spacing
+                val z = (row - center) * spacing
+                add(x to z)
+            }
+        }
+    }
+ 
+    private fun entranceLiftSeatLocation(
+        baseLocation: Location,
+        template: EntranceLiftTemplate,
+        rise: Int,
+        offsetX: Double,
+        offsetZ: Double
+    ): Location {
+        return baseLocation.clone().add(
+            template.sizeX.toDouble() / 2.0 + offsetX,
+            rise.toDouble() + 1.0,
+            template.sizeZ.toDouble() / 2.0 + offsetZ
+        )
+    }
+
+    private fun teleportLiftParticipantsToStage(session: ArenaSession, participants: List<Player>, world: World) {
+        val now = System.currentTimeMillis()
+        participants.forEach { player ->
+            if (!player.isOnline) return@forEach
+            val spawnLocation = session.entranceLocation.clone().apply {
+                this.world = world
+            }
+            world.getChunkAt(spawnLocation.blockX shr 4, spawnLocation.blockZ shr 4).load(true)
+            applyStageStartFacingYaw(session, spawnLocation)
+            player.teleport(spawnLocation)
+            applySessionGameMode(session, player)
+            playStageEntrySoundsLater(player)
+            session.participantLocationHistory[player.uniqueId] = ArrayDeque<TimedPlayerLocation>().apply {
+                addLast(TimedPlayerLocation(now, spawnLocation.clone()))
+            }
+            session.participantLastSampleMillis[player.uniqueId] = now
+        }
+    }
+
+    private fun findNearbyLiftMarkers(origin: Location, radius: Double): List<Location> {
         val world = origin.world ?: return emptyList()
         return world.getNearbyEntities(origin, radius, radius, radius)
             .asSequence()
             .filterIsInstance<Marker>()
-            .filter { marker -> marker.scoreboardTags.contains("arena.marker.join_area") }
+            .filter { marker -> marker.scoreboardTags.contains("arena.marker.lift") }
             .map { it.location.clone() }
             .toList()
+    }
+
+    private fun isEntranceLiftReady(liftMarkers: List<Location>): Boolean {
+        if (liftMarkers.isEmpty()) {
+            return false
+        }
+        val template = resolveEntranceLiftTemplate() ?: return false
+        val resetTemplate = resolveEntranceLiftResetTemplate() ?: return false
+        return template.sizeX > 0 && template.sizeY > 0 && template.sizeZ > 0 &&
+            resetTemplate.sizeX > 0 && resetTemplate.sizeY > 0 && resetTemplate.sizeZ > 0
     }
 
     private fun findLoadedLobbyMarkers(world: World): List<Location> {
@@ -5382,9 +5922,11 @@ class ArenaManager(
             .toList()
     }
 
-    private fun isInsideJoinArea(markerLocation: Location, playerLocation: Location): Boolean {
+    private fun isInsideLiftArea(markerLocation: Location, playerLocation: Location): Boolean {
         val markerWorld = markerLocation.world ?: return false
         if (playerLocation.world?.uid != markerWorld.uid) return false
+
+        val template = resolveEntranceLiftTemplate() ?: return false
 
         val blockX = markerLocation.blockX
         val blockY = markerLocation.blockY
@@ -5394,9 +5936,9 @@ class ArenaManager(
         val y = playerLocation.y
         val z = playerLocation.z
 
-        return x >= blockX && x < blockX + 1.0 &&
-            z >= blockZ && z < blockZ + 1.0 &&
-            y >= blockY && y < blockY + 0.125
+        return x >= blockX && x < blockX + template.sizeX.toDouble() &&
+            z >= blockZ && z < blockZ + template.sizeZ.toDouble() &&
+            y >= blockY - 1.0 && y < blockY + template.sizeY.toDouble() + 1.0
     }
 
     private fun updateActionMarkers() {

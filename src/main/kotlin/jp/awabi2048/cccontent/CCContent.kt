@@ -738,7 +738,9 @@ class CCContent : JavaPlugin(), Listener {
             CustomItemManager.register(ArenaTicketItem())
             CustomItemManager.register(ArenaMedalItem())
             CustomItemManager.register(ArenaPrizeItem())
-            CustomItemManager.register(ArenaMarkerToolItem())
+            CustomItemManager.register(ArenaStructureMarkerToolItem())
+            CustomItemManager.register(ArenaOtherMarkerToolItem())
+            CustomItemManager.register(ArenaLiftToolItem())
         }
 
         if (isContentEnabledAtStartup("sukima_dungeon")) {

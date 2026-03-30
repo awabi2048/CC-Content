@@ -7,6 +7,7 @@ import jp.awabi2048.cccontent.features.arena.ArenaStartResult
 import jp.awabi2048.cccontent.features.arena.event.ArenaDailyQuestGeneratedEvent
 import jp.awabi2048.cccontent.features.arena.event.ArenaQuestStartRequestEvent
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
+import jp.awabi2048.cccontent.util.OageMessageSender
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -254,6 +255,16 @@ class ArenaQuestService(
                 is ArenaStartResult.Error -> {
                     if (result.messageKey == "arena.messages.command.start_error.stage_build_failed") {
                         player.sendMessage(ArenaI18n.text(player, "arena.messages.quest.stage_build_failed_internal", "§cステージの生成に失敗しました。スタッフに報告してください。(STRUCTURE_ERROR)"))
+                    } else if (result.messageKey == "arena.messages.command.start_error.lift_not_ready") {
+                        OageMessageSender.send(
+                            player,
+                            ArenaI18n.text(
+                                player,
+                                "arena.messages.multiplayer.lift_not_ready_oage",
+                                "§f「リフトの準備が出来ていないみたいです！ちょっとまってね！」"
+                            ),
+                            plugin
+                        )
                     } else {
                         player.sendMessage(
                             ArenaI18n.text(

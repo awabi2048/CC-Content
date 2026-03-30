@@ -332,6 +332,18 @@ custom_items:
         - "§7Hold it and press §eShift twice§7 to open the menu."
         - "§7Use §eShift + scroll§7 to change selected item."
   arena:
+    structure_marker_tool:
+      name: "§6Arena Structure Marker Tool"
+      lore:
+        - "§7Places markers for arena structures"
+    other_marker_tool:
+      name: "§6Arena Utility Marker Tool"
+      lore:
+        - "§7Places waiting/lobby markers"
+    lift_tool:
+      name: "§6Arena Lift Placement Tool"
+      lore:
+        - "§7Tool dedicated to lift markers"
     ticket:
       name: "§6Arena Ticket"
       lore:
@@ -392,6 +404,7 @@ custom_items:
         entrance: '&aEntrance'
         join_area: '&fJoin Area'
         lobby: '&bLobby'
+        lift: '&dLift'
         connection: '&6Connection'
         door_block: '&eDoor'
         barrier_core: '&bBarrier Core'
@@ -422,6 +435,7 @@ custom_items:
           theme_not_found: '&cNo valid theme was found'
           world_create_failed: '&cFailed to create arena world'
           stage_build_failed: '&c{message}'
+          lift_not_ready: '&cCannot start because the lift is not ready'
           join_area_not_found: '&cCannot start because no join area marker exists nearby'
           lobby_marker_not_found: '&cCannot start because no lobby marker exists in loaded chunks'
       multiplayer:
@@ -429,6 +443,7 @@ custom_items:
         wait_area_hint: '&7Invited players enter waiting state by standing in the join area with the owner'
         waiting_entered: '&aYou entered the waiting area. Stay here until the grace time ends'
         waiting_exited: '&cYou stepped off the lift. Stay on it if you want to join!'
+        lift_not_ready_oage: '§f"Looks like the lift is not ready yet! Please wait a little!"'
         invite_sent: '&aInvitation sent to {player}'
         invited: '&6You were invited to arena by {owner}. Please enter the waiting area'
         invited_decline_hint: '&7To decline, left-click the inviter'

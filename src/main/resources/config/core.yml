@@ -118,6 +118,10 @@ arena:
     join_marker_search_radius: 16.0
     invite_auto_decline_distance: 16.0
     stage_build_steps_per_tick: 1
+  entrance_lift:
+    interval_ticks: 10
+    transfer_rise_blocks: 2
+    max_rise_blocks: 6
   session:
     max_concurrent: 3
   world_pool:
