@@ -131,6 +131,7 @@ data class ArenaSession(
     var totalKillCount: Int = 0,
     val waveClearTargets: MutableMap<Int, Int> = mutableMapOf(),
     val pendingWaveClearedAnnouncements: MutableSet<Int> = mutableSetOf(),
+    val waveClearedAnnouncementTasks: MutableMap<Int, BukkitTask> = mutableMapOf(),
     var lastClearedWaveForBossBar: Int? = null,
     var stageMaxAliveCount: Int = 1,
     val mobWaveMap: MutableMap<UUID, Int> = mutableMapOf(),

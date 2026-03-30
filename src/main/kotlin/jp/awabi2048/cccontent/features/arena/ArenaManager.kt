@@ -250,6 +250,8 @@ class ArenaManager(
         const val ENTRANCE_BGM_START_DELAY_TICKS = 30L
         const val MULTIPLAYER_STAGE_INTRO_TELEPORT_EXTRA_DELAY_TICKS = 20L
         const val MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS = 5L
+        const val OAGE_FOLLOWUP_DELAY_TICKS = 60L
+        const val OAGE_COMBAT_MONITOR_INTERVAL_TICKS = 1200L
         const val WAVE_CATCHUP_TELEPORT_DELAY_MILLIS = 30_000L
         const val DOWN_REVIVE_HOLD_SECONDS_DEFAULT = 3
         const val DOWN_REVIVE_RADIUS_DEFAULT = 2.5
@@ -888,7 +890,16 @@ class ArenaManager(
             .filter { it != player.uniqueId }
             .mapNotNull { Bukkit.getPlayer(it) }
             .filter { it.isOnline && it.world.name == session.worldName }
-            .forEach { it.sendMessage(ArenaI18n.text(it, "arena.messages.down.participant_died", "§4{player}さんが死亡しました...", "player" to player.name)) }
+            .forEach { participant ->
+                participant.sendMessage(ArenaI18n.text(participant, "arena.messages.down.participant_died", "§4{player}さんが死亡しました...", "player" to player.name))
+                scheduleOageMessage(
+                    participant,
+                    OAGE_FOLLOWUP_DELAY_TICKS,
+                    "arena.messages.oage.participant_died_followup",
+                    "いま助けに行きますー！",
+                    force = true
+                )
+            }
     }
 
     fun shutdown() {
@@ -1671,6 +1682,20 @@ class ArenaManager(
                     participant.sendMessage(ArenaI18n.text(participant, "arena.messages.down.needs_revive", "§c{player}さんがダウンしました！蘇生が必要です！", "player" to player.name))
                 }
         }
+
+        if (reviveDisabled && hasOtherAliveNonDownParticipant(session, player.uniqueId)) {
+            val oageMessage = ArenaI18n.stringList(
+                player,
+                "arena.messages.oage.down_with_survivors",
+                listOf("お疲れさま！他のみなさんの様子はここからでも確認できますよ！")
+            ).randomOrNull() ?: "お疲れさま！他のみなさんの様子はここからでも確認できますよ！"
+            sendOageMessage(
+                player,
+                "arena.messages.oage.down_with_survivors",
+                oageMessage,
+                force = true
+            )
+        }
     }
 
     private fun recoverDownedPlayer(session: ArenaSession, downed: Player, revivedBy: Player?) {
@@ -1751,6 +1776,13 @@ class ArenaManager(
                                     "arena.messages.down.game_over",
                                     "&c目の前がまっくらになった...！\n&7おあげちゃんが救出中..."
                                 )
+                            )
+                            scheduleOageMessage(
+                                downed,
+                                OAGE_FOLLOWUP_DELAY_TICKS,
+                                "arena.messages.oage.game_over_followup",
+                                "いま行きます！ちょっと待ってね",
+                                force = true
                             )
                         }
                         clearReviveBindingForDowned(session, downedId, playInterruptedSound = false)
@@ -2457,6 +2489,8 @@ class ArenaManager(
         session.oageAnnouncements.clear()
         session.waveClearReminderTasks.values.forEach { it.cancel() }
         session.waveClearReminderTasks.clear()
+        session.waveClearedAnnouncementTasks.values.forEach { it.cancel() }
+        session.waveClearedAnnouncementTasks.clear()
         session.animatingDoorWaves.clear()
         session.actionMarkers.clear()
         session.actionMarkerHoldStates.clear()
@@ -3209,6 +3243,8 @@ class ArenaManager(
             tryQueueWaveClearedMessage(session, wave)
         }
 
+        schedulePendingWaveClearedMessageIfReady(session)
+
         if (!countKill || wave == null) {
             return
         }
@@ -3249,6 +3285,31 @@ class ArenaManager(
         tryQueueWaveClearedMessage(session, wave)
 
         if (wave < session.waves) {
+            Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+                val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
+                if (activeSession !== session) return@Runnable
+                if (!activeSession.clearedWaves.contains(wave)) return@Runnable
+                val targetRoom = activeSession.roomBounds[wave + 1] ?: return@Runnable
+                val maxAlive = activeSession.stageMaxAliveCount.coerceAtLeast(1)
+                val aliveInRoom = activeSession.activeMobs
+                    .asSequence()
+                    .mapNotNull { mobId -> Bukkit.getEntity(mobId) as? Mob }
+                    .filter { mob -> mob.isValid && !mob.isDead && mob.world.name == activeSession.worldName }
+                    .count { mob ->
+                        val location = mob.location
+                        targetRoom.contains(location.x, location.y, location.z)
+                    }
+                if (aliveInRoom < maxAlive) return@Runnable
+
+                broadcastOageMessage(
+                    activeSession,
+                    "arena.messages.oage.wave_cleared_full_room",
+                    listOf("今です！行きましょう！")
+                )
+            }, 40L)
+        }
+
+        if (wave < session.waves) {
             scheduleWaveClearReminder(session, wave)
         }
 
@@ -3286,9 +3347,16 @@ class ArenaManager(
 
         if (session.oageAnnouncements.contains("wave_cleared_room_empty_$wave")) return
         session.pendingWaveClearedAnnouncements.add(wave)
+        schedulePendingWaveClearedMessageIfReady(session)
     }
 
     private fun tryBroadcastPendingWaveClearedMessageOnNormalBgm(session: ArenaSession) {
+        schedulePendingWaveClearedMessageIfReady(session)
+    }
+
+    private fun schedulePendingWaveClearedMessageIfReady(session: ArenaSession) {
+        if (session.activeMobs.isNotEmpty()) return
+
         val pendingWave = session.pendingWaveClearedAnnouncements
             .asSequence()
             .filter { wave -> session.clearedWaves.contains(wave) }
@@ -3296,17 +3364,31 @@ class ArenaManager(
             ?: return
 
         val announcementKey = "wave_cleared_room_empty_$pendingWave"
-        if (!session.oageAnnouncements.add(announcementKey)) {
+        if (session.oageAnnouncements.contains(announcementKey)) {
             session.pendingWaveClearedAnnouncements.remove(pendingWave)
+            session.waveClearedAnnouncementTasks.remove(pendingWave)?.cancel()
             return
         }
-        session.pendingWaveClearedAnnouncements.remove(pendingWave)
 
-        broadcastOageMessage(
-            session,
-            "arena.messages.oage.wave_cleared",
-            listOf("ひとまず安全ですね！態勢を整えて次のウェーブに進みましょう！")
-        )
+        if (session.waveClearedAnnouncementTasks.containsKey(pendingWave)) return
+
+        val task = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
+            if (activeSession.activeMobs.isNotEmpty()) return@Runnable
+            if (!activeSession.pendingWaveClearedAnnouncements.contains(pendingWave)) return@Runnable
+            if (!activeSession.clearedWaves.contains(pendingWave)) return@Runnable
+            if (!activeSession.oageAnnouncements.add(announcementKey)) return@Runnable
+
+            activeSession.pendingWaveClearedAnnouncements.remove(pendingWave)
+            activeSession.waveClearedAnnouncementTasks.remove(pendingWave)
+            broadcastOageMessage(
+                activeSession,
+                "arena.messages.oage.wave_cleared",
+                listOf("ひとまず安全ですね！態勢を整えて次のウェーブに進みましょう！")
+            )
+        }, 40L)
+
+        session.waveClearedAnnouncementTasks[pendingWave] = task
     }
 
     private fun hasBarrierActivationObjective(session: ArenaSession): Boolean {
@@ -3519,6 +3601,8 @@ class ArenaManager(
         } else {
             session.waveMobIds[wave] = remaining
         }
+
+        schedulePendingWaveClearedMessageIfReady(session)
     }
 
     private fun shouldKeepWaveMob(session: ArenaSession, mobId: UUID): Boolean {
@@ -3593,6 +3677,18 @@ class ArenaManager(
         session.barrierRestartStartMillis = System.currentTimeMillis()
         session.barrierRestartDurationMillis = durationMillis
         session.barrierRestartProgressMillis = 0L
+
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
+            if (activeSession !== session) return@Runnable
+            if (!activeSession.barrierRestarting) return@Runnable
+
+            broadcastOageMessage(
+                activeSession,
+                "arena.messages.oage.barrier_restart_started",
+                listOf("結界解除後はモンスターが寄り付きやすくなります！気をつけて！")
+            )
+        }, 20L)
 
         restartWaveSpawnLoopWithIntervalScale(session, session.waves, 0.5)
 
@@ -3946,11 +4042,6 @@ class ArenaManager(
         playSoundAtBarrier(session, Sound.BLOCK_BEACON_ACTIVATE, 5.0f, 0.5f)
         val world = Bukkit.getWorld(session.worldName) ?: return
         spawnBarrierRestartSuccessParticles(world, session)
-        broadcastOageMessage(
-            session,
-            "arena.messages.oage.barrier_restart_complete",
-            listOf("結界石の再起動、完了しました！")
-        )
         arenaQuestService?.recordBarrierRestart(session.participants)
 
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
@@ -3960,7 +4051,11 @@ class ArenaManager(
                 if (!player.isOnline || player.world.name != activeSession.worldName) return@forEach
                 player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 2.0f)
                 player.playSound(player.location, Sound.BLOCK_BEACON_ACTIVATE, 1.0f, 1.0f)
-                OageMessageSender.send(player, ArenaI18n.text(player, "arena.messages.barrier.restart_confirmed", "結界の再起動を確認しました！転送します！"), plugin)
+                sendOageMessage(
+                    player,
+                    "arena.messages.barrier.restart_confirmed",
+                    ArenaI18n.text(player, "arena.messages.barrier.restart_confirmed", "結界の再起動を確認しました！転送します！")
+                )
             }
 
             terminateSession(
@@ -3987,6 +4082,8 @@ class ArenaManager(
         }
 
         session.waveMobIds.values.forEach { it.clear() }
+
+        schedulePendingWaveClearedMessageIfReady(session)
     }
 
     private fun removeAllMobsInArenaWorld(session: ArenaSession, smoke: Boolean) {
@@ -4234,7 +4331,77 @@ class ArenaManager(
             if (!player.isOnline || player.world.name != session.worldName) return@forEach
 
             val message = ArenaI18n.stringList(player, key, fallback, *placeholders).randomOrNull() ?: return@forEach
-            OageMessageSender.send(player, "§f「$message」", plugin)
+            sendOageMessage(player, key, message)
+        }
+    }
+
+    private fun oageMessageChance(key: String): Double {
+        return when (key) {
+            "arena.messages.oage.stage_start" -> 1.0
+            "arena.messages.oage.combat_all_engaged",
+            "arena.messages.oage.combat_all_calm",
+            "arena.messages.oage.wave_cleared_full_room" -> 0.3
+            "arena.messages.oage.barrier_restart_started",
+            "arena.messages.oage.game_over_followup",
+            "arena.messages.oage.participant_died_followup",
+            "arena.messages.oage.down_with_survivors" -> 1.0
+            else -> 0.5
+        }
+    }
+
+    private fun sendOageMessage(
+        player: Player,
+        key: String,
+        message: String,
+        force: Boolean = false
+    ) {
+        if (!force && random.nextDouble() >= oageMessageChance(key)) return
+        OageMessageSender.send(player, "§f「$message」", plugin)
+    }
+
+    private fun scheduleOageMessage(
+        player: Player,
+        delayTicks: Long,
+        key: String,
+        fallback: String,
+        vararg placeholders: Pair<String, Any?>,
+        force: Boolean = false
+    ) {
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            val activePlayer = Bukkit.getPlayer(player.uniqueId) ?: return@Runnable
+            if (!activePlayer.isOnline) return@Runnable
+            val message = ArenaI18n.stringList(activePlayer, key, listOf(fallback), *placeholders).randomOrNull() ?: return@Runnable
+            sendOageMessage(activePlayer, key, message, force = force)
+        }, delayTicks)
+    }
+
+    private fun monitorOageBroadcasts(currentTick: Long) {
+        if (currentTick % OAGE_COMBAT_MONITOR_INTERVAL_TICKS != 0L) return
+
+        sessionsByWorld.values.forEach { session ->
+            val world = Bukkit.getWorld(session.worldName) ?: return@forEach
+            val participants = session.participants
+                .asSequence()
+                .mapNotNull { Bukkit.getPlayer(it) }
+                .filter { it.isOnline && it.world.uid == world.uid && !isPlayerDowned(session, it.uniqueId) && !it.isDead && it.gameMode != GameMode.SPECTATOR }
+                .toList()
+            if (participants.isEmpty()) return@forEach
+
+            val allInCombat = participants.all { hasMobTargetingParticipant(session, it.uniqueId) }
+            val noneInCombat = participants.none { hasMobTargetingParticipant(session, it.uniqueId) }
+
+            when {
+                allInCombat -> broadcastOageMessage(
+                    session,
+                    "arena.messages.oage.combat_all_engaged",
+                    listOf("なかなか手強いですね…！")
+                )
+                noneInCombat && session.startedWaves.contains(1) -> broadcastOageMessage(
+                    session,
+                    "arena.messages.oage.combat_all_calm",
+                    listOf("いい感じです！この調子でがんばりましょう！")
+                )
+            }
         }
     }
 
@@ -5932,6 +6099,7 @@ class ArenaManager(
                 updateMultiplayerJoinStates()
                 updateDownedPlayers(currentTick)
                 updateActionMarkers()
+                monitorOageBroadcasts(currentTick)
                 updateArenaBgmTransitions()
                 processArenaWorldCleanupQueue()
                 if (currentTick % 5L == 0L) {
