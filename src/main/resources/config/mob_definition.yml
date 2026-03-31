@@ -6,18 +6,6 @@ zombie_normal:
   armor: 0.0
   scale: 1.0
 
-zombie_basic:
-  type: ZOMBIE
-  health: 22.0
-  attack: 5.0
-  movement_speed: 0.24
-  armor: 3.5
-  scale: 1.0
-  equipment:
-    helmet: LEATHER_HELMET
-    chestplate: LEATHER_CHESTPLATE
-    main_hand: WOODEN_SWORD
-
 skeleton_normal:
   type: skeleton_normal
   health: 20.0
@@ -26,24 +14,6 @@ skeleton_normal:
   armor: 0.0
   scale: 1.0
 
-skeleton_basic:
-  type: skeleton_normal
-  health: 20.0
-  attack: 4.0
-  movement_speed: 0.23
-  armor: 0.0
-  scale: 1.0
-
-skeleton_fast_arrow_basic:
-  type: skeleton_fast_arrow
-  health: 20.0
-  attack: 4.0
-  movement_speed: 0.23
-  armor: 0.0
-  scale: 1.0
-  equipment:
-    main_hand: BOW
-
 skeleton_rapid:
   type: skeleton_rapid
   health: 20.0
@@ -51,47 +21,6 @@ skeleton_rapid:
   movement_speed: 0.23
   armor: 0.0
   scale: 1.0
-skeleton_effect_arrow_basic:
-  type: skeleton_effect_arrow
-  health: 20.0
-  attack: 4.0
-  movement_speed: 0.23
-  armor: 0.0
-  scale: 1.0
-  equipment:
-    main_hand: BOW
-
-skeleton_curve_shot_basic:
-  type: skeleton_curve_shot
-  health: 20.0
-  attack: 4.0
-  movement_speed: 0.23
-  armor: 0.0
-  scale: 1.0
-  equipment:
-    main_hand: BOW
-
-skeleton_shield_basic:
-  type: skeleton_shield_only
-  health: 24.0
-  attack: 5.0
-  movement_speed: 0.23
-  armor: 3.0
-  scale: 1.0
-  equipment:
-    main_hand: STONE_SWORD
-    off_hand: SHIELD
-
-skeleton_boomerang_basic:
-  type: skeleton_boomerang
-  health: 22.0
-  attack: 4.0
-  movement_speed: 0.24
-  armor: 1.0
-  scale: 1.0
-  equipment:
-    main_hand: BONE
-
 skeleton_curve_backstep:
   type: skeleton_curve_backstep
   health: 20.0
@@ -113,29 +42,6 @@ skeleton_throw_close:
   movement_speed: 0.24
   armor: 1.0
   scale: 1.0
-zombie_heavy:
-  type: ZOMBIE
-  health: 30.0
-  attack: 6.5
-  movement_speed: 0.2
-  armor: 9.0
-  scale: 1.1
-  equipment:
-    helmet: IRON_HELMET
-    boots: IRON_BOOTS
-    main_hand: STONE_AXE
-
-zombie_boss:
-  type: ZOMBIE
-  health: 50.0
-  attack: 10.0
-  movement_speed: 0.23
-  armor: 12.0
-  scale: 1.5
-  equipment:
-    helmet: DIAMOND_HELMET
-    chestplate: DIAMOND_CHESTPLATE
-    main_hand: DIAMOND_SWORD
 
 zombie_light_leap:
   type: zombie_light_leap
@@ -349,4 +255,3 @@ guardian_drain:
   scale: 1.2
   spawn_conditions:
     - WATER_ONLY
-

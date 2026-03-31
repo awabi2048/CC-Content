@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.mob.ability
 
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
+import org.bukkit.Bukkit
 import org.bukkit.FluidCollisionMode
 import org.bukkit.Location
 import org.bukkit.Sound
@@ -17,14 +18,18 @@ class BackstepAbility(
     private val horizontalSpeed: Double = DEFAULT_HORIZONTAL_SPEED,
     private val verticalSpeed: Double = DEFAULT_VERTICAL_SPEED,
     private val postStepFaceTicks: Long = DEFAULT_POST_STEP_FACE_TICKS,
-    private val obstacleCheckTicks: Int = DEFAULT_OBSTACLE_CHECK_TICKS
+    private val obstacleCheckTicks: Int = DEFAULT_OBSTACLE_CHECK_TICKS,
+    private val shootArrowOnLand: Boolean = false,
+    private val arrowSpeedMultiplier: Double = DEFAULT_ARROW_SPEED_MULTIPLIER,
+    private val homingConfig: MobShootUtil.HomingConfig? = null
 ) : MobAbility {
     data class Runtime(
         var cooldownTicks: Long = 0L,
         var closeRangeTicks: Long = 0L,
         var postStepFaceTicks: Long = 0L,
         var postStepTargetId: java.util.UUID? = null,
-        var searchPhaseOffsetSteps: Int = 0
+        var searchPhaseOffsetSteps: Int = 0,
+        var wasInAir: Boolean = false
     ) : MobAbilityRuntime
 
     override fun createRuntime(context: jp.awabi2048.cccontent.mob.MobSpawnContext): MobAbilityRuntime {
@@ -56,8 +61,9 @@ class BackstepAbility(
             abilityRuntime.closeRangeTicks = 0L
             return
         }
+        val effectiveTriggerDistance = if (triggerDistance <= 0.0) getInteractionRange(target) else triggerDistance
         val distanceSquared = entity.location.distanceSquared(target.location)
-        val triggerDistanceSquared = triggerDistance * triggerDistance
+        val triggerDistanceSquared = effectiveTriggerDistance * effectiveTriggerDistance
         if (distanceSquared > triggerDistanceSquared) {
             abilityRuntime.closeRangeTicks = 0L
             return
@@ -88,24 +94,57 @@ class BackstepAbility(
     }
 
     private fun keepFacingDuringAir(context: MobRuntimeContext, runtime: Runtime) {
-        if (runtime.postStepFaceTicks <= 0L) return
+        if (runtime.postStepFaceTicks <= 0L) {
+            runtime.wasInAir = false
+            return
+        }
         val entity = context.entity
         if (entity.isOnGround) {
+            if (runtime.wasInAir && shootArrowOnLand) {
+                fireLandingArrow(context, runtime)
+            }
             runtime.postStepFaceTicks = 0L
             runtime.postStepTargetId = null
+            runtime.wasInAir = false
             return
         }
 
+        runtime.wasInAir = true
         val targetId = runtime.postStepTargetId ?: return
-        val target = org.bukkit.Bukkit.getEntity(targetId) as? LivingEntity
+        val target = Bukkit.getEntity(targetId) as? LivingEntity
         if (target == null || !target.isValid || target.isDead || target.world.uid != entity.world.uid) {
             runtime.postStepFaceTicks = 0L
             runtime.postStepTargetId = null
+            runtime.wasInAir = false
             return
         }
 
         MobAbilityUtils.faceTowards(entity, target)
         runtime.postStepFaceTicks = (runtime.postStepFaceTicks - 10L).coerceAtLeast(0L)
+    }
+
+    private fun fireLandingArrow(context: MobRuntimeContext, runtime: Runtime) {
+        val targetId = runtime.postStepTargetId ?: return
+        val entity = context.entity
+        val target = Bukkit.getEntity(targetId) as? LivingEntity
+        if (target == null || !target.isValid || target.isDead || target.world.uid != entity.world.uid) return
+
+        MobShootUtil.shootArrow(
+            plugin = context.plugin,
+            entity = entity,
+            target = target,
+            activeMob = context.activeMob,
+            speedMultiplier = arrowSpeedMultiplier,
+            homingConfig = homingConfig
+        )
+    }
+
+    private fun getInteractionRange(entity: LivingEntity): Double {
+        return try {
+            entity.javaClass.getMethod("getInteractionRange").invoke(entity) as? Double ?: DEFAULT_FALLBACK_DISTANCE
+        } catch (_: Exception) {
+            DEFAULT_FALLBACK_DISTANCE
+        }
     }
 
     private fun isBackstepPathClear(start: Location, initialVelocity: Vector, simulateTicks: Int): Boolean {
@@ -149,13 +188,15 @@ class BackstepAbility(
     }
 
     companion object {
-        const val DEFAULT_TRIGGER_DISTANCE = 3.0
+        const val DEFAULT_TRIGGER_DISTANCE = 0.0
         const val DEFAULT_TRIGGER_DURATION_TICKS = 40L
         const val DEFAULT_COOLDOWN_TICKS = 80L
         const val DEFAULT_HORIZONTAL_SPEED = 0.9
         const val DEFAULT_VERTICAL_SPEED = 0.45
         const val DEFAULT_POST_STEP_FACE_TICKS = 20L
         const val DEFAULT_OBSTACLE_CHECK_TICKS = 12
+        const val DEFAULT_ARROW_SPEED_MULTIPLIER = 1.0
+        private const val DEFAULT_FALLBACK_DISTANCE = 3.0
         private const val SEARCH_PHASE_VARIANTS = 16
     }
 }

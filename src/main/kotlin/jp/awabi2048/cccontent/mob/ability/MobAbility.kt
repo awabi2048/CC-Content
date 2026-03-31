@@ -6,7 +6,6 @@ import jp.awabi2048.cccontent.mob.MobDamagedContext
 import jp.awabi2048.cccontent.mob.MobDeathContext
 import jp.awabi2048.cccontent.mob.MobGenericDamagedContext
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
-import jp.awabi2048.cccontent.mob.MobShootBowContext
 import jp.awabi2048.cccontent.mob.MobSpawnContext
 
 interface MobAbilityRuntime
@@ -29,6 +28,4 @@ interface MobAbility {
     fun onDeath(context: MobDeathContext, runtime: MobAbilityRuntime?) {}
 
     fun onCombust(context: MobCombustContext, runtime: MobAbilityRuntime?) {}
-
-    fun onShootBow(context: MobShootBowContext, runtime: MobAbilityRuntime?) {}
 }

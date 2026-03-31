@@ -38,6 +38,7 @@ import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieNormalMobType
 import jp.awabi2048.cccontent.mob.type.ZombieShieldOnlyMobType
 import jp.awabi2048.cccontent.mob.ability.BoomerangService
+import jp.awabi2048.cccontent.mob.ability.HomingArrowService
 import jp.awabi2048.cccontent.mob.ability.ThrownWeaponService
 import org.bukkit.Bukkit
 import org.bukkit.Location
@@ -348,7 +349,7 @@ class MobService(private val plugin: JavaPlugin) {
 
         mobType.applyDefaultEquipment(spawnContext, runtime)
         mobType.onSpawn(spawnContext, runtime)
-        applyDefinitionEquipment(entity, definition, onlyIfEmpty = true)
+        applyDefinitionEquipment(entity, definition, onlyIfEmpty = false)
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             if (!entity.isValid || entity.isDead) return@Runnable
             enforceStrictSpawnState(entity)
@@ -393,23 +394,15 @@ class MobService(private val plugin: JavaPlugin) {
     fun handleShootBow(event: EntityShootBowEvent) {
         val shooter = event.entity as? LivingEntity ?: return
         val activeMob = activeMobs[shooter.uniqueId] ?: return
-        val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
-        val startedAt = System.nanoTime()
-        activeMob.mobType.onShootBow(
-            MobShootBowContext(
-                plugin = plugin,
-                entity = shooter,
-                activeMob = activeMob,
-                event = event,
-                loadSnapshot = snapshot
-            ),
-            activeMob.runtime
-        )
-        addCpuNanos(activeMob.sessionKey, System.nanoTime() - startedAt)
+        event.isCancelled = true
     }
 
     fun handleProjectileHit(event: ProjectileHitEvent) {
         ThrownWeaponService.getInstance(plugin).handleProjectileHit(event)
+        val arrow = event.entity
+        if (arrow != null) {
+            HomingArrowService.getInstance(plugin).handleHit(arrow.uniqueId)
+        }
     }
 
     fun handleEntityPickupItem(event: EntityPickupItemEvent) {
@@ -455,6 +448,7 @@ class MobService(private val plugin: JavaPlugin) {
         activeMobs.clear()
         sessionLoadMetrics.clear()
         BoomerangService.getInstance(plugin).shutdown()
+        HomingArrowService.getInstance(plugin).shutdown()
         ThrownWeaponService.getInstance(plugin).shutdown()
         synchronized(instances) {
             instances.remove(plugin)

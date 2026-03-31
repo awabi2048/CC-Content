@@ -7,11 +7,11 @@ import jp.awabi2048.cccontent.mob.ability.ArmorMagnetPullAbility
 import jp.awabi2048.cccontent.mob.ability.BoomerangAbility
 import jp.awabi2048.cccontent.mob.ability.BackstepAbility
 import jp.awabi2048.cccontent.mob.ability.ClimbingLeapAbility
-import jp.awabi2048.cccontent.mob.ability.CurveShotAbility
 import jp.awabi2048.cccontent.mob.ability.GuardianBeamAbility
 import jp.awabi2048.cccontent.mob.ability.LeapAbility
 import jp.awabi2048.cccontent.mob.ability.LinearProjectileAbility
 import jp.awabi2048.cccontent.mob.ability.MeleeKnockbackBoostAbility
+import jp.awabi2048.cccontent.mob.ability.MobShootUtil
 import jp.awabi2048.cccontent.mob.ability.PeriodicCobwebAbility
 import jp.awabi2048.cccontent.mob.ability.PlayerTargetAssistAbility
 import jp.awabi2048.cccontent.mob.ability.PoisonOnMeleeHitAbility
@@ -326,7 +326,11 @@ class SkeletonPlainMobType : EquipmentMobType(
 class SkeletonNormalMobType : EquipmentMobType(
     id = "skeleton_normal",
     baseEntityType = EntityType.SKELETON,
-    abilities = emptyList(),
+    abilities = listOf(
+        RangedAttackAbility(
+            id = "skeleton_normal_ranged"
+        )
+    ),
     defaultMainHand = Material.BOW
 )
 
@@ -383,7 +387,10 @@ class SkeletonCurveShotMobType : EquipmentMobType(
     id = "skeleton_curve_shot",
     baseEntityType = EntityType.SKELETON,
     abilities = listOf(
-        CurveShotAbility(id = "skeleton_curve_shot_curve")
+        RangedAttackAbility(
+            id = "skeleton_curve_shot_ranged",
+            homingConfig = MobShootUtil.HomingConfig()
+        )
     ),
     defaultMainHand = Material.BOW
 )
@@ -407,10 +414,17 @@ class SkeletonCurveBackstepMobType : EquipmentMobType(
     id = "skeleton_curve_backstep",
     baseEntityType = EntityType.SKELETON,
     abilities = listOf(
-        CurveShotAbility(id = "skeleton_curve_backstep_curve"),
+        RangedAttackAbility(
+            id = "skeleton_curve_backstep_ranged",
+            homingConfig = MobShootUtil.HomingConfig()
+        ),
         BackstepAbility(
             id = "skeleton_curve_backstep_backstep",
-            cooldownTicks = 20L
+            cooldownTicks = 20L,
+            shootArrowOnLand = true,
+            horizontalSpeed = 1.8,
+            verticalSpeed = 0.9,
+            homingConfig = MobShootUtil.HomingConfig()
         )
     ),
     defaultMainHand = Material.BOW,
@@ -427,6 +441,7 @@ class SkeletonBowShieldMobType : EquipmentMobType(
     id = "skeleton_heavy_bow_shield",
     baseEntityType = EntityType.SKELETON,
     abilities = listOf(
+        RangedAttackAbility(id = "skeleton_bow_shield_ranged"),
         ShieldAbility(id = "skeleton_bow_shield", breakDisablesShieldPermanently = true)
     ),
     defaultMainHand = Material.BOW,
@@ -449,9 +464,7 @@ class SkeletonWeaponThrowCloseMobType : EquipmentMobType(
     override fun applyDefaultEquipment(context: MobSpawnContext, runtime: CustomMobRuntime?) {
         super.applyDefaultEquipment(context, runtime)
         val equipment = context.entity.equipment ?: return
-        if (equipment.itemInMainHand.type.isAir) {
-            equipment.setItemInMainHand(ItemStack(randomGoldenTool()))
-        }
+        equipment.setItemInMainHand(ItemStack(randomGoldenTool()))
     }
 }
 

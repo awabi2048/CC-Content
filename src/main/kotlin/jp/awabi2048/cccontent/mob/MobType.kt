@@ -27,8 +27,6 @@ interface MobType {
     fun onDeath(context: MobDeathContext, runtime: CustomMobRuntime?) {}
 
     fun onCombust(context: MobCombustContext, runtime: CustomMobRuntime?) {}
-
-    fun onShootBow(context: MobShootBowContext, runtime: CustomMobRuntime?) {}
 }
 
 data class VanillaMobType(

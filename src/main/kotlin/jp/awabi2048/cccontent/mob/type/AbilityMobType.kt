@@ -7,7 +7,6 @@ import jp.awabi2048.cccontent.mob.MobDamagedContext
 import jp.awabi2048.cccontent.mob.MobDeathContext
 import jp.awabi2048.cccontent.mob.MobGenericDamagedContext
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
-import jp.awabi2048.cccontent.mob.MobShootBowContext
 import jp.awabi2048.cccontent.mob.MobSpawnContext
 import jp.awabi2048.cccontent.mob.MobType
 import jp.awabi2048.cccontent.mob.ability.MobAbility
@@ -65,12 +64,6 @@ abstract class AbilityMobType(
     override fun onCombust(context: MobCombustContext, runtime: CustomMobRuntime?) {
         forEachAbility(runtime) { ability, abilityRuntime ->
             ability.onCombust(context, abilityRuntime)
-        }
-    }
-
-    override fun onShootBow(context: MobShootBowContext, runtime: CustomMobRuntime?) {
-        forEachAbility(runtime) { ability, abilityRuntime ->
-            ability.onShootBow(context, abilityRuntime)
         }
     }
 

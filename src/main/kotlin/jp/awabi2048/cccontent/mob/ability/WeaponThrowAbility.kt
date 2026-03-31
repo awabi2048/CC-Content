@@ -94,9 +94,10 @@ class WeaponThrowAbility(
         projectile.isSilent = true
         projectile.pickupStatus = AbstractArrow.PickupStatus.DISALLOWED
         projectile.isCritical = false
+        projectile.setGravity(false)
         hideInternalProjectile(projectile)
 
-        val itemAttackDamage = resolveThrowBaseDamage(weapon, abilityRuntime) ?: return
+        val itemAttackDamage = resolveThrowBaseDamage(weapon, abilityRuntime, context) ?: return
         val throwDamage = itemAttackDamage * damageMultiplier
 
         val launched = service.launch(
@@ -143,13 +144,12 @@ class WeaponThrowAbility(
         return "weapon_throw_loader_$id"
     }
 
-    private fun resolveThrowBaseDamage(weapon: ItemStack, runtime: Runtime): Double? {
-        val weaponType = weapon.type
+    private fun resolveThrowBaseDamage(weapon: ItemStack, runtime: Runtime, context: MobRuntimeContext): Double {
         val sampledDamage = runtime.lastMeleeDamage
-        if (sampledDamage != null && runtime.lastMeleeWeaponType == weaponType) {
+        if (sampledDamage != null && runtime.lastMeleeWeaponType == weapon.type) {
             return sampledDamage.coerceAtLeast(0.0)
         }
-        return null
+        return context.activeMob.definition.attack.coerceAtLeast(1.0)
     }
 
     private fun isDirectMeleeAttack(event: EntityDamageByEntityEvent, attacker: LivingEntity): Boolean {
@@ -162,6 +162,7 @@ class WeaponThrowAbility(
         val dropped = service.findNearestGroundWeapon(loaderKeyString(), entity.location, PICKUP_SEARCH_RANGE) ?: return
         val mob = entity as? Mob ?: return
 
+        mob.pathfinder.stopPathfinding()
         mob.target = null
         mob.pathfinder.moveTo(dropped.location, PICKUP_PATHFIND_SPEED)
     }
@@ -181,12 +182,12 @@ class WeaponThrowAbility(
         const val DEFAULT_THROW_COOLDOWN_TICKS = 80L
         const val DEFAULT_TRIGGER_MIN_DISTANCE = 5.0
         const val DEFAULT_TRIGGER_MAX_DISTANCE = 7.0
-        const val DEFAULT_THROW_SPEED = 0.925
+        const val DEFAULT_THROW_SPEED = 0.6
         const val DEFAULT_GRAVITY_COMPENSATION_PER_BLOCK = 0.018
         const val DEFAULT_SPREAD = 0.02
         const val DEFAULT_DAMAGE_MULTIPLIER = 2.0
         private const val PICKUP_SEARCH_RANGE = 12.0
-        private const val PICKUP_PATHFIND_SPEED = 1.15
+        private const val PICKUP_PATHFIND_SPEED = 2.3
         private const val SEARCH_PHASE_VARIANTS = 16
     }
 }

@@ -14,6 +14,7 @@ import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
+import jp.awabi2048.cccontent.items.arena.BoomerangTokenItem
 import jp.awabi2048.cccontent.mob.MobDefinition
 import jp.awabi2048.cccontent.mob.MobSpawnCondition
 import jp.awabi2048.cccontent.mob.MobService
@@ -2447,6 +2448,7 @@ class ArenaManager(
         for (typeId in tokenTypeIds) {
             CustomItemManager.register(ArenaMobTokenItem(typeId))
         }
+        CustomItemManager.register(BoomerangTokenItem())
     }
 
     fun activateDoorActionMarkers(worldName: String, wave: Int): Int {

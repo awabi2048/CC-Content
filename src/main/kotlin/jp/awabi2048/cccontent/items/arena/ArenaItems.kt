@@ -171,3 +171,11 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
         }
     }
 }
+
+class BoomerangTokenItem : ArenaSimpleItem(
+    material = Material.POISONOUS_POTATO,
+    modelData = null,
+    id = "boomerang_token",
+    displayName = "§6ボーンメラン",
+    lore = listOf("§7アリーナに出現するモンスターが落としたアイテム", "§7アリーナロビーで報酬と交換しよう！")
+)
