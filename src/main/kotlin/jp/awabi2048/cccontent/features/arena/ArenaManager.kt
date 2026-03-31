@@ -908,7 +908,10 @@ class ArenaManager(
             .mapNotNull { Bukkit.getPlayer(it) }
             .filter { it.isOnline && it.world.name == session.worldName }
             .forEach { participant ->
-                participant.sendMessage(ArenaI18n.text(participant, "arena.messages.down.participant_died", "§4{player}さんが死亡しました...", "player" to player.name))
+                participant.sendMessage(ArenaI18n.text(participant, "arena.messages.down.participant_died", "§4{player}さんが倒れました... §7（おあげちゃんが救出に向かいます）", "player" to player.name))
+                if (!hasOtherAliveNonDownParticipant(session, participant.uniqueId)) {
+                    return@forEach
+                }
                 scheduleOageMessage(
                     participant,
                     OAGE_FOLLOWUP_DELAY_TICKS,
@@ -1173,13 +1176,17 @@ class ArenaManager(
 
         event.isCancelled = true
 
+        val otherAliveExists = hasOtherAliveNonDownParticipant(session, player.uniqueId)
         if (!isMultiplayerSession(session) ||
-            !hasOtherAliveNonDownParticipant(session, player.uniqueId) ||
+            !otherAliveExists ||
             !canBeRevived(session, player.uniqueId)
         ) {
             setPlayerDown(session, player, reviveDisabled = true)
             notifyParticipantDeath(player)
             handleInviteTargetUnavailable(player)
+            if (isMultiplayerSession(session) && !otherAliveExists) {
+                convertDownedPlayersToGameOver(session)
+            }
             return
         }
 
@@ -1730,6 +1737,47 @@ class ArenaManager(
         }
     }
 
+    private fun convertDownedPlayersToGameOver(session: ArenaSession) {
+        val now = System.currentTimeMillis()
+        for (downedId in session.downedPlayers.keys.toList()) {
+            val downState = session.downedPlayers[downedId] ?: continue
+            if (downState.timeoutExecuteAtMillis != null) continue
+
+            val downed = Bukkit.getPlayer(downedId)
+            if (downed == null || !downed.isOnline || downed.world.name != session.worldName) {
+                continue
+            }
+
+            downState.reviveDisabled = true
+            downState.bleedoutAtMillis = now
+            downState.timeoutExecuteAtMillis = null
+
+            syncDownedShulker(session, downed, forceTeleport = true)
+
+            downed.walkSpeed = DOWNED_GAME_OVER_WALK_SPEED
+            stopArenaBgmForPlayer(downed)
+            downed.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, Int.MAX_VALUE, 0, false, false, false))
+            downed.playSound(downed.location, Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0f, 0.75f)
+            downed.sendMessage(
+                ArenaI18n.text(
+                    downed,
+                    "arena.messages.down.game_over",
+                    "&c目の前がまっくらになった...！\n&7おあげちゃんが救出中..."
+                )
+            )
+            scheduleOageMessage(
+                downed,
+                OAGE_FOLLOWUP_DELAY_TICKS,
+                "arena.messages.oage.game_over_followup",
+                "いま行きます！ちょっと待ってね",
+                force = true
+            )
+            clearReviveBindingForDowned(session, downedId, playInterruptedSound = false)
+
+            downState.timeoutExecuteAtMillis = now + DOWN_GAME_OVER_RETURN_DELAY_MILLIS
+        }
+    }
+
     private fun recoverDownedPlayer(session: ArenaSession, downed: Player, revivedBy: Player?) {
         clearDownedState(session, downed.uniqueId, playInterruptedSound = false)
         session.reviveCountByPlayer[downed.uniqueId] = reviveCount(session, downed.uniqueId) + 1
@@ -1821,6 +1869,19 @@ class ArenaManager(
                         downState.timeoutExecuteAtMillis = now + executeDelayMillis
                     } else if (now >= timeoutExecuteAt) {
                         if (downState.reviveDisabled) {
+                            val otherAliveExists = hasOtherAliveNonDownParticipant(session, downedId)
+                            val oageKey = if (otherAliveExists) {
+                                "arena.messages.oage.game_over_with_survivors"
+                            } else {
+                                "arena.messages.oage.game_over_all_wiped"
+                            }
+                            scheduleOageMessage(
+                                downed,
+                                40L,
+                                oageKey,
+                                if (otherAliveExists) "おつかれさま！他の方の様子はここからでも確認できます！" else "おつかれさま！間に合って良かったです！",
+                                force = true
+                            )
                             stopSessionToLobbyById(downedId, "")
                         } else {
                             stopSessionById(
@@ -4413,6 +4474,8 @@ class ArenaManager(
             "arena.messages.oage.wave_cleared_full_room" -> 0.3
             "arena.messages.oage.barrier_restart_started",
             "arena.messages.oage.game_over_followup",
+            "arena.messages.oage.game_over_with_survivors",
+            "arena.messages.oage.game_over_all_wiped",
             "arena.messages.oage.participant_died_followup",
             "arena.messages.oage.down_with_survivors" -> 1.0
             else -> 0.5

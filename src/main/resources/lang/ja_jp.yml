@@ -1148,12 +1148,12 @@ arena:
       invite_message_quest: '§e【{quest}】'
       invite_message_suffix: '&7に招待しました！'
     down:
-      entered: '&cダウンしました。生存者の蘇生を待ってください'
+      entered: '§cダウン！§7他の方が蘇生すると復活できます'
       recovered: '&a蘇生されました！'
       revive_success: '&a{player} を蘇生しました'
       timeout: '&cダウン時間切れです。ロビーへ転送されます'
       game_over: "&c目の前がまっくらになった...！\n&7おあげちゃんが救出中..."
-      participant_died: '&4{player}さんが死亡しました...'
+      participant_died: '§4{player}さんが倒れました... §7（おあげちゃんが救出に向かいます）'
       needs_revive: '&c{player}さんがダウンしました！蘇生が必要です！'
     oage:
       stage_start:
@@ -1178,6 +1178,10 @@ arena:
         - 'あとちょっとです...！'
       game_over_followup:
         - 'いま行きます！ちょっと待ってね'
+      game_over_with_survivors:
+        - 'おつかれさま！他の方の様子はここからでも確認できます！'
+      game_over_all_wiped:
+        - 'おつかれさま！間に合って良かったです！'
       participant_died_followup:
         - 'いま助けに行きますー！'
       down_with_survivors:

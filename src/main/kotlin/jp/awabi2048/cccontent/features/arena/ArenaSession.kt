@@ -43,7 +43,7 @@ data class ArenaDownedPlayerState(
     var shulkerEntityId: UUID? = null,
     var carrierEntityId: UUID? = null,
     var timeoutExecuteAtMillis: Long? = null,
-    val reviveDisabled: Boolean = false
+    var reviveDisabled: Boolean = false
 )
 
 data class ArenaReviveHoldState(
