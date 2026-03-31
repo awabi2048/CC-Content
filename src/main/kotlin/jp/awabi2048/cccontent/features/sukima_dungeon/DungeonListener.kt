@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
+import jp.awabi2048.cccontent.features.common.BGMManager
 import org.bukkit.Material
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener

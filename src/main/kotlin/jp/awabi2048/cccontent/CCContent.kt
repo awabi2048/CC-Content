@@ -65,6 +65,7 @@ import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskCheckerImpl
 import jp.awabi2048.cccontent.features.rank.listener.*
 // SukimaDungeon (GitHub版)
+import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.*
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureLoader
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureBuilder

@@ -10,7 +10,7 @@ import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeWeightedMobEntr
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
 import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestModifiers
 import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestService
-import jp.awabi2048.cccontent.features.sukima_dungeon.BGMManager
+import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
@@ -2484,7 +2484,6 @@ class ArenaManager(
         session.participantLastSampleMillis.remove(playerId)
         session.actionMarkerHoldStates.remove(playerId)
         session.arenaBgmModeByParticipant.remove(playerId)
-        session.arenaBgmPlaybackStartTickByParticipant.remove(playerId)
         session.arenaBgmSwitchRequestByParticipant.remove(playerId)
         session.playerWaveCatchupDeadlineMillis.remove(playerId)
         clearReviveBindingByReviver(session, playerId)
@@ -2612,7 +2611,6 @@ class ArenaManager(
         session.reviveBossBarsByDowned.clear()
         session.reviveCountByPlayer.clear()
         session.arenaBgmModeByParticipant.clear()
-        session.arenaBgmPlaybackStartTickByParticipant.clear()
         session.arenaBgmSwitchRequestByParticipant.clear()
         session.downedOriginalWalkSpeeds.clear()
         session.downedOriginalJumpStrengths.clear()
@@ -4832,9 +4830,9 @@ class ArenaManager(
         track: ArenaBgmTrackConfig,
         tick: Long
     ): Long {
-        val startTick = session.arenaBgmPlaybackStartTickByParticipant[participantId] ?: 0L
-        val elapsedTicks = (tick - startTick).coerceAtLeast(0L)
-        return floor(elapsedTicks.toDouble() / track.beatTicks).toLong() + 1L
+        val player = Bukkit.getPlayer(participantId) ?: return 1L
+        val beatNanos = track.beatTicks * 50_000_000.0
+        return BGMManager.getElapsedBeats(player, beatNanos)
     }
 
     private fun startArenaBgmMode(session: ArenaSession, participantId: UUID, mode: ArenaBgmMode, startTick: Long) {
@@ -4842,10 +4840,9 @@ class ArenaManager(
         val player = Bukkit.getPlayer(participantId)
         if (player != null && player.isOnline && player.world.name == session.worldName) {
             stopArenaBgmForPlayer(player)
-            BGMManager.playLoopTicks(player, track.soundKey, track.loopTicks)
+            BGMManager.playPrecise(player, track.soundKey, track.loopTicks)
         }
         session.arenaBgmModeByParticipant[participantId] = mode
-        session.arenaBgmPlaybackStartTickByParticipant[participantId] = startTick
         session.arenaBgmSwitchRequestByParticipant.remove(participantId)
         if (mode == ArenaBgmMode.NORMAL) {
             tryBroadcastPendingWaveClearedMessageOnNormalBgm(session)
@@ -4866,7 +4863,6 @@ class ArenaManager(
             stopArenaBgmForPlayer(player)
         }
         session.arenaBgmModeByParticipant[participantId] = ArenaBgmMode.STOPPED
-        session.arenaBgmPlaybackStartTickByParticipant[participantId] = 0L
         session.arenaBgmSwitchRequestByParticipant.remove(participantId)
     }
 

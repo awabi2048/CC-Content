@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
+import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.world.WorldSettingsHelper

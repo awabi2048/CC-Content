@@ -441,8 +441,8 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
                 isMultiplayer = isMultiplayer
             )
             ScoreboardManager.setupScoreboard(player)
-            jp.awabi2048.cccontent.features.sukima_dungeon.BGMManager.loadConfig()
-            jp.awabi2048.cccontent.features.sukima_dungeon.BGMManager.play(player, "default")
+            jp.awabi2048.cccontent.features.common.BGMManager.loadConfig()
+            jp.awabi2048.cccontent.features.common.BGMManager.play(player, "default")
         }
     }
 }

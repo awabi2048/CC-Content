@@ -147,7 +147,6 @@ data class ArenaSession(
     val reviveMaxPerPlayer: Int = Int.MAX_VALUE,
     val reviveTimeLimitSeconds: Int = 0,
     val arenaBgmModeByParticipant: MutableMap<UUID, ArenaBgmMode> = mutableMapOf(),
-    val arenaBgmPlaybackStartTickByParticipant: MutableMap<UUID, Long> = mutableMapOf(),
     val arenaBgmSwitchRequestByParticipant: MutableMap<UUID, ArenaBgmSwitchRequest?> = mutableMapOf(),
     val downedOriginalWalkSpeeds: MutableMap<UUID, Float> = mutableMapOf(),
     val downedOriginalJumpStrengths: MutableMap<UUID, Double> = mutableMapOf(),
