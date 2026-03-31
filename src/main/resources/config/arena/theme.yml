@@ -166,78 +166,33 @@ ocean_monument:
     key: minecraft:block.iron_door.open
     pitch: 1.0
   mobs:
-    husk_normal:
+    drowned_normal:
+      weight: 10
+      wave: 1..
+    drowned_warrior:
       weight: 8
-      wave: 1..
-    husk_light_leap:
-      weight: 9
-      wave: 1..
-    husk_heavy_shield:
-      weight: 7
-      wave: 3..
-    husk_archer:
-      weight: 7
       wave: 2..
-    husk_archer_swap:
-      weight: 8
-      wave: 3..
-    husk_weakening_aura:
+    drowned_grudge:
       weight: 6
       wave: 3..
+    drowned_power_throw:
+      weight: 7
+      wave: 2..
+    water_spirit:
+      weight: 4
+      wave: 4..
     guardian_normal:
-      weight: 8
+      weight: 5
       wave: 2..
     guardian_small:
-      weight: 6
+      weight: 4
       wave: 2..
     guardian_drain:
-      weight: 5
+      weight: 3
       wave: 3..
     guardian_beam_burst:
-      weight: 3
+      weight: 2
       wave: 4..
-    skeleton_normal:
-      weight: 8
-      wave: 1..
-    skeleton_plain:
-      weight: 7
-      wave: 1..
-    skeleton_rapid:
-      weight: 7
-      wave: 2..
-    skeleton_curve_backstep:
-      weight: 6
-      wave: 3..
-    skeleton_heavy_bow_shield:
-      weight: 6
-      wave: 3..
-    skeleton_throw_close:
-      weight: 7
-      wave: 2..
-    silverfish_plain:
-      weight: 10
-      wave: 2..
-    silverfish_big_poison:
-      weight: 5
-      wave: 4..
-    spider_plain:
-      weight: 8
-      wave: 1..
-    spider_stealth:
-      weight: 7
-      wave: 2..
-    spider_swift:
-      weight: 7
-      wave: 2..
-    spider_ferocious:
-      weight: 6
-      wave: 3..
-    spider_venom_frenzy:
-      weight: 5
-      wave: 4..
-    spider_broodmother:
-      weight: 3
-      wave: 5..
   orientation:
     entrance_exit: north
     corner_entry: south
@@ -254,48 +209,39 @@ natura:
     key: minecraft:block.iron_door.open
     pitch: 1.0
   mobs:
-    husk_normal:
+    zombie_normal:
       weight: 8
       wave: 1..
-    husk_light_leap:
+    zombie_light_leap:
       weight: 9
       wave: 1..
-    husk_heavy_shield:
+    zombie_heavy_shield:
       weight: 7
       wave: 3..
-    husk_archer:
+    zombie_archer:
       weight: 7
       wave: 2..
-    husk_archer_swap:
+    zombie_archer_swap:
       weight: 8
       wave: 3..
-    husk_weakening_aura:
-      weight: 6
-      wave: 3..
-    skeleton_normal:
+    bogged_plain:
+      weight: 7
+      wave: 1..
+    bogged_normal:
       weight: 8
       wave: 1..
-    skeleton_plain:
-      weight: 7
-      wave: 1..
-    skeleton_rapid:
+    bogged_rapid:
       weight: 7
       wave: 2..
-    skeleton_curve_backstep:
+    bogged_curve_backstep:
       weight: 6
       wave: 3..
-    skeleton_heavy_bow_shield:
+    bogged_heavy_bow_shield:
       weight: 6
       wave: 3..
-    skeleton_throw_close:
+    bogged_throw_close:
       weight: 7
       wave: 2..
-    silverfish_plain:
-      weight: 10
-      wave: 2..
-    silverfish_big_poison:
-      weight: 5
-      wave: 4..
     spider_plain:
       weight: 8
       wave: 1..
@@ -314,6 +260,21 @@ natura:
     spider_broodmother:
       weight: 3
       wave: 5..
+    slime_small:
+      weight: 10
+      wave: 1..
+    slime_medium:
+      weight: 7
+      wave: 2..
+    slime_large:
+      weight: 3
+      wave: 4..
+    slime_poison:
+      weight: 5
+      wave: 3..
+    slime_wither:
+      weight: 4
+      wave: 4..
   orientation:
     entrance_exit: north
     corner_entry: south

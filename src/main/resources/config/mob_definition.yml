@@ -255,3 +255,189 @@ guardian_drain:
   scale: 1.2
   spawn_conditions:
     - WATER_ONLY
+
+bogged_plain:
+  type: bogged_plain
+  health: 15.0
+  attack: 3.8
+  movement_speed: 0.25
+  armor: 0.0
+  scale: 1.0
+
+bogged_normal:
+  type: bogged_normal
+  health: 20.0
+  attack: 4.0
+  movement_speed: 0.23
+  armor: 0.0
+  scale: 1.0
+
+bogged_rapid:
+  type: bogged_rapid
+  health: 20.0
+  attack: 4.0
+  movement_speed: 0.23
+  armor: 0.0
+  scale: 1.0
+
+bogged_curve_backstep:
+  type: bogged_curve_backstep
+  health: 20.0
+  attack: 4.0
+  movement_speed: 0.24
+  armor: 1.0
+  scale: 1.0
+
+bogged_heavy_bow_shield:
+  type: bogged_heavy_bow_shield
+  health: 24.0
+  attack: 4.0
+  movement_speed: 0.22
+  armor: 4.0
+  scale: 1.0
+
+bogged_throw_close:
+  type: bogged_throw_close
+  health: 22.0
+  attack: 5.0
+  movement_speed: 0.24
+  armor: 1.0
+  scale: 1.0
+
+stray_plain:
+  type: stray_plain
+  health: 15.0
+  attack: 3.8
+  movement_speed: 0.25
+  armor: 0.0
+  scale: 1.0
+
+stray_normal:
+  type: stray_normal
+  health: 20.0
+  attack: 4.0
+  movement_speed: 0.23
+  armor: 0.0
+  scale: 1.0
+
+stray_rapid:
+  type: stray_rapid
+  health: 20.0
+  attack: 4.0
+  movement_speed: 0.23
+  armor: 0.0
+  scale: 1.0
+
+stray_curve_backstep:
+  type: stray_curve_backstep
+  health: 20.0
+  attack: 4.0
+  movement_speed: 0.24
+  armor: 1.0
+  scale: 1.0
+
+stray_heavy_bow_shield:
+  type: stray_heavy_bow_shield
+  health: 24.0
+  attack: 4.0
+  movement_speed: 0.22
+  armor: 4.0
+  scale: 1.0
+
+stray_throw_close:
+  type: stray_throw_close
+  health: 22.0
+  attack: 5.0
+  movement_speed: 0.24
+  armor: 1.0
+  scale: 1.0
+
+slime_small:
+  type: slime_small
+  health: 8.0
+  attack: 2.0
+  movement_speed: 0.30
+  armor: 0.0
+  scale: 1.0
+
+slime_medium:
+  type: slime_medium
+  health: 20.0
+  attack: 4.0
+  movement_speed: 0.26
+  armor: 2.0
+  scale: 2.0
+
+slime_large:
+  type: slime_large
+  health: 40.0
+  attack: 7.0
+  movement_speed: 0.22
+  armor: 6.0
+  scale: 3.0
+
+slime_poison:
+  type: slime_poison
+  health: 22.0
+  attack: 3.5
+  movement_speed: 0.25
+  armor: 2.0
+  scale: 2.0
+
+slime_wither:
+  type: slime_wither
+  health: 24.0
+  attack: 4.0
+  movement_speed: 0.24
+  armor: 3.0
+  scale: 2.0
+
+drowned_normal:
+  type: drowned_normal
+  health: 22.0
+  attack: 5.0
+  movement_speed: 0.23
+  armor: 2.0
+  scale: 1.0
+  spawn_conditions:
+    - WATER_ONLY
+
+drowned_warrior:
+  type: drowned_warrior
+  health: 28.0
+  attack: 5.5
+  movement_speed: 0.22
+  armor: 5.0
+  scale: 1.0
+  spawn_conditions:
+    - WATER_ONLY
+
+drowned_grudge:
+  type: drowned_grudge
+  health: 26.0
+  attack: 4.5
+  movement_speed: 0.20
+  armor: 3.0
+  scale: 1.0
+  spawn_conditions:
+    - WATER_ONLY
+
+drowned_power_throw:
+  type: drowned_power_throw
+  health: 24.0
+  attack: 6.0
+  movement_speed: 0.21
+  armor: 2.5
+  scale: 1.0
+  spawn_conditions:
+    - WATER_ONLY
+
+water_spirit:
+  type: water_spirit
+  health: 60.0
+  attack: 5.0
+  movement_speed: 0.30
+  armor: 5.0
+  scale: 3.0
+  spawn_conditions:
+    - WATER_ONLY

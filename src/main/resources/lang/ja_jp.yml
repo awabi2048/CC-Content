@@ -1005,12 +1005,18 @@ custom_items:
         skeleton_curve_shot: '曲射スケルトン'
         skeleton_shield_only: '盾スケルトン'
         skeleton_boomerang: '骨投擲スケルトン'
+        drowned_normal: 'ノーマルドラウンド'
+        drowned_warrior: 'ドラウンド戦士'
+        drowned_grudge: '怨念ドラウンド'
+        drowned_power_throw: '強投擲ドラウンド'
+        water_spirit: '水の精霊'
       drop_names:
         husk: 'ハスクのかたびら'
         iron_golem: 'ゴーレムのコア'
         guardian: 'ガーディアンのうろこ'
         silverfish: 'シルバーフィッシュの殻'
         spider: 'クモのハサミ'
+        drowned: 'ドラウンドの潮珠'
 arena:
   ticket:
     name: '§6アリーナチケット'
@@ -1043,12 +1049,18 @@ arena:
       skeleton_curve_shot: '曲射スケルトン'
       skeleton_shield_only: '盾スケルトン'
       skeleton_boomerang: '骨投擲スケルトン'
+      drowned_normal: 'ノーマルドラウンド'
+      drowned_warrior: 'ドラウンド戦士'
+      drowned_grudge: '怨念ドラウンド'
+      drowned_power_throw: '強投擲ドラウンド'
+      water_spirit: '水の精霊'
     drop_names:
       husk: 'ハスクのかたびら'
       iron_golem: 'ゴーレムのコア'
       guardian: 'ガーディアンのうろこ'
       silverfish: 'シルバーフィッシュの殻'
       spider: 'クモのハサミ'
+      drowned: 'ドラウンドの潮珠'
   theme:
     ruins:
       name: '遺跡'

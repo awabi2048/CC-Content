@@ -15,12 +15,17 @@ import jp.awabi2048.cccontent.mob.ability.MobShootUtil
 import jp.awabi2048.cccontent.mob.ability.PeriodicCobwebAbility
 import jp.awabi2048.cccontent.mob.ability.PlayerTargetAssistAbility
 import jp.awabi2048.cccontent.mob.ability.PoisonOnMeleeHitAbility
+import jp.awabi2048.cccontent.mob.ability.PotionSlimeAbility
 import jp.awabi2048.cccontent.mob.ability.ProjectileAndFireImmunityAbility
+import jp.awabi2048.cccontent.mob.ability.SlimeMergeAbility
 import jp.awabi2048.cccontent.mob.ability.RangedAttackAbility
 import jp.awabi2048.cccontent.mob.ability.RandomInvisibilityAbility
 import jp.awabi2048.cccontent.mob.ability.ShieldAbility
 import jp.awabi2048.cccontent.mob.ability.SplitOnDeathAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponThrowAbility
+import jp.awabi2048.cccontent.mob.ability.GrudgeAuraAbility
+import jp.awabi2048.cccontent.mob.ability.PowerTridentThrowAbility
+import jp.awabi2048.cccontent.mob.ability.WaterSpiritAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponSwapAbility
 import org.bukkit.Color
 import org.bukkit.Particle
@@ -636,6 +641,339 @@ class SpiderFerociousMobType : EquipmentMobType(
                     target.addPotionEffect(PotionEffect(miningFatigue, 80, 0, false, true, true))
                 }
             }
+        )
+    )
+)
+
+class BoggedPlainMobType : EquipmentMobType(
+    id = "bogged_plain",
+    baseEntityType = EntityType.BOGGED,
+    abilities = emptyList()
+)
+
+class BoggedNormalMobType : EquipmentMobType(
+    id = "bogged_normal",
+    baseEntityType = EntityType.BOGGED,
+    abilities = listOf(
+        RangedAttackAbility(
+            id = "bogged_normal_ranged"
+        )
+    ),
+    defaultMainHand = Material.BOW
+)
+
+class BoggedRapidShotMobType : EquipmentMobType(
+    id = "bogged_rapid",
+    baseEntityType = EntityType.BOGGED,
+    abilities = listOf(
+        RangedAttackAbility(
+            id = "bogged_rapid_shot_ranged",
+            arrowSpeedMultiplier = 1.0,
+            intervalMultiplier = RangedAttackAbility.DEFAULT_RAPID_INTERVAL_MULTIPLIER,
+            effectArrowChance = 0.0
+        )
+    ),
+    defaultMainHand = Material.BOW,
+    defaultHelmet = Material.GOLDEN_HELMET,
+    defaultBoots = Material.GOLDEN_BOOTS
+) {
+    override fun applyDefaultEquipment(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.applyDefaultEquipment(context, runtime)
+        applyGlintBow(context.entity.equipment?.itemInMainHand)
+    }
+}
+
+class BoggedCurveBackstepMobType : EquipmentMobType(
+    id = "bogged_curve_backstep",
+    baseEntityType = EntityType.BOGGED,
+    abilities = listOf(
+        RangedAttackAbility(
+            id = "bogged_curve_backstep_ranged",
+            homingConfig = MobShootUtil.HomingConfig()
+        ),
+        BackstepAbility(
+            id = "bogged_curve_backstep_backstep",
+            cooldownTicks = 20L,
+            shootArrowOnLand = true,
+            horizontalSpeed = 1.8,
+            verticalSpeed = 0.9,
+            homingConfig = MobShootUtil.HomingConfig()
+        )
+    ),
+    defaultMainHand = Material.BOW,
+    defaultHelmet = Material.CHAINMAIL_HELMET,
+    defaultBoots = Material.CHAINMAIL_BOOTS
+) {
+    override fun applyDefaultEquipment(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.applyDefaultEquipment(context, runtime)
+        applyGlintBow(context.entity.equipment?.itemInMainHand)
+    }
+}
+
+class BoggedBowShieldMobType : EquipmentMobType(
+    id = "bogged_heavy_bow_shield",
+    baseEntityType = EntityType.BOGGED,
+    abilities = listOf(
+        RangedAttackAbility(id = "bogged_bow_shield_ranged"),
+        ShieldAbility(id = "bogged_bow_shield", breakDisablesShieldPermanently = true)
+    ),
+    defaultMainHand = Material.BOW,
+    defaultOffHand = Material.SHIELD,
+    defaultHelmet = Material.LEATHER_HELMET,
+    defaultChestplate = Material.IRON_CHESTPLATE,
+    defaultLeggings = Material.LEATHER_LEGGINGS,
+    defaultBoots = Material.LEATHER_BOOTS
+)
+
+class BoggedWeaponThrowCloseMobType : EquipmentMobType(
+    id = "bogged_throw_close",
+    baseEntityType = EntityType.BOGGED,
+    abilities = listOf(
+        WeaponThrowAbility(id = "bogged_weapon_throw_close")
+    ),
+    defaultHelmet = Material.LEATHER_HELMET,
+    defaultChestplate = Material.CHAINMAIL_CHESTPLATE
+) {
+    override fun applyDefaultEquipment(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.applyDefaultEquipment(context, runtime)
+        val equipment = context.entity.equipment ?: return
+        equipment.setItemInMainHand(ItemStack(randomGoldenTool()))
+    }
+}
+
+class StrayPlainMobType : EquipmentMobType(
+    id = "stray_plain",
+    baseEntityType = EntityType.STRAY,
+    abilities = emptyList()
+)
+
+class StrayNormalMobType : EquipmentMobType(
+    id = "stray_normal",
+    baseEntityType = EntityType.STRAY,
+    abilities = listOf(
+        RangedAttackAbility(
+            id = "stray_normal_ranged"
+        )
+    ),
+    defaultMainHand = Material.BOW
+)
+
+class StrayRapidShotMobType : EquipmentMobType(
+    id = "stray_rapid",
+    baseEntityType = EntityType.STRAY,
+    abilities = listOf(
+        RangedAttackAbility(
+            id = "stray_rapid_shot_ranged",
+            arrowSpeedMultiplier = 1.0,
+            intervalMultiplier = RangedAttackAbility.DEFAULT_RAPID_INTERVAL_MULTIPLIER,
+            effectArrowChance = 0.0
+        )
+    ),
+    defaultMainHand = Material.BOW,
+    defaultHelmet = Material.GOLDEN_HELMET,
+    defaultBoots = Material.GOLDEN_BOOTS
+) {
+    override fun applyDefaultEquipment(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.applyDefaultEquipment(context, runtime)
+        applyGlintBow(context.entity.equipment?.itemInMainHand)
+    }
+}
+
+class StrayCurveBackstepMobType : EquipmentMobType(
+    id = "stray_curve_backstep",
+    baseEntityType = EntityType.STRAY,
+    abilities = listOf(
+        RangedAttackAbility(
+            id = "stray_curve_backstep_ranged",
+            homingConfig = MobShootUtil.HomingConfig()
+        ),
+        BackstepAbility(
+            id = "stray_curve_backstep_backstep",
+            cooldownTicks = 20L,
+            shootArrowOnLand = true,
+            horizontalSpeed = 1.8,
+            verticalSpeed = 0.9,
+            homingConfig = MobShootUtil.HomingConfig()
+        )
+    ),
+    defaultMainHand = Material.BOW,
+    defaultHelmet = Material.CHAINMAIL_HELMET,
+    defaultBoots = Material.CHAINMAIL_BOOTS
+) {
+    override fun applyDefaultEquipment(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.applyDefaultEquipment(context, runtime)
+        applyGlintBow(context.entity.equipment?.itemInMainHand)
+    }
+}
+
+class StrayBowShieldMobType : EquipmentMobType(
+    id = "stray_heavy_bow_shield",
+    baseEntityType = EntityType.STRAY,
+    abilities = listOf(
+        RangedAttackAbility(id = "stray_bow_shield_ranged"),
+        ShieldAbility(id = "stray_bow_shield", breakDisablesShieldPermanently = true)
+    ),
+    defaultMainHand = Material.BOW,
+    defaultOffHand = Material.SHIELD,
+    defaultHelmet = Material.LEATHER_HELMET,
+    defaultChestplate = Material.IRON_CHESTPLATE,
+    defaultLeggings = Material.LEATHER_LEGGINGS,
+    defaultBoots = Material.LEATHER_BOOTS
+)
+
+class StrayWeaponThrowCloseMobType : EquipmentMobType(
+    id = "stray_throw_close",
+    baseEntityType = EntityType.STRAY,
+    abilities = listOf(
+        WeaponThrowAbility(id = "stray_weapon_throw_close")
+    ),
+    defaultHelmet = Material.LEATHER_HELMET,
+    defaultChestplate = Material.CHAINMAIL_CHESTPLATE
+) {
+    override fun applyDefaultEquipment(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.applyDefaultEquipment(context, runtime)
+        val equipment = context.entity.equipment ?: return
+        equipment.setItemInMainHand(ItemStack(randomGoldenTool()))
+    }
+}
+
+class SlimeSmallMobType : EquipmentMobType(
+    id = "slime_small",
+    baseEntityType = EntityType.SLIME,
+    abilities = listOf(
+        ProjectileAndFireImmunityAbility(id = "slime_small_immunity"),
+        SlimeMergeAbility(
+            id = "slime_small_merge",
+            selfDefinitionId = "slime_small",
+            mergeOrder = listOf("slime_small", "slime_medium", "slime_large")
+        )
+    )
+)
+
+class SlimeMediumMobType : EquipmentMobType(
+    id = "slime_medium",
+    baseEntityType = EntityType.SLIME,
+    abilities = listOf(
+        ProjectileAndFireImmunityAbility(id = "slime_medium_immunity"),
+        SlimeMergeAbility(
+            id = "slime_medium_merge",
+            selfDefinitionId = "slime_medium",
+            mergeOrder = listOf("slime_small", "slime_medium", "slime_large")
+        )
+    )
+)
+
+class SlimeLargeMobType : EquipmentMobType(
+    id = "slime_large",
+    baseEntityType = EntityType.SLIME,
+    abilities = listOf(
+        ProjectileAndFireImmunityAbility(id = "slime_large_immunity"),
+        LeapAbility(
+            id = "slime_large_leap",
+            cooldownTicks = 100L,
+            minRangeSquared = 9.0,
+            maxRange = 10.0,
+            horizontalSpeed = 1.5,
+            verticalSpeed = 0.7
+        )
+    )
+)
+
+class SlimePoisonMobType : EquipmentMobType(
+    id = "slime_poison",
+    baseEntityType = EntityType.SLIME,
+    abilities = listOf(
+        ProjectileAndFireImmunityAbility(id = "slime_poison_immunity"),
+        PotionSlimeAbility(
+            id = "slime_poison_effect",
+            effectType = PotionEffectType.POISON,
+            effectDurationTicks = 80,
+            effectAmplifier = 0,
+            cloudColor = Color.GREEN
+        )
+    )
+)
+
+class SlimeWitherMobType : EquipmentMobType(
+    id = "slime_wither",
+    baseEntityType = EntityType.SLIME,
+    abilities = listOf(
+        ProjectileAndFireImmunityAbility(id = "slime_wither_immunity"),
+        PotionSlimeAbility(
+            id = "slime_wither_effect",
+            effectType = PotionEffectType.WITHER,
+            effectDurationTicks = 80,
+            effectAmplifier = 0,
+            cloudColor = Color.GRAY
+        )
+    )
+)
+
+class DrownedNormalMobType : EquipmentMobType(
+    id = "drowned_normal",
+    baseEntityType = EntityType.DROWNED,
+    abilities = emptyList()
+)
+
+class DrownedWarriorMobType : EquipmentMobType(
+    id = "drowned_warrior",
+    baseEntityType = EntityType.DROWNED,
+    abilities = listOf(
+        ShieldAbility(id = "drowned_warrior_shield", breakDisablesShieldPermanently = true),
+        BackstepAbility(
+            id = "drowned_warrior_backstep",
+            cooldownTicks = 100L,
+            horizontalSpeed = 0.8,
+            verticalSpeed = 0.35
+        )
+    ),
+    defaultMainHand = Material.STONE_SWORD,
+    defaultOffHand = Material.SHIELD
+)
+
+class DrownedGrudgeMobType : EquipmentMobType(
+    id = "drowned_grudge",
+    baseEntityType = EntityType.DROWNED,
+    abilities = listOf(
+        GrudgeAuraAbility(
+            id = "drowned_grudge_aura",
+            radius = 5.0,
+            debuffIntervalTicks = 120L,
+            debuffDurationSlownessTicks = 100,
+            debuffAmplifierSlowness = 1,
+            debuffDurationBlindnessTicks = 60,
+            damageIntervalTicks = 160L,
+            damageAmount = 3.0
+        )
+    ),
+    defaultMainHand = Material.TRIDENT
+)
+
+class DrownedPowerThrowMobType : EquipmentMobType(
+    id = "drowned_power_throw",
+    baseEntityType = EntityType.DROWNED,
+    abilities = listOf(
+        PowerTridentThrowAbility(
+            id = "drowned_power_throw_trident",
+            throwCooldownTicks = 100L,
+            triggerMinDistance = 3.0,
+            triggerMaxDistance = 20.0,
+            knockbackMultiplier = 3.0
+        )
+    ),
+    defaultMainHand = Material.TRIDENT
+)
+
+class WaterSpiritMobType : EquipmentMobType(
+    id = "water_spirit",
+    baseEntityType = EntityType.ALLAY,
+    abilities = listOf(
+        WaterSpiritAbility(
+            id = "water_spirit_attack",
+            approachDistance = 5.0,
+            closeRangeDamage = 5.0,
+            farRangeOrbDamage = 3.5,
+            sharedCooldownTicks = 120L
         )
     )
 )

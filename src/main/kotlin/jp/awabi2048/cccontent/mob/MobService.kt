@@ -6,6 +6,16 @@ import jp.awabi2048.cccontent.mob.type.HuskLeapOnlyMobType
 import jp.awabi2048.cccontent.mob.type.HuskNormalMobType
 import jp.awabi2048.cccontent.mob.type.HuskShieldOnlyMobType
 import jp.awabi2048.cccontent.mob.type.HuskWeakeningAuraMobType
+import jp.awabi2048.cccontent.mob.type.BoggedBowShieldMobType
+import jp.awabi2048.cccontent.mob.type.BoggedCurveBackstepMobType
+import jp.awabi2048.cccontent.mob.type.BoggedNormalMobType
+import jp.awabi2048.cccontent.mob.type.BoggedPlainMobType
+import jp.awabi2048.cccontent.mob.type.BoggedRapidShotMobType
+import jp.awabi2048.cccontent.mob.type.BoggedWeaponThrowCloseMobType
+import jp.awabi2048.cccontent.mob.type.DrownedGrudgeMobType
+import jp.awabi2048.cccontent.mob.type.DrownedNormalMobType
+import jp.awabi2048.cccontent.mob.type.DrownedPowerThrowMobType
+import jp.awabi2048.cccontent.mob.type.DrownedWarriorMobType
 import jp.awabi2048.cccontent.mob.type.GuardianBeamBurstMobType
 import jp.awabi2048.cccontent.mob.type.GuardianDrainMobType
 import jp.awabi2048.cccontent.mob.type.GuardianNormalMobType
@@ -14,6 +24,11 @@ import jp.awabi2048.cccontent.mob.type.IronGolemMagnetMobType
 import jp.awabi2048.cccontent.mob.type.IronGolemNormalMobType
 import jp.awabi2048.cccontent.mob.type.SilverfishBigPoisonMobType
 import jp.awabi2048.cccontent.mob.type.SilverfishPlainMobType
+import jp.awabi2048.cccontent.mob.type.SlimeLargeMobType
+import jp.awabi2048.cccontent.mob.type.SlimeMediumMobType
+import jp.awabi2048.cccontent.mob.type.SlimePoisonMobType
+import jp.awabi2048.cccontent.mob.type.SlimeSmallMobType
+import jp.awabi2048.cccontent.mob.type.SlimeWitherMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonPlainMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonBoomerangMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonCurveShotMobType
@@ -32,6 +47,13 @@ import jp.awabi2048.cccontent.mob.type.SpiderPlainMobType
 import jp.awabi2048.cccontent.mob.type.SpiderStealthMobType
 import jp.awabi2048.cccontent.mob.type.SpiderSwiftMobType
 import jp.awabi2048.cccontent.mob.type.SpiderVenomFrenzyMobType
+import jp.awabi2048.cccontent.mob.type.StrayBowShieldMobType
+import jp.awabi2048.cccontent.mob.type.StrayCurveBackstepMobType
+import jp.awabi2048.cccontent.mob.type.StrayNormalMobType
+import jp.awabi2048.cccontent.mob.type.StrayPlainMobType
+import jp.awabi2048.cccontent.mob.type.StrayRapidShotMobType
+import jp.awabi2048.cccontent.mob.type.StrayWeaponThrowCloseMobType
+import jp.awabi2048.cccontent.mob.type.WaterSpiritMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
@@ -160,6 +182,28 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(GuardianSmallMobType())
         registerMobType(GuardianBeamBurstMobType())
         registerMobType(GuardianDrainMobType())
+        registerMobType(BoggedPlainMobType())
+        registerMobType(BoggedNormalMobType())
+        registerMobType(BoggedRapidShotMobType())
+        registerMobType(BoggedCurveBackstepMobType())
+        registerMobType(BoggedBowShieldMobType())
+        registerMobType(BoggedWeaponThrowCloseMobType())
+        registerMobType(StrayPlainMobType())
+        registerMobType(StrayNormalMobType())
+        registerMobType(StrayRapidShotMobType())
+        registerMobType(StrayCurveBackstepMobType())
+        registerMobType(StrayBowShieldMobType())
+        registerMobType(StrayWeaponThrowCloseMobType())
+        registerMobType(SlimeSmallMobType())
+        registerMobType(SlimeMediumMobType())
+        registerMobType(SlimeLargeMobType())
+        registerMobType(SlimePoisonMobType())
+        registerMobType(SlimeWitherMobType())
+        registerMobType(DrownedNormalMobType())
+        registerMobType(DrownedWarriorMobType())
+        registerMobType(DrownedGrudgeMobType())
+        registerMobType(DrownedPowerThrowMobType())
+        registerMobType(WaterSpiritMobType())
     }
 
     fun registerMobType(mobType: MobType) {
@@ -407,6 +451,16 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun handleEntityPickupItem(event: EntityPickupItemEvent) {
         ThrownWeaponService.getInstance(plugin).handleItemPickup(event)
+    }
+
+    fun handleSlimeSplit(event: org.bukkit.event.entity.SlimeSplitEvent) {
+        if (getActiveMob(event.entity.uniqueId) != null) {
+            event.isCancelled = true
+            return
+        }
+        if (event.entity.persistentDataContainer.has(customMobKey, PersistentDataType.BYTE)) {
+            event.isCancelled = true
+        }
     }
 
     fun startTickTask(intervalTicks: Long = 10L) {
@@ -712,6 +766,7 @@ class MobService(private val plugin: JavaPlugin) {
                 cleanupNearbyChickenMounts(entity)
             }
             is Ageable -> entity.setAdult()
+            is org.bukkit.entity.Slime -> entity.setSize(1)
         }
     }
 
