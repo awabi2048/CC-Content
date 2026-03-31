@@ -1160,7 +1160,7 @@ arena:
       needs_revive: '&c{player}さんがダウンしました！蘇生が必要です！'
     oage:
       stage_start:
-        - '§f現地に到着しました！おねがいしますね！'
+        - '§f現地に到着しました！'
       combat_all_engaged:
         - 'なかなか手強いですね…！'
       combat_all_calm:
@@ -1190,7 +1190,7 @@ arena:
       down_with_survivors:
         - 'お疲れさま！他のみなさんの様子はここからでも確認できますよ！'
       lift_ready:
-        - '§f「リフトの準備ができました！搭乗してお待ちください～」'
+        - '§f「おねがいします！準備ができるまでリフトに乗ってお待ちください～」'
     barrier:
       cannot_break: '&c結界石は破壊できません'
       cannot_place_on: '&c結界石の上には設置できません'

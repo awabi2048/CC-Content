@@ -300,6 +300,7 @@ class ArenaManager(
     private val knownMobTypeIds = mutableSetOf<String>()
     private val mobToDefinitionTypeId = mutableMapOf<UUID, String>()
     private val liftOccupiedMarkerKeys = mutableSetOf<String>()
+    private val liftOccupiedWaiters = mutableSetOf<UUID>()
     private var maintenanceTask: BukkitTask? = null
     private var playerMonitorTask: BukkitTask? = null
     private var actionMarkerTask: BukkitTask? = null
@@ -706,6 +707,7 @@ class ArenaManager(
         }
 
         if (enableMultiplayerJoin && liftMarkers.any { liftOccupiedMarkerKeys.contains(liftMarkerKey(it)) }) {
+            liftOccupiedWaiters.add(target.uniqueId)
             return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.lift_occupied",
                 "&cリフトが使用中のため開始できません"
@@ -970,6 +972,7 @@ class ArenaManager(
         invitedPlayerLocks.clear()
         inviteSwingCooldownUntilTick.clear()
         liftOccupiedMarkerKeys.clear()
+        liftOccupiedWaiters.clear()
         processPendingWorldDeletions()
     }
 
@@ -2620,6 +2623,7 @@ class ArenaManager(
         session.joinCountdownBossBars.clear()
         session.joinAreaMarkerLocations.clear()
         releaseOccupiedLiftMarkers(session)
+        liftOccupiedWaiters.clear()
         session.liftMarkerLocations.clear()
         session.lobbyMarkerLocations.clear()
         session.entranceLiftChunkTicketWorldName = null
@@ -5670,7 +5674,10 @@ class ArenaManager(
                 session.entranceLiftTask = null
                 restorePlayerMovement(originalSpeeds)
                 releaseEntranceLiftChunkTickets(session)
-                releaseOccupiedLiftMarkers(session)
+                Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+                    releaseOccupiedLiftMarkers(session)
+                    notifyLiftOccupiedWaiters()
+                }, 40L)
                 return@Runnable
             }
 
@@ -5949,6 +5956,26 @@ class ArenaManager(
     private fun releaseOccupiedLiftMarkers(session: ArenaSession) {
         session.liftMarkerLocations.forEach { loc ->
             liftOccupiedMarkerKeys.remove(liftMarkerKey(loc))
+        }
+    }
+
+    private fun notifyLiftOccupiedWaiters() {
+        if (liftOccupiedWaiters.isEmpty()) return
+        val waiters = liftOccupiedWaiters.toList()
+        liftOccupiedWaiters.clear()
+        waiters.forEach { playerId ->
+            val player = Bukkit.getPlayer(playerId)
+            if (player != null && player.isOnline) {
+                OageMessageSender.send(
+                    player,
+                    ArenaI18n.text(
+                        player,
+                        "arena.messages.oage.lift_occupied_done",
+                        "§f「リフトの準備が終わりました！」"
+                    ),
+                    plugin
+                )
+            }
         }
     }
 

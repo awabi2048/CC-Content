@@ -469,7 +469,7 @@ custom_items:
         game_over: '&cEverything went dark...!\n&7Game over. Teleporting to lobby'
       oage:
         stage_start:
-          - '§fWe have arrived on site! Please take care of us!'
+          - '§fWe have arrived on site!'
         wave_cleared:
           - 'It seems safe for now! Let's regroup and move on to the next wave!'
         wave_clear_wait:
@@ -489,7 +489,7 @@ custom_items:
         game_over_all_wiped:
           - '§fGood work! Glad I made it in time!'
         lift_ready:
-          - '§f"The lift is ready! Please board and wait~"'
+          - '§f"Please wait on the lift until it is ready~"'
     ui:
       quest:
         difficulty_inline: '§f❙ §7Difficulty §f{difficulty}'

@@ -252,7 +252,7 @@ class ArenaQuestService(
                                 ArenaI18n.text(
                                     player,
                                     "arena.messages.oage.lift_ready",
-                                    "§f「リフトの準備ができました！搭乗してお待ちください～」"
+                                    "§f「おねがいします！準備ができるまでリフトに乗ってお待ちください～」"
                                 ),
                                 plugin
                             )
