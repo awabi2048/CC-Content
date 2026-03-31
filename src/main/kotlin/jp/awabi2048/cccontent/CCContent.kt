@@ -42,6 +42,7 @@ import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.arena.ArenaItemListener
 import jp.awabi2048.cccontent.features.arena.ArenaListener
 import jp.awabi2048.cccontent.features.arena.ArenaManager
+import jp.awabi2048.cccontent.features.arena.ArenaSessionInfoMenu
 import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestService
 import jp.awabi2048.cccontent.features.brewery.BreweryFeature
 import jp.awabi2048.cccontent.features.cooking.CookingFeature
@@ -115,6 +116,7 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var adminMarkerToolService: AdminMarkerToolService
     private lateinit var arenaManager: ArenaManager
     private var arenaQuestService: ArenaQuestService? = null
+    private var arenaSessionInfoMenu: ArenaSessionInfoMenu? = null
     private lateinit var sharedMobService: MobService
     private lateinit var breweryFeature: BreweryFeature
     private lateinit var cookingFeature: CookingFeature
@@ -188,6 +190,7 @@ class CCContent : JavaPlugin(), Listener {
                 arenaQuestService = ArenaQuestService(this, arenaManager)
                 arenaManager.setQuestService(arenaQuestService)
                 arenaQuestService?.initialize()
+                arenaSessionInfoMenu = ArenaSessionInfoMenu(this, arenaManager)
                 arenaFeatureReady = true
             } catch (e: Exception) {
                 runCatching { arenaQuestService?.shutdown() }
@@ -198,6 +201,7 @@ class CCContent : JavaPlugin(), Listener {
                     }
                 }
                 arenaQuestService = null
+                arenaSessionInfoMenu = null
                 arenaFeatureReady = false
                 arenaFeatureFailureReason = e.message?.takeIf { it.isNotBlank() }
                     ?: "Arena feature の初期化に失敗しました"
@@ -275,6 +279,7 @@ class CCContent : JavaPlugin(), Listener {
             val arenaCommand = ArenaCommand(
                 arenaManagerProvider = { if (::arenaManager.isInitialized) arenaManager else null },
                 questService = arenaQuestService,
+                sessionInfoMenu = arenaSessionInfoMenu,
                 featureEnabledProvider = { arenaFeatureReady },
                 featureFailureReasonProvider = { arenaFeatureFailureReason }
             )
@@ -293,6 +298,9 @@ class CCContent : JavaPlugin(), Listener {
             server.pluginManager.registerEvents(ArenaItemListener(), this)
             server.pluginManager.registerEvents(ArenaListener(arenaManager), this)
             arenaQuestService?.let {
+                server.pluginManager.registerEvents(it, this)
+            }
+            arenaSessionInfoMenu?.let {
                 server.pluginManager.registerEvents(it, this)
             }
         }
@@ -332,6 +340,7 @@ class CCContent : JavaPlugin(), Listener {
                 breweryFeature.shutdown()
             }
             arenaQuestService?.shutdown()
+            arenaSessionInfoMenu = null
             if (::arenaManager.isInitialized) {
                 arenaManager.setQuestService(null)
             }

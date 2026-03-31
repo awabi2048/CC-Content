@@ -11,6 +11,7 @@ import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestService
 class ArenaCommand(
     private val arenaManagerProvider: () -> ArenaManager? = { null },
     private val questService: ArenaQuestService? = null,
+    private val sessionInfoMenu: ArenaSessionInfoMenu? = null,
     private val featureEnabledProvider: () -> Boolean = { true },
     private val featureFailureReasonProvider: () -> String? = { null }
 ) : CommandExecutor, TabCompleter {
@@ -37,6 +38,7 @@ class ArenaCommand(
             "start" -> handleStart(sender, args)
             "stop" -> handleStop(sender, args)
             "theme" -> handleTheme(sender, args)
+            "broadcast" -> handleBroadcast(sender)
             else -> {
                 showUsage(sender)
                 true
@@ -234,12 +236,30 @@ class ArenaCommand(
         return true
     }
 
+    private fun handleBroadcast(sender: CommandSender): Boolean {
+        val player = sender as? Player
+        if (player == null) {
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.player_only", "§cこのコマンドはプレイヤーのみ実行できます"))
+            return true
+        }
+
+        val menu = sessionInfoMenu
+        if (menu == null) {
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable", "§cArena feature は初期化に失敗したため利用できません"))
+            return true
+        }
+
+        menu.openMenu(player)
+        return true
+    }
+
     private fun showUsage(sender: CommandSender) {
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.header", "&6=== Arena 管理コマンド ==="))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.menu", "&f/arenaa menu"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s|@near> <difficulty_id> [theme]"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop", "&f/arenaa stop <player>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.theme", "&f/arenaa theme list"))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.broadcast", "&f/arenaa broadcast"))
     }
 
     override fun onTabComplete(
@@ -252,7 +272,7 @@ class ArenaCommand(
         if (!featureEnabledProvider()) return emptyList()
 
         return when (args.size) {
-            1 -> listOf("menu", "start", "stop", "theme").filter { it.startsWith(args[0], ignoreCase = true) }
+            1 -> listOf("menu", "start", "stop", "theme", "broadcast").filter { it.startsWith(args[0], ignoreCase = true) }
             2 -> when (args[0].lowercase()) {
                 "menu" -> emptyList()
                 "start" -> listOf("@s", "@near") + Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], ignoreCase = true) }

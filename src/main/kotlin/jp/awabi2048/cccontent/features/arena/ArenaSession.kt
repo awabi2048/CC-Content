@@ -31,6 +31,12 @@ enum class ArenaBgmMode {
     STOPPED
 }
 
+enum class ArenaLiftStatus {
+    READY,
+    OCCUPIED,
+    UNAVAILABLE
+}
+
 data class ArenaBgmSwitchRequest(
     val targetMode: ArenaBgmMode,
     val requestedAtTick: Long,
@@ -170,6 +176,7 @@ data class ArenaSession(
     val playerWaveCatchupDeadlineMillis: MutableMap<UUID, Long> = mutableMapOf(),
     val waveSpawningStopped: MutableSet<Int> = mutableSetOf(),
     val oageAnnouncements: MutableSet<String> = mutableSetOf(),
+    var lastOageMessage: String? = null,
     val waveClearReminderTasks: MutableMap<Int, BukkitTask> = mutableMapOf(),
     val animatingDoorWaves: MutableSet<Int> = mutableSetOf(),
     val actionMarkers: MutableMap<UUID, ArenaActionMarker> = mutableMapOf(),

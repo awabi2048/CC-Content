@@ -990,6 +990,24 @@ class ArenaManager(
         return playerToSessionWorld.keys.mapNotNull { uuid -> Bukkit.getPlayer(uuid)?.name }.toSet()
     }
 
+    fun getActiveSessions(): List<ArenaSession> {
+        return sessionsByWorld.values.toList()
+    }
+
+    fun resolveParticipantStatus(session: ArenaSession, playerId: UUID): String {
+        return resolveSidebarParticipantStatus(session, playerId)
+    }
+
+    fun getLiftStatusForSession(session: ArenaSession): ArenaLiftStatus {
+        val hasLiftMarkers = session.liftMarkerLocations.isNotEmpty()
+        val anyOccupied = session.liftMarkerLocations.any { loc -> liftOccupiedMarkerKeys.contains(liftMarkerKey(loc)) }
+        return when {
+            !hasLiftMarkers || !isEntranceLiftReady(session.liftMarkerLocations) -> ArenaLiftStatus.UNAVAILABLE
+            anyOccupied -> ArenaLiftStatus.OCCUPIED
+            else -> ArenaLiftStatus.READY
+        }
+    }
+
     fun isPlayerInvitedToSession(playerId: UUID): Boolean {
         return invitedPlayerLocks.containsKey(playerId)
     }
@@ -4526,12 +4544,17 @@ class ArenaManager(
         fallback: List<String>,
         vararg placeholders: Pair<String, Any?>
     ) {
+        var lastMessage: String? = null
         session.participants.forEach { participantId ->
             val player = Bukkit.getPlayer(participantId) ?: return@forEach
             if (!player.isOnline || player.world.name != session.worldName) return@forEach
 
             val message = ArenaI18n.stringList(player, key, fallback, *placeholders).randomOrNull() ?: return@forEach
+            lastMessage = message
             sendOageMessage(player, key, message)
+        }
+        if (lastMessage != null) {
+            session.lastOageMessage = lastMessage
         }
     }
 

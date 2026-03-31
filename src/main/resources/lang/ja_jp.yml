@@ -1340,4 +1340,32 @@ arena:
       name: '§a培養済み酵母（モック）'
       lore:
         - '§7発酵GUIの酵母スロット用（効果なし）'
+  arena:
+    ui:
+      broadcast:
+        title: '§8アリーナ実況'
+        default_title: '§fアリーナクエスト'
+        empty_slot: '§e余裕あり'
+        info:
+          name: '§bInfo'
+          lore:
+            - '§7おあげちゃんが基地から'
+            - '§7サポートを行っています'
+        lift:
+          no_session: '§8-'
+          occupied: '§cリフト使用中'
+          ready: '§aリフト使用可'
+          preparing: '§eリフト準備中'
+        players_header: '§f❙ §7参加プレイヤー'
+        player_line: '§7・ §b{name} {status}'
+        radio_header: '§f❙ §7無線'
+        wave:
+          get_ready: '§7« §6Wave ◯ (Last Wave) §7» §e到着！'
+          normal: '§7« §6Wave {wave} §7»'
+          last: '§7« §6Wave ◯ (Last Wave) §7»'
+          clear: '§dCLEAR'
+      messages:
+        command:
+          help:
+            broadcast: '&f/arenaa broadcast'
 
