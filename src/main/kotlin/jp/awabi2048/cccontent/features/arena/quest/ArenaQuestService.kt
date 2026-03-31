@@ -223,13 +223,6 @@ class ArenaQuestService(
         }
 
         player.closeInventory()
-        player.sendMessage(
-            ArenaI18n.text(
-                player,
-                "arena.messages.session.starting",
-                "&6[Arena] アリーナを開始します..."
-            )
-        )
 
         Bukkit.getScheduler().runTask(plugin, Runnable {
             if (!player.isOnline) {
@@ -247,14 +240,38 @@ class ArenaQuestService(
                 enableMultiplayerJoin = true,
                 inviteQuestTitle = inviteQuestTitle,
                 inviteQuestLore = inviteQuestLore,
-                maxParticipants = quest.maxParticipants
+                maxParticipants = quest.maxParticipants,
+                showSessionStartedMessage = false
             )) {
                 is ArenaStartResult.Success -> {
                     activeQuests[player.uniqueId] = ArenaActiveQuestRecord(dateKey, quest.index, quest)
+                    Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+                        if (player.isOnline) {
+                            OageMessageSender.send(
+                                player,
+                                ArenaI18n.text(
+                                    player,
+                                    "arena.messages.oage.lift_ready",
+                                    "§f「リフトの準備ができました！搭乗してお待ちください～」"
+                                ),
+                                plugin
+                            )
+                        }
+                    }, 40L)
                 }
                 is ArenaStartResult.Error -> {
                     if (result.messageKey == "arena.messages.command.start_error.stage_build_failed") {
                         player.sendMessage(ArenaI18n.text(player, "arena.messages.quest.stage_build_failed_internal", "§cステージの生成に失敗しました。スタッフに報告してください。(STRUCTURE_ERROR)"))
+                    } else if (result.messageKey == "arena.messages.command.start_error.lift_occupied") {
+                        OageMessageSender.send(
+                            player,
+                            ArenaI18n.text(
+                                player,
+                                "arena.messages.multiplayer.lift_occupied_oage",
+                                "§f「リフトが空くまでちょっとまってね！」"
+                            ),
+                            plugin
+                        )
                     } else if (result.messageKey == "arena.messages.command.start_error.lift_not_ready") {
                         OageMessageSender.send(
                             player,
@@ -676,7 +693,7 @@ class ArenaQuestService(
                 ArenaI18n.text(player, "arena.ui.quest.item_name", "§a{quest}", "quest" to title)
             }
         )
-        meta.lore = buildQuestLore(quest)
+        meta.lore = buildQuestLore(player, quest)
         item.itemMeta = meta
         return item
     }
@@ -726,16 +743,15 @@ class ArenaQuestService(
         )
     }
 
-    private fun buildQuestLore(quest: ArenaDailyQuestEntry): List<String> {
+    private fun buildQuestLore(player: Player, quest: ArenaDailyQuestEntry): List<String> {
         val mission = ArenaQuestMissionType.fromId(quest.missionTypeId) ?: ArenaQuestMissionType.BARRIER_RESTART
         val lore = mutableListOf<String>()
-        lore += ArenaI18n.text(null, "arena.ui.separator", "§8§m――――――――――――――――――――")
-        lore += ArenaI18n.text(null, "arena.ui.quest.mission_title", "§f❙ §7ミッション内容")
-        lore += missionGuideHints(mission)
+        lore += ArenaI18n.text(player, "arena.ui.separator", "§8§m――――――――――――――――――――")
+        lore += ArenaI18n.text(player, "arena.ui.quest.mission_title", "§f❙ §7ミッション内容")
+        lore += missionGuideHints(mission, player)
         lore += ""
-        lore += ArenaI18n.text(null, "arena.ui.quest.difficulty_title", "§f❙ §7難易度")
-        lore += ArenaI18n.text(null, "arena.ui.quest.difficulty_value", "§7{difficulty}", "difficulty" to difficultyDisplay(quest.difficultyId))
-        lore += ArenaI18n.text(null, "arena.ui.separator", "§8§m――――――――――――――――――――")
+        lore += ArenaI18n.text(player, "arena.ui.quest.difficulty_inline", "§f❙ §7難易度 §f{difficulty}", "difficulty" to difficultyDisplay(quest.difficultyId))
+        lore += ArenaI18n.text(player, "arena.ui.separator", "§8§m――――――――――――――――――――")
         return lore
     }
 
@@ -747,11 +763,8 @@ class ArenaQuestService(
         lore += ArenaI18n.text(player, "arena.ui.quest.mission_title", "§f❙ §7ミッション内容")
         lore += missionGuideHints(mission, player)
         lore += ""
-        lore += ArenaI18n.text(player, "arena.ui.quest.difficulty_title", "§f❙ §7難易度")
-        lore += ArenaI18n.text(player, "arena.ui.quest.difficulty_value", "§7{difficulty}", "difficulty" to difficultyDisplay(quest.difficultyId))
-        lore += ArenaI18n.text(player, "arena.ui.separator", "§8§m――――――――――――――――――――")
-        lore += ArenaI18n.text(player, "arena.ui.quest.memo_title", "§f❙ §7メモ")
-        lore += memo
+        lore += ArenaI18n.text(player, "arena.ui.quest.difficulty_inline", "§f❙ §7難易度 §f{difficulty}", "difficulty" to difficultyDisplay(quest.difficultyId))
+        lore += ArenaI18n.text(player, "arena.ui.quest.memo_inline", "§f❙ §7メモ §f{memo}", "memo" to memo)
         lore += ArenaI18n.text(player, "arena.ui.separator", "§8§m――――――――――――――――――――")
         return lore
     }

@@ -299,6 +299,7 @@ class ArenaManager(
     private val mobDefinitions = mutableMapOf<String, MobDefinition>()
     private val knownMobTypeIds = mutableSetOf<String>()
     private val mobToDefinitionTypeId = mutableMapOf<UUID, String>()
+    private val liftOccupiedMarkerKeys = mutableSetOf<String>()
     private var maintenanceTask: BukkitTask? = null
     private var playerMonitorTask: BukkitTask? = null
     private var actionMarkerTask: BukkitTask? = null
@@ -623,6 +624,7 @@ class ArenaManager(
         inviteQuestTitle: String? = null,
         inviteQuestLore: List<String> = emptyList(),
         maxParticipants: Int = MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT,
+        showSessionStartedMessage: Boolean = true,
         onCompleted: ((Long) -> Unit)? = null
     ): ArenaStartResult {
         val startedAtNanos = System.nanoTime()
@@ -703,6 +705,13 @@ class ArenaManager(
             ))
         }
 
+        if (enableMultiplayerJoin && liftMarkers.any { liftOccupiedMarkerKeys.contains(liftMarkerKey(it)) }) {
+            return completed(ArenaStartResult.Error(
+                "arena.messages.command.start_error.lift_occupied",
+                "&cリフトが使用中のため開始できません"
+            ))
+        }
+
         val lobbyMarkers = findLoadedLobbyMarkers(target.world)
         if (lobbyMarkers.isEmpty()) {
             return completed(ArenaStartResult.Error(
@@ -767,6 +776,9 @@ class ArenaManager(
         participantPlayers.forEach { participant ->
             playerToSessionWorld[participant.uniqueId] = world.name
         }
+        if (enableMultiplayerJoin) {
+            liftMarkers.forEach { liftOccupiedMarkerKeys.add(liftMarkerKey(it)) }
+        }
         logArenaPoolState("セッション開始", world.name)
 
         return try {
@@ -776,7 +788,14 @@ class ArenaManager(
                     ArenaI18n.text(
                         target,
                         "arena.messages.multiplayer.invite_window_started",
-                        "&7アリーナセッションを開始します…\n左クリックで他のプレイヤーを招待できます。招待メンバーはリフトで待機すると、一緒に入場できます"
+                        "§6クエストを受注しました！§7リフトを準備中です..."
+                    )
+                )
+                target.sendMessage(
+                    ArenaI18n.text(
+                        target,
+                        "arena.messages.multiplayer.invite_window_hint",
+                        "§7左クリックでほかのプレイヤーをクエストに誘うことができます"
                     )
                 )
 
@@ -843,17 +862,19 @@ class ArenaManager(
                 updateSessionProgressBossBar(session)
                 onCompleted?.invoke(elapsedMillisSince(startedAtNanos))
             }
-            target.sendMessage(
-                ArenaI18n.text(
-                    target,
-                    "arena.messages.session.started",
-                    "&6[Arena] セッション開始: theme={theme}, difficulty={difficulty}, waves={waves}",
-                    "theme" to theme.id,
-                    "mob_type" to theme.id,
-                    "difficulty" to difficulty.display,
-                    "waves" to difficulty.waves
+            if (showSessionStartedMessage) {
+                target.sendMessage(
+                    ArenaI18n.text(
+                        target,
+                        "arena.messages.session.started",
+                        "&6[Arena] セッション開始: theme={theme}, difficulty={difficulty}, waves={waves}",
+                        "theme" to theme.id,
+                        "mob_type" to theme.id,
+                        "difficulty" to difficulty.display,
+                        "waves" to difficulty.waves
+                    )
                 )
-            )
+            }
             ArenaStartResult.Success(theme.id, difficulty.waves, difficulty.id, difficulty.display)
         } catch (e: Exception) {
             if (e is ArenaStageBuildException) {
@@ -948,6 +969,7 @@ class ArenaManager(
         clearAllArenaSidebars()
         invitedPlayerLocks.clear()
         inviteSwingCooldownUntilTick.clear()
+        liftOccupiedMarkerKeys.clear()
         processPendingWorldDeletions()
     }
 
@@ -2597,6 +2619,7 @@ class ArenaManager(
         session.entranceLiftLockedParticipants.clear()
         session.joinCountdownBossBars.clear()
         session.joinAreaMarkerLocations.clear()
+        releaseOccupiedLiftMarkers(session)
         session.liftMarkerLocations.clear()
         session.lobbyMarkerLocations.clear()
         session.entranceLiftChunkTicketWorldName = null
@@ -5310,7 +5333,7 @@ class ArenaManager(
                 (ownerRemaining.toDouble() / session.joinGraceDurationMillis.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
             }
             val ownerBar = getOrCreateJoinCountdownBossBar(session, owner.uniqueId)
-            ownerBar.name(legacySerializer.deserialize(ArenaI18n.text(owner, "arena.bossbar.join_countdown", "§7アリーナを準備中... §8(§b残り {seconds}秒§8)", "seconds" to formatRemainingSeconds(ownerRemaining))))
+            ownerBar.name(legacySerializer.deserialize(ArenaI18n.text(owner, "arena.bossbar.join_countdown", "§f開始まで §e{seconds} 秒", "seconds" to formatRemainingSeconds(ownerRemaining))))
             ownerBar.progress(ownerProgress)
             owner.showBossBar(ownerBar)
         }
@@ -5326,7 +5349,7 @@ class ArenaManager(
                 (remaining.toDouble() / session.joinGraceDurationMillis.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
             }
             val bar = getOrCreateJoinCountdownBossBar(session, invitedId)
-            bar.name(legacySerializer.deserialize(ArenaI18n.text(invited, "arena.bossbar.join_countdown", "§7アリーナを準備中... §8(§b残り {seconds}秒§8)", "seconds" to formatRemainingSeconds(remaining))))
+            bar.name(legacySerializer.deserialize(ArenaI18n.text(invited, "arena.bossbar.join_countdown", "§f開始まで §e{seconds} 秒", "seconds" to formatRemainingSeconds(remaining))))
             bar.progress(progress)
             invited.showBossBar(bar)
         }
@@ -5334,13 +5357,13 @@ class ArenaManager(
 
     private fun getOrCreateJoinCountdownBossBar(session: ArenaSession, playerId: UUID): BossBar {
         return session.joinCountdownBossBars.getOrPut(playerId) {
-            BossBar.bossBar(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.join_countdown", "§7アリーナを準備中... §8(§b残り {seconds}秒§8)", "seconds" to "0.0")), 1.0f, BossBar.Color.BLUE, BossBar.Overlay.PROGRESS)
+            BossBar.bossBar(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.join_countdown", "§f開始まで §e{seconds} 秒", "seconds" to "0")), 1.0f, BossBar.Color.WHITE, BossBar.Overlay.NOTCHED_12)
         }
     }
 
     private fun formatRemainingSeconds(remainingMillis: Long): String {
-        val tenths = (remainingMillis.coerceAtLeast(0L) / 100L).toDouble() / 10.0
-        return String.format(Locale.US, "%.1f", tenths)
+        val seconds = (remainingMillis.coerceAtLeast(0L) / 1000L).coerceAtLeast(0L)
+        return seconds.toString()
     }
 
     private fun updateWaitingParticipants(session: ArenaSession) {
@@ -5647,6 +5670,7 @@ class ArenaManager(
                 session.entranceLiftTask = null
                 restorePlayerMovement(originalSpeeds)
                 releaseEntranceLiftChunkTickets(session)
+                releaseOccupiedLiftMarkers(session)
                 return@Runnable
             }
 
@@ -5915,6 +5939,17 @@ class ArenaManager(
             .filter { marker -> marker.scoreboardTags.contains("arena.marker.lift") }
             .map { it.location.clone() }
             .toList()
+    }
+
+    private fun liftMarkerKey(location: Location): String {
+        val world = location.world ?: return "unknown:${location.blockX}:${location.blockY}:${location.blockZ}"
+        return "${world.uid}:${location.blockX}:${location.blockY}:${location.blockZ}"
+    }
+
+    private fun releaseOccupiedLiftMarkers(session: ArenaSession) {
+        session.liftMarkerLocations.forEach { loc ->
+            liftOccupiedMarkerKeys.remove(liftMarkerKey(loc))
+        }
     }
 
     private fun isEntranceLiftReady(liftMarkers: List<Location>): Boolean {
@@ -6316,7 +6351,7 @@ class ArenaManager(
 
     private fun buildRecruitmentSidebarLines(session: ArenaSession): List<String> {
         val now = System.currentTimeMillis()
-        val remainingSeconds = ((session.joinGraceEndMillis - now).coerceAtLeast(0L) + 999L) / 1000L
+        val remainingSeconds = (session.joinGraceEndMillis - now).coerceAtLeast(0L) / 1000L
         val questTitle = session.inviteQuestTitle?.takeIf { it.isNotBlank() } ?: ArenaI18n.text(null, "arena.ui.recruitment.default_quest_title", "アリーナクエスト")
 
         val lines = mutableListOf<String>()

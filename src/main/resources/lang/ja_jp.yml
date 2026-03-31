@@ -1097,6 +1097,7 @@ arena:
         theme: '&c使用法: /arenaa theme list'
       start_error:
         lift_not_ready: '&cリフトの準備ができていないため開始できません'
+        lift_occupied: '&cリフトが使用中のため開始できません'
       help:
         header: '&6=== Arena 管理コマンド ==='
         start: '&f/arenaa start <player|@s> <mob_type> <difficulty> [theme]'
@@ -1121,11 +1122,13 @@ arena:
       start_cancelled: '&cクエスト開始はキャンセルされました'
       stage_build_failed_internal: '&cステージの生成に失敗しました。スタッフに報告してください。(STRUCTURE_ERROR)'
     multiplayer:
-      invite_window_started: '&7アリーナセッションを開始します…\n左クリックで他のプレイヤーを招待できます。招待メンバーはリフトで待機すると、一緒に入場できます'
+      invite_window_started: '§6クエストを受注しました！§7リフトを準備中です...'
+      invite_window_hint: '§7左クリックでほかのプレイヤーをクエストに誘うことができます'
       wait_area_hint: '&7招待したプレイヤーと開始待機エリアに入ると待機状態になります'
       waiting_entered: '&a開始待機エリアに入りました。猶予終了まで待機してください'
       waiting_exited: '§cリフトから降りました。参加する場合は乗って待機してください！'
       lift_not_ready_oage: '§f「リフトの準備が出来ていないみたいです！ちょっとまってね！」'
+      lift_occupied_oage: '§f「リフトが空くまでちょっとまってね！」'
       waiting_title: '&7参加待機中'
       stage_wait_title: '&7アリーナを準備中...'
       invite_sent: '&a{player} に招待を送信しました'
@@ -1186,6 +1189,8 @@ arena:
         - 'いま助けに行きますー！'
       down_with_survivors:
         - 'お疲れさま！他のみなさんの様子はここからでも確認できますよ！'
+      lift_ready:
+        - '§f「リフトの準備ができました！搭乗してお待ちください～」'
     barrier:
       cannot_break: '&c結界石は破壊できません'
       cannot_place_on: '&c結界石の上には設置できません'
@@ -1235,7 +1240,7 @@ arena:
         - '§71日1回、§e24時§7にクエストが更新されます'
         - '§7みんなで協力して、おあげちゃんを助けてあげましょう'
         - '§7クエストを達成するとおあげちゃんから§eご褒美§7が貰えるほか、'
-        - 'アリーナのモンスターは§dレアなアイテム§7を落とすことがあります'
+        - '§7アリーナのモンスターは§dレアなアイテム§7を落とすことがあります'
     confirm:
       ok_name: '§aOK'
       ok_lore:
@@ -1247,9 +1252,8 @@ arena:
       item_name: '§a{quest}'
       completed_item_name: '§a§m{quest}'
       mission_title: '§f❙ §7ミッション内容'
-      difficulty_title: '§f❙ §7難易度'
-      difficulty_value: '§7{difficulty}'
-      memo_title: '§f❙ §7メモ'
+      difficulty_inline: '§f❙ §7難易度 §f{difficulty}'
+      memo_inline: '§f❙ §7メモ §f{memo}'
     player:
       name_format: '§6{player}'
       mob_kills: '§f❙ §7倒したモブ §e{count} 体'
@@ -1272,7 +1276,7 @@ arena:
       status_preparing: '§dPREPARING'
       status_dead: '§cDEAD'
   bossbar:
-    join_countdown: '§7アリーナを準備中... §8(§b残り {seconds}秒§8)'
+    join_countdown: '§f開始まで §e{seconds} 秒'
     revive:
       downed: '§7{reviver}さんが蘇生中...'
       reviver: '§7{downed}さんを蘇生中...'

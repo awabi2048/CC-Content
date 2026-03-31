@@ -436,14 +436,17 @@ custom_items:
           world_create_failed: '&cFailed to create arena world'
           stage_build_failed: '&c{message}'
           lift_not_ready: '&cCannot start because the lift is not ready'
+          lift_occupied: '&cCannot start because the lift is in use'
           join_area_not_found: '&cCannot start because no join area marker exists nearby'
           lobby_marker_not_found: '&cCannot start because no lobby marker exists in loaded chunks'
       multiplayer:
-        invite_window_started: '&7Starting arena session...\nLeft-click to invite other players. Invited members can enter together by waiting on the lift'
+        invite_window_started: '§6Quest accepted!§7 Preparing the lift...'
+        invite_window_hint: '§7Left-click to invite other players to your quest'
         wait_area_hint: '&7Invited players enter waiting state by standing in the join area with the owner'
         waiting_entered: '&aYou entered the waiting area. Stay here until the grace time ends'
         waiting_exited: '&cYou stepped off the lift. Stay on it if you want to join!'
         lift_not_ready_oage: '§f"Looks like the lift is not ready yet! Please wait a little!"'
+        lift_occupied_oage: '§f"Please wait until the lift is free!"'
         invite_sent: '&aInvitation sent to {player}'
         invited: '&6You were invited to arena by {owner}. Please enter the waiting area'
         invited_decline_hint: '&7To decline, left-click the inviter'
@@ -485,6 +488,14 @@ custom_items:
           - '§fGood work out there! You can still check on the others from here!'
         game_over_all_wiped:
           - '§fGood work! Glad I made it in time!'
+        lift_ready:
+          - '§f"The lift is ready! Please board and wait~"'
+    ui:
+      quest:
+        difficulty_inline: '§f❙ §7Difficulty §f{difficulty}'
+        memo_inline: '§f❙ §7Memo §f{memo}'
+    bossbar:
+      join_countdown: '§fStarting in §e{seconds} sec'
       barrier:
         cannot_break: '&cThe barrier core cannot be broken'
         cannot_place_on: '&cYou cannot place blocks on the barrier core'
