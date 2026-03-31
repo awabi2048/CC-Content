@@ -1118,6 +1118,7 @@ arena:
         lobby_marker_not_found: '&cロビーマーカーが見つからないため開始できません'
     quest:
       already_completed: '&eこのクエストはすでに完了済みです'
+      already_in_quest: '&cすでに進行中のクエストがあります'
       not_found: '&cアリーナクエストが見つかりません'
       start_cancelled: '&cクエスト開始はキャンセルされました'
       stage_build_failed_internal: '&cステージの生成に失敗しました。スタッフに報告してください。(STRUCTURE_ERROR)'

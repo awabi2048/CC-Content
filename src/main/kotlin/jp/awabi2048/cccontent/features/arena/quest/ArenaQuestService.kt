@@ -134,6 +134,11 @@ class ArenaQuestService(
             return true
         }
 
+        if (arenaManager.isPlayerInvitedToSession(player.uniqueId)) {
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.quest.already_in_quest", "§cすでに進行中のクエストがあります"))
+            return true
+        }
+
         if (!openConfirmMenu(player, holder.dateKey, quest.index)) {
             player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed", "§cアリーナクエストを開けませんでした"))
         }

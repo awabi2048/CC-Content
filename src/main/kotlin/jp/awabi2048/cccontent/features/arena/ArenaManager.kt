@@ -989,6 +989,10 @@ class ArenaManager(
         return playerToSessionWorld.keys.mapNotNull { uuid -> Bukkit.getPlayer(uuid)?.name }.toSet()
     }
 
+    fun isPlayerInvitedToSession(playerId: UUID): Boolean {
+        return invitedPlayerLocks.containsKey(playerId)
+    }
+
     fun handleInviteTargetUnavailable(player: Player) {
         val worldName = invitedPlayerLocks[player.uniqueId] ?: return
         val session = sessionsByWorld[worldName] ?: run {
@@ -1432,7 +1436,7 @@ class ArenaManager(
             maxDistance,
             FluidCollisionMode.NEVER,
             true,
-            0.2
+            0.0
         ) { candidate ->
             candidate is Player && candidate.uniqueId != source.uniqueId
         }
