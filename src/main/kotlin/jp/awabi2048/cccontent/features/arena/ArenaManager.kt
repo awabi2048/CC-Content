@@ -1727,6 +1727,44 @@ class ArenaManager(
         player.fireTicks = 0
         player.fallDistance = 0.0f
         player.walkSpeed = if (reviveDisabled) DOWNED_GAME_OVER_WALK_SPEED else DOWNED_PLAYER_WALK_SPEED
+        player.velocity = Vector(0.0, 0.0, 0.0)
+
+        if (!player.isOnGround) {
+            val loc = player.location
+            val world = loc.world ?: return
+            val bounds = session.roomBounds.entries.firstOrNull { (_, b) -> b.contains(loc.x, loc.y, loc.z) }?.value
+            val maxSearch = (bounds?.let { it.maxY - it.minY } ?: 30).coerceIn(5, 64)
+            val halfW = 0.3
+            val offsets = listOf(-halfW, 0.0, halfW).flatMap { ox ->
+                listOf(-halfW, 0.0, halfW).map { oz -> ox to oz }
+            }
+            var bestY: Double? = null
+            var hitBlockY: Int? = null
+            for ((ox, oz) in offsets) {
+                val start = Location(world, loc.x + ox, loc.y, loc.z + oz, loc.yaw, loc.pitch)
+                val hit = world.rayTraceBlocks(start, Vector(0.0, -1.0, 0.0), maxSearch.toDouble(), FluidCollisionMode.NEVER, true)
+                val nonNullHit = hit ?: continue
+                val y = nonNullHit.hitPosition.y
+                if (bestY == null || y > bestY) {
+                    bestY = y
+                    hitBlockY = nonNullHit.hitBlock?.y
+                }
+            }
+            if (bestY != null && hitBlockY != null) {
+                val belowBlock = world.getBlockAt(loc.blockX, hitBlockY - 1, loc.blockZ)
+                val belowTopY = belowBlock.collisionShape.boundingBoxes
+                    .map { it.maxY + belowBlock.y }
+                    .maxOrNull()
+                if (belowTopY != null && belowTopY > bestY) {
+                    bestY = belowTopY
+                }
+                player.teleport(Location(world, loc.x, bestY, loc.z, loc.yaw, loc.pitch))
+            } else {
+                val latestWave = latestEnteredWave(session) ?: 1
+                teleportToNearestDoorMarkerForWave(player, session, world, latestWave.coerceIn(1, session.waves))
+            }
+        }
+
         player.playSound(player.location, Sound.BLOCK_ANVIL_LAND, 1.0f, 0.75f)
 
         syncDownedShulker(session, player, forceTeleport = true)
