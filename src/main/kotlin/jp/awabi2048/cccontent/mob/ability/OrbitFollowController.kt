@@ -60,6 +60,38 @@ class OrbitFollowState(baseAngularSpeed: Double) {
 }
 
 object OrbitFollowController {
+    private fun startResumeFromCurrent(
+        state: OrbitFollowState,
+        config: OrbitFollowConfig,
+        followerX: Double,
+        followerZ: Double,
+        centerX: Double,
+        centerZ: Double
+    ) {
+        state.isStationaryMode = false
+        state.resumeTicksRemaining = config.directionTransitionTicks
+        state.resumeStartRadius = hypot(followerX - centerX, followerZ - centerZ)
+        state.orbitalAngle = atan2(followerZ - centerZ, followerX - centerX)
+    }
+
+    fun reanchorFromCurrentPosition(
+        state: OrbitFollowState,
+        config: OrbitFollowConfig,
+        targetUuid: UUID,
+        followerX: Double,
+        followerZ: Double,
+        targetX: Double,
+        targetZ: Double
+    ) {
+        state.delayedTargetUuid = targetUuid
+        state.delayedTargetCenters.clear()
+        state.delayedTargetCenters.addLast(OrbitTargetCenter(targetX, targetZ))
+        state.stationaryTicks = 0
+        state.movingTicks = 0
+        state.isStationaryMode = false
+        startResumeFromCurrent(state, config, followerX, followerZ, targetX, targetZ)
+    }
+
     fun clearTarget(state: OrbitFollowState) {
         state.hasSmoothedY = false
         state.delayedTargetUuid = null
@@ -119,9 +151,7 @@ object OrbitFollowController {
             state.resumeTicksRemaining = 0
         }
         if (state.isStationaryMode && state.movingTicks >= config.stationaryExitTicks) {
-            state.isStationaryMode = false
-            state.resumeTicksRemaining = config.directionTransitionTicks
-            state.resumeStartRadius = -1.0
+            startResumeFromCurrent(state, config, followerX, followerZ, targetX, targetZ)
         }
 
         state.delayedTargetCenters.addLast(OrbitTargetCenter(targetX, targetZ))
@@ -173,10 +203,6 @@ object OrbitFollowController {
             val dx = followerX - delayedCenter.x
             val dz = followerZ - delayedCenter.z
             state.orbitalAngle = atan2(dz, dx)
-
-            if (state.resumeStartRadius < 0.0) {
-                state.resumeStartRadius = hypot(dx, dz)
-            }
 
             val remainingRatio = state.resumeTicksRemaining.toDouble() / config.directionTransitionTicks.toDouble()
             state.currentAngularSpeed = state.targetAngularSpeed * (1.0 - remainingRatio)

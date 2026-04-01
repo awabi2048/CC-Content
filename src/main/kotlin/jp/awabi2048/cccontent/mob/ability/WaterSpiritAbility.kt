@@ -4,6 +4,7 @@ import jp.awabi2048.cccontent.mob.MobDamagedContext
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import org.bukkit.Bukkit
 import org.bukkit.Color
+import org.bukkit.FluidCollisionMode
 import org.bukkit.Location
 import org.bukkit.Particle
 import org.bukkit.Sound
@@ -21,6 +22,7 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import org.bukkit.scheduler.BukkitTask
 import org.bukkit.util.Vector
+import java.util.UUID
 import kotlin.math.*
 import kotlin.random.Random
 
@@ -55,7 +57,13 @@ class WaterSpiritAbility(
     data class Runtime(
         var sharedCooldownTicks: Long = 0L,
         var frozenTicks: Long = 0L,
+        var holdLockTicks: Long = 0L,
+        var holdAnchorX: Double = 0.0,
+        var holdAnchorY: Double = 0.0,
+        var holdAnchorZ: Double = 0.0,
         var ambientParticleTicks: Long = 0L,
+        var ambientSoundTicks: Long = 0L,
+        var ominousAlternate: Boolean = false,
         var orbitState: OrbitFollowState = OrbitFollowState(ANGULAR_SPEED),
         var searchPhaseOffsetSteps: Int = 0,
         var syncTask: BukkitTask? = null,
@@ -157,6 +165,35 @@ class WaterSpiritAbility(
                 return@Runnable
             }
 
+            if (rt.holdLockTicks > 0L) {
+                rt.holdLockTicks -= 1L
+                val newLoc = Location(allay.world, rt.holdAnchorX, rt.holdAnchorY, rt.holdAnchorZ)
+                val targetPlayer = findNearestPlayer(allay)
+                if (targetPlayer != null && targetPlayer.isValid && !targetPlayer.isDead) {
+                    val from = allay.location.clone().add(0.0, 1.0, 0.0)
+                    val to = targetPlayer.location.clone().add(0.0, 1.0, 0.0)
+                    val dir = to.toVector().subtract(from.toVector())
+                    val yaw = Math.toDegrees(atan2(-dir.x, dir.z)).toFloat()
+                    val pitch = (-Math.toDegrees(atan2(dir.y, sqrt(dir.x * dir.x + dir.z * dir.z)))).toFloat()
+                    newLoc.yaw = yaw
+                    newLoc.pitch = pitch
+
+                    if (rt.holdLockTicks == 0L) {
+                        OrbitFollowController.reanchorFromCurrentPosition(
+                            state = rt.orbitState,
+                            config = orbitFollowConfig,
+                            targetUuid = targetPlayer.uniqueId,
+                            followerX = allay.location.x,
+                            followerZ = allay.location.z,
+                            targetX = targetPlayer.location.x,
+                            targetZ = targetPlayer.location.z
+                        )
+                    }
+                }
+                allay.teleport(newLoc)
+                return@Runnable
+            }
+
             val targetPlayer = findNearestPlayer(allay)
             if (targetPlayer == null || !targetPlayer.isValid || targetPlayer.isDead) {
                 OrbitFollowController.clearTarget(rt.orbitState)
@@ -196,10 +233,12 @@ class WaterSpiritAbility(
             rt.sharedCooldownTicks -= 10L
         }
         rt.ambientParticleTicks += 10L
+        rt.ambientSoundTicks += 10L
 
         val entity = context.entity
 
         spawnAmbientParticles(entity, rt)
+        playAmbientSound(entity, rt)
 
         if (!context.isCombatActive()) return
 
@@ -210,13 +249,13 @@ class WaterSpiritAbility(
 
         if (rt.sharedCooldownTicks <= 0L) {
             if (distance <= approachDistance) {
-                executeMeleeAttack(entity, target)
+                executeMeleeAttack(context.plugin, entity, target)
                 rt.sharedCooldownTicks = sharedCooldownTicks
                 if (ENABLE_TELEPORT) {
                     scheduleTeleport(entity, rt, freeFarAttack = true)
                 }
             } else if (entity.hasLineOfSight(target)) {
-                executeFarAttack(context.plugin, entity, target)
+                executeFarAttack(context.plugin, entity, target, rt)
                 rt.sharedCooldownTicks = (sharedCooldownTicks * context.loadSnapshot.abilityCooldownMultiplier).roundToLong().coerceAtLeast(sharedCooldownTicks)
             }
         }
@@ -256,12 +295,37 @@ class WaterSpiritAbility(
         val world = loc.world ?: return
         for (i in 0 until 20) {
             val angle = Random.nextDouble(0.0, Math.PI * 2)
-            val radius = 0.9 + Random.nextDouble(0.0, 0.6)
+            val radius = 1.8 + Random.nextDouble(0.0, 1.2)
             val x = cos(angle) * radius
             val z = sin(angle) * radius
             val y = Random.nextDouble(-0.5, 0.5)
             world.spawnParticle(Particle.DOLPHIN, loc.clone().add(x, y, z), 1, 0.0, 0.0, 0.0, 0.0)
         }
+        val ominousCount = if (rt.ominousAlternate) 1 else 0
+        rt.ominousAlternate = !rt.ominousAlternate
+        for (i in 0 until ominousCount) {
+            val angle = Random.nextDouble(0.0, Math.PI * 2)
+            val radius = 0.9 + Random.nextDouble(0.0, 0.6)
+            val x = cos(angle) * radius
+            val z = sin(angle) * radius
+            val y = Random.nextDouble(-0.5, 0.5)
+            world.spawnParticle(
+                Particle.TRIAL_SPAWNER_DETECTION_OMINOUS,
+                loc.clone().add(x, y, z),
+                15,
+                1.0,
+                1.0,
+                1.0,
+                0.0
+            )
+        }
+    }
+
+    private fun playAmbientSound(entity: LivingEntity, rt: Runtime) {
+        if (rt.ambientSoundTicks < 60L) return
+        rt.ambientSoundTicks = 0L
+        val world = entity.world ?: return
+        world.playSound(entity.location, Sound.ENTITY_ALLAY_AMBIENT_WITHOUT_ITEM, 0.8f, 0.8f)
     }
 
     private fun performTeleportEffect(from: Location, to: Location) {
@@ -270,13 +334,48 @@ class WaterSpiritAbility(
         world.spawnParticle(Particle.DRIPPING_DRIPSTONE_WATER, from.clone().add(0.0, 1.0, 0.0), 120, 1.0, 1.0, 1.0, 0.0)
     }
 
-    private fun executeMeleeAttack(entity: LivingEntity, target: LivingEntity) {
-        val loc = target.location.clone().add(0.0, 1.0, 0.0)
-        val world = loc.world ?: return
-        world.spawnParticle(Particle.SPLASH, loc, 20, 0.3, 0.5, 0.3, 0.1)
-        world.spawnParticle(Particle.BUBBLE_COLUMN_UP, loc, 10, 0.2, 0.8, 0.2, 0.05)
-        world.playSound(loc, Sound.ENTITY_ELDER_GUARDIAN_DEATH, 0.8f, 2.0f)
-        target.damage(closeRangeDamage, entity)
+    private fun executeMeleeAttack(plugin: JavaPlugin, entity: LivingEntity, target: LivingEntity) {
+        val world = target.world ?: return
+        val currentPos = target.location.clone().add(0.0, 0.1, 0.0)
+        val velocity = Vector(0.0, WATER_COLUMN_INITIAL_SPEED, 0.0)
+        val hitPlayers = mutableSetOf<UUID>()
+
+        world.playSound(currentPos, Sound.ENTITY_ELDER_GUARDIAN_DEATH, 0.8f, 2.0f)
+
+        object : BukkitRunnable() {
+            override fun run() {
+                if (!entity.isValid || entity.isDead) {
+                    cancel()
+                    return
+                }
+
+                currentPos.add(velocity)
+                world.spawnParticle(
+                    Particle.DRIPPING_DRIPSTONE_WATER,
+                    currentPos,
+                    15,
+                    1.0,
+                    1.0,
+                    1.0,
+                    0.0
+                )
+
+                world.getNearbyEntities(currentPos, WATER_COLUMN_HIT_RADIUS, WATER_COLUMN_HIT_RADIUS, WATER_COLUMN_HIT_RADIUS)
+                    .asSequence()
+                    .filterIsInstance<Player>()
+                    .filter { it.isValid && !it.isDead }
+                    .forEach { player ->
+                        if (hitPlayers.add(player.uniqueId)) {
+                            player.damage(closeRangeDamage, entity)
+                        }
+                    }
+
+                velocity.multiply(WATER_COLUMN_DRAG)
+                if (velocity.length() <= WATER_COLUMN_STOP_SPEED) {
+                    cancel()
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 1L)
     }
 
     private fun scheduleTeleport(entity: LivingEntity, rt: Runtime, freeFarAttack: Boolean = false) {
@@ -310,16 +409,88 @@ class WaterSpiritAbility(
         }, 5L)
     }
 
-    private fun executeFarAttack(plugin: JavaPlugin, entity: LivingEntity, target: LivingEntity) {
+    private fun executeFarAttack(plugin: JavaPlugin, entity: LivingEntity, target: LivingEntity, runtime: Runtime? = null) {
         val world = entity.world ?: return
-        val origin = entity.location.clone().add(0.0, 1.0, 0.0)
+        runtime?.let {
+            it.holdLockTicks = ORB_HOLD_TICKS + ORB_STAGGER_TICKS * (orbCount - 1)
+            it.holdAnchorX = entity.location.x
+            it.holdAnchorY = entity.location.y
+            it.holdAnchorZ = entity.location.z
+        }
+        scheduleHeldOrbLaunch(plugin, entity, target)
 
-        for (i in 0 until orbCount) {
-            val angleOffset = (i.toDouble() / orbCount) * Math.PI * 2
-            launchRotatingOrb(plugin, entity, target, origin, angleOffset, farRangeOrbDamage)
+        world.playSound(entity.location, Sound.ENTITY_ELDER_GUARDIAN_AMBIENT, 0.7f, 1.33f)
+    }
+
+    private fun buildPerpendicularBasis(forward: Vector): Pair<Vector, Vector> {
+        val reference = if (abs(forward.dot(Vector(0.0, 1.0, 0.0))) > 0.95) {
+            Vector(1.0, 0.0, 0.0)
+        } else {
+            Vector(0.0, 1.0, 0.0)
         }
 
-        world.playSound(entity.location, Sound.ENTITY_PLAYER_SPLASH_HIGH_SPEED, 0.6f, 1.4f)
+        var u = forward.clone().crossProduct(reference)
+        if (u.lengthSquared() < 1.0e-6) {
+            u = forward.clone().crossProduct(Vector(0.0, 0.0, 1.0))
+        }
+        u.normalize()
+
+        val v = u.clone().crossProduct(forward).normalize()
+        return u to v
+    }
+
+    private fun scheduleHeldOrbLaunch(
+        plugin: JavaPlugin,
+        entity: LivingEntity,
+        target: LivingEntity
+    ) {
+        object : BukkitRunnable() {
+            var ticks = 0L
+            var launchedCount = 0
+
+            override fun run() {
+                if (!entity.isValid || entity.isDead || !target.isValid || target.isDead) {
+                    cancel()
+                    return
+                }
+
+                val rotation = ticks.toDouble() * ORB_HOLD_ROTATION_SPEED
+                val origin = entity.location.clone().add(0.0, 1.0, 0.0)
+                val forward = entity.location.direction.clone().normalize()
+                val (basisU, basisV) = buildPerpendicularBasis(forward)
+
+                val holdPositions = (0 until orbCount).map { index ->
+                    val baseAngle = (index.toDouble() / orbCount.toDouble()) * Math.PI * 2.0
+                    val angle = baseAngle + rotation
+                    origin.clone().add(
+                        basisU.clone().multiply(cos(angle) * ORB_HOLD_RADIUS)
+                            .add(basisV.clone().multiply(sin(angle) * ORB_HOLD_RADIUS))
+                    )
+                }
+
+                holdPositions.drop(launchedCount).forEach { pos ->
+                    val world = pos.world ?: return@forEach
+                    world.spawnParticle(Particle.DUST, pos, 2, 0.1, 0.1, 0.1, 0.0, Particle.DustOptions(ORB_COLOR, ORB_HOLD_DUST_SIZE))
+                    world.spawnParticle(Particle.BUBBLE, pos, 2, 0.12, 0.12, 0.12, 0.0)
+                }
+
+                if (ticks >= ORB_HOLD_TICKS && launchedCount < orbCount) {
+                    val afterHoldTicks = ticks - ORB_HOLD_TICKS
+                    if (afterHoldTicks % ORB_STAGGER_TICKS == 0L) {
+                        val pos = holdPositions[launchedCount]
+                        val angleOffset = (launchedCount.toDouble() / orbCount.toDouble()) * Math.PI * 2.0
+                        launchRotatingOrb(plugin, entity, target, pos, angleOffset, farRangeOrbDamage)
+                        pos.world?.playSound(pos, Sound.ENTITY_ILLUSIONER_CAST_SPELL, 0.75f, 1.0f)
+                        launchedCount += 1
+                    }
+                }
+
+                ticks += 1
+                if (launchedCount >= orbCount) {
+                    cancel()
+                }
+            }
+        }.runTaskTimer(plugin, 0L, 1L)
     }
 
     private fun launchRotatingOrb(
@@ -332,10 +503,11 @@ class WaterSpiritAbility(
     ) {
         val world = origin.world ?: return
         var currentPos = origin.clone()
-        var traveledDistance = 0.0
-        val maxDistance = 30.0
-        val stepDistance = orbSpeed / 20.0
+        val stepDistance = (orbSpeed / 20.0) * ORB_SPEED_MULTIPLIER
         var tickCount = 0L
+        var ageTicks = 0L
+        var homingTicksRemaining = ORB_HOMING_TICKS
+        var flightDirection = target.location.clone().add(0.0, 1.0, 0.0).toVector().subtract(currentPos.toVector()).normalize()
 
         object : BukkitRunnable() {
             override fun run() {
@@ -344,7 +516,8 @@ class WaterSpiritAbility(
                     return
                 }
 
-                if (traveledDistance >= maxDistance) {
+                ageTicks += 1
+                if (ageTicks >= ORB_MAX_LIFETIME_TICKS) {
                     cancel()
                     return
                 }
@@ -367,18 +540,45 @@ class WaterSpiritAbility(
                     return
                 }
 
-                val moveDir = toTarget.normalize().multiply(stepDistance)
-                currentPos.add(moveDir.x + orbitOffsetX * 0.1, moveDir.y + orbitOffsetY * 0.05, moveDir.z + orbitOffsetZ * 0.1)
-                traveledDistance += stepDistance
+                if (homingTicksRemaining > 0 && toTarget.lengthSquared() > 1.0e-6) {
+                    val desiredDir = toTarget.normalize()
+                    flightDirection = flightDirection.multiply(1.0 - ORB_HOMING_STEER_FACTOR)
+                        .add(desiredDir.multiply(ORB_HOMING_STEER_FACTOR))
+                        .normalize()
+                    homingTicksRemaining -= 1
+                }
 
-                val dustColor = Color.fromRGB(100, 180, 255)
+                val moveDir = flightDirection.clone().multiply(stepDistance)
+                val displacement = Vector(
+                    moveDir.x + orbitOffsetX * 0.1,
+                    moveDir.y + orbitOffsetY * 0.05,
+                    moveDir.z + orbitOffsetZ * 0.1
+                )
+
+                val displacementLength = displacement.length()
+                if (displacementLength > 1.0e-6) {
+                    val blockHit = world.rayTraceBlocks(
+                        currentPos,
+                        displacement.clone().normalize(),
+                        displacementLength,
+                        FluidCollisionMode.NEVER,
+                        true
+                    )
+                    if (blockHit != null) {
+                        cancel()
+                        return
+                    }
+                }
+
+                currentPos.add(displacement)
+
                 world.spawnParticle(
                     Particle.DUST,
                     currentPos.clone(),
                     2,
                     0.1, 0.1, 0.1,
                     0.0,
-                    Particle.DustOptions(dustColor, 0.6f)
+                    Particle.DustOptions(ORB_COLOR, 0.6f)
                 )
                 world.spawnParticle(Particle.BUBBLE, currentPos.clone(), 1, 0.05, 0.05, 0.05, 0.0)
             }
@@ -411,5 +611,19 @@ class WaterSpiritAbility(
         private const val STATIONARY_EXIT_TICKS = 3
         private const val STATIONARY_HOVER_AMPLITUDE = 0.45
         private const val STATIONARY_HOVER_ANGULAR_SPEED = 0.2
+        private const val ORB_HOLD_RADIUS = 2.7
+        private const val ORB_HOLD_TICKS = 40L
+        private const val ORB_STAGGER_TICKS = 5L
+        private val ORB_HOLD_ROTATION_SPEED = Math.toRadians(10.0) / 20.0
+        private const val ORB_HOLD_DUST_SIZE = 1.6f
+        private const val ORB_SPEED_MULTIPLIER = 0.5
+        private const val ORB_HOMING_TICKS = 40
+        private const val ORB_HOMING_STEER_FACTOR = 0.2
+        private const val ORB_MAX_LIFETIME_TICKS = 100L
+        private val ORB_COLOR = Color.fromRGB(30, 90, 200)
+        private const val WATER_COLUMN_INITIAL_SPEED = 0.6
+        private const val WATER_COLUMN_DRAG = 0.86
+        private const val WATER_COLUMN_STOP_SPEED = 0.01
+        private const val WATER_COLUMN_HIT_RADIUS = 0.8
     }
 }
