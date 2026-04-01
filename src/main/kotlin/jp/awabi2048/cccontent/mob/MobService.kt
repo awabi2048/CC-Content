@@ -77,6 +77,7 @@ import org.bukkit.entity.Ageable
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Player
 import org.bukkit.entity.Projectile
+import org.bukkit.entity.Slime
 import org.bukkit.entity.Zombie
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityCombustEvent
@@ -378,8 +379,8 @@ class MobService(private val plugin: JavaPlugin) {
         val sessionKey = resolveSessionKey(options, world.name)
 
         val entity = world.spawnEntity(location, mobType.baseEntityType) as? LivingEntity ?: return null
-        enforceStrictSpawnState(entity)
         markEntity(entity, definition, mobType, options)
+        enforceStrictSpawnState(entity)
         applyDefinitionStats(entity, definition)
 
         val spawnContext = MobSpawnContext(plugin, entity, definition, mobType, options)
@@ -398,10 +399,6 @@ class MobService(private val plugin: JavaPlugin) {
         mobType.applyDefaultEquipment(spawnContext, runtime)
         mobType.onSpawn(spawnContext, runtime)
         applyDefinitionEquipment(entity, definition, onlyIfEmpty = false)
-        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
-            if (!entity.isValid || entity.isDead) return@Runnable
-            enforceStrictSpawnState(entity)
-        }, 1L)
         return entity
     }
 
@@ -496,7 +493,6 @@ class MobService(private val plugin: JavaPlugin) {
                     iterator.remove()
                     continue
                 }
-
                 activeCountBySession[activeMob.sessionKey] = (activeCountBySession[activeMob.sessionKey] ?: 0) + 1
 
                 activeMob.tickCount += intervalTicks
@@ -784,8 +780,21 @@ class MobService(private val plugin: JavaPlugin) {
                 cleanupNearbyChickenMounts(entity)
             }
             is Ageable -> entity.setAdult()
-            is org.bukkit.entity.Slime -> entity.setSize(1)
+            is Slime -> ensureSlimeSize(entity)
         }
+    }
+
+    private fun ensureSlimeSize(entity: LivingEntity) {
+        val slime = entity as? Slime ?: return
+        val beforeSize = slime.size
+        val definitionId = slime.persistentDataContainer.get(mobDefinitionKey, PersistentDataType.STRING) ?: "unknown"
+        val typeId = slime.persistentDataContainer.get(mobTypeKey, PersistentDataType.STRING) ?: "unknown"
+        val changed = beforeSize != 1
+        plugin.logger.info("[MobService][DEBUG] Slime size check phase=spawn_once entity=${slime.uniqueId} def=$definitionId type=$typeId before=$beforeSize target=1 changed=$changed")
+        if (changed) {
+            slime.setSize(1)
+        }
+        plugin.logger.info("[MobService][DEBUG] Slime size result phase=spawn_once entity=${slime.uniqueId} after=${slime.size} changed=$changed")
     }
 
     private fun cleanupNearbyChickenMounts(zombie: Zombie) {
