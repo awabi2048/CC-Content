@@ -62,6 +62,7 @@ import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityDismountEvent
 import org.bukkit.event.entity.EntityDeathEvent
+import org.bukkit.event.entity.EntityPotionEffectEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPlaceEvent
@@ -274,6 +275,10 @@ class ArenaManager(
         const val ENTRANCE_LIFT_INTERVAL_TICKS_DEFAULT = 10L
         const val ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT = 2
         const val ENTRANCE_LIFT_MAX_RISE_BLOCKS_DEFAULT = 6
+        const val ELDER_CURSE_DAMAGE = 10.0
+        const val ELDER_CURSE_DURATION_TICKS = 100
+        const val ELDER_CURSE_AMPLIFIER = 2
+        const val ELDER_CURSE_PLAYER_COOLDOWN_MILLIS = 60_000L
 
         fun defaultSwitchIntervalBeats(): Int {
             return ARENA_BGM_SWITCH_INTERVAL_BEATS_DEFAULT
@@ -300,6 +305,7 @@ class ArenaManager(
     private val mobDefinitions = mutableMapOf<String, MobDefinition>()
     private val knownMobTypeIds = mutableSetOf<String>()
     private val mobToDefinitionTypeId = mutableMapOf<UUID, String>()
+    private val elderCurseCooldownUntilMillis = mutableMapOf<UUID, Long>()
     private val liftOccupiedMarkerKeys = mutableSetOf<String>()
     private val liftOccupiedWaiters = mutableSetOf<UUID>()
     private var maintenanceTask: BukkitTask? = null
@@ -1241,6 +1247,41 @@ class ArenaManager(
         setPlayerDown(session, player)
     }
 
+    fun handleElderGuardianCurse(event: EntityPotionEffectEvent) {
+        val player = event.entity as? Player ?: return
+        val session = getSession(player) ?: return
+        if (!session.participants.contains(player.uniqueId)) return
+
+        val effectType = event.modifiedType ?: event.newEffect?.type ?: return
+        if (!isMiningFatigueType(effectType)) return
+        if (event.cause == EntityPotionEffectEvent.Cause.PLUGIN) return
+
+        event.isCancelled = true
+
+        if (!isCurseApplyAction(event.action)) return
+        val newEffect = event.newEffect ?: return
+        if (newEffect.amplifier < ELDER_CURSE_AMPLIFIER) return
+
+        val now = System.currentTimeMillis()
+        val cooldownUntil = elderCurseCooldownUntilMillis[player.uniqueId] ?: 0L
+        if (now < cooldownUntil) {
+            return
+        }
+        elderCurseCooldownUntilMillis[player.uniqueId] = now + ELDER_CURSE_PLAYER_COOLDOWN_MILLIS
+
+        player.damage(ELDER_CURSE_DAMAGE)
+        player.addPotionEffect(
+            PotionEffect(
+                effectType,
+                ELDER_CURSE_DURATION_TICKS,
+                ELDER_CURSE_AMPLIFIER,
+                false,
+                true,
+                true
+            )
+        )
+    }
+
     fun handleDownedPlayerAttack(event: EntityDamageByEntityEvent) {
         val target = event.entity as? LivingEntity ?: return
         if (target is Player) return
@@ -1252,6 +1293,16 @@ class ArenaManager(
         }
 
         event.isCancelled = true
+    }
+
+    private fun isMiningFatigueType(effectType: PotionEffectType): Boolean {
+        val key = effectType.key.key.uppercase(Locale.ROOT)
+        return key == "MINING_FATIGUE" || key == "SLOW_DIGGING"
+    }
+
+    private fun isCurseApplyAction(action: EntityPotionEffectEvent.Action): Boolean {
+        return action == EntityPotionEffectEvent.Action.ADDED ||
+            action == EntityPotionEffectEvent.Action.CHANGED
     }
 
     fun handleParticipantFriendlyFire(event: EntityDamageByEntityEvent) {

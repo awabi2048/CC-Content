@@ -6,6 +6,7 @@ import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
+import org.bukkit.event.entity.EntityPotionEffectEvent
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.PlayerDeathEvent
@@ -42,6 +43,11 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
             return
         }
         arenaManager.handleMobFriendlyFire(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityPotionEffect(event: EntityPotionEffectEvent) {
+        arenaManager.handleElderGuardianCurse(event)
     }
 
     @EventHandler(ignoreCancelled = true)

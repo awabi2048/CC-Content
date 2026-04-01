@@ -381,6 +381,7 @@ custom_items:
         guardian: "Guardian Scale"
         silverfish: "Silverfish Shell"
         spider: "Spider Claw"
+        drowned: "Heavily Tarnished Copper Ingot"
     theme:
       ruins:
         name: "Ruins"

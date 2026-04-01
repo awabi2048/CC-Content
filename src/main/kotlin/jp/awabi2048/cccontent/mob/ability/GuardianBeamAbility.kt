@@ -47,6 +47,7 @@ class GuardianBeamAbility(
     private val activationSoundVolume: Float = 1.0f,
     private val activationSoundPitch: Float = 1.0f,
     private val activationSoundOnlyFirst: Boolean = false,
+    private val activationSoundOnPulse: Boolean = false,
     private val activationTargetParticles: ((Location) -> Unit)? = null,
     private val impactTargetParticles: ((Location) -> Unit)? = null
 ) : MobAbility {
@@ -170,11 +171,8 @@ class GuardianBeamAbility(
         runtime.startedLaserTicks = startTicks
         runtime.pulseCooldownTicks = chargePulseIntervalTicks.coerceAtLeast(10L)
         startChargeParticleTask(plugin, guardian, runtime)
-        activationSound?.let { sound ->
-            if (!activationSoundOnlyFirst || !runtime.activationSoundPlayed) {
-                guardian.world.playSound(target.location, sound, activationSoundVolume, activationSoundPitch)
-                runtime.activationSoundPlayed = true
-            }
+        if (!activationSoundOnPulse) {
+            playActivationSoundIfNeeded(guardian, target.location, runtime)
         }
         activationTargetParticles?.invoke(target.location.clone().add(0.0, 0.9, 0.0))
     }
@@ -221,6 +219,9 @@ class GuardianBeamAbility(
         }
 
         if (appliedEffect) {
+            if (activationSoundOnPulse) {
+                playActivationSoundIfNeeded(guardian, target.location, runtime)
+            }
             chargePulseSound?.let { sound ->
                 guardian.world.playSound(target.location, sound, chargePulseSoundVolume, chargePulseSoundPitch)
             }
@@ -255,6 +256,15 @@ class GuardianBeamAbility(
         runtime.chargeParticleTask?.cancel()
         runtime.chargeParticleTask = null
         runtime.cooldownTicks = cooldownTicks
+    }
+
+    private fun playActivationSoundIfNeeded(guardian: Guardian, location: Location, runtime: Runtime) {
+        activationSound?.let { sound ->
+            if (!activationSoundOnlyFirst || !runtime.activationSoundPlayed) {
+                guardian.world.playSound(location, sound, activationSoundVolume, activationSoundPitch)
+                runtime.activationSoundPlayed = true
+            }
+        }
     }
 
     private fun reset(guardian: Guardian, runtime: Runtime) {

@@ -78,6 +78,7 @@ import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Player
 import org.bukkit.entity.Projectile
 import org.bukkit.entity.Slime
+import org.bukkit.entity.Trident
 import org.bukkit.entity.Zombie
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityCombustEvent
@@ -396,6 +397,7 @@ class MobService(private val plugin: JavaPlugin) {
             runtime = runtime
         )
 
+        clearImplicitEquipmentIfNeeded(entity, mobType)
         mobType.applyDefaultEquipment(spawnContext, runtime)
         mobType.onSpawn(spawnContext, runtime)
         applyDefinitionEquipment(entity, definition, onlyIfEmpty = false)
@@ -437,7 +439,13 @@ class MobService(private val plugin: JavaPlugin) {
         ThrownWeaponService.getInstance(plugin).handleProjectileDamage(event)
 
         val target = event.entity as? LivingEntity ?: return
-        val arrow = event.damager as? AbstractArrow ?: return
+        val damager = event.damager
+        val trident = damager as? Trident
+        if (trident != null) {
+            applyDrownedPowerThrowKnockback(trident, target)
+        }
+
+        val arrow = damager as? AbstractArrow ?: return
         val container = arrow.persistentDataContainer
         if (container.get(skeletonEffectArrowKey, PersistentDataType.BYTE)?.toInt() != 1) {
             return
@@ -448,6 +456,37 @@ class MobService(private val plugin: JavaPlugin) {
         val amplifier = container.get(skeletonEffectArrowAmplifierKey, PersistentDataType.INTEGER) ?: 0
         val durationTicks = (container.get(skeletonEffectArrowDurationKey, PersistentDataType.INTEGER) ?: 200).coerceAtLeast(1)
         target.addPotionEffect(PotionEffect(effectType, durationTicks, amplifier, false, true, true))
+    }
+
+    private fun applyDrownedPowerThrowKnockback(trident: Trident, target: LivingEntity) {
+        val shooter = trident.shooter as? LivingEntity ?: return
+        val activeMob = activeMobs[shooter.uniqueId] ?: return
+        if (activeMob.mobType.id != "drowned_power_throw") {
+            return
+        }
+
+        val direction = target.location.toVector().subtract(shooter.location.toVector())
+            .setY(0.0)
+            .takeIf { it.lengthSquared() > 0.0001 }
+            ?.normalize()
+            ?: trident.velocity.clone().setY(0.0).takeIf { it.lengthSquared() > 0.0001 }?.normalize()
+            ?: return
+        val bonusHorizontal = 1.2
+        val bonusVertical = 0.18
+        target.velocity = target.velocity.add(direction.multiply(bonusHorizontal).setY(bonusVertical))
+    }
+
+    private fun clearImplicitEquipmentIfNeeded(entity: LivingEntity, mobType: MobType) {
+        if (!mobType.id.startsWith("drowned_")) {
+            return
+        }
+        val equipment = entity.equipment ?: return
+        equipment.setItemInMainHand(ItemStack(Material.AIR))
+        equipment.setItemInOffHand(ItemStack(Material.AIR))
+        equipment.helmet = ItemStack(Material.AIR)
+        equipment.chestplate = ItemStack(Material.AIR)
+        equipment.leggings = ItemStack(Material.AIR)
+        equipment.boots = ItemStack(Material.AIR)
     }
 
     fun handleShootBow(event: EntityShootBowEvent) {

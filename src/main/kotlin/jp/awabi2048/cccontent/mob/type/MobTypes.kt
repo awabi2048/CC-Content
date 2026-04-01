@@ -24,7 +24,6 @@ import jp.awabi2048.cccontent.mob.ability.ShieldAbility
 import jp.awabi2048.cccontent.mob.ability.SplitOnDeathAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponThrowAbility
 import jp.awabi2048.cccontent.mob.ability.GrudgeAuraAbility
-import jp.awabi2048.cccontent.mob.ability.PowerTridentThrowAbility
 import jp.awabi2048.cccontent.mob.ability.WaterSpiritAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponSwapAbility
 import org.bukkit.Color
@@ -234,7 +233,7 @@ class GuardianSmallMobType : EquipmentMobType(
 
 class GuardianBeamBurstMobType : EquipmentMobType(
     id = "guardian_beam_burst",
-    baseEntityType = EntityType.GUARDIAN,
+    baseEntityType = EntityType.ELDER_GUARDIAN,
     abilities = listOf(
         GuardianBeamAbility(
             id = "guardian_burst_beam",
@@ -256,7 +255,7 @@ class GuardianBeamBurstMobType : EquipmentMobType(
                 0.55,
                 0.85,
                 0.55,
-                particleCount = 24,
+                particleCount = 48,
                 size = 1.2f
             ),
             impactParticle = Particle.EXPLOSION_EMITTER,
@@ -299,12 +298,13 @@ class GuardianDrainMobType : EquipmentMobType(
                 0.55,
                 0.85,
                 0.55,
-                particleCount = 24,
+                particleCount = 48,
                 size = 1.2f
             ),
             activationSound = Sound.ENTITY_GUARDIAN_DEATH,
             activationSoundPitch = 2.0f,
             activationSoundOnlyFirst = true,
+            activationSoundOnPulse = true,
             activationTargetParticles = { location ->
                 location.world.spawnParticle(Particle.WARPED_SPORE, location, 100, 0.55, 0.45, 0.55, 0.02)
                 location.world.spawnParticle(
@@ -917,13 +917,17 @@ class SlimeWitherMobType : EquipmentMobType(
 class DrownedNormalMobType : EquipmentMobType(
     id = "drowned_normal",
     baseEntityType = EntityType.DROWNED,
-    abilities = emptyList()
+    abilities = listOf(
+        PlayerTargetAssistAbility(id = "drowned_normal_target_assist")
+    ),
+    defaultMainHand = Material.STONE_SWORD
 )
 
 class DrownedWarriorMobType : EquipmentMobType(
     id = "drowned_warrior",
     baseEntityType = EntityType.DROWNED,
     abilities = listOf(
+        PlayerTargetAssistAbility(id = "drowned_warrior_target_assist"),
         ShieldAbility(id = "drowned_warrior_shield", breakDisablesShieldPermanently = true),
         BackstepAbility(
             id = "drowned_warrior_backstep",
@@ -940,6 +944,7 @@ class DrownedGrudgeMobType : EquipmentMobType(
     id = "drowned_grudge",
     baseEntityType = EntityType.DROWNED,
     abilities = listOf(
+        PlayerTargetAssistAbility(id = "drowned_grudge_target_assist"),
         GrudgeAuraAbility(
             id = "drowned_grudge_aura",
             radius = 5.0,
@@ -958,13 +963,7 @@ class DrownedPowerThrowMobType : EquipmentMobType(
     id = "drowned_power_throw",
     baseEntityType = EntityType.DROWNED,
     abilities = listOf(
-        PowerTridentThrowAbility(
-            id = "drowned_power_throw_trident",
-            throwCooldownTicks = 100L,
-            triggerMinDistance = 3.0,
-            triggerMaxDistance = 20.0,
-            knockbackMultiplier = 3.0
-        )
+        PlayerTargetAssistAbility(id = "drowned_power_throw_target_assist")
     ),
     defaultMainHand = Material.TRIDENT
 )

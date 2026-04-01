@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.mob.ability
 
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
+import org.bukkit.Color
 import org.bukkit.Particle
 import org.bukkit.attribute.Attribute
 import org.bukkit.entity.LivingEntity
@@ -66,16 +67,28 @@ class GrudgeAuraAbility(
     }
 
     private fun spawnParticles(entity: LivingEntity) {
-        val loc = entity.location.clone().add(0.0, 1.0, 0.0)
-        val world = loc.world ?: return
-        for (i in 0 until 8) {
-            val angle = (i / 8.0) * Math.PI * 2
-            val x = Math.cos(angle) * radius * 0.9
-            val z = Math.sin(angle) * radius * 0.9
-            val particleLoc = loc.clone().add(x, 0.0, z)
-            world.spawnParticle(Particle.SQUID_INK, particleLoc, 1, 0.15, 0.3, 0.15, 0.0)
-            world.spawnParticle(Particle.DRIPPING_OBSIDIAN_TEAR, particleLoc, 1, 0.15, 0.3, 0.15, 0.0)
-        }
+        val scale = entity.getAttribute(Attribute.SCALE)?.value ?: 1.0
+        val center = entity.location.clone().add(0.0, entity.height * 0.5, 0.0)
+        val world = center.world ?: return
+        world.spawnParticle(
+            Particle.DUST_COLOR_TRANSITION,
+            center,
+            18,
+            0.55 * scale,
+            0.85 * scale,
+            0.55 * scale,
+            0.0,
+            Particle.DustTransition(Color.fromRGB(88, 54, 180), Color.fromRGB(0, 0, 0), 1.15f)
+        )
+        world.spawnParticle(
+            Particle.DRIPPING_OBSIDIAN_TEAR,
+            center,
+            8,
+            0.55 * scale,
+            0.85 * scale,
+            0.55 * scale,
+            0.0
+        )
     }
 
     private fun applyDebuffs(players: List<Player>) {
