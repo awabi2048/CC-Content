@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.mob
 
+import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.mob.type.HuskBowOnlyMobType
 import jp.awabi2048.cccontent.mob.type.HuskBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.HuskLeapOnlyMobType
@@ -70,9 +71,12 @@ import org.bukkit.attribute.Attribute
 import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.EntityType
+import org.bukkit.entity.Entity
 import org.bukkit.entity.AbstractArrow
 import org.bukkit.entity.Ageable
 import org.bukkit.entity.LivingEntity
+import org.bukkit.entity.Player
+import org.bukkit.entity.Projectile
 import org.bukkit.entity.Zombie
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityCombustEvent
@@ -403,6 +407,20 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun getActiveMob(entityId: UUID): ActiveMob? {
         return activeMobs[entityId]
+    }
+
+    fun resolveCustomMobDisplayNameByDamager(damager: Entity, viewer: Player?): String? {
+        val activeMob = resolveActiveMobByDamager(damager) ?: return null
+        val key = "arena.mob_token.mob_names.${activeMob.mobType.id}"
+        return ArenaI18n.text(viewer, key, activeMob.mobType.id)
+    }
+
+    private fun resolveActiveMobByDamager(damager: Entity): ActiveMob? {
+        activeMobs[damager.uniqueId]?.let { return it }
+
+        val projectile = damager as? Projectile ?: return null
+        val shooterEntity = projectile.shooter as? Entity ?: return null
+        return activeMobs[shooterEntity.uniqueId]
     }
 
     fun markSkeletonEffectArrow(

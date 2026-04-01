@@ -1,6 +1,8 @@
 package jp.awabi2048.cccontent.mob
 
 import org.bukkit.entity.LivingEntity
+import org.bukkit.entity.Entity
+import org.bukkit.entity.Projectile
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.entity.EntityCombustEvent
@@ -10,6 +12,8 @@ import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.entity.ProjectileHitEvent
 import org.bukkit.event.entity.EntityShootBowEvent
+import org.bukkit.event.entity.PlayerDeathEvent
+import org.bukkit.event.entity.SlimeSplitEvent
 
 class MobEventListener(private val mobService: MobService) : Listener {
 
@@ -48,6 +52,43 @@ class MobEventListener(private val mobService: MobService) : Listener {
         mobService.handleDeath(event)
     }
 
+    @EventHandler
+    fun onPlayerDeath(event: PlayerDeathEvent) {
+        val cause = event.entity.lastDamageCause as? EntityDamageByEntityEvent ?: return
+        val mobName = mobService.resolveCustomMobDisplayNameByDamager(cause.damager, event.entity) ?: return
+        val message = event.deathMessage ?: return
+
+        val replacementCandidates = buildReplacementCandidates(cause.damager)
+        var replaced = false
+        var newMessage = message
+        for (candidate in replacementCandidates) {
+            if (candidate.isBlank()) continue
+            if (newMessage.contains(candidate)) {
+                newMessage = newMessage.replace(candidate, mobName)
+                replaced = true
+                break
+            }
+        }
+
+        if (replaced) {
+            event.deathMessage = newMessage
+        }
+    }
+
+    private fun buildReplacementCandidates(damager: Entity): List<String> {
+        val candidates = mutableListOf<String>()
+        damager.customName?.let { candidates.add(it) }
+        candidates.add(damager.name)
+
+        val projectile = damager as? Projectile
+        val shooter = projectile?.shooter as? Entity
+        if (shooter != null) {
+            shooter.customName?.let { candidates.add(it) }
+            candidates.add(shooter.name)
+        }
+        return candidates.distinct()
+    }
+
     @EventHandler(ignoreCancelled = true)
     fun onShootBow(event: EntityShootBowEvent) {
         mobService.handleShootBow(event)
@@ -61,5 +102,10 @@ class MobEventListener(private val mobService: MobService) : Listener {
     @EventHandler(ignoreCancelled = true)
     fun onEntityPickupItem(event: EntityPickupItemEvent) {
         mobService.handleEntityPickupItem(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onSlimeSplit(event: SlimeSplitEvent) {
+        mobService.handleSlimeSplit(event)
     }
 }
