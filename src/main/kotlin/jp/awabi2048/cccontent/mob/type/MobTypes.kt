@@ -838,38 +838,43 @@ class StrayWeaponThrowCloseMobType : EquipmentMobType(
 }
 
 class SlimeSmallMobType : EquipmentMobType(
-    id = "slime_small",
+    id = "slime_merge_small",
     baseEntityType = EntityType.SLIME,
     abilities = listOf(
-        ProjectileAndFireImmunityAbility(id = "slime_small_immunity"),
+        ProjectileAndFireImmunityAbility(id = "slime_merge_small_immunity"),
         SlimeMergeAbility(
-            id = "slime_small_merge",
-            selfDefinitionId = "slime_small",
-            mergeOrder = listOf("slime_small", "slime_medium", "slime_large")
+            id = "slime_merge_small_merge",
+            selfDefinitionId = "slime_merge_small",
+            mergeOrder = listOf("slime_merge_small", "slime_merge_medium", "slime_merge_large")
         )
     )
 )
 
 class SlimeMediumMobType : EquipmentMobType(
-    id = "slime_medium",
+    id = "slime_merge_medium",
     baseEntityType = EntityType.SLIME,
     abilities = listOf(
-        ProjectileAndFireImmunityAbility(id = "slime_medium_immunity"),
+        ProjectileAndFireImmunityAbility(id = "slime_merge_medium_immunity"),
         SlimeMergeAbility(
-            id = "slime_medium_merge",
-            selfDefinitionId = "slime_medium",
-            mergeOrder = listOf("slime_small", "slime_medium", "slime_large")
+            id = "slime_merge_medium_merge",
+            selfDefinitionId = "slime_merge_medium",
+            mergeOrder = listOf("slime_merge_small", "slime_merge_medium", "slime_merge_large")
         )
     )
 )
 
 class SlimeLargeMobType : EquipmentMobType(
-    id = "slime_large",
+    id = "slime_merge_large",
     baseEntityType = EntityType.SLIME,
     abilities = listOf(
-        ProjectileAndFireImmunityAbility(id = "slime_large_immunity"),
+        ProjectileAndFireImmunityAbility(id = "slime_merge_large_immunity"),
+        SlimeMergeAbility(
+            id = "slime_merge_large_merge",
+            selfDefinitionId = "slime_merge_large",
+            mergeOrder = listOf("slime_merge_small", "slime_merge_medium", "slime_merge_large")
+        ),
         LeapAbility(
-            id = "slime_large_leap",
+            id = "slime_merge_large_leap",
             cooldownTicks = 100L,
             minRangeSquared = 9.0,
             maxRange = 10.0,

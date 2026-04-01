@@ -352,29 +352,29 @@ stray_throw_close:
   armor: 1.0
   scale: 1.0
 
-slime_small:
-  type: slime_small
+slime_merge_small:
+  type: slime_merge_small
   health: 8.0
   attack: 2.0
   movement_speed: 0.30
   armor: 0.0
-  scale: 1.0
+  scale: 2.0
 
-slime_medium:
-  type: slime_medium
+slime_merge_medium:
+  type: slime_merge_medium
   health: 20.0
   attack: 4.0
   movement_speed: 0.26
   armor: 2.0
-  scale: 2.0
+  scale: 3.0
 
-slime_large:
-  type: slime_large
+slime_merge_large:
+  type: slime_merge_large
   health: 40.0
   attack: 7.0
   movement_speed: 0.22
   armor: 6.0
-  scale: 3.0
+  scale: 4.0
 
 slime_poison:
   type: slime_poison
@@ -382,7 +382,7 @@ slime_poison:
   attack: 3.5
   movement_speed: 0.25
   armor: 2.0
-  scale: 2.0
+  scale: 3.0
 
 slime_wither:
   type: slime_wither
@@ -390,7 +390,7 @@ slime_wither:
   attack: 4.0
   movement_speed: 0.24
   armor: 3.0
-  scale: 2.0
+  scale: 3.0
 
 drowned_normal:
   type: drowned_normal
