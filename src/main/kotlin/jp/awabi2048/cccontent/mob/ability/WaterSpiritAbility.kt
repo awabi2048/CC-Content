@@ -21,8 +21,6 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import org.bukkit.scheduler.BukkitTask
 import org.bukkit.util.Vector
-import java.util.ArrayDeque
-import java.util.UUID
 import kotlin.math.*
 import kotlin.random.Random
 
@@ -39,20 +37,26 @@ class WaterSpiritAbility(
     private val orbitSpeed: Double = DEFAULT_ORBIT_SPEED
 ) : MobAbility {
 
+    private val orbitFollowConfig = OrbitFollowConfig(
+        orbitRadius = ORBIT_RADIUS,
+        orbitHeightOffset = ORBIT_HEIGHT_OFFSET,
+        targetPositionDelayTicks = TARGET_POSITION_DELAY_TICKS,
+        directionChangeIntervalTicks = DIRECTION_CHANGE_INTERVAL_TICKS,
+        directionTransitionTicks = DIRECTION_TRANSITION_TICKS,
+        baseAngularSpeed = ANGULAR_SPEED,
+        yFollowLerpFactor = Y_FOLLOW_LERP_FACTOR,
+        stationarySpeedThreshold = STATIONARY_SPEED_THRESHOLD,
+        stationaryEnterTicks = STATIONARY_ENTER_TICKS,
+        stationaryExitTicks = STATIONARY_EXIT_TICKS,
+        stationaryHoverAmplitude = STATIONARY_HOVER_AMPLITUDE,
+        stationaryHoverAngularSpeed = STATIONARY_HOVER_ANGULAR_SPEED
+    )
+
     data class Runtime(
         var sharedCooldownTicks: Long = 0L,
         var frozenTicks: Long = 0L,
         var ambientParticleTicks: Long = 0L,
-        var orbitalAngle: Double = 0.0,
-        var currentAngularSpeed: Double = ANGULAR_SPEED,
-        var transitionStartAngularSpeed: Double = ANGULAR_SPEED,
-        var targetAngularSpeed: Double = ANGULAR_SPEED,
-        var directionChangeTicks: Int = 0,
-        var directionTransitionTicksRemaining: Int = 0,
-        var smoothedY: Double = 0.0,
-        var hasSmoothedY: Boolean = false,
-        var delayedTargetUuid: UUID? = null,
-        var delayedTargetCenters: ArrayDeque<Vector> = ArrayDeque(),
+        var orbitState: OrbitFollowState = OrbitFollowState(ANGULAR_SPEED),
         var searchPhaseOffsetSteps: Int = 0,
         var syncTask: BukkitTask? = null,
         var damageListener: Listener? = null,
@@ -147,7 +151,7 @@ class WaterSpiritAbility(
                     if (tp != null && tp.isValid && !tp.isDead) {
                         val dx = allay.location.x - tp.location.x
                         val dz = allay.location.z - tp.location.z
-                        rt.orbitalAngle = atan2(dz, dx)
+                        rt.orbitState.orbitalAngle = atan2(dz, dx)
                     }
                 }
                 return@Runnable
@@ -155,61 +159,22 @@ class WaterSpiritAbility(
 
             val targetPlayer = findNearestPlayer(allay)
             if (targetPlayer == null || !targetPlayer.isValid || targetPlayer.isDead) {
-                rt.hasSmoothedY = false
-                rt.delayedTargetUuid = null
-                rt.delayedTargetCenters.clear()
+                OrbitFollowController.clearTarget(rt.orbitState)
                 return@Runnable
             }
 
-            if (rt.delayedTargetUuid != targetPlayer.uniqueId) {
-                rt.delayedTargetUuid = targetPlayer.uniqueId
-                rt.delayedTargetCenters.clear()
-            }
+            val orbitOutput = OrbitFollowController.update(
+                state = rt.orbitState,
+                config = orbitFollowConfig,
+                targetUuid = targetPlayer.uniqueId,
+                followerX = allay.location.x,
+                followerZ = allay.location.z,
+                targetX = targetPlayer.location.x,
+                targetY = targetPlayer.location.y,
+                targetZ = targetPlayer.location.z
+            )
 
-            rt.delayedTargetCenters.addLast(targetPlayer.location.toVector())
-            val delayedCenter = if (rt.delayedTargetCenters.size > TARGET_POSITION_DELAY_TICKS) {
-                rt.delayedTargetCenters.removeFirst()
-            } else {
-                rt.delayedTargetCenters.first()
-            }
-
-            rt.directionChangeTicks += 1
-            if (rt.directionChangeTicks >= DIRECTION_CHANGE_INTERVAL_TICKS) {
-                rt.directionChangeTicks = 0
-                rt.targetAngularSpeed = if (Random.nextBoolean()) ANGULAR_SPEED else -ANGULAR_SPEED
-                rt.transitionStartAngularSpeed = rt.currentAngularSpeed
-                rt.directionTransitionTicksRemaining = DIRECTION_TRANSITION_TICKS
-            }
-
-            if (rt.directionTransitionTicksRemaining > 0) {
-                val elapsedTicks = DIRECTION_TRANSITION_TICKS - rt.directionTransitionTicksRemaining + 1
-                val t = elapsedTicks.toDouble() / DIRECTION_TRANSITION_TICKS.toDouble()
-                rt.currentAngularSpeed =
-                    rt.transitionStartAngularSpeed + (rt.targetAngularSpeed - rt.transitionStartAngularSpeed) * t
-                rt.directionTransitionTicksRemaining -= 1
-            } else {
-                rt.currentAngularSpeed = rt.targetAngularSpeed
-            }
-            rt.orbitalAngle += rt.currentAngularSpeed
-
-            val cosA = cos(rt.orbitalAngle)
-            val sinA = sin(rt.orbitalAngle)
-            val px = delayedCenter.x
-            val pz = delayedCenter.z
-            val targetY = targetPlayer.location.y + ORBIT_HEIGHT_OFFSET
-
-            if (!rt.hasSmoothedY) {
-                rt.smoothedY = targetY
-                rt.hasSmoothedY = true
-            } else {
-                rt.smoothedY += (targetY - rt.smoothedY) * Y_FOLLOW_LERP_FACTOR
-            }
-
-            val newX = px + ORBIT_RADIUS * cosA
-            val newZ = pz + ORBIT_RADIUS * sinA
-            val newY = rt.smoothedY
-
-            val newLoc = Location(allay.world, newX, newY, newZ, allay.location.yaw, allay.location.pitch)
+            val newLoc = Location(allay.world, orbitOutput.x, orbitOutput.y, orbitOutput.z, allay.location.yaw, allay.location.pitch)
             allay.teleport(newLoc)
 
             val from = allay.location.clone().add(0.0, 1.0, 0.0)
@@ -337,7 +302,7 @@ class WaterSpiritAbility(
             alive.teleport(newLoc)
 
             rt.frozenTicks = freezeTicks
-            rt.orbitalAngle = angle
+            rt.orbitState.orbitalAngle = angle
 
             if (freeFarAttack && alive.hasLineOfSight(tp)) {
                 executeFarAttack(plugin, alive, tp)
@@ -441,5 +406,10 @@ class WaterSpiritAbility(
         private const val DIRECTION_CHANGE_INTERVAL_TICKS = 20
         private const val DIRECTION_TRANSITION_TICKS = 10
         private const val Y_FOLLOW_LERP_FACTOR = 0.08
+        private const val STATIONARY_SPEED_THRESHOLD = 0.02
+        private const val STATIONARY_ENTER_TICKS = 3
+        private const val STATIONARY_EXIT_TICKS = 3
+        private const val STATIONARY_HOVER_AMPLITUDE = 0.45
+        private const val STATIONARY_HOVER_ANGULAR_SPEED = 0.2
     }
 }
