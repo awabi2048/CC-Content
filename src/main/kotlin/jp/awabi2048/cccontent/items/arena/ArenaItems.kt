@@ -164,6 +164,7 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
                 "husk" -> NamespacedKey.minecraft("leather_chestplate")
                 "iron_golem" -> NamespacedKey.minecraft("resin_clump")
                 "guardian" -> NamespacedKey.minecraft("prismarine_shard")
+                "drowned" -> NamespacedKey.minecraft("moss_block")
                 "silverfish" -> NamespacedKey.minecraft("blue_egg")
                 "spider" -> NamespacedKey.minecraft("disc_fragment_5")
                 else -> NamespacedKey.minecraft("poisonous_potato")

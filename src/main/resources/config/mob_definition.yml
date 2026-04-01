@@ -242,7 +242,7 @@ guardian_beam_burst:
   attack: 9.0
   movement_speed: 0.24
   armor: 8.0
-  scale: 1.5
+  scale: 1.0
   spawn_conditions:
     - WATER_ONLY
 
@@ -252,7 +252,7 @@ guardian_drain:
   attack: 6.0
   movement_speed: 0.26
   armor: 7.0
-  scale: 1.2
+  scale: 2.5
   spawn_conditions:
     - WATER_ONLY
 

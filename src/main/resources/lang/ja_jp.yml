@@ -1016,7 +1016,7 @@ custom_items:
         guardian: 'ガーディアンのうろこ'
         silverfish: 'シルバーフィッシュの殻'
         spider: 'クモのハサミ'
-        drowned: 'ドラウンドの潮珠'
+        drowned: 'ひどく錆びた銅インゴット'
 arena:
   ticket:
     name: '§6アリーナチケット'
@@ -1060,7 +1060,7 @@ arena:
       guardian: 'ガーディアンのうろこ'
       silverfish: 'シルバーフィッシュの殻'
       spider: 'クモのハサミ'
-      drowned: 'ドラウンドの潮珠'
+      drowned: 'ひどく錆びた銅インゴット'
   theme:
     ruins:
       name: '遺跡'
