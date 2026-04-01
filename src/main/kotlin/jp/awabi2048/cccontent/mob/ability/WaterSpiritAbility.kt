@@ -5,34 +5,25 @@ import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import org.bukkit.Bukkit
 import org.bukkit.Color
 import org.bukkit.Location
-import org.bukkit.Material
 import org.bukkit.Particle
 import org.bukkit.Sound
-import org.bukkit.attribute.Attribute
 import org.bukkit.entity.Allay
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Player
-import org.bukkit.entity.Vex
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.HandlerList
 import org.bukkit.event.Listener
 import org.bukkit.event.entity.EntityCombustEvent
-import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.player.PlayerInteractEntityEvent
-import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
-import org.bukkit.potion.PotionEffect
-import org.bukkit.potion.PotionEffectType
 import org.bukkit.scheduler.BukkitRunnable
 import org.bukkit.scheduler.BukkitTask
+import org.bukkit.util.Vector
+import java.util.ArrayDeque
 import java.util.UUID
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.roundToLong
-import kotlin.math.sin
-import kotlin.math.sqrt
+import kotlin.math.*
 import kotlin.random.Random
 
 class WaterSpiritAbility(
@@ -41,7 +32,6 @@ class WaterSpiritAbility(
     private val closeRangeDamage: Double = DEFAULT_CLOSE_RANGE_DAMAGE,
     private val farRangeOrbDamage: Double = DEFAULT_FAR_RANGE_ORB_DAMAGE,
     private val sharedCooldownTicks: Long = DEFAULT_SHARED_COOLDOWN_TICKS,
-    private val teleportCooldownTicks: Long = DEFAULT_TELEPORT_COOLDOWN_TICKS,
     private val freezeTicks: Long = DEFAULT_FREEZE_TICKS,
     private val orbSpeed: Double = DEFAULT_ORB_SPEED,
     private val orbCount: Int = DEFAULT_ORB_COUNT,
@@ -50,15 +40,22 @@ class WaterSpiritAbility(
 ) : MobAbility {
 
     data class Runtime(
-        var vexUuid: UUID? = null,
         var sharedCooldownTicks: Long = 0L,
-        var teleportCooldownTicks: Long = 0L,
         var frozenTicks: Long = 0L,
-        var searchPhaseOffsetSteps: Int = 0,
         var ambientParticleTicks: Long = 0L,
+        var orbitalAngle: Double = 0.0,
+        var currentAngularSpeed: Double = ANGULAR_SPEED,
+        var transitionStartAngularSpeed: Double = ANGULAR_SPEED,
+        var targetAngularSpeed: Double = ANGULAR_SPEED,
+        var directionChangeTicks: Int = 0,
+        var directionTransitionTicksRemaining: Int = 0,
+        var smoothedY: Double = 0.0,
+        var hasSmoothedY: Boolean = false,
+        var delayedTargetUuid: UUID? = null,
+        var delayedTargetCenters: ArrayDeque<Vector> = ArrayDeque(),
+        var searchPhaseOffsetSteps: Int = 0,
         var syncTask: BukkitTask? = null,
         var damageListener: Listener? = null,
-        var attackListener: Listener? = null,
         var combustListener: Listener? = null,
         var interactListener: Listener? = null,
         var plugin: JavaPlugin? = null
@@ -75,24 +72,12 @@ class WaterSpiritAbility(
         val allay = context.entity as? Allay ?: return
         Bukkit.getMobGoals().removeAllGoals(allay)
         allay.isSilent = true
-
-        val loc = allay.location
-        val vex = loc.world!!.spawn(loc, Vex::class.java)
-        vex.isInvisible = true
-        vex.isSilent = true
-        vex.isInvulnerable = true
-        vex.isGlowing = false
-        vex.addPotionEffect(PotionEffect(PotionEffectType.INVISIBILITY, Integer.MAX_VALUE, 0, false, false, false))
-        vex.isAware = true
-        vex.setLimitedLifetime(false)
-        vex.equipment?.setItemInMainHand(ItemStack(Material.AIR))
-        vex.getAttribute(Attribute.SCALE)?.baseValue = 0.1
+        allay.setGravity(false)
 
         val rt = runtime as? Runtime ?: return
-        rt.vexUuid = vex.uniqueId
         rt.plugin = context.plugin
 
-        loc.world!!.playSound(loc, Sound.ENTITY_WITHER_SHOOT, 0.6f, 1.2f)
+        allay.world!!.playSound(allay.location, Sound.ENTITY_WITHER_SHOOT, 0.6f, 1.2f)
 
         val damageListener = object : Listener {
             @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -110,18 +95,6 @@ class WaterSpiritAbility(
         }
         Bukkit.getPluginManager().registerEvents(damageListener, context.plugin)
         rt.damageListener = damageListener
-
-        val attackListener = object : Listener {
-            @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-            fun onVexAttack(event: EntityDamageByEntityEvent) {
-                val vexId = rt.vexUuid ?: return
-                if (event.damager.uniqueId == vexId && event.entity is Player) {
-                    event.isCancelled = true
-                }
-            }
-        }
-        Bukkit.getPluginManager().registerEvents(attackListener, context.plugin)
-        rt.attackListener = attackListener
 
         val combustListener = object : Listener {
             @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -145,7 +118,6 @@ class WaterSpiritAbility(
         Bukkit.getPluginManager().registerEvents(interactListener, context.plugin)
         rt.interactListener = interactListener
 
-        val vexUuid = vex.uniqueId
         rt.syncTask = Bukkit.getScheduler().runTaskTimer(context.plugin, Runnable {
             if (!allay.isValid || allay.isDead) {
                 rt.syncTask?.cancel()
@@ -153,10 +125,12 @@ class WaterSpiritAbility(
                 return@Runnable
             }
 
+            allay.fireTicks = 0
+            allay.velocity = Vector(0, 0, 0)
+
             if (rt.frozenTicks > 0L) {
                 rt.frozenTicks -= 1L
-                allay.fireTicks = 0
-                val targetPlayer = allay.target as? Player
+                val targetPlayer = findNearestPlayer(allay)
                 if (targetPlayer != null && targetPlayer.isValid && !targetPlayer.isDead) {
                     val from = allay.location.clone().add(0.0, 1.0, 0.0)
                     val to = targetPlayer.location.clone().add(0.0, 1.0, 0.0)
@@ -169,47 +143,84 @@ class WaterSpiritAbility(
                     allay.teleport(newLoc)
                 }
                 if (rt.frozenTicks == 0L) {
-                    val vexEntity = Bukkit.getEntity(vexUuid) as? Vex
-                    if (vexEntity != null && vexEntity.isValid && !vexEntity.isDead) {
-                        vexEntity.teleport(allay.location)
+                    val tp = findNearestPlayer(allay)
+                    if (tp != null && tp.isValid && !tp.isDead) {
+                        val dx = allay.location.x - tp.location.x
+                        val dz = allay.location.z - tp.location.z
+                        rt.orbitalAngle = atan2(dz, dx)
                     }
                 }
                 return@Runnable
             }
 
-            val vexEntity = Bukkit.getEntity(vexUuid) as? Vex
-            if (vexEntity == null || !vexEntity.isValid || vexEntity.isDead) {
-                val newVex = allay.world!!.spawn(allay.location, Vex::class.java)
-                newVex.isInvisible = true
-                newVex.isSilent = true
-                newVex.isInvulnerable = true
-                newVex.addPotionEffect(PotionEffect(PotionEffectType.INVISIBILITY, Integer.MAX_VALUE, 0, false, false, false))
-                newVex.isAware = true
-                newVex.setLimitedLifetime(false)
-                newVex.equipment?.setItemInMainHand(ItemStack(Material.AIR))
-                newVex.getAttribute(Attribute.SCALE)?.baseValue = 0.1
-                rt.vexUuid = newVex.uniqueId
+            val targetPlayer = findNearestPlayer(allay)
+            if (targetPlayer == null || !targetPlayer.isValid || targetPlayer.isDead) {
+                rt.hasSmoothedY = false
+                rt.delayedTargetUuid = null
+                rt.delayedTargetCenters.clear()
                 return@Runnable
             }
-            val target = vexEntity.target
-            if (target != null && target.isValid && !target.isDead) {
-                allay.target = target
-            }
-            allay.teleport(vexEntity.location)
-            allay.fireTicks = 0
 
-            val targetPlayer = target as? Player
-            if (targetPlayer != null && targetPlayer.isValid && !targetPlayer.isDead) {
-                val from = allay.location.clone().add(0.0, 1.0, 0.0)
-                val to = targetPlayer.location.clone().add(0.0, 1.0, 0.0)
-                val dir = to.toVector().subtract(from.toVector())
-                val yaw = Math.toDegrees(atan2(-dir.x, dir.z)).toFloat()
-                val pitch = (-Math.toDegrees(atan2(dir.y, sqrt(dir.x * dir.x + dir.z * dir.z)))).toFloat()
-                val newLoc = allay.location.clone()
-                newLoc.yaw = yaw
-                newLoc.pitch = pitch
-                allay.teleport(newLoc)
+            if (rt.delayedTargetUuid != targetPlayer.uniqueId) {
+                rt.delayedTargetUuid = targetPlayer.uniqueId
+                rt.delayedTargetCenters.clear()
             }
+
+            rt.delayedTargetCenters.addLast(targetPlayer.location.toVector())
+            val delayedCenter = if (rt.delayedTargetCenters.size > TARGET_POSITION_DELAY_TICKS) {
+                rt.delayedTargetCenters.removeFirst()
+            } else {
+                rt.delayedTargetCenters.first()
+            }
+
+            rt.directionChangeTicks += 1
+            if (rt.directionChangeTicks >= DIRECTION_CHANGE_INTERVAL_TICKS) {
+                rt.directionChangeTicks = 0
+                rt.targetAngularSpeed = if (Random.nextBoolean()) ANGULAR_SPEED else -ANGULAR_SPEED
+                rt.transitionStartAngularSpeed = rt.currentAngularSpeed
+                rt.directionTransitionTicksRemaining = DIRECTION_TRANSITION_TICKS
+            }
+
+            if (rt.directionTransitionTicksRemaining > 0) {
+                val elapsedTicks = DIRECTION_TRANSITION_TICKS - rt.directionTransitionTicksRemaining + 1
+                val t = elapsedTicks.toDouble() / DIRECTION_TRANSITION_TICKS.toDouble()
+                rt.currentAngularSpeed =
+                    rt.transitionStartAngularSpeed + (rt.targetAngularSpeed - rt.transitionStartAngularSpeed) * t
+                rt.directionTransitionTicksRemaining -= 1
+            } else {
+                rt.currentAngularSpeed = rt.targetAngularSpeed
+            }
+            rt.orbitalAngle += rt.currentAngularSpeed
+
+            val cosA = cos(rt.orbitalAngle)
+            val sinA = sin(rt.orbitalAngle)
+            val px = delayedCenter.x
+            val pz = delayedCenter.z
+            val targetY = targetPlayer.location.y + ORBIT_HEIGHT_OFFSET
+
+            if (!rt.hasSmoothedY) {
+                rt.smoothedY = targetY
+                rt.hasSmoothedY = true
+            } else {
+                rt.smoothedY += (targetY - rt.smoothedY) * Y_FOLLOW_LERP_FACTOR
+            }
+
+            val newX = px + ORBIT_RADIUS * cosA
+            val newZ = pz + ORBIT_RADIUS * sinA
+            val newY = rt.smoothedY
+
+            val newLoc = Location(allay.world, newX, newY, newZ, allay.location.yaw, allay.location.pitch)
+            allay.teleport(newLoc)
+
+            val from = allay.location.clone().add(0.0, 1.0, 0.0)
+            val to = targetPlayer.location.clone().add(0.0, 1.0, 0.0)
+            val dir = to.toVector().subtract(from.toVector())
+            val yaw = Math.toDegrees(atan2(-dir.x, dir.z)).toFloat()
+            val pitch = (-Math.toDegrees(atan2(dir.y, sqrt(dir.x * dir.x + dir.z * dir.z)))).toFloat()
+            val faceLoc = allay.location.clone()
+            faceLoc.yaw = yaw
+            faceLoc.pitch = pitch
+            allay.teleport(faceLoc)
         }, 1L, 1L)
     }
 
@@ -219,34 +230,11 @@ class WaterSpiritAbility(
         if (rt.sharedCooldownTicks > 0L) {
             rt.sharedCooldownTicks -= 10L
         }
-        if (rt.teleportCooldownTicks > 0L) {
-            rt.teleportCooldownTicks -= 10L
-        }
         rt.ambientParticleTicks += 10L
 
         val entity = context.entity
-        val vexUuid = rt.vexUuid
-        val vex = if (vexUuid != null) Bukkit.getEntity(vexUuid) as? Vex else null
-
-        if (vex != null && vex.isValid && !vex.isDead) {
-            updateVexTarget(vex, entity)
-        }
 
         spawnAmbientParticles(entity, rt)
-
-        if (entity.location.block.type != Material.AIR && rt.teleportCooldownTicks <= 0L) {
-            val safeLoc = findSafeLocation(entity)
-            if (safeLoc != null) {
-                performTeleportEffect(entity.location, safeLoc)
-                val vexEntity = vex
-                if (vexEntity != null && vexEntity.isValid && !vexEntity.isDead) {
-                    vexEntity.teleport(safeLoc)
-                }
-                entity.teleport(safeLoc)
-                rt.frozenTicks = freezeTicks
-                rt.teleportCooldownTicks = teleportCooldownTicks
-            }
-        }
 
         if (!context.isCombatActive()) return
 
@@ -259,7 +247,9 @@ class WaterSpiritAbility(
             if (distance <= approachDistance) {
                 executeMeleeAttack(entity, target)
                 rt.sharedCooldownTicks = sharedCooldownTicks
-                scheduleTeleport(entity, rt, freeFarAttack = true)
+                if (ENABLE_TELEPORT) {
+                    scheduleTeleport(entity, rt, freeFarAttack = true)
+                }
             } else if (entity.hasLineOfSight(target)) {
                 executeFarAttack(context.plugin, entity, target)
                 rt.sharedCooldownTicks = (sharedCooldownTicks * context.loadSnapshot.abilityCooldownMultiplier).roundToLong().coerceAtLeast(sharedCooldownTicks)
@@ -281,27 +271,10 @@ class WaterSpiritAbility(
         rt.syncTask = null
         rt.damageListener?.let { HandlerList.unregisterAll(it) }
         rt.damageListener = null
-        rt.attackListener?.let { HandlerList.unregisterAll(it) }
-        rt.attackListener = null
         rt.combustListener?.let { HandlerList.unregisterAll(it) }
         rt.combustListener = null
         rt.interactListener?.let { HandlerList.unregisterAll(it) }
         rt.interactListener = null
-        rt.vexUuid?.let { uuid ->
-            val vex = Bukkit.getEntity(uuid) as? Vex
-            if (vex != null && vex.isValid && !vex.isDead) {
-                vex.remove()
-            }
-        }
-    }
-
-    private fun updateVexTarget(vex: Vex, allay: LivingEntity) {
-        val target = findNearestPlayer(allay)
-        if (target != null && target.isValid && !target.isDead) {
-            vex.target = target
-        } else {
-            vex.target = null
-        }
     }
 
     private fun findNearestPlayer(entity: LivingEntity): Player? {
@@ -326,32 +299,6 @@ class WaterSpiritAbility(
         }
     }
 
-    private fun findSafeLocation(entity: LivingEntity): Location? {
-        val world = entity.world
-        val baseX = entity.location.blockX
-        val baseY = entity.location.blockY
-        val baseZ = entity.location.blockZ
-        for (dy in 0..10) {
-            val block = world.getBlockAt(baseX, baseY + dy, baseZ)
-            if (block.type == Material.AIR) {
-                return Location(world, baseX + 0.5, baseY + dy.toDouble(), baseZ + 0.5, entity.location.yaw, entity.location.pitch)
-            }
-        }
-        for (attempt in 0 until 50) {
-            val angle = Random.nextDouble(0.0, Math.PI * 2)
-            val hDist = Random.nextDouble(1.0, 10.0)
-            val yOff = Random.nextDouble(-5.0, 10.0)
-            val tx = baseX + cos(angle) * hDist
-            val ty = baseY + yOff
-            val tz = baseZ + sin(angle) * hDist
-            val block = world.getBlockAt(tx.toInt(), ty.toInt(), tz.toInt())
-            if (block.type == Material.AIR) {
-                return Location(world, tx + 0.5, ty.toDouble(), tz + 0.5, entity.location.yaw, entity.location.pitch)
-            }
-        }
-        return null
-    }
-
     private fun performTeleportEffect(from: Location, to: Location) {
         val world = from.world ?: return
         world.playSound(from, Sound.ENTITY_ILLUSIONER_MIRROR_MOVE, 0.8f, 1.5f)
@@ -370,37 +317,30 @@ class WaterSpiritAbility(
     private fun scheduleTeleport(entity: LivingEntity, rt: Runtime, freeFarAttack: Boolean = false) {
         val plugin = rt.plugin ?: return
         val entityId = entity.uniqueId
-        val vexId = rt.vexUuid
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             val alive = Bukkit.getEntity(entityId) as? LivingEntity
             if (alive == null || !alive.isValid || alive.isDead) return@Runnable
             val world = alive.world ?: return@Runnable
             val currentLoc = alive.location
 
-            val theta = Random.nextDouble(0.0, Math.PI * 2)
-            val phi = Random.nextDouble(0.0, Math.PI)
-            val r = 8.0
-            val newX = currentLoc.x + r * sin(phi) * cos(theta)
-            val newY = currentLoc.y + r * cos(phi)
-            val newZ = currentLoc.z + r * sin(phi) * sin(theta)
+            val target = findNearestPlayer(alive)
+            val tp = if (target != null && target.isValid && !target.isDead) target else return@Runnable
+
+            val angle = Random.nextDouble(0.0, Math.PI * 2)
+            val newX = tp.location.x + ORBIT_RADIUS * cos(angle)
+            val newZ = tp.location.z + ORBIT_RADIUS * sin(angle)
+            val newY = tp.location.y + ORBIT_HEIGHT_OFFSET
             val newLoc = Location(world, newX, newY, newZ, currentLoc.yaw, currentLoc.pitch)
 
             performTeleportEffect(currentLoc, newLoc)
 
-            val vexEntity = if (vexId != null) Bukkit.getEntity(vexId) as? Vex else null
-            if (vexEntity != null && vexEntity.isValid && !vexEntity.isDead) {
-                vexEntity.teleport(newLoc)
-            }
             alive.teleport(newLoc)
 
             rt.frozenTicks = freezeTicks
-            rt.teleportCooldownTicks = teleportCooldownTicks
+            rt.orbitalAngle = angle
 
-            if (freeFarAttack) {
-                val target = findNearestPlayer(alive)
-                if (target != null && target.isValid && !target.isDead && alive.hasLineOfSight(target)) {
-                    executeFarAttack(plugin, alive, target)
-                }
+            if (freeFarAttack && alive.hasLineOfSight(tp)) {
+                executeFarAttack(plugin, alive, tp)
             }
         }, 5L)
     }
@@ -485,7 +425,6 @@ class WaterSpiritAbility(
         const val DEFAULT_CLOSE_RANGE_DAMAGE = 5.0
         const val DEFAULT_FAR_RANGE_ORB_DAMAGE = 3.5
         const val DEFAULT_SHARED_COOLDOWN_TICKS = 60L
-        const val DEFAULT_TELEPORT_COOLDOWN_TICKS = 20L
         const val DEFAULT_FREEZE_TICKS = 20L
         const val DEFAULT_ORB_SPEED = 16.0
         const val DEFAULT_ORB_COUNT = 3
@@ -493,5 +432,14 @@ class WaterSpiritAbility(
         const val DEFAULT_ORBIT_SPEED = 0.15
         private const val SEARCH_PHASE_VARIANTS = 16
         private const val SEARCH_RANGE = 40.0
+
+        private const val ENABLE_TELEPORT = false
+        private const val ORBIT_RADIUS = 6.0
+        private const val ANGULAR_SPEED = 0.039269908169872414 // 45°/sec = 2.25°/tick
+        private const val ORBIT_HEIGHT_OFFSET = 2.0
+        private const val TARGET_POSITION_DELAY_TICKS = 20
+        private const val DIRECTION_CHANGE_INTERVAL_TICKS = 20
+        private const val DIRECTION_TRANSITION_TICKS = 10
+        private const val Y_FOLLOW_LERP_FACTOR = 0.08
     }
 }
