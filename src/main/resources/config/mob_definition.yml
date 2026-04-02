@@ -442,6 +442,14 @@ water_spirit:
   spawn_conditions:
     - WATER_ONLY
 
+frog_big:
+  type: frog_big
+  health: 36.0
+  attack: 6.0
+  movement_speed: 0.28
+  armor: 4.0
+  scale: 3.0
+
 blaze_normal:
   type: blaze_normal
   health: 28.0

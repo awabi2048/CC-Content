@@ -32,6 +32,7 @@ import jp.awabi2048.cccontent.mob.ability.WeaponThrowAbility
 import jp.awabi2048.cccontent.mob.ability.GrudgeAuraAbility
 import jp.awabi2048.cccontent.mob.ability.WaterSpiritAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponSwapAbility
+import jp.awabi2048.cccontent.mob.ability.GreatFrogAbility
 import org.bukkit.Color
 import org.bukkit.Particle
 import org.bukkit.Sound
@@ -1097,6 +1098,14 @@ class WaterSpiritMobType : EquipmentMobType(
             farRangeOrbDamage = 3.5,
             sharedCooldownTicks = 120L
         )
+    )
+)
+
+class GreatFrogMobType : EquipmentMobType(
+    id = "frog_big",
+    baseEntityType = EntityType.FROG,
+    abilities = listOf(
+        GreatFrogAbility(id = "frog_big_predator")
     )
 )
 

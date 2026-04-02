@@ -26,6 +26,7 @@ import jp.awabi2048.cccontent.mob.type.GuardianBeamBurstMobType
 import jp.awabi2048.cccontent.mob.type.GuardianDrainMobType
 import jp.awabi2048.cccontent.mob.type.GuardianNormalMobType
 import jp.awabi2048.cccontent.mob.type.GuardianSmallMobType
+import jp.awabi2048.cccontent.mob.type.GreatFrogMobType
 import jp.awabi2048.cccontent.mob.type.IronGolemMagnetMobType
 import jp.awabi2048.cccontent.mob.type.IronGolemNormalMobType
 import jp.awabi2048.cccontent.mob.type.SilverfishBigPoisonMobType
@@ -227,6 +228,7 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(DrownedGrudgeMobType())
         registerMobType(DrownedPowerThrowMobType())
         registerMobType(WaterSpiritMobType())
+        registerMobType(GreatFrogMobType())
     }
 
     fun registerMobType(mobType: MobType) {

@@ -260,6 +260,9 @@ natura:
     spider_broodmother:
       weight: 3
       wave: 5..
+    frog_big:
+      weight: 4
+      wave: 3..
     slime_merge_small:
       weight: 10
       wave: 1..
