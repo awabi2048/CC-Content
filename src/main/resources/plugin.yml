@@ -9,7 +9,7 @@ softdepend: [HeadDatabase]
 commands:
   cc-content:
     description: CC-Contentメインコマンド
-    usage: /cc-content reload
+    usage: /ccc <reload|restart>
     aliases: [ccc]
   rank:
     description: ランクシステムコマンド（デバッグ用）

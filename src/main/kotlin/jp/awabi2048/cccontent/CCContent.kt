@@ -220,7 +220,8 @@ class CCContent : JavaPlugin(), Listener {
         val giveCommand = GiveCommand()
         val ccCommand = CCCommand(
             giveCommand = giveCommand,
-            onReload = { reloadConfiguration() },
+            onReload = { reloadConfigFiles() },
+            onRestart = { restartPlugin() },
             onClearBlockPlacementData = { clearBlockPlacementData() },
             mobDefinitionIdsProvider = { sharedMobService.getDefinitionIds() },
             onSummonMob = { definitionId, location -> summonConfiguredMob(definitionId, location) },
@@ -789,9 +790,45 @@ class CCContent : JavaPlugin(), Listener {
     }
     
     /**
+     * config 配下の設定を再読込
+     */
+    private fun reloadConfigFiles() {
+        coreConfig = CoreConfigManager.load(this)
+        logContentEnabledChangeIfNeeded(loadContentEnabledSettings())
+        SukimaConfigHelper.reload(this)
+        MessageManager.load(this)
+        BGMManager.loadConfig()
+
+        if (isContentEnabledAtStartup("sukima_dungeon") && ::structureLoader.isInitialized && ::mobManager.isInitialized && ::itemManager.isInitialized) {
+            reloadSukimaDungeon()
+        }
+        sharedMobService.reloadDefinitions()
+
+        GulliverConfig.reload()
+        AutoIgnitionBoosterConfig.reload()
+        AirCannonConfig.reload()
+        CustomHeadConfigRegistry.reload(this)
+        RadioCassetteConfig.reload()
+        registerCustomHeadItems()
+        registerRadioCassetteItems()
+
+        if (::breweryFeature.isInitialized) {
+            breweryFeature.reload()
+        }
+        if (::cookingFeature.isInitialized) {
+            cookingFeature.reload()
+        }
+        if (arenaFeatureReady && ::arenaManager.isInitialized && isContentEnabledAtStartup("arena")) {
+            arenaManager.reloadThemes()
+        }
+
+        logger.info("[CCContent] config 配下の再読込を完了しました")
+    }
+
+    /**
      * プラグインを再起動相当に再初期化
      */
-    private fun reloadConfiguration() {
+    private fun restartPlugin() {
         ArenaI18n.clearCache()
         stopPlugin()
         startPlugin()
