@@ -13,6 +13,10 @@ interface MobAbilityRuntime
 interface MobAbility {
     val id: String
 
+    fun tickIntervalTicks(): Long = 10L
+
+    fun useLoadAdaptiveTickInterval(): Boolean = false
+
     fun createRuntime(context: MobSpawnContext): MobAbilityRuntime? = null
 
     fun onSpawn(context: MobSpawnContext, runtime: MobAbilityRuntime?) {}

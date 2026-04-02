@@ -375,6 +375,11 @@ custom_items:
         skeleton_curve_shot: "Curved Shot Skeleton"
         skeleton_shield_only: "Shield Skeleton"
         skeleton_boomerang: "Boomerang Skeleton"
+        blaze_normal: "Normal Blaze"
+        blaze_power: "Power Blaze"
+        blaze_rapid: "Rapid Blaze"
+        blaze_melee: "Melee Blaze"
+        blaze_beam: "Beam Blaze"
       drop_names:
         husk: "Husk Tunic"
         iron_golem: "Golem Core"
@@ -391,6 +396,8 @@ custom_items:
         name: "Ocean Monument"
       natura:
         name: "Lush Cave"
+      nether:
+        name: "Nether Fortress"
     marker:
       current_mode: '&f§l| §7Current Mode §a{mode}'
       mode_changed: '&7Placement mode changed to §a{mode}§7.'

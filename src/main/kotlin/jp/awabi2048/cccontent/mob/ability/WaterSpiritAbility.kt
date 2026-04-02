@@ -230,10 +230,10 @@ class WaterSpiritAbility(
         val rt = runtime as? Runtime ?: return
 
         if (rt.sharedCooldownTicks > 0L) {
-            rt.sharedCooldownTicks -= 10L
+            rt.sharedCooldownTicks = (rt.sharedCooldownTicks - context.tickDelta).coerceAtLeast(0L)
         }
-        rt.ambientParticleTicks += 10L
-        rt.ambientSoundTicks += 10L
+        rt.ambientParticleTicks += context.tickDelta
+        rt.ambientSoundTicks += context.tickDelta
 
         val entity = context.entity
 

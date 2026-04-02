@@ -24,9 +24,15 @@ object MobAbilityUtils {
         entity.setRotation(yaw, pitch)
     }
 
-    fun shouldProcessSearchTick(tickCount: Long, searchIntervalMultiplier: Int, phaseOffsetSteps: Int): Boolean {
+    fun shouldProcessSearchTick(
+        tickCount: Long,
+        searchIntervalMultiplier: Int,
+        phaseOffsetSteps: Int,
+        baseStepTicks: Long = 10L
+    ): Boolean {
         val intervalSteps = searchIntervalMultiplier.coerceAtLeast(1).toLong()
-        val currentStep = (tickCount / 10L) + phaseOffsetSteps.toLong()
+        val stepTicks = baseStepTicks.coerceAtLeast(1L)
+        val currentStep = (tickCount / stepTicks) + phaseOffsetSteps.toLong()
         return currentStep % intervalSteps == 0L
     }
 }

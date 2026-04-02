@@ -48,7 +48,7 @@ class LinearProjectileAbility(
     override fun onTick(context: MobRuntimeContext, runtime: MobAbilityRuntime?) {
         val abilityRuntime = runtime as? Runtime ?: return
         if (abilityRuntime.shotCooldownTicks > 0L) {
-            abilityRuntime.shotCooldownTicks -= 10L
+            abilityRuntime.shotCooldownTicks = (abilityRuntime.shotCooldownTicks - context.tickDelta).coerceAtLeast(0L)
         }
 
         val attacker = context.entity

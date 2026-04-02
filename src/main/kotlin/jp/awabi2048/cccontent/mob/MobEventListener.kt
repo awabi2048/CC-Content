@@ -13,6 +13,7 @@ import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.entity.ProjectileHitEvent
 import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.entity.PlayerDeathEvent
+import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.event.entity.SlimeSplitEvent
 
 class MobEventListener(private val mobService: MobService) : Listener {
@@ -97,6 +98,11 @@ class MobEventListener(private val mobService: MobService) : Listener {
     @EventHandler(ignoreCancelled = true)
     fun onProjectileHit(event: ProjectileHitEvent) {
         mobService.handleProjectileHit(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onProjectileLaunch(event: ProjectileLaunchEvent) {
+        mobService.handleProjectileLaunch(event)
     }
 
     @EventHandler(ignoreCancelled = true)

@@ -46,7 +46,7 @@ class WeaponThrowAbility(
     override fun onTick(context: MobRuntimeContext, runtime: MobAbilityRuntime?) {
         val abilityRuntime = runtime as? Runtime ?: return
         if (abilityRuntime.cooldownTicks > 0L) {
-            abilityRuntime.cooldownTicks -= 10L
+            abilityRuntime.cooldownTicks = (abilityRuntime.cooldownTicks - context.tickDelta).coerceAtLeast(0L)
         }
 
         val entity = context.entity

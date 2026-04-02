@@ -6,7 +6,11 @@ import jp.awabi2048.cccontent.mob.ability.AreaEffectPulseAbility
 import jp.awabi2048.cccontent.mob.ability.ArmorMagnetPullAbility
 import jp.awabi2048.cccontent.mob.ability.BoomerangAbility
 import jp.awabi2048.cccontent.mob.ability.BackstepAbility
+import jp.awabi2048.cccontent.mob.ability.BlazeSoundControllerAbility
+import jp.awabi2048.cccontent.mob.ability.BlazeVolleyAbility
 import jp.awabi2048.cccontent.mob.ability.ClimbingLeapAbility
+import jp.awabi2048.cccontent.mob.ability.DashToTargetOffsetAbility
+import jp.awabi2048.cccontent.mob.ability.GenericBeamAbility
 import jp.awabi2048.cccontent.mob.ability.GuardianBeamAbility
 import jp.awabi2048.cccontent.mob.ability.LeapAbility
 import jp.awabi2048.cccontent.mob.ability.LinearProjectileAbility
@@ -17,6 +21,7 @@ import jp.awabi2048.cccontent.mob.ability.PlayerTargetAssistAbility
 import jp.awabi2048.cccontent.mob.ability.PoisonOnMeleeHitAbility
 import jp.awabi2048.cccontent.mob.ability.PotionSlimeAbility
 import jp.awabi2048.cccontent.mob.ability.ProjectileAndFireImmunityAbility
+import jp.awabi2048.cccontent.mob.ability.ProximityFlamePulseAbility
 import jp.awabi2048.cccontent.mob.ability.SlimeMergeAbility
 import jp.awabi2048.cccontent.mob.ability.RangedAttackAbility
 import jp.awabi2048.cccontent.mob.ability.RandomInvisibilityAbility
@@ -910,6 +915,116 @@ class SlimeWitherMobType : EquipmentMobType(
             effectDurationTicks = 80,
             effectAmplifier = 0,
             cloudColor = Color.GRAY
+        )
+    )
+)
+
+class BlazeNormalMobType : EquipmentMobType(
+    id = "blaze_normal",
+    baseEntityType = EntityType.BLAZE,
+    abilities = listOf(
+        BlazeSoundControllerAbility(id = "blaze_normal_sound", pitch = 1.0f),
+        BlazeVolleyAbility(
+            id = "blaze_normal_volley",
+            projectileKind = BlazeVolleyAbility.ProjectileKind.SMALL_FIREBALL,
+            projectileSpeed = 0.95,
+            inaccuracy = 0.02,
+            cooldownTicks = 70L,
+            burstCount = 3,
+            burstIntervalTicks = 6L,
+            damageMultiplier = 1.0
+        )
+    )
+)
+
+class BlazePowerMobType : EquipmentMobType(
+    id = "blaze_power",
+    baseEntityType = EntityType.BLAZE,
+    abilities = listOf(
+        BlazeSoundControllerAbility(id = "blaze_power_sound", pitch = 0.8f),
+        BlazeVolleyAbility(
+            id = "blaze_power_volley",
+            projectileKind = BlazeVolleyAbility.ProjectileKind.FIREBALL,
+            projectileSpeed = 0.78,
+            inaccuracy = 0.028,
+            cooldownTicks = 117L,
+            burstCount = 3,
+            burstIntervalTicks = 8L,
+            damageMultiplier = 2.0
+        )
+    )
+)
+
+class BlazeRapidMobType : EquipmentMobType(
+    id = "blaze_rapid",
+    baseEntityType = EntityType.BLAZE,
+    abilities = listOf(
+        BlazeSoundControllerAbility(id = "blaze_rapid_sound", pitch = 1.3f),
+        BlazeVolleyAbility(
+            id = "blaze_rapid_volley",
+            projectileKind = BlazeVolleyAbility.ProjectileKind.SMALL_FIREBALL,
+            projectileSpeed = 0.9,
+            inaccuracy = 0.11,
+            cooldownTicks = 96L,
+            burstCount = 10,
+            burstIntervalTicks = 4L,
+            recoilPerShot = 0.13,
+            damageMultiplier = 0.52
+        )
+    )
+)
+
+class BlazeMeleeMobType : EquipmentMobType(
+    id = "blaze_melee",
+    baseEntityType = EntityType.BLAZE,
+    abilities = listOf(
+        BlazeSoundControllerAbility(id = "blaze_melee_sound", pitch = 1.2f),
+        DashToTargetOffsetAbility(
+            id = "blaze_melee_dash",
+            triggerMinDistance = 10.0,
+            cooldownTicks = 90L,
+            dashSpeed = 1.6,
+            dashVerticalSpeed = 0.2,
+            hoverHeight = 3.0,
+            hoverDurationTicks = 10L,
+            maxDashDurationTicks = 24L,
+            stabilizationSpeedThreshold = 0.2,
+            stabilizationRequiredTicks = 6L,
+            explosionPower = 4.2f,
+            requireLineOfSight = true
+        ),
+        ProximityFlamePulseAbility(
+            id = "blaze_melee_flame_pulse",
+            intervalTicks = 30L,
+            radius = 5.0,
+            damage = 16.0,
+            fireTicks = 60,
+            particleCount = 280,
+            particleSpreadX = 8.0,
+            particleSpreadY = 8.0,
+            particleSpreadZ = 8.0
+        )
+    )
+)
+
+class BlazeBeamMobType : EquipmentMobType(
+    id = "blaze_beam",
+    baseEntityType = EntityType.BLAZE,
+    abilities = listOf(
+        BlazeSoundControllerAbility(id = "blaze_beam_sound", pitch = 0.7f),
+        GenericBeamAbility(
+            id = "blaze_beam_attack",
+            cooldownTicks = 105L,
+            chargeTicks = 40L,
+            minRange = 2.0,
+            maxRange = 19.0,
+            hitRadius = 0.9,
+            damageMultiplier = 1.15,
+            bonusDamage = 2.0,
+            directKnockback = 0.85,
+            verticalBoost = 0.08,
+            beamStep = 0.45,
+            requireLineOfSight = true
         )
     )
 )

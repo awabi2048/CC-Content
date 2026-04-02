@@ -34,7 +34,7 @@ class RangedAttackAbility(
     override fun onTick(context: MobRuntimeContext, runtime: MobAbilityRuntime?) {
         val abilityRuntime = runtime as? Runtime ?: return
         if (abilityRuntime.shotCooldownTicks > 0L) {
-            abilityRuntime.shotCooldownTicks -= 10L
+            abilityRuntime.shotCooldownTicks = (abilityRuntime.shotCooldownTicks - context.tickDelta).coerceAtLeast(0L)
         }
 
         if (!context.isCombatActive()) {
@@ -66,7 +66,7 @@ class RangedAttackAbility(
         MobAbilityUtils.faceTowards(entity, target)
 
         if (!entity.hasLineOfSight(target)) {
-            abilityRuntime.lostSightTicks += 10L
+            abilityRuntime.lostSightTicks += context.tickDelta
             if (abilityRuntime.lostSightTicks >= AIM_RESET_LOST_SIGHT_TICKS) {
                 resetAimState(abilityRuntime)
             }
@@ -78,7 +78,7 @@ class RangedAttackAbility(
             return
         }
 
-        abilityRuntime.aimTicks += 10L
+        abilityRuntime.aimTicks += context.tickDelta
         val requiredAimTicks = calculateRequiredAimTicks(distanceSquared)
         if (abilityRuntime.aimTicks < requiredAimTicks) {
             return
