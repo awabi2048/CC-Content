@@ -23,7 +23,6 @@ import jp.awabi2048.cccontent.mob.ability.PoisonOnMeleeHitAbility
 import jp.awabi2048.cccontent.mob.ability.PotionSlimeAbility
 import jp.awabi2048.cccontent.mob.ability.ProjectileAndFireImmunityAbility
 import jp.awabi2048.cccontent.mob.ability.ProximityFlamePulseAbility
-import jp.awabi2048.cccontent.mob.ability.ReturnToWaterPriorityAbility
 import jp.awabi2048.cccontent.mob.ability.SlimeMergeAbility
 import jp.awabi2048.cccontent.mob.ability.RangedAttackAbility
 import jp.awabi2048.cccontent.mob.ability.RandomInvisibilityAbility
@@ -1074,7 +1073,6 @@ class DrownedGrudgeMobType : EquipmentMobType(
             damageIntervalTicks = 160L,
             damageAmount = 3.0
         ),
-        ReturnToWaterPriorityAbility(id = "drowned_grudge_return_to_water")
     ),
     defaultMainHand = Material.TRIDENT
 )
@@ -1084,7 +1082,6 @@ class DrownedPowerThrowMobType : EquipmentMobType(
     baseEntityType = EntityType.DROWNED,
     abilities = listOf(
         PlayerTargetAssistAbility(id = "drowned_power_throw_target_assist"),
-        ReturnToWaterPriorityAbility(id = "drowned_power_throw_return_to_water")
     ),
     defaultMainHand = Material.TRIDENT
 )
