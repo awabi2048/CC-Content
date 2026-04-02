@@ -49,7 +49,8 @@ data class ArenaDownedPlayerState(
     var shulkerEntityId: UUID? = null,
     var carrierEntityId: UUID? = null,
     var timeoutExecuteAtMillis: Long? = null,
-    var reviveDisabled: Boolean = false
+    var reviveDisabled: Boolean = false,
+    var gameOverLocation: Location? = null
 )
 
 data class ArenaReviveHoldState(

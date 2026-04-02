@@ -1824,7 +1824,8 @@ class ArenaManager(
         session.downedPlayers[player.uniqueId] = ArenaDownedPlayerState(
             downedAtMillis = now,
             bleedoutAtMillis = reviveDeadline,
-            reviveDisabled = reviveDisabled
+            reviveDisabled = reviveDisabled,
+            gameOverLocation = if (reviveDisabled) player.location.clone() else null
         )
         session.reviveHoldStates[player.uniqueId] = ArenaReviveHoldState()
         session.downedOriginalWalkSpeeds.putIfAbsent(player.uniqueId, player.walkSpeed)
@@ -1928,6 +1929,7 @@ class ArenaManager(
             downState.reviveDisabled = true
             downState.bleedoutAtMillis = now
             downState.timeoutExecuteAtMillis = null
+            downState.gameOverLocation = downed.location.clone()
 
             syncDownedShulker(session, downed, forceTeleport = true)
 
@@ -2157,9 +2159,25 @@ class ArenaManager(
     }
 
     private fun applyDownedMovementLimit(player: Player, downState: ArenaDownedPlayerState?) {
-        val walk = if (downState?.reviveDisabled == true) DOWNED_GAME_OVER_WALK_SPEED else DOWNED_PLAYER_WALK_SPEED
-        if (player.walkSpeed != walk) {
-            player.walkSpeed = walk
+        if (downState?.reviveDisabled == true) {
+            if (player.walkSpeed != DOWNED_GAME_OVER_WALK_SPEED) {
+                player.walkSpeed = DOWNED_GAME_OVER_WALK_SPEED
+            }
+            val anchor = downState.gameOverLocation
+            if (anchor != null) {
+                val loc = player.location
+                if (loc.world?.uid != anchor.world?.uid ||
+                    loc.distanceSquared(anchor) > 0.01
+                ) {
+                    player.teleport(anchor)
+                }
+            }
+            player.velocity = Vector(0.0, 0.0, 0.0)
+            return
+        }
+
+        if (player.walkSpeed != DOWNED_PLAYER_WALK_SPEED) {
+            player.walkSpeed = DOWNED_PLAYER_WALK_SPEED
         }
 
         if (!player.isInWater) {
@@ -2323,12 +2341,11 @@ class ArenaManager(
                 downState.shulkerEntityId = spawned.uniqueId
             }
 
-        if (!carrier.passengers.contains(shulker)) {
-            carrier.addPassenger(shulker)
-        }
-
         if (forceTeleport || carrier.location.distanceSquared(anchor) > 0.01) {
+            carrier.removePassenger(shulker)
             carrier.teleport(anchor)
+            shulker.teleport(anchor)
+            carrier.addPassenger(shulker)
         }
 
         ejectAlivePassengersFromDownedShulker(session, shulker)
