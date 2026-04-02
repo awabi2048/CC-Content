@@ -20,6 +20,7 @@ import kotlin.math.max
 class CCCommand(
     private val giveCommand: GiveCommand,
     private val onReload: (() -> Unit)? = null,
+    private val onRestart: (() -> Unit)? = null,
     private val onClearBlockPlacementData: (() -> Unit)? = null,
     private val mobDefinitionIdsProvider: (() -> Collection<String>)? = null,
     private val onSummonMob: ((String, Location) -> LivingEntity?)? = null,
@@ -52,6 +53,9 @@ class CCCommand(
             }
             "reload" -> {
                 handleReload(sender)
+            }
+            "restart" -> {
+                handleRestart(sender)
             }
             "clear_block_placement_data" -> {
                 handleClearBlockPlacementData(sender)
@@ -363,10 +367,33 @@ class CCCommand(
             sender.sendMessage("§cリロード機能が利用できません")
             return false
         }
-        
+
+        try {
+            sender.sendMessage("§6config を再読込中...")
+            onReload.invoke()
+            sender.sendMessage("§aconfig を再読込しました")
+            return true
+        } catch (e: Exception) {
+            sender.sendMessage("§c再読込中にエラーが発生しました: ${e.message}")
+            e.printStackTrace()
+            return false
+        }
+    }
+
+    private fun handleRestart(sender: CommandSender): Boolean {
+        if (!sender.hasPermission("cc-content.admin")) {
+            sender.sendMessage("§c権限がありません")
+            return false
+        }
+
+        if (onRestart == null) {
+            sender.sendMessage("§c再起動機能が利用できません")
+            return false
+        }
+
         try {
             sender.sendMessage("§6CC-Content を再起動中...")
-            onReload.invoke()
+            onRestart.invoke()
             sender.sendMessage("§aCC-Content を再起動しました")
             return true
         } catch (e: Exception) {
@@ -385,8 +412,11 @@ class CCCommand(
               §7  - 例: /cc-content give @a arena.prize 10
               §7  - 例: /cc-content give @s sukima_dungeon.talisman
               
-                §f/cc-content reload
-                §7  - プラグインを再起動相当に再初期化します
+                 §f/ccc reload
+                 §7  - config 配下の設定を再読込します
+
+                 §f/ccc restart
+                 §7  - プラグインを再起動相当に再初期化します
 
                §f/ccc summon <mob_definition_id> <x> <y> <z>
                §7  - 共通 mob_definition からモブを召喚します
@@ -430,11 +460,12 @@ class CCCommand(
           if (args.size == 1) {
               val prefix = args[0].lowercase()
                val candidates = mutableListOf("give", "help")
-                if (sender.hasPermission("cc-content.admin")) {
-                    candidates.add("reload")
-                    candidates.add("summon")
-                    candidates.add("clear_block_placement_data")
-                    candidates.add("debug")
+                 if (sender.hasPermission("cc-content.admin")) {
+                     candidates.add("reload")
+                     candidates.add("restart")
+                     candidates.add("summon")
+                     candidates.add("clear_block_placement_data")
+                     candidates.add("debug")
                     candidates.add("update_day")
                 }
                 return candidates.filter { it.startsWith(prefix) }
