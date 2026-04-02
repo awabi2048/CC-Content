@@ -12,6 +12,7 @@ import jp.awabi2048.cccontent.mob.MobType
 import jp.awabi2048.cccontent.mob.ability.MobAbility
 import jp.awabi2048.cccontent.mob.ability.MobAbilityRuntime
 import org.bukkit.entity.EntityType
+import kotlin.random.Random
 
 abstract class AbilityMobType(
     override val id: String,
@@ -19,10 +20,20 @@ abstract class AbilityMobType(
     private val abilities: List<MobAbility>
 ) : MobType {
 
-    data class Runtime(val abilityRuntimes: List<MobAbilityRuntime?>) : CustomMobRuntime
+    data class AbilityTickState(var nextDueTick: Long)
+
+    data class Runtime(
+        val abilityRuntimes: List<MobAbilityRuntime?>,
+        val abilityTickStates: List<AbilityTickState>
+    ) : CustomMobRuntime
 
     override fun createRuntime(context: MobSpawnContext): CustomMobRuntime {
-        return Runtime(abilities.map { ability -> ability.createRuntime(context) })
+        val runtimes = abilities.map { ability -> ability.createRuntime(context) }
+        val tickStates = abilities.map { ability ->
+            val interval = ability.tickIntervalTicks().coerceAtLeast(1L)
+            AbilityTickState(nextDueTick = if (interval <= 1L) 0L else Random.nextLong(interval))
+        }
+        return Runtime(runtimes, tickStates)
     }
 
     override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
@@ -32,8 +43,29 @@ abstract class AbilityMobType(
     }
 
     override fun onTick(context: MobRuntimeContext, runtime: CustomMobRuntime?) {
-        forEachAbility(runtime) { ability, abilityRuntime ->
-            ability.onTick(context, abilityRuntime)
+        val typedRuntime = runtime as? Runtime
+        val abilityRuntimes = typedRuntime?.abilityRuntimes
+        val tickStates = typedRuntime?.abilityTickStates
+        abilities.forEachIndexed { index, ability ->
+            val tickState = tickStates?.getOrNull(index)
+            if (tickState == null) {
+                ability.onTick(context, abilityRuntimes?.getOrNull(index))
+                return@forEachIndexed
+            }
+
+            val currentTick = context.activeMob.tickCount
+            if (currentTick < tickState.nextDueTick) {
+                return@forEachIndexed
+            }
+
+            val baseInterval = ability.tickIntervalTicks().coerceAtLeast(1L)
+            val effectiveInterval = if (ability.useLoadAdaptiveTickInterval()) {
+                baseInterval * context.loadSnapshot.searchIntervalMultiplier.coerceAtLeast(1)
+            } else {
+                baseInterval
+            }
+            tickState.nextDueTick = currentTick + effectiveInterval.coerceAtLeast(1L)
+            ability.onTick(context.copy(tickDelta = effectiveInterval.coerceAtLeast(1L)), abilityRuntimes?.getOrNull(index))
         }
     }
 

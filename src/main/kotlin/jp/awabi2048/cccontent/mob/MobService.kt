@@ -13,6 +13,11 @@ import jp.awabi2048.cccontent.mob.type.BoggedNormalMobType
 import jp.awabi2048.cccontent.mob.type.BoggedPlainMobType
 import jp.awabi2048.cccontent.mob.type.BoggedRapidShotMobType
 import jp.awabi2048.cccontent.mob.type.BoggedWeaponThrowCloseMobType
+import jp.awabi2048.cccontent.mob.type.BlazeBeamMobType
+import jp.awabi2048.cccontent.mob.type.BlazeMeleeMobType
+import jp.awabi2048.cccontent.mob.type.BlazeNormalMobType
+import jp.awabi2048.cccontent.mob.type.BlazePowerMobType
+import jp.awabi2048.cccontent.mob.type.BlazeRapidMobType
 import jp.awabi2048.cccontent.mob.type.DrownedGrudgeMobType
 import jp.awabi2048.cccontent.mob.type.DrownedNormalMobType
 import jp.awabi2048.cccontent.mob.type.DrownedPowerThrowMobType
@@ -74,9 +79,11 @@ import org.bukkit.entity.EntityType
 import org.bukkit.entity.Entity
 import org.bukkit.entity.AbstractArrow
 import org.bukkit.entity.Ageable
+import org.bukkit.entity.Fireball
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Player
 import org.bukkit.entity.Projectile
+import org.bukkit.entity.SmallFireball
 import org.bukkit.entity.Slime
 import org.bukkit.entity.Trident
 import org.bukkit.entity.Zombie
@@ -85,6 +92,7 @@ import org.bukkit.event.entity.EntityCombustEvent
 import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityPickupItemEvent
+import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.entity.ProjectileHitEvent
 import org.bukkit.inventory.EquipmentSlot
@@ -137,6 +145,8 @@ class MobService(private val plugin: JavaPlugin) {
     private val activeMobs = mutableMapOf<UUID, ActiveMob>()
     private val definitions = mutableMapOf<String, MobDefinition>()
     private val sessionLoadMetrics = mutableMapOf<String, SessionLoadMetrics>()
+    private val managedProjectilePermits = mutableMapOf<UUID, Int>()
+    private val directDamagePermits = mutableMapOf<Pair<UUID, UUID>, Int>()
     private val mobTypeKey = NamespacedKey(plugin, "mob_type_id")
     private val mobDefinitionKey = NamespacedKey(plugin, "mob_definition_id")
     private val mobFeatureKey = NamespacedKey(plugin, "mob_feature_id")
@@ -145,6 +155,7 @@ class MobService(private val plugin: JavaPlugin) {
     private val skeletonEffectArrowTypeKey = NamespacedKey(plugin, "skeleton_effect_arrow_type")
     private val skeletonEffectArrowAmplifierKey = NamespacedKey(plugin, "skeleton_effect_arrow_amp")
     private val skeletonEffectArrowDurationKey = NamespacedKey(plugin, "skeleton_effect_arrow_duration")
+    private val customProjectileDamageKey = NamespacedKey(plugin, "custom_projectile_damage")
     private var tickTask: BukkitTask? = null
 
     init {
@@ -205,6 +216,11 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(SlimeLargeMobType())
         registerMobType(SlimePoisonMobType())
         registerMobType(SlimeWitherMobType())
+        registerMobType(BlazeNormalMobType())
+        registerMobType(BlazePowerMobType())
+        registerMobType(BlazeRapidMobType())
+        registerMobType(BlazeMeleeMobType())
+        registerMobType(BlazeBeamMobType())
         registerMobType(DrownedNormalMobType())
         registerMobType(DrownedWarriorMobType())
         registerMobType(DrownedGrudgeMobType())
@@ -435,6 +451,44 @@ class MobService(private val plugin: JavaPlugin) {
         container.set(skeletonEffectArrowDurationKey, PersistentDataType.INTEGER, durationTicks)
     }
 
+    fun markCustomProjectileDamage(projectile: Projectile, damage: Double) {
+        projectile.persistentDataContainer.set(customProjectileDamageKey, PersistentDataType.DOUBLE, damage.coerceAtLeast(0.0))
+    }
+
+    fun issueManagedProjectilePermit(shooterId: UUID) {
+        managedProjectilePermits[shooterId] = (managedProjectilePermits[shooterId] ?: 0) + 1
+    }
+
+    fun issueDirectDamagePermit(attackerId: UUID, targetId: UUID) {
+        val key = attackerId to targetId
+        directDamagePermits[key] = (directDamagePermits[key] ?: 0) + 1
+    }
+
+    private fun consumeManagedProjectilePermit(shooterId: UUID): Boolean {
+        val current = managedProjectilePermits[shooterId] ?: return false
+        if (current <= 1) {
+            managedProjectilePermits.remove(shooterId)
+        } else {
+            managedProjectilePermits[shooterId] = current - 1
+        }
+        return true
+    }
+
+    private fun consumeDirectDamagePermit(attackerId: UUID, targetId: UUID): Boolean {
+        val key = attackerId to targetId
+        val current = directDamagePermits[key] ?: return false
+        if (current <= 1) {
+            directDamagePermits.remove(key)
+        } else {
+            directDamagePermits[key] = current - 1
+        }
+        return true
+    }
+
+    fun isManagedCustomProjectile(projectile: Projectile): Boolean {
+        return projectile.persistentDataContainer.has(customProjectileDamageKey, PersistentDataType.DOUBLE)
+    }
+
     fun handleProjectileEffects(event: EntityDamageByEntityEvent) {
         ThrownWeaponService.getInstance(plugin).handleProjectileDamage(event)
 
@@ -443,6 +497,14 @@ class MobService(private val plugin: JavaPlugin) {
         val trident = damager as? Trident
         if (trident != null) {
             applyDrownedPowerThrowKnockback(trident, target)
+        }
+
+        val projectile = damager as? Projectile
+        if (projectile != null) {
+            val customDamage = projectile.persistentDataContainer.get(customProjectileDamageKey, PersistentDataType.DOUBLE)
+            if (customDamage != null) {
+                event.damage = customDamage.coerceAtLeast(0.0)
+            }
         }
 
         val arrow = damager as? AbstractArrow ?: return
@@ -495,6 +557,24 @@ class MobService(private val plugin: JavaPlugin) {
         event.isCancelled = true
     }
 
+    fun handleProjectileLaunch(event: ProjectileLaunchEvent) {
+        val projectile = event.entity as? Projectile ?: return
+        if (projectile !is SmallFireball && projectile !is Fireball) {
+            return
+        }
+
+        val shooter = projectile.shooter as? LivingEntity ?: return
+        val activeMob = activeMobs[shooter.uniqueId] ?: return
+        if (!activeMob.mobType.id.startsWith("blaze_")) {
+            return
+        }
+
+        if (!consumeManagedProjectilePermit(shooter.uniqueId)) {
+            event.isCancelled = true
+            projectile.remove()
+        }
+    }
+
     fun handleProjectileHit(event: ProjectileHitEvent) {
         ThrownWeaponService.getInstance(plugin).handleProjectileHit(event)
         val arrow = event.entity
@@ -517,7 +597,7 @@ class MobService(private val plugin: JavaPlugin) {
         }
     }
 
-    fun startTickTask(intervalTicks: Long = 10L) {
+    fun startTickTask(intervalTicks: Long = 1L) {
         if (tickTask != null) {
             return
         }
@@ -538,7 +618,7 @@ class MobService(private val plugin: JavaPlugin) {
                 val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
                 val startedAt = System.nanoTime()
                 activeMob.mobType.onTick(
-                    MobRuntimeContext(plugin, entity, activeMob, snapshot),
+                    MobRuntimeContext(plugin, entity, activeMob, snapshot, tickDelta = intervalTicks),
                     activeMob.runtime
                 )
                 val elapsedNanos = System.nanoTime() - startedAt
@@ -553,6 +633,8 @@ class MobService(private val plugin: JavaPlugin) {
         tickTask?.cancel()
         tickTask = null
         activeMobs.clear()
+        managedProjectilePermits.clear()
+        directDamagePermits.clear()
         sessionLoadMetrics.clear()
         BoomerangService.getInstance(plugin).shutdown()
         HomingArrowService.getInstance(plugin).shutdown()
@@ -568,6 +650,15 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun handleAttack(event: EntityDamageByEntityEvent, attacker: LivingEntity) {
         val activeMob = activeMobs[attacker.uniqueId] ?: return
+        if (activeMob.mobType.id.startsWith("blaze_") && event.damager.uniqueId == attacker.uniqueId) {
+            val targetId = (event.entity as? LivingEntity)?.uniqueId
+            if (targetId != null && consumeDirectDamagePermit(attacker.uniqueId, targetId)) {
+                return
+            }
+            event.damage = 0.0
+            event.isCancelled = true
+            return
+        }
         val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
         val startedAt = System.nanoTime()
         activeMob.mobType.onAttack(

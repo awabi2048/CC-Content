@@ -87,7 +87,8 @@ data class MobRuntimeContext(
     val plugin: JavaPlugin,
     val entity: LivingEntity,
     val activeMob: ActiveMob,
-    val loadSnapshot: MobLoadSnapshot
+    val loadSnapshot: MobLoadSnapshot,
+    val tickDelta: Long = 1L
 ) {
     val definition: MobDefinition
         get() = activeMob.definition

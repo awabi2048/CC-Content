@@ -31,10 +31,10 @@ class ShieldAbility(
     override fun onTick(context: MobRuntimeContext, runtime: MobAbilityRuntime?) {
         val abilityRuntime = runtime as? Runtime ?: return
         if (abilityRuntime.blockCooldownTicks > 0L) {
-            abilityRuntime.blockCooldownTicks -= 10L
+            abilityRuntime.blockCooldownTicks = (abilityRuntime.blockCooldownTicks - context.tickDelta).coerceAtLeast(0L)
         }
         if (abilityRuntime.shieldDownTicks > 0L) {
-            abilityRuntime.shieldDownTicks -= 10L
+            abilityRuntime.shieldDownTicks = (abilityRuntime.shieldDownTicks - context.tickDelta).coerceAtLeast(0L)
         }
     }
 

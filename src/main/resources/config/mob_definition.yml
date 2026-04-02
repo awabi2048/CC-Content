@@ -441,3 +441,43 @@ water_spirit:
   scale: 3.0
   spawn_conditions:
     - WATER_ONLY
+
+blaze_normal:
+  type: blaze_normal
+  health: 28.0
+  attack: 6.0
+  movement_speed: 0.24
+  armor: 2.0
+  scale: 1.0
+
+blaze_power:
+  type: blaze_power
+  health: 38.0
+  attack: 7.0
+  movement_speed: 0.23
+  armor: 4.0
+  scale: 1.5
+
+blaze_rapid:
+  type: blaze_rapid
+  health: 30.0
+  attack: 5.0
+  movement_speed: 0.26
+  armor: 2.5
+  scale: 1.2
+
+blaze_melee:
+  type: blaze_melee
+  health: 42.0
+  attack: 7.0
+  movement_speed: 0.27
+  armor: 5.0
+  scale: 1.25
+
+blaze_beam:
+  type: blaze_beam
+  health: 36.0
+  attack: 8.0
+  movement_speed: 0.24
+  armor: 4.0
+  scale: 1.2

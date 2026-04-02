@@ -21,18 +21,22 @@ class SlimeMergeAbility(
 ) : MobAbility {
 
     data class Runtime(
-        var cooldownTicks: Long
+        var cooldownTicks: Long,
+        val searchPhaseOffsetSteps: Int
     ) : MobAbilityRuntime
 
     override fun createRuntime(context: jp.awabi2048.cccontent.mob.MobSpawnContext): MobAbilityRuntime {
-        return Runtime(cooldownTicks = initialCooldownTicks)
+        return Runtime(
+            cooldownTicks = initialCooldownTicks,
+            searchPhaseOffsetSteps = Random.nextInt(SEARCH_PHASE_VARIANTS)
+        )
     }
 
     override fun onTick(context: MobRuntimeContext, runtime: MobAbilityRuntime?) {
         val rt = runtime as? Runtime ?: return
 
         if (rt.cooldownTicks > 0L) {
-            rt.cooldownTicks -= 10L
+            rt.cooldownTicks = (rt.cooldownTicks - context.tickDelta).coerceAtLeast(0L)
             return
         }
 
@@ -41,7 +45,7 @@ class SlimeMergeAbility(
         val selfIndex = mergeOrder.indexOf(selfDefinitionId)
         if (selfIndex < 0 || selfIndex >= mergeOrder.lastIndex) return
 
-        if (!MobAbilityUtils.shouldProcessSearchTick(context.activeMob.tickCount, context.loadSnapshot.searchIntervalMultiplier, Random.nextInt(SEARCH_PHASE_VARIANTS))) return
+        if (!MobAbilityUtils.shouldProcessSearchTick(context.activeMob.tickCount, context.loadSnapshot.searchIntervalMultiplier, rt.searchPhaseOffsetSteps)) return
         if (Random.nextDouble() < context.loadSnapshot.abilityExecutionSkipChance) return
 
         val entity = context.entity

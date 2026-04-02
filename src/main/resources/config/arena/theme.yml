@@ -282,3 +282,34 @@ natura:
     straight_entry: south
     corridor_entry: south
     goal_entry: west
+
+nether:
+  icon: NETHER_BRICKS
+  max_summon_count: 10
+  clear_mob_count: 20
+  door_open_sound:
+    key: minecraft:block.nether_bricks.place
+    pitch: 0.9
+  mobs:
+    blaze_normal:
+      weight: 10
+      wave: 1..
+    blaze_rapid:
+      weight: 8
+      wave: 2..
+    blaze_melee:
+      weight: 6
+      wave: 3..
+    blaze_power:
+      weight: 4
+      wave: 4..
+    blaze_beam:
+      weight: 3
+      wave: 5..
+  orientation:
+    entrance_exit: north
+    corner_entry: south
+    corner_exit: east
+    straight_entry: south
+    corridor_entry: south
+    goal_entry: west

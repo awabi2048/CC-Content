@@ -41,7 +41,7 @@ class BackstepAbility(
         keepFacingDuringAir(context, abilityRuntime)
 
         if (abilityRuntime.cooldownTicks > 0L) {
-            abilityRuntime.cooldownTicks -= 10L
+            abilityRuntime.cooldownTicks = (abilityRuntime.cooldownTicks - context.tickDelta).coerceAtLeast(0L)
         }
 
         if (!context.isCombatActive()) {
@@ -120,7 +120,7 @@ class BackstepAbility(
         }
 
         MobAbilityUtils.faceTowards(entity, target)
-        runtime.postStepFaceTicks = (runtime.postStepFaceTicks - 10L).coerceAtLeast(0L)
+        runtime.postStepFaceTicks = (runtime.postStepFaceTicks - context.tickDelta).coerceAtLeast(0L)
     }
 
     private fun fireLandingArrow(context: MobRuntimeContext, runtime: Runtime) {

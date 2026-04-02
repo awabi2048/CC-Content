@@ -65,7 +65,7 @@ class PeriodicCobwebAbility(
         if (!context.isCombatActive()) return
 
         if (abilityRuntime.cycleCooldownTicks > 0L) {
-            abilityRuntime.cycleCooldownTicks -= 10L
+            abilityRuntime.cycleCooldownTicks = (abilityRuntime.cycleCooldownTicks - context.tickDelta).coerceAtLeast(0L)
             return
         }
 

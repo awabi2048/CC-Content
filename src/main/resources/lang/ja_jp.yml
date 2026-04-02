@@ -1010,6 +1010,11 @@ custom_items:
         drowned_grudge: '怨念ドラウンド'
         drowned_power_throw: '強投擲ドラウンド'
         water_spirit: '水の精霊'
+        blaze_normal: 'ノーマルブレイズ'
+        blaze_power: 'パワーブレイズ'
+        blaze_rapid: '連射ブレイズ'
+        blaze_melee: '近接ブレイズ'
+        blaze_beam: '強射撃ブレイズ'
       drop_names:
         husk: 'ハスクのかたびら'
         iron_golem: 'ゴーレムのコア'
@@ -1054,6 +1059,11 @@ arena:
       drowned_grudge: '怨念ドラウンド'
       drowned_power_throw: '強投擲ドラウンド'
       water_spirit: '水の精霊'
+      blaze_normal: 'ノーマルブレイズ'
+      blaze_power: 'パワーブレイズ'
+      blaze_rapid: '連射ブレイズ'
+      blaze_melee: '近接ブレイズ'
+      blaze_beam: '強射撃ブレイズ'
     drop_names:
       husk: 'ハスクのかたびら'
       iron_golem: 'ゴーレムのコア'
@@ -1070,6 +1080,8 @@ arena:
       name: '海底神殿'
     natura:
       name: '繁茂した洞窟'
+    nether:
+      name: 'ネザー要塞'
   marker:
     current_mode: '&f§l| §7現在のモード §a{mode}'
     mode_changed: '&7設置モードを §a{mode} §7に変更しました。'

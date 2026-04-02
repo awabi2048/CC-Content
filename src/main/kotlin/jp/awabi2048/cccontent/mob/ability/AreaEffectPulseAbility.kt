@@ -24,7 +24,7 @@ class AreaEffectPulseAbility(
     override fun onTick(context: MobRuntimeContext, runtime: MobAbilityRuntime?) {
         val pulseRuntime = runtime as? Runtime ?: return
         if (pulseRuntime.cooldownTicks > 0L) {
-            pulseRuntime.cooldownTicks -= 10L
+            pulseRuntime.cooldownTicks = (pulseRuntime.cooldownTicks - context.tickDelta).coerceAtLeast(0L)
             return
         }
         if (!context.isCombatActive()) return

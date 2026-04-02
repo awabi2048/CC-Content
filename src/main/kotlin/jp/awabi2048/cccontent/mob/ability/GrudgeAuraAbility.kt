@@ -36,8 +36,8 @@ class GrudgeAuraAbility(
     override fun onTick(context: MobRuntimeContext, runtime: MobAbilityRuntime?) {
         val rt = runtime as? Runtime ?: return
 
-        if (rt.debuffCooldownTicks > 0L) rt.debuffCooldownTicks -= 10L
-        if (rt.damageCooldownTicks > 0L) rt.damageCooldownTicks -= 10L
+        if (rt.debuffCooldownTicks > 0L) rt.debuffCooldownTicks = (rt.debuffCooldownTicks - context.tickDelta).coerceAtLeast(0L)
+        if (rt.damageCooldownTicks > 0L) rt.damageCooldownTicks = (rt.damageCooldownTicks - context.tickDelta).coerceAtLeast(0L)
 
         if (!context.isCombatActive()) return
 

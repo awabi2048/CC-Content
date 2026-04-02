@@ -35,7 +35,7 @@ class LeapAbility(
         continuePostLeapFacing(context, abilityRuntime)
 
         if (abilityRuntime.leapCooldownTicks > 0L) {
-            abilityRuntime.leapCooldownTicks -= 10L
+            abilityRuntime.leapCooldownTicks = (abilityRuntime.leapCooldownTicks - context.tickDelta).coerceAtLeast(0L)
         }
 
         if (!context.isCombatActive()) return
@@ -93,7 +93,7 @@ class LeapAbility(
         }
 
         MobAbilityUtils.faceTowards(entity, target)
-        runtime.postLeapFaceTicks = (runtime.postLeapFaceTicks - 10L).coerceAtLeast(0L)
+        runtime.postLeapFaceTicks = (runtime.postLeapFaceTicks - context.tickDelta).coerceAtLeast(0L)
     }
 
     private fun redirectToPlayerOnLanding(entity: LivingEntity, target: LivingEntity?) {
