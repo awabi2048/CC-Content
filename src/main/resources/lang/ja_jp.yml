@@ -1297,6 +1297,7 @@ arena:
     sidebar:
       title: '§7« §cARENA §7»'
       get_ready: '§7§lGet Ready!'
+      defeat: '§c§lDEFEAT'
       participant_line: '§7◯ §b{name} {status}'
       last_wave: '§7» §6§lLast Wave §7«'
       wave: '§7» §6§lWave {wave} §7«'

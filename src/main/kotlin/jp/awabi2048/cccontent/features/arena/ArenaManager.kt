@@ -315,6 +315,7 @@ class ArenaManager(
     private var maintenanceTask: BukkitTask? = null
     private var playerMonitorTask: BukkitTask? = null
     private var actionMarkerTask: BukkitTask? = null
+    private var shuttingDown: Boolean = false
     private var barrierRestartConfig = BarrierRestartConfig(30, 0.05)
     private var multiplayerJoinGraceSeconds = MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT
     private var multiplayerJoinMarkerSearchRadius = MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
@@ -785,6 +786,7 @@ class ArenaManager(
             lobbyMarkerLocations = lobbyMarkers.map { it.clone() }.toMutableList(),
             participantSpawnProtectionUntilMillis = if (enableMultiplayerJoin) Long.MAX_VALUE else now + 4000L,
             multiplayerJoinEnabled = enableMultiplayerJoin,
+            phase = if (enableMultiplayerJoin) ArenaPhase.RECRUITING else ArenaPhase.PREPARING,
             joinGraceStartMillis = if (enableMultiplayerJoin) now else 0L,
             joinGraceDurationMillis = if (enableMultiplayerJoin) multiplayerJoinGraceSeconds * 1000L else 0L,
             joinGraceEndMillis = if (enableMultiplayerJoin) now + (multiplayerJoinGraceSeconds * 1000L) else 0L,
@@ -970,6 +972,7 @@ class ArenaManager(
     }
 
     fun shutdown() {
+        shuttingDown = true
         maintenanceTask?.cancel()
         maintenanceTask = null
         playerMonitorTask?.cancel()
@@ -982,7 +985,8 @@ class ArenaManager(
                 session,
                 false,
                 messageKey = "arena.messages.session.ended_by_shutdown",
-                fallbackMessage = "&cサーバー停止によりアリーナを終了しました"
+                fallbackMessage = "&cサーバー停止によりアリーナを終了しました",
+                duringShutdown = true
             )
         }
         sessionsByWorld.clear()
@@ -1794,6 +1798,22 @@ class ArenaManager(
         return reviveCount(session, playerId) < maxCount
     }
 
+    private fun transitionSessionPhase(session: ArenaSession, phase: ArenaPhase) {
+        if (session.phase == phase) {
+            return
+        }
+        session.phase = phase
+    }
+
+    private fun transitionToGameOver(session: ArenaSession) {
+        if (session.phase == ArenaPhase.GAME_OVER || session.phase == ArenaPhase.TERMINATING) {
+            return
+        }
+
+        transitionSessionPhase(session, ArenaPhase.GAME_OVER)
+        updateArenaSidebars()
+    }
+
     private fun hasOtherAliveNonDownParticipant(session: ArenaSession, excludedPlayerId: UUID): Boolean {
         val world = Bukkit.getWorld(session.worldName) ?: return false
         return session.participants
@@ -1917,6 +1937,7 @@ class ArenaManager(
 
     private fun convertDownedPlayersToGameOver(session: ArenaSession) {
         val now = System.currentTimeMillis()
+        transitionToGameOver(session)
         for (downedId in session.downedPlayers.keys.toList()) {
             val downState = session.downedPlayers[downedId] ?: continue
             if (downState.timeoutExecuteAtMillis != null) continue
@@ -2026,6 +2047,7 @@ class ArenaManager(
                             1000L
                         }
                         if (downState.reviveDisabled) {
+                            transitionToGameOver(session)
                             stopArenaBgmForPlayer(downed)
                         }
                         downed.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, blindnessTicks, 0, false, false, false))
@@ -2713,8 +2735,10 @@ class ArenaManager(
         success: Boolean,
         messageKey: String? = null,
         fallbackMessage: String? = null,
+        duringShutdown: Boolean = false,
         vararg messagePlaceholders: Pair<String, Any?>
     ) {
+        transitionSessionPhase(session, ArenaPhase.TERMINATING)
         Bukkit.getPluginManager().callEvent(
             ArenaSessionEndedEvent(
                 ownerPlayerId = session.ownerPlayerId,
@@ -2758,7 +2782,11 @@ class ArenaManager(
             inviteSwingCooldownUntilTick.remove(participantId)
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline) {
-                scheduleBoundaryStopArenaBgmForPlayer(session, participantId, player)
+                if (duringShutdown || shuttingDown) {
+                    stopArenaBgmForPlayer(player)
+                } else {
+                    scheduleBoundaryStopArenaBgmForPlayer(session, participantId, player)
+                }
                 restoreSessionGameMode(session, player)
                 val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
                 val destination = if (session.returnLocations[participantId]?.world != null) {
@@ -2819,6 +2847,7 @@ class ArenaManager(
         session.entranceLiftChunkTicketWorldName = null
         session.entranceLiftChunkTicketKeys.clear()
         session.multiplayerJoinEnabled = false
+        transitionSessionPhase(session, ArenaPhase.PREPARING)
         session.multiplayerJoinFinalizeStarted = false
         session.multiplayerJoinIntroStarted = false
         session.joinGraceStartMillis = 0L
@@ -3766,6 +3795,7 @@ class ArenaManager(
         onCorridorOpened(session, targetWave)
         if (targetWave == 1 && !session.stageStarted) {
             session.stageStarted = true
+            transitionSessionPhase(session, ArenaPhase.IN_PROGRESS)
         }
         playDoorAnimationSound(session)
         plugin.logger.info("[Arena] door animation start: world=${session.worldName} target_wave=$targetWave")
@@ -5721,6 +5751,7 @@ class ArenaManager(
         )
         clearMultiplayerRecruitmentState(session)
         session.multiplayerJoinEnabled = false
+        transitionSessionPhase(session, ArenaPhase.PREPARING)
         session.joinGraceEndMillis = 0L
 
         startMultiplayerStageIntro(session, participants)
@@ -6716,6 +6747,7 @@ class ArenaManager(
         val lines = mutableListOf<String>()
         lines += ""
         lines += when {
+            session.phase == ArenaPhase.GAME_OVER -> ArenaI18n.text(null, "arena.ui.sidebar.defeat", "§c§lDEFEAT")
             inGetReady -> ArenaI18n.text(null, "arena.ui.sidebar.get_ready", "§7§lGet Ready!")
             else -> buildWaveSidebarHeader(session, sidebarWave ?: session.currentWave.coerceAtLeast(1))
         }
