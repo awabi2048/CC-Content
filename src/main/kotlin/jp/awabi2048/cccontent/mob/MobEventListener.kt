@@ -12,6 +12,7 @@ import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.entity.ProjectileHitEvent
 import org.bukkit.event.entity.EntityShootBowEvent
+import org.bukkit.event.entity.EntityTransformEvent
 import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.event.entity.SlimeSplitEvent
@@ -113,5 +114,10 @@ class MobEventListener(private val mobService: MobService) : Listener {
     @EventHandler(ignoreCancelled = true)
     fun onSlimeSplit(event: SlimeSplitEvent) {
         mobService.handleSlimeSplit(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityTransform(event: EntityTransformEvent) {
+        mobService.handleEntityTransform(event)
     }
 }

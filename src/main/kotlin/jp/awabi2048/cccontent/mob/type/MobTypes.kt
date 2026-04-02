@@ -1031,8 +1031,8 @@ class BlazeBeamMobType : EquipmentMobType(
 )
 
 class DrownedNormalMobType : EquipmentMobType(
-    id = "drowned_normal",
-    baseEntityType = EntityType.DROWNED,
+    id = "zombie_ocean_normal",
+    baseEntityType = EntityType.ZOMBIE,
     abilities = listOf(
         DrownedAquaticPursuitAbility(id = "drowned_normal_aquatic_pursuit"),
         PlayerTargetAssistAbility(id = "drowned_normal_target_assist")
@@ -1041,8 +1041,8 @@ class DrownedNormalMobType : EquipmentMobType(
 )
 
 class DrownedWarriorMobType : EquipmentMobType(
-    id = "drowned_warrior",
-    baseEntityType = EntityType.DROWNED,
+    id = "zombie_ocean_warrior",
+    baseEntityType = EntityType.ZOMBIE,
     abilities = listOf(
         DrownedAquaticPursuitAbility(id = "drowned_warrior_aquatic_pursuit"),
         PlayerTargetAssistAbility(id = "drowned_warrior_target_assist"),
@@ -1062,7 +1062,6 @@ class DrownedGrudgeMobType : EquipmentMobType(
     id = "drowned_grudge",
     baseEntityType = EntityType.DROWNED,
     abilities = listOf(
-        DrownedAquaticPursuitAbility(id = "drowned_grudge_aquatic_pursuit"),
         PlayerTargetAssistAbility(id = "drowned_grudge_target_assist"),
         GrudgeAuraAbility(
             id = "drowned_grudge_aura",
@@ -1073,7 +1072,7 @@ class DrownedGrudgeMobType : EquipmentMobType(
             debuffDurationBlindnessTicks = 60,
             damageIntervalTicks = 160L,
             damageAmount = 3.0
-        )
+        ),
     ),
     defaultMainHand = Material.TRIDENT
 )
@@ -1082,8 +1081,7 @@ class DrownedPowerThrowMobType : EquipmentMobType(
     id = "drowned_power_throw",
     baseEntityType = EntityType.DROWNED,
     abilities = listOf(
-        DrownedAquaticPursuitAbility(id = "drowned_power_throw_aquatic_pursuit"),
-        PlayerTargetAssistAbility(id = "drowned_power_throw_target_assist")
+        PlayerTargetAssistAbility(id = "drowned_power_throw_target_assist"),
     ),
     defaultMainHand = Material.TRIDENT
 )
