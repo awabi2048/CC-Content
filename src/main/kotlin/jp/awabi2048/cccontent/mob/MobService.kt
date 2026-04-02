@@ -31,6 +31,7 @@ import jp.awabi2048.cccontent.mob.type.IronGolemMagnetMobType
 import jp.awabi2048.cccontent.mob.type.IronGolemNormalMobType
 import jp.awabi2048.cccontent.mob.type.SilverfishBigPoisonMobType
 import jp.awabi2048.cccontent.mob.type.SilverfishPlainMobType
+import jp.awabi2048.cccontent.mob.type.SilverfishStealthFangMobType
 import jp.awabi2048.cccontent.mob.type.SlimeLargeMobType
 import jp.awabi2048.cccontent.mob.type.SlimeMediumMobType
 import jp.awabi2048.cccontent.mob.type.SlimePoisonMobType
@@ -86,6 +87,7 @@ import org.bukkit.entity.EntityType
 import org.bukkit.entity.Entity
 import org.bukkit.entity.AbstractArrow
 import org.bukkit.entity.Ageable
+import org.bukkit.entity.EvokerFangs
 import org.bukkit.entity.Fireball
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Player
@@ -132,6 +134,7 @@ class MobService(private val plugin: JavaPlugin) {
 
     companion object {
         private val instances = WeakHashMap<JavaPlugin, MobService>()
+        private const val STEALTH_FANG_KNOCKUP = 0.55
 
         fun getInstance(plugin: JavaPlugin): MobService? {
             synchronized(instances) {
@@ -179,6 +182,7 @@ class MobService(private val plugin: JavaPlugin) {
     private val skeletonEffectArrowAmplifierKey = NamespacedKey(plugin, "skeleton_effect_arrow_amp")
     private val skeletonEffectArrowDurationKey = NamespacedKey(plugin, "skeleton_effect_arrow_duration")
     private val customProjectileDamageKey = NamespacedKey(plugin, "custom_projectile_damage")
+    private val stealthFangKey = NamespacedKey(plugin, "stealth_fang")
     private var tickTask: BukkitTask? = null
 
     private val ELITE_WITCH_MAGIC_CONVERT_CHANCE = 0.3
@@ -230,6 +234,7 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(SpiderFerociousMobType())
         registerMobType(SilverfishPlainMobType())
         registerMobType(SilverfishBigPoisonMobType())
+        registerMobType(SilverfishStealthFangMobType())
         registerMobType(IronGolemNormalMobType())
         registerMobType(IronGolemMagnetMobType())
         registerMobType(GuardianNormalMobType())
@@ -497,6 +502,19 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun markCustomProjectileDamage(projectile: Projectile, damage: Double) {
         projectile.persistentDataContainer.set(customProjectileDamageKey, PersistentDataType.DOUBLE, damage.coerceAtLeast(0.0))
+    }
+
+    fun markStealthFang(fangs: EvokerFangs) {
+        fangs.persistentDataContainer.set(stealthFangKey, PersistentDataType.BYTE, 1)
+    }
+
+    fun handleStealthFangDamage(event: EntityDamageByEntityEvent) {
+        val fangs = event.damager as? EvokerFangs ?: return
+        if (!fangs.persistentDataContainer.has(stealthFangKey, PersistentDataType.BYTE)) return
+
+        event.damage = (event.damage * 0.5).coerceAtLeast(0.0)
+        val target = event.entity as? Player ?: return
+        target.velocity = target.velocity.add(Vector(0.0, STEALTH_FANG_KNOCKUP, 0.0))
     }
 
     fun issueManagedProjectilePermit(shooterId: UUID) {

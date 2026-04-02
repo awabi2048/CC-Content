@@ -387,6 +387,7 @@ custom_items:
         blaze_beam: "Beam Blaze"
         witch_normal: "Witch"
         witch_elite: "Elite Witch"
+        silverfish_stealth_fang: "Stealth Fang Silverfish"
       drop_names:
         husk: "Husk Tunic"
         iron_golem: "Golem Core"

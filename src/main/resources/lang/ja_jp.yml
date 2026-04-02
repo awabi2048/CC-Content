@@ -1018,6 +1018,7 @@ custom_items:
         blaze_beam: '強射撃ブレイズ'
         witch_normal: 'ウィッチ'
         witch_elite: 'エリートウィッチ'
+        silverfish_stealth_fang: 'ステルスファングシルバーフィッシュ'
       drop_names:
         husk: 'ハスクのかたびら'
         iron_golem: 'ゴーレムのコア'
