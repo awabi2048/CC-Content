@@ -22,6 +22,7 @@ class MobEventListener(private val mobService: MobService) : Listener {
     @EventHandler(ignoreCancelled = true)
     fun onEntityDamage(event: EntityDamageByEntityEvent) {
         mobService.handleProjectileEffects(event)
+        mobService.handleStealthFangDamage(event)
 
         val damaged = event.entity as? LivingEntity
         if (damaged != null) {

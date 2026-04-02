@@ -27,6 +27,7 @@ import jp.awabi2048.cccontent.mob.ability.SlimeMergeAbility
 import jp.awabi2048.cccontent.mob.ability.RangedAttackAbility
 import jp.awabi2048.cccontent.mob.ability.RandomInvisibilityAbility
 import jp.awabi2048.cccontent.mob.ability.ShieldAbility
+import jp.awabi2048.cccontent.mob.ability.StealthFangAbility
 import jp.awabi2048.cccontent.mob.ability.SplitOnDeathAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponThrowAbility
 import jp.awabi2048.cccontent.mob.ability.GrudgeAuraAbility
@@ -497,6 +498,18 @@ class SilverfishBigPoisonMobType : EquipmentMobType(
             chance = 0.25,
             durationTicks = 60,
             amplifier = 0
+        )
+    )
+)
+
+class SilverfishStealthFangMobType : EquipmentMobType(
+    id = "silverfish_stealth_fang",
+    baseEntityType = EntityType.SILVERFISH,
+    abilities = listOf(
+        StealthFangAbility(
+            id = "silverfish_stealth_fang_ability",
+            stealthCycleTicks = 160L,
+            stealthDurationTicks = 60
         )
     )
 )

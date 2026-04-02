@@ -200,6 +200,14 @@ silverfish_big_poison:
   armor: 1.0
   scale: 1.5
 
+silverfish_stealth_fang:
+  type: silverfish_stealth_fang
+  health: 18.0
+  attack: 5.0
+  movement_speed: 0.30
+  armor: 2.0
+  scale: 2.5
+
 iron_golem_normal:
   type: iron_golem_normal
   health: 80.0

@@ -144,12 +144,9 @@ desert_temple:
     spider_broodmother:
       weight: 3
       wave: 5..
-    iron_golem_normal:
+    silverfish_stealth_fang:
       weight: 3
       wave: 4..
-    iron_golem_magnet:
-      weight: 2
-      wave: 5..
   orientation:
     entrance_exit: south
     corner_entry: north
