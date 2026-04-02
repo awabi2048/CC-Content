@@ -555,3 +555,8 @@ custom_items:
       name: "§aCultured Yeast (Mock)"
       lore:
         - "§7For fermentation GUI yeast slot (no effect)"
+
+arena:
+  ui:
+    sidebar:
+      defeat: "§c§lDEFEAT"

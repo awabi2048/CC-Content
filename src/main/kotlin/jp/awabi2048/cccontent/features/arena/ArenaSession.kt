@@ -37,6 +37,14 @@ enum class ArenaLiftStatus {
     UNAVAILABLE
 }
 
+enum class ArenaPhase {
+    RECRUITING,
+    PREPARING,
+    IN_PROGRESS,
+    GAME_OVER,
+    TERMINATING
+}
+
 data class ArenaBgmSwitchRequest(
     val targetMode: ArenaBgmMode,
     val requestedAtBeat: Long? = null,
@@ -106,6 +114,7 @@ data class ArenaSession(
     var joinGraceEndMillis: Long = 0L,
     var inviteQuestTitle: String? = null,
     var inviteQuestLore: List<String> = emptyList(),
+    var phase: ArenaPhase = ArenaPhase.PREPARING,
     var stageGenerationCompleted: Boolean = true,
     var stageGenerationWaitTitleShown: Boolean = false,
     var stageBuildTask: BukkitTask? = null,
