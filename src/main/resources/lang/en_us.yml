@@ -385,6 +385,8 @@ custom_items:
         blaze_rapid: "Rapid Blaze"
         blaze_melee: "Melee Blaze"
         blaze_beam: "Beam Blaze"
+        witch_normal: "Witch"
+        witch_elite: "Elite Witch"
       drop_names:
         husk: "Husk Tunic"
         iron_golem: "Golem Core"
@@ -392,6 +394,7 @@ custom_items:
         silverfish: "Silverfish Shell"
         spider: "Spider Claw"
         drowned: "Heavily Tarnished Copper Ingot"
+        witch: "Suspicious Potion Bottle"
     theme:
       ruins:
         name: "Ruins"

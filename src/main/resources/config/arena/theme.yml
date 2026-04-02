@@ -278,6 +278,12 @@ natura:
     slime_wither:
       weight: 4
       wave: 4..
+    witch_normal:
+      weight: 6
+      wave: 2..
+    witch_elite:
+      weight: 3
+      wave: 4..
   orientation:
     entrance_exit: north
     corner_entry: south

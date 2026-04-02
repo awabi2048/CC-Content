@@ -61,6 +61,8 @@ import jp.awabi2048.cccontent.mob.type.StrayPlainMobType
 import jp.awabi2048.cccontent.mob.type.StrayRapidShotMobType
 import jp.awabi2048.cccontent.mob.type.StrayWeaponThrowCloseMobType
 import jp.awabi2048.cccontent.mob.type.WaterSpiritMobType
+import jp.awabi2048.cccontent.mob.type.WitchEliteMobType
+import jp.awabi2048.cccontent.mob.type.WitchNormalMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
@@ -70,9 +72,13 @@ import jp.awabi2048.cccontent.mob.ability.BoomerangService
 import jp.awabi2048.cccontent.mob.ability.HomingArrowService
 import jp.awabi2048.cccontent.mob.ability.ThrownWeaponService
 import org.bukkit.Bukkit
+import org.bukkit.Color
+import org.bukkit.FluidCollisionMode
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
+import org.bukkit.Particle
+import org.bukkit.Sound
 import org.bukkit.attribute.Attribute
 import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
@@ -86,8 +92,11 @@ import org.bukkit.entity.Player
 import org.bukkit.entity.Projectile
 import org.bukkit.entity.SmallFireball
 import org.bukkit.entity.Slime
+import org.bukkit.entity.LingeringPotion
+import org.bukkit.entity.ThrownPotion
 import org.bukkit.entity.Trident
 import org.bukkit.entity.Zombie
+import org.bukkit.entity.Mob
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityCombustEvent
 import org.bukkit.event.entity.EntityDamageEvent
@@ -99,16 +108,28 @@ import org.bukkit.event.entity.ProjectileHitEvent
 import org.bukkit.event.entity.EntityTransformEvent
 import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
+import org.bukkit.inventory.meta.PotionMeta
+import org.bukkit.potion.PotionType
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.scheduler.BukkitRunnable
 import org.bukkit.scheduler.BukkitTask
+import org.bukkit.util.Vector
+import kotlin.random.Random
 import java.io.File
 import java.util.UUID
 import java.util.WeakHashMap
 
 class MobService(private val plugin: JavaPlugin) {
+    private data class WitchEffectEntry(
+        val effectType: PotionEffectType,
+        val durationTicks: Int,
+        val amplifier: Int,
+        val color: Color
+    )
+
     companion object {
         private val instances = WeakHashMap<JavaPlugin, MobService>()
 
@@ -159,6 +180,20 @@ class MobService(private val plugin: JavaPlugin) {
     private val skeletonEffectArrowDurationKey = NamespacedKey(plugin, "skeleton_effect_arrow_duration")
     private val customProjectileDamageKey = NamespacedKey(plugin, "custom_projectile_damage")
     private var tickTask: BukkitTask? = null
+
+    private val ELITE_WITCH_MAGIC_CONVERT_CHANCE = 0.3
+    private val ELITE_WITCH_MAGIC_TARGET_SEARCH_RADIUS = 24.0
+    private val ELITE_WITCH_MAGIC_PROJECTILE_COUNT = 3
+    private val ELITE_WITCH_MAGIC_STEP_DISTANCE = 4.0 / 20.0
+    private val ELITE_WITCH_MAGIC_ORIGIN_SPREAD = 0.4
+    private val ELITE_WITCH_MAGIC_HOMING_END_TICKS = 50L
+    private val ELITE_WITCH_MAGIC_HIT_DISTANCE = 1.1
+    private val ELITE_WITCH_MAGIC_HOMING_STEER_FACTOR = 0.18
+    private val ELITE_WITCH_MAGIC_MAX_LIFETIME_TICKS = 120L
+    private val ELITE_WITCH_MAGIC_SOUND_PITCH = 1.666f
+    private val ELITE_WITCH_DEFAULT_EFFECT_COLOR = Color.fromRGB(140, 60, 175)
+    private val ELITE_WITCH_EFFECT_AMPLIFIER_BONUS = 1
+    private val eliteWitchEffectTable: List<WitchEffectEntry> = buildEliteWitchEffectTable()
 
     init {
         synchronized(instances) {
@@ -229,6 +264,8 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(DrownedPowerThrowMobType())
         registerMobType(WaterSpiritMobType())
         registerMobType(GreatFrogMobType())
+        registerMobType(WitchNormalMobType())
+        registerMobType(WitchEliteMobType())
     }
 
     fun registerMobType(mobType: MobType) {
@@ -580,12 +617,18 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun handleProjectileLaunch(event: ProjectileLaunchEvent) {
         val projectile = event.entity as? Projectile ?: return
+        val shooter = projectile.shooter as? LivingEntity ?: return
+        val activeMob = activeMobs[shooter.uniqueId] ?: return
+
+        if (activeMob.mobType.id == "witch_elite" && projectile is ThrownPotion) {
+            handleEliteWitchPotionLaunch(event, shooter, activeMob, projectile)
+            return
+        }
+
         if (projectile !is SmallFireball && projectile !is Fireball) {
             return
         }
 
-        val shooter = projectile.shooter as? LivingEntity ?: return
-        val activeMob = activeMobs[shooter.uniqueId] ?: return
         if (!activeMob.mobType.id.startsWith("blaze_")) {
             return
         }
@@ -594,6 +637,249 @@ class MobService(private val plugin: JavaPlugin) {
             event.isCancelled = true
             projectile.remove()
         }
+    }
+
+    private fun handleEliteWitchPotionLaunch(
+        event: ProjectileLaunchEvent,
+        shooter: LivingEntity,
+        activeMob: ActiveMob,
+        potion: ThrownPotion
+    ) {
+        val launchLocation = potion.location.clone()
+        val launchVelocity = potion.velocity.clone()
+        val effectEntry = pickEliteWitchEffectEntry()
+        val boostedEffects = listOf(
+            PotionEffect(
+                effectEntry.effectType,
+                effectEntry.durationTicks,
+                (effectEntry.amplifier + ELITE_WITCH_EFFECT_AMPLIFIER_BONUS).coerceAtLeast(0),
+                false,
+                true,
+                true
+            )
+        )
+        val effectColor = effectEntry.color
+
+        if (Random.nextDouble() < ELITE_WITCH_MAGIC_CONVERT_CHANCE) {
+            event.isCancelled = true
+            potion.remove()
+            val target = resolveEliteWitchMagicTarget(shooter) ?: run {
+                spawnEliteLingeringPotionProjectile(shooter, launchLocation, launchVelocity, boostedEffects, effectColor)
+                return
+            }
+            launchEliteWitchMagicVolley(
+                shooter = shooter,
+                activeMob = activeMob,
+                target = target,
+                boostedEffects = boostedEffects,
+                effectColor = effectColor
+            )
+            return
+        }
+
+        event.isCancelled = true
+        potion.remove()
+        spawnEliteLingeringPotionProjectile(shooter, launchLocation, launchVelocity, boostedEffects, effectColor)
+    }
+
+    private fun spawnEliteLingeringPotionProjectile(
+        shooter: LivingEntity,
+        spawnLocation: Location,
+        velocity: Vector,
+        boostedEffects: List<PotionEffect>,
+        effectColor: Color
+    ) {
+        val item = ItemStack(Material.LINGERING_POTION)
+        val meta = item.itemMeta as? PotionMeta ?: return
+        meta.basePotionType = PotionType.WATER
+        meta.color = effectColor
+        boostedEffects.forEach { meta.addCustomEffect(it, true) }
+        item.itemMeta = meta
+
+        val world = shooter.world
+        val lingering = world.spawn(spawnLocation, LingeringPotion::class.java)
+        lingering.shooter = shooter
+        lingering.velocity = velocity
+        lingering.item = item
+    }
+
+    private fun resolveEliteWitchMagicTarget(shooter: LivingEntity): Player? {
+        val directTarget = (shooter as? Mob)?.target as? Player
+        if (directTarget != null && directTarget.isValid && !directTarget.isDead && directTarget.gameMode != org.bukkit.GameMode.SPECTATOR && directTarget.world.uid == shooter.world.uid) {
+            return directTarget
+        }
+        return shooter.getNearbyEntities(ELITE_WITCH_MAGIC_TARGET_SEARCH_RADIUS, ELITE_WITCH_MAGIC_TARGET_SEARCH_RADIUS, ELITE_WITCH_MAGIC_TARGET_SEARCH_RADIUS)
+            .asSequence()
+            .filterIsInstance<Player>()
+            .filter { it.isValid && !it.isDead && it.gameMode != org.bukkit.GameMode.SPECTATOR }
+            .minByOrNull { it.location.distanceSquared(shooter.location) }
+    }
+
+    private fun launchEliteWitchMagicVolley(
+        shooter: LivingEntity,
+        activeMob: ActiveMob,
+        target: Player,
+        boostedEffects: List<PotionEffect>,
+        effectColor: Color
+    ) {
+        val origin = shooter.eyeLocation.clone().add(0.0, -0.25, 0.0)
+        shooter.world.playSound(origin, Sound.ENTITY_ILLUSIONER_CAST_SPELL, 1.0f, ELITE_WITCH_MAGIC_SOUND_PITCH)
+        shooter.world.playSound(origin, Sound.BLOCK_ENCHANTMENT_TABLE_USE, 1.0f, ELITE_WITCH_MAGIC_SOUND_PITCH)
+
+        val forward = target.eyeLocation.toVector().subtract(origin.toVector())
+            .takeIf { it.lengthSquared() > 1.0e-6 }
+            ?.normalize()
+            ?: shooter.location.direction.clone().normalize()
+        val planeU = createPlaneBasisU(forward)
+        val planeV = forward.clone().crossProduct(planeU).normalize()
+        val clockDirections = listOf(
+            planeV.clone(),
+            planeU.clone().multiply(0.8660254037844386).add(planeV.clone().multiply(-0.5)).normalize(),
+            planeU.clone().multiply(-0.8660254037844386).add(planeV.clone().multiply(-0.5)).normalize()
+        )
+
+        repeat(ELITE_WITCH_MAGIC_PROJECTILE_COUNT) { index ->
+            val laneOffset = clockDirections[index].clone().multiply(ELITE_WITCH_MAGIC_ORIGIN_SPREAD)
+            val laneOrigin = origin.clone().add(laneOffset)
+            launchEliteWitchMagicProjectile(
+                shooter = shooter,
+                activeMob = activeMob,
+                initialTarget = target,
+                origin = laneOrigin,
+                initialDirection = clockDirections[index],
+                forwardDirection = forward,
+                boostedEffects = boostedEffects,
+                effectColor = effectColor
+            )
+        }
+    }
+
+    private fun launchEliteWitchMagicProjectile(
+        shooter: LivingEntity,
+        activeMob: ActiveMob,
+        initialTarget: Player,
+        origin: Location,
+        initialDirection: Vector,
+        forwardDirection: Vector,
+        boostedEffects: List<PotionEffect>,
+        effectColor: Color
+    ) {
+        val world = origin.world ?: return
+        var currentPos = origin.clone()
+        var targetRef: LivingEntity = initialTarget
+        var ageTicks = 0L
+        var flightDirection = initialDirection.clone().normalize()
+        val planeNormal = forwardDirection.clone().crossProduct(initialDirection).normalize()
+        object : BukkitRunnable() {
+            override fun run() {
+                if (!shooter.isValid || shooter.isDead) {
+                    cancel()
+                    return
+                }
+
+                if (!targetRef.isValid || targetRef.isDead || targetRef.world.uid != shooter.world.uid) {
+                    targetRef = resolveEliteWitchMagicTarget(shooter) ?: run {
+                        cancel()
+                        return
+                    }
+                }
+
+                ageTicks += 1
+                if (ageTicks > ELITE_WITCH_MAGIC_MAX_LIFETIME_TICKS) {
+                    cancel()
+                    return
+                }
+
+                val targetEye = targetRef.eyeLocation
+                val toTarget = targetEye.toVector().subtract(currentPos.toVector())
+                if (toTarget.length() < ELITE_WITCH_MAGIC_HIT_DISTANCE) {
+                    targetRef.damage(activeMob.definition.attack.coerceAtLeast(0.0), shooter)
+                    boostedEffects.forEach { targetRef.addPotionEffect(it) }
+                    world.spawnParticle(Particle.ENTITY_EFFECT, currentPos, 1, effectColor)
+                    cancel()
+                    return
+                }
+
+                if (ageTicks <= ELITE_WITCH_MAGIC_HOMING_END_TICKS && toTarget.lengthSquared() > 1.0e-6) {
+                    val desiredDir = projectOntoPlane(toTarget.normalize(), planeNormal)
+                    flightDirection = flightDirection.multiply(1.0 - ELITE_WITCH_MAGIC_HOMING_STEER_FACTOR)
+                        .add(desiredDir.multiply(ELITE_WITCH_MAGIC_HOMING_STEER_FACTOR))
+                        .normalize()
+                }
+
+                val displacement = flightDirection.clone().multiply(ELITE_WITCH_MAGIC_STEP_DISTANCE)
+
+                val displacementLength = displacement.length()
+                if (displacementLength > 1.0e-6) {
+                    val blockHit = world.rayTraceBlocks(
+                        currentPos,
+                        displacement.clone().normalize(),
+                        displacementLength,
+                        FluidCollisionMode.NEVER,
+                        true
+                    )
+                    if (blockHit != null) {
+                        cancel()
+                        return
+                    }
+                }
+
+                currentPos.add(displacement)
+                world.spawnParticle(Particle.ENTITY_EFFECT, currentPos, 1, effectColor)
+                world.spawnParticle(
+                    Particle.DUST_COLOR_TRANSITION,
+                    currentPos,
+                    1,
+                    0.02,
+                    0.02,
+                    0.02,
+                    0.0,
+                    Particle.DustTransition(effectColor, Color.BLACK, 0.8f)
+                )
+            }
+        }.runTaskTimer(plugin, 0L, 1L)
+    }
+
+    private fun createPlaneBasisU(normal: Vector): Vector {
+        val worldUp = Vector(0.0, 1.0, 0.0)
+        val basis = normal.clone().crossProduct(worldUp)
+        if (basis.lengthSquared() > 1.0e-6) {
+            return basis.normalize()
+        }
+        return normal.clone().crossProduct(Vector(1.0, 0.0, 0.0)).normalize()
+    }
+
+    private fun projectOntoPlane(direction: Vector, planeNormal: Vector): Vector {
+        val projected = direction.clone().subtract(planeNormal.clone().multiply(direction.dot(planeNormal)))
+        if (projected.lengthSquared() <= 1.0e-6) {
+            return direction
+        }
+        return projected.normalize()
+    }
+
+    private fun pickEliteWitchEffectEntry(): WitchEffectEntry {
+        return eliteWitchEffectTable.randomOrNull()
+            ?: WitchEffectEntry(PotionEffectType.POISON, 80, 0, ELITE_WITCH_DEFAULT_EFFECT_COLOR)
+    }
+
+    private fun buildEliteWitchEffectTable(): List<WitchEffectEntry> {
+        val miningFatigue = resolveMiningFatigueEffectType()
+        val table = mutableListOf(
+            WitchEffectEntry(PotionEffectType.SLOWNESS, 100, 0, Color.fromRGB(78, 92, 122)),
+            WitchEffectEntry(PotionEffectType.WEAKNESS, 100, 0, Color.fromRGB(102, 88, 106)),
+            WitchEffectEntry(PotionEffectType.POISON, 100, 0, Color.fromRGB(66, 134, 60)),
+            WitchEffectEntry(PotionEffectType.BLINDNESS, 60, 0, Color.fromRGB(36, 36, 36)),
+            WitchEffectEntry(PotionEffectType.WITHER, 80, 0, Color.fromRGB(52, 52, 52))
+        )
+        if (miningFatigue != null) {
+            table += WitchEffectEntry(miningFatigue, 100, 0, Color.fromRGB(58, 95, 116))
+        }
+        return table
+    }
+
+    private fun resolveMiningFatigueEffectType(): PotionEffectType? {
+        return PotionEffectType.getByName("MINING_FATIGUE")
+            ?: PotionEffectType.getByName("SLOW_DIGGING")
     }
 
     fun handleProjectileHit(event: ProjectileHitEvent) {

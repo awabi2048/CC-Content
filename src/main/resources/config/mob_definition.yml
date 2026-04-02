@@ -489,3 +489,19 @@ blaze_beam:
   movement_speed: 0.24
   armor: 4.0
   scale: 1.2
+
+witch_normal:
+  type: witch_normal
+  health: 26.0
+  attack: 4.0
+  movement_speed: 0.23
+  armor: 0.0
+  scale: 1.0
+
+witch_elite:
+  type: witch_elite
+  health: 36.0
+  attack: 5.5
+  movement_speed: 0.24
+  armor: 3.0
+  scale: 1.2
