@@ -340,7 +340,11 @@ class WaterSpiritAbility(
         val velocity = Vector(0.0, WATER_COLUMN_INITIAL_SPEED, 0.0)
         val hitPlayers = mutableSetOf<UUID>()
 
-        world.playSound(currentPos, Sound.ENTITY_ELDER_GUARDIAN_DEATH, 0.8f, 2.0f)
+        if (target is Player) {
+            target.playSound(target.location, Sound.ENTITY_ELDER_GUARDIAN_DEATH, 0.8f, 2.0f)
+        } else {
+            world.playSound(currentPos, Sound.ENTITY_ELDER_GUARDIAN_DEATH, 0.8f, 2.0f)
+        }
 
         object : BukkitRunnable() {
             override fun run() {
@@ -366,7 +370,11 @@ class WaterSpiritAbility(
                     .filter { it.isValid && !it.isDead }
                     .forEach { player ->
                         if (hitPlayers.add(player.uniqueId)) {
-                            player.damage(closeRangeDamage, entity)
+                            player.damage(closeRangeDamage * DAMAGE_MULTIPLIER, entity)
+                            val lifted = player.velocity.clone().apply {
+                                y = max(y, WATER_COLUMN_LAUNCH_Y)
+                            }
+                            player.velocity = lifted
                         }
                     }
 
@@ -472,6 +480,7 @@ class WaterSpiritAbility(
                     val world = pos.world ?: return@forEach
                     world.spawnParticle(Particle.DUST, pos, 2, 0.1, 0.1, 0.1, 0.0, Particle.DustOptions(ORB_COLOR, ORB_HOLD_DUST_SIZE))
                     world.spawnParticle(Particle.BUBBLE, pos, 2, 0.12, 0.12, 0.12, 0.0)
+                    world.spawnParticle(Particle.WAX_OFF, pos, 2, 0.12, 0.12, 0.12, 0.0)
                 }
 
                 if (ticks >= ORB_HOLD_TICKS && launchedCount < orbCount) {
@@ -479,8 +488,12 @@ class WaterSpiritAbility(
                     if (afterHoldTicks % ORB_STAGGER_TICKS == 0L) {
                         val pos = holdPositions[launchedCount]
                         val angleOffset = (launchedCount.toDouble() / orbCount.toDouble()) * Math.PI * 2.0
-                        launchRotatingOrb(plugin, entity, target, pos, angleOffset, farRangeOrbDamage)
-                        pos.world?.playSound(pos, Sound.ENTITY_ILLUSIONER_CAST_SPELL, 0.75f, 1.0f)
+                        launchRotatingOrb(plugin, entity, target, pos, angleOffset, farRangeOrbDamage * DAMAGE_MULTIPLIER)
+                        if (target is Player) {
+                            target.playSound(target.location, Sound.ENTITY_ILLUSIONER_CAST_SPELL, 0.75f, 1.0f)
+                        } else {
+                            pos.world?.playSound(pos, Sound.ENTITY_ILLUSIONER_CAST_SPELL, 0.75f, 1.0f)
+                        }
                         launchedCount += 1
                     }
                 }
@@ -535,7 +548,12 @@ class WaterSpiritAbility(
                 if (distToTarget < 1.2) {
                     target.damage(damage, entity)
                     world.spawnParticle(Particle.SPLASH, currentPos, 8, 0.2, 0.2, 0.2, 0.05)
-                    world.playSound(currentPos, Sound.ENTITY_PLAYER_SPLASH, 0.5f, 1.2f)
+                    world.spawnParticle(Particle.WAX_OFF, currentPos.clone(), 8, 0.2, 0.2, 0.2, 0.0)
+                    if (target is Player) {
+                        target.playSound(target.location, Sound.ENTITY_PLAYER_SPLASH, 0.5f, 1.2f)
+                    } else {
+                        world.playSound(currentPos, Sound.ENTITY_PLAYER_SPLASH, 0.5f, 1.2f)
+                    }
                     cancel()
                     return
                 }
@@ -581,6 +599,7 @@ class WaterSpiritAbility(
                     Particle.DustOptions(ORB_COLOR, 0.6f)
                 )
                 world.spawnParticle(Particle.BUBBLE, currentPos.clone(), 1, 0.05, 0.05, 0.05, 0.0)
+                world.spawnParticle(Particle.WAX_OFF, currentPos.clone(), 1, 0.05, 0.05, 0.05, 0.0)
             }
         }.runTaskTimer(plugin, 0L, 1L)
     }
@@ -625,5 +644,7 @@ class WaterSpiritAbility(
         private const val WATER_COLUMN_DRAG = 0.86
         private const val WATER_COLUMN_STOP_SPEED = 0.01
         private const val WATER_COLUMN_HIT_RADIUS = 0.8
+        private const val WATER_COLUMN_LAUNCH_Y = 1.05
+        private const val DAMAGE_MULTIPLIER = 2.5
     }
 }

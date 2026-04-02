@@ -1964,6 +1964,7 @@ class ArenaManager(
                 }
 
                 val downState = session.downedPlayers[downedId]
+                applyDownedMovementLimit(downed, downState)
                 if (shouldFollowShulker) {
                     syncDownedShulker(session, downed, forceTeleport = false)
                 }
@@ -2113,6 +2114,27 @@ class ArenaManager(
 
             recoverDownedPlayer(session, downed, reviver)
         }
+    }
+
+    private fun applyDownedMovementLimit(player: Player, downState: ArenaDownedPlayerState?) {
+        val walk = if (downState?.reviveDisabled == true) DOWNED_GAME_OVER_WALK_SPEED else DOWNED_PLAYER_WALK_SPEED
+        if (player.walkSpeed != walk) {
+            player.walkSpeed = walk
+        }
+
+        if (!player.isInWater) {
+            return
+        }
+
+        if (player.isSwimming) {
+            player.isSwimming = false
+        }
+
+        val current = player.velocity
+        if (current.x == 0.0 && current.z == 0.0) {
+            return
+        }
+        player.velocity = Vector(0.0, current.y, 0.0)
     }
 
     private fun handleReviveTargetSelection(session: ArenaSession, reviver: Player, target: Player) {
