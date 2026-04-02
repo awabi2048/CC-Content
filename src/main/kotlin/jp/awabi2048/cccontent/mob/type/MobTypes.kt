@@ -32,7 +32,9 @@ import jp.awabi2048.cccontent.mob.ability.WeaponThrowAbility
 import jp.awabi2048.cccontent.mob.ability.GrudgeAuraAbility
 import jp.awabi2048.cccontent.mob.ability.WaterSpiritAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponSwapAbility
+import jp.awabi2048.cccontent.mob.ability.BuffEffectEntry
 import jp.awabi2048.cccontent.mob.ability.GreatFrogAbility
+import jp.awabi2048.cccontent.mob.ability.WitchRetreatBuffAbility
 import org.bukkit.Color
 import org.bukkit.Particle
 import org.bukkit.Sound
@@ -1106,6 +1108,32 @@ class GreatFrogMobType : EquipmentMobType(
     baseEntityType = EntityType.FROG,
     abilities = listOf(
         GreatFrogAbility(id = "frog_big_predator")
+    )
+)
+
+class WitchNormalMobType : EquipmentMobType(
+    id = "witch_normal",
+    baseEntityType = EntityType.WITCH,
+    abilities = emptyList()
+)
+
+class WitchEliteMobType : EquipmentMobType(
+    id = "witch_elite",
+    baseEntityType = EntityType.WITCH,
+    abilities = listOf(
+        WitchRetreatBuffAbility(
+            id = "witch_elite_retreat_buff",
+            retreatTriggerDistance = 4.0,
+            retreatTriggerDurationTicks = 20L,
+            retreatSearchDistance = 12.0,
+            retreatCooldownTicks = 100L,
+            buffRadius = 8.0,
+            buffIntervalTicks = 100L,
+            buffEffects = listOf(
+                BuffEffectEntry(PotionEffectType.SPEED, 120, 0),
+                BuffEffectEntry(PotionEffectType.REGENERATION, 120, 0)
+            )
+        )
     )
 )
 
