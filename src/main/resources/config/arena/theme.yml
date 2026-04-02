@@ -186,7 +186,7 @@ ocean_monument:
       wave: 2..
     guardian_small:
       weight: 2
-      wave: 2..
+      wave: 1..
     guardian_drain:
       weight: 2
       wave: 3..
