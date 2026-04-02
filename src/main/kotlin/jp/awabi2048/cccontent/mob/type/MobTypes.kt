@@ -10,6 +10,7 @@ import jp.awabi2048.cccontent.mob.ability.BlazeSoundControllerAbility
 import jp.awabi2048.cccontent.mob.ability.BlazeVolleyAbility
 import jp.awabi2048.cccontent.mob.ability.ClimbingLeapAbility
 import jp.awabi2048.cccontent.mob.ability.DashToTargetOffsetAbility
+import jp.awabi2048.cccontent.mob.ability.DrownedAquaticPursuitAbility
 import jp.awabi2048.cccontent.mob.ability.GenericBeamAbility
 import jp.awabi2048.cccontent.mob.ability.GuardianBeamAbility
 import jp.awabi2048.cccontent.mob.ability.LeapAbility
@@ -1033,6 +1034,7 @@ class DrownedNormalMobType : EquipmentMobType(
     id = "drowned_normal",
     baseEntityType = EntityType.DROWNED,
     abilities = listOf(
+        DrownedAquaticPursuitAbility(id = "drowned_normal_aquatic_pursuit"),
         PlayerTargetAssistAbility(id = "drowned_normal_target_assist")
     ),
     defaultMainHand = Material.STONE_SWORD
@@ -1042,6 +1044,7 @@ class DrownedWarriorMobType : EquipmentMobType(
     id = "drowned_warrior",
     baseEntityType = EntityType.DROWNED,
     abilities = listOf(
+        DrownedAquaticPursuitAbility(id = "drowned_warrior_aquatic_pursuit"),
         PlayerTargetAssistAbility(id = "drowned_warrior_target_assist"),
         ShieldAbility(id = "drowned_warrior_shield", breakDisablesShieldPermanently = true),
         BackstepAbility(
@@ -1059,6 +1062,7 @@ class DrownedGrudgeMobType : EquipmentMobType(
     id = "drowned_grudge",
     baseEntityType = EntityType.DROWNED,
     abilities = listOf(
+        DrownedAquaticPursuitAbility(id = "drowned_grudge_aquatic_pursuit"),
         PlayerTargetAssistAbility(id = "drowned_grudge_target_assist"),
         GrudgeAuraAbility(
             id = "drowned_grudge_aura",
@@ -1078,6 +1082,7 @@ class DrownedPowerThrowMobType : EquipmentMobType(
     id = "drowned_power_throw",
     baseEntityType = EntityType.DROWNED,
     abilities = listOf(
+        DrownedAquaticPursuitAbility(id = "drowned_power_throw_aquatic_pursuit"),
         PlayerTargetAssistAbility(id = "drowned_power_throw_target_assist")
     ),
     defaultMainHand = Material.TRIDENT
