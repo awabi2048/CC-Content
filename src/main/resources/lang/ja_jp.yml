@@ -1226,7 +1226,10 @@ arena:
       activation_complete_title: '&a再起動完了'
       restart_started: '&c結界石の再起動を開始しました！結界を一時的に解除します！'
       restart_success: '&a結界石の再起動に成功しました！'
-      restart_confirmed: '結界の再起動を確認しました！転送します！'
+      restart_confirmed: '結界の再起動を確認しました！'
+      return_hint: '§7Shift長押しでロビーに帰還できます'
+      return_countdown: '§7帰還中 §e{seconds} 秒'
+      returned: '&aロビーへ帰還しました'
     session:
       starting: '&6[Arena] アリーナを開始します...'
       started: '&6[Arena] セッション開始: theme={theme}, mob_type={mob_type}, difficulty={difficulty}, waves={waves}'
@@ -1311,7 +1314,7 @@ arena:
     wave_label: 'Wave {wave}'
     wave_clear_dynamic: '§7- §6{waveLabel} §7- §bCLEAR'
     last_wave_progress: '§7- §6Last Wave §7- §8(§7{activated}/§b{total}§8)'
-    wave_progress: '§7- §6{waveLabel} §7- §8(§7{kills}/§c{target}§8)'
+    wave_progress: '§7- §6{waveLabel} §7- §8(§c{kills}§7/{target}§8)'
   quest:
     memo_choices:
       - '§eがんばってください！'

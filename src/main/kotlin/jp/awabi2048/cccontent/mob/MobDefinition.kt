@@ -15,6 +15,7 @@ data class MobDefinition(
     val movementSpeed: Double,
     val armor: Double,
     val scale: Double,
+    val mobTokenDropChance: Double? = null,
     val equipment: Map<EquipmentSlot, Material>,
     val spawnConditions: Set<MobSpawnCondition> = emptySet()
 )

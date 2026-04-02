@@ -127,6 +127,11 @@ object BGMManager {
         return activePlaybacks[player.uniqueId]?.startNanos
     }
 
+    fun isPlaying(player: Player, soundKey: String? = null): Boolean {
+        val playback = activePlaybacks[player.uniqueId] ?: return false
+        return soundKey == null || playback.soundKey == soundKey
+    }
+
     fun stop(player: Player) {
         val playback = activePlaybacks.remove(player.uniqueId) ?: return
         playback.task.cancel()

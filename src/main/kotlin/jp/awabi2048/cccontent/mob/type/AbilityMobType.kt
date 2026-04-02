@@ -11,6 +11,7 @@ import jp.awabi2048.cccontent.mob.MobSpawnContext
 import jp.awabi2048.cccontent.mob.MobType
 import jp.awabi2048.cccontent.mob.ability.MobAbility
 import jp.awabi2048.cccontent.mob.ability.MobAbilityRuntime
+import jp.awabi2048.cccontent.mob.ability.RangedAttackAbility
 import org.bukkit.entity.EntityType
 import kotlin.random.Random
 
@@ -19,6 +20,10 @@ abstract class AbilityMobType(
     override val baseEntityType: EntityType,
     private val abilities: List<MobAbility>
 ) : MobType {
+
+    override fun hasCustomRangedAttack(): Boolean {
+        return abilities.any { it is RangedAttackAbility }
+    }
 
     data class AbilityTickState(var nextDueTick: Long)
 

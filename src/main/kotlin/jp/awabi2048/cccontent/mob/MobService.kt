@@ -349,6 +349,10 @@ class MobService(private val plugin: JavaPlugin) {
                 movementSpeed = mobSection.getDouble("movement_speed", 0.23).coerceAtLeast(0.01),
                 armor = mobSection.getDouble("armor", 0.0).coerceAtLeast(0.0),
                 scale = mobSection.getDouble("scale", 1.0).coerceAtLeast(0.1),
+                mobTokenDropChance = mobSection
+                    .getDouble("mob_token_drop_chance", -1.0)
+                    .takeIf { it >= 0.0 }
+                    ?.coerceIn(0.0, 1.0),
                 equipment = equipment,
                 spawnConditions = spawnConditions
             )
@@ -554,7 +558,9 @@ class MobService(private val plugin: JavaPlugin) {
     fun handleShootBow(event: EntityShootBowEvent) {
         val shooter = event.entity as? LivingEntity ?: return
         val activeMob = activeMobs[shooter.uniqueId] ?: return
-        event.isCancelled = true
+        if (activeMob.mobType.hasCustomRangedAttack()) {
+            event.isCancelled = true
+        }
     }
 
     fun handleProjectileLaunch(event: ProjectileLaunchEvent) {

@@ -251,7 +251,11 @@ class ArenaManager(
         const val ACTION_MARKER_CENTER_Y_OFFSET = -0.25
         const val BARRIER_MARKER_HOLD_TICKS = 60
         const val MIDDLE_RING_MAX_ANGULAR_VELOCITY = 0.14
-        const val MOB_TOKEN_DROP_CHANCE = 0.05
+        const val MOB_TOKEN_DROP_CHANCE = 0.30
+        const val MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT = 0.033
+        const val FINAL_WAVE_TIME_LIMIT_SECONDS_DEFAULT = 600
+        const val STAGE_TRANSFER_BLINDNESS_TICKS = 20
+        const val BARRIER_RETURN_HOLD_TICKS = 60
         const val MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT = 45
         const val MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT = 16.0
         const val MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT = 6
@@ -330,6 +334,9 @@ class ArenaManager(
     private var actionMarkerColorTransitionTicks = 16
     private var doorAnimationTotalTicks = DOOR_ANIMATION_TOTAL_TICKS_DEFAULT
     private var sharedWaveMaxAlive = SHARED_WAVE_MAX_ALIVE_DEFAULT
+    private var mobTokenDropChance = MOB_TOKEN_DROP_CHANCE
+    private var mobTokenLootingBonusPerLevel = MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT
+    private var finalWaveTimeLimitSeconds = FINAL_WAVE_TIME_LIMIT_SECONDS_DEFAULT
     private var arenaDoorAnimationSoundKey = "minecraft:block.iron_door.open"
     private var arenaDoorAnimationSoundPitch = 1.0f
     private var arenaQuestService: ArenaQuestService? = null
@@ -433,6 +440,15 @@ class ArenaManager(
             .toFloat()
             .coerceIn(0.5f, 2.0f)
         sharedWaveMaxAlive = config.getInt("arena.mob_spawn.system_max_alive", SHARED_WAVE_MAX_ALIVE_DEFAULT)
+            .coerceAtLeast(1)
+        mobTokenDropChance = config
+            .getDouble("arena.mob_token_drop_chance", MOB_TOKEN_DROP_CHANCE)
+            .coerceIn(0.0, 1.0)
+        mobTokenLootingBonusPerLevel = config
+            .getDouble("arena.mob_token_looting_bonus_per_level", MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT)
+            .coerceAtLeast(0.0)
+        finalWaveTimeLimitSeconds = config
+            .getInt("arena.final_wave_time_limit_seconds", FINAL_WAVE_TIME_LIMIT_SECONDS_DEFAULT)
             .coerceAtLeast(1)
         maxConcurrentSessions = config
             .getInt("arena.session.max_concurrent", ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT)
@@ -862,6 +878,7 @@ class ArenaManager(
                     val spawnLocation = session.entranceLocation.clone()
                     applyStageStartFacingYaw(session, spawnLocation)
                     participant.teleport(spawnLocation)
+                    participant.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, STAGE_TRANSFER_BLINDNESS_TICKS, 0, false, false, false))
                     applySessionGameMode(session, participant)
                     playStageEntrySoundsLater(participant)
                 }
@@ -1135,6 +1152,12 @@ class ArenaManager(
                 if (player == null || !player.isOnline) continue
 
                 val location = player.location
+                applyFinalWaveOvertimeWither(session, player, now)
+
+                if (session.barrierRestartCompleted) {
+                    continue
+                }
+
                 val currentWave = session.currentWave.coerceAtLeast(1)
                 if (location.world?.name != world.name || !session.stageBounds.contains(location.x, location.y, location.z)) {
                     teleportToLatestDoorMarker(player, session, world, currentWave)
@@ -1171,6 +1194,23 @@ class ArenaManager(
                 recordParticipantValidLocation(session, participantId, player.location)
             }
         }
+    }
+
+    private fun applyFinalWaveOvertimeWither(session: ArenaSession, player: Player, nowMillis: Long) {
+        if (session.barrierRestartCompleted) return
+        if (session.finalWaveStartedAtMillis <= 0L) return
+        if (!session.startedWaves.contains(session.waves)) return
+        if (player.world.name != session.worldName) return
+        if (isPlayerDowned(session, player.uniqueId)) return
+
+        val limitMillis = finalWaveTimeLimitSeconds.toLong().coerceAtLeast(1L) * 1000L
+        val elapsedMillis = (nowMillis - session.finalWaveStartedAtMillis).coerceAtLeast(0L)
+        if (elapsedMillis <= limitMillis) return
+
+        val overtimeMillis = elapsedMillis - limitMillis
+        val overtimeLevel = (overtimeMillis / 60_000L).toInt().coerceAtLeast(0) + 1
+        val amplifier = (overtimeLevel - 1).coerceAtLeast(0)
+        player.addPotionEffect(PotionEffect(PotionEffectType.WITHER, 40, amplifier, false, true, true))
     }
 
     private fun clearPreviousRoomMobTargetsOnCorridorEntry(session: ArenaSession, corridorWave: Int) {
@@ -2432,7 +2472,7 @@ class ArenaManager(
         rebuiltDrops += rebuildVanillaNonEquipmentDrops(vanillaDrops)
         rebuiltDrops += buildConfiguredAdditionalDrops(killer, normalizedTypeId, lootingLevel)
 
-        createMobTokenDrop(killer, normalizedTypeId)?.let { token ->
+        createMobTokenDrop(killer, normalizedTypeId, lootingLevel)?.let { token ->
             rebuiltDrops += token
         }
 
@@ -2503,8 +2543,12 @@ class ArenaManager(
         }
     }
 
-    private fun createMobTokenDrop(killer: Player, mobTypeId: String): ItemStack? {
-        if (random.nextDouble() >= MOB_TOKEN_DROP_CHANCE) {
+    private fun createMobTokenDrop(killer: Player, mobTypeId: String, lootingLevel: Int): ItemStack? {
+        val definitionDropChance = mobDefinitions[mobTypeId]?.mobTokenDropChance
+        val baseDropChance = (definitionDropChance ?: mobTokenDropChance).coerceIn(0.0, 1.0)
+        val finalDropChance = (baseDropChance + lootingLevel.coerceAtLeast(0).toDouble() * mobTokenLootingBonusPerLevel)
+            .coerceIn(0.0, 1.0)
+        if (random.nextDouble() >= finalDropChance) {
             return null
         }
         val categoryTypeId = resolveMobTokenCategoryTypeId(mobTypeId)
@@ -2556,14 +2600,6 @@ class ArenaManager(
                     changed += 1
                 }
             }
-        if (changed > 0) {
-            session.participants.forEach { participantId ->
-                val player = Bukkit.getPlayer(participantId) ?: return@forEach
-                if (player.isOnline && player.world.name == session.worldName) {
-                    player.sendMessage(ArenaI18n.text(player, "arena.messages.door.corridor_opened_notice", "§3次のウェーブへの道が開かれました..."))
-                }
-            }
-        }
         return changed
     }
 
@@ -2614,6 +2650,8 @@ class ArenaManager(
         session.participantLocationHistory.remove(playerId)
         session.participantLastSampleMillis.remove(playerId)
         session.actionMarkerHoldStates.remove(playerId)
+        session.barrierReturnHoldTicksByParticipant.remove(playerId)
+        session.barrierReturnSubtitleNextTickByParticipant.remove(playerId)
         session.arenaBgmModeByParticipant.remove(playerId)
         session.arenaBgmSwitchRequestByParticipant.remove(playerId)
         session.playerWaveCatchupDeadlineMillis.remove(playerId)
@@ -2703,7 +2741,7 @@ class ArenaManager(
             inviteSwingCooldownUntilTick.remove(participantId)
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline) {
-                stopArenaBgmForPlayer(player)
+                scheduleBoundaryStopArenaBgmForPlayer(session, participantId, player)
                 restoreSessionGameMode(session, player)
                 val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
                 val destination = if (session.returnLocations[participantId]?.world != null) {
@@ -2730,6 +2768,8 @@ class ArenaManager(
         }
 
         session.participants.clear()
+        session.barrierReturnHoldTicksByParticipant.clear()
+        session.barrierReturnSubtitleNextTickByParticipant.clear()
         session.returnLocations.clear()
         session.originalGameModes.clear()
         session.playerNotifiedWaves.clear()
@@ -2941,14 +2981,6 @@ class ArenaManager(
 
         session.waveClearReminderTasks.remove(wave - 1)?.cancel()
 
-        if (wave == session.waves && session.oageAnnouncements.add("final_wave_start")) {
-            broadcastOageMessage(
-                session,
-                "arena.messages.oage.final_wave_start",
-                listOf("真ん中のものが結界石です！周囲のマーカーをすべて活性化させると再起動が始まります！")
-            )
-        }
-
         val spawns = session.roomMobSpawns[wave].orEmpty()
         val candidates = selectSpawnCandidates(theme, wave)
         val isFinalWaveBarrierObjective = wave == session.waves && hasBarrierActivationObjective(session)
@@ -2983,6 +3015,9 @@ class ArenaManager(
 
         session.lastClearedWaveForBossBar = null
         session.startedWaves.add(wave)
+        if (wave == session.waves && session.finalWaveStartedAtMillis <= 0L) {
+            session.finalWaveStartedAtMillis = System.currentTimeMillis()
+        }
         requestWaveStartCombatBgm(session)
         session.waveKillCount.putIfAbsent(wave, 0)
         session.waveClearTargets[wave] = clearTarget
@@ -3029,6 +3064,7 @@ class ArenaManager(
             if (!currentSession.startedWaves.contains(wave)) return@Runnable
             if (currentSession.waveSpawningStopped.contains(wave)) return@Runnable
             if (currentSession.clearedWaves.contains(wave)) return@Runnable
+            if (!isCombatBgmReadyForWaveStart(currentSession)) return@Runnable
 
             val spawnThrottle = mobService.getSpawnThrottle("arena:${currentSession.worldName}")
             val intervalChance = (1.0 / spawnThrottle.intervalMultiplier).coerceIn(0.0, 1.0)
@@ -3216,11 +3252,7 @@ class ArenaManager(
         } else {
             ArenaI18n.text(player, "arena.messages.wave.title", "§7- §6Wave {wave} §7-", "wave" to wave)
         }
-        if (wave >= session.waves) {
-            player.sendTitle(title, "", 10, 50, 10)
-        } else {
-            player.sendTitle("", title, 10, 50, 10)
-        }
+        player.sendTitle("", title, 10, 50, 10)
         if (playWitherSpawn) {
             player.playSound(player.location, Sound.ENTITY_WITHER_SPAWN, 1.0f, 1.0f)
         }
@@ -3233,10 +3265,6 @@ class ArenaManager(
             handleWaveRoomEntry(session, player, room)
             return
         }
-
-        if (session.startedWaves.contains(room) && !session.clearedWaves.contains(room)) {
-            requestWaveStartCombatBgmForParticipant(session, player.uniqueId, Bukkit.getCurrentTick().toLong())
-        }
     }
 
     private fun handleWaveRoomEntry(session: ArenaSession, entrant: Player, wave: Int) {
@@ -3247,16 +3275,6 @@ class ArenaManager(
 
         val catchupTargets = findPlayersInPreviousWaveOrEarlierRooms(session, wave, excludePlayerId = entrant.uniqueId)
         catchupTargets.forEach { target ->
-            target.sendMessage(
-                ArenaI18n.text(
-                    target,
-                    "arena.messages.wave.player_advanced",
-                    "§7{player} さんが §6Wave {wave}§7 に突入しました！",
-                    "player" to entrant.name,
-                    "wave" to wave
-                )
-            )
-            target.playSound(target.location, Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 2.0f)
             session.playerWaveCatchupDeadlineMillis[target.uniqueId] = now + WAVE_CATCHUP_TELEPORT_DELAY_MILLIS
         }
 
@@ -3560,7 +3578,7 @@ class ArenaManager(
             return
         }
 
-        playSound(session, Sound.ENTITY_ARROW_HIT_PLAYER, 1.0f, 1.0f)
+        playSound(session, Sound.ENTITY_ARROW_HIT_PLAYER, 1.0f, 2.0f)
 
         updateSessionProgressBossBar(session)
     }
@@ -3591,17 +3609,7 @@ class ArenaManager(
                         targetRoom.contains(location.x, location.y, location.z)
                     }
                 if (aliveInRoom < maxAlive) return@Runnable
-
-                broadcastOageMessage(
-                    activeSession,
-                    "arena.messages.oage.wave_cleared_full_room",
-                    listOf("今です！行きましょう！")
-                )
             }, 40L)
-        }
-
-        if (wave < session.waves) {
-            scheduleWaveClearReminder(session, wave)
         }
 
         if (session.clearedWaves.size >= session.waves) {
@@ -3646,40 +3654,9 @@ class ArenaManager(
     }
 
     private fun schedulePendingWaveClearedMessageIfReady(session: ArenaSession) {
-        if (session.activeMobs.isNotEmpty()) return
-
-        val pendingWave = session.pendingWaveClearedAnnouncements
-            .asSequence()
-            .filter { wave -> session.clearedWaves.contains(wave) }
-            .minOrNull()
-            ?: return
-
-        val announcementKey = "wave_cleared_room_empty_$pendingWave"
-        if (session.oageAnnouncements.contains(announcementKey)) {
-            session.pendingWaveClearedAnnouncements.remove(pendingWave)
-            session.waveClearedAnnouncementTasks.remove(pendingWave)?.cancel()
-            return
-        }
-
-        if (session.waveClearedAnnouncementTasks.containsKey(pendingWave)) return
-
-        val task = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
-            val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
-            if (activeSession.activeMobs.isNotEmpty()) return@Runnable
-            if (!activeSession.pendingWaveClearedAnnouncements.contains(pendingWave)) return@Runnable
-            if (!activeSession.clearedWaves.contains(pendingWave)) return@Runnable
-            if (!activeSession.oageAnnouncements.add(announcementKey)) return@Runnable
-
-            activeSession.pendingWaveClearedAnnouncements.remove(pendingWave)
-            activeSession.waveClearedAnnouncementTasks.remove(pendingWave)
-            broadcastOageMessage(
-                activeSession,
-                "arena.messages.oage.wave_cleared",
-                listOf("ひとまず安全ですね！態勢を整えて次のウェーブに進みましょう！")
-            )
-        }, 40L)
-
-        session.waveClearedAnnouncementTasks[pendingWave] = task
+        session.pendingWaveClearedAnnouncements.clear()
+        session.waveClearedAnnouncementTasks.values.forEach { it.cancel() }
+        session.waveClearedAnnouncementTasks.clear()
     }
 
     private fun hasBarrierActivationObjective(session: ArenaSession): Boolean {
@@ -3969,21 +3946,7 @@ class ArenaManager(
         session.barrierRestartDurationMillis = durationMillis
         session.barrierRestartProgressMillis = 0L
 
-        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
-            val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
-            if (activeSession !== session) return@Runnable
-            if (!activeSession.barrierRestarting) return@Runnable
-
-            broadcastOageMessage(
-                activeSession,
-                "arena.messages.oage.barrier_restart_started",
-                listOf("結界解除後はモンスターが寄り付きやすくなります！気をつけて！")
-            )
-        }, 20L)
-
         restartWaveSpawnLoopWithIntervalScale(session, session.waves, 0.5)
-
-        broadcastRawMessage(session, ArenaI18n.text(null, "arena.messages.barrier.restart_started", "§c結界石の再起動を開始しました！結界を一時的に解除します！"))
 
         session.barrierAmbientTask?.cancel()
         session.barrierAmbientTask = null
@@ -4018,7 +3981,6 @@ class ArenaManager(
 
         val progress = barrierRestartProgress(activeSession)
         updateSessionProgressBossBar(activeSession)
-        sendBarrierRestartOageMessages(activeSession, progress)
 
         if (progress >= 1.0) {
             activeSession.barrierRestartTask = null
@@ -4315,6 +4277,7 @@ class ArenaManager(
 
         session.barrierRestarting = false
         session.barrierRestartCompleted = true
+        session.finalWaveStartedAtMillis = 0L
         stopWaveSpawning(session, session.waves)
 
         session.barrierRestartTask?.cancel()
@@ -4345,16 +4308,16 @@ class ArenaManager(
                 sendOageMessage(
                     player,
                     "arena.messages.barrier.restart_confirmed",
-                    ArenaI18n.text(player, "arena.messages.barrier.restart_confirmed", "結界の再起動を確認しました！転送します！")
+                    ArenaI18n.text(player, "arena.messages.barrier.restart_confirmed", "結界の再起動を確認しました！")
+                )
+                player.sendTitle(
+                    "",
+                    ArenaI18n.text(player, "arena.messages.barrier.return_hint", "§7Shift長押しでロビーに帰還できます"),
+                    0,
+                    50,
+                    10
                 )
             }
-
-            terminateSession(
-                activeSession,
-                true,
-                messageKey = "arena.messages.session.cleared",
-                fallbackMessage = "&aアリーナクリア！"
-            )
         }, 200L)
     }
 
@@ -4406,7 +4369,7 @@ class ArenaManager(
             Component.empty(),
             0.0f,
             BossBar.Color.YELLOW,
-            BossBar.Overlay.PROGRESS
+            BossBar.Overlay.NOTCHED_10
         ).also { created ->
             session.progressBossBar = created
         }
@@ -4445,7 +4408,7 @@ class ArenaManager(
             val nextWave = clearedWave + 1
             if (nextWave <= session.waves && !session.startedWaves.contains(nextWave)) {
                 bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.wave_clear", "§7- §6Wave {wave} §7- §bCLEAR", "wave" to clearedWave)))
-                bossBar.color(BossBar.Color.GREEN)
+                bossBar.color(BossBar.Color.BLUE)
                 bossBar.progress(1.0f)
                 return
             }
@@ -4456,7 +4419,7 @@ class ArenaManager(
                 ArenaI18n.text(null, "arena.bossbar.wave_label", "Wave {wave}", "wave" to clearedWave)
             }
             bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.wave_clear_dynamic", "§7- §6{waveLabel} §7- §bCLEAR", "waveLabel" to waveLabel)))
-            bossBar.color(BossBar.Color.GREEN)
+            bossBar.color(BossBar.Color.BLUE)
             bossBar.progress(1.0f)
             return
         }
@@ -4482,7 +4445,7 @@ class ArenaManager(
         } else {
             ArenaI18n.text(null, "arena.bossbar.wave_label", "Wave {wave}", "wave" to wave)
         }
-        bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.wave_progress", "§7- §6{waveLabel} §7- §8(§7{kills}/§c{target}§8)", "waveLabel" to waveLabel, "kills" to kills, "target" to target)))
+        bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.wave_progress", "§7- §6{waveLabel} §7- §8(§c{kills}§7/{target}§8)", "waveLabel" to waveLabel, "kills" to kills, "target" to target)))
         bossBar.color(BossBar.Color.RED)
         bossBar.progress(progress)
     }
@@ -4783,6 +4746,9 @@ class ArenaManager(
                 val themeName = ArenaI18n.text(player, "arena.theme.${activeSession.themeId}.name", activeSession.themeId)
                 player.sendTitle("", "§7« §6$themeName §7»", 10, 60, 10)
             }
+            if (hasPendingCombatWave(activeSession)) {
+                return@Runnable
+            }
             requestArenaBgmMode(activeSession, ArenaBgmMode.NORMAL)
         }, delayTicks.coerceAtLeast(0L))
     }
@@ -4819,11 +4785,41 @@ class ArenaManager(
         if (currentMode == ArenaBgmMode.COMBAT && session.arenaBgmSwitchRequestByParticipant[participantId] == null) {
             return
         }
+        requestArenaBgmModeForParticipant(
+            session,
+            participantId,
+            ArenaBgmMode.COMBAT,
+            currentTick,
+            strictNextBoundary = true
+        )
+    }
 
-        if (currentMode == ArenaBgmMode.STOPPED) {
-            startArenaBgmMode(session, participantId, ArenaBgmMode.NORMAL, currentTick)
+    private fun isCombatBgmReadyForWaveStart(session: ArenaSession): Boolean {
+        val world = Bukkit.getWorld(session.worldName) ?: return false
+        val targets = session.participants
+            .asSequence()
+            .filter { participantId -> !isPlayerDowned(session, participantId) }
+            .mapNotNull { participantId -> Bukkit.getPlayer(participantId) }
+            .filter { player ->
+                player.isOnline &&
+                    !player.isDead &&
+                    player.gameMode != GameMode.SPECTATOR &&
+                    player.world.uid == world.uid
+            }
+            .toList()
+        if (targets.isEmpty()) {
+            return true
         }
-        requestArenaBgmModeForParticipant(session, participantId, ArenaBgmMode.COMBAT, currentTick)
+        return targets.all { player -> isCombatBgmReadyForParticipant(session, player.uniqueId) }
+    }
+
+    private fun isCombatBgmReadyForParticipant(session: ArenaSession, participantId: UUID): Boolean {
+        val mode = participantArenaBgmMode(session, participantId)
+        val request = session.arenaBgmSwitchRequestByParticipant[participantId]
+        if (mode != ArenaBgmMode.COMBAT || request != null) {
+            return false
+        }
+        return hasArenaBgmPlayback(session, participantId, ArenaBgmMode.COMBAT)
     }
 
     private fun requestArenaBgmModeForParticipant(
@@ -4870,9 +4866,13 @@ class ArenaManager(
 
     private fun updateArenaCombatBgmRequest(session: ArenaSession, participantId: UUID, currentTick: Long) {
         val currentMode = participantArenaBgmMode(session, participantId)
-        if (currentMode == ArenaBgmMode.STOPPED) return
+        if (currentMode != ArenaBgmMode.STOPPED && !hasArenaBgmPlayback(session, participantId, currentMode)) {
+            session.arenaBgmModeByParticipant[participantId] = ArenaBgmMode.STOPPED
+        }
 
-        val desiredMode = if (hasAnyAliveCombatMob(session)) ArenaBgmMode.COMBAT else ArenaBgmMode.NORMAL
+        val hasAliveCombatMob = hasAnyAliveCombatMob(session)
+        val shouldUseCombatMode = hasAliveCombatMob || hasPendingCombatWave(session)
+        val desiredMode = if (shouldUseCombatMode) ArenaBgmMode.COMBAT else ArenaBgmMode.NORMAL
         val currentRequest = session.arenaBgmSwitchRequestByParticipant[participantId]
 
         if (currentRequest?.targetMode == desiredMode) return
@@ -4887,6 +4887,12 @@ class ArenaManager(
             desiredMode,
             currentTick
         )
+    }
+
+    private fun hasPendingCombatWave(session: ArenaSession): Boolean {
+        return session.startedWaves.any { wave ->
+            !session.clearedWaves.contains(wave) && !session.waveSpawningStopped.contains(wave)
+        }
     }
 
     private fun hasAnyAliveCombatMob(session: ArenaSession): Boolean {
@@ -4924,11 +4930,38 @@ class ArenaManager(
     private fun processArenaBgmSwitchRequest(session: ArenaSession, participantId: UUID, currentTick: Long) {
         val request = session.arenaBgmSwitchRequestByParticipant[participantId] ?: return
         val currentMode = participantArenaBgmMode(session, participantId)
-        if (currentMode == ArenaBgmMode.STOPPED) {
+        val player = Bukkit.getPlayer(participantId)
+        if (player == null || !player.isOnline || player.world.name != session.worldName) {
             session.arenaBgmSwitchRequestByParticipant.remove(participantId)
-            if (request.targetMode != ArenaBgmMode.STOPPED) {
-                startArenaBgmMode(session, participantId, request.targetMode, currentTick)
+            return
+        }
+
+        if (currentMode == ArenaBgmMode.STOPPED) {
+            val normalTrack = arenaBgmTrackForMode(ArenaBgmMode.NORMAL) ?: return
+            if (!isTickBoundaryReached(normalTrack, currentTick, request.requestedAtTick, request.strictNextBoundary)) {
+                return
             }
+            session.arenaBgmSwitchRequestByParticipant.remove(participantId)
+            if (request.targetMode == ArenaBgmMode.STOPPED) {
+                stopArenaBgmForParticipant(session, participantId)
+                return
+            }
+
+            startArenaBgmMode(session, participantId, ArenaBgmMode.NORMAL, currentTick)
+            if (request.targetMode == ArenaBgmMode.COMBAT) {
+                requestArenaBgmModeForParticipant(
+                    session,
+                    participantId,
+                    ArenaBgmMode.COMBAT,
+                    currentTick,
+                    strictNextBoundary = true
+                )
+            }
+            return
+        }
+
+        if (!hasArenaBgmPlayback(session, participantId, currentMode)) {
+            session.arenaBgmModeByParticipant[participantId] = ArenaBgmMode.STOPPED
             return
         }
 
@@ -4958,6 +4991,53 @@ class ArenaManager(
         }
 
         startArenaBgmMode(session, participantId, resolvedTargetMode, currentTick)
+    }
+
+    private fun hasArenaBgmPlayback(session: ArenaSession, participantId: UUID, mode: ArenaBgmMode): Boolean {
+        val player = Bukkit.getPlayer(participantId) ?: return false
+        if (!player.isOnline || player.world.name != session.worldName) return false
+        val track = arenaBgmTrackForMode(mode) ?: return false
+        return BGMManager.isPlaying(player, track.soundKey)
+    }
+
+    private fun isTickBoundaryReached(
+        track: ArenaBgmTrackConfig,
+        currentTick: Long,
+        requestedAtTick: Long,
+        strictNextBoundary: Boolean
+    ): Boolean {
+        val intervalTicks = (track.beatTicks * track.switchIntervalBeats.toDouble())
+            .roundToLong()
+            .coerceAtLeast(1L)
+        val currentBoundary = currentTick / intervalTicks
+        val requestedBoundary = requestedAtTick / intervalTicks
+        if (strictNextBoundary && currentBoundary <= requestedBoundary) {
+            return false
+        }
+        return currentTick % intervalTicks == 0L
+    }
+
+    private fun scheduleBoundaryStopArenaBgmForPlayer(session: ArenaSession, participantId: UUID, player: Player) {
+        val mode = participantArenaBgmMode(session, participantId)
+        val track = arenaBgmTrackForMode(mode)
+        if (track == null) {
+            stopArenaBgmForPlayer(player)
+            return
+        }
+
+        val absoluteBeatNow = currentAbsoluteBeatAtTick(session, participantId, track, Bukkit.getCurrentTick().toLong())
+        val switchInterval = track.switchIntervalBeats.toLong().coerceAtLeast(1L)
+        val beatOffset = (absoluteBeatNow - 1L).mod(switchInterval)
+        val beatsUntilNextBoundary = if (beatOffset == 0L) switchInterval else (switchInterval - beatOffset)
+        val delayTicks = (beatsUntilNextBoundary.toDouble() * track.beatTicks)
+            .roundToLong()
+            .coerceAtLeast(1L)
+
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            if (player.isOnline) {
+                stopArenaBgmForPlayer(player)
+            }
+        }, delayTicks)
     }
 
     private fun currentAbsoluteBeatAtTick(
@@ -5714,8 +5794,6 @@ class ArenaManager(
         participants.forEachIndexed { index, player ->
             session.arenaPreparingUntilMillisByParticipant[player.uniqueId] = Long.MAX_VALUE
             session.entranceLiftLockedParticipants.add(player.uniqueId)
-            player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 120, 0, false, false, false))
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.multiplayer.stage_intro", "&6ステージ転送を開始します..."))
 
             val offset = playerOffsets[index]
             playerUnits += LiftPlayerUnit(player, offset.first, offset.second)
@@ -6065,6 +6143,7 @@ class ArenaManager(
             world.getChunkAt(spawnLocation.blockX shr 4, spawnLocation.blockZ shr 4).load(true)
             applyStageStartFacingYaw(session, spawnLocation)
             player.teleport(spawnLocation)
+            player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, STAGE_TRANSFER_BLINDNESS_TICKS, 0, false, false, false))
             applySessionGameMode(session, player)
             playStageEntrySoundsLater(player)
             session.participantLocationHistory[player.uniqueId] = ArrayDeque<TimedPlayerLocation>().apply {
@@ -6182,6 +6261,66 @@ class ArenaManager(
         }
     }
 
+    private fun updateBarrierReturnHoldStates(currentTick: Long) {
+        for (session in sessionsByWorld.values) {
+            if (!session.barrierRestartCompleted) {
+                if (session.barrierReturnHoldTicksByParticipant.isNotEmpty()) {
+                    session.barrierReturnHoldTicksByParticipant.clear()
+                    session.barrierReturnSubtitleNextTickByParticipant.clear()
+                }
+                continue
+            }
+
+            for (participantId in session.participants.toList()) {
+                val player = Bukkit.getPlayer(participantId)
+                if (player == null || !player.isOnline) {
+                    session.barrierReturnHoldTicksByParticipant.remove(participantId)
+                    session.barrierReturnSubtitleNextTickByParticipant.remove(participantId)
+                    continue
+                }
+
+                if (!player.isSneaking) {
+                    session.barrierReturnHoldTicksByParticipant.remove(participantId)
+                    session.barrierReturnSubtitleNextTickByParticipant.remove(participantId)
+                    continue
+                }
+
+                val holdTicks = (session.barrierReturnHoldTicksByParticipant[participantId] ?: 0) + 1
+                session.barrierReturnHoldTicksByParticipant[participantId] = holdTicks
+
+                val nextSubtitleTick = session.barrierReturnSubtitleNextTickByParticipant[participantId] ?: 0L
+                if (currentTick >= nextSubtitleTick) {
+                    val remainingSeconds = ((BARRIER_RETURN_HOLD_TICKS - holdTicks).coerceAtLeast(0)).toDouble() / 20.0
+                    val formatted = String.format(Locale.US, "%.1f", remainingSeconds)
+                    player.sendTitle(
+                        "",
+                        ArenaI18n.text(
+                            player,
+                            "arena.messages.barrier.return_countdown",
+                            "§7帰還中 §e{seconds} 秒",
+                            "seconds" to formatted
+                        ),
+                        0,
+                        6,
+                        0
+                    )
+                    session.barrierReturnSubtitleNextTickByParticipant[participantId] = currentTick + 2L
+                }
+
+                if (holdTicks < BARRIER_RETURN_HOLD_TICKS) {
+                    continue
+                }
+
+                session.barrierReturnHoldTicksByParticipant.remove(participantId)
+                session.barrierReturnSubtitleNextTickByParticipant.remove(participantId)
+                stopSessionToLobbyById(
+                    participantId,
+                    ArenaI18n.text(player, "arena.messages.barrier.returned", "&aロビーへ帰還しました")
+                )
+            }
+        }
+    }
+
     private fun updateActionMarkerHoldState(session: ArenaSession, player: Player, currentTick: Long) {
         val marker = findHoldableActionMarker(session, player.location)
         if (marker?.type == ArenaActionMarkerType.DOOR_TOGGLE) {
@@ -6200,6 +6339,14 @@ class ArenaManager(
             if (!player.isSneaking && holdState != null && holdState.heldTicks >= 20) {
                 player.playSound(player.location, Sound.BLOCK_BEACON_DEACTIVATE, 1.0f, 2.0f)
             }
+            resetActionMarkerHoldState(session, player.uniqueId, currentTick)
+            return
+        }
+
+        val anotherPlayerHolding = session.actionMarkerHoldStates.entries.any { (holderId, holdState) ->
+            holderId != player.uniqueId && holdState.markerId == marker.id && holdState.heldTicks > 0
+        }
+        if (anotherPlayerHolding) {
             resetActionMarkerHoldState(session, player.uniqueId, currentTick)
             return
         }
@@ -6772,7 +6919,7 @@ class ArenaManager(
                 updateMultiplayerJoinStates()
                 updateDownedPlayers(currentTick)
                 updateActionMarkers()
-                monitorOageBroadcasts(currentTick)
+                updateBarrierReturnHoldStates(currentTick)
                 updateArenaBgmTransitions()
                 processArenaWorldCleanupQueue()
                 if (currentTick % 5L == 0L) {

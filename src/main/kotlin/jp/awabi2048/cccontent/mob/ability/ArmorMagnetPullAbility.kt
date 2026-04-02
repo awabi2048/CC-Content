@@ -8,6 +8,7 @@ import org.bukkit.Color
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.Particle
+import org.bukkit.Sound
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Player
 import org.bukkit.scheduler.BukkitTask
@@ -94,6 +95,7 @@ class ArmorMagnetPullAbility(
 
         if (shouldRenderLineAndAura) {
             drawPullLine(entity.location.clone().add(0.0, 1.0, 0.0), target.location.clone().add(0.0, 1.0, 0.0))
+            entity.world.playSound(entity.location, Sound.BLOCK_BEACON_AMBIENT, 1.0f, 0.8f)
         }
 
         val directionToGolem = entity.location.toVector().subtract(target.location.toVector())

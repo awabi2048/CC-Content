@@ -145,6 +145,9 @@ arena:
     sound:
       key: "minecraft:block.iron_door.open"
       pitch: 1.0
+  mob_token_drop_chance: 0.30
+  mob_token_looting_bonus_per_level: 0.033
+  final_wave_time_limit_seconds: 600
   barrier_restart:
     default_duration_seconds: 30
     corruption_ratio_base: 0.05
