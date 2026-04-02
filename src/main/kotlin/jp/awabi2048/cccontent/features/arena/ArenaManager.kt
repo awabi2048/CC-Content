@@ -229,7 +229,7 @@ class ArenaManager(
         const val BARRIER_RESTART_DAMAGE_INTERVAL_TICKS = 20L
         const val BARRIER_RESTART_BEAM_BLINK_INTERVAL_TICKS = 50L
         const val BARRIER_RESTART_BEAM_POINTS = 24
-        const val ENTRANCE_NORMAL_BGM_START_DELAY_TICKS = 10L
+        const val ENTRANCE_NORMAL_BGM_START_DELAY_TICKS = 40L
         const val POSITION_SAMPLE_INTERVAL_MILLIS = 1000L
         const val POSITION_RESTORE_LOOKBACK_MILLIS = 10_000L
         const val POSITION_HISTORY_RETENTION_MILLIS = 12_000L
@@ -1169,7 +1169,7 @@ class ArenaManager(
                     teleportToCurrentWavePosition(player, session, world, applyBlindness = true)
                     continue
                 }
-                if (room != null && room > 0) {
+                if (session.entranceNormalBgmStarted && room != null && room > 0) {
                     processRoomProgress(session, player, room)
                 }
 
@@ -4738,19 +4738,26 @@ class ArenaManager(
     }
 
     private fun scheduleStartEntranceNormalBgm(session: ArenaSession, delayTicks: Long = 0L) {
-        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+        val task = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
+            if (!activeSession.stageStarted || activeSession.barrierRestartCompleted) {
+                return@Runnable
+            }
+            if (activeSession.entranceNormalBgmStarted) {
+                return@Runnable
+            }
+            activeSession.entranceNormalBgmStarted = true
+
+            val currentTick = Bukkit.getCurrentTick().toLong()
             activeSession.participants.forEach { participantId ->
                 val player = Bukkit.getPlayer(participantId) ?: return@forEach
                 if (!player.isOnline || player.world.name != activeSession.worldName) return@forEach
                 val themeName = ArenaI18n.text(player, "arena.theme.${activeSession.themeId}.name", activeSession.themeId)
                 player.sendTitle("", "§7« §6$themeName §7»", 10, 60, 10)
+                startArenaBgmMode(activeSession, participantId, ArenaBgmMode.NORMAL, currentTick)
             }
-            if (hasPendingCombatWave(activeSession)) {
-                return@Runnable
-            }
-            requestArenaBgmMode(activeSession, ArenaBgmMode.NORMAL)
         }, delayTicks.coerceAtLeast(0L))
+        session.transitionTasks.add(task)
     }
 
     private fun requestArenaBgmMode(session: ArenaSession, targetMode: ArenaBgmMode, strictNextBoundary: Boolean = false) {
@@ -4829,6 +4836,10 @@ class ArenaManager(
         currentTick: Long,
         strictNextBoundary: Boolean = false
     ) {
+        if (session.barrierRestartCompleted && targetMode != ArenaBgmMode.STOPPED) {
+            return
+        }
+
         val currentMode = participantArenaBgmMode(session, participantId)
         val currentRequest = session.arenaBgmSwitchRequestByParticipant[participantId]
 
@@ -4843,9 +4854,13 @@ class ArenaManager(
             return
         }
 
+        val requestedAtBeat = arenaBgmTrackForMode(currentMode)?.let { track ->
+            currentAbsoluteBeat(session, participantId, track)
+        }
+
         session.arenaBgmSwitchRequestByParticipant[participantId] = ArenaBgmSwitchRequest(
             targetMode = targetMode,
-            requestedAtTick = currentTick,
+            requestedAtBeat = requestedAtBeat,
             strictNextBoundary = strictNextBoundary
         )
     }
@@ -4853,45 +4868,38 @@ class ArenaManager(
     private fun updateArenaBgmTransitions() {
         val currentTick = Bukkit.getCurrentTick().toLong()
         sessionsByWorld.values.forEach { session ->
+            val hasAliveCombatMob = hasAnyAliveCombatMob(session)
+            if (session.stageStarted && !session.barrierRestarting && !session.barrierRestartCompleted) {
+                if (hasAliveCombatMob) {
+                    session.hadAliveCombatMobs = true
+                } else if (session.hadAliveCombatMobs) {
+                    session.hadAliveCombatMobs = false
+                    requestArenaBgmMode(session, ArenaBgmMode.NORMAL, strictNextBoundary = true)
+                }
+            }
+
             session.participants.forEach { participantId ->
                 if (isPlayerDowned(session, participantId)) {
                     session.arenaBgmSwitchRequestByParticipant.remove(participantId)
                     return@forEach
                 }
-                updateArenaCombatBgmRequest(session, participantId, currentTick)
+                if (!session.stageStarted) {
+                    return@forEach
+                }
+                if (session.barrierRestartCompleted) {
+                    processArenaBgmSwitchRequest(session, participantId, currentTick)
+                    return@forEach
+                }
+                refreshArenaBgmPlaybackState(session, participantId)
                 processArenaBgmSwitchRequest(session, participantId, currentTick)
             }
         }
     }
 
-    private fun updateArenaCombatBgmRequest(session: ArenaSession, participantId: UUID, currentTick: Long) {
+    private fun refreshArenaBgmPlaybackState(session: ArenaSession, participantId: UUID) {
         val currentMode = participantArenaBgmMode(session, participantId)
         if (currentMode != ArenaBgmMode.STOPPED && !hasArenaBgmPlayback(session, participantId, currentMode)) {
             session.arenaBgmModeByParticipant[participantId] = ArenaBgmMode.STOPPED
-        }
-
-        val hasAliveCombatMob = hasAnyAliveCombatMob(session)
-        val shouldUseCombatMode = hasAliveCombatMob || hasPendingCombatWave(session)
-        val desiredMode = if (shouldUseCombatMode) ArenaBgmMode.COMBAT else ArenaBgmMode.NORMAL
-        val currentRequest = session.arenaBgmSwitchRequestByParticipant[participantId]
-
-        if (currentRequest?.targetMode == desiredMode) return
-
-        if (currentRequest == null && currentMode == desiredMode) {
-            return
-        }
-
-        requestArenaBgmModeForParticipant(
-            session,
-            participantId,
-            desiredMode,
-            currentTick
-        )
-    }
-
-    private fun hasPendingCombatWave(session: ArenaSession): Boolean {
-        return session.startedWaves.any { wave ->
-            !session.clearedWaves.contains(wave) && !session.waveSpawningStopped.contains(wave)
         }
     }
 
@@ -4937,10 +4945,6 @@ class ArenaManager(
         }
 
         if (currentMode == ArenaBgmMode.STOPPED) {
-            val normalTrack = arenaBgmTrackForMode(ArenaBgmMode.NORMAL) ?: return
-            if (!isTickBoundaryReached(normalTrack, currentTick, request.requestedAtTick, request.strictNextBoundary)) {
-                return
-            }
             session.arenaBgmSwitchRequestByParticipant.remove(participantId)
             if (request.targetMode == ArenaBgmMode.STOPPED) {
                 stopArenaBgmForParticipant(session, participantId)
@@ -4966,18 +4970,9 @@ class ArenaManager(
         }
 
         val currentTrack = arenaBgmTrackForMode(currentMode) ?: return
-        val absoluteBeatNow = currentAbsoluteBeatAtTick(session, participantId, currentTrack, currentTick)
-        val switchInterval = currentTrack.switchIntervalBeats.toLong().coerceAtLeast(1L)
-        val beatOffset = (absoluteBeatNow - 1L).mod(switchInterval)
-        if (beatOffset != 0L) {
+        val absoluteBeatNow = currentAbsoluteBeat(session, participantId, currentTrack)
+        if (!isBeatBoundaryReached(currentTrack, absoluteBeatNow, request.requestedAtBeat, request.strictNextBoundary)) {
             return
-        }
-
-        if (request.strictNextBoundary) {
-            val requestedAbsoluteBeat = currentAbsoluteBeatAtTick(session, participantId, currentTrack, request.requestedAtTick)
-            if (absoluteBeatNow == requestedAbsoluteBeat) {
-                return
-            }
         }
 
         session.arenaBgmSwitchRequestByParticipant.remove(participantId)
@@ -5000,21 +4995,26 @@ class ArenaManager(
         return BGMManager.isPlaying(player, track.soundKey)
     }
 
-    private fun isTickBoundaryReached(
+    private fun isBeatBoundaryReached(
         track: ArenaBgmTrackConfig,
-        currentTick: Long,
-        requestedAtTick: Long,
+        absoluteBeatNow: Long,
+        requestedAtBeat: Long?,
         strictNextBoundary: Boolean
     ): Boolean {
-        val intervalTicks = (track.beatTicks * track.switchIntervalBeats.toDouble())
-            .roundToLong()
-            .coerceAtLeast(1L)
-        val currentBoundary = currentTick / intervalTicks
-        val requestedBoundary = requestedAtTick / intervalTicks
-        if (strictNextBoundary && currentBoundary <= requestedBoundary) {
+        val switchInterval = track.switchIntervalBeats.toLong().coerceAtLeast(1L)
+        val beatOffset = (absoluteBeatNow - 1L).mod(switchInterval)
+        if (beatOffset != 0L) {
             return false
         }
-        return currentTick % intervalTicks == 0L
+        if (!strictNextBoundary) {
+            return true
+        }
+
+        val currentBoundary = (absoluteBeatNow - 1L) / switchInterval
+        val requestedBoundary = requestedAtBeat
+            ?.let { beat -> (beat.coerceAtLeast(1L) - 1L) / switchInterval }
+            ?: currentBoundary
+        return currentBoundary > requestedBoundary
     }
 
     private fun scheduleBoundaryStopArenaBgmForPlayer(session: ArenaSession, participantId: UUID, player: Player) {
@@ -5025,7 +5025,7 @@ class ArenaManager(
             return
         }
 
-        val absoluteBeatNow = currentAbsoluteBeatAtTick(session, participantId, track, Bukkit.getCurrentTick().toLong())
+        val absoluteBeatNow = currentAbsoluteBeat(session, participantId, track)
         val switchInterval = track.switchIntervalBeats.toLong().coerceAtLeast(1L)
         val beatOffset = (absoluteBeatNow - 1L).mod(switchInterval)
         val beatsUntilNextBoundary = if (beatOffset == 0L) switchInterval else (switchInterval - beatOffset)
@@ -5040,11 +5040,10 @@ class ArenaManager(
         }, delayTicks)
     }
 
-    private fun currentAbsoluteBeatAtTick(
+    private fun currentAbsoluteBeat(
         session: ArenaSession,
         participantId: UUID,
-        track: ArenaBgmTrackConfig,
-        tick: Long
+        track: ArenaBgmTrackConfig
     ): Long {
         val player = Bukkit.getPlayer(participantId) ?: return 1L
         val beatNanos = track.beatTicks * 50_000_000.0
@@ -5053,6 +5052,11 @@ class ArenaManager(
 
     private fun startArenaBgmMode(session: ArenaSession, participantId: UUID, mode: ArenaBgmMode, startTick: Long) {
         val track = arenaBgmTrackForMode(mode) ?: return
+        val currentMode = participantArenaBgmMode(session, participantId)
+        if (currentMode == mode && hasArenaBgmPlayback(session, participantId, mode)) {
+            session.arenaBgmSwitchRequestByParticipant.remove(participantId)
+            return
+        }
         val player = Bukkit.getPlayer(participantId)
         if (player != null && player.isOnline && player.world.name == session.worldName) {
             stopArenaBgmForPlayer(player)

@@ -39,7 +39,7 @@ enum class ArenaLiftStatus {
 
 data class ArenaBgmSwitchRequest(
     val targetMode: ArenaBgmMode,
-    val requestedAtTick: Long,
+    val requestedAtBeat: Long? = null,
     val strictNextBoundary: Boolean = false
 )
 
@@ -185,6 +185,8 @@ data class ArenaSession(
     val actionMarkers: MutableMap<UUID, ArenaActionMarker> = mutableMapOf(),
     val actionMarkerHoldStates: MutableMap<UUID, ArenaActionMarkerHoldState> = mutableMapOf(),
     var arenaWaveStartCombatDelayTask: BukkitTask? = null,
+    var entranceNormalBgmStarted: Boolean = false,
+    var hadAliveCombatMobs: Boolean = false,
     val transitionTasks: MutableList<BukkitTask> = mutableListOf(),
     val waveSpawnTasks: MutableMap<Int, BukkitTask> = mutableMapOf()
 )
