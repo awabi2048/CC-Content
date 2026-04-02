@@ -95,6 +95,7 @@ import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.entity.ProjectileHitEvent
+import org.bukkit.event.entity.EntityTransformEvent
 import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.bukkit.potion.PotionEffect
@@ -543,7 +544,7 @@ class MobService(private val plugin: JavaPlugin) {
     }
 
     private fun clearImplicitEquipmentIfNeeded(entity: LivingEntity, mobType: MobType) {
-        if (!mobType.id.startsWith("drowned_")) {
+        if (mobType.baseEntityType != EntityType.DROWNED) {
             return
         }
         val equipment = entity.equipment ?: return
@@ -553,6 +554,18 @@ class MobService(private val plugin: JavaPlugin) {
         equipment.chestplate = ItemStack(Material.AIR)
         equipment.leggings = ItemStack(Material.AIR)
         equipment.boots = ItemStack(Material.AIR)
+    }
+
+    fun handleEntityTransform(event: EntityTransformEvent) {
+        if (event.transformReason != EntityTransformEvent.TransformReason.DROWNED) {
+            return
+        }
+        val zombie = event.entity as? Zombie ?: return
+        val activeMob = activeMobs[zombie.uniqueId] ?: return
+        if (activeMob.mobType.id != "zombie_ocean_normal" && activeMob.mobType.id != "zombie_ocean_warrior") {
+            return
+        }
+        event.isCancelled = true
     }
 
     fun handleShootBow(event: EntityShootBowEvent) {

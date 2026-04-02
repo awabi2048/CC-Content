@@ -23,24 +23,18 @@ import java.util.UUID
 
 class DrownedAquaticPursuitAbility(
     override val id: String,
-    private val requiredSubmergedTicks: Long = DEFAULT_REQUIRED_SUBMERGED_TICKS,
-    private val waterMovementEfficiencyBonus: Double = DEFAULT_WATER_MOVEMENT_EFFICIENCY_BONUS,
-    private val leapAbility: LeapAbility = LeapAbility(id = "drowned_aquatic_pursuit_leap")
+    private val waterMovementEfficiencyBonus: Double = DEFAULT_WATER_MOVEMENT_EFFICIENCY_BONUS
 ) : MobAbility {
 
     data class Runtime(
-        var submergedTicks: Long = 0L,
         var groundAttackCooldownTicks: Long = 0L,
-        var lastNaturalMeleeTick: Long = Long.MIN_VALUE,
-        val leapRuntime: MobAbilityRuntime?
+        var lastNaturalMeleeTick: Long = Long.MIN_VALUE
     ) : MobAbilityRuntime
 
     override fun createRuntime(context: MobSpawnContext): MobAbilityRuntime {
         return Runtime(
-            submergedTicks = 0L,
             groundAttackCooldownTicks = 0L,
-            lastNaturalMeleeTick = Long.MIN_VALUE,
-            leapRuntime = leapAbility.createRuntime(context)
+            lastNaturalMeleeTick = Long.MIN_VALUE
         )
     }
 
@@ -49,7 +43,6 @@ class DrownedAquaticPursuitAbility(
         removeWaterSpeedModifier(entity)
         applyWaterSpeedModifier(entity)
         configureAttackGoals(context)
-        leapAbility.onSpawn(context, (runtime as? Runtime)?.leapRuntime)
     }
 
     override fun onTick(context: MobRuntimeContext, runtime: MobAbilityRuntime?) {
@@ -61,21 +54,13 @@ class DrownedAquaticPursuitAbility(
         }
 
         val lowerBodyInWater = isLowerBodyInWater(entity)
-        if (lowerBodyInWater) {
-            rt.submergedTicks += 10L
-        } else {
-            rt.submergedTicks = 0L
+        if (!lowerBodyInWater) {
             tryGroundFallbackMeleeAttack(context, rt)
-        }
-
-        if (lowerBodyInWater && rt.submergedTicks >= requiredSubmergedTicks) {
-            leapAbility.onTick(context, rt.leapRuntime)
         }
     }
 
     override fun onDeath(context: MobDeathContext, runtime: MobAbilityRuntime?) {
         removeWaterSpeedModifier(context.entity)
-        leapAbility.onDeath(context, (runtime as? Runtime)?.leapRuntime)
     }
 
     override fun onAttack(context: MobAttackContext, runtime: MobAbilityRuntime?) {
@@ -230,7 +215,6 @@ class DrownedAquaticPursuitAbility(
     }
 
     companion object {
-        const val DEFAULT_REQUIRED_SUBMERGED_TICKS = 30L
         const val DEFAULT_WATER_MOVEMENT_EFFICIENCY_BONUS = 0.75
 
         private val WATER_SPEED_MODIFIER_UUID: UUID = UUID.fromString("5eabbe49-d690-4c85-a7de-4ce9a64f8b67")

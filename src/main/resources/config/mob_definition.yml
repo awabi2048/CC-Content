@@ -392,8 +392,8 @@ slime_wither:
   armor: 3.0
   scale: 3.0
 
-drowned_normal:
-  type: drowned_normal
+zombie_ocean_normal:
+  type: zombie_ocean_normal
   health: 22.0
   attack: 5.0
   movement_speed: 0.23
@@ -402,8 +402,8 @@ drowned_normal:
   spawn_conditions:
     - WATER_ONLY
 
-drowned_warrior:
-  type: drowned_warrior
+zombie_ocean_warrior:
+  type: zombie_ocean_warrior
   health: 28.0
   attack: 5.5
   movement_speed: 0.22
