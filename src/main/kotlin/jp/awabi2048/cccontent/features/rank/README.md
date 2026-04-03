@@ -1,267 +1,173 @@
-# ランクシステム (Rank System)
+# Rank Feature アーキテクチャ
 
-## 概要
+このディレクトリは、`cc-content` のランク機能を実装する。
+現在の実装は「ティアスコア制」ではなく、以下の段階型フローで構成される。
 
-ランクシステムは、アリーナ・スキマダンジョン・カスタムアイテムの3つの異なるコンテンツに対して、独立したランク管理機能を提供します。
+1. チュートリアルランク（`NEWBIE` → `ATTAINER`）
+2. 職業選択（9職業）
+3. 職業EXP・レベル進行
+4. スキルツリー解放
+5. 効果フレームワーク適用
+6. プレステージ
 
-## アーキテクチャ
+## 1. 主要コンポーネント
 
-### コアコンポーネント
+### 1.1 Facade / 永続化
 
-#### 1. **RankTier** (`RankTier.kt`)
-ランクの階級を定義します。Bronze I から Master まで16段階のティアが存在します。
+- `RankManager.kt`: 機能外部から利用する統合インターフェース
+- `impl/RankManagerImpl.kt`: Tutorial / Profession 系の実処理を委譲するFacade実装
+- `RankStorage.kt`: 永続化インターフェース
+- `impl/YamlRankStorage.kt`: `playerdata/<uuid>.yml` に保存する実装
 
-- **属性**
-  - `displayName`: 表示名（色コード付き）
-  - `level`: ティアレベル（1～16）
-  - `nextThreshold`: このティアに到達するために必要なスコア
+### 1.2 チュートリアルランク
 
-- **主要メソッド**
-  - `getTierByScore(score: Long)`: スコアに基づいてティアを取得
+- `tutorial/TutorialRank.kt`: ランク定義（NEWBIE, VISITOR, PIONEER, ADVENTURER, ATTAINER）
+- `tutorial/PlayerTutorialRank.kt`: プレイヤーごとの進捗データ
+- `tutorial/TutorialRankManager.kt`: チュートリアル管理インターフェース
+- `impl/TutorialRankManagerImpl.kt`: 実装
+- `tutorial/task/*`: 条件ローダ・判定器・進捗管理
 
-```
-BRONZE_I → BRONZE_II → BRONZE_III 
-  ↓         ↓           ↓
-SILVER_I → SILVER_II → SILVER_III
-  ↓         ↓           ↓
-GOLD_I → GOLD_II → GOLD_III
-  ↓         ↓           ↓
-PLATINUM_I → PLATINUM_II → PLATINUM_III
-  ↓           ↓             ↓
-DIAMOND_I → DIAMOND_II → DIAMOND_III
-  ↓           ↓             ↓
-        MASTER (最高位)
-```
+### 1.3 職業・スキルツリー
 
-#### 2. **RankType** (`RankType.kt`)
-ランクを適用するコンテンツのタイプを定義します。
+- `profession/Profession.kt`: 9職業定義
+- `profession/PlayerProfession.kt`: 職業進行データ
+- `profession/ProfessionManager.kt`: 職業管理インターフェース
+- `impl/ProfessionManagerImpl.kt`: 実装
+- `profession/SkillTree.kt`: スキルツリーインターフェース
+- `profession/skilltree/ConfigBasedSkillTree.kt`: YAMLロード実装
+- `profession/SkillNode.kt`: ノード定義
+- `profession/SkillTreeRegistry.kt`: ツリー登録
 
-- `ARENA`: アリーナランク
-- `SUKIMA_DUNGEON`: スキマダンジョンランク
-- `CUSTOM_ITEM`: カスタムアイテムランク
+### 1.4 効果フレームワーク
 
-#### 3. **PlayerRank** (`PlayerRank.kt`)
-プレイヤーの個別のランク情報を保持します。
+- `skill/SkillEffect.kt`: 効果定義
+- `skill/SkillEffectHandler.kt`: 効果ハンドラインターフェース
+- `skill/SkillEffectRegistry.kt`: ハンドラ登録
+- `skill/SkillEffectEngine.kt`: キャッシュ・合成・適用中核
+- `skill/EffectContext.kt`: 適用コンテキスト
+- `skill/CompiledEffects.kt`: プレイヤー別コンパイル結果
+- `skill/handlers/*`: 個別効果実装
+- `skill/listeners/*`: イベント適用層
 
-- **属性**
-  - `playerUuid`: プレイヤーのUUID
-  - `rankType`: ランクのタイプ
-  - `score`: 現在のスコア
-  - `tier`: 現在のティア
-  - `lastUpdated`: 最後の更新日時
+### 1.5 プレステージ
 
-- **主要メソッド**
-  - `addScore(amount: Long)`: スコアを追加（ティア変更を自動判定）
-  - `resetScore()`: スコアをリセット
-  - `getTierProgress()`: 現在のティアの進捗度（0.0～1.0）
-  - `getScoreToNextTier()`: 次のティアまでの必要スコア
+- `prestige/PrestigeToken.kt`: プレステージトークン（PDC付きアイテム）
+- `prestige/PrestigeTokenListener.kt`: 所持状態の監視と再評価
 
-#### 4. **PlayerRankData** (`PlayerRankData.kt`)
-プレイヤーの全ランク情報（3つのRankType）を統合管理します。
+## 2. 職業一覧
 
-- **属性**
-  - `playerUuid`: プレイヤーのUUID
-  - `ranks`: RankTypeごとのPlayerRankマップ
+`Profession.kt` の定義:
 
-- **主要メソッド**
-  - `getRank(rankType: RankType)`: 指定されたRankTypeのランク情報を取得
-  - `getTotalScore()`: 全ランクの総スコア
-  - `getHighestTier()`: 最高のティア
+- `lumberjack`
+- `brewer`
+- `miner`
+- `cook`
+- `swordsman`
+- `warrior`
+- `farmer`
+- `gardener`
+- `carpenter`
 
-#### 5. **RankManager** (`RankManager.kt`)
-ランク情報の管理を行うインターフェース。実装クラスは`RankManagerImpl`
+## 3. 設定ファイル構成
 
-- **主要メソッド**
-  - `getPlayerRankData(playerUuid)`: プレイヤーのランクデータを取得
-  - `getPlayerRank(playerUuid, rankType)`: 特定のランク情報を取得
-  - `addScore(playerUuid, rankType, score)`: スコアを追加
-  - `getRanking(rankType, limit)`: ランキングを取得
-  - `saveData()`: ストレージに保存
-  - `loadData()`: ストレージから読み込み
+### 3.1 スキルツリー
 
-#### 6. **RankStorage** (`RankStorage.kt`)
-ランクデータの永続化を行うインターフェース。実装クラスは`JsonRankStorage`
+- `src/main/resources/config/rank/job/*.yml`
 
-- **主要メソッド**
-  - `savePlayerRank(rankData)`: ランクデータを保存
-  - `loadPlayerRank(playerUuid)`: ランクデータを読み込み
-  - `getAllPlayerRanks(rankType)`: 全プレイヤーのランクデータを取得
+各ファイルは以下を持つ:
 
-### イベントシステム
+- `skills.settings.level.initialExp`
+- `skills.settings.level.base`
+- `skills.settings.level.maxLevel`
+- `skills.settings.overviewIcon`
+- `skills.settings.bossBarColor`
+- ノード定義（`requiredLevel`, `children`, `effect`, `exclusiveBranch`, `activationToggleable`）
 
-#### 1. **PlayerScoreAddEvent**
-プレイヤーのランクにスコアが追加されたときに発火します。
+### 3.2 EXPテーブル
 
-```kotlin
-class PlayerScoreAddEvent(
-    val player: Player,
-    val rankType: RankType,
-    val addedScore: Long,
-    val oldScore: Long,
-    val newScore: Long
-)
-```
+- `src/main/resources/config/rank/job_exp.yml`
 
-#### 2. **PlayerRankChangeEvent**
-プレイヤーのランクが変更されたときに発火します（昇格・降格）。
+ブロック破壊・討伐時EXPの対応表を定義する。
 
-```kotlin
-class PlayerRankChangeEvent(
-    val player: Player,
-    val rankType: RankType,
-    val oldTier: RankTier,
-    val newTier: RankTier,
-    val currentScore: Long
-)
-```
+### 3.3 チュートリアル条件
 
-#### 3. **PlayerRankUpEvent**
-プレイヤーがランクアップしたときに発火します（昇格のみ）。
+- `src/main/resources/config/rank/tutorial_tasks.yml`
 
-```kotlin
-class PlayerRankUpEvent(
-    val player: Player,
-    val rankType: RankType,
-    val fromTier: RankTier,
-    val toTier: RankTier,
-    val currentScore: Long
-)
-```
+`play_time_min`, `kill_mobs`, `mine_blocks`, `vanilla_exp`, `items`, `kill_boss` などを定義する。
 
-### ストレージ実装
+## 4. 効果フレームワークの実行モデル
 
-#### YamlRankStorage
-YAML形式でランクデータを保存します。既存の`playerdata/<uuid>.yml`ファイル内の`rank`セクションにランク情報を格納します。
+### 4.1 評価モード
 
-**ファイル構造:**
-```
-plugins/CC-Content/playerdata/
-  ├── {uuid1}.yml
-  ├── {uuid2}.yml
-  └── ...
-```
+- `CACHED`: 事前コンパイル済み効果を参照
+- `RUNTIME`: イベントごとに評価
 
-**YAMLフォーマット:**
-```yaml
-# playerdata/550e8400-e29b-41d4-a716-446655440000.yml
-rank:
-  ARENA:
-    score: 5000
-    tier: SILVER_I
-    lastUpdated: 1643000000000
-  SUKIMA_DUNGEON:
-    score: 3000
-    tier: BRONZE_III
-    lastUpdated: 1643000000000
-  CUSTOM_ITEM:
-    score: 0
-    tier: BRONZE_I
-    lastUpdated: 1643000000000
+### 4.2 合成ルール
+
+`CombineRule`:
+
+- `ADD`
+- `MULTIPLY`
+- `REPLACE`
+- `MAX`
+- `MAX_BY_DEPTH`
+
+### 4.3 適用の流れ
+
+1. スキル取得/転職/レベルアップ等で `SkillEffectEngine.rebuildCache()`
+2. リスナーがイベント発火時に `CompiledEffects` を参照
+3. 対応ハンドラが `EffectContext` で適用
+
+## 5. 主要イベント
+
+`event/RankEvent.kt` で以下を公開する:
+
+- `TutorialRankUpEvent`
+- `ProfessionSelectedEvent`
+- `ProfessionChangedEvent`
+- `ProfessionLevelUpEvent`
+- `SkillAcquiredEvent`
+- `PlayerExperienceGainEvent`
+- `PrestigeSkillAcquiredEvent`
+- `PrestigeExecutedEvent`
+
+## 6. 進行フロー
+
+```text
+NEWBIE
+  -> (tutorial_tasks.yml達成)
+ATTAINER
+  -> 職業選択
+職業EXP蓄積
+  -> レベルアップ
+スキル解放
+  -> 効果適用
+最大レベル到達 + 条件達成
+  -> プレステージ
 ```
 
-**特徴:**
-- プレイヤーの他のデータと同じファイルで管理
-- BukkitのYamlConfiguration APIで簡単に扱える
-- 既存のplayerdataシステムとの統合が容易
-- ファイルフォーマットが人間が読みやすい
+## 7. データ保存
 
-## 使用方法
+`playerdata/<uuid>.yml` の `rank` セクションに保存する。
 
-### 1. RankManagerの初期化
+- `rank.tutorial.*`
+- `rank.profession.*`
 
-```kotlin
-val storage = YamlRankStorage(plugin.dataFolder)
-val rankManager = RankManagerImpl(storage)
-```
+代表フィールド:
 
-### 2. スコアの追加
+- `profession`
+- `acquiredSkills`
+- `prestigeSkills`
+- `currentExp`
+- `activeSkillId`
+- `skillSwitchMode`
+- `skillActivationStates`
+- `bossBarEnabled`
+- `bossBarDisplayMode`
 
-```kotlin
-val tierChanged = rankManager.addScore(
-    playerUuid,
-    RankType.ARENA,
-    100L  // 追加するスコア
-)
+## 8. 実装時の注意
 
-if (tierChanged) {
-    // ティアが変更された場合の処理
-}
-```
-
-### 3. ランク情報の取得
-
-```kotlin
-// 全ランク情報を取得
-val rankData = rankManager.getPlayerRankData(playerUuid)
-
-// 特定のランク情報を取得
-val arenaRank = rankManager.getPlayerRank(playerUuid, RankType.ARENA)
-println("${arenaRank.tier.displayName} - ${arenaRank.score}点")
-println("進捗: ${String.format("%.1f", arenaRank.getTierProgress() * 100)}%")
-println("次のティアまで: ${arenaRank.getScoreToNextTier()}点")
-```
-
-### 4. ランキングの取得
-
-```kotlin
-val ranking = rankManager.getRanking(RankType.ARENA, limit = 10)
-ranking.forEachIndexed { index, (uuid, score, tier) ->
-    println("#${index + 1} - $uuid: ${tier.displayName} ($score点)")
-}
-```
-
-### 5. イベントのリッスン
-
-```kotlin
-class MyRankListener : RankListener {
-    override fun onScoreAdd(event: PlayerScoreAddEvent) {
-        event.player.sendMessage("§a+${event.addedScore}点!")
-    }
-    
-    override fun onRankUp(event: PlayerRankUpEvent) {
-        event.player.sendMessage("§6${event.fromTier.displayName} → ${event.toTier.displayName}")
-    }
-    
-    override fun onRankChange(event: PlayerRankChangeEvent) {
-        // ランク変更時の処理
-    }
-}
-
-Bukkit.getPluginManager().registerEvents(MyRankListener(), plugin)
-```
-
-## 今後の実装
-
-このコンテンツ構造は、以下の機能の実装をサポートするように設計されています：
-
-- [ ] ランク情報を表示するコマンド（`/rank info`, `/rank ranking`など）
-- [ ] ランク報酬システム（ランクアップ時の報酬配布）
-- [ ] ランクリセット機能（季節ごとのリセットなど）
-- [ ] ランク保護機能（デマンク）
-- [ ] ランク統計情報の表示
-- [ ] MySQL/PostgreSQLなどのデータベースへの対応
-
-## ティアシステム詳細
-
-### スコア基準
-
-| ティア | スコア | 必要スコア |
-|--------|--------|-----------|
-| BRONZE_I | 0～1,000 | 1,000 |
-| BRONZE_II | 1,000～2,000 | 2,000 |
-| BRONZE_III | 2,000～3,000 | 3,000 |
-| SILVER_I | 3,000～5,000 | 5,000 |
-| SILVER_II | 5,000～7,000 | 7,000 |
-| SILVER_III | 7,000～9,000 | 9,000 |
-| GOLD_I | 9,000～12,000 | 12,000 |
-| GOLD_II | 12,000～15,000 | 15,000 |
-| GOLD_III | 15,000～18,000 | 18,000 |
-| PLATINUM_I | 18,000～22,000 | 22,000 |
-| PLATINUM_II | 22,000～26,000 | 26,000 |
-| PLATINUM_III | 26,000～30,000 | 30,000 |
-| DIAMOND_I | 30,000～35,000 | 35,000 |
-| DIAMOND_II | 35,000～40,000 | 40,000 |
-| DIAMOND_III | 40,000～50,000 | 50,000 |
-| MASTER | 50,000～ | ∞ |
-
-（※ スコア基準は後ほどバランス調整が可能）
+- 効果追加時は、`SkillEffectHandler` 実装 + `SkillEffectRegistry` 登録 + 対応YAML更新をセットで行う。
+- 職業・スキル構成変更時は、旧データとの互換が必要かを先に判断する。
+- 職業EXP判定は `job/` リスナー群で分かれているため、対象イベントをまたぐ副作用に注意する。
+- `RankCommand.kt` は巨大ファイルのため、GUI・コマンド修正は局所化して変更範囲を限定する。
