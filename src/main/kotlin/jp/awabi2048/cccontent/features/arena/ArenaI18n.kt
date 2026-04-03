@@ -29,9 +29,12 @@ object ArenaI18n {
 
     fun text(player: Player?, key: String, fallback: String, vararg placeholders: Pair<String, Any?>): String {
         val locale = resolveLocale(player)
-        val primary = getConfig(locale)?.getString(key)
-        val fallbackValue = if (locale != DEFAULT_LOCALE) getConfig(DEFAULT_LOCALE)?.getString(key) else null
-        var value = primary ?: fallbackValue ?: fallback
+        val config = getConfig(locale)
+        if (!config.isString(key)) {
+            throw IllegalStateException("言語キーが見つからないか型が不正です: locale=$locale key=$key expected=String")
+        }
+        var value = config.getString(key)
+            ?: throw IllegalStateException("言語キーの値取得に失敗しました: locale=$locale key=$key")
         for ((placeholderKey, placeholderValue) in placeholders) {
             value = value.replace("{$placeholderKey}", placeholderValue?.toString() ?: "null")
         }
@@ -40,13 +43,11 @@ object ArenaI18n {
 
     fun stringList(player: Player?, key: String, fallback: List<String>, vararg placeholders: Pair<String, Any?>): List<String> {
         val locale = resolveLocale(player)
-        val primary = getConfig(locale)?.getStringList(key).orEmpty()
-        val fallbackValue = if (locale != DEFAULT_LOCALE) getConfig(DEFAULT_LOCALE)?.getStringList(key).orEmpty() else emptyList()
-        val values = when {
-            primary.isNotEmpty() -> primary
-            fallbackValue.isNotEmpty() -> fallbackValue
-            else -> fallback
+        val config = getConfig(locale)
+        if (!config.isList(key)) {
+            throw IllegalStateException("言語キーが見つからないか型が不正です: locale=$locale key=$key expected=List")
         }
+        val values = config.getStringList(key)
         return values.map { line ->
             var value = line
             for ((placeholderKey, placeholderValue) in placeholders) {
@@ -67,12 +68,12 @@ object ArenaI18n {
         }
     }
 
-    private fun getConfig(locale: String): YamlConfiguration? {
+    private fun getConfig(locale: String): YamlConfiguration {
         val normalized = locale.lowercase()
         cache[normalized]?.let { return it }
 
         if (!::plugin.isInitialized) {
-            return null
+            throw IllegalStateException("ArenaI18n が初期化されていません")
         }
 
         val fromDataFolder = File(plugin.dataFolder, "lang/$normalized.yml")
@@ -82,7 +83,8 @@ object ArenaI18n {
             }
         }
 
-        val fromResource = plugin.getResource("lang/$normalized.yml") ?: return null
+        val fromResource = plugin.getResource("lang/$normalized.yml")
+            ?: throw IllegalStateException("言語ファイルが見つかりません: lang/$normalized.yml")
         val config = fromResource.use { input ->
             InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
                 YamlConfiguration.loadConfiguration(reader)

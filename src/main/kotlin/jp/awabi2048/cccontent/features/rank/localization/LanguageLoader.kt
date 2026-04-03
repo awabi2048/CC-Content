@@ -3,8 +3,6 @@ package jp.awabi2048.cccontent.features.rank.localization
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
-import java.io.InputStreamReader
-import java.nio.charset.StandardCharsets
 
 /**
  * 言語ファイルを読み込むクラス
@@ -14,7 +12,6 @@ class LanguageLoader(
     private val language: String = "ja_jp"
 ) {
     private val languageData: MutableMap<String, String> = mutableMapOf()
-    private val bundledLanguageData: MutableMap<String, String> = mutableMapOf()
     private val langFile: File
     private val normalizedLanguage = language.lowercase()
     
@@ -28,7 +25,9 @@ class LanguageLoader(
             extractDefaultLanguageFile()
         }
 
-        loadBundledLanguageData()
+        if (!langFile.exists()) {
+            throw IllegalStateException("言語ファイルが見つかりません: ${langFile.absolutePath}")
+        }
         
         loadLanguageFile()
     }
@@ -65,38 +64,10 @@ class LanguageLoader(
         try {
             languageData.clear()
             val config = YamlConfiguration.loadConfiguration(langFile)
-
-            var mergedCount = 0
-            for ((key, value) in bundledLanguageData) {
-                if (!config.isSet(key)) {
-                    config.set(key, value)
-                    mergedCount++
-                }
-            }
-
-            if (mergedCount > 0) {
-                config.save(langFile)
-            }
-
             flattenConfig(config, "")
         } catch (e: Exception) {
-            plugin.logger.warning("言語ファイルの読み込みに失敗しました: ${e.message}")
+            throw IllegalStateException("言語ファイルの読み込みに失敗しました: ${e.message}", e)
         }
-    }
-
-    private fun loadBundledLanguageData() {
-        bundledLanguageData.clear()
-
-        val config = resourcePathCandidates().firstNotNullOfOrNull { candidate ->
-            val stream = plugin.getResource(candidate) ?: return@firstNotNullOfOrNull null
-            stream.use { input ->
-                InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
-                    YamlConfiguration.loadConfiguration(reader)
-                }
-            }
-        } ?: return
-
-        flattenConfig(config, "", bundledLanguageData)
     }
     
     /**
@@ -127,17 +98,7 @@ class LanguageLoader(
      */
     fun getMessage(key: String, vararg placeholders: Pair<String, Any?>): String {
         val template = languageData[key]
-        var resolvedTemplate = template
-
-        if (resolvedTemplate == null) {
-            resolvedTemplate = bundledLanguageData[key]
-        }
-
-        if (resolvedTemplate == null) {
-            // デバッグログ：見つからないキーを記録
-            plugin.logger.warning("翻訳キーが見つかりません: $key (全キー数: ${languageData.size})")
-            return "§c[Missing: $key]"
-        }
+        var resolvedTemplate = template ?: throw IllegalStateException("翻訳キーが見つかりません: $key")
         var result: String = resolvedTemplate
         for ((placeholderKey, value) in placeholders) {
             result = result.replace("{$placeholderKey}", value?.toString() ?: "null")
@@ -151,7 +112,7 @@ class LanguageLoader(
      * メッセージを直接取得（翻訳キーなし）
      */
     fun getRawMessage(key: String): String {
-        return languageData[key] ?: "§c[Missing: $key]"
+        return languageData[key] ?: throw IllegalStateException("翻訳キーが見つかりません: $key")
     }
 
     /**
@@ -159,19 +120,9 @@ class LanguageLoader(
      */
     fun getStringList(key: String): List<String> {
         val config = YamlConfiguration.loadConfiguration(langFile)
-        val list = config.getStringList(key)
-        if (list.isEmpty()) {
-            // バンドルされたリソースから取得
-            val bundledConfig = resourcePathCandidates().firstNotNullOfOrNull { candidate ->
-                val stream = plugin.getResource(candidate) ?: return@firstNotNullOfOrNull null
-                stream.use { input ->
-                    InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
-                        YamlConfiguration.loadConfiguration(reader)
-                    }
-                }
-            }
-            return bundledConfig?.getStringList(key)?.map { it.replace('&', '§') } ?: emptyList()
+        if (!config.isList(key)) {
+            throw IllegalStateException("翻訳リストキーが見つからないか型が不正です: $key")
         }
-        return list.map { it.replace('&', '§') }
+        return config.getStringList(key).map { it.replace('&', '§') }
     }
 }

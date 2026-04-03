@@ -77,6 +77,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.tasks.SpecialTileTask
 import jp.awabi2048.cccontent.mob.MobEventListener
 import jp.awabi2048.cccontent.mob.MobService
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
+import jp.awabi2048.cccontent.util.LanguageFileValidator
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
@@ -147,6 +148,7 @@ class CCContent : JavaPlugin(), Listener {
     private fun startPlugin() {
         instance = this
         coreConfig = CoreConfigManager.load(this)
+        LanguageFileValidator.validateAll(this)
         contentEnabledAtStartup = loadContentEnabledSettings()
 
         featureInitLogger = FeatureInitializationLogger(logger)
@@ -794,6 +796,7 @@ class CCContent : JavaPlugin(), Listener {
      */
     private fun reloadConfigFiles() {
         coreConfig = CoreConfigManager.load(this)
+        LanguageFileValidator.validateAll(this)
         logContentEnabledChangeIfNeeded(loadContentEnabledSettings())
         SukimaConfigHelper.reload(this)
         MessageManager.load(this)

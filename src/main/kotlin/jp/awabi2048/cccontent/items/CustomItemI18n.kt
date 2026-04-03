@@ -20,27 +20,22 @@ object CustomItemI18n {
 
     fun text(player: Player?, key: String, fallback: String): String {
         val locale = resolveLocale(player)
-        val primary = getConfig(locale)?.getString(key)
-        val fallbackValue = if (locale != DEFAULT_LOCALE) getConfig(DEFAULT_LOCALE)?.getString(key) else null
-        val value = primary ?: fallbackValue ?: fallback
+        val config = getConfig(locale)
+        if (!config.isString(key)) {
+            throw IllegalStateException("言語キーが見つからないか型が不正です: locale=$locale key=$key expected=String")
+        }
+        val value = config.getString(key)
+            ?: throw IllegalStateException("言語キーの値取得に失敗しました: locale=$locale key=$key")
         return value.replace('&', '§')
     }
 
     fun list(player: Player?, key: String, fallback: List<String>): List<String> {
         val locale = resolveLocale(player)
-        val value = getConfig(locale)?.getStringList(key).orEmpty()
-        if (value.isNotEmpty()) {
-            return value.map { it.replace('&', '§') }
+        val config = getConfig(locale)
+        if (!config.isList(key)) {
+            throw IllegalStateException("言語キーが見つからないか型が不正です: locale=$locale key=$key expected=List")
         }
-
-        if (locale != DEFAULT_LOCALE) {
-            val fallbackValue = getConfig(DEFAULT_LOCALE)?.getStringList(key).orEmpty()
-            if (fallbackValue.isNotEmpty()) {
-                return fallbackValue.map { it.replace('&', '§') }
-            }
-        }
-
-        return fallback
+        return config.getStringList(key).map { it.replace('&', '§') }
     }
 
     fun resolveLocale(player: Player?): String {
@@ -54,12 +49,12 @@ object CustomItemI18n {
         }
     }
 
-    private fun getConfig(locale: String): YamlConfiguration? {
+    private fun getConfig(locale: String): YamlConfiguration {
         val normalized = locale.lowercase()
         cache[normalized]?.let { return it }
 
         if (!::plugin.isInitialized) {
-            return null
+            throw IllegalStateException("CustomItemI18n が初期化されていません")
         }
 
         val fromDataFolder = File(plugin.dataFolder, "lang/$normalized.yml")
@@ -69,7 +64,8 @@ object CustomItemI18n {
             }
         }
 
-        val fromResource = plugin.getResource("lang/$normalized.yml") ?: return null
+        val fromResource = plugin.getResource("lang/$normalized.yml")
+            ?: throw IllegalStateException("言語ファイルが見つかりません: lang/$normalized.yml")
         val config = fromResource.use { input ->
             InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
                 YamlConfiguration.loadConfiguration(reader)

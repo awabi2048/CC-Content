@@ -4,8 +4,6 @@ import org.bukkit.ChatColor
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
-import java.io.InputStreamReader
-import java.nio.charset.StandardCharsets
 
 object LangManager {
     private val langMap = mutableMapOf<String, YamlConfiguration>()
@@ -17,26 +15,27 @@ object LangManager {
             langDir.mkdirs()
         }
 
-        // Save default resources
-        saveDefaultLang(plugin, "en_us.yml")
         saveDefaultLang(plugin, "ja_jp.yml")
+        saveDefaultLang(plugin, "en_us.yml")
 
-         // Load all yml files in lang dir
-         langMap.clear()
-         // Load only specific language files
-         val langFiles = listOf("ja_jp.yml", "en_us.yml")
-         langFiles.forEach { fileName ->
-             val file = File(langDir, fileName)
-             if (file.exists()) {
-                 try {
-                     val langName = fileName.removeSuffix(".yml").lowercase()
-                     val config = YamlConfiguration.loadConfiguration(file)
-                     langMap[langName] = config
-                 } catch (e: Exception) {
-                     plugin.logger.warning("[LangManager] Failed to load language file $fileName: ${e.message}")
-                 }
-             }
-         }
+        langMap.clear()
+        val langFiles = langDir.listFiles { file ->
+            file.isFile && file.name.endsWith(".yml", ignoreCase = true)
+        }?.sortedBy { it.name.lowercase() }.orEmpty()
+
+        if (langFiles.isEmpty()) {
+            throw IllegalStateException("[LangManager] 言語ファイルが見つかりません: ${langDir.absolutePath}")
+        }
+
+        langFiles.forEach { file ->
+            val langName = file.name.removeSuffix(".yml").lowercase()
+            val config = YamlConfiguration.loadConfiguration(file)
+            langMap[langName] = config
+        }
+
+        if (defaultLang !in langMap.keys) {
+            throw IllegalStateException("[LangManager] 既定言語ファイルが見つかりません: $defaultLang.yml")
+        }
     }
 
     private fun saveDefaultLang(plugin: JavaPlugin, fileName: String) {
@@ -48,14 +47,16 @@ object LangManager {
 
      fun getMessage(lang: String, key: String, params: Map<String, String> = emptyMap()): String {
          val normalizedLang = lang.lowercase()
-         val config = langMap[normalizedLang] ?: langMap[defaultLang] ?: return "Missing Lang Config: $lang (available: ${langMap.keys})"
-        
-        // Check if it's a list (for random selection)
-        val messageList = config.getStringList("sukima_dungeon.$key")
-        var message = if (messageList.isNotEmpty()) {
-            messageList.random()
-        } else {
-            config.getString("sukima_dungeon.$key") ?: return "Missing message: $key ($lang)"
+         val config = langMap[normalizedLang]
+             ?: throw IllegalStateException("[LangManager] 言語がロードされていません: $lang (available=${langMap.keys})")
+
+        val fullKey = "sukima_dungeon.$key"
+        val messageList = config.getStringList(fullKey)
+        var message = when {
+            messageList.isNotEmpty() -> messageList.random()
+            config.isString(fullKey) -> config.getString(fullKey)
+                ?: throw IllegalStateException("[LangManager] メッセージ取得に失敗しました: key=$fullKey lang=$lang")
+            else -> throw IllegalStateException("[LangManager] メッセージキーが見つかりません: key=$fullKey lang=$lang")
         }
 
         for ((k, v) in params) {
@@ -67,18 +68,24 @@ object LangManager {
 
      fun getList(lang: String, key: String): List<String> {
          val normalizedLang = lang.lowercase()
-         val config = langMap[normalizedLang] ?: langMap[defaultLang] ?: return emptyList()
-        val list = config.getStringList("sukima_dungeon.$key")
-        if (list.isNotEmpty()) return list.map { ChatColor.translateAlternateColorCodes('&', it) }
-        
-        // Fallback to single string as list
-        val single = config.getString("sukima_dungeon.$key") ?: return emptyList()
-        return listOf(ChatColor.translateAlternateColorCodes('&', single))
+         val config = langMap[normalizedLang]
+             ?: throw IllegalStateException("[LangManager] 言語がロードされていません: $lang (available=${langMap.keys})")
+        val fullKey = "sukima_dungeon.$key"
+        if (config.isList(fullKey)) {
+            return config.getStringList(fullKey).map { ChatColor.translateAlternateColorCodes('&', it) }
+        }
+        throw IllegalStateException("[LangManager] リストキーが見つからないか型が不正です: key=$fullKey lang=$lang")
     }
 
      fun getTierName(lang: String, tier: String): String {
          val normalizedLang = lang.lowercase()
-         val config = langMap[normalizedLang] ?: langMap[defaultLang] ?: return tier
-        return config.getString("sukima_dungeon.tiers.$tier") ?: tier
+         val config = langMap[normalizedLang]
+             ?: throw IllegalStateException("[LangManager] 言語がロードされていません: $lang (available=${langMap.keys})")
+        val key = "sukima_dungeon.tiers.$tier"
+        if (!config.isString(key)) {
+            throw IllegalStateException("[LangManager] tier名キーが見つからないか型が不正です: key=$key lang=$lang")
+        }
+        return config.getString(key)
+            ?: throw IllegalStateException("[LangManager] tier名の取得に失敗しました: key=$key lang=$lang")
     }
 }

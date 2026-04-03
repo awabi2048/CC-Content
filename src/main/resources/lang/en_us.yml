@@ -490,7 +490,7 @@ custom_items:
         stage_start:
           - '§fWe have arrived on site!'
         wave_cleared:
-          - 'It seems safe for now! Let's regroup and move on to the next wave!'
+          - 'It seems safe for now! Let''s regroup and move on to the next wave!'
         wave_clear_wait:
           - 'If you approach the marker in front of the door, we may figure something out!'
         final_wave_start:
