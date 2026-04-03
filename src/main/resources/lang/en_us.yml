@@ -375,6 +375,7 @@ custom_items:
         skeleton_curve_shot: "Curved Shot Skeleton"
         skeleton_shield_only: "Shield Skeleton"
         skeleton_boomerang: "Boomerang Skeleton"
+        bogged_boomerang: "Boomerang Bogged"
         zombie_ocean_normal: "Abyss Zombie"
         zombie_ocean_warrior: "Abyss Warrior Zombie"
         drowned_grudge: "Grudge Drowned"

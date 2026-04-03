@@ -5,6 +5,7 @@ import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import org.bukkit.Material
 import org.bukkit.entity.LivingEntity
 import org.bukkit.event.entity.EntityDamageByEntityEvent
+import org.bukkit.potion.PotionEffectType
 import kotlin.math.roundToLong
 import kotlin.random.Random
 
@@ -13,6 +14,10 @@ class RangedAttackAbility(
     private val arrowSpeedMultiplier: Double = 1.0,
     private val intervalMultiplier: Double = 1.0,
     private val effectArrowChance: Double = 0.0,
+    private val effectArrowAmplifier: Int = 0,
+    private val effectArrowType: PotionEffectType? = null,
+    private val confusionArrowChance: Double = 0.0,
+    private val confusionDurationTicks: Int = 200,
     private val retreatOnCloseRange: Boolean = false,
     private val retreatMinDistanceSquared: Double = DEFAULT_RETREAT_MIN_DISTANCE_SQUARED,
     private val retreatSpeed: Double = DEFAULT_RETREAT_SPEED,
@@ -88,7 +93,7 @@ class RangedAttackAbility(
             return
         }
 
-        shootArrow(context, entity, target, distanceSquared)
+        shootArrow(context, entity, target)
         val baseCooldown = (BOW_SHOT_COOLDOWN_TICKS * intervalMultiplier).roundToLong().coerceAtLeast(8L)
         abilityRuntime.shotCooldownTicks =
             (baseCooldown * loadSnapshot.abilityCooldownMultiplier).roundToLong().coerceAtLeast(baseCooldown)
@@ -119,7 +124,7 @@ class RangedAttackAbility(
         return (base * intervalMultiplier).roundToLong().coerceAtLeast(6L)
     }
 
-    private fun shootArrow(context: MobRuntimeContext, entity: LivingEntity, target: LivingEntity, distanceSquared: Double) {
+    private fun shootArrow(context: MobRuntimeContext, entity: LivingEntity, target: LivingEntity) {
         MobShootUtil.shootArrow(
             plugin = context.plugin,
             entity = entity,
@@ -127,6 +132,10 @@ class RangedAttackAbility(
             activeMob = context.activeMob,
             speedMultiplier = arrowSpeedMultiplier,
             effectArrowChance = effectArrowChance,
+            effectArrowAmplifier = effectArrowAmplifier,
+            effectArrowType = effectArrowType,
+            confusionArrowChance = confusionArrowChance,
+            confusionDurationTicks = confusionDurationTicks,
             homingConfig = homingConfig
         )
     }

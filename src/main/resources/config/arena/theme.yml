@@ -239,6 +239,9 @@ natura:
     bogged_throw_close:
       weight: 7
       wave: 2..
+    bogged_boomerang:
+      weight: 6
+      wave: 2..
     spider_plain:
       weight: 8
       wave: 1..

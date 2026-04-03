@@ -11,8 +11,6 @@ import org.bukkit.entity.TippedArrow
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
-import org.bukkit.util.Vector
-import kotlin.math.sqrt
 import kotlin.random.Random
 
 object MobShootUtil {
@@ -31,7 +29,11 @@ object MobShootUtil {
         speedMultiplier: Double = 1.0,
         effectArrowChance: Double = 0.0,
         homingConfig: HomingConfig? = null,
-        arrowSpeed: Double? = null
+        arrowSpeed: Double? = null,
+        effectArrowAmplifier: Int = 0,
+        effectArrowType: PotionEffectType? = null,
+        confusionArrowChance: Double = 0.0,
+        confusionDurationTicks: Int = 200
     ) {
         val source = entity.eyeLocation
         val distance = source.distance(target.eyeLocation)
@@ -50,7 +52,17 @@ object MobShootUtil {
         val baseArrowSpeed = arrowSpeed ?: calculateArrowSpeed(distance)
         val finalSpeed = baseArrowSpeed * speedMultiplier
 
-        val effectSpec = if (Random.nextDouble() < effectArrowChance) buildEffectArrowSpec() else null
+        val roll = Random.nextDouble()
+        val effectSpec = when {
+            roll < effectArrowChance -> {
+                if (effectArrowType != null) EffectArrowSpec(effectArrowType, 200, effectArrowAmplifier)
+                else buildEffectArrowSpec()
+            }
+            roll < effectArrowChance + confusionArrowChance -> null
+            else -> null
+        }
+        val isConfusionArrow = roll >= effectArrowChance && roll < effectArrowChance + confusionArrowChance
+
         val projectile = entity.launchProjectile(Arrow::class.java).apply {
             shooter = entity
         }
@@ -82,6 +94,13 @@ object MobShootUtil {
                 effectSpec.type.name,
                 effectSpec.amplifier,
                 effectSpec.durationTicks
+            )
+        } else if (isConfusionArrow) {
+            MobService.getInstance(plugin)?.markSkeletonEffectArrow(
+                projectile,
+                CONFUSION_EFFECT_NAME,
+                confusionDurationTicks,
+                200
             )
         }
 
@@ -120,4 +139,6 @@ object MobShootUtil {
         }
         return EffectArrowSpec(effectType, 200, 0)
     }
+
+    const val CONFUSION_EFFECT_NAME = "CONFUSION"
 }

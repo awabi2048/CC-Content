@@ -3,16 +3,21 @@ package jp.awabi2048.cccontent.mob.ability
 import jp.awabi2048.cccontent.mob.MobCombustContext
 import jp.awabi2048.cccontent.mob.MobDamagedContext
 import jp.awabi2048.cccontent.mob.MobGenericDamagedContext
+import org.bukkit.Sound
 import org.bukkit.entity.Projectile
 import org.bukkit.event.entity.EntityDamageEvent
 
 class ProjectileAndFireImmunityAbility(
-    override val id: String
+    override val id: String,
+    private val playSoundOnProjectileBlock: Boolean = false
 ) : MobAbility {
 
     override fun onDamaged(context: MobDamagedContext, runtime: MobAbilityRuntime?) {
         if (context.event.damager is Projectile) {
             context.event.isCancelled = true
+            if (playSoundOnProjectileBlock) {
+                context.entity.world.playSound(context.entity.location, Sound.ENTITY_SLIME_SQUISH, 0.8f, 1.2f)
+            }
         }
     }
 

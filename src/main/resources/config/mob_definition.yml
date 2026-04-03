@@ -312,6 +312,14 @@ bogged_throw_close:
   armor: 1.0
   scale: 1.0
 
+bogged_boomerang:
+  type: bogged_boomerang
+  health: 22.0
+  attack: 5.0
+  movement_speed: 0.24
+  armor: 1.0
+  scale: 1.0
+
 stray_plain:
   type: stray_plain
   health: 15.0
@@ -366,7 +374,7 @@ slime_merge_small:
   attack: 2.0
   movement_speed: 0.30
   armor: 0.0
-  scale: 2.0
+  scale: 3.0
 
 slime_merge_medium:
   type: slime_merge_medium
@@ -374,7 +382,7 @@ slime_merge_medium:
   attack: 4.0
   movement_speed: 0.26
   armor: 2.0
-  scale: 3.0
+  scale: 4.0
 
 slime_merge_large:
   type: slime_merge_large
@@ -382,7 +390,7 @@ slime_merge_large:
   attack: 7.0
   movement_speed: 0.22
   armor: 6.0
-  scale: 4.0
+  scale: 5.0
 
 slime_poison:
   type: slime_poison
@@ -390,7 +398,7 @@ slime_poison:
   attack: 3.5
   movement_speed: 0.25
   armor: 2.0
-  scale: 3.0
+  scale: 4.0
 
 slime_wither:
   type: slime_wither
@@ -398,7 +406,7 @@ slime_wither:
   attack: 4.0
   movement_speed: 0.24
   armor: 3.0
-  scale: 3.0
+  scale: 4.0
 
 zombie_ocean_normal:
   type: zombie_ocean_normal

@@ -206,6 +206,8 @@ class ArenaManager(
     private val plugin: JavaPlugin,
     private val mobService: MobService = MobService(plugin)
 ) {
+    val confusionManager = ConfusionManager(plugin)
+
     private companion object {
         const val DEBUG_VOID_WORLD_MARKER_FILE_NAME = ".cc-debug-void-world"
         const val DEBUG_VOID_TEMPLATE_MARKER_FILE_NAME = ".cc-debug-void-template"
@@ -229,7 +231,7 @@ class ArenaManager(
         const val BARRIER_RESTART_DAMAGE_INTERVAL_TICKS = 20L
         const val BARRIER_RESTART_BEAM_BLINK_INTERVAL_TICKS = 50L
         const val BARRIER_RESTART_BEAM_POINTS = 24
-        const val ENTRANCE_NORMAL_BGM_START_DELAY_TICKS = 40L
+        const val ENTRANCE_NORMAL_BGM_START_DELAY_TICKS = 20L
         const val POSITION_SAMPLE_INTERVAL_MILLIS = 1000L
         const val POSITION_RESTORE_LOOKBACK_MILLIS = 10_000L
         const val POSITION_HISTORY_RETENTION_MILLIS = 12_000L
@@ -995,6 +997,7 @@ class ArenaManager(
         mobToDefinitionTypeId.clear()
         cleanupWorldJobs.clear()
         readyArenaWorldNames.clear()
+        confusionManager.clearAll()
         arenaWorldStates.clear()
         clearAllArenaSidebars()
         invitedPlayerLocks.clear()
@@ -2706,6 +2709,7 @@ class ArenaManager(
         hideJoinCountdownBossBar(session, playerId)
         releaseInvitedPlayerLock(playerId)
         removeArenaSidebar(playerId)
+        confusionManager.removeConfusion(playerId)
 
         val player = Bukkit.getPlayer(playerId)
         if (player != null && player.isOnline) {
@@ -6975,6 +6979,7 @@ class ArenaManager(
                 updateBarrierReturnHoldStates(currentTick)
                 updateArenaBgmTransitions()
                 processArenaWorldCleanupQueue()
+                confusionManager.tick()
                 if (currentTick % 5L == 0L) {
                     updateArenaSidebars()
                 }

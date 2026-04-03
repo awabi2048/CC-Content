@@ -679,7 +679,12 @@ class BoggedNormalMobType : EquipmentMobType(
     baseEntityType = EntityType.BOGGED,
     abilities = listOf(
         RangedAttackAbility(
-            id = "bogged_normal_ranged"
+            id = "bogged_normal_ranged",
+            effectArrowChance = 0.3,
+            effectArrowAmplifier = 1,
+            effectArrowType = PotionEffectType.POISON,
+            confusionArrowChance = 0.3,
+            confusionDurationTicks = 200
         )
     ),
     defaultMainHand = Material.BOW
@@ -693,7 +698,11 @@ class BoggedRapidShotMobType : EquipmentMobType(
             id = "bogged_rapid_shot_ranged",
             arrowSpeedMultiplier = 1.0,
             intervalMultiplier = RangedAttackAbility.DEFAULT_RAPID_INTERVAL_MULTIPLIER,
-            effectArrowChance = 0.0
+            effectArrowChance = 0.3,
+            effectArrowAmplifier = 1,
+            effectArrowType = PotionEffectType.POISON,
+            confusionArrowChance = 0.3,
+            confusionDurationTicks = 200
         )
     ),
     defaultMainHand = Material.BOW,
@@ -712,7 +721,12 @@ class BoggedCurveBackstepMobType : EquipmentMobType(
     abilities = listOf(
         RangedAttackAbility(
             id = "bogged_curve_backstep_ranged",
-            homingConfig = MobShootUtil.HomingConfig()
+            homingConfig = MobShootUtil.HomingConfig(),
+            effectArrowChance = 0.3,
+            effectArrowAmplifier = 1,
+            effectArrowType = PotionEffectType.POISON,
+            confusionArrowChance = 0.3,
+            confusionDurationTicks = 200
         ),
         BackstepAbility(
             id = "bogged_curve_backstep_backstep",
@@ -737,7 +751,7 @@ class BoggedBowShieldMobType : EquipmentMobType(
     id = "bogged_heavy_bow_shield",
     baseEntityType = EntityType.BOGGED,
     abilities = listOf(
-        RangedAttackAbility(id = "bogged_bow_shield_ranged"),
+        RangedAttackAbility(id = "bogged_bow_shield_ranged", effectArrowChance = 0.3, effectArrowAmplifier = 1, effectArrowType = PotionEffectType.POISON, confusionArrowChance = 0.3, confusionDurationTicks = 200),
         ShieldAbility(id = "bogged_bow_shield", breakDisablesShieldPermanently = true)
     ),
     defaultMainHand = Material.BOW,
@@ -763,6 +777,13 @@ class BoggedWeaponThrowCloseMobType : EquipmentMobType(
         equipment.setItemInMainHand(ItemStack(randomGoldenTool()))
     }
 }
+
+class BoggedBoomerangMobType : EquipmentMobType(
+    id = "bogged_boomerang",
+    baseEntityType = EntityType.BOGGED,
+    abilities = listOf(BoomerangAbility(id = "bogged_boomerang")),
+    defaultMainHand = Material.BONE
+)
 
 class StrayPlainMobType : EquipmentMobType(
     id = "stray_plain",
@@ -864,7 +885,7 @@ class SlimeSmallMobType : EquipmentMobType(
     id = "slime_merge_small",
     baseEntityType = EntityType.SLIME,
     abilities = listOf(
-        ProjectileAndFireImmunityAbility(id = "slime_merge_small_immunity"),
+        ProjectileAndFireImmunityAbility(id = "slime_merge_small_immunity", playSoundOnProjectileBlock = true),
         SlimeMergeAbility(
             id = "slime_merge_small_merge",
             selfDefinitionId = "slime_merge_small",
@@ -877,7 +898,7 @@ class SlimeMediumMobType : EquipmentMobType(
     id = "slime_merge_medium",
     baseEntityType = EntityType.SLIME,
     abilities = listOf(
-        ProjectileAndFireImmunityAbility(id = "slime_merge_medium_immunity"),
+        ProjectileAndFireImmunityAbility(id = "slime_merge_medium_immunity", playSoundOnProjectileBlock = true),
         SlimeMergeAbility(
             id = "slime_merge_medium_merge",
             selfDefinitionId = "slime_merge_medium",
@@ -890,7 +911,7 @@ class SlimeLargeMobType : EquipmentMobType(
     id = "slime_merge_large",
     baseEntityType = EntityType.SLIME,
     abilities = listOf(
-        ProjectileAndFireImmunityAbility(id = "slime_merge_large_immunity"),
+        ProjectileAndFireImmunityAbility(id = "slime_merge_large_immunity", playSoundOnProjectileBlock = true),
         SlimeMergeAbility(
             id = "slime_merge_large_merge",
             selfDefinitionId = "slime_merge_large",
@@ -911,7 +932,7 @@ class SlimePoisonMobType : EquipmentMobType(
     id = "slime_poison",
     baseEntityType = EntityType.SLIME,
     abilities = listOf(
-        ProjectileAndFireImmunityAbility(id = "slime_poison_immunity"),
+        ProjectileAndFireImmunityAbility(id = "slime_poison_immunity", playSoundOnProjectileBlock = true),
         PotionSlimeAbility(
             id = "slime_poison_effect",
             effectType = PotionEffectType.POISON,
@@ -926,7 +947,7 @@ class SlimeWitherMobType : EquipmentMobType(
     id = "slime_wither",
     baseEntityType = EntityType.SLIME,
     abilities = listOf(
-        ProjectileAndFireImmunityAbility(id = "slime_wither_immunity"),
+        ProjectileAndFireImmunityAbility(id = "slime_wither_immunity", playSoundOnProjectileBlock = true),
         PotionSlimeAbility(
             id = "slime_wither_effect",
             effectType = PotionEffectType.WITHER,
