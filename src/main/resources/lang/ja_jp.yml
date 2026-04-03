@@ -1019,6 +1019,7 @@ custom_items:
         witch_normal: 'ウィッチ'
         witch_elite: 'エリートウィッチ'
         silverfish_stealth_fang: 'ステルスファングシルバーフィッシュ'
+        bat_venom: 'ヴェノムコウモリ'
       drop_names:
         husk: 'ハスクのかたびら'
         iron_golem: 'ゴーレムのコア'

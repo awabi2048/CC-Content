@@ -281,6 +281,9 @@ natura:
     witch_elite:
       weight: 3
       wave: 4..
+    bat_venom:
+      weight: 2
+      wave: 4..
   orientation:
     entrance_exit: north
     corner_entry: south

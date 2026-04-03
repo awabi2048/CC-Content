@@ -13,6 +13,7 @@ import jp.awabi2048.cccontent.mob.type.BoggedNormalMobType
 import jp.awabi2048.cccontent.mob.type.BoggedPlainMobType
 import jp.awabi2048.cccontent.mob.type.BoggedRapidShotMobType
 import jp.awabi2048.cccontent.mob.type.BoggedWeaponThrowCloseMobType
+import jp.awabi2048.cccontent.mob.type.BatVenomMobType
 import jp.awabi2048.cccontent.mob.type.BlazeBeamMobType
 import jp.awabi2048.cccontent.mob.type.BlazeMeleeMobType
 import jp.awabi2048.cccontent.mob.type.BlazeNormalMobType
@@ -271,6 +272,7 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(GreatFrogMobType())
         registerMobType(WitchNormalMobType())
         registerMobType(WitchEliteMobType())
+        registerMobType(BatVenomMobType())
     }
 
     fun registerMobType(mobType: MobType) {

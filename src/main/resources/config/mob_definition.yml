@@ -513,3 +513,11 @@ witch_elite:
   movement_speed: 0.24
   armor: 3.0
   scale: 1.2
+
+bat_venom:
+  type: bat_venom
+  health: 60.0
+  attack: 5.0
+  movement_speed: 0.30
+  armor: 5.0
+  scale: 3.0

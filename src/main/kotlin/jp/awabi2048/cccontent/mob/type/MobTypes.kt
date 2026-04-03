@@ -35,6 +35,7 @@ import jp.awabi2048.cccontent.mob.ability.WaterSpiritAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponSwapAbility
 import jp.awabi2048.cccontent.mob.ability.BuffEffectEntry
 import jp.awabi2048.cccontent.mob.ability.GreatFrogAbility
+import jp.awabi2048.cccontent.mob.ability.BatSwoopAbility
 import jp.awabi2048.cccontent.mob.ability.WitchRetreatBuffAbility
 import org.bukkit.Color
 import org.bukkit.Particle
@@ -1128,6 +1129,12 @@ class WitchNormalMobType : EquipmentMobType(
     id = "witch_normal",
     baseEntityType = EntityType.WITCH,
     abilities = emptyList()
+)
+
+class BatVenomMobType : EquipmentMobType(
+    id = "bat_venom",
+    baseEntityType = EntityType.BAT,
+    abilities = listOf(BatSwoopAbility(id = "bat_venom_swoop"))
 )
 
 class WitchEliteMobType : EquipmentMobType(
