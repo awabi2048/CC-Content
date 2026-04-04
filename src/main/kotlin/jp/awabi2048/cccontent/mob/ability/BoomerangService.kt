@@ -24,7 +24,9 @@ class BoomerangService private constructor(private val plugin: JavaPlugin) {
         val damage: Double,
         val maxLifetimeTicks: Long,
         val handItem: ItemStack? = null,
-        val onReturn: (() -> Unit)? = null
+        val onReturn: (() -> Unit)? = null,
+        val trailEffect: ((Location) -> Unit)? = null,
+        val onHitPlayer: ((LivingEntity) -> Unit)? = null
     )
 
     private data class ActiveBoomerang(
@@ -44,6 +46,8 @@ class BoomerangService private constructor(private val plugin: JavaPlugin) {
         val flyingDisplay: FlyingItemDisplay,
         val handItem: ItemStack?,
         val onReturn: (() -> Unit)?,
+        val trailEffect: ((Location) -> Unit)?,
+        val onHitPlayer: ((LivingEntity) -> Unit)?,
         var ownerDead: Boolean = false
     )
 
@@ -72,7 +76,7 @@ class BoomerangService private constructor(private val plugin: JavaPlugin) {
         if (!direction.isFinite) return false
         val speed = spec.velocityPerTick.length().coerceAtLeast(0.01)
 
-        val flyingDisplay = FlyingItemDisplay.spawn(world, spec.start, ItemStack(Material.BONE))
+        val flyingDisplay = FlyingItemDisplay.spawn(world, spec.start, spec.handItem ?: ItemStack(Material.BONE))
 
         ensureTask()
         boomerangs[spec.ownerId] = ActiveBoomerang(
@@ -91,7 +95,9 @@ class BoomerangService private constructor(private val plugin: JavaPlugin) {
             returnHitPlayers = mutableSetOf(),
             flyingDisplay = flyingDisplay,
             handItem = spec.handItem,
-            onReturn = spec.onReturn
+            onReturn = spec.onReturn,
+            trailEffect = spec.trailEffect,
+            onHitPlayer = spec.onHitPlayer
         )
         return true
     }
@@ -221,6 +227,7 @@ class BoomerangService private constructor(private val plugin: JavaPlugin) {
             if (display.isValid()) {
                 val elapsedTicks = active.maxLifetimeTicks - active.remainingTicks
                 display.updatePosition(next, active.direction, elapsedTicks)
+                active.trailEffect?.invoke(Location(world, next.x, next.y, next.z))
             }
             return
         }
@@ -273,11 +280,13 @@ class BoomerangService private constructor(private val plugin: JavaPlugin) {
                 ownerId = active.ownerId,
                 hitSet = active.outboundHitPlayers,
                 owner = owner,
-                damage = active.damage
+                damage = active.damage,
+                onHitPlayer = active.onHitPlayer
             )
         }
 
         active.flyingDisplay.updatePosition(next, displacement, active.maxLifetimeTicks - active.remainingTicks)
+        active.trailEffect?.invoke(Location(world, next.x, next.y, next.z))
         active.lineProgress = nextProgress
 
         if (active.returning) {
@@ -324,10 +333,12 @@ class BoomerangService private constructor(private val plugin: JavaPlugin) {
             ownerId = active.ownerId,
             hitSet = active.returnHitPlayers,
             owner = owner,
-            damage = active.damage
+            damage = active.damage,
+            onHitPlayer = active.onHitPlayer
         )
 
         active.flyingDisplay.updatePosition(newPos, moveDir, active.maxLifetimeTicks - active.remainingTicks)
+        active.trailEffect?.invoke(Location(world, newPos.x, newPos.y, newPos.z))
 
         val totalElapsed = active.maxLifetimeTicks - active.remainingTicks
         if (totalElapsed > 0L && totalElapsed % SWEEP_SOUND_INTERVAL_TICKS == 0L) {

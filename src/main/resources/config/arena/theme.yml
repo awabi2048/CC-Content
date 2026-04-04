@@ -318,6 +318,24 @@ nether:
     blaze_beam:
       weight: 3
       wave: 5..
+    magma_cube_medium:
+      weight: 6
+      wave: 2..
+    magma_cube_large:
+      weight: 4
+      wave: 4..
+    wither_skeleton_swap:
+      weight: 6
+      wave: 1..
+    wither_skeleton_bow_guard:
+      weight: 5
+      wave: 3..
+    wither_skeleton_wither_boomerang:
+      weight: 4
+      wave: 4..
+    ashen_spirit:
+      weight: 2
+      wave: 5..
   orientation:
     entrance_exit: north
     corner_entry: south

@@ -15,6 +15,7 @@ import jp.awabi2048.cccontent.mob.type.BoggedRapidShotMobType
 import jp.awabi2048.cccontent.mob.type.BoggedWeaponThrowCloseMobType
 import jp.awabi2048.cccontent.mob.type.BoggedBoomerangMobType
 import jp.awabi2048.cccontent.mob.type.BatVenomMobType
+import jp.awabi2048.cccontent.mob.type.AshenSpiritMobType
 import jp.awabi2048.cccontent.mob.type.BlazeBeamMobType
 import jp.awabi2048.cccontent.mob.type.BlazeMeleeMobType
 import jp.awabi2048.cccontent.mob.type.BlazeNormalMobType
@@ -39,6 +40,9 @@ import jp.awabi2048.cccontent.mob.type.SlimeMediumMobType
 import jp.awabi2048.cccontent.mob.type.SlimePoisonMobType
 import jp.awabi2048.cccontent.mob.type.SlimeSmallMobType
 import jp.awabi2048.cccontent.mob.type.SlimeWitherMobType
+import jp.awabi2048.cccontent.mob.type.MagmaCubeLargeMobType
+import jp.awabi2048.cccontent.mob.type.MagmaCubeMediumMobType
+import jp.awabi2048.cccontent.mob.type.MagmaCubeSmallMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonPlainMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonBoomerangMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonCurveShotMobType
@@ -63,6 +67,9 @@ import jp.awabi2048.cccontent.mob.type.StrayNormalMobType
 import jp.awabi2048.cccontent.mob.type.StrayPlainMobType
 import jp.awabi2048.cccontent.mob.type.StrayRapidShotMobType
 import jp.awabi2048.cccontent.mob.type.StrayWeaponThrowCloseMobType
+import jp.awabi2048.cccontent.mob.type.WitherSkeletonBowGuardMobType
+import jp.awabi2048.cccontent.mob.type.WitherSkeletonSwapMobType
+import jp.awabi2048.cccontent.mob.type.WitherSkeletonWitherBoomerangMobType
 import jp.awabi2048.cccontent.mob.type.WaterSpiritMobType
 import jp.awabi2048.cccontent.mob.type.WitchEliteMobType
 import jp.awabi2048.cccontent.mob.type.WitchNormalMobType
@@ -256,6 +263,12 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(StrayCurveBackstepMobType())
         registerMobType(StrayBowShieldMobType())
         registerMobType(StrayWeaponThrowCloseMobType())
+        registerMobType(MagmaCubeLargeMobType())
+        registerMobType(MagmaCubeMediumMobType())
+        registerMobType(MagmaCubeSmallMobType())
+        registerMobType(WitherSkeletonSwapMobType())
+        registerMobType(WitherSkeletonBowGuardMobType())
+        registerMobType(WitherSkeletonWitherBoomerangMobType())
         registerMobType(SlimeSmallMobType())
         registerMobType(SlimeMediumMobType())
         registerMobType(SlimeLargeMobType())
@@ -271,6 +284,7 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(DrownedGrudgeMobType())
         registerMobType(DrownedPowerThrowMobType())
         registerMobType(WaterSpiritMobType())
+        registerMobType(AshenSpiritMobType())
         registerMobType(GreatFrogMobType())
         registerMobType(WitchNormalMobType())
         registerMobType(WitchEliteMobType())
@@ -605,9 +619,6 @@ class MobService(private val plugin: JavaPlugin) {
     }
 
     private fun clearImplicitEquipmentIfNeeded(entity: LivingEntity, mobType: MobType) {
-        if (mobType.baseEntityType != EntityType.DROWNED) {
-            return
-        }
         val equipment = entity.equipment ?: return
         equipment.setItemInMainHand(ItemStack(Material.AIR))
         equipment.setItemInOffHand(ItemStack(Material.AIR))

@@ -7,6 +7,7 @@ import jp.awabi2048.cccontent.mob.ability.ArmorMagnetPullAbility
 import jp.awabi2048.cccontent.mob.ability.BoomerangAbility
 import jp.awabi2048.cccontent.mob.ability.BackstepAbility
 import jp.awabi2048.cccontent.mob.ability.BlazeSoundControllerAbility
+import jp.awabi2048.cccontent.mob.ability.BlazePackGapDashAbility
 import jp.awabi2048.cccontent.mob.ability.BlazeVolleyAbility
 import jp.awabi2048.cccontent.mob.ability.ClimbingLeapAbility
 import jp.awabi2048.cccontent.mob.ability.DashToTargetOffsetAbility
@@ -36,13 +37,19 @@ import jp.awabi2048.cccontent.mob.ability.WeaponSwapAbility
 import jp.awabi2048.cccontent.mob.ability.BuffEffectEntry
 import jp.awabi2048.cccontent.mob.ability.GreatFrogAbility
 import jp.awabi2048.cccontent.mob.ability.BatSwoopAbility
+import jp.awabi2048.cccontent.mob.ability.AshenSpiritAbility
 import jp.awabi2048.cccontent.mob.ability.WitchRetreatBuffAbility
+import jp.awabi2048.cccontent.mob.ability.MagmaLandingBurstAbility
+import jp.awabi2048.cccontent.mob.ability.MagmaStageDeathAbility
+import jp.awabi2048.cccontent.mob.ability.TriFlameShotAbility
+import jp.awabi2048.cccontent.mob.ability.WitherBoomerangAbility
 import org.bukkit.Color
 import org.bukkit.Particle
 import org.bukkit.Sound
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.Material
 import org.bukkit.entity.EntityType
+import org.bukkit.entity.Slime
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.potion.PotionEffect
@@ -336,7 +343,8 @@ class GuardianDrainMobType : EquipmentMobType(
 class SkeletonPlainMobType : EquipmentMobType(
     id = "skeleton_plain",
     baseEntityType = EntityType.SKELETON,
-    abilities = emptyList()
+    abilities = emptyList(),
+    defaultMainHand = Material.BOW
 )
 
 class SkeletonNormalMobType : EquipmentMobType(
@@ -671,7 +679,8 @@ class SpiderFerociousMobType : EquipmentMobType(
 class BoggedPlainMobType : EquipmentMobType(
     id = "bogged_plain",
     baseEntityType = EntityType.BOGGED,
-    abilities = emptyList()
+    abilities = emptyList(),
+    defaultMainHand = Material.BOW
 )
 
 class BoggedNormalMobType : EquipmentMobType(
@@ -788,7 +797,8 @@ class BoggedBoomerangMobType : EquipmentMobType(
 class StrayPlainMobType : EquipmentMobType(
     id = "stray_plain",
     baseEntityType = EntityType.STRAY,
-    abilities = emptyList()
+    abilities = emptyList(),
+    defaultMainHand = Material.BOW
 )
 
 class StrayNormalMobType : EquipmentMobType(
@@ -881,6 +891,125 @@ class StrayWeaponThrowCloseMobType : EquipmentMobType(
     }
 }
 
+class MagmaCubeLargeMobType : EquipmentMobType(
+    id = "magma_cube_large",
+    baseEntityType = EntityType.MAGMA_CUBE,
+    abilities = listOf(
+        ProjectileAndFireImmunityAbility(id = "magma_cube_large_immunity", playSoundOnProjectileBlock = true),
+        MagmaLandingBurstAbility(id = "magma_cube_large_landing_burst"),
+        MagmaStageDeathAbility(
+            id = "magma_cube_large_split",
+            explosionPower = 0.0f,
+            lavaRadius = 0,
+            lavaLevels = emptyList(),
+            childDefinitionId = "magma_cube_medium"
+        )
+    )
+) {
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val magma = context.entity as? Slime ?: return
+        magma.setSize(4)
+    }
+}
+
+class MagmaCubeMediumMobType : EquipmentMobType(
+    id = "magma_cube_medium",
+    baseEntityType = EntityType.MAGMA_CUBE,
+    abilities = listOf(
+        ProjectileAndFireImmunityAbility(id = "magma_cube_medium_immunity", playSoundOnProjectileBlock = true),
+        MagmaStageDeathAbility(
+            id = "magma_cube_medium_death",
+            explosionPower = 1.0f,
+            lavaRadius = 1,
+            lavaLevels = listOf(1, 2),
+            childDefinitionId = "magma_cube_small"
+        )
+    )
+) {
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val magma = context.entity as? Slime ?: return
+        magma.setSize(3)
+    }
+}
+
+class MagmaCubeSmallMobType : EquipmentMobType(
+    id = "magma_cube_small",
+    baseEntityType = EntityType.MAGMA_CUBE,
+    abilities = listOf(
+        ProjectileAndFireImmunityAbility(id = "magma_cube_small_immunity", playSoundOnProjectileBlock = true),
+        MagmaStageDeathAbility(
+            id = "magma_cube_small_death",
+            explosionPower = 0.5f,
+            lavaRadius = 0,
+            lavaLevels = listOf(7)
+        )
+    )
+) {
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val magma = context.entity as? Slime ?: return
+        magma.setSize(2)
+    }
+}
+
+class WitherSkeletonSwapMobType : EquipmentMobType(
+    id = "wither_skeleton_swap",
+    baseEntityType = EntityType.WITHER_SKELETON,
+    abilities = listOf(
+        WeaponSwapAbility(
+            id = "wither_skeleton_swap_weapon_swap",
+            meleeWeapon = Material.STONE_SWORD,
+            rangedWeapon = Material.BOW,
+            rangedDistanceSquared = 36.0
+        ),
+        RangedAttackAbility(
+            id = "wither_skeleton_swap_ranged",
+            retreatOnCloseRange = true,
+            rangedWeaponTypes = setOf(Material.BOW)
+        )
+    ),
+    defaultMainHand = Material.STONE_SWORD,
+    defaultHelmet = Material.CHAINMAIL_HELMET,
+    defaultBoots = Material.CHAINMAIL_BOOTS
+)
+
+class WitherSkeletonBowGuardMobType : EquipmentMobType(
+    id = "wither_skeleton_bow_guard",
+    baseEntityType = EntityType.WITHER_SKELETON,
+    abilities = listOf(
+        TriFlameShotAbility(
+            id = "wither_skeleton_bow_guard_tri_flame",
+            spreadAngleDegrees = 10.0,
+            retreatOnCloseRange = true,
+            retreatMinDistanceSquared = 25.0
+        ),
+        BackstepAbility(
+            id = "wither_skeleton_bow_guard_backstep",
+            cooldownTicks = 20L,
+            shootArrowOnLand = true,
+            horizontalSpeed = 1.8,
+            verticalSpeed = 0.9,
+            homingConfig = MobShootUtil.HomingConfig()
+        ),
+        ShieldAbility(id = "wither_skeleton_bow_guard_shield", breakDisablesShieldPermanently = true)
+    ),
+    defaultMainHand = Material.BOW,
+    defaultOffHand = Material.SHIELD,
+    defaultHelmet = Material.LEATHER_HELMET,
+    defaultChestplate = Material.IRON_CHESTPLATE,
+    defaultLeggings = Material.LEATHER_LEGGINGS,
+    defaultBoots = Material.LEATHER_BOOTS
+)
+
+class WitherSkeletonWitherBoomerangMobType : EquipmentMobType(
+    id = "wither_skeleton_wither_boomerang",
+    baseEntityType = EntityType.WITHER_SKELETON,
+    abilities = listOf(WitherBoomerangAbility(id = "wither_skeleton_wither_boomerang_ability")),
+    defaultMainHand = Material.BONE
+)
+
 class SlimeSmallMobType : EquipmentMobType(
     id = "slime_merge_small",
     baseEntityType = EntityType.SLIME,
@@ -963,6 +1092,7 @@ class BlazeNormalMobType : EquipmentMobType(
     baseEntityType = EntityType.BLAZE,
     abilities = listOf(
         BlazeSoundControllerAbility(id = "blaze_normal_sound", pitch = 1.0f),
+        BlazePackGapDashAbility(id = "blaze_normal_pack_gap_dash", requiredBlazeCount = 3, targetCheckRadius = 8.0),
         BlazeVolleyAbility(
             id = "blaze_normal_volley",
             projectileKind = BlazeVolleyAbility.ProjectileKind.SMALL_FIREBALL,
@@ -981,6 +1111,7 @@ class BlazePowerMobType : EquipmentMobType(
     baseEntityType = EntityType.BLAZE,
     abilities = listOf(
         BlazeSoundControllerAbility(id = "blaze_power_sound", pitch = 0.8f),
+        BlazePackGapDashAbility(id = "blaze_power_pack_gap_dash", requiredBlazeCount = 3, targetCheckRadius = 8.0),
         BlazeVolleyAbility(
             id = "blaze_power_volley",
             projectileKind = BlazeVolleyAbility.ProjectileKind.FIREBALL,
@@ -999,6 +1130,7 @@ class BlazeRapidMobType : EquipmentMobType(
     baseEntityType = EntityType.BLAZE,
     abilities = listOf(
         BlazeSoundControllerAbility(id = "blaze_rapid_sound", pitch = 1.3f),
+        BlazePackGapDashAbility(id = "blaze_rapid_pack_gap_dash", requiredBlazeCount = 3, targetCheckRadius = 8.0),
         BlazeVolleyAbility(
             id = "blaze_rapid_volley",
             projectileKind = BlazeVolleyAbility.ProjectileKind.SMALL_FIREBALL,
@@ -1018,6 +1150,7 @@ class BlazeMeleeMobType : EquipmentMobType(
     baseEntityType = EntityType.BLAZE,
     abilities = listOf(
         BlazeSoundControllerAbility(id = "blaze_melee_sound", pitch = 1.2f),
+        BlazePackGapDashAbility(id = "blaze_melee_pack_gap_dash", requiredBlazeCount = 3, targetCheckRadius = 8.0),
         DashToTargetOffsetAbility(
             id = "blaze_melee_dash",
             triggerMinDistance = 10.0,
@@ -1051,6 +1184,7 @@ class BlazeBeamMobType : EquipmentMobType(
     baseEntityType = EntityType.BLAZE,
     abilities = listOf(
         BlazeSoundControllerAbility(id = "blaze_beam_sound", pitch = 0.7f),
+        BlazePackGapDashAbility(id = "blaze_beam_pack_gap_dash", requiredBlazeCount = 3, targetCheckRadius = 8.0),
         GenericBeamAbility(
             id = "blaze_beam_attack",
             cooldownTicks = 105L,
@@ -1133,6 +1267,20 @@ class WaterSpiritMobType : EquipmentMobType(
             approachDistance = 5.0,
             closeRangeDamage = 5.0,
             farRangeOrbDamage = 3.5,
+            sharedCooldownTicks = 120L
+        )
+    )
+)
+
+class AshenSpiritMobType : EquipmentMobType(
+    id = "ashen_spirit",
+    baseEntityType = EntityType.VEX,
+    abilities = listOf(
+        AshenSpiritAbility(
+            id = "ashen_spirit_attack",
+            approachDistance = 5.0,
+            closeRangeDamage = 5.0,
+            farRangeDashDamage = 3.5,
             sharedCooldownTicks = 120L
         )
     )

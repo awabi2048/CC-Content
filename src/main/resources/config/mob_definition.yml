@@ -458,6 +458,14 @@ water_spirit:
   spawn_conditions:
     - WATER_ONLY
 
+ashen_spirit:
+  type: ashen_spirit
+  health: 60.0
+  attack: 5.0
+  movement_speed: 0.15
+  armor: 5.0
+  scale: 3.0
+
 frog_big:
   type: frog_big
   health: 36.0
@@ -505,6 +513,54 @@ blaze_beam:
   movement_speed: 0.24
   armor: 4.0
   scale: 1.2
+
+magma_cube_large:
+  type: magma_cube_large
+  health: 44.0
+  attack: 6.0
+  movement_speed: 0.22
+  armor: 5.0
+  scale: 4.8
+
+magma_cube_medium:
+  type: magma_cube_medium
+  health: 28.0
+  attack: 5.0
+  movement_speed: 0.25
+  armor: 2.5
+  scale: 3.8
+
+magma_cube_small:
+  type: magma_cube_small
+  health: 18.0
+  attack: 4.0
+  movement_speed: 0.27
+  armor: 1.5
+  scale: 3.2
+
+wither_skeleton_swap:
+  type: wither_skeleton_swap
+  health: 30.0
+  attack: 6.0
+  movement_speed: 0.24
+  armor: 3.0
+  scale: 1.0
+
+wither_skeleton_bow_guard:
+  type: wither_skeleton_bow_guard
+  health: 34.0
+  attack: 6.5
+  movement_speed: 0.23
+  armor: 5.0
+  scale: 1.0
+
+wither_skeleton_wither_boomerang:
+  type: wither_skeleton_wither_boomerang
+  health: 32.0
+  attack: 6.0
+  movement_speed: 0.24
+  armor: 3.5
+  scale: 1.0
 
 witch_normal:
   type: witch_normal

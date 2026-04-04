@@ -9,6 +9,7 @@ import jp.awabi2048.cccontent.mob.MobGenericDamagedContext
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import jp.awabi2048.cccontent.mob.MobSpawnContext
 import jp.awabi2048.cccontent.mob.MobType
+import jp.awabi2048.cccontent.mob.ability.CustomRangedAttackAbility
 import jp.awabi2048.cccontent.mob.ability.MobAbility
 import jp.awabi2048.cccontent.mob.ability.MobAbilityRuntime
 import jp.awabi2048.cccontent.mob.ability.RangedAttackAbility
@@ -22,7 +23,7 @@ abstract class AbilityMobType(
 ) : MobType {
 
     override fun hasCustomRangedAttack(): Boolean {
-        return abilities.any { it is RangedAttackAbility }
+        return abilities.any { it is RangedAttackAbility || it is CustomRangedAttackAbility }
     }
 
     data class AbilityTickState(var nextDueTick: Long)

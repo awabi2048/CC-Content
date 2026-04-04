@@ -74,7 +74,8 @@ class FlyingItemDisplay private constructor(
         ownerId: UUID,
         hitSet: MutableSet<UUID>,
         owner: LivingEntity,
-        damage: Double
+        damage: Double,
+        onHitPlayer: ((LivingEntity) -> Unit)? = null
     ): Boolean {
         val minX = minOf(from.x, to.x) - DISC_RADIUS
         val maxX = maxOf(from.x, to.x) + DISC_RADIUS
@@ -101,6 +102,7 @@ class FlyingItemDisplay private constructor(
                 continue
             }
             living.damage(damage, owner)
+            onHitPlayer?.invoke(living)
             world.spawnParticle(Particle.CRIT, living.location.add(0.0, 1.0, 0.0), 4, 0.1, 0.1, 0.1, 0.02)
             world.playSound(living.location, Sound.ITEM_SHIELD_BREAK, 0.9f, 1.0f)
         }
