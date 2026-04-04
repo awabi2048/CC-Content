@@ -343,6 +343,13 @@ slime_merge_large:
   movement_speed: 0.22
   armor: 6.0
 
+slime_merge_mini:
+  type: slime_merge_mini
+  health: 5.3333333333
+  attack: 1.3333333333
+  movement_speed: 0.20
+  armor: 0.0
+
 slime_poison:
   type: slime_poison
   health: 22.0

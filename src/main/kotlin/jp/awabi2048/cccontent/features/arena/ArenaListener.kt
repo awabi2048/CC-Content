@@ -36,7 +36,7 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
 
     @EventHandler
     fun onCustomMobSpawn(event: CustomMobSpawnEvent) {
-        arenaManager.registerChildMob(event.entity, event.definition.typeId, event.options.featureId)
+        arenaManager.registerChildMob(event.entity, event.definition.typeId, event.options)
     }
 
     @EventHandler(ignoreCancelled = true)
