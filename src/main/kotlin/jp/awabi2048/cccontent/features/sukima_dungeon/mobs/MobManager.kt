@@ -165,7 +165,6 @@ class MobManager(
         entity.getAttribute(Attribute.ATTACK_DAMAGE)?.baseValue = attack
         entity.getAttribute(Attribute.MOVEMENT_SPEED)?.baseValue = definition.movementSpeed
         entity.getAttribute(Attribute.ARMOR)?.baseValue = definition.armor
-        entity.getAttribute(Attribute.SCALE)?.baseValue = definition.scale
 
         finalEntry.specialBehaviorId?.let { behaviorId ->
             val behavior = behaviors[behaviorId]

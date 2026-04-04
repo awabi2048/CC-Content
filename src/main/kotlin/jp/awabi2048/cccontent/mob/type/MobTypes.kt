@@ -43,14 +43,12 @@ import jp.awabi2048.cccontent.mob.ability.MagmaLandingBurstAbility
 import jp.awabi2048.cccontent.mob.ability.MagmaStageDeathAbility
 import jp.awabi2048.cccontent.mob.ability.TriFlameShotAbility
 import jp.awabi2048.cccontent.mob.ability.WitherBoomerangAbility
-import org.bukkit.attribute.Attribute
 import org.bukkit.Color
 import org.bukkit.Particle
 import org.bukkit.Sound
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.Material
 import org.bukkit.entity.EntityType
-import org.bukkit.entity.Slime
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.potion.PotionEffect
@@ -903,17 +901,10 @@ class MagmaCubeLargeMobType : EquipmentMobType(
             explosionPower = 0.0f,
             lavaRadius = 0,
             lavaLevels = emptyList(),
-            childDefinitionId = "magma_cube_medium"
+            childDefinitionId = "magma_cube_small"
         )
     )
-) {
-    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
-        super.onSpawn(context, runtime)
-        val magma = context.entity as? Slime ?: return
-        magma.setSize(4)
-        restoreMagmaHealth(context)
-    }
-}
+)
 
 class MagmaCubeMediumMobType : EquipmentMobType(
     id = "magma_cube_medium",
@@ -928,14 +919,7 @@ class MagmaCubeMediumMobType : EquipmentMobType(
             childDefinitionId = "magma_cube_small"
         )
     )
-) {
-    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
-        super.onSpawn(context, runtime)
-        val magma = context.entity as? Slime ?: return
-        magma.setSize(3)
-        restoreMagmaHealth(context)
-    }
-}
+)
 
 class MagmaCubeSmallMobType : EquipmentMobType(
     id = "magma_cube_small",
@@ -946,24 +930,25 @@ class MagmaCubeSmallMobType : EquipmentMobType(
             id = "magma_cube_small_death",
             explosionPower = 0.5f,
             lavaRadius = 0,
-            lavaLevels = listOf(7)
+            lavaLevels = listOf(7),
+            childDefinitionId = "magma_cube_mini"
         )
     )
-) {
-    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
-        super.onSpawn(context, runtime)
-        val magma = context.entity as? Slime ?: return
-        magma.setSize(2)
-        restoreMagmaHealth(context)
-    }
-}
+)
 
-private fun restoreMagmaHealth(context: MobSpawnContext) {
-    val magma = context.entity as? Slime ?: return
-    val maxHealth = magma.getAttribute(Attribute.MAX_HEALTH) ?: return
-    maxHealth.baseValue = context.definition.health
-    magma.health = context.definition.health
-}
+class MagmaCubeMiniMobType : EquipmentMobType(
+    id = "magma_cube_mini",
+    baseEntityType = EntityType.MAGMA_CUBE,
+    abilities = listOf(
+        ProjectileAndFireImmunityAbility(id = "magma_cube_mini_immunity", playSoundOnProjectileBlock = true),
+        MagmaStageDeathAbility(
+            id = "magma_cube_mini_death",
+            explosionPower = 0.0f,
+            lavaRadius = 0,
+            lavaLevels = emptyList()
+        )
+    )
+)
 
 class WitherSkeletonSwapMobType : EquipmentMobType(
     id = "wither_skeleton_swap",

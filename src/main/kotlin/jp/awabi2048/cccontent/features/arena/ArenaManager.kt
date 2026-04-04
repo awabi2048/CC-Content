@@ -148,8 +148,7 @@ private data class ArenaDifficultyConfig(
     val mobStatsMaxHealth: Double,
     val mobStatsMaxAttack: Double,
     val mobStatsMaxMovementSpeed: Double,
-    val mobStatsMaxArmor: Double,
-    val mobStatsMaxScale: Double
+    val mobStatsMaxArmor: Double
 ) {
     val difficultyValue: Double
         get() = (difficultyRange.start + difficultyRange.endInclusive) / 2.0
@@ -161,7 +160,9 @@ private data class ArenaDifficultyConfig(
 
 private data class ArenaDropEntry(
     val itemId: String,
-    val baseAmount: Int
+    val minAmount: Int,
+    val maxAmount: Int,
+    val chance: Double
 )
 
 private data class ArenaDropConfig(
@@ -547,7 +548,6 @@ class ArenaManager(
             val mobStatsMaxAttack = section.getDouble("mob_stats_max_attack", 1.0).coerceAtLeast(0.0)
             val mobStatsMaxMovementSpeed = section.getDouble("mob_stats_max_movement_speed", 0.23).coerceAtLeast(0.01)
             val mobStatsMaxArmor = section.getDouble("mob_stats_max_armor", 0.0).coerceAtLeast(0.0)
-            val mobStatsMaxScale = section.getDouble("mob_stats_max_scale", 1.0).coerceAtLeast(0.1)
 
             loaded[difficultyId] = ArenaDifficultyConfig(
                 id = difficultyId,
@@ -562,8 +562,7 @@ class ArenaManager(
                 mobStatsMaxHealth = mobStatsMaxHealth,
                 mobStatsMaxAttack = mobStatsMaxAttack,
                 mobStatsMaxMovementSpeed = mobStatsMaxMovementSpeed,
-                mobStatsMaxArmor = mobStatsMaxArmor,
-                mobStatsMaxScale = mobStatsMaxScale
+                mobStatsMaxArmor = mobStatsMaxArmor
             )
         }
 
@@ -624,10 +623,23 @@ class ArenaManager(
             if (itemId.isBlank()) {
                 continue
             }
-            val baseAmount = entry["amount"]?.toString()?.toIntOrNull()?.coerceAtLeast(1) ?: 1
-            entries.add(ArenaDropEntry(itemId = itemId, baseAmount = baseAmount))
+            val (minAmount, maxAmount) = parseAmountRange(entry["amount"]?.toString()?.trim())
+            val chance = entry["chance"]?.toString()?.toDoubleOrNull()?.coerceIn(0.0, 1.0) ?: 1.0
+            entries.add(ArenaDropEntry(itemId = itemId, minAmount = minAmount, maxAmount = maxAmount, chance = chance))
         }
         return entries
+    }
+
+    private fun parseAmountRange(text: String?): Pair<Int, Int> {
+        if (text.isNullOrBlank()) return 1 to 1
+        val rangeMatch = Regex("^(\\d+)\\s*-\\s*(\\d+)$").matchEntire(text)
+        if (rangeMatch != null) {
+            val min = rangeMatch.groupValues[1].toIntOrNull()?.coerceAtLeast(0) ?: 0
+            val max = rangeMatch.groupValues[2].toIntOrNull()?.coerceAtLeast(min) ?: min
+            return min to max
+        }
+        val fixed = text.toIntOrNull()?.coerceAtLeast(0) ?: 1
+        return fixed to fixed
     }
 
     private fun parseDifficultyRange(text: String?): ClosedFloatingPointRange<Double>? {
@@ -1258,6 +1270,16 @@ class ArenaManager(
             killer?.uniqueId?.let { arenaQuestService?.recordMobKill(it) }
         }
         consumeMob(session, entityId, countKill = countKill)
+    }
+
+    fun registerChildMob(entity: LivingEntity, definitionTypeId: String, featureId: String) {
+        if (featureId != "arena") return
+        val worldName = entity.world.name
+        val session = sessionsByWorld[worldName] ?: return
+        val entityId = entity.uniqueId
+        mobToSessionWorld[entityId] = worldName
+        mobToDefinitionTypeId[entityId] = definitionTypeId
+        session.activeMobs.add(entityId)
     }
 
     fun handleParticipantDamage(event: EntityDamageEvent) {
@@ -2498,7 +2520,6 @@ class ArenaManager(
 
         val killer = entity.killer
         val baseExp = event.droppedExp
-        val vanillaDrops = event.drops.map { it.clone() }
         event.drops.clear()
 
         if (killer == null) {
@@ -2511,7 +2532,6 @@ class ArenaManager(
         val lootingLevel = resolveLootingLevel(killer.inventory)
 
         val rebuiltDrops = mutableListOf<ItemStack>()
-        rebuiltDrops += rebuildVanillaNonEquipmentDrops(vanillaDrops)
         rebuiltDrops += buildConfiguredAdditionalDrops(killer, normalizedTypeId, lootingLevel)
 
         createMobTokenDrop(killer, normalizedTypeId, lootingLevel)?.let { token ->
@@ -2520,16 +2540,9 @@ class ArenaManager(
 
         rebuiltDrops.forEach { stack ->
             if (stack.type.isAir || stack.amount <= 0) return@forEach
-            event.drops += stack
+            entity.world.dropItemNaturally(entity.location.add(0.0, 0.5, 0.0), stack)
         }
         event.droppedExp = floor(baseExp * dropConfig.mockExpBonusRate).toInt().coerceAtLeast(0)
-    }
-
-    private fun rebuildVanillaNonEquipmentDrops(vanillaDrops: List<ItemStack>): List<ItemStack> {
-        return vanillaDrops
-            .filter { !it.type.isAir && it.amount > 0 }
-            .filterNot { classifyEquipmentDropType(it.type) != null }
-            .map { it.clone() }
     }
 
     private fun buildConfiguredAdditionalDrops(killer: Player, mobTypeId: String, lootingLevel: Int): List<ItemStack> {
@@ -2542,7 +2555,8 @@ class ArenaManager(
         }
 
         return entries.mapNotNull { entry ->
-            val amount = applyAmountModifiers(entry.baseAmount, lootingLevel)
+            if (random.nextDouble() >= entry.chance) return@mapNotNull null
+            val amount = applyAmountModifiers(entry.minAmount, entry.maxAmount, lootingLevel)
             resolveConfiguredDrop(entry.itemId, killer, amount)
         }
     }
@@ -2555,8 +2569,12 @@ class ArenaManager(
         return ItemStack(material, amount)
     }
 
-    private fun applyAmountModifiers(baseAmount: Int, lootingLevel: Int): Int {
-        val base = baseAmount.coerceAtLeast(1)
+    private fun applyAmountModifiers(minAmount: Int, maxAmount: Int, lootingLevel: Int): Int {
+        val base = if (minAmount == maxAmount) {
+            minAmount
+        } else {
+            random.nextInt(minAmount, maxAmount + 1)
+        }
         val mockBonus = dropConfig.mockItemCountBonus
         val lootingBonus = if (lootingLevel > 0) random.nextInt(lootingLevel + 1) else 0
         return (base + mockBonus + lootingBonus).coerceAtLeast(1)
@@ -2568,21 +2586,6 @@ class ArenaManager(
         val mainLevel = main.getEnchantmentLevel(Enchantment.LOOTING)
         val offLevel = off.getEnchantmentLevel(Enchantment.LOOTING)
         return maxOf(mainLevel, offLevel)
-    }
-
-    private fun classifyEquipmentDropType(material: Material): String? {
-        val name = material.name
-        return when {
-            name.endsWith("_AXE") -> "axe"
-            name.endsWith("_SWORD") -> "sword"
-            name == "SHIELD" -> "shield"
-            name == "BOW" -> "bow"
-            name.endsWith("_HELMET") -> "helmet"
-            name.endsWith("_CHESTPLATE") -> "chestplate"
-            name.endsWith("_LEGGINGS") -> "leggings"
-            name.endsWith("_BOOTS") -> "boots"
-            else -> null
-        }
     }
 
     private fun createMobTokenDrop(killer: Player, mobTypeId: String, lootingLevel: Int): ItemStack? {
@@ -3537,13 +3540,11 @@ class ArenaManager(
             .coerceAtLeast(0.0)
         val speed = interpolate(definition.movementSpeed, difficulty.mobStatsMaxMovementSpeed, progress).coerceAtLeast(0.01)
         val armor = interpolate(definition.armor, difficulty.mobStatsMaxArmor, progress).coerceAtLeast(0.0)
-        val scale = interpolate(definition.scale, difficulty.mobStatsMaxScale, progress).coerceAtLeast(0.1)
 
         entity.getAttribute(Attribute.MAX_HEALTH)?.baseValue = maxHealth
         entity.getAttribute(Attribute.ATTACK_DAMAGE)?.baseValue = attack
         entity.getAttribute(Attribute.MOVEMENT_SPEED)?.baseValue = speed
         entity.getAttribute(Attribute.ARMOR)?.baseValue = armor
-        entity.getAttribute(Attribute.SCALE)?.baseValue = scale
         entity.health = maxHealth
     }
 
@@ -5371,6 +5372,7 @@ class ArenaManager(
             setGameRule(GameRule.MAX_ENTITY_CRAMMING, 0)
             setGameRule(GameRule.DO_MOB_SPAWNING, false)
             setGameRule(GameRule.DO_TILE_DROPS, false)
+            setGameRule(GameRule.DO_MOB_LOOT, false)
             setGameRule(GameRule.MOB_GRIEFING, false)
             setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false)
             setGameRule(GameRule.DO_WEATHER_CYCLE, false)

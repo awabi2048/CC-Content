@@ -41,6 +41,7 @@ import jp.awabi2048.cccontent.mob.type.SlimePoisonMobType
 import jp.awabi2048.cccontent.mob.type.SlimeSmallMobType
 import jp.awabi2048.cccontent.mob.type.SlimeWitherMobType
 import jp.awabi2048.cccontent.mob.type.MagmaCubeLargeMobType
+import jp.awabi2048.cccontent.mob.type.MagmaCubeMiniMobType
 import jp.awabi2048.cccontent.mob.type.MagmaCubeMediumMobType
 import jp.awabi2048.cccontent.mob.type.MagmaCubeSmallMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonPlainMobType
@@ -266,6 +267,7 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(MagmaCubeLargeMobType())
         registerMobType(MagmaCubeMediumMobType())
         registerMobType(MagmaCubeSmallMobType())
+        registerMobType(MagmaCubeMiniMobType())
         registerMobType(WitherSkeletonSwapMobType())
         registerMobType(WitherSkeletonBowGuardMobType())
         registerMobType(WitherSkeletonWitherBoomerangMobType())
@@ -411,7 +413,6 @@ class MobService(private val plugin: JavaPlugin) {
                 attack = mobSection.getDouble("attack", 1.0).coerceAtLeast(0.0),
                 movementSpeed = mobSection.getDouble("movement_speed", 0.23).coerceAtLeast(0.01),
                 armor = mobSection.getDouble("armor", 0.0).coerceAtLeast(0.0),
-                scale = mobSection.getDouble("scale", 1.0).coerceAtLeast(0.1),
                 mobTokenDropChance = mobSection
                     .getDouble("mob_token_drop_chance", -1.0)
                     .takeIf { it >= 0.0 }
@@ -484,6 +485,13 @@ class MobService(private val plugin: JavaPlugin) {
         mobType.applyDefaultEquipment(spawnContext, runtime)
         mobType.onSpawn(spawnContext, runtime)
         applyDefinitionEquipment(entity, definition, onlyIfEmpty = false)
+
+        if (plugin.isEnabled) {
+            Bukkit.getPluginManager().callEvent(
+                jp.awabi2048.cccontent.mob.event.CustomMobSpawnEvent(entity, definition, options)
+            )
+        }
+
         return entity
     }
 
@@ -1225,7 +1233,6 @@ class MobService(private val plugin: JavaPlugin) {
         entity.getAttribute(Attribute.ATTACK_DAMAGE)?.baseValue = definition.attack
         entity.getAttribute(Attribute.MOVEMENT_SPEED)?.baseValue = definition.movementSpeed
         entity.getAttribute(Attribute.ARMOR)?.baseValue = definition.armor
-        entity.getAttribute(Attribute.SCALE)?.baseValue = definition.scale
         entity.health = definition.health
     }
 

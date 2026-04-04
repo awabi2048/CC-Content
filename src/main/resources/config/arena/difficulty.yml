@@ -11,6 +11,5 @@ easy:
   mob_stats_max_attack: 6.5
   mob_stats_max_movement_speed: 0.28
   mob_stats_max_armor: 5.0
-  mob_stats_max_scale: 1.1
 
 

@@ -4,13 +4,89 @@ difficulty_mock:
   rarity: common
 
 additional_drops:
-  default:
-    - item: ROTTEN_FLESH
-      amount: 1
+  default: []
   by_mob_type:
     zombie:
-      - item: IRON_NUGGET
+      - item: ROTTEN_FLESH
+        amount: 0-2
+      - item: IRON_INGOT
         amount: 1
+        chance: 0.025
+    husk:
+      - item: ROTTEN_FLESH
+        amount: 0-2
+      - item: IRON_INGOT
+        amount: 1
+        chance: 0.025
+    drowned:
+      - item: ROTTEN_FLESH
+        amount: 0-2
+      - item: COPPER_INGOT
+        amount: 0-1
+        chance: 0.11
     skeleton:
       - item: BONE
-        amount: 1
+        amount: 0-2
+      - item: ARROW
+        amount: 0-2
+        chance: 0.8
+    spider:
+      - item: STRING
+        amount: 0-2
+      - item: SPIDER_EYE
+        amount: 0-1
+        chance: 0.33
+    silverfish:
+      - item: GUNPOWDER
+        amount: 0-1
+        chance: 0.3
+    iron_golem:
+      - item: IRON_INGOT
+        amount: 0-2
+      - item: POPPY
+        amount: 0-1
+    guardian:
+      - item: PRISMARINE_SHARD
+        amount: 0-2
+      - item: PRISMARINE_CRYSTALS
+        amount: 0-1
+        chance: 0.33
+    bogged:
+      - item: BONE
+        amount: 0-2
+      - item: ARROW
+        amount: 0-2
+        chance: 0.8
+    slime:
+      - item: SLIME_BALL
+        amount: 0-2
+    blaze:
+      - item: BLAZE_ROD
+        amount: 0-1
+    magma_cube:
+      - item: MAGMA_CREAM
+        amount: 0-1
+    wither_skeleton:
+      - item: COAL
+        amount: 0-1
+      - item: BONE
+        amount: 0-1
+    witch:
+      - item: GLOWSTONE_DUST
+        amount: 0-2
+        chance: 0.125
+      - item: SUGAR
+        amount: 0-2
+        chance: 0.125
+      - item: REDSTONE
+        amount: 0-2
+        chance: 0.125
+      - item: SPIDER_EYE
+        amount: 0-2
+        chance: 0.125
+      - item: GLASS_BOTTLE
+        amount: 0-2
+        chance: 0.125
+      - item: GUNPOWDER
+        amount: 0-2
+        chance: 0.125

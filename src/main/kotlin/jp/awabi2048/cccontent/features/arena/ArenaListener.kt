@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.arena
 
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.mob.ability.MobShootUtil
+import jp.awabi2048.cccontent.mob.event.CustomMobSpawnEvent
 import org.bukkit.NamespacedKey
 import org.bukkit.Sound
 import org.bukkit.entity.AbstractArrow
@@ -31,6 +32,11 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     @EventHandler
     fun onEntityDeath(event: EntityDeathEvent) {
         arenaManager.handleMobDeath(event)
+    }
+
+    @EventHandler
+    fun onCustomMobSpawn(event: CustomMobSpawnEvent) {
+        arenaManager.registerChildMob(event.entity, event.definition.typeId, event.options.featureId)
     }
 
     @EventHandler(ignoreCancelled = true)
