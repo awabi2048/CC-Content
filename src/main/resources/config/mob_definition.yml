@@ -460,8 +460,8 @@ water_spirit:
 
 ashen_spirit:
   type: ashen_spirit
-  health: 60.0
-  attack: 5.0
+  health: 40.0
+  attack: 3.3333333333
   movement_speed: 0.15
   armor: 5.0
   scale: 3.0
@@ -476,88 +476,88 @@ frog_big:
 
 blaze_normal:
   type: blaze_normal
-  health: 28.0
-  attack: 6.0
+  health: 18.6666666667
+  attack: 4.0
   movement_speed: 0.24
   armor: 2.0
   scale: 1.0
 
 blaze_power:
   type: blaze_power
-  health: 38.0
-  attack: 7.0
+  health: 25.3333333333
+  attack: 4.6666666667
   movement_speed: 0.23
   armor: 4.0
   scale: 1.5
 
 blaze_rapid:
   type: blaze_rapid
-  health: 30.0
-  attack: 5.0
+  health: 20.0
+  attack: 3.3333333333
   movement_speed: 0.26
   armor: 2.5
   scale: 1.2
 
 blaze_melee:
   type: blaze_melee
-  health: 42.0
-  attack: 7.0
+  health: 28.0
+  attack: 4.6666666667
   movement_speed: 0.27
   armor: 5.0
   scale: 1.25
 
 blaze_beam:
   type: blaze_beam
-  health: 36.0
-  attack: 8.0
+  health: 24.0
+  attack: 5.3333333333
   movement_speed: 0.24
   armor: 4.0
   scale: 1.2
 
 magma_cube_large:
   type: magma_cube_large
-  health: 44.0
-  attack: 6.0
+  health: 29.3333333333
+  attack: 4.0
   movement_speed: 0.22
   armor: 5.0
   scale: 4.8
 
 magma_cube_medium:
   type: magma_cube_medium
-  health: 28.0
-  attack: 5.0
+  health: 18.6666666667
+  attack: 3.3333333333
   movement_speed: 0.25
   armor: 2.5
   scale: 3.8
 
 magma_cube_small:
   type: magma_cube_small
-  health: 18.0
-  attack: 4.0
+  health: 12.0
+  attack: 2.6666666667
   movement_speed: 0.27
   armor: 1.5
   scale: 3.2
 
 wither_skeleton_swap:
   type: wither_skeleton_swap
-  health: 30.0
-  attack: 6.0
+  health: 20.0
+  attack: 4.0
   movement_speed: 0.24
   armor: 3.0
   scale: 1.0
 
 wither_skeleton_bow_guard:
   type: wither_skeleton_bow_guard
-  health: 34.0
-  attack: 6.5
+  health: 22.6666666667
+  attack: 4.3333333333
   movement_speed: 0.23
   armor: 5.0
   scale: 1.0
 
 wither_skeleton_wither_boomerang:
   type: wither_skeleton_wither_boomerang
-  health: 32.0
-  attack: 6.0
+  health: 21.3333333333
+  attack: 4.0
   movement_speed: 0.24
   armor: 3.5
   scale: 1.0

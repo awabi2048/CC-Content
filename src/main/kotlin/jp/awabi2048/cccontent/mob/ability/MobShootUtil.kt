@@ -4,6 +4,7 @@ import jp.awabi2048.cccontent.mob.ActiveMob
 import jp.awabi2048.cccontent.mob.MobService
 import org.bukkit.Particle
 import org.bukkit.Sound
+import org.bukkit.entity.EntityType
 import org.bukkit.entity.AbstractArrow
 import org.bukkit.entity.Arrow
 import org.bukkit.entity.LivingEntity
@@ -65,6 +66,9 @@ object MobShootUtil {
 
         val projectile = entity.launchProjectile(Arrow::class.java).apply {
             shooter = entity
+        }
+        if (entity.type == EntityType.WITHER_SKELETON) {
+            projectile.fireTicks = maxOf(projectile.fireTicks, 100)
         }
         if (effectSpec != null) {
             (projectile as? TippedArrow)?.addCustomEffect(

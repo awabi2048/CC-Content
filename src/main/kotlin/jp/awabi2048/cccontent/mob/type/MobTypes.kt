@@ -43,6 +43,7 @@ import jp.awabi2048.cccontent.mob.ability.MagmaLandingBurstAbility
 import jp.awabi2048.cccontent.mob.ability.MagmaStageDeathAbility
 import jp.awabi2048.cccontent.mob.ability.TriFlameShotAbility
 import jp.awabi2048.cccontent.mob.ability.WitherBoomerangAbility
+import org.bukkit.attribute.Attribute
 import org.bukkit.Color
 import org.bukkit.Particle
 import org.bukkit.Sound
@@ -910,6 +911,7 @@ class MagmaCubeLargeMobType : EquipmentMobType(
         super.onSpawn(context, runtime)
         val magma = context.entity as? Slime ?: return
         magma.setSize(4)
+        restoreMagmaHealth(context)
     }
 }
 
@@ -931,6 +933,7 @@ class MagmaCubeMediumMobType : EquipmentMobType(
         super.onSpawn(context, runtime)
         val magma = context.entity as? Slime ?: return
         magma.setSize(3)
+        restoreMagmaHealth(context)
     }
 }
 
@@ -951,7 +954,15 @@ class MagmaCubeSmallMobType : EquipmentMobType(
         super.onSpawn(context, runtime)
         val magma = context.entity as? Slime ?: return
         magma.setSize(2)
+        restoreMagmaHealth(context)
     }
+}
+
+private fun restoreMagmaHealth(context: MobSpawnContext) {
+    val magma = context.entity as? Slime ?: return
+    val maxHealth = magma.getAttribute(Attribute.MAX_HEALTH) ?: return
+    maxHealth.baseValue = context.definition.health
+    magma.health = context.definition.health
 }
 
 class WitherSkeletonSwapMobType : EquipmentMobType(
