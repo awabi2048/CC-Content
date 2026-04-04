@@ -3133,7 +3133,10 @@ class ArenaManager(
             } else {
                 maxAliveBase
             }
-            if (currentSession.activeMobs.size >= maxAlive) {
+            val waveAliveCount = currentSession.waveMobIds[wave]
+                ?.count { mobId -> Bukkit.getEntity(mobId)?.let { it.isValid && !it.isDead } == true }
+                ?: 0
+            if (waveAliveCount >= maxAlive) {
                 return@Runnable
             }
 
@@ -3342,7 +3345,11 @@ class ArenaManager(
         if (previousWave <= 0) return
 
         stopWaveSpawning(session, previousWave)
-        removeWaveMobs(session, previousWave)
+
+        val olderWave = previousWave - 1
+        if (olderWave > 0) {
+            removeWaveMobs(session, olderWave)
+        }
     }
 
     private fun findPlayersInPreviousWaveOrEarlierRooms(
