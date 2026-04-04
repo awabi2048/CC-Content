@@ -152,6 +152,7 @@ data class ArenaSession(
     var lastClearedWaveForBossBar: Int? = null,
     var stageMaxAliveCount: Int = 1,
     val mobWaveMap: MutableMap<UUID, Int> = mutableMapOf(),
+    val mobDamagedParticipants: MutableMap<UUID, MutableSet<UUID>> = mutableMapOf(),
     val playerNotifiedWaves: MutableMap<UUID, MutableSet<Int>> = mutableMapOf(),
     val participantLocationHistory: MutableMap<UUID, ArrayDeque<TimedPlayerLocation>> = mutableMapOf(),
     val participantLastSampleMillis: MutableMap<UUID, Long> = mutableMapOf(),

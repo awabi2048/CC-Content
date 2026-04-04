@@ -994,6 +994,7 @@ custom_items:
       mob_names:
         zombie: 'ゾンビ'
         skeleton: 'スケルトン'
+        wither_skeleton: 'ウィザースケルトン'
         zombie_leap_only: '跳躍ゾンビ'
         zombie_bow_only: '弓ゾンビ'
         zombie_bow_swap: '換装ゾンビ'
@@ -1025,10 +1026,20 @@ custom_items:
         husk: 'ハスクのかたびら'
         iron_golem: 'ゴーレムのコア'
         guardian: 'ガーディアンのうろこ'
+        elder_guardian: 'エルダーガーディアンのうろこ'
         silverfish: 'シルバーフィッシュの殻'
         spider: 'クモのハサミ'
         drowned: 'ひどく錆びた銅インゴット'
         witch: '怪しげな薬瓶'
+        blaze: '灼熱の残り火'
+        magma_cube: '溶岩核'
+        slime: '粘体コア'
+        bogged: '沼骨の欠片'
+        stray: '凍てつく骨片'
+        bat: '毒蝙蝠の翼膜'
+        allay: '水精の欠片'
+        vex: '灰霊の欠片'
+        frog: '巨蛙の舌'
     theme:
     ruins:
       name: '遺跡'

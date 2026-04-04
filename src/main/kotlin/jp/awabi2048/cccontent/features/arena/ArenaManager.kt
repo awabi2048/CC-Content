@@ -82,8 +82,11 @@ import org.bukkit.scheduler.BukkitTask
 import org.bukkit.scoreboard.DisplaySlot
 import org.bukkit.util.Vector
 import java.io.File
+import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
 import java.util.Locale
 import java.util.UUID
+import java.util.logging.Level
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.floor
@@ -584,7 +587,8 @@ class ArenaManager(
         mobDefinitions.putAll(loaded)
         knownMobTypeIds.clear()
         knownMobTypeIds.addAll(loaded.values.map { it.typeId.trim().lowercase(Locale.ROOT) })
-        registerMobTypeTokenItems()
+        val tokenTypeIds = registerMobTypeTokenItems()
+        validateMobTokenLanguageKeys(tokenTypeIds)
 
         if (mobDefinitions.isEmpty()) {
             plugin.logger.severe("[Arena] config/mob_definition.yml が空のためアリーナを開始できません")
@@ -1258,16 +1262,32 @@ class ArenaManager(
 
     fun handleMobDeath(event: EntityDeathEvent) {
         val entityId = event.entity.uniqueId
-        applyArenaMobDrop(event)
+        try {
+            applyArenaMobDrop(event)
+        } catch (exception: Exception) {
+            plugin.logger.log(Level.SEVERE, "[Arena] モブドロップ処理に失敗しましたが討伐進行は継続します: entityId=$entityId", exception)
+        }
         val worldName = mobToSessionWorld.remove(entityId) ?: return
         val session = sessionsByWorld[worldName] ?: return
         session.barrierDefenseMobIds.remove(entityId)
         session.barrierDefenseTargetMobIds.remove(entityId)
         session.barrierDefenseAssaultMobIds.remove(entityId)
         val killer = event.entity.killer
-        val countKill = killer != null && session.participants.contains(killer.uniqueId)
+        val trackedParticipantDamagers = session.mobDamagedParticipants.remove(entityId)
+            .orEmpty()
+            .filter { session.participants.contains(it) }
+            .toSet()
+        val killerParticipantId = killer?.uniqueId?.takeIf { session.participants.contains(it) }
+        val killAwardParticipantIds = when {
+            killerParticipantId == null -> trackedParticipantDamagers
+            trackedParticipantDamagers.isEmpty() -> setOf(killerParticipantId)
+            else -> trackedParticipantDamagers + killerParticipantId
+        }
+        val countKill = killAwardParticipantIds.isNotEmpty()
         if (countKill) {
-            killer?.uniqueId?.let { arenaQuestService?.recordMobKill(it) }
+            killAwardParticipantIds.forEach { participantId ->
+                arenaQuestService?.recordMobKill(participantId)
+            }
         }
         consumeMob(session, entityId, countKill = countKill)
     }
@@ -1501,6 +1521,22 @@ class ArenaManager(
         val attackerMobId = resolveArenaMobAttackerId(event) ?: return
         val attackerWorld = mobToSessionWorld[attackerMobId] ?: return
         if (damagedWorld != attackerWorld) return
+        event.isCancelled = true
+    }
+
+    fun handleMobDamagedByParticipant(event: EntityDamageByEntityEvent) {
+        val damaged = event.entity as? LivingEntity ?: return
+        if (damaged is Player) return
+
+        val worldName = mobToSessionWorld[damaged.uniqueId] ?: return
+        val session = sessionsByWorld[worldName] ?: return
+        val attacker = resolveDamagerPlayer(event) ?: return
+        if (!session.participants.contains(attacker.uniqueId)) return
+        if (attacker.world.name != session.worldName) return
+
+        session.mobDamagedParticipants
+            .getOrPut(damaged.uniqueId) { mutableSetOf() }
+            .add(attacker.uniqueId)
     }
 
     fun handleMultiplayerInviteSwing(event: PlayerAnimationEvent) {
@@ -2621,7 +2657,7 @@ class ArenaManager(
         return normalized.replace(Regex("[^a-z0-9_]+"), "_")
     }
 
-    private fun registerMobTypeTokenItems() {
+    private fun registerMobTypeTokenItems(): Set<String> {
         val tokenTypeIds = buildSet {
             knownMobTypeIds.forEach { add(resolveMobTokenCategoryTypeId(it)) }
         }
@@ -2629,6 +2665,90 @@ class ArenaManager(
             CustomItemManager.register(ArenaMobTokenItem(typeId))
         }
         CustomItemManager.register(BoomerangTokenItem())
+        return tokenTypeIds
+    }
+
+    private fun validateMobTokenLanguageKeys(requiredTypeIds: Set<String>) {
+        if (requiredTypeIds.isEmpty()) return
+
+        val locales = discoverAvailableLocales()
+        locales.forEach { locale ->
+            val config = loadLangConfig(locale)
+            if (config == null) {
+                plugin.logger.warning("[Arena] mob_token言語検証: locale=$locale の言語ファイルを読み込めません")
+                return@forEach
+            }
+
+            val missingKeys = mutableListOf<String>()
+            if (!config.isString("custom_items.arena.mob_token.display_format")) {
+                missingKeys += "custom_items.arena.mob_token.display_format"
+            }
+            if (!config.isList("custom_items.arena.mob_token.lore")) {
+                missingKeys += "custom_items.arena.mob_token.lore"
+            }
+
+            requiredTypeIds.forEach { typeId ->
+                val normalizedTypeId = normalizeMobTokenLanguageTypeId(typeId)
+                val key = if (usesHeadTokenDisplayName(normalizedTypeId)) {
+                    "custom_items.arena.mob_token.mob_names.$normalizedTypeId"
+                } else {
+                    "custom_items.arena.mob_token.drop_names.$normalizedTypeId"
+                }
+                if (!config.isString(key)) {
+                    missingKeys += key
+                }
+            }
+
+            if (missingKeys.isNotEmpty()) {
+                plugin.logger.warning("[Arena] mob_token言語検証: locale=$locale で不足/型不正キー ${missingKeys.size}件")
+                missingKeys.forEach { key ->
+                    plugin.logger.warning("[Arena]   - $key")
+                }
+            }
+        }
+    }
+
+    private fun usesHeadTokenDisplayName(typeId: String): Boolean {
+        return when (typeId) {
+            "skeleton", "zombie", "creeper", "piglin", "wither_skeleton", "ender_dragon" -> true
+            else -> false
+        }
+    }
+
+    private fun normalizeMobTokenLanguageTypeId(typeId: String): String {
+        return when (sanitizeMobTypeId(typeId)) {
+            "cave_spider" -> "spider"
+            else -> sanitizeMobTypeId(typeId)
+        }
+    }
+
+    private fun discoverAvailableLocales(): Set<String> {
+        val locales = linkedSetOf("ja_jp", "en_us")
+
+        val langDir = File(plugin.dataFolder, "lang")
+        if (langDir.exists()) {
+            val fromDataFolder = langDir.listFiles { file ->
+                file.isFile && file.extension.equals("yml", ignoreCase = true)
+            }.orEmpty().map { it.nameWithoutExtension.lowercase(Locale.ROOT) }
+            locales.addAll(fromDataFolder)
+        }
+
+        return locales
+    }
+
+    private fun loadLangConfig(locale: String): YamlConfiguration? {
+        val normalized = locale.lowercase(Locale.ROOT)
+        val fromDataFolder = File(plugin.dataFolder, "lang/$normalized.yml")
+        if (fromDataFolder.exists()) {
+            return YamlConfiguration.loadConfiguration(fromDataFolder)
+        }
+
+        val resource = plugin.getResource("lang/$normalized.yml") ?: return null
+        resource.use { input ->
+            InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
+                return YamlConfiguration.loadConfiguration(reader)
+            }
+        }
     }
 
     fun activateDoorActionMarkers(worldName: String, wave: Int): Int {
@@ -2887,6 +3007,7 @@ class ArenaManager(
             mobToSessionWorld.remove(mobId)
             mobToDefinitionTypeId.remove(mobId)
             session.mobWaveMap.remove(mobId)
+            session.mobDamagedParticipants.remove(mobId)
             mobService.untrack(mobId)
             val entity = Bukkit.getEntity(mobId)
             if (entity != null && entity.isValid && !entity.isDead) {
@@ -3605,6 +3726,7 @@ class ArenaManager(
         mobToSessionWorld.remove(mobId)
         mobToDefinitionTypeId.remove(mobId)
         val wave = session.mobWaveMap.remove(mobId)
+        session.mobDamagedParticipants.remove(mobId)
         if (wave != null) {
             session.waveMobIds[wave]?.remove(mobId)
             tryQueueWaveClearedMessage(session, wave)
@@ -3913,6 +4035,7 @@ class ArenaManager(
 
             session.activeMobs.remove(mobId)
             session.mobWaveMap.remove(mobId)
+            session.mobDamagedParticipants.remove(mobId)
             mobToSessionWorld.remove(mobId)
             mobToDefinitionTypeId.remove(mobId)
             mobService.untrack(mobId)
@@ -4390,6 +4513,7 @@ class ArenaManager(
             mobToSessionWorld.remove(mobId)
             mobToDefinitionTypeId.remove(mobId)
             session.mobWaveMap.remove(mobId)
+            session.mobDamagedParticipants.remove(mobId)
             mobService.untrack(mobId)
             session.activeMobs.remove(mobId)
         }
@@ -4409,6 +4533,7 @@ class ArenaManager(
                 val mobId = mob.uniqueId
                 session.activeMobs.remove(mobId)
                 session.mobWaveMap.remove(mobId)
+                session.mobDamagedParticipants.remove(mobId)
                 session.waveMobIds.values.forEach { it.remove(mobId) }
                 session.barrierDefenseMobIds.remove(mobId)
                 session.barrierDefenseTargetMobIds.remove(mobId)
@@ -4558,6 +4683,7 @@ class ArenaManager(
         ids.forEach { mobId ->
             mobToSessionWorld.remove(mobId)
             mobToDefinitionTypeId.remove(mobId)
+            session.mobDamagedParticipants.remove(mobId)
             mobService.untrack(mobId)
             session.barrierDefenseTargetMobIds.remove(mobId)
             session.barrierDefenseAssaultMobIds.remove(mobId)

@@ -364,6 +364,7 @@ custom_items:
       mob_names:
         zombie: "Zombie"
         skeleton: "Skeleton"
+        wither_skeleton: "Wither Skeleton"
         zombie_leap_only: "Leaper Zombie"
         zombie_bow_only: "Archer Zombie"
         zombie_bow_swap: "Swap Zombie"
@@ -394,10 +395,20 @@ custom_items:
         husk: "Husk Tunic"
         iron_golem: "Golem Core"
         guardian: "Guardian Scale"
+        elder_guardian: "Elder Guardian Scale"
         silverfish: "Silverfish Shell"
         spider: "Spider Claw"
         drowned: "Heavily Tarnished Copper Ingot"
         witch: "Suspicious Potion Bottle"
+        blaze: "Scorching Ember"
+        magma_cube: "Magma Core"
+        slime: "Slime Core"
+        bogged: "Bogged Bone Fragment"
+        stray: "Frostbone Fragment"
+        bat: "Venom Bat Wing Membrane"
+        allay: "Spirit Shard"
+        vex: "Ash Wisp Fragment"
+        frog: "Great Frog Tongue"
     theme:
       ruins:
         name: "Ruins"

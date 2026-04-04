@@ -62,6 +62,7 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
         if (event.isCancelled) {
             return
         }
+        arenaManager.handleMobDamagedByParticipant(event)
         handleConfusionArrowHit(event)
         handleConfusionMeleeMiss(event)
     }
