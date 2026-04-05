@@ -60,8 +60,16 @@ object CustomItemManager {
         return createItemForPlayer(fullId, null, amount)
     }
 
+    fun createItem(customItem: CustomItem, amount: Int = 1): ItemStack {
+        return createItemForPlayer(customItem, null, amount)
+    }
+
     fun createItemForPlayer(fullId: String, player: Player?, amount: Int = 1): ItemStack? {
         val customItem = items[fullId] ?: return null
+        return createItemForPlayer(customItem, player, amount)
+    }
+
+    fun createItemForPlayer(customItem: CustomItem, player: Player?, amount: Int = 1): ItemStack {
         val created = customItem.createItemForPlayer(player, amount)
         applyCommonDataComponents(customItem, created)
         markCustomItemId(created, customItem.fullId)

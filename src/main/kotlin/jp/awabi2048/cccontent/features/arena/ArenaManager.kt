@@ -2641,8 +2641,7 @@ class ArenaManager(
             return null
         }
         val categoryTypeId = resolveMobTokenCategoryTypeId(mobTypeId)
-        val fullId = "arena.mob_token_${sanitizeMobTypeId(categoryTypeId)}"
-        return CustomItemManager.createItemForPlayer(fullId, killer, 1)
+        return CustomItemManager.createItemForPlayer(ArenaMobTokenItem(categoryTypeId), killer, 1)
     }
 
     private fun resolveMobTokenCategoryTypeId(mobTypeId: String): String {
@@ -2672,9 +2671,7 @@ class ArenaManager(
         val tokenTypeIds = buildSet {
             knownMobTypeIds.forEach { add(resolveMobTokenCategoryTypeId(it)) }
         }
-        for (typeId in tokenTypeIds) {
-            CustomItemManager.register(ArenaMobTokenItem(typeId))
-        }
+        CustomItemManager.register(ArenaMobTokenItem())
         CustomItemManager.register(BoomerangTokenItem())
         return tokenTypeIds
     }

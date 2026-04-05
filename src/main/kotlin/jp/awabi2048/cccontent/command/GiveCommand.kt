@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.command
 
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
 import org.bukkit.Bukkit
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
@@ -61,14 +62,19 @@ class GiveCommand : CommandExecutor, TabCompleter {
             return true
         }
         
-        if (CustomItemManager.getItem(fullId) == null) {
+        val arenaTokenCategory = parseArenaTokenCategory(fullId)
+        if (arenaTokenCategory == null && CustomItemManager.getItem(fullId) == null) {
             sender.sendMessage("§cアイテムID '§f$fullId§c' が見つかりません")
             return true
         }
-        
+
         // プレイヤーに配布
         targetPlayers.forEach { player ->
-            val item = CustomItemManager.createItemForPlayer(fullId, player, amount)
+            val item = if (arenaTokenCategory != null) {
+                CustomItemManager.createItemForPlayer(ArenaMobTokenItem(arenaTokenCategory), player, amount)
+            } else {
+                CustomItemManager.createItemForPlayer(fullId, player, amount)
+            }
             if (item != null) {
                 player.inventory.addItem(item)
             }
@@ -101,12 +107,37 @@ class GiveCommand : CommandExecutor, TabCompleter {
              }
              // アイテムID補完（/cc give <player> [ここ]）
              2 -> {
-                 val itemPrefix = args[1].lowercase()
-                 CustomItemManager.getAllItemIds()
-                     .filter { it.lowercase().startsWith(itemPrefix) }
-                     .toList()
-             }
-             else -> emptyList()
-         }
-     }
-}
+                  val itemPrefix = args[1].lowercase()
+                  val baseCandidates = CustomItemManager.getAllItemIds()
+                      .filter { it.lowercase().startsWith(itemPrefix) }
+                  val tokenCandidates = when {
+                      itemPrefix.startsWith("arena.mob_token#") -> {
+                          val raw = itemPrefix.substringAfter("#", "")
+                          ArenaMobTokenItem.supportedTokenCategoryTypeIds()
+                              .sorted()
+                              .map { "arena.mob_token#$it" }
+                              .filter { it.startsWith("arena.mob_token#$raw") }
+                      }
+                      "arena.mob_token#".startsWith(itemPrefix) -> listOf("arena.mob_token#")
+                      else -> emptyList()
+                  }
+                  (baseCandidates + tokenCandidates).distinct().toList()
+              }
+              else -> emptyList()
+          }
+      }
+
+    private fun parseArenaTokenCategory(fullId: String): String? {
+        if (!fullId.startsWith("arena.mob_token#")) {
+            return null
+        }
+        val rawCategory = fullId.substringAfter('#', "").trim()
+        if (rawCategory.isBlank()) {
+            return null
+        }
+        if (!ArenaMobTokenItem.supportsTokenCategoryTypeId(rawCategory)) {
+            return null
+        }
+        return ArenaMobTokenItem.resolveTokenCategoryTypeId(rawCategory)
+    }
+ }

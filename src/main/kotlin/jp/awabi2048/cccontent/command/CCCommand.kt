@@ -92,8 +92,8 @@ class CCCommand(
             return false
         }
 
-        if (args.size != 5) {
-            sender.sendMessage("§c使用法: /ccc summon <mob_definition_id> <x> <y> <z>")
+        if (args.size != 2 && args.size != 5) {
+            sender.sendMessage("§c使用法: /ccc summon <mob_definition_id> [<x> <y> <z>]")
             return false
         }
 
@@ -103,11 +103,18 @@ class CCCommand(
             return false
         }
 
-        val location = try {
-            parseLocation(sender, args[2], args[3], args[4])
-        } catch (e: IllegalArgumentException) {
-            sender.sendMessage("§c${e.message}")
-            return false
+        val location = if (args.size == 2) {
+            senderLocation(sender)?.clone() ?: run {
+                sender.sendMessage("§c座標省略は位置を持つ実行者のみ使用できます")
+                return false
+            }
+        } else {
+            try {
+                parseLocation(sender, args[2], args[3], args[4])
+            } catch (e: IllegalArgumentException) {
+                sender.sendMessage("§c${e.message}")
+                return false
+            }
         }
 
         val entity = onSummonMob.invoke(definitionId, location)
@@ -418,9 +425,11 @@ class CCCommand(
                  §f/ccc restart
                  §7  - プラグインを再起動相当に再初期化します
 
-               §f/ccc summon <mob_definition_id> <x> <y> <z>
+               §f/ccc summon <mob_definition_id> [<x> <y> <z>]
                §7  - 共通 mob_definition からモブを召喚します
+               §7  - 座標省略時は実行者の現在地で召喚します
                §7  - 例: /ccc summon zombie_leap_only ~ ~ ~
+               §7  - 例: /ccc summon zombie_leap_only
 
                §f/ccc clear_block_placement_data
                §7  - プレイヤー設置ブロック判定データを削除します

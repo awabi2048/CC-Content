@@ -241,7 +241,9 @@ class BoomerangService private constructor(private val plugin: JavaPlugin) {
     }
 
     private fun createBoomerangToken(): ItemStack {
-        return jp.awabi2048.cccontent.items.arena.BoomerangTokenItem().createItem(1)
+        return requireNotNull(jp.awabi2048.cccontent.items.CustomItemManager.createItem("arena.boomerang_token", 1)) {
+            "arena.boomerang_token is not registered"
+        }
     }
 
     private fun tickOutbound(

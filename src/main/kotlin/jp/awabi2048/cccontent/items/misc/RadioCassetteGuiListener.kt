@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.items.misc
 
+import jp.awabi2048.cccontent.items.CustomItemManager
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -171,7 +172,9 @@ object RadioCassetteGui {
                 createIcon(Material.BARRIER, "§7カセットテープ", listOf("§7未挿入", "§7下段インベントリのカセットを", "§7クリックして挿入します"))
             )
         } else {
-            val cassetteIcon = CassetteTapeItem(inserted).createItem(1)
+            val cassetteIcon = requireNotNull(CustomItemManager.createItem("misc.cassette_${inserted.id}", 1)) {
+                "misc.cassette_${inserted.id} is not registered"
+            }
             val meta = cassetteIcon.itemMeta
             if (meta != null) {
                 val lore = (meta.lore() ?: emptyList()).toMutableList()
