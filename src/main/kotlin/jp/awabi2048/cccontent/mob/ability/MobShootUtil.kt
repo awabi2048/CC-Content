@@ -67,6 +67,7 @@ object MobShootUtil {
         val projectile = entity.launchProjectile(Arrow::class.java).apply {
             shooter = entity
         }
+        MobService.getInstance(plugin)?.markMobShotArrow(projectile)
         if (entity.type == EntityType.WITHER_SKELETON) {
             projectile.fireTicks = maxOf(projectile.fireTicks, 100)
         }

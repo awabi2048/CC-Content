@@ -8,6 +8,10 @@ import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.util.Vector
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 class MagmaLandingBurstAbility(
     override val id: String,
@@ -42,8 +46,8 @@ class MagmaLandingBurstAbility(
     private fun triggerBurst(entity: LivingEntity, runtime: Runtime) {
         val world = entity.world
         val center = entity.location.clone().add(0.0, 0.1, 0.0)
-        world.spawnParticle(Particle.FLAME, center, 65, 1.4, 0.6, 1.4, 0.03)
-        world.spawnParticle(Particle.SMOKE, center, 36, 1.2, 0.5, 1.2, 0.02)
+        world.spawnParticle(Particle.FLAME, center, 22, 1.4, 0.6, 1.4, 0.03)
+        world.spawnParticle(Particle.SMOKE, center, 12, 1.2, 0.5, 1.2, 0.02)
         world.playSound(center, Sound.ENTITY_MAGMA_CUBE_SQUISH, 1.0f, 0.7f)
         spawnDustTransitionField(entity, center, runtime)
 
@@ -67,22 +71,24 @@ class MagmaLandingBurstAbility(
     private fun spawnDustTransitionField(entity: LivingEntity, center: org.bukkit.Location, runtime: Runtime) {
         val plugin = runtime.plugin ?: return
         val world = center.world ?: return
-        val transitions = listOf(
-            Particle.DustTransition(Color.fromRGB(255, 0, 0), Color.fromRGB(255, 96, 0), 1.3f),
-            Particle.DustTransition(Color.fromRGB(255, 96, 0), Color.fromRGB(255, 185, 64), 1.3f),
-            Particle.DustTransition(Color.fromRGB(255, 185, 64), Color.fromRGB(255, 255, 136), 1.3f)
-        )
+        val transition = Particle.DustTransition(Color.fromRGB(255, 0, 0), Color.fromRGB(0, 0, 0), 0.5f)
+        val steps = 10
+        val pointsPerStep = ((radius * radius * 10.0) / 3.0).toInt().coerceAtLeast(10)
+        val ringWidth = (radius / steps.toDouble()).coerceAtLeast(0.35)
 
-        repeat(10) { tick ->
+        repeat(steps) { tick ->
             plugin.server.scheduler.runTaskLater(plugin, Runnable {
                 if (!entity.isValid || entity.isDead) return@Runnable
-                val transition = transitions[(tick * transitions.size) / 10]
-                val points = (radius * radius * 10.0).toInt().coerceAtLeast(28)
-                repeat(points) {
-                    val angle = Math.random() * Math.PI * 2.0
-                    val distance = Math.sqrt(Math.random()) * radius
-                    val x = kotlin.math.cos(angle) * distance
-                    val z = kotlin.math.sin(angle) * distance
+                val progress = (tick + 1).toDouble() / steps.toDouble()
+                val outerRadius = radius * progress
+                val innerRadius = (outerRadius - ringWidth).coerceAtLeast(0.0)
+                val outerSquared = outerRadius * outerRadius
+                val innerSquared = innerRadius * innerRadius
+                repeat(pointsPerStep) {
+                    val angle = Math.random() * PI * 2.0
+                    val distance = sqrt(Math.random() * (outerSquared - innerSquared) + innerSquared)
+                    val x = cos(angle) * distance
+                    val z = sin(angle) * distance
                     val loc = center.clone().add(x, 0.12 + Math.random() * 0.45, z)
                     world.spawnParticle(Particle.DUST_COLOR_TRANSITION, loc, 1, 0.0, 0.0, 0.0, 0.0, transition)
                 }

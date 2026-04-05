@@ -198,6 +198,7 @@ data class ArenaSession(
     var arenaWaveStartCombatDelayTask: BukkitTask? = null,
     var entranceNormalBgmStarted: Boolean = false,
     var hadAliveCombatMobs: Boolean = false,
+    var combatMobEmptySinceTick: Long? = null,
     val transitionTasks: MutableList<BukkitTask> = mutableListOf(),
     val waveSpawnTasks: MutableMap<Int, BukkitTask> = mutableMapOf()
 )

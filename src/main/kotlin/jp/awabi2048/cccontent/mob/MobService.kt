@@ -37,6 +37,7 @@ import jp.awabi2048.cccontent.mob.type.SilverfishPlainMobType
 import jp.awabi2048.cccontent.mob.type.SilverfishStealthFangMobType
 import jp.awabi2048.cccontent.mob.type.SlimeLargeMobType
 import jp.awabi2048.cccontent.mob.type.SlimeMediumMobType
+import jp.awabi2048.cccontent.mob.type.SlimeMiniMobType
 import jp.awabi2048.cccontent.mob.type.SlimePoisonMobType
 import jp.awabi2048.cccontent.mob.type.SlimeSmallMobType
 import jp.awabi2048.cccontent.mob.type.SlimeWitherMobType
@@ -191,7 +192,10 @@ class MobService(private val plugin: JavaPlugin) {
     private val skeletonEffectArrowTypeKey = NamespacedKey(plugin, "skeleton_effect_arrow_type")
     private val skeletonEffectArrowAmplifierKey = NamespacedKey(plugin, "skeleton_effect_arrow_amp")
     private val skeletonEffectArrowDurationKey = NamespacedKey(plugin, "skeleton_effect_arrow_duration")
+    private val mobShotArrowKey = NamespacedKey(plugin, "mob_shot_arrow")
     private val customProjectileDamageKey = NamespacedKey(plugin, "custom_projectile_damage")
+    private val blazeDirectHitAppliedKey = NamespacedKey(plugin, "blaze_direct_hit_applied")
+    private val downgradeAoEProtectUntilTickKey = NamespacedKey(plugin, "downgrade_aoe_protect_until")
     private val stealthFangKey = NamespacedKey(plugin, "stealth_fang")
     private var tickTask: BukkitTask? = null
 
@@ -208,6 +212,16 @@ class MobService(private val plugin: JavaPlugin) {
     private val ELITE_WITCH_DEFAULT_EFFECT_COLOR = Color.fromRGB(140, 60, 175)
     private val ELITE_WITCH_EFFECT_AMPLIFIER_BONUS = 1
     private val eliteWitchEffectTable: List<WitchEffectEntry> = buildEliteWitchEffectTable()
+    private val DOWNGRADE_AOE_PROTECTION_TICKS = 15L
+    private val DOWNGRADE_AOE_DAMAGE_CAUSES = setOf(
+        EntityDamageEvent.DamageCause.ENTITY_EXPLOSION,
+        EntityDamageEvent.DamageCause.BLOCK_EXPLOSION,
+        EntityDamageEvent.DamageCause.FIRE,
+        EntityDamageEvent.DamageCause.FIRE_TICK,
+        EntityDamageEvent.DamageCause.LAVA,
+        EntityDamageEvent.DamageCause.HOT_FLOOR,
+        EntityDamageEvent.DamageCause.CAMPFIRE
+    )
 
     init {
         synchronized(instances) {
@@ -274,6 +288,7 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(SlimeSmallMobType())
         registerMobType(SlimeMediumMobType())
         registerMobType(SlimeLargeMobType())
+        registerMobType(SlimeMiniMobType())
         registerMobType(SlimePoisonMobType())
         registerMobType(SlimeWitherMobType())
         registerMobType(BlazeNormalMobType())
@@ -526,6 +541,10 @@ class MobService(private val plugin: JavaPlugin) {
         container.set(skeletonEffectArrowDurationKey, PersistentDataType.INTEGER, durationTicks)
     }
 
+    fun markMobShotArrow(arrow: AbstractArrow) {
+        arrow.persistentDataContainer.set(mobShotArrowKey, PersistentDataType.BYTE, 1)
+    }
+
     fun markCustomProjectileDamage(projectile: Projectile, damage: Double) {
         projectile.persistentDataContainer.set(customProjectileDamageKey, PersistentDataType.DOUBLE, damage.coerceAtLeast(0.0))
     }
@@ -591,7 +610,11 @@ class MobService(private val plugin: JavaPlugin) {
         if (projectile != null) {
             val customDamage = projectile.persistentDataContainer.get(customProjectileDamageKey, PersistentDataType.DOUBLE)
             if (customDamage != null) {
-                event.damage = customDamage.coerceAtLeast(0.0)
+                if (isManagedBlazeFireball(projectile)) {
+                    event.damage = 0.0
+                } else {
+                    event.damage = customDamage.coerceAtLeast(0.0)
+                }
             }
         }
 
@@ -925,10 +948,43 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun handleProjectileHit(event: ProjectileHitEvent) {
         ThrownWeaponService.getInstance(plugin).handleProjectileHit(event)
-        val arrow = event.entity
-        if (arrow != null) {
-            HomingArrowService.getInstance(plugin).handleHit(arrow.uniqueId)
+        val projectile = event.entity
+        HomingArrowService.getInstance(plugin).handleHit(projectile.uniqueId)
+
+        applyBlazeDirectHitDamage(projectile, event.hitEntity as? LivingEntity)
+
+        val arrow = projectile as? AbstractArrow ?: return
+        if (!arrow.persistentDataContainer.has(mobShotArrowKey, PersistentDataType.BYTE)) {
+            return
         }
+        arrow.remove()
+    }
+
+    private fun applyBlazeDirectHitDamage(projectile: Projectile, hitEntity: LivingEntity?) {
+        if (hitEntity == null) return
+        if (projectile !is SmallFireball && projectile !is Fireball) return
+        if (projectile.persistentDataContainer.get(blazeDirectHitAppliedKey, PersistentDataType.BYTE)?.toInt() == 1) return
+
+        val damage = projectile.persistentDataContainer.get(customProjectileDamageKey, PersistentDataType.DOUBLE)
+            ?.coerceAtLeast(0.0)
+            ?: return
+        if (damage <= 0.0) return
+
+        val shooter = projectile.shooter as? LivingEntity ?: return
+        val activeMob = activeMobs[shooter.uniqueId] ?: return
+        if (!activeMob.mobType.id.startsWith("blaze_")) return
+
+        issueDirectDamagePermit(shooter.uniqueId, hitEntity.uniqueId)
+        hitEntity.noDamageTicks = 0
+        hitEntity.damage(damage, shooter)
+        projectile.persistentDataContainer.set(blazeDirectHitAppliedKey, PersistentDataType.BYTE, 1)
+    }
+
+    private fun isManagedBlazeFireball(projectile: Projectile): Boolean {
+        if (projectile !is SmallFireball && projectile !is Fireball) return false
+        val shooter = projectile.shooter as? LivingEntity ?: return false
+        val activeMob = activeMobs[shooter.uniqueId] ?: return false
+        return activeMob.mobType.id.startsWith("blaze_")
     }
 
     fun handleEntityPickupItem(event: EntityPickupItemEvent) {
@@ -1025,6 +1081,10 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun handleDamaged(event: EntityDamageByEntityEvent, damaged: LivingEntity) {
         val activeMob = activeMobs[damaged.uniqueId] ?: return
+        if (shouldBlockDowngradedAoEDamage(damaged, event.cause)) {
+            event.isCancelled = true
+            return
+        }
         val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
         val startedAt = System.nanoTime()
         activeMob.mobType.onDamaged(
@@ -1043,6 +1103,10 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun handleDamaged(event: EntityDamageEvent, damaged: LivingEntity) {
         val activeMob = activeMobs[damaged.uniqueId] ?: return
+        if (shouldBlockDowngradedAoEDamage(damaged, event.cause)) {
+            event.isCancelled = true
+            return
+        }
         val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
         val startedAt = System.nanoTime()
         activeMob.mobType.onGenericDamaged(
@@ -1060,6 +1124,10 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun handleCombust(event: EntityCombustEvent, entity: LivingEntity) {
         val activeMob = activeMobs[entity.uniqueId] ?: return
+        if (isDowngradeAoEProtectionActive(entity)) {
+            event.isCancelled = true
+            return
+        }
         val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
         val startedAt = System.nanoTime()
         activeMob.mobType.onCombust(
@@ -1226,6 +1294,29 @@ class MobService(private val plugin: JavaPlugin) {
         container.set(mobDefinitionKey, PersistentDataType.STRING, definition.id)
         container.set(mobFeatureKey, PersistentDataType.STRING, options.featureId)
         container.set(customMobKey, PersistentDataType.BYTE, if (mobType.isCustom) 1 else 0)
+        if (options.metadata.containsKey("slime_downgrade") || options.metadata.containsKey("magma_split_child")) {
+            val protectUntil = Bukkit.getCurrentTick().toLong() + DOWNGRADE_AOE_PROTECTION_TICKS
+            container.set(downgradeAoEProtectUntilTickKey, PersistentDataType.LONG, protectUntil)
+        }
+    }
+
+    private fun shouldBlockDowngradedAoEDamage(entity: LivingEntity, cause: EntityDamageEvent.DamageCause): Boolean {
+        if (!DOWNGRADE_AOE_DAMAGE_CAUSES.contains(cause)) {
+            return false
+        }
+        return isDowngradeAoEProtectionActive(entity)
+    }
+
+    private fun isDowngradeAoEProtectionActive(entity: LivingEntity): Boolean {
+        val untilTick = entity.persistentDataContainer
+            .get(downgradeAoEProtectUntilTickKey, PersistentDataType.LONG)
+            ?: return false
+        val currentTick = Bukkit.getCurrentTick().toLong()
+        if (currentTick <= untilTick) {
+            return true
+        }
+        entity.persistentDataContainer.remove(downgradeAoEProtectUntilTickKey)
+        return false
     }
 
     private fun applyDefinitionStats(entity: LivingEntity, definition: MobDefinition) {
@@ -1257,21 +1348,7 @@ class MobService(private val plugin: JavaPlugin) {
                 cleanupNearbyChickenMounts(entity)
             }
             is Ageable -> entity.setAdult()
-            is Slime -> ensureSlimeSize(entity)
         }
-    }
-
-    private fun ensureSlimeSize(entity: LivingEntity) {
-        val slime = entity as? Slime ?: return
-        val beforeSize = slime.size
-        val definitionId = slime.persistentDataContainer.get(mobDefinitionKey, PersistentDataType.STRING) ?: "unknown"
-        val typeId = slime.persistentDataContainer.get(mobTypeKey, PersistentDataType.STRING) ?: "unknown"
-        val changed = beforeSize != 1
-        plugin.logger.info("[MobService][DEBUG] Slime size check phase=spawn_once entity=${slime.uniqueId} def=$definitionId type=$typeId before=$beforeSize target=1 changed=$changed")
-        if (changed) {
-            slime.setSize(1)
-        }
-        plugin.logger.info("[MobService][DEBUG] Slime size result phase=spawn_once entity=${slime.uniqueId} after=${slime.size} changed=$changed")
     }
 
     private fun cleanupNearbyChickenMounts(zombie: Zombie) {

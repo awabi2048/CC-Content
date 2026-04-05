@@ -144,6 +144,7 @@ class TriFlameShotAbility(
             val projectile = entity.launchProjectile(Arrow::class.java).apply {
                 shooter = entity
             }
+            MobService.getInstance(context.plugin)?.markMobShotArrow(projectile)
             projectile.velocity = direction.multiply(finalSpeed)
             projectile.pickupStatus = AbstractArrow.PickupStatus.DISALLOWED
             projectile.isCritical = true

@@ -1292,14 +1292,22 @@ class ArenaManager(
         consumeMob(session, entityId, countKill = countKill)
     }
 
-    fun registerChildMob(entity: LivingEntity, definitionTypeId: String, featureId: String) {
-        if (featureId != "arena") return
+    fun registerChildMob(entity: LivingEntity, definitionTypeId: String, options: MobSpawnOptions) {
+        if (options.featureId != "arena") return
         val worldName = entity.world.name
         val session = sessionsByWorld[worldName] ?: return
         val entityId = entity.uniqueId
         mobToSessionWorld[entityId] = worldName
         mobToDefinitionTypeId[entityId] = definitionTypeId
         session.activeMobs.add(entityId)
+
+        val wave = options.metadata["wave"]?.toIntOrNull()
+            ?: session.currentWave.takeIf { it > 0 }
+            ?: session.startedWaves.maxOrNull()
+        if (wave != null) {
+            session.mobWaveMap[entityId] = wave
+            session.waveMobIds.getOrPut(wave) { mutableSetOf() }.add(entityId)
+        }
     }
 
     fun handleParticipantDamage(event: EntityDamageEvent) {
@@ -2633,12 +2641,14 @@ class ArenaManager(
             return null
         }
         val categoryTypeId = resolveMobTokenCategoryTypeId(mobTypeId)
-        val fullId = "arena.mob_token_${sanitizeMobTypeId(categoryTypeId)}"
-        return CustomItemManager.createItemForPlayer(fullId, killer, 1)
+        return CustomItemManager.createItemForPlayer(ArenaMobTokenItem(categoryTypeId), killer, 1)
     }
 
     private fun resolveMobTokenCategoryTypeId(mobTypeId: String): String {
         val normalized = sanitizeMobTypeId(mobTypeId)
+        when (normalized) {
+            "ashen_spirit", "water_spirit" -> return "spirit"
+        }
         val baseEntityType = mobService.resolveMobType(normalized)?.baseEntityType
         if (baseEntityType != null) {
             return sanitizeMobTypeId(baseEntityType.name)
@@ -2661,9 +2671,7 @@ class ArenaManager(
         val tokenTypeIds = buildSet {
             knownMobTypeIds.forEach { add(resolveMobTokenCategoryTypeId(it)) }
         }
-        for (typeId in tokenTypeIds) {
-            CustomItemManager.register(ArenaMobTokenItem(typeId))
-        }
+        CustomItemManager.register(ArenaMobTokenItem())
         CustomItemManager.register(BoomerangTokenItem())
         return tokenTypeIds
     }
@@ -2710,7 +2718,7 @@ class ArenaManager(
 
     private fun usesHeadTokenDisplayName(typeId: String): Boolean {
         return when (typeId) {
-            "skeleton", "zombie", "creeper", "piglin", "wither_skeleton", "ender_dragon" -> true
+            "skeleton", "zombie", "creeper", "piglin", "ender_dragon" -> true
             else -> false
         }
     }
@@ -5057,8 +5065,18 @@ class ArenaManager(
             if (session.stageStarted && !session.barrierRestarting && !session.barrierRestartCompleted) {
                 if (hasAliveCombatMob) {
                     session.hadAliveCombatMobs = true
+                    session.combatMobEmptySinceTick = null
                 } else if (session.hadAliveCombatMobs) {
+                    val emptySinceTick = session.combatMobEmptySinceTick
+                    if (emptySinceTick == null) {
+                        session.combatMobEmptySinceTick = currentTick
+                        return@forEach
+                    }
+                    if (currentTick - emptySinceTick < 20L) {
+                        return@forEach
+                    }
                     session.hadAliveCombatMobs = false
+                    session.combatMobEmptySinceTick = null
                     requestArenaBgmMode(session, ArenaBgmMode.NORMAL, strictNextBoundary = true)
                 }
             }

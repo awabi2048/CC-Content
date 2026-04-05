@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent.mob.ability
 import jp.awabi2048.cccontent.mob.MobDeathContext
 import jp.awabi2048.cccontent.mob.MobService
 import jp.awabi2048.cccontent.mob.MobSpawnOptions
+import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.block.data.Levelled
 import kotlin.random.Random
@@ -64,6 +65,13 @@ class MagmaStageDeathAbility(
             combatActiveProvider = context.activeMob.combatActiveProvider,
             metadata = context.activeMob.metadata + ("magma_split_child" to "true")
         )
-        mobService.spawn(childDefinition, deathLocation.clone().add(0.0, 0.1, 0.0), options)
+        val child = mobService.spawn(childDefinition, deathLocation.clone().add(0.0, 0.1, 0.0), options)
+        if (child != null) {
+            return
+        }
+
+        Bukkit.getScheduler().runTask(context.plugin, Runnable {
+            mobService.spawn(childDefinition, deathLocation.clone().add(0.0, 0.1, 0.0), options)
+        })
     }
 }

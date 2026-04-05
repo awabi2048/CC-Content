@@ -77,9 +77,10 @@ open class EquipmentMobType(
             "magma_cube_medium" to 3,
             "magma_cube_small" to 2,
             "magma_cube_mini" to 0,
-            "slime_merge_large" to 5,
-            "slime_merge_medium" to 4,
-            "slime_merge_small" to 3,
+            "slime_merge_large" to 4,
+            "slime_merge_medium" to 3,
+            "slime_merge_small" to 2,
+            "slime_merge_mini" to 0,
             "slime_poison" to 4,
             "slime_wither" to 4
         )

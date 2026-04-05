@@ -17,6 +17,9 @@ class LeapAbility(
     private val maxRange: Double = 8.0,
     private val horizontalSpeed: Double = 0.9,
     private val verticalSpeed: Double = 0.45,
+    private val farJumpStartRangeSquared: Double? = null,
+    private val farHorizontalSpeed: Double = horizontalSpeed,
+    private val farVerticalSpeed: Double = verticalSpeed,
     private val postLeapFaceTicks: Long = 20L
 ) : MobAbility {
     data class Runtime(
@@ -62,9 +65,12 @@ class LeapAbility(
         val delta = target.location.toVector().subtract(entity.location.toVector())
         val horizontal = delta.clone().setY(0.0)
         if (horizontal.lengthSquared() < 0.0001) return
+        val useFarJump = farJumpStartRangeSquared != null && distanceSquared >= farJumpStartRangeSquared
+        val selectedHorizontalSpeed = if (useFarJump) farHorizontalSpeed else horizontalSpeed
+        val selectedVerticalSpeed = if (useFarJump) farVerticalSpeed else verticalSpeed
 
         entity.world.playSound(entity.location, Sound.ENTITY_IRON_GOLEM_STEP, 1.0f, 0.8f)
-        entity.velocity = horizontal.normalize().multiply(horizontalSpeed).setY(verticalSpeed)
+        entity.velocity = horizontal.normalize().multiply(selectedHorizontalSpeed).setY(selectedVerticalSpeed)
         abilityRuntime.postLeapFaceTicks = postLeapFaceTicks
         abilityRuntime.postLeapTargetId = target.uniqueId
 

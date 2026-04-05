@@ -84,10 +84,10 @@ class ArenaDecayedEquipmentItem(
     override val itemModel: NamespacedKey = NamespacedKey.minecraft(modelKey)
 }
 
-class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
+class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleItem(
     material = Material.POISONOUS_POTATO,
     modelData = null,
-    id = "mob_token_${sanitizeMobTypeId(mobTypeId)}",
+    id = "mob_token",
     displayName = "§6${mobTypeId.lowercase(Locale.ROOT)}の頭",
     lore = listOf("§7アリーナに出現するモンスターのヘッド", "§7アリーナロビーで報酬と交換しよう！")
 ) {
@@ -96,7 +96,7 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
         val item = ItemStack(Material.POISONOUS_POTATO, amount.coerceAtLeast(1))
         val meta = item.itemMeta ?: return item
-        val normalizedTypeId = normalizeTokenCategoryTypeId(mobTypeId)
+        val normalizedTypeId = resolveTokenCategoryTypeId(mobTypeId)
         val usesHeadDisplayName = usesHeadDisplayName(normalizedTypeId)
         val mobNamePath = if (usesHeadDisplayName) {
             "custom_items.arena.mob_token.mob_names.$normalizedTypeId"
@@ -127,6 +127,7 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
         val decoratedDisplayName = if (resolvedDisplayName.startsWith("§6")) resolvedDisplayName else "§6$resolvedDisplayName"
         meta.displayName(Component.text(decoratedDisplayName))
         meta.lore(localizedLore.map { Component.text(it) })
+        meta.setItemModel(itemModel)
         meta.persistentDataContainer.set(arenaItemKey, PersistentDataType.STRING, id)
         item.itemMeta = meta
         return item
@@ -137,39 +138,82 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
             return typeId.trim().lowercase(Locale.ROOT).replace(Regex("[^a-z0-9_]+"), "_")
         }
 
-        private fun normalizeTokenCategoryTypeId(typeId: String): String {
+        fun resolveTokenCategoryTypeId(typeId: String): String {
             val normalized = sanitizeMobTypeId(typeId)
             return when (normalized) {
                 "cave_spider" -> "spider"
+                "ashen_spirit", "water_spirit", "vex" -> "spirit"
                 else -> normalized
             }
         }
 
+        fun supportsTokenCategoryTypeId(typeId: String): Boolean {
+            return SUPPORTED_TOKEN_CATEGORY_TYPE_IDS.contains(resolveTokenCategoryTypeId(typeId))
+        }
+
+        fun supportedTokenCategoryTypeIds(): Set<String> = SUPPORTED_TOKEN_CATEGORY_TYPE_IDS
+
         private fun usesHeadDisplayName(typeId: String): Boolean {
             return when (typeId) {
-                "skeleton", "zombie", "creeper", "piglin", "wither_skeleton", "ender_dragon" -> true
+                "skeleton", "zombie", "creeper", "piglin", "ender_dragon" -> true
                 else -> false
             }
         }
 
         private fun resolveItemModel(typeId: String): NamespacedKey {
-            val normalized = normalizeTokenCategoryTypeId(typeId)
+            val normalized = resolveTokenCategoryTypeId(typeId)
             return when (normalized) {
                 "skeleton" -> NamespacedKey.minecraft("skeleton_skull")
                 "zombie" -> NamespacedKey.minecraft("zombie_head")
                 "creeper" -> NamespacedKey.minecraft("creeper_head")
                 "piglin" -> NamespacedKey.minecraft("piglin_head")
-                "wither_skeleton" -> NamespacedKey.minecraft("wither_skeleton_skull")
+                "wither_skeleton" -> NamespacedKey.minecraft("charcoal")
                 "ender_dragon" -> NamespacedKey.minecraft("dragon_head")
                 "husk" -> NamespacedKey.minecraft("leather_chestplate")
                 "iron_golem" -> NamespacedKey.minecraft("resin_clump")
                 "guardian" -> NamespacedKey.minecraft("prismarine_shard")
+                "elder_guardian" -> NamespacedKey.minecraft("tide_armor_trim_smithing_template")
                 "drowned" -> NamespacedKey.minecraft("moss_block")
                 "silverfish" -> NamespacedKey.minecraft("blue_egg")
                 "spider" -> NamespacedKey.minecraft("disc_fragment_5")
+                "blaze" -> NamespacedKey.minecraft("blaze_powder")
+                "magma_cube" -> NamespacedKey.minecraft("fire_charge")
+                "spirit" -> NamespacedKey.minecraft("ghast_tear")
+                "witch" -> NamespacedKey.minecraft("leather_chestplate")
+                "bat" -> NamespacedKey.minecraft("phantom_membrane")
+                "bogged" -> NamespacedKey.minecraft("skeleton_skull")
+                "stray" -> NamespacedKey.minecraft("skeleton_skull")
+                "frog" -> NamespacedKey.minecraft("resin_clump")
+                "slime" -> NamespacedKey.minecraft("emerald")
                 else -> NamespacedKey.minecraft("poisonous_potato")
             }
         }
+
+        private val SUPPORTED_TOKEN_CATEGORY_TYPE_IDS = setOf(
+            "skeleton",
+            "zombie",
+            "creeper",
+            "piglin",
+            "wither_skeleton",
+            "ender_dragon",
+            "husk",
+            "iron_golem",
+            "guardian",
+            "elder_guardian",
+            "drowned",
+            "silverfish",
+            "spider",
+            "witch",
+            "blaze",
+            "magma_cube",
+            "slime",
+            "bogged",
+            "stray",
+            "bat",
+            "allay",
+            "spirit",
+            "frog"
+        )
     }
 }
 

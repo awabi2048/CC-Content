@@ -896,11 +896,22 @@ class MagmaCubeLargeMobType : EquipmentMobType(
     abilities = listOf(
         ProjectileAndFireImmunityAbility(id = "magma_cube_large_immunity", playSoundOnProjectileBlock = true),
         MagmaLandingBurstAbility(id = "magma_cube_large_landing_burst"),
+        LeapAbility(
+            id = "magma_cube_large_leap",
+            cooldownTicks = 35L,
+            minRangeSquared = 4.0,
+            maxRange = 10.0,
+            horizontalSpeed = 0.75,
+            verticalSpeed = 0.34,
+            farJumpStartRangeSquared = 36.0,
+            farHorizontalSpeed = 1.35,
+            farVerticalSpeed = 0.68
+        ),
         MagmaStageDeathAbility(
             id = "magma_cube_large_split",
             explosionPower = 0.0f,
-            lavaRadius = 0,
-            lavaLevels = emptyList(),
+            lavaRadius = 2,
+            lavaLevels = listOf(7),
             childDefinitionId = "magma_cube_small"
         )
     )
@@ -915,8 +926,8 @@ class MagmaCubeMediumMobType : EquipmentMobType(
             id = "magma_cube_medium_death",
             explosionPower = 1.0f,
             lavaRadius = 1,
-            lavaLevels = listOf(1, 2),
-            childDefinitionId = "magma_cube_small"
+            lavaLevels = listOf(7),
+            childDefinitionId = "magma_cube_mini"
         )
     )
 )
@@ -945,7 +956,7 @@ class MagmaCubeMiniMobType : EquipmentMobType(
             id = "magma_cube_mini_death",
             explosionPower = 0.0f,
             lavaRadius = 0,
-            lavaLevels = emptyList()
+            lavaLevels = listOf(7)
         )
     )
 )
@@ -1014,7 +1025,7 @@ class SlimeSmallMobType : EquipmentMobType(
         SlimeMergeAbility(
             id = "slime_merge_small_merge",
             selfDefinitionId = "slime_merge_small",
-            mergeOrder = listOf("slime_merge_small", "slime_merge_medium", "slime_merge_large")
+            mergeOrder = listOf("slime_merge_mini", "slime_merge_small", "slime_merge_large")
         )
     )
 )
@@ -1027,7 +1038,7 @@ class SlimeMediumMobType : EquipmentMobType(
         SlimeMergeAbility(
             id = "slime_merge_medium_merge",
             selfDefinitionId = "slime_merge_medium",
-            mergeOrder = listOf("slime_merge_small", "slime_merge_medium", "slime_merge_large")
+            mergeOrder = listOf("slime_merge_mini", "slime_merge_medium", "slime_merge_large")
         )
     )
 )
@@ -1040,7 +1051,7 @@ class SlimeLargeMobType : EquipmentMobType(
         SlimeMergeAbility(
             id = "slime_merge_large_merge",
             selfDefinitionId = "slime_merge_large",
-            mergeOrder = listOf("slime_merge_small", "slime_merge_medium", "slime_merge_large")
+            mergeOrder = listOf("slime_merge_mini", "slime_merge_small", "slime_merge_large")
         ),
         LeapAbility(
             id = "slime_merge_large_leap",
@@ -1050,6 +1061,14 @@ class SlimeLargeMobType : EquipmentMobType(
             horizontalSpeed = 1.5,
             verticalSpeed = 0.7
         )
+    )
+)
+
+class SlimeMiniMobType : EquipmentMobType(
+    id = "slime_merge_mini",
+    baseEntityType = EntityType.SLIME,
+    abilities = listOf(
+        ProjectileAndFireImmunityAbility(id = "slime_merge_mini_immunity", playSoundOnProjectileBlock = true)
     )
 )
 

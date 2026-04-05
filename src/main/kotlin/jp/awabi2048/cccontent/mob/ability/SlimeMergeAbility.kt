@@ -116,7 +116,9 @@ class SlimeMergeAbility(
             metadata = context.activeMob.metadata + ("slime_downgrade" to "true")
         )
 
-        val downgraded = mobService.spawnByDefinitionId(resultDefinitionId, spawnLocation, options) ?: return
+        val downgraded = mobService.spawnByDefinitionId(resultDefinitionId, spawnLocation, options)
+            ?: mobService.spawnByDefinitionId(resultDefinitionId, spawnLocation.clone().add(0.0, 0.1, 0.0), options)
+            ?: return
         playTransitionEffect(downgraded.location)
     }
 
