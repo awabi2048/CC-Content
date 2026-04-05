@@ -986,6 +986,91 @@ custom_items:
       name: '§6アリーナ報酬箱'
       lore:
         - '§7アリーナでの勝利報酬'
+    limit_breaking_sharpness_t1:
+      name: '§d限界突破触媒: ダメージ増加 T1'
+      lore:
+        - '§7ダメージ増加の限界突破に使用'
+        - '§7目標: Sharpness +1'
+    limit_breaking_sharpness_t2:
+      name: '§d限界突破触媒: ダメージ増加 T2'
+      lore:
+        - '§7ダメージ増加の限界突破に使用'
+        - '§7目標: Sharpness +2'
+    limit_breaking_sharpness_t3:
+      name: '§d限界突破触媒: ダメージ増加 T3'
+      lore:
+        - '§7ダメージ増加の限界突破に使用'
+        - '§7目標: Sharpness +3'
+    over_stacking_infinity:
+      name: '§5競合無視触媒: 無限'
+      lore:
+        - '§7競合エンチャントの追加付与に使用'
+        - '§7このルートは1回のみ'
+    over_stacking_mending:
+      name: '§5競合無視触媒: 修繕'
+      lore:
+        - '§7競合エンチャントの追加付与に使用'
+        - '§7このルートは1回のみ'
+    over_stacking_sharpness:
+      name: '§5競合無視触媒: ダメージ増加'
+      lore:
+        - '§7競合エンチャントの追加付与に使用'
+        - '§7このルートは1回のみ'
+    over_stacking_smite:
+      name: '§5競合無視触媒: アンデッド特攻'
+      lore:
+        - '§7競合エンチャントの追加付与に使用'
+        - '§7このルートは1回のみ'
+    over_stacking_bane_of_arthropods:
+      name: '§5競合無視触媒: 虫特攻'
+      lore:
+        - '§7競合エンチャントの追加付与に使用'
+        - '§7このルートは1回のみ'
+    over_stacking_protection:
+      name: '§5競合無視触媒: 防護'
+      lore:
+        - '§7競合エンチャントの追加付与に使用'
+        - '§7このルートは1回のみ'
+    over_stacking_fire_protection:
+      name: '§5競合無視触媒: 火炎耐性'
+      lore:
+        - '§7競合エンチャントの追加付与に使用'
+        - '§7このルートは1回のみ'
+    over_stacking_blast_protection:
+      name: '§5競合無視触媒: 爆発耐性'
+      lore:
+        - '§7競合エンチャントの追加付与に使用'
+        - '§7このルートは1回のみ'
+    over_stacking_projectile_protection:
+      name: '§5競合無視触媒: 飛び道具耐性'
+      lore:
+        - '§7競合エンチャントの追加付与に使用'
+        - '§7このルートは1回のみ'
+    over_stacking_multishot:
+      name: '§5競合無視触媒: 拡散'
+      lore:
+        - '§7競合エンチャントの追加付与に使用'
+        - '§7このルートは1回のみ'
+    over_stacking_piercing:
+      name: '§5競合無視触媒: 貫通'
+      lore:
+        - '§7競合エンチャントの追加付与に使用'
+        - '§7このルートは1回のみ'
+    exotic_attach_infinity:
+      name: '§b特殊付与触媒: 無限'
+      lore:
+        - '§7通常付与できないエンチャントを追加'
+        - '§7このルートは1回のみ'
+    exotic_attach_sharpness:
+      name: '§b特殊付与触媒: ダメージ増加'
+      lore:
+        - '§7通常付与できないエンチャントを追加'
+        - '§7このルートは1回のみ'
+    exotic_attach_breach:
+      name: '§b特殊付与触媒: 防具貫通'
+      lore:
+        - '§7通常付与できないエンチャントを追加'
+        - '§7このルートは1回のみ'
     mob_token:
       display_format: '§6{mob}の頭'
       lore:
@@ -1415,6 +1500,7 @@ arena:
         stop: '&f/arenaa stop <player>'
         theme: '&f/arenaa theme list'
         broadcast: '&f/arenaa broadcast'
+        pedestal: '&f/arenaa pedestal'
     menu:
       open_failed: '&cアリーナクエストを開けませんでした'
       open_failed_detail: '&cアリーナメニューを開けませんでした: {message}'
@@ -1548,6 +1634,24 @@ arena:
   ui:
     menu_title: '§8アリーナ掲示板'
     confirm_title: '§8参加確認'
+    pedestal:
+      title: '§8不思議な祭壇'
+      blank: ' '
+      placeholder:
+        left: '§a触媒の導線'
+        right: '§a情報の導線'
+      exp:
+        name: '§e必要経験値'
+        waiting: '§7触媒をセットすると必要レベルが表示されます'
+        required: '§7必要レベル: §e{value}'
+        current: '§7所持レベル: §f{value}'
+        ready: '§a条件達成'
+        not_ready: '§cレベル不足'
+      execute:
+        ready: '§aオーバーエンチャント実行'
+        waiting: '§cオーバーエンチャント実行'
+        ready_lore: '§7クリックで実行'
+        waiting_lore: '§7条件を満たすと実行できます'
     separator: '§8§m――――――――――――――――――――'
     coming_soon: '§7Coming Soon!'
     info_title: '§bInfo'

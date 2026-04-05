@@ -356,6 +356,91 @@ custom_items:
       name: "§6Arena Prize Box"
       lore:
         - "§7Victory reward from the arena"
+    limit_breaking_sharpness_t1:
+      name: "§dLimit Break Catalyst: Sharpness T1"
+      lore:
+        - "§7Used for limit-breaking sharpness"
+        - "§7Target: Sharpness +1"
+    limit_breaking_sharpness_t2:
+      name: "§dLimit Break Catalyst: Sharpness T2"
+      lore:
+        - "§7Used for limit-breaking sharpness"
+        - "§7Target: Sharpness +2"
+    limit_breaking_sharpness_t3:
+      name: "§dLimit Break Catalyst: Sharpness T3"
+      lore:
+        - "§7Used for limit-breaking sharpness"
+        - "§7Target: Sharpness +3"
+    over_stacking_infinity:
+      name: "§5Conflict Ignore Catalyst: Infinity"
+      lore:
+        - "§7Adds a conflicting enchantment"
+        - "§7This route can be used once"
+    over_stacking_mending:
+      name: "§5Conflict Ignore Catalyst: Mending"
+      lore:
+        - "§7Adds a conflicting enchantment"
+        - "§7This route can be used once"
+    over_stacking_sharpness:
+      name: "§5Conflict Ignore Catalyst: Sharpness"
+      lore:
+        - "§7Adds a conflicting enchantment"
+        - "§7This route can be used once"
+    over_stacking_smite:
+      name: "§5Conflict Ignore Catalyst: Smite"
+      lore:
+        - "§7Adds a conflicting enchantment"
+        - "§7This route can be used once"
+    over_stacking_bane_of_arthropods:
+      name: "§5Conflict Ignore Catalyst: Bane of Arthropods"
+      lore:
+        - "§7Adds a conflicting enchantment"
+        - "§7This route can be used once"
+    over_stacking_protection:
+      name: "§5Conflict Ignore Catalyst: Protection"
+      lore:
+        - "§7Adds a conflicting enchantment"
+        - "§7This route can be used once"
+    over_stacking_fire_protection:
+      name: "§5Conflict Ignore Catalyst: Fire Protection"
+      lore:
+        - "§7Adds a conflicting enchantment"
+        - "§7This route can be used once"
+    over_stacking_blast_protection:
+      name: "§5Conflict Ignore Catalyst: Blast Protection"
+      lore:
+        - "§7Adds a conflicting enchantment"
+        - "§7This route can be used once"
+    over_stacking_projectile_protection:
+      name: "§5Conflict Ignore Catalyst: Projectile Protection"
+      lore:
+        - "§7Adds a conflicting enchantment"
+        - "§7This route can be used once"
+    over_stacking_multishot:
+      name: "§5Conflict Ignore Catalyst: Multishot"
+      lore:
+        - "§7Adds a conflicting enchantment"
+        - "§7This route can be used once"
+    over_stacking_piercing:
+      name: "§5Conflict Ignore Catalyst: Piercing"
+      lore:
+        - "§7Adds a conflicting enchantment"
+        - "§7This route can be used once"
+    exotic_attach_infinity:
+      name: "§bExotic Attach Catalyst: Infinity"
+      lore:
+        - "§7Adds a normally incompatible enchantment"
+        - "§7This route can be used once"
+    exotic_attach_sharpness:
+      name: "§bExotic Attach Catalyst: Sharpness"
+      lore:
+        - "§7Adds a normally incompatible enchantment"
+        - "§7This route can be used once"
+    exotic_attach_breach:
+      name: "§bExotic Attach Catalyst: Breach"
+      lore:
+        - "§7Adds a normally incompatible enchantment"
+        - "§7This route can be used once"
     mob_token:
       display_format: "§6{mob} Head"
       lore:
@@ -576,6 +661,28 @@ custom_items:
         - "§7For fermentation GUI yeast slot (no effect)"
 
 arena:
+  messages:
+    command:
+      help:
+        pedestal: '&f/arenaa pedestal'
   ui:
+    pedestal:
+      title: '§8Mysterious Altar'
+      blank: ' '
+      placeholder:
+        left: '§aCatalyst Flow'
+        right: '§aInfo Flow'
+      exp:
+        name: '§eRequired Level'
+        waiting: '§7Insert a catalyst to see required level'
+        required: '§7Required Level: §e{value}'
+        current: '§7Current Level: §f{value}'
+        ready: '§aRequirement met'
+        not_ready: '§cInsufficient level'
+      execute:
+        ready: '§aRun Over Enchant'
+        waiting: '§cRun Over Enchant'
+        ready_lore: '§7Click to execute'
+        waiting_lore: '§7Execution unlocks when conditions are met'
     sidebar:
       defeat: "§c§lDEFEAT"

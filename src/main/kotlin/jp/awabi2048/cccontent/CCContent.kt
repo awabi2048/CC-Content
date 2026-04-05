@@ -43,6 +43,7 @@ import jp.awabi2048.cccontent.features.arena.ArenaItemListener
 import jp.awabi2048.cccontent.features.arena.ArenaListener
 import jp.awabi2048.cccontent.features.arena.ArenaManager
 import jp.awabi2048.cccontent.features.arena.ArenaSessionInfoMenu
+import jp.awabi2048.cccontent.features.arena.ArenaEnchantPedestalMenu
 import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestService
 import jp.awabi2048.cccontent.features.brewery.BreweryFeature
 import jp.awabi2048.cccontent.features.cooking.CookingFeature
@@ -118,6 +119,7 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var arenaManager: ArenaManager
     private var arenaQuestService: ArenaQuestService? = null
     private var arenaSessionInfoMenu: ArenaSessionInfoMenu? = null
+    private var arenaEnchantPedestalMenu: ArenaEnchantPedestalMenu? = null
     private lateinit var sharedMobService: MobService
     private lateinit var breweryFeature: BreweryFeature
     private lateinit var cookingFeature: CookingFeature
@@ -193,6 +195,7 @@ class CCContent : JavaPlugin(), Listener {
                 arenaManager.setQuestService(arenaQuestService)
                 arenaQuestService?.initialize()
                 arenaSessionInfoMenu = ArenaSessionInfoMenu(this, arenaManager)
+                arenaEnchantPedestalMenu = ArenaEnchantPedestalMenu(this) { coreConfig }
                 arenaFeatureReady = true
             } catch (e: Exception) {
                 runCatching { arenaQuestService?.shutdown() }
@@ -204,6 +207,7 @@ class CCContent : JavaPlugin(), Listener {
                 }
                 arenaQuestService = null
                 arenaSessionInfoMenu = null
+                arenaEnchantPedestalMenu = null
                 arenaFeatureReady = false
                 arenaFeatureFailureReason = e.message?.takeIf { it.isNotBlank() }
                     ?: "Arena feature の初期化に失敗しました"
@@ -283,6 +287,7 @@ class CCContent : JavaPlugin(), Listener {
                 arenaManagerProvider = { if (::arenaManager.isInitialized) arenaManager else null },
                 questService = arenaQuestService,
                 sessionInfoMenu = arenaSessionInfoMenu,
+                pedestalMenu = arenaEnchantPedestalMenu,
                 featureEnabledProvider = { arenaFeatureReady },
                 featureFailureReasonProvider = { arenaFeatureFailureReason }
             )
@@ -304,6 +309,9 @@ class CCContent : JavaPlugin(), Listener {
                 server.pluginManager.registerEvents(it, this)
             }
             arenaSessionInfoMenu?.let {
+                server.pluginManager.registerEvents(it, this)
+            }
+            arenaEnchantPedestalMenu?.let {
                 server.pluginManager.registerEvents(it, this)
             }
         }
@@ -344,6 +352,7 @@ class CCContent : JavaPlugin(), Listener {
             }
             arenaQuestService?.shutdown()
             arenaSessionInfoMenu = null
+            arenaEnchantPedestalMenu = null
             if (::arenaManager.isInitialized) {
                 arenaManager.setQuestService(null)
             }
@@ -754,6 +763,7 @@ class CCContent : JavaPlugin(), Listener {
             CustomItemManager.register(ArenaStructureMarkerToolItem())
             CustomItemManager.register(ArenaOtherMarkerToolItem())
             CustomItemManager.register(ArenaLiftToolItem())
+            arenaOverEnchanterCatalystItems().forEach { CustomItemManager.register(it) }
         }
 
         if (isContentEnabledAtStartup("sukima_dungeon")) {

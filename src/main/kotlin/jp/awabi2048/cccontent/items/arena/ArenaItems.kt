@@ -8,6 +8,7 @@ import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
+import org.bukkit.inventory.meta.ItemMeta
 import org.bukkit.persistence.PersistentDataType
 import java.util.Locale
 
@@ -224,3 +225,171 @@ class BoomerangTokenItem : ArenaSimpleItem(
     displayName = "§6ボーンメラン",
     lore = listOf("§7アリーナに出現するモンスターが落としたアイテム", "§7アリーナロビーで報酬と交換しよう！")
 )
+
+enum class ArenaOverEnchanterMode(val id: String) {
+    LIMIT_BREAKING("limit_breaking"),
+    OVER_STACKING("over_stacking"),
+    EXOTIC_ATTACH("exotic_attach");
+
+    companion object {
+        fun fromId(id: String): ArenaOverEnchanterMode? {
+            return entries.firstOrNull { it.id == id }
+        }
+    }
+}
+
+object ArenaOverEnchanterCatalystData {
+    data class Catalyst(
+        val mode: ArenaOverEnchanterMode,
+        val targetEnchantmentId: String,
+        val overLevel: Int?
+    )
+
+    private val modeKey by lazy {
+        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "over_enchanter_mode")
+    }
+
+    private val targetEnchantmentKey by lazy {
+        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "over_enchanter_target_enchantment")
+    }
+
+    private val overLevelKey by lazy {
+        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "over_enchanter_over_level")
+    }
+
+    fun apply(meta: ItemMeta, catalyst: Catalyst) {
+        meta.persistentDataContainer.set(modeKey, PersistentDataType.STRING, catalyst.mode.id)
+        meta.persistentDataContainer.set(targetEnchantmentKey, PersistentDataType.STRING, catalyst.targetEnchantmentId)
+        if (catalyst.overLevel != null) {
+            meta.persistentDataContainer.set(overLevelKey, PersistentDataType.INTEGER, catalyst.overLevel)
+        } else {
+            meta.persistentDataContainer.remove(overLevelKey)
+        }
+    }
+
+    fun read(item: ItemStack): Catalyst? {
+        val meta = item.itemMeta ?: return null
+        val modeId = meta.persistentDataContainer.get(modeKey, PersistentDataType.STRING) ?: return null
+        val targetEnchantment = meta.persistentDataContainer.get(targetEnchantmentKey, PersistentDataType.STRING) ?: return null
+        val mode = ArenaOverEnchanterMode.fromId(modeId) ?: return null
+        val overLevel = meta.persistentDataContainer.get(overLevelKey, PersistentDataType.INTEGER)
+        return Catalyst(mode = mode, targetEnchantmentId = targetEnchantment, overLevel = overLevel)
+    }
+}
+
+class ArenaOverEnchanterCatalystItem(
+    id: String,
+    displayName: String,
+    lore: List<String>,
+    private val catalyst: ArenaOverEnchanterCatalystData.Catalyst,
+    private val fixedDisplayName: String,
+    private val fixedLore: List<String>,
+    material: Material
+) : ArenaSimpleItem(
+    material = material,
+    modelData = null,
+    id = id,
+    displayName = displayName,
+    lore = lore
+) {
+    override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
+        val item = super.createItemForPlayer(player, amount)
+        val meta = item.itemMeta ?: return item
+        item.amount = 1
+        meta.setMaxStackSize(1)
+        meta.displayName(Component.text(fixedDisplayName))
+        meta.lore(fixedLore.map { Component.text(it) })
+        ArenaOverEnchanterCatalystData.apply(meta, catalyst)
+        item.itemMeta = meta
+        return item
+    }
+}
+
+private fun tierDecoration(tier: Int): String {
+    val normalized = tier.coerceIn(1, 4)
+    val active = "§d" + "❖".repeat(normalized)
+    val inactive = "§7" + "❖".repeat(4 - normalized)
+    return "§8【$active$inactive§8】"
+}
+
+private fun catalystDisplayName(enchantLabel: String, tier: Int): String {
+    return "§b${enchantLabel}のかけら ${tierDecoration(tier)}"
+}
+
+fun arenaOverEnchanterCatalystItems(): List<ArenaOverEnchanterCatalystItem> {
+    val limitBreaking = listOf(
+        ArenaOverEnchanterCatalystItem(
+            id = "limit_breaking_sharpness_t1",
+            displayName = catalystDisplayName("ダメージ増加", 1),
+            lore = listOf("§7限界突破用だよ"),
+            catalyst = ArenaOverEnchanterCatalystData.Catalyst(ArenaOverEnchanterMode.LIMIT_BREAKING, "sharpness", 1),
+            fixedDisplayName = catalystDisplayName("ダメージ増加", 1),
+            fixedLore = listOf("§7限界突破用だよ"),
+            material = Material.BLAZE_POWDER
+        ),
+        ArenaOverEnchanterCatalystItem(
+            id = "limit_breaking_sharpness_t2",
+            displayName = catalystDisplayName("ダメージ増加", 2),
+            lore = listOf("§7限界突破用だよ"),
+            catalyst = ArenaOverEnchanterCatalystData.Catalyst(ArenaOverEnchanterMode.LIMIT_BREAKING, "sharpness", 2),
+            fixedDisplayName = catalystDisplayName("ダメージ増加", 2),
+            fixedLore = listOf("§7限界突破用だよ"),
+            material = Material.BLAZE_POWDER
+        ),
+        ArenaOverEnchanterCatalystItem(
+            id = "limit_breaking_sharpness_t3",
+            displayName = catalystDisplayName("ダメージ増加", 3),
+            lore = listOf("§7限界突破用だよ"),
+            catalyst = ArenaOverEnchanterCatalystData.Catalyst(ArenaOverEnchanterMode.LIMIT_BREAKING, "sharpness", 3),
+            fixedDisplayName = catalystDisplayName("ダメージ増加", 3),
+            fixedLore = listOf("§7限界突破用だよ"),
+            material = Material.BLAZE_POWDER
+        )
+    )
+
+    val overStackingTargets = listOf(
+        "infinity" to "無限",
+        "mending" to "修繕",
+        "sharpness" to "ダメージ増加",
+        "smite" to "アンデッド特攻",
+        "bane_of_arthropods" to "虫特攻",
+        "protection" to "防護",
+        "fire_protection" to "火炎耐性",
+        "blast_protection" to "爆発耐性",
+        "projectile_protection" to "飛び道具耐性",
+        "multishot" to "拡散",
+        "piercing" to "貫通"
+    ).map { (id, label) ->
+        ArenaOverEnchanterCatalystItem(
+            id = "over_stacking_$id",
+            displayName = catalystDisplayName(label, 1),
+            lore = listOf("§7競合エンチャント用だよ"),
+            catalyst = ArenaOverEnchanterCatalystData.Catalyst(ArenaOverEnchanterMode.OVER_STACKING, id, null),
+            fixedDisplayName = catalystDisplayName(label, 1),
+            fixedLore = listOf("§7競合エンチャント用だよ"),
+            material = Material.FERMENTED_SPIDER_EYE
+        )
+    }
+
+    val exoticAttach = listOf(
+        "infinity" to "無限",
+        "sharpness" to "ダメージ増加",
+        "breach" to "防具貫通"
+    ).map { (id, label) ->
+        ArenaOverEnchanterCatalystItem(
+            id = "exotic_attach_$id",
+            displayName = catalystDisplayName(label, 1),
+            lore = listOf("§7強制付加用だよ"),
+            catalyst = ArenaOverEnchanterCatalystData.Catalyst(ArenaOverEnchanterMode.EXOTIC_ATTACH, id, null),
+            fixedDisplayName = catalystDisplayName(label, 1),
+            fixedLore = listOf("§7強制付加用だよ"),
+            material = Material.NETHER_STAR
+        )
+    }
+
+    return buildList {
+        addAll(limitBreaking)
+        addAll(overStackingTargets)
+        addAll(exoticAttach)
+    }
+}

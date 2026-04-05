@@ -147,6 +147,28 @@ arena:
       pitch: 1.0
   mob_token_drop_chance: 0.30
   mob_token_looting_bonus_per_level: 0.033
+  over_enchanter:
+    limit_breaking:
+      sharpness:
+        1: 50
+        2: 70
+        3: 95
+    over_stacking:
+      infinity: 55
+      mending: 55
+      sharpness: 60
+      smite: 60
+      bane_of_arthropods: 60
+      protection: 65
+      fire_protection: 65
+      blast_protection: 65
+      projectile_protection: 65
+      multishot: 58
+      piercing: 58
+    exotic_attach:
+      infinity: 75
+      sharpness: 75
+      breach: 80
   final_wave_time_limit_seconds: 600
   barrier_restart:
     default_duration_seconds: 30
