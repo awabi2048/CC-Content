@@ -975,6 +975,7 @@ class MobService(private val plugin: JavaPlugin) {
         if (!activeMob.mobType.id.startsWith("blaze_")) return
 
         issueDirectDamagePermit(shooter.uniqueId, hitEntity.uniqueId)
+        hitEntity.noDamageTicks = 0
         hitEntity.damage(damage, shooter)
         projectile.persistentDataContainer.set(blazeDirectHitAppliedKey, PersistentDataType.BYTE, 1)
     }

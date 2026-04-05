@@ -2647,6 +2647,9 @@ class ArenaManager(
 
     private fun resolveMobTokenCategoryTypeId(mobTypeId: String): String {
         val normalized = sanitizeMobTypeId(mobTypeId)
+        when (normalized) {
+            "ashen_spirit", "water_spirit" -> return "spirit"
+        }
         val baseEntityType = mobService.resolveMobType(normalized)?.baseEntityType
         if (baseEntityType != null) {
             return sanitizeMobTypeId(baseEntityType.name)
@@ -2718,7 +2721,7 @@ class ArenaManager(
 
     private fun usesHeadTokenDisplayName(typeId: String): Boolean {
         return when (typeId) {
-            "skeleton", "zombie", "creeper", "piglin", "wither_skeleton", "ender_dragon" -> true
+            "skeleton", "zombie", "creeper", "piglin", "ender_dragon" -> true
             else -> false
         }
     }

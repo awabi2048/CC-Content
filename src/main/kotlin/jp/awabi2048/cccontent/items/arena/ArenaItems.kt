@@ -147,7 +147,7 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
 
         private fun usesHeadDisplayName(typeId: String): Boolean {
             return when (typeId) {
-                "skeleton", "zombie", "creeper", "piglin", "wither_skeleton", "ender_dragon" -> true
+                "skeleton", "zombie", "creeper", "piglin", "ender_dragon" -> true
                 else -> false
             }
         }
@@ -159,7 +159,7 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
                 "zombie" -> NamespacedKey.minecraft("zombie_head")
                 "creeper" -> NamespacedKey.minecraft("creeper_head")
                 "piglin" -> NamespacedKey.minecraft("piglin_head")
-                "wither_skeleton" -> NamespacedKey.minecraft("wither_skeleton_skull")
+                "wither_skeleton" -> NamespacedKey.minecraft("charcoal")
                 "ender_dragon" -> NamespacedKey.minecraft("dragon_head")
                 "husk" -> NamespacedKey.minecraft("leather_chestplate")
                 "iron_golem" -> NamespacedKey.minecraft("resin_clump")
@@ -167,6 +167,9 @@ class ArenaMobTokenItem(private val mobTypeId: String) : ArenaSimpleItem(
                 "drowned" -> NamespacedKey.minecraft("moss_block")
                 "silverfish" -> NamespacedKey.minecraft("blue_egg")
                 "spider" -> NamespacedKey.minecraft("disc_fragment_5")
+                "blaze" -> NamespacedKey.minecraft("blaze_powder")
+                "magma_cube" -> NamespacedKey.minecraft("fire_charge")
+                "spirit" -> NamespacedKey.minecraft("ghast_tear")
                 else -> NamespacedKey.minecraft("poisonous_potato")
             }
         }
