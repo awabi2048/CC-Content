@@ -16,6 +16,8 @@ import jp.awabi2048.cccontent.mob.ability.DashToTargetOffsetAbility
 import jp.awabi2048.cccontent.mob.ability.DrownedAquaticPursuitAbility
 import jp.awabi2048.cccontent.mob.ability.GenericBeamAbility
 import jp.awabi2048.cccontent.mob.ability.GuardianBeamAbility
+import jp.awabi2048.cccontent.mob.ability.GuardianSpineShotAbility
+import jp.awabi2048.cccontent.mob.ability.GuardianWaterDiveSplashAbility
 import jp.awabi2048.cccontent.mob.ability.LeapAbility
 import jp.awabi2048.cccontent.mob.ability.LightningBranchAbility
 import jp.awabi2048.cccontent.mob.ability.LinearProjectileAbility
@@ -33,8 +35,8 @@ import jp.awabi2048.cccontent.mob.ability.RandomInvisibilityAbility
 import jp.awabi2048.cccontent.mob.ability.ShieldAbility
 import jp.awabi2048.cccontent.mob.ability.StealthFangAbility
 import jp.awabi2048.cccontent.mob.ability.SplitOnDeathAbility
+import jp.awabi2048.cccontent.mob.ability.TridentThrowAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponThrowAbility
-import jp.awabi2048.cccontent.mob.ability.GrudgeAuraAbility
 import jp.awabi2048.cccontent.mob.ability.WaterSpiritAbility
 import jp.awabi2048.cccontent.mob.ability.WeaponSwapAbility
 import jp.awabi2048.cccontent.mob.ability.BuffEffectEntry
@@ -255,19 +257,23 @@ class GuardianNormalMobType : EquipmentMobType(
     id = "guardian_normal",
     baseEntityType = EntityType.GUARDIAN,
     abilities = listOf(
+        PlayerTargetAssistAbility(id = "guardian_normal_target_assist"),
         GuardianBeamAbility(
             id = "guardian_normal_beam",
             cooldownTicks = 90L,
             chargeTicks = 30L,
-            minRange = 2.0,
+            minRange = 6.0,
             maxRange = 16.0,
             directDamageMultiplier = 1.0,
             directBonusDamage = 1.5,
             explosionRadius = 0.0,
             directKnockback = 1.5,
             splashKnockback = 0.0,
-            chargePulseIntervalTicks = 0L
-        )
+            chargePulseIntervalTicks = 40L,
+            chargePulseDamage = 2.0
+        ),
+        GuardianSpineShotAbility(id = "guardian_normal_spine_shot", cooldownTicks = 60L, spikeScale = 1.0f),
+        GuardianWaterDiveSplashAbility(id = "guardian_normal_water_dive", jumpCooldownTicks = 70L)
     )
 )
 
@@ -275,19 +281,29 @@ class GuardianSmallMobType : EquipmentMobType(
     id = "guardian_small",
     baseEntityType = EntityType.GUARDIAN,
     abilities = listOf(
+        PlayerTargetAssistAbility(id = "guardian_small_target_assist"),
         GuardianBeamAbility(
             id = "guardian_small_beam",
             cooldownTicks = 70L,
             chargeTicks = 24L,
-            minRange = 2.0,
+            minRange = 6.0,
             maxRange = 14.0,
             directDamageMultiplier = 0.75,
             directBonusDamage = 1.0,
             explosionRadius = 0.0,
             directKnockback = 1.25,
             splashKnockback = 0.0,
-            chargePulseIntervalTicks = 0L
-        )
+            chargePulseIntervalTicks = 40L,
+            chargePulseDamage = 1.5
+        ),
+        GuardianSpineShotAbility(
+            id = "guardian_small_spine_shot",
+            cooldownTicks = 60L,
+            spikeScale = 1.0f,
+            damageMultiplier = 0.7,
+            triggerMaxDistance = 5.5
+        ),
+        GuardianWaterDiveSplashAbility(id = "guardian_small_water_dive", jumpCooldownTicks = 70L, splashDamage = 3.0, splashRadius = 3.2)
     )
 )
 
@@ -295,11 +311,12 @@ class GuardianBeamBurstMobType : EquipmentMobType(
     id = "guardian_beam_burst",
     baseEntityType = EntityType.ELDER_GUARDIAN,
     abilities = listOf(
+        PlayerTargetAssistAbility(id = "guardian_beam_burst_target_assist"),
         GuardianBeamAbility(
             id = "guardian_burst_beam",
             cooldownTicks = 105L,
             chargeTicks = 35L,
-            minRange = 2.0,
+            minRange = 6.0,
             maxRange = 18.0,
             directDamageMultiplier = 1.1,
             directBonusDamage = 3.0,
@@ -307,7 +324,8 @@ class GuardianBeamBurstMobType : EquipmentMobType(
             directKnockback = 2.3,
             splashKnockback = 1.2,
             splashVerticalBoost = 0.26,
-            chargePulseIntervalTicks = 0L,
+            chargePulseIntervalTicks = 40L,
+            chargePulseDamage = 2.5,
             decorationIntervalTicks = 10L,
             decorationEffect = GuardianBeamAbility.centeredBoxDecorationEffect(
                 Color.fromRGB(220, 40, 40),
@@ -325,7 +343,15 @@ class GuardianBeamBurstMobType : EquipmentMobType(
                 Color.fromRGB(255, 255, 255),
                 1.35f
             )
-        )
+        ),
+        GuardianSpineShotAbility(
+            id = "guardian_beam_burst_spine_shot",
+            cooldownTicks = 60L,
+            spikeScale = 1.0f,
+            damageMultiplier = 1.1,
+            triggerMaxDistance = 6.5
+        ),
+        GuardianWaterDiveSplashAbility(id = "guardian_beam_burst_water_dive", jumpCooldownTicks = 70L, splashDamage = 5.0, splashRadius = 4.2)
     )
 )
 
@@ -333,18 +359,19 @@ class GuardianDrainMobType : EquipmentMobType(
     id = "guardian_drain",
     baseEntityType = EntityType.GUARDIAN,
     abilities = listOf(
+        PlayerTargetAssistAbility(id = "guardian_drain_target_assist"),
         GuardianBeamAbility(
             id = "guardian_drain_beam",
             cooldownTicks = 95L,
             chargeTicks = 40L,
-            minRange = 2.0,
+            minRange = 6.0,
             maxRange = 16.0,
             directDamageMultiplier = 0.8,
             directBonusDamage = 1.5,
             explosionRadius = 0.0,
             directKnockback = 1.5,
             splashKnockback = 0.0,
-            chargePulseIntervalTicks = 30L,
+            chargePulseIntervalTicks = 40L,
             chargePulseDamage = 3.0,
             chargePulseSelfHeal = 2.0,
             chargeDebuffType = PotionEffectType.WEAKNESS,
@@ -378,7 +405,15 @@ class GuardianDrainMobType : EquipmentMobType(
                     Particle.DustTransition(Color.fromRGB(0, 110, 150), Color.fromRGB(255, 255, 255), 1.25f)
                 )
             }
-        )
+        ),
+        GuardianSpineShotAbility(
+            id = "guardian_drain_spine_shot",
+            cooldownTicks = 60L,
+            spikeScale = 1.0f,
+            damageMultiplier = 0.85,
+            triggerMaxDistance = 6.0
+        ),
+        GuardianWaterDiveSplashAbility(id = "guardian_drain_water_dive", jumpCooldownTicks = 70L, splashDamage = 4.5, splashRadius = 4.0)
     )
 )
 
@@ -1260,60 +1295,81 @@ class BlazeBeamMobType : EquipmentMobType(
     )
 )
 
-class DrownedNormalMobType : EquipmentMobType(
-    id = "drowned_normal",
+class DrownedUnarmedMobType : EquipmentMobType(
+    id = "drowned_unarmed",
     baseEntityType = EntityType.DROWNED,
     abilities = listOf(
-        DrownedAquaticPursuitAbility(id = "drowned_normal_aquatic_pursuit"),
-        PlayerTargetAssistAbility(id = "drowned_normal_target_assist")
+        DrownedAquaticPursuitAbility(id = "drowned_unarmed_aquatic_pursuit"),
+        PlayerTargetAssistAbility(id = "drowned_unarmed_target_assist"),
+        BackstepAbility(
+            id = "drowned_unarmed_backstep",
+            cooldownTicks = 95L,
+            horizontalSpeed = 0.78,
+            verticalSpeed = 0.33
+        )
     ),
-    defaultMainHand = Material.STONE_SWORD
+    defaultHelmet = Material.LEATHER_HELMET,
+    defaultBoots = Material.LEATHER_BOOTS
 )
 
-class DrownedWarriorMobType : EquipmentMobType(
-    id = "drowned_warrior",
+class DrownedTridentGuardMobType : EquipmentMobType(
+    id = "drowned_trident_guard",
     baseEntityType = EntityType.DROWNED,
     abilities = listOf(
-        DrownedAquaticPursuitAbility(id = "drowned_warrior_aquatic_pursuit"),
-        PlayerTargetAssistAbility(id = "drowned_warrior_target_assist"),
-        ShieldAbility(id = "drowned_warrior_shield", breakDisablesShieldPermanently = true),
+        DrownedAquaticPursuitAbility(
+            id = "drowned_trident_guard_aquatic_pursuit",
+            meleeReachMultiplier = 1.5
+        ),
+        PlayerTargetAssistAbility(id = "drowned_trident_guard_target_assist"),
+        ShieldAbility(id = "drowned_trident_guard_shield", breakDisablesShieldPermanently = true),
         BackstepAbility(
-            id = "drowned_warrior_backstep",
+            id = "drowned_trident_guard_backstep",
             cooldownTicks = 100L,
-            horizontalSpeed = 0.8,
+            horizontalSpeed = 0.82,
+            verticalSpeed = 0.34
+        ),
+        TridentThrowAbility(
+            id = "drowned_trident_guard_throw",
+            throwCooldownTicks = 90L,
+            homingConfig = MobShootUtil.HomingConfig(
+                accuracy = 0.9,
+                turnStrength = 0.2,
+                maxTurnDegrees = 14.0
+            )
+        )
+    ),
+    defaultMainHand = Material.TRIDENT,
+    defaultOffHand = Material.SHIELD,
+    defaultHelmet = Material.CHAINMAIL_HELMET,
+    defaultChestplate = Material.CHAINMAIL_CHESTPLATE,
+    defaultLeggings = Material.CHAINMAIL_LEGGINGS,
+    defaultBoots = Material.CHAINMAIL_BOOTS
+)
+
+class DrownedRaiderAxeMobType : EquipmentMobType(
+    id = "drowned_raider_axe",
+    baseEntityType = EntityType.DROWNED,
+    abilities = listOf(
+        DrownedAquaticPursuitAbility(id = "drowned_raider_axe_aquatic_pursuit"),
+        PlayerTargetAssistAbility(id = "drowned_raider_axe_target_assist"),
+        LeapAbility(
+            id = "drowned_raider_axe_leap",
+            cooldownTicks = 70L,
+            minRangeSquared = 9.0,
+            maxRange = 8.0,
+            horizontalSpeed = 1.05,
+            verticalSpeed = 0.5
+        ),
+        BackstepAbility(
+            id = "drowned_raider_axe_backstep",
+            cooldownTicks = 90L,
+            horizontalSpeed = 0.86,
             verticalSpeed = 0.35
         )
     ),
-    defaultMainHand = Material.STONE_SWORD,
-    defaultOffHand = Material.SHIELD
-)
-
-class DrownedGrudgeMobType : EquipmentMobType(
-    id = "drowned_grudge",
-    baseEntityType = EntityType.DROWNED,
-    abilities = listOf(
-        PlayerTargetAssistAbility(id = "drowned_grudge_target_assist"),
-        GrudgeAuraAbility(
-            id = "drowned_grudge_aura",
-            radius = 5.0,
-            debuffIntervalTicks = 120L,
-            debuffDurationSlownessTicks = 100,
-            debuffAmplifierSlowness = 1,
-            debuffDurationBlindnessTicks = 60,
-            damageIntervalTicks = 160L,
-            damageAmount = 3.0
-        ),
-    ),
-    defaultMainHand = Material.TRIDENT
-)
-
-class DrownedPowerThrowMobType : EquipmentMobType(
-    id = "drowned_power_throw",
-    baseEntityType = EntityType.DROWNED,
-    abilities = listOf(
-        PlayerTargetAssistAbility(id = "drowned_power_throw_target_assist"),
-    ),
-    defaultMainHand = Material.TRIDENT
+    defaultMainHand = Material.DIAMOND_AXE,
+    defaultHelmet = Material.GOLDEN_HELMET,
+    defaultBoots = Material.GOLDEN_BOOTS
 )
 
 class WaterSpiritMobType : EquipmentMobType(
@@ -1326,6 +1382,23 @@ class WaterSpiritMobType : EquipmentMobType(
             closeRangeDamage = 5.0,
             farRangeOrbDamage = 3.5,
             sharedCooldownTicks = 120L
+        )
+    )
+)
+
+class WaterSpiritEliteMobType : EquipmentMobType(
+    id = "water_spirit_elite",
+    baseEntityType = EntityType.ALLAY,
+    abilities = listOf(
+        WaterSpiritAbility(
+            id = "water_spirit_elite_attack",
+            approachDistance = 5.0,
+            closeRangeDamage = 5.0,
+            farRangeOrbDamage = 3.5,
+            sharedCooldownTicks = 120L,
+            orbCount = 6,
+            waterColumnExtraAnglesDegrees = listOf(120.0, 240.0),
+            enhancedAmbientOrbit = true
         )
     )
 )

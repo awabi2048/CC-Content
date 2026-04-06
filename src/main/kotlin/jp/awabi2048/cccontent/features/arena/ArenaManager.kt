@@ -2665,7 +2665,7 @@ class ArenaManager(
     private fun resolveMobTokenCategoryTypeId(mobTypeId: String): String {
         val normalized = sanitizeMobTypeId(mobTypeId)
         when (normalized) {
-            "ashen_spirit", "water_spirit" -> return "spirit"
+            "ashen_spirit", "water_spirit", "water_spirit_elite" -> return "spirit"
         }
         val baseEntityType = mobService.resolveMobType(normalized)?.baseEntityType
         if (baseEntityType != null) {
@@ -3281,7 +3281,9 @@ class ArenaManager(
                 return@Runnable
             }
             val spawnCandidates = selectSpawnCandidates(theme, wave)
-            val candidates = filterSpawnCandidatesByLocation(spawnCandidates, spawnPoint)
+            val locationFiltered = filterSpawnCandidatesByLocation(spawnCandidates, spawnPoint)
+            val transformedCandidates = promoteWaterSpiritCandidates(currentSession, locationFiltered)
+            val candidates = filterSpawnCandidatesByMaxAlive(currentSession, transformedCandidates)
             if (candidates.isEmpty()) {
                 return@Runnable
             }
@@ -3645,6 +3647,50 @@ class ArenaManager(
         return candidates.filter { entry ->
             val definition = mobDefinitions[entry.mobId] ?: return@filter false
             canSpawnAt(definition, spawnPoint)
+        }
+    }
+
+    private fun filterSpawnCandidatesByMaxAlive(
+        session: ArenaSession,
+        candidates: List<ArenaThemeWeightedMobEntry>
+    ): List<ArenaThemeWeightedMobEntry> {
+        if (candidates.isEmpty()) {
+            return candidates
+        }
+        return candidates.filter { entry ->
+            val maxAlive = entry.maxAlive ?: return@filter true
+            val alive = countAliveMobsByDefinitionTypeId(session, entry.mobId)
+            alive < maxAlive
+        }
+    }
+
+    private fun promoteWaterSpiritCandidates(
+        session: ArenaSession,
+        candidates: List<ArenaThemeWeightedMobEntry>
+    ): List<ArenaThemeWeightedMobEntry> {
+        if (candidates.isEmpty()) {
+            return candidates
+        }
+        val normalAlive = countAliveMobsByDefinitionTypeId(session, "water_spirit")
+        if (normalAlive < 2) {
+            return candidates
+        }
+        return candidates.map { entry ->
+            if (entry.mobId == "water_spirit") {
+                entry.copy(mobId = "water_spirit_elite")
+            } else {
+                entry
+            }
+        }
+    }
+
+    private fun countAliveMobsByDefinitionTypeId(session: ArenaSession, definitionTypeId: String): Int {
+        return session.activeMobs.count { mobId ->
+            if (mobToDefinitionTypeId[mobId] != definitionTypeId) {
+                return@count false
+            }
+            val entity = Bukkit.getEntity(mobId)
+            entity != null && entity.isValid && !entity.isDead
         }
     }
 
@@ -4493,7 +4539,9 @@ class ArenaManager(
         if (random.nextDouble() > intervalChance) return
 
         val spawnPoint = selectSpawnPoint(spawnPoints) ?: return
-        val candidates = filterSpawnCandidatesByLocation(selectSpawnCandidates(theme, session.waves), spawnPoint)
+        val locationFiltered = filterSpawnCandidatesByLocation(selectSpawnCandidates(theme, session.waves), spawnPoint)
+        val transformedCandidates = promoteWaterSpiritCandidates(session, locationFiltered)
+        val candidates = filterSpawnCandidatesByMaxAlive(session, transformedCandidates)
         val weightedMob = selectWeightedMob(candidates) ?: return
         val definition = mobDefinitions[weightedMob.mobId] ?: return
 

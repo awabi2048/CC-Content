@@ -249,7 +249,6 @@ class GuardianBeamAbility(
 
     private fun finishBeam(guardian: Guardian, runtime: Runtime) {
         guardian.setLaser(false)
-        guardian.target = null
         runtime.currentTargetId = null
         runtime.startedLaserTicks = Int.MIN_VALUE
         runtime.pulseCooldownTicks = 0L
@@ -269,7 +268,6 @@ class GuardianBeamAbility(
 
     private fun reset(guardian: Guardian, runtime: Runtime) {
         guardian.setLaser(false)
-        guardian.target = null
         runtime.currentTargetId = null
         runtime.startedLaserTicks = Int.MIN_VALUE
         runtime.pulseCooldownTicks = 0L

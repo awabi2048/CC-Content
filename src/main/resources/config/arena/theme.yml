@@ -163,32 +163,34 @@ ocean_monument:
     key: minecraft:block.iron_door.open
     pitch: 1.0
   mobs:
-    drowned_normal:
+    drowned_unarmed:
       weight: 8
       wave: 1..
-    drowned_warrior:
+    drowned_trident_guard:
       weight: 12
       wave: 2..
-    drowned_grudge:
-      weight: 2
+    drowned_raider_axe:
+      weight: 6
       wave: 3..
-    drowned_power_throw:
-      weight: 2
-      wave: 2..
     water_spirit:
       weight: 2
-      wave: 4..
+      wave: 2..3
+      max_alive: 2
+    water_spirit_elite:
+      weight: 2
+      wave: 4..5
+      max_alive: 2
     guardian_normal:
-      weight: 3
+      weight: 4
       wave: 2..
     guardian_small:
-      weight: 2
+      weight: 3
       wave: 1..
     guardian_drain:
-      weight: 2
+      weight: 3
       wave: 3..
     guardian_beam_burst:
-      weight: 1
+      weight: 2
       wave: 4..
   orientation:
     entrance_exit: north

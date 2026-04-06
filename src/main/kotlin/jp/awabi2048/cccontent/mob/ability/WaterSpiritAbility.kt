@@ -36,7 +36,9 @@ class WaterSpiritAbility(
     private val orbSpeed: Double = DEFAULT_ORB_SPEED,
     private val orbCount: Int = DEFAULT_ORB_COUNT,
     private val orbitRadius: Double = DEFAULT_ORBIT_RADIUS,
-    private val orbitSpeed: Double = DEFAULT_ORBIT_SPEED
+    private val orbitSpeed: Double = DEFAULT_ORBIT_SPEED,
+    private val waterColumnExtraAnglesDegrees: List<Double> = emptyList(),
+    private val enhancedAmbientOrbit: Boolean = false
 ) : MobAbility {
 
     private val orbitFollowConfig = OrbitFollowConfig(
@@ -290,9 +292,23 @@ class WaterSpiritAbility(
     }
 
     private fun spawnAmbientParticles(entity: LivingEntity, rt: Runtime) {
-        if (rt.ambientParticleTicks % 5L != 0L) return
+        if (!enhancedAmbientOrbit && rt.ambientParticleTicks % 5L != 0L) return
         val loc = entity.location.clone().add(0.0, 1.0, 0.0)
         val world = loc.world ?: return
+
+        if (enhancedAmbientOrbit) {
+            val baseAngle = rt.ambientParticleTicks.toDouble() * AMBIENT_ORBIT_ANGULAR_SPEED_PER_TICK
+            repeat(5) { index ->
+                val angle = baseAngle + (Math.PI * 2.0) * index.toDouble() / 5.0
+                val offsetX = cos(angle) * ENHANCED_AMBIENT_ORBIT_RADIUS
+                val offsetZ = sin(angle) * ENHANCED_AMBIENT_ORBIT_RADIUS
+                val point = loc.clone().add(offsetX, 0.0, offsetZ)
+                world.spawnParticle(Particle.DRIPPING_WATER, point, 10, 0.1, 0.1, 0.1, 0.0)
+                world.spawnParticle(Particle.WITCH, point, 5, 0.1, 0.1, 0.1, 0.0)
+            }
+            return
+        }
+
         for (i in 0 until 20) {
             val angle = Random.nextDouble(0.0, Math.PI * 2)
             val radius = 1.8 + Random.nextDouble(0.0, 1.2)
@@ -335,8 +351,35 @@ class WaterSpiritAbility(
     }
 
     private fun executeMeleeAttack(plugin: JavaPlugin, entity: LivingEntity, target: LivingEntity) {
+        val baseOrigin = target.location.clone().add(0.0, 0.1, 0.0)
+        val origins = mutableListOf(baseOrigin)
+
+        if (waterColumnExtraAnglesDegrees.isNotEmpty()) {
+            val fromEntity = baseOrigin.toVector().subtract(entity.location.toVector()).setY(0.0)
+            if (fromEntity.lengthSquared() > 1.0e-6) {
+                val radius = fromEntity.length()
+                val baseDirection = fromEntity.normalize()
+                waterColumnExtraAnglesDegrees.forEach { degrees ->
+                    val rotated = rotateVectorY(baseDirection.clone(), Math.toRadians(degrees)).multiply(radius)
+                    val extraOrigin = entity.location.toVector().clone().add(rotated)
+                    origins += Location(entity.world, extraOrigin.x, baseOrigin.y, extraOrigin.z)
+                }
+            }
+        }
+
+        origins.forEach { origin ->
+            launchWaterColumn(plugin, entity, target, origin)
+        }
+    }
+
+    private fun launchWaterColumn(
+        plugin: JavaPlugin,
+        entity: LivingEntity,
+        target: LivingEntity,
+        startPosition: Location
+    ) {
         val world = target.world ?: return
-        val currentPos = target.location.clone().add(0.0, 0.1, 0.0)
+        val currentPos = startPosition.clone()
         val velocity = Vector(0.0, WATER_COLUMN_INITIAL_SPEED, 0.0)
         val hitPlayers = mutableSetOf<UUID>()
 
@@ -384,6 +427,14 @@ class WaterSpiritAbility(
                 }
             }
         }.runTaskTimer(plugin, 0L, 1L)
+    }
+
+    private fun rotateVectorY(vector: Vector, radians: Double): Vector {
+        val cos = cos(radians)
+        val sin = sin(radians)
+        val x = vector.x * cos - vector.z * sin
+        val z = vector.x * sin + vector.z * cos
+        return Vector(x, vector.y, z)
     }
 
     private fun scheduleTeleport(entity: LivingEntity, rt: Runtime, freeFarAttack: Boolean = false) {
@@ -478,9 +529,18 @@ class WaterSpiritAbility(
 
                 holdPositions.drop(launchedCount).forEach { pos ->
                     val world = pos.world ?: return@forEach
-                    world.spawnParticle(Particle.DUST, pos, 2, 0.1, 0.1, 0.1, 0.0, Particle.DustOptions(ORB_COLOR, ORB_HOLD_DUST_SIZE))
+                    world.spawnParticle(
+                        Particle.DUST_COLOR_TRANSITION,
+                        pos,
+                        2,
+                        0.1 * ORB_PARTICLE_RADIUS_MULTIPLIER,
+                        0.1 * ORB_PARTICLE_RADIUS_MULTIPLIER,
+                        0.1 * ORB_PARTICLE_RADIUS_MULTIPLIER,
+                        0.0,
+                        Particle.DustTransition(ORB_COLOR, ORB_OUTER_COLOR, ORB_HOLD_DUST_SIZE)
+                    )
                     world.spawnParticle(Particle.BUBBLE, pos, 2, 0.12, 0.12, 0.12, 0.0)
-                    world.spawnParticle(Particle.WAX_OFF, pos, 2, 0.12, 0.12, 0.12, 0.0)
+                    world.spawnParticle(Particle.FIREWORK, pos, 2, 0.12, 0.12, 0.12, 0.0)
                 }
 
                 if (ticks >= ORB_HOLD_TICKS && launchedCount < orbCount) {
@@ -545,10 +605,10 @@ class WaterSpiritAbility(
                 val toTarget = targetPos.toVector().subtract(currentPos.toVector())
                 val distToTarget = toTarget.length()
 
-                if (distToTarget < 1.2) {
+                if (distToTarget < ORB_HIT_RADIUS) {
                     target.damage(damage, entity)
                     world.spawnParticle(Particle.SPLASH, currentPos, 8, 0.2, 0.2, 0.2, 0.05)
-                    world.spawnParticle(Particle.WAX_OFF, currentPos.clone(), 8, 0.2, 0.2, 0.2, 0.0)
+                    world.spawnParticle(Particle.FIREWORK, currentPos.clone(), 8, 0.2, 0.2, 0.2, 0.0)
                     if (target is Player) {
                         target.playSound(target.location, Sound.ENTITY_PLAYER_SPLASH, 0.5f, 1.2f)
                     } else {
@@ -591,15 +651,17 @@ class WaterSpiritAbility(
                 currentPos.add(displacement)
 
                 world.spawnParticle(
-                    Particle.DUST,
+                    Particle.DUST_COLOR_TRANSITION,
                     currentPos.clone(),
                     2,
-                    0.1, 0.1, 0.1,
+                    0.1 * ORB_PARTICLE_RADIUS_MULTIPLIER,
+                    0.1 * ORB_PARTICLE_RADIUS_MULTIPLIER,
+                    0.1 * ORB_PARTICLE_RADIUS_MULTIPLIER,
                     0.0,
-                    Particle.DustOptions(ORB_COLOR, 0.6f)
+                    Particle.DustTransition(ORB_COLOR, ORB_OUTER_COLOR, ORB_TRAIL_DUST_SIZE)
                 )
                 world.spawnParticle(Particle.BUBBLE, currentPos.clone(), 1, 0.05, 0.05, 0.05, 0.0)
-                world.spawnParticle(Particle.WAX_OFF, currentPos.clone(), 1, 0.05, 0.05, 0.05, 0.0)
+                world.spawnParticle(Particle.FIREWORK, currentPos.clone(), 1, 0.05, 0.05, 0.05, 0.0)
             }
         }.runTaskTimer(plugin, 0L, 1L)
     }
@@ -639,12 +701,18 @@ class WaterSpiritAbility(
         private const val ORB_HOMING_TICKS = 40
         private const val ORB_HOMING_STEER_FACTOR = 0.2
         private const val ORB_MAX_LIFETIME_TICKS = 100L
+        private const val ORB_HIT_RADIUS = 1.44
+        private const val ORB_PARTICLE_RADIUS_MULTIPLIER = 1.2
+        private const val ORB_TRAIL_DUST_SIZE = 0.72f
         private val ORB_COLOR = Color.fromRGB(30, 90, 200)
+        private val ORB_OUTER_COLOR = Color.fromRGB(255, 255, 255)
         private const val WATER_COLUMN_INITIAL_SPEED = 0.6
         private const val WATER_COLUMN_DRAG = 0.86
         private const val WATER_COLUMN_STOP_SPEED = 0.01
         private const val WATER_COLUMN_HIT_RADIUS = 0.8
         private const val WATER_COLUMN_LAUNCH_Y = 1.05
         private const val DAMAGE_MULTIPLIER = 2.5
+        private const val ENHANCED_AMBIENT_ORBIT_RADIUS = 2.0
+        private val AMBIENT_ORBIT_ANGULAR_SPEED_PER_TICK = Math.toRadians(45.0) / 20.0
     }
 }

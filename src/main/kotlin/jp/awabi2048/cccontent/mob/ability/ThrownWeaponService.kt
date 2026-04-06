@@ -7,6 +7,7 @@ import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Mob
 import org.bukkit.entity.Player
 import org.bukkit.entity.Projectile
+import org.bukkit.entity.Trident
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.entity.ProjectileHitEvent
@@ -29,7 +30,7 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
     private data class ActiveThrownWeapon(
         val ownerId: UUID,
         val projectileId: UUID,
-        val flyingDisplay: FlyingItemDisplay,
+        val flyingDisplay: FlyingItemDisplay?,
         val weapon: ItemStack,
         val damage: Double,
         val loaderKey: String
@@ -68,7 +69,11 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
         val projectile = spec.projectile
         val world = projectile.world
 
-        val flyingDisplay = FlyingItemDisplay.spawn(world, projectile.location, spec.weapon.clone())
+        val flyingDisplay = if (projectile is Trident) {
+            null
+        } else {
+            FlyingItemDisplay.spawn(world, projectile.location, spec.weapon.clone())
+        }
 
         val active = ActiveThrownWeapon(
             ownerId = spec.ownerId,
@@ -135,7 +140,7 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
         task = null
 
         activeThrows.values.forEach { active ->
-            active.flyingDisplay.cleanup()
+            active.flyingDisplay?.cleanup()
             Bukkit.getEntity(active.projectileId)?.remove()
         }
         groundWeapons.values.forEach { ground ->
@@ -164,7 +169,7 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
             val (projectileId, active) = activeIterator.next()
             val projectile = Bukkit.getEntity(projectileId) as? Projectile
             if (projectile == null || !projectile.isValid || projectile.isDead) {
-                active.flyingDisplay.cleanup()
+                active.flyingDisplay?.cleanup()
                 ownerToProjectile.remove(active.ownerId)
                 activeIterator.remove()
                 continue
@@ -172,7 +177,7 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
 
             if (shouldUpdateDisplay) {
                 val vel = projectile.velocity
-                active.flyingDisplay.updatePosition(
+                active.flyingDisplay?.updatePosition(
                     projectile.location.toVector(),
                     if (vel.lengthSquared() > 0.0001) vel else projectile.location.direction,
                     projectile.ticksLived.toLong()
@@ -226,7 +231,7 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
     }
 
     private fun toGroundWeapon(active: ActiveThrownWeapon, location: org.bukkit.Location) {
-        active.flyingDisplay.cleanup()
+        active.flyingDisplay?.cleanup()
 
         val world = location.world ?: return
         val dropLoc = location.clone().add(0.0, 0.1, 0.0)

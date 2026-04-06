@@ -41,7 +41,8 @@ data class ArenaThemeWaveRange(
 data class ArenaThemeWeightedMobEntry(
     val mobId: String,
     val weight: Int,
-    val waveRange: ArenaThemeWaveRange
+    val waveRange: ArenaThemeWaveRange,
+    val maxAlive: Int?
 )
 
 data class ArenaThemeMobSpawnConfig(
@@ -306,11 +307,27 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 warnings.add(warning)
                 continue
             }
+
+            val maxAlivePath = "$mobId.max_alive"
+            val maxAlive = if (mobsSection.contains(maxAlivePath)) {
+                val value = mobsSection.getInt(maxAlivePath, 0)
+                if (value <= 0) {
+                    val warning = "[Arena] theme.yml の mobs.max_alive は1以上である必要があります: theme=$themeId mob=$id max_alive=$value"
+                    plugin.logger.warning(warning)
+                    warnings.add(warning)
+                    continue
+                }
+                value
+            } else {
+                null
+            }
+
             weightedMobs.add(
                 ArenaThemeWeightedMobEntry(
                     mobId = id,
                     weight = weight,
-                    waveRange = waveRange
+                    waveRange = waveRange,
+                    maxAlive = maxAlive
                 )
             )
         }
