@@ -2804,8 +2804,6 @@ class ArenaManager(
         session.actionMarkerHoldStates.remove(playerId)
         session.barrierReturnHoldTicksByParticipant.remove(playerId)
         session.barrierReturnSubtitleNextTickByParticipant.remove(playerId)
-        session.arenaBgmModeByParticipant.remove(playerId)
-        session.arenaBgmSwitchRequestByParticipant.remove(playerId)
         session.playerWaveCatchupDeadlineMillis.remove(playerId)
         clearReviveBindingByReviver(session, playerId)
         clearDownedState(session, playerId)
@@ -2823,7 +2821,7 @@ class ArenaManager(
 
         val player = Bukkit.getPlayer(playerId)
         if (player != null && player.isOnline) {
-            stopArenaBgmForPlayer(player)
+            stopArenaBgmForParticipant(session, playerId)
             restoreSessionGameMode(session, player)
             session.progressBossBar?.let { player.hideBossBar(it) }
             val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
@@ -2899,7 +2897,7 @@ class ArenaManager(
                 if (duringShutdown || shuttingDown) {
                     stopArenaBgmForPlayer(player)
                 } else {
-                    scheduleBoundaryStopArenaBgmForPlayer(session, participantId, player)
+                    scheduleBoundaryStopArenaBgmForPlayer(session, player)
                 }
                 restoreSessionGameMode(session, player)
                 val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
@@ -2940,8 +2938,9 @@ class ArenaManager(
         session.reviveBossBarsByDowned.values.forEach { hideReviveBossBarFromAll(session, it) }
         session.reviveBossBarsByDowned.clear()
         session.reviveCountByPlayer.clear()
-        session.arenaBgmModeByParticipant.clear()
-        session.arenaBgmSwitchRequestByParticipant.clear()
+        session.arenaBgmMode = ArenaBgmMode.STOPPED
+        session.arenaBgmSwitchRequest = null
+        session.arenaBgmModeStartedTick = 0L
         session.downedOriginalWalkSpeeds.clear()
         session.downedOriginalJumpStrengths.clear()
         session.invitedParticipants.clear()
@@ -5029,21 +5028,42 @@ class ArenaManager(
                 if (!player.isOnline || player.world.name != activeSession.worldName) return@forEach
                 val themeName = ArenaI18n.text(player, "arena.theme.${activeSession.themeId}.name", activeSession.themeId)
                 player.sendTitle("", "§7« §6$themeName §7»", 10, 60, 10)
-                startArenaBgmMode(activeSession, participantId, ArenaBgmMode.NORMAL, currentTick)
             }
+            startArenaBgmMode(activeSession, ArenaBgmMode.NORMAL, currentTick)
         }, delayTicks.coerceAtLeast(0L))
         session.transitionTasks.add(task)
     }
 
     private fun requestArenaBgmMode(session: ArenaSession, targetMode: ArenaBgmMode, strictNextBoundary: Boolean = false) {
+        if (session.barrierRestartCompleted && targetMode != ArenaBgmMode.STOPPED) {
+            return
+        }
         if (targetMode != ArenaBgmMode.COMBAT) {
             session.arenaWaveStartCombatDelayTask?.cancel()
             session.arenaWaveStartCombatDelayTask = null
         }
-        val currentTick = Bukkit.getCurrentTick().toLong()
-        session.participants.forEach { participantId ->
-            requestArenaBgmModeForParticipant(session, participantId, targetMode, currentTick, strictNextBoundary = strictNextBoundary)
+
+        val currentMode = session.arenaBgmMode
+        val currentRequest = session.arenaBgmSwitchRequest
+        if (currentRequest != null &&
+            currentRequest.targetMode == targetMode &&
+            currentRequest.strictNextBoundary == strictNextBoundary
+        ) {
+            return
         }
+        if (currentMode == targetMode && currentRequest == null) {
+            return
+        }
+
+        val requestedAtBeat = arenaBgmTrackForMode(currentMode)?.let { track ->
+            currentAbsoluteBeat(session, track)
+        }
+
+        session.arenaBgmSwitchRequest = ArenaBgmSwitchRequest(
+            targetMode = targetMode,
+            requestedAtBeat = requestedAtBeat,
+            strictNextBoundary = strictNextBoundary
+        )
     }
 
     private fun requestWaveStartCombatBgm(session: ArenaSession) {
@@ -5053,27 +5073,10 @@ class ArenaManager(
         val delayedTask = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             session.arenaWaveStartCombatDelayTask = null
             val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
-            val currentTick = Bukkit.getCurrentTick().toLong()
-            activeSession.participants.forEach { participantId ->
-                requestWaveStartCombatBgmForParticipant(activeSession, participantId, currentTick)
-            }
+            requestArenaBgmMode(activeSession, ArenaBgmMode.COMBAT, strictNextBoundary = true)
         }, WAVE_START_COMBAT_BGM_DELAY_TICKS)
         session.arenaWaveStartCombatDelayTask = delayedTask
         session.transitionTasks.add(delayedTask)
-    }
-
-    private fun requestWaveStartCombatBgmForParticipant(session: ArenaSession, participantId: UUID, currentTick: Long) {
-        val currentMode = participantArenaBgmMode(session, participantId)
-        if (currentMode == ArenaBgmMode.COMBAT && session.arenaBgmSwitchRequestByParticipant[participantId] == null) {
-            return
-        }
-        requestArenaBgmModeForParticipant(
-            session,
-            participantId,
-            ArenaBgmMode.COMBAT,
-            currentTick,
-            strictNextBoundary = true
-        )
     }
 
     private fun isCombatBgmReadyForWaveStart(session: ArenaSession): Boolean {
@@ -5092,52 +5095,10 @@ class ArenaManager(
         if (targets.isEmpty()) {
             return true
         }
-        return targets.all { player -> isCombatBgmReadyForParticipant(session, player.uniqueId) }
-    }
-
-    private fun isCombatBgmReadyForParticipant(session: ArenaSession, participantId: UUID): Boolean {
-        val mode = participantArenaBgmMode(session, participantId)
-        val request = session.arenaBgmSwitchRequestByParticipant[participantId]
-        if (mode != ArenaBgmMode.COMBAT || request != null) {
+        if (session.arenaBgmMode != ArenaBgmMode.COMBAT || session.arenaBgmSwitchRequest != null) {
             return false
         }
-        return hasArenaBgmPlayback(session, participantId, ArenaBgmMode.COMBAT)
-    }
-
-    private fun requestArenaBgmModeForParticipant(
-        session: ArenaSession,
-        participantId: UUID,
-        targetMode: ArenaBgmMode,
-        currentTick: Long,
-        strictNextBoundary: Boolean = false
-    ) {
-        if (session.barrierRestartCompleted && targetMode != ArenaBgmMode.STOPPED) {
-            return
-        }
-
-        val currentMode = participantArenaBgmMode(session, participantId)
-        val currentRequest = session.arenaBgmSwitchRequestByParticipant[participantId]
-
-        if (currentRequest != null &&
-            currentRequest.targetMode == targetMode &&
-            currentRequest.strictNextBoundary == strictNextBoundary
-        ) {
-            return
-        }
-
-        if (currentMode == targetMode && currentRequest == null) {
-            return
-        }
-
-        val requestedAtBeat = arenaBgmTrackForMode(currentMode)?.let { track ->
-            currentAbsoluteBeat(session, participantId, track)
-        }
-
-        session.arenaBgmSwitchRequestByParticipant[participantId] = ArenaBgmSwitchRequest(
-            targetMode = targetMode,
-            requestedAtBeat = requestedAtBeat,
-            strictNextBoundary = strictNextBoundary
-        )
+        return targets.all { player -> hasArenaBgmPlayback(session, player.uniqueId, ArenaBgmMode.COMBAT) }
     }
 
     private fun updateArenaBgmTransitions() {
@@ -5163,28 +5124,34 @@ class ArenaManager(
                 }
             }
 
-            session.participants.forEach { participantId ->
-                if (isPlayerDowned(session, participantId)) {
-                    session.arenaBgmSwitchRequestByParticipant.remove(participantId)
-                    return@forEach
-                }
-                if (!session.stageStarted) {
-                    return@forEach
-                }
-                if (session.barrierRestartCompleted) {
-                    processArenaBgmSwitchRequest(session, participantId, currentTick)
-                    return@forEach
-                }
-                refreshArenaBgmPlaybackState(session, participantId)
-                processArenaBgmSwitchRequest(session, participantId, currentTick)
+            if (!session.stageStarted) {
+                return@forEach
             }
+
+            refreshArenaBgmPlaybackState(session, currentTick)
+            processArenaBgmSwitchRequest(session, currentTick)
         }
     }
 
-    private fun refreshArenaBgmPlaybackState(session: ArenaSession, participantId: UUID) {
-        val currentMode = participantArenaBgmMode(session, participantId)
-        if (currentMode != ArenaBgmMode.STOPPED && !hasArenaBgmPlayback(session, participantId, currentMode)) {
-            session.arenaBgmModeByParticipant[participantId] = ArenaBgmMode.STOPPED
+    private fun refreshArenaBgmPlaybackState(session: ArenaSession, currentTick: Long) {
+        val currentMode = session.arenaBgmMode
+        if (currentMode == ArenaBgmMode.STOPPED) {
+            return
+        }
+        val track = arenaBgmTrackForMode(currentMode) ?: run {
+            session.arenaBgmMode = ArenaBgmMode.STOPPED
+            session.arenaBgmSwitchRequest = null
+            session.arenaBgmModeStartedTick = 0L
+            return
+        }
+
+        val targets = arenaBgmPlaybackTargets(session)
+        if (targets.isEmpty()) {
+            return
+        }
+        val allPlaying = targets.all { player -> BGMManager.isPlaying(player, track.soundKey) }
+        if (!allPlaying) {
+            startArenaBgmMode(session, currentMode, currentTick)
         }
     }
 
@@ -5220,57 +5187,53 @@ class ArenaManager(
         }
     }
 
-    private fun processArenaBgmSwitchRequest(session: ArenaSession, participantId: UUID, currentTick: Long) {
-        val request = session.arenaBgmSwitchRequestByParticipant[participantId] ?: return
-        val currentMode = participantArenaBgmMode(session, participantId)
-        val player = Bukkit.getPlayer(participantId)
-        if (player == null || !player.isOnline || player.world.name != session.worldName) {
-            session.arenaBgmSwitchRequestByParticipant.remove(participantId)
-            return
-        }
+    private fun processArenaBgmSwitchRequest(session: ArenaSession, currentTick: Long) {
+        val request = session.arenaBgmSwitchRequest ?: return
+        val currentMode = session.arenaBgmMode
 
         if (currentMode == ArenaBgmMode.STOPPED) {
-            session.arenaBgmSwitchRequestByParticipant.remove(participantId)
+            session.arenaBgmSwitchRequest = null
             if (request.targetMode == ArenaBgmMode.STOPPED) {
-                stopArenaBgmForParticipant(session, participantId)
+                stopArenaBgm(session)
                 return
             }
 
-            startArenaBgmMode(session, participantId, ArenaBgmMode.NORMAL, currentTick)
+            startArenaBgmMode(session, ArenaBgmMode.NORMAL, currentTick)
             if (request.targetMode == ArenaBgmMode.COMBAT) {
-                requestArenaBgmModeForParticipant(
-                    session,
-                    participantId,
-                    ArenaBgmMode.COMBAT,
-                    currentTick,
-                    strictNextBoundary = true
-                )
+                requestArenaBgmMode(session, ArenaBgmMode.COMBAT, strictNextBoundary = true)
             }
             return
         }
 
-        if (!hasArenaBgmPlayback(session, participantId, currentMode)) {
-            session.arenaBgmModeByParticipant[participantId] = ArenaBgmMode.STOPPED
+        if (!hasSessionArenaBgmPlayback(session, currentMode)) {
+            session.arenaBgmMode = ArenaBgmMode.STOPPED
+            session.arenaBgmSwitchRequest = null
+            session.arenaBgmModeStartedTick = 0L
             return
         }
 
         val currentTrack = arenaBgmTrackForMode(currentMode) ?: return
-        val absoluteBeatNow = currentAbsoluteBeat(session, participantId, currentTrack)
+        val absoluteBeatNow = currentAbsoluteBeat(session, currentTrack)
         if (!isBeatBoundaryReached(currentTrack, absoluteBeatNow, request.requestedAtBeat, request.strictNextBoundary)) {
             return
         }
 
-        session.arenaBgmSwitchRequestByParticipant.remove(participantId)
+        session.arenaBgmSwitchRequest = null
         val resolvedTargetMode = request.targetMode
         if (resolvedTargetMode == ArenaBgmMode.STOPPED) {
-            stopArenaBgmForParticipant(session, participantId)
+            stopArenaBgm(session)
             return
         }
         if (resolvedTargetMode == currentMode) {
             return
         }
 
-        startArenaBgmMode(session, participantId, resolvedTargetMode, currentTick)
+        startArenaBgmMode(session, resolvedTargetMode, currentTick)
+    }
+
+    private fun hasSessionArenaBgmPlayback(session: ArenaSession, mode: ArenaBgmMode): Boolean {
+        val track = arenaBgmTrackForMode(mode) ?: return false
+        return arenaBgmPlaybackTargets(session).any { player -> BGMManager.isPlaying(player, track.soundKey) }
     }
 
     private fun hasArenaBgmPlayback(session: ArenaSession, participantId: UUID, mode: ArenaBgmMode): Boolean {
@@ -5302,15 +5265,15 @@ class ArenaManager(
         return currentBoundary > requestedBoundary
     }
 
-    private fun scheduleBoundaryStopArenaBgmForPlayer(session: ArenaSession, participantId: UUID, player: Player) {
-        val mode = participantArenaBgmMode(session, participantId)
+    private fun scheduleBoundaryStopArenaBgmForPlayer(session: ArenaSession, player: Player) {
+        val mode = session.arenaBgmMode
         val track = arenaBgmTrackForMode(mode)
         if (track == null) {
             stopArenaBgmForPlayer(player)
             return
         }
 
-        val absoluteBeatNow = currentAbsoluteBeat(session, participantId, track)
+        val absoluteBeatNow = currentAbsoluteBeat(session, track)
         val switchInterval = track.switchIntervalBeats.toLong().coerceAtLeast(1L)
         val beatOffset = (absoluteBeatNow - 1L).mod(switchInterval)
         val beatsUntilNextBoundary = if (beatOffset == 0L) switchInterval else (switchInterval - beatOffset)
@@ -5325,30 +5288,30 @@ class ArenaManager(
         }, delayTicks)
     }
 
-    private fun currentAbsoluteBeat(
-        session: ArenaSession,
-        participantId: UUID,
-        track: ArenaBgmTrackConfig
-    ): Long {
-        val player = Bukkit.getPlayer(participantId) ?: return 1L
-        val beatNanos = track.beatTicks * 50_000_000.0
-        return BGMManager.getElapsedBeats(player, beatNanos)
+    private fun currentAbsoluteBeat(session: ArenaSession, track: ArenaBgmTrackConfig): Long {
+        val startedTick = session.arenaBgmModeStartedTick
+        if (startedTick <= 0L) {
+            return 1L
+        }
+        val elapsedTicks = (Bukkit.getCurrentTick().toLong() - startedTick).coerceAtLeast(0L)
+        return (elapsedTicks.toDouble() / track.beatTicks).toLong() + 1L
     }
 
-    private fun startArenaBgmMode(session: ArenaSession, participantId: UUID, mode: ArenaBgmMode, startTick: Long) {
+    private fun startArenaBgmMode(session: ArenaSession, mode: ArenaBgmMode, startTick: Long) {
         val track = arenaBgmTrackForMode(mode) ?: return
-        val currentMode = participantArenaBgmMode(session, participantId)
-        if (currentMode == mode && hasArenaBgmPlayback(session, participantId, mode)) {
-            session.arenaBgmSwitchRequestByParticipant.remove(participantId)
+        val currentMode = session.arenaBgmMode
+        if (currentMode == mode && hasSessionArenaBgmPlayback(session, mode)) {
+            session.arenaBgmSwitchRequest = null
             return
         }
-        val player = Bukkit.getPlayer(participantId)
-        if (player != null && player.isOnline && player.world.name == session.worldName) {
+
+        arenaBgmPlaybackTargets(session).forEach { player ->
             stopArenaBgmForPlayer(player)
             BGMManager.playPrecise(player, track.soundKey, track.loopTicks)
         }
-        session.arenaBgmModeByParticipant[participantId] = mode
-        session.arenaBgmSwitchRequestByParticipant.remove(participantId)
+        session.arenaBgmMode = mode
+        session.arenaBgmModeStartedTick = startTick
+        session.arenaBgmSwitchRequest = null
         if (mode == ArenaBgmMode.NORMAL) {
             tryBroadcastPendingWaveClearedMessageOnNormalBgm(session)
         }
@@ -5357,9 +5320,10 @@ class ArenaManager(
     private fun stopArenaBgm(session: ArenaSession) {
         session.arenaWaveStartCombatDelayTask?.cancel()
         session.arenaWaveStartCombatDelayTask = null
-        session.participants.forEach { participantId ->
-            stopArenaBgmForParticipant(session, participantId)
-        }
+        stopArenaBgmPlaybackOnly(session)
+        session.arenaBgmMode = ArenaBgmMode.STOPPED
+        session.arenaBgmModeStartedTick = 0L
+        session.arenaBgmSwitchRequest = null
     }
 
     private fun stopArenaBgmForParticipant(session: ArenaSession, participantId: UUID) {
@@ -5367,12 +5331,20 @@ class ArenaManager(
         if (player != null && player.isOnline && player.world.name == session.worldName) {
             stopArenaBgmForPlayer(player)
         }
-        session.arenaBgmModeByParticipant[participantId] = ArenaBgmMode.STOPPED
-        session.arenaBgmSwitchRequestByParticipant.remove(participantId)
+        val currentMode = session.arenaBgmMode
+        if (currentMode != ArenaBgmMode.STOPPED && !hasSessionArenaBgmPlayback(session, currentMode)) {
+            session.arenaBgmMode = ArenaBgmMode.STOPPED
+            session.arenaBgmModeStartedTick = 0L
+            session.arenaBgmSwitchRequest = null
+        }
     }
 
-    private fun participantArenaBgmMode(session: ArenaSession, participantId: UUID): ArenaBgmMode {
-        return session.arenaBgmModeByParticipant[participantId] ?: ArenaBgmMode.STOPPED
+    private fun arenaBgmPlaybackTargets(session: ArenaSession): List<Player> {
+        return session.participants
+            .asSequence()
+            .mapNotNull { participantId -> Bukkit.getPlayer(participantId) }
+            .filter { player -> player.isOnline && player.world.name == session.worldName }
+            .toList()
     }
 
     private fun stopArenaBgmPlaybackOnly(session: ArenaSession) {

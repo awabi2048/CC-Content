@@ -10,9 +10,9 @@ object BGMManager {
     private data class PrecisePlayback(
         val task: BukkitTask,
         val soundKey: String,
-        val startNanos: Long,
-        val loopDurationNanos: Long,
-        @Volatile var nextPlayAtNanos: Long,
+        val startTick: Long,
+        val loopDurationTicks: Long,
+        @Volatile var nextPlayAtTick: Long,
         @Volatile var loopCount: Long
     )
 
@@ -82,9 +82,8 @@ object BGMManager {
             return
         }
 
-        val loopDurationNanos = loopTicks * 50_000_000L
-        val startNanos = System.nanoTime()
-        val nextPlayAtNanos = startNanos + loopDurationNanos
+        val startTick = Bukkit.getCurrentTick().toLong()
+        val nextPlayAtTick = startTick + loopTicks
 
         // 初回即時再生
         player.playSound(player.location, soundKey, 1.0f, 1.0f)
@@ -97,25 +96,26 @@ object BGMManager {
                 }
 
                 val playback = activePlaybacks[player.uniqueId] ?: return
-                val now = System.nanoTime()
-                if (now >= playback.nextPlayAtNanos) {
+                val currentTick = Bukkit.getCurrentTick().toLong()
+                if (currentTick >= playback.nextPlayAtTick) {
                     player.playSound(player.location, soundKey, 1.0f, 1.0f)
-                    var next = playback.nextPlayAtNanos + playback.loopDurationNanos
-                    while (next <= now) {
-                        next += playback.loopDurationNanos
+                    var next = playback.nextPlayAtTick + playback.loopDurationTicks
+                    while (next <= currentTick) {
+                        next += playback.loopDurationTicks
                     }
-                    playback.nextPlayAtNanos = next
+                    playback.nextPlayAtTick = next
                     playback.loopCount++
                 }
             }
         }.runTaskTimer(plugin, 0L, 1L)
 
-        replaceActivePlayback(player, task, soundKey, startNanos, loopDurationNanos, nextPlayAtNanos)
+        replaceActivePlayback(player, task, soundKey, startTick, loopTicks, nextPlayAtTick)
     }
 
     fun getElapsedNanos(player: Player): Long? {
         val playback = activePlaybacks[player.uniqueId] ?: return null
-        return System.nanoTime() - playback.startNanos
+        val elapsedTicks = (Bukkit.getCurrentTick().toLong() - playback.startTick).coerceAtLeast(0L)
+        return elapsedTicks * 50_000_000L
     }
 
     fun getElapsedBeats(player: Player, beatNanos: Double): Long {
@@ -124,7 +124,7 @@ object BGMManager {
     }
 
     fun getPlaybackStartNanos(player: Player): Long? {
-        return activePlaybacks[player.uniqueId]?.startNanos
+        return activePlaybacks[player.uniqueId]?.startTick?.times(50_000_000L)
     }
 
     fun isPlaying(player: Player, soundKey: String? = null): Boolean {
@@ -150,9 +150,9 @@ object BGMManager {
         player: Player,
         task: BukkitTask,
         soundKey: String,
-        startNanos: Long,
-        loopDurationNanos: Long,
-        nextPlayAtNanos: Long
+        startTick: Long,
+        loopDurationTicks: Long,
+        nextPlayAtTick: Long
     ) {
         activePlaybacks.remove(player.uniqueId)?.let { current ->
             current.task.cancel()
@@ -161,9 +161,9 @@ object BGMManager {
         activePlaybacks[player.uniqueId] = PrecisePlayback(
             task = task,
             soundKey = soundKey,
-            startNanos = startNanos,
-            loopDurationNanos = loopDurationNanos,
-            nextPlayAtNanos = nextPlayAtNanos,
+            startTick = startTick,
+            loopDurationTicks = loopDurationTicks,
+            nextPlayAtTick = nextPlayAtTick,
             loopCount = 0L
         )
     }
