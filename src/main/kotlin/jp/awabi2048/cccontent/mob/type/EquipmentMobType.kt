@@ -96,6 +96,7 @@ open class EquipmentMobType(
             "guardian_small" to 0.75,
             "guardian_drain" to 2.5,
             "water_spirit" to 3.0,
+            "water_spirit_elite" to 3.75,
             "ashen_spirit" to 3.0,
             "frog_big" to 3.0,
             "blaze_power" to 1.5,

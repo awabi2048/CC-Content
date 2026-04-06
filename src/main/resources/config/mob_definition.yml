@@ -371,39 +371,30 @@ slime_wither:
   movement_speed: 0.24
   armor: 3.0
 
-zombie_ocean_normal:
-  type: zombie_ocean_normal
+drowned_unarmed:
+  type: drowned_unarmed
   health: 22.0
-  attack: 5.0
+  attack: 7.5
   movement_speed: 0.23
   armor: 2.0
   spawn_conditions:
     - WATER_ONLY
 
-zombie_ocean_warrior:
-  type: zombie_ocean_warrior
-  health: 28.0
+drowned_trident_guard:
+  type: drowned_trident_guard
+  health: 30.0
   attack: 5.5
-  movement_speed: 0.22
-  armor: 5.0
-  spawn_conditions:
-    - WATER_ONLY
-
-drowned_grudge:
-  type: drowned_grudge
-  health: 26.0
-  attack: 4.5
-  movement_speed: 0.20
-  armor: 3.0
-  spawn_conditions:
-    - WATER_ONLY
-
-drowned_power_throw:
-  type: drowned_power_throw
-  health: 24.0
-  attack: 6.0
   movement_speed: 0.21
-  armor: 2.5
+  armor: 6.0
+  spawn_conditions:
+    - WATER_ONLY
+
+drowned_raider_axe:
+  type: drowned_raider_axe
+  health: 27.0
+  attack: 6.5
+  movement_speed: 0.22
+  armor: 4.0
   spawn_conditions:
     - WATER_ONLY
 
@@ -413,6 +404,15 @@ water_spirit:
   attack: 5.0
   movement_speed: 0.30
   armor: 5.0
+  spawn_conditions:
+    - WATER_ONLY
+
+water_spirit_elite:
+  type: water_spirit_elite
+  health: 90.0
+  attack: 7.0
+  movement_speed: 0.30
+  armor: 6.0
   spawn_conditions:
     - WATER_ONLY
 

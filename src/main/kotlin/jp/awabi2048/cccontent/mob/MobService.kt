@@ -21,10 +21,9 @@ import jp.awabi2048.cccontent.mob.type.BlazeMeleeMobType
 import jp.awabi2048.cccontent.mob.type.BlazeNormalMobType
 import jp.awabi2048.cccontent.mob.type.BlazePowerMobType
 import jp.awabi2048.cccontent.mob.type.BlazeRapidMobType
-import jp.awabi2048.cccontent.mob.type.DrownedGrudgeMobType
-import jp.awabi2048.cccontent.mob.type.DrownedNormalMobType
-import jp.awabi2048.cccontent.mob.type.DrownedPowerThrowMobType
-import jp.awabi2048.cccontent.mob.type.DrownedWarriorMobType
+import jp.awabi2048.cccontent.mob.type.DrownedRaiderAxeMobType
+import jp.awabi2048.cccontent.mob.type.DrownedTridentGuardMobType
+import jp.awabi2048.cccontent.mob.type.DrownedUnarmedMobType
 import jp.awabi2048.cccontent.mob.type.GuardianBeamBurstMobType
 import jp.awabi2048.cccontent.mob.type.GuardianDrainMobType
 import jp.awabi2048.cccontent.mob.type.GuardianNormalMobType
@@ -73,6 +72,7 @@ import jp.awabi2048.cccontent.mob.type.StrayWeaponThrowCloseMobType
 import jp.awabi2048.cccontent.mob.type.WitherSkeletonBowGuardMobType
 import jp.awabi2048.cccontent.mob.type.WitherSkeletonSwapMobType
 import jp.awabi2048.cccontent.mob.type.WitherSkeletonWitherBoomerangMobType
+import jp.awabi2048.cccontent.mob.type.WaterSpiritEliteMobType
 import jp.awabi2048.cccontent.mob.type.WaterSpiritMobType
 import jp.awabi2048.cccontent.mob.type.WitchEliteMobType
 import jp.awabi2048.cccontent.mob.type.WitchNormalMobType
@@ -81,6 +81,7 @@ import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieNormalMobType
 import jp.awabi2048.cccontent.mob.type.ZombieShieldOnlyMobType
+import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
 import jp.awabi2048.cccontent.mob.ability.BoomerangService
 import jp.awabi2048.cccontent.mob.ability.HomingArrowService
 import jp.awabi2048.cccontent.mob.ability.ThrownWeaponService
@@ -108,7 +109,6 @@ import org.bukkit.entity.SmallFireball
 import org.bukkit.entity.Slime
 import org.bukkit.entity.LingeringPotion
 import org.bukkit.entity.ThrownPotion
-import org.bukkit.entity.Trident
 import org.bukkit.entity.Zombie
 import org.bukkit.entity.Mob
 import org.bukkit.event.entity.EntityDamageByEntityEvent
@@ -298,11 +298,11 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(BlazeRapidMobType())
         registerMobType(BlazeMeleeMobType())
         registerMobType(BlazeBeamMobType())
-        registerMobType(DrownedNormalMobType())
-        registerMobType(DrownedWarriorMobType())
-        registerMobType(DrownedGrudgeMobType())
-        registerMobType(DrownedPowerThrowMobType())
+        registerMobType(DrownedUnarmedMobType())
+        registerMobType(DrownedTridentGuardMobType())
+        registerMobType(DrownedRaiderAxeMobType())
         registerMobType(WaterSpiritMobType())
+        registerMobType(WaterSpiritEliteMobType())
         registerMobType(AshenSpiritMobType())
         registerMobType(GreatFrogMobType())
         registerMobType(WitchNormalMobType())
@@ -518,8 +518,12 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun resolveCustomMobDisplayNameByDamager(damager: Entity, viewer: Player?): String? {
         val activeMob = resolveActiveMobByDamager(damager) ?: return null
-        val key = "arena.mob_token.mob_names.${activeMob.mobType.id}"
-        return ArenaI18n.text(viewer, key, activeMob.mobType.id)
+        val categoryId = when (activeMob.mobType.id) {
+            "ashen_spirit", "water_spirit", "water_spirit_elite" -> "spirit"
+            else -> ArenaMobTokenItem.resolveTokenCategoryTypeId(activeMob.mobType.baseEntityType.name)
+        }
+        val key = "custom_items.arena.mob_token.token_names.$categoryId"
+        return ArenaI18n.text(viewer, key, categoryId)
     }
 
     private fun resolveActiveMobByDamager(damager: Entity): ActiveMob? {
@@ -603,10 +607,6 @@ class MobService(private val plugin: JavaPlugin) {
 
         val target = event.entity as? LivingEntity ?: return
         val damager = event.damager
-        val trident = damager as? Trident
-        if (trident != null) {
-            applyDrownedPowerThrowKnockback(trident, target)
-        }
 
         val projectile = damager as? Projectile
         if (projectile != null) {
@@ -633,24 +633,6 @@ class MobService(private val plugin: JavaPlugin) {
         target.addPotionEffect(PotionEffect(effectType, durationTicks, amplifier, false, true, true))
     }
 
-    private fun applyDrownedPowerThrowKnockback(trident: Trident, target: LivingEntity) {
-        val shooter = trident.shooter as? LivingEntity ?: return
-        val activeMob = activeMobs[shooter.uniqueId] ?: return
-        if (activeMob.mobType.id != "drowned_power_throw") {
-            return
-        }
-
-        val direction = target.location.toVector().subtract(shooter.location.toVector())
-            .setY(0.0)
-            .takeIf { it.lengthSquared() > 0.0001 }
-            ?.normalize()
-            ?: trident.velocity.clone().setY(0.0).takeIf { it.lengthSquared() > 0.0001 }?.normalize()
-            ?: return
-        val bonusHorizontal = 1.2
-        val bonusVertical = 0.18
-        target.velocity = target.velocity.add(direction.multiply(bonusHorizontal).setY(bonusVertical))
-    }
-
     private fun clearImplicitEquipmentIfNeeded(entity: LivingEntity, mobType: MobType) {
         val equipment = entity.equipment ?: return
         equipment.setItemInMainHand(ItemStack(Material.AIR))
@@ -667,7 +649,10 @@ class MobService(private val plugin: JavaPlugin) {
         }
         val zombie = event.entity as? Zombie ?: return
         val activeMob = activeMobs[zombie.uniqueId] ?: return
-        if (activeMob.mobType.id != "zombie_ocean_normal" && activeMob.mobType.id != "zombie_ocean_warrior") {
+        if (activeMob.mobType.id != "drowned_unarmed" &&
+            activeMob.mobType.id != "drowned_trident_guard" &&
+            activeMob.mobType.id != "drowned_raider_axe"
+        ) {
             return
         }
         event.isCancelled = true
