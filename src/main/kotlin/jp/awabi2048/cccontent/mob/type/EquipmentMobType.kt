@@ -104,7 +104,11 @@ open class EquipmentMobType(
             "blaze_melee" to 1.25,
             "blaze_beam" to 1.2,
             "witch_elite" to 1.2,
-            "bat_venom" to 3.0
+            "bat_venom" to 3.0,
+            "enderman_phase" to 0.95,
+            "enderman_drain" to 1.05,
+            "enderman_mirror" to 1.15,
+            "enderman_eye_summoner" to 1.25
         )
     }
 }

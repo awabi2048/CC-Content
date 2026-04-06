@@ -637,6 +637,9 @@ custom_items:
         - "§7For fermentation GUI yeast slot (no effect)"
 
 arena:
+  theme:
+    end:
+      name: "The End"
   messages:
     command:
       help:

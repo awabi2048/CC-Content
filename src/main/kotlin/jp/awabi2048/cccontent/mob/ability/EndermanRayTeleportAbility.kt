@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.mob.ability
 
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
+import org.bukkit.Color
 import org.bukkit.FluidCollisionMode
 import org.bukkit.Location
 import org.bukkit.Particle
@@ -16,7 +17,7 @@ import kotlin.random.Random
 class EndermanRayTeleportAbility(
     override val id: String,
     private val cooldownTicks: Long = 120L,
-    private val chargeTicks: Long = 40L,
+    private val chargeTicks: Long = 160L,
     private val rayCount: Int = 8,
     private val rayRange: Double = 32.0,
     private val rayHitRadius: Double = 0.7,
@@ -29,6 +30,7 @@ class EndermanRayTeleportAbility(
         var startLocation: Location? = null,
         var rayDirections: List<Vector> = emptyList(),
         var rayEndpoints: List<Location> = emptyList(),
+        var chargeElapsedTicks: Long = 0L,
         var hitPlayerId: java.util.UUID? = null,
         var hitLocation: Location? = null,
         var searchPhaseOffsetSteps: Int = 0
@@ -85,6 +87,7 @@ class EndermanRayTeleportAbility(
         runtime.startLocation = entity.location.clone()
         runtime.hitPlayerId = null
         runtime.hitLocation = null
+        runtime.chargeElapsedTicks = 0L
 
         val yawBase = Math.toRadians(entity.location.yaw.toDouble()) + Random.nextDouble(-0.3, 0.3)
         val directions = (0 until rayCount.coerceAtLeast(1)).map { index ->
@@ -111,18 +114,23 @@ class EndermanRayTeleportAbility(
         val entity = context.entity
         val world = entity.world
         val start = runtime.startLocation ?: entity.location.clone()
+        val maxReach = (runtime.chargeElapsedTicks.toDouble() * RAY_EXPAND_BLOCKS_PER_TICK).coerceAtMost(rayRange)
 
-        runtime.rayEndpoints.forEach { end ->
-            renderRayTelegraph(world, start, end)
+        if (maxReach > 0.0) {
+            runtime.rayEndpoints.forEach { end ->
+                renderRayTelegraph(world, start, end, maxReach)
+            }
         }
 
-        if (runtime.hitPlayerId == null) {
-            val hit = findFirstHitPlayer(world, entity.uniqueId, start, runtime.rayEndpoints)
+        if (runtime.hitPlayerId == null && maxReach > 0.0) {
+            val hit = findFirstHitPlayer(world, entity.uniqueId, start, runtime.rayEndpoints, maxReach)
             if (hit != null) {
                 runtime.hitPlayerId = hit.uniqueId
                 runtime.hitLocation = hit.location.clone()
             }
         }
+
+        runtime.chargeElapsedTicks += context.tickDelta
 
         runtime.chargeRemainingTicks = (runtime.chargeRemainingTicks - context.tickDelta).coerceAtLeast(0L)
         if (runtime.chargeRemainingTicks > 0L) {
@@ -167,21 +175,38 @@ class EndermanRayTeleportAbility(
         runtime.startLocation = null
         runtime.rayDirections = emptyList()
         runtime.rayEndpoints = emptyList()
+        runtime.chargeElapsedTicks = 0L
         runtime.hitPlayerId = null
         runtime.hitLocation = null
         entity.removePotionEffect(org.bukkit.potion.PotionEffectType.INVISIBILITY)
     }
 
-    private fun renderRayTelegraph(world: org.bukkit.World, from: Location, to: Location) {
+    private fun renderRayTelegraph(world: org.bukkit.World, from: Location, to: Location, maxReach: Double) {
         val direction = to.toVector().subtract(from.toVector())
         val length = direction.length()
         if (length <= 0.0001) return
-        val step = direction.normalize().multiply(0.7)
-        val count = (length / 0.7).toInt().coerceAtLeast(1)
-        var cursor = from.clone()
-        repeat(count) {
-            world.spawnParticle(Particle.END_ROD, cursor, 1, 0.02, 0.02, 0.02, 0.0)
-            cursor = cursor.add(step)
+        val normalized = direction.normalize()
+        val renderLength = minOf(length, maxReach)
+        if (renderLength <= 0.0001) return
+
+        var traveled = 0.0
+        var cursor = from.clone().add(0.0, 0.1, 0.0)
+        while (traveled <= renderLength) {
+            val noiseX = Random.nextDouble(-RAY_NOISE_RADIUS, RAY_NOISE_RADIUS)
+            val noiseY = Random.nextDouble(-RAY_NOISE_RADIUS, RAY_NOISE_RADIUS)
+            val noiseZ = Random.nextDouble(-RAY_NOISE_RADIUS, RAY_NOISE_RADIUS)
+            world.spawnParticle(
+                Particle.DUST,
+                cursor.clone().add(noiseX, noiseY, noiseZ),
+                1,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                Particle.DustOptions(Color.fromRGB(171, 112, 230), 1.0f)
+            )
+            cursor = cursor.add(normalized.clone().multiply(RAY_RENDER_STEP))
+            traveled += RAY_RENDER_STEP
         }
     }
 
@@ -189,7 +214,8 @@ class EndermanRayTeleportAbility(
         world: org.bukkit.World,
         ownerId: java.util.UUID,
         from: Location,
-        rayEnds: List<Location>
+        rayEnds: List<Location>,
+        maxReach: Double
     ): Player? {
         for (end in rayEnds) {
             val segment = end.toVector().subtract(from.toVector())
@@ -197,16 +223,17 @@ class EndermanRayTeleportAbility(
             if (length <= 0.0001) continue
             val dir = segment.normalize()
             var traveled = 0.0
-            var cursor = from.clone()
-            while (traveled <= length) {
+            val cappedLength = minOf(length, maxReach)
+            var cursor = from.clone().add(0.0, 0.1, 0.0)
+            while (traveled <= cappedLength) {
                 val nearby = world.getNearbyEntities(cursor, rayHitRadius, rayHitRadius, rayHitRadius)
                 for (entity in nearby) {
                     val player = entity as? Player ?: continue
                     if (player.uniqueId == ownerId || !player.isValid || player.isDead) continue
                     return player
                 }
-                cursor = cursor.add(dir.clone().multiply(0.7))
-                traveled += 0.7
+                cursor = cursor.add(dir.clone().multiply(RAY_RENDER_STEP))
+                traveled += RAY_RENDER_STEP
             }
         }
         return null
@@ -214,5 +241,8 @@ class EndermanRayTeleportAbility(
 
     private companion object {
         const val SEARCH_PHASE_VARIANTS = 16
+        const val RAY_EXPAND_BLOCKS_PER_TICK = 1.0 / 20.0
+        const val RAY_RENDER_STEP = 0.1
+        const val RAY_NOISE_RADIUS = 0.03
     }
 }

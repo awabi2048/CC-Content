@@ -51,6 +51,7 @@ import jp.awabi2048.cccontent.mob.ability.WitherBoomerangAbility
 import jp.awabi2048.cccontent.mob.ability.EndermanPhaseDefenseAbility
 import jp.awabi2048.cccontent.mob.ability.EndermanRayTeleportAbility
 import jp.awabi2048.cccontent.mob.ability.EndermanStrikeWarpAbility
+import jp.awabi2048.cccontent.mob.ability.EndermanAmbientParticleAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerCarrierArtilleryAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerBurstShotAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerEndRodLaserAbility
@@ -1469,7 +1470,15 @@ class EndermanPhaseMobType : EquipmentMobType(
     id = "enderman_phase",
     baseEntityType = EntityType.ENDERMAN,
     abilities = listOf(
-        EndermanPhaseDefenseAbility(id = "enderman_phase_defense", projectileNegateChance = 0.0),
+        EndermanPhaseDefenseAbility(id = "enderman_phase_defense", evadeRadius = 0.5),
+        EndermanAmbientParticleAbility(
+            id = "enderman_phase_ambient",
+            portalCount = 4,
+            dustCount = 4,
+            innerColor = Color.fromRGB(118, 57, 197),
+            outerColor = Color.fromRGB(37, 12, 70),
+            dustSize = 0.88f
+        ),
         EndermanRayTeleportAbility(id = "enderman_phase_ray"),
         EndermanStrikeWarpAbility(id = "enderman_phase_strike", swapChance = 0.16)
     )
@@ -1479,7 +1488,15 @@ class EndermanDrainMobType : EquipmentMobType(
     id = "enderman_drain",
     baseEntityType = EntityType.ENDERMAN,
     abilities = listOf(
-        EndermanPhaseDefenseAbility(id = "enderman_drain_defense", projectileNegateChance = 0.45),
+        EndermanPhaseDefenseAbility(id = "enderman_drain_defense", evadeRadius = 0.5),
+        EndermanAmbientParticleAbility(
+            id = "enderman_drain_ambient",
+            portalCount = 5,
+            dustCount = 5,
+            innerColor = Color.fromRGB(156, 72, 214),
+            outerColor = Color.fromRGB(52, 20, 92),
+            dustSize = 0.95f
+        ),
         EndermanRayTeleportAbility(id = "enderman_drain_ray"),
         EndermanStrikeWarpAbility(id = "enderman_drain_strike", swapChance = 0.24)
     )
@@ -1489,7 +1506,15 @@ class EndermanMirrorMobType : EquipmentMobType(
     id = "enderman_mirror",
     baseEntityType = EntityType.ENDERMAN,
     abilities = listOf(
-        EndermanPhaseDefenseAbility(id = "enderman_mirror_defense", projectileNegateChance = 1.0),
+        EndermanPhaseDefenseAbility(id = "enderman_mirror_defense", evadeRadius = 0.5),
+        EndermanAmbientParticleAbility(
+            id = "enderman_mirror_ambient",
+            portalCount = 4,
+            dustCount = 6,
+            innerColor = Color.fromRGB(180, 95, 228),
+            outerColor = Color.fromRGB(73, 29, 126),
+            dustSize = 1.0f
+        ),
         EndermanRayTeleportAbility(id = "enderman_mirror_ray"),
         EndermanStrikeWarpAbility(id = "enderman_mirror_strike", swapChance = 0.32)
     )
@@ -1499,7 +1524,15 @@ class EndermanEyeSummonerMobType : EquipmentMobType(
     id = "enderman_eye_summoner",
     baseEntityType = EntityType.ENDERMAN,
     abilities = listOf(
-        EndermanPhaseDefenseAbility(id = "enderman_eye_summoner_defense", projectileNegateChance = 0.6),
+        EndermanPhaseDefenseAbility(id = "enderman_eye_summoner_defense", evadeRadius = 0.5),
+        EndermanAmbientParticleAbility(
+            id = "enderman_eye_summoner_ambient",
+            portalCount = 6,
+            dustCount = 7,
+            innerColor = Color.fromRGB(204, 116, 240),
+            outerColor = Color.fromRGB(92, 37, 153),
+            dustSize = 1.05f
+        ),
         EndermanRayTeleportAbility(id = "enderman_eye_summoner_ray"),
         EndermanStrikeWarpAbility(id = "enderman_eye_summoner_strike", swapChance = 0.2),
         EnderEyeSummonerAbility(id = "enderman_eye_summoner_spawn")
@@ -1528,8 +1561,15 @@ class ShulkerLaserMobType : EquipmentMobType(
             teleportIntervalTicks = 220L,
             prioritizeBarrierMarkerOnFinalWave = false
         ),
-        ShulkerBurstShotAbility(id = "shulker_laser_burst", cooldownTicks = 38L, burstCount = 3, burstIntervalTicks = 5L),
-        ShulkerEndRodLaserAbility(id = "shulker_laser_end_rod", burstCount = 3, burstIntervalTicks = 5L)
+        ShulkerEndRodLaserAbility(
+            id = "shulker_laser_end_rod",
+            cooldownTicks = 40L,
+            burstCount = 3,
+            burstIntervalTicks = 5L,
+            allowBurstAlternative = true,
+            altBurstCount = 3,
+            altBurstIntervalTicks = 5L
+        )
     )
 )
 
@@ -1542,28 +1582,43 @@ class ShulkerDisruptorMobType : EquipmentMobType(
             teleportIntervalTicks = 180L,
             prioritizeBarrierMarkerOnFinalWave = true
         ),
-        ShulkerBurstShotAbility(id = "shulker_disruptor_burst", cooldownTicks = 36L, burstCount = 3, burstIntervalTicks = 5L),
-        ShulkerEndRodLaserAbility(id = "shulker_disruptor_end_rod", burstCount = 2, burstIntervalTicks = 6L, cooldownTicks = 88L)
+        ShulkerBurstShotAbility(id = "shulker_disruptor_burst", cooldownTicks = 40L, burstCount = 3, burstIntervalTicks = 5L)
     )
 )
 
 class EnderEyeHunterMobType : EquipmentMobType(
     id = "ender_eye_hunter",
-    baseEntityType = EntityType.ALLAY,
+    baseEntityType = EntityType.VEX,
     abilities = listOf(
-        EnderEyeHunterAbility(id = "ender_eye_hunter_ai")
+        EnderEyeHunterAbility(
+            id = "ender_eye_hunter_ai",
+            orbitRadius = 6.0,
+            orbitHeightOffset = 2.2,
+            shotCooldownTicks = 46L,
+            projectileSpeedPerTick = 0.7734375,
+            shotWayCount = 3,
+            shotSpreadDegrees = 60.0,
+            headTextureValue = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZDM5ZjFjMGRkY2Y1MzgzM2JhYzVmYmY1NzcxNWY3YzI1M2VlZmQyODcyZmYyN2U0YTg5M2JlMzA1MjliYzY4NSJ9fX0=",
+            ambientParticle = Particle.TRIAL_SPAWNER_DETECTION,
+            ambientParticleCount = 3,
+            ambientParticleRadius = 0.5
+        )
     )
 )
 
 class EnderEyeOrbitMobType : EquipmentMobType(
     id = "ender_eye_orbit",
-    baseEntityType = EntityType.ALLAY,
+    baseEntityType = EntityType.VEX,
     abilities = listOf(
         EnderEyeHunterAbility(
             id = "ender_eye_orbit_ai",
-            orbitRadius = 5.0,
-            orbitHeightOffset = 2.0,
-            shotCooldownTicks = 54L
+            orbitRadius = 7.2,
+            orbitHeightOffset = 2.4,
+            shotCooldownTicks = 54L,
+            projectileSpeedPerTick = 0.6875,
+            ambientParticle = Particle.TRIAL_SPAWNER_DETECTION_OMINOUS,
+            ambientParticleCount = 3,
+            ambientParticleRadius = 0.5
         )
     )
 )

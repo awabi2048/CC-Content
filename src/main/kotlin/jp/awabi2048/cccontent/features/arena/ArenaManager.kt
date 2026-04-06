@@ -3020,12 +3020,11 @@ class ArenaManager(
             mobToDefinitionTypeId.remove(mobId)
             session.mobWaveMap.remove(mobId)
             session.mobDamagedParticipants.remove(mobId)
-            mobService.untrack(mobId)
             val entity = Bukkit.getEntity(mobId)
             if (entity != null && entity.isValid && !entity.isDead) {
                 spawnMobDisappearSmoke(entity.location)
-                entity.remove()
             }
+            mobService.despawnTrackedMob(mobId)
             session.activeMobs.remove(mobId)
         }
         session.waveMobIds.clear()
@@ -4165,12 +4164,11 @@ class ArenaManager(
             session.mobDamagedParticipants.remove(mobId)
             mobToSessionWorld.remove(mobId)
             mobToDefinitionTypeId.remove(mobId)
-            mobService.untrack(mobId)
             val entity = Bukkit.getEntity(mobId)
             if (entity != null && entity.isValid && !entity.isDead) {
                 spawnMobDisappearSmoke(entity.location)
-                entity.remove()
             }
+            mobService.despawnTrackedMob(mobId)
         }
 
         if (remaining.isEmpty()) {
@@ -4637,13 +4635,12 @@ class ArenaManager(
             val entity = Bukkit.getEntity(mobId) as? LivingEntity
             if (entity != null && entity.isValid && !entity.isDead) {
                 spawnSmoke(entity.location)
-                entity.remove()
             }
             mobToSessionWorld.remove(mobId)
             mobToDefinitionTypeId.remove(mobId)
             session.mobWaveMap.remove(mobId)
             session.mobDamagedParticipants.remove(mobId)
-            mobService.untrack(mobId)
+            mobService.despawnTrackedMob(mobId)
             session.activeMobs.remove(mobId)
         }
 
@@ -4669,11 +4666,10 @@ class ArenaManager(
                 session.barrierDefenseAssaultMobIds.remove(mobId)
                 mobToSessionWorld.remove(mobId)
                 mobToDefinitionTypeId.remove(mobId)
-                mobService.untrack(mobId)
                 if (smoke) {
                     spawnSmoke(mob.location)
                 }
-                mob.remove()
+                mobService.despawnTrackedMob(mobId)
             }
     }
 
@@ -4813,7 +4809,6 @@ class ArenaManager(
             mobToSessionWorld.remove(mobId)
             mobToDefinitionTypeId.remove(mobId)
             session.mobDamagedParticipants.remove(mobId)
-            mobService.untrack(mobId)
             session.barrierDefenseTargetMobIds.remove(mobId)
             session.barrierDefenseAssaultMobIds.remove(mobId)
 
@@ -4822,8 +4817,8 @@ class ArenaManager(
                 if (smoke) {
                     spawnSmoke(entity.location)
                 }
-                entity.remove()
             }
+            mobService.despawnTrackedMob(mobId)
             session.barrierDefenseMobIds.remove(mobId)
         }
     }
