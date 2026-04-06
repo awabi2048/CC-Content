@@ -29,6 +29,9 @@ object EndThemeEffects {
         blindnessTicks: Int = 50,
         witherTicks: Int = 50
     ) {
+        if (!TELEPORT_DEBUFF_FIELD_ENABLED) {
+            return
+        }
         val world = center.world ?: return
         val fixedCenter = center.clone()
         var remaining = durationTicks.coerceAtLeast(1L)
@@ -58,7 +61,13 @@ object EndThemeEffects {
         val world = anchor.world ?: return null
         repeat(attempts.coerceAtLeast(1)) {
             val angle = Random.nextDouble(0.0, Math.PI * 2.0)
-            val distance = Random.nextDouble(1.2, radius.coerceAtLeast(1.2))
+            val maxDistance = radius.coerceAtLeast(0.05)
+            val minDistance = minOf(1.2, maxDistance)
+            val distance = if (maxDistance - minDistance < 1.0e-6) {
+                maxDistance
+            } else {
+                Random.nextDouble(minDistance, maxDistance)
+            }
             val x = anchor.x + cos(angle) * distance
             val z = anchor.z + sin(angle) * distance
             val yBase = anchor.y
@@ -104,4 +113,6 @@ object EndThemeEffects {
         world.spawnParticle(Particle.PORTAL, center.clone().add(0.0, 0.4, 0.0), 24, radius, 0.25, radius, 0.04)
         world.spawnParticle(Particle.SQUID_INK, center.clone().add(0.0, 0.2, 0.0), 14, radius * 0.65, 0.2, radius * 0.65, 0.0)
     }
+
+    private const val TELEPORT_DEBUFF_FIELD_ENABLED = false
 }

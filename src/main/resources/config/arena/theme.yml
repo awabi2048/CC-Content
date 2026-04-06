@@ -375,12 +375,17 @@ end:
     shulker_disruptor:
       weight: 4
       wave: 5..
+    raiden_creeper:
+      weight: 3
+      wave: 3..
     ender_eye_hunter:
       weight: 5
       wave: 2..
+      max_alive: 1
     ender_eye_orbit:
       weight: 4
       wave: 4..
+      max_alive: 1
   orientation:
     entrance_exit: north
     corner_entry: south

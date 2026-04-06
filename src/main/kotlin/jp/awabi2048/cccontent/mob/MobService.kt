@@ -141,6 +141,8 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import org.bukkit.scheduler.BukkitTask
 import org.bukkit.util.Vector
+import org.bukkit.damage.DamageSource
+import org.bukkit.damage.DamageType
 import kotlin.random.Random
 import java.io.File
 import java.util.UUID
@@ -1046,12 +1048,15 @@ class MobService(private val plugin: JavaPlugin) {
 
         tickTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
             val activeCountBySession = mutableMapOf<String, Int>()
-            val iterator = activeMobs.entries.iterator()
-            while (iterator.hasNext()) {
-                val (_, activeMob) = iterator.next()
+            val activeMobSnapshot = activeMobs.values.toList()
+            val staleIds = mutableListOf<UUID>()
+            for (activeMob in activeMobSnapshot) {
+                if (activeMobs[activeMob.entityId] !== activeMob) {
+                    continue
+                }
                 val entity = Bukkit.getEntity(activeMob.entityId) as? LivingEntity
                 if (entity == null || !entity.isValid || entity.isDead) {
-                    iterator.remove()
+                    staleIds.add(activeMob.entityId)
                     continue
                 }
                 activeCountBySession[activeMob.sessionKey] = (activeCountBySession[activeMob.sessionKey] ?: 0) + 1
@@ -1065,6 +1070,9 @@ class MobService(private val plugin: JavaPlugin) {
                 )
                 val elapsedNanos = System.nanoTime() - startedAt
                 addCpuNanos(activeMob.sessionKey, elapsedNanos)
+            }
+            staleIds.forEach { staleId ->
+                activeMobs.remove(staleId)
             }
 
             refreshSessionLoadSnapshots(activeCountBySession)
@@ -1088,6 +1096,35 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun untrack(entityId: UUID) {
         activeMobs.remove(entityId)
+    }
+
+    fun despawnTrackedMob(entityId: UUID) {
+        val activeMob = activeMobs.remove(entityId) ?: run {
+            val entity = Bukkit.getEntity(entityId) as? LivingEntity
+            if (entity != null && entity.isValid && !entity.isDead) {
+                entity.remove()
+            }
+            return
+        }
+
+        val entity = Bukkit.getEntity(entityId) as? LivingEntity
+        if (entity != null) {
+            runDeathCallbacks(activeMob, entity)
+            if (entity.isValid && !entity.isDead) {
+                entity.remove()
+            }
+        }
+    }
+
+    fun despawnTrackedMobsByMetadata(definitionId: String, metadataKey: String, metadataValue: String) {
+        val targets = activeMobs.values
+            .asSequence()
+            .filter { it.definition.id == definitionId }
+            .filter { it.metadata[metadataKey] == metadataValue }
+            .map { it.entityId }
+            .toList()
+
+        targets.forEach { despawnTrackedMob(it) }
     }
 
     fun handleAttack(event: EntityDamageByEntityEvent, attacker: LivingEntity) {
@@ -1184,10 +1221,19 @@ class MobService(private val plugin: JavaPlugin) {
     fun handleDeath(event: EntityDeathEvent) {
         val entity = event.entity
         val activeMob = activeMobs.remove(entity.uniqueId) ?: return
+        runDeathCallbacks(activeMob, entity, event)
+    }
+
+    private fun runDeathCallbacks(activeMob: ActiveMob, entity: LivingEntity, event: EntityDeathEvent? = null) {
         val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
         val startedAt = System.nanoTime()
+        val deathEvent = event ?: EntityDeathEvent(
+            entity,
+            DamageSource.builder(DamageType.GENERIC).build(),
+            mutableListOf()
+        )
         activeMob.mobType.onDeath(
-            MobDeathContext(plugin, entity, activeMob, event, snapshot),
+            MobDeathContext(plugin, entity, activeMob, deathEvent, snapshot),
             activeMob.runtime
         )
         addCpuNanos(activeMob.sessionKey, System.nanoTime() - startedAt)

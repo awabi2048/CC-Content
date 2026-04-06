@@ -37,6 +37,8 @@ class ShulkerCarrierArtilleryAbility(
         val rt = runtime as? Runtime ?: return
         val world = shulker.world
 
+        shulker.setAI(false)
+
         val carrier = world.spawn(shulker.location, ArmorStand::class.java)
         carrier.isInvisible = true
         carrier.isInvulnerable = true
@@ -45,6 +47,7 @@ class ShulkerCarrierArtilleryAbility(
         carrier.setAI(false)
         carrier.isSilent = true
         carrier.isCollidable = false
+        carrier.isPersistent = true
         carrier.addScoreboardTag("cc.mob.shulker_carrier")
         carrier.addPassenger(shulker)
 
@@ -58,10 +61,7 @@ class ShulkerCarrierArtilleryAbility(
     override fun onTick(context: MobRuntimeContext, runtime: MobAbilityRuntime?) {
         val shulker = context.entity as? Shulker ?: return
         val rt = runtime as? Runtime ?: return
-        val carrier = rt.carrierId?.let { org.bukkit.Bukkit.getEntity(it) as? ArmorStand } ?: return
-        if (!carrier.isValid || shulker.world.uid != carrier.world.uid) {
-            return
-        }
+        val carrier = ensureCarrier(shulker, rt) ?: return
 
         if (rt.anchor == null) {
             rt.anchor = carrier.location.clone()
@@ -74,6 +74,9 @@ class ShulkerCarrierArtilleryAbility(
         val nextY = anchor.y + sin(rt.elapsedTicks.toDouble() * oscillationFrequency) * oscillationAmplitude
         val lifted = anchor.clone().apply { y = nextY }
         carrier.teleport(lifted)
+        if (!carrier.passengers.any { it.uniqueId == shulker.uniqueId }) {
+            carrier.addPassenger(shulker)
+        }
 
         if (!context.isCombatActive()) {
             return
@@ -91,6 +94,30 @@ class ShulkerCarrierArtilleryAbility(
         carrier.teleport(destination)
         rt.teleportCooldownTicks = teleportIntervalTicks
         shulker.world.playSound(destination, org.bukkit.Sound.ENTITY_SHULKER_TELEPORT, 0.9f, 1.35f)
+    }
+
+    private fun ensureCarrier(shulker: Shulker, runtime: Runtime): ArmorStand? {
+        val existing = runtime.carrierId
+            ?.let { org.bukkit.Bukkit.getEntity(it) as? ArmorStand }
+            ?.takeIf { it.isValid && !it.isDead && it.world.uid == shulker.world.uid }
+        if (existing != null) {
+            return existing
+        }
+
+        val spawned = shulker.world.spawn(shulker.location, ArmorStand::class.java)
+        spawned.isInvisible = true
+        spawned.isInvulnerable = true
+        spawned.setGravity(false)
+        spawned.isMarker = true
+        spawned.setAI(false)
+        spawned.isSilent = true
+        spawned.isCollidable = false
+        spawned.isPersistent = true
+        spawned.addScoreboardTag("cc.mob.shulker_carrier")
+        spawned.addPassenger(shulker)
+        runtime.carrierId = spawned.uniqueId
+        runtime.anchor = spawned.location.clone()
+        return spawned
     }
 
     override fun onDeath(context: MobDeathContext, runtime: MobAbilityRuntime?) {

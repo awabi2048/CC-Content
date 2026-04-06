@@ -1272,6 +1272,9 @@ custom_items:
       ended_by_warp: '&cワープしたため死亡扱いでアリーナを終了しました'
       ended_by_shutdown: '&cサーバー停止によりアリーナを終了しました'
       stopped_by_admin: '&c管理コマンドによりアリーナを停止しました'
+    theme:
+      end:
+        name: 'エンド'
     stage:
       already_started: '&eステージはすでに開始しています'
       start_subtitle: '&6ステージ開始'
@@ -1727,10 +1730,10 @@ arena:
         name: '掃討'
         hints:
           - '§7たくさん湧いているので倒そう'
-      boss:
-        name: 'ボス'
-        hints:
-          - '§7ボスがいて困るので倒そう'
+    boss:
+      name: 'ボス'
+      hints:
+        - '§7ボスがいて困るので倒そう'
   theme:
     test:
       name: 'テスト'
@@ -1754,4 +1757,6 @@ arena:
       name: '繁茂した洞窟'
     nether:
       name: 'ネザー要塞'
+    end:
+      name: 'エンド'
 

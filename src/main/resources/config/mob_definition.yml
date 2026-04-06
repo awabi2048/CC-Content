@@ -588,12 +588,12 @@ ender_eye_hunter:
   type: ender_eye_hunter
   health: 24.0
   attack: 4.5
-  movement_speed: 0.28
+  movement_speed: 0.0933333333
   armor: 2.0
 
 ender_eye_orbit:
   type: ender_eye_orbit
   health: 26.0
   attack: 4.8
-  movement_speed: 0.29
+  movement_speed: 0.0966666667
   armor: 2.5

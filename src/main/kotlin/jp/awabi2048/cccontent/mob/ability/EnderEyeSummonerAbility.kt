@@ -79,7 +79,10 @@ class EnderEyeSummonerAbility(
                     featureId = context.activeMob.featureId,
                     sessionKey = context.activeMob.sessionKey,
                     combatActiveProvider = context.activeMob.combatActiveProvider,
-                    metadata = context.activeMob.metadata + mapOf("summoner_id" to ownerId)
+                    metadata = context.activeMob.metadata + mapOf(
+                        "summoner_id" to ownerId,
+                        "summon_slot" to (index % maxSummonedEyes.coerceAtLeast(1)).toString()
+                    )
                 )
             )
             if (spawned != null) {
@@ -95,15 +98,11 @@ class EnderEyeSummonerAbility(
     override fun onDeath(context: MobDeathContext, runtime: MobAbilityRuntime?) {
         val service = MobService.getInstance(context.plugin) ?: return
         val ownerId = context.entity.uniqueId.toString()
-        context.entity.world.getNearbyEntities(context.entity.location, 96.0, 96.0, 96.0)
-            .asSequence()
-            .filterIsInstance<org.bukkit.entity.LivingEntity>()
-            .forEach { entity ->
-                val active = service.getActiveMob(entity.uniqueId) ?: return@forEach
-                if (active.definition.id == summonDefinitionId && active.metadata["summoner_id"] == ownerId) {
-                    entity.remove()
-                }
-            }
+        service.despawnTrackedMobsByMetadata(
+            definitionId = summonDefinitionId,
+            metadataKey = "summoner_id",
+            metadataValue = ownerId
+        )
     }
 
     private companion object {
