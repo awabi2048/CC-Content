@@ -79,12 +79,12 @@ class ArenaCommand(
     }
 
     private fun handleStart(sender: CommandSender, args: Array<out String>): Boolean {
-        if (args.size < 3) {
+        if (args.size < 4) {
             sender.sendMessage(
                 ArenaI18n.text(
                     sender,
                     "arena.messages.command.usage.start",
-                    "&c使用法: /arenaa start <player|@s|@near> <difficulty_id> [theme]"
+                    "&c使用法: /arenaa start <player|@s|@near> <star_count> <theme>"
                 )
             )
             return true
@@ -126,8 +126,14 @@ class ArenaCommand(
                 player to emptyList()
             }
         }
-        val difficultyId = args[2]
-        val theme = args.getOrNull(3)
+
+        val starCount = args[2].toIntOrNull()
+        if (starCount == null || starCount < 1 || starCount > 4) {
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.usage.start", "&c使用法: /arenaa start <player|@s|@near> <star_count(1-4)> <theme>"))
+            return true
+        }
+        val difficultyId = "star_$starCount"
+        val theme = args[3]
 
         val startedAt = System.nanoTime()
         when (val result = manager.startSession(
@@ -275,7 +281,7 @@ class ArenaCommand(
     private fun showUsage(sender: CommandSender) {
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.header", "&6=== Arena 管理コマンド ==="))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.menu", "&f/arenaa menu"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s|@near> <difficulty_id> [theme]"))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s|@near> <star_count> <theme>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop", "&f/arenaa stop <player>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.theme", "&f/arenaa theme list"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.broadcast", "&f/arenaa broadcast"))
@@ -301,7 +307,7 @@ class ArenaCommand(
                 else -> emptyList()
             }
             3 -> when (args[0].lowercase()) {
-                "start" -> arenaManagerProvider()?.getDifficultyIds()?.filter { it.startsWith(args[2], ignoreCase = true) } ?: emptyList()
+                "start" -> listOf("1", "2", "3", "4").filter { it.startsWith(args[2], ignoreCase = true) }
                 else -> emptyList()
             }
             4 -> when (args[0].lowercase()) {

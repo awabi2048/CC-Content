@@ -6,6 +6,7 @@ import org.bukkit.Location
 import org.bukkit.scheduler.BukkitTask
 import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestModifiers
 import java.util.UUID
+import kotlin.random.Random
 
 data class ArenaBounds(
     val minX: Int,
@@ -84,8 +85,7 @@ data class ArenaSession(
     val worldName: String,
     val themeId: String,
     val difficultyId: String,
-    val difficultyValue: Double,
-    val difficultyScore: Double,
+    val sessionVariance: Double = Random.nextDouble(0.85, 1.15),
     val waves: Int,
     val questModifiers: ArenaQuestModifiers = ArenaQuestModifiers.NONE,
     var maxParticipants: Int = 6,

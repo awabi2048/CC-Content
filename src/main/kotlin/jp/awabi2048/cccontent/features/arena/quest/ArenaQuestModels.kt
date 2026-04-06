@@ -9,7 +9,6 @@ import jp.awabi2048.cccontent.features.arena.ArenaI18n
 data class ArenaDailyQuestEntry(
     val index: Int,
     val missionTypeId: String,
-    val difficultyScore: Double,
     val difficultyId: String,
     val themeId: String,
     val maxParticipants: Int = 6
@@ -53,7 +52,6 @@ data class ArenaPlayerQuestData(
 
 data class ArenaDifficultyDefinition(
     val id: String,
-    val difficultyRange: ClosedFloatingPointRange<Double>,
     val display: String
 )
 

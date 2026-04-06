@@ -52,7 +52,7 @@ class ArenaSessionEndedEvent(
     val worldName: String,
     val themeId: String,
     val difficultyId: String,
-    val difficultyValue: Double,
+    val starCount: Int,
     val waves: Int,
     val success: Boolean
 ) : Event() {

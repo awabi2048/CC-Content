@@ -113,6 +113,7 @@ arena:
       switch_interval_beats: 8
   quest:
     generate_count: 14
+    promotion_probability: 0.25
   multiplayer:
     join_grace_seconds: 45
     join_marker_search_radius: 16.0
