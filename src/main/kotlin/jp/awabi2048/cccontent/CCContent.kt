@@ -44,7 +44,7 @@ import jp.awabi2048.cccontent.features.arena.ArenaListener
 import jp.awabi2048.cccontent.features.arena.ArenaManager
 import jp.awabi2048.cccontent.features.arena.ArenaSessionInfoMenu
 import jp.awabi2048.cccontent.features.arena.ArenaEnchantPedestalMenu
-import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestService
+import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import jp.awabi2048.cccontent.features.brewery.BreweryFeature
 import jp.awabi2048.cccontent.features.cooking.CookingFeature
 import jp.awabi2048.cccontent.features.rank.RankManager
@@ -117,7 +117,7 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var markerManager: MarkerManager
     private lateinit var adminMarkerToolService: AdminMarkerToolService
     private lateinit var arenaManager: ArenaManager
-    private var arenaQuestService: ArenaQuestService? = null
+    private var arenaMissionService: ArenaMissionService? = null
     private var arenaSessionInfoMenu: ArenaSessionInfoMenu? = null
     private var arenaEnchantPedestalMenu: ArenaEnchantPedestalMenu? = null
     private lateinit var sharedMobService: MobService
@@ -191,21 +191,21 @@ class CCContent : JavaPlugin(), Listener {
                 arenaFeatureFailureReason = null
                 arenaManager = ArenaManager(this, sharedMobService)
                 arenaManager.initialize(featureInitLogger)
-                arenaQuestService = ArenaQuestService(this, arenaManager)
-                arenaManager.setQuestService(arenaQuestService)
-                arenaQuestService?.initialize()
+                arenaMissionService = ArenaMissionService(this, arenaManager)
+                arenaManager.setMissionService(arenaMissionService)
+                arenaMissionService?.initialize()
                 arenaSessionInfoMenu = ArenaSessionInfoMenu(this, arenaManager)
                 arenaEnchantPedestalMenu = ArenaEnchantPedestalMenu(this) { coreConfig }
                 arenaFeatureReady = true
             } catch (e: Exception) {
-                runCatching { arenaQuestService?.shutdown() }
+                runCatching { arenaMissionService?.shutdown() }
                 runCatching {
                     if (::arenaManager.isInitialized) {
-                        arenaManager.setQuestService(null)
+                        arenaManager.setMissionService(null)
                         arenaManager.shutdown()
                     }
                 }
-                arenaQuestService = null
+                arenaMissionService = null
                 arenaSessionInfoMenu = null
                 arenaEnchantPedestalMenu = null
                 arenaFeatureReady = false
@@ -246,7 +246,7 @@ class CCContent : JavaPlugin(), Listener {
             },
             onUpdateDay = { target ->
                 when (target) {
-                    null, "arena" -> arenaQuestService?.updateToday() ?: false
+                    null, "arena" -> arenaMissionService?.updateToday() ?: false
                     else -> false
                 }
             },
@@ -285,7 +285,7 @@ class CCContent : JavaPlugin(), Listener {
             ArenaI18n.initialize(this)
             val arenaCommand = ArenaCommand(
                 arenaManagerProvider = { if (::arenaManager.isInitialized) arenaManager else null },
-                questService = arenaQuestService,
+                missionService = arenaMissionService,
                 sessionInfoMenu = arenaSessionInfoMenu,
                 pedestalMenu = arenaEnchantPedestalMenu,
                 featureEnabledProvider = { arenaFeatureReady },
@@ -305,7 +305,7 @@ class CCContent : JavaPlugin(), Listener {
         if (isContentEnabledAtStartup("arena") && arenaFeatureReady && ::arenaManager.isInitialized) {
             server.pluginManager.registerEvents(ArenaItemListener(), this)
             server.pluginManager.registerEvents(ArenaListener(arenaManager), this)
-            arenaQuestService?.let {
+            arenaMissionService?.let {
                 server.pluginManager.registerEvents(it, this)
             }
             arenaSessionInfoMenu?.let {
@@ -350,13 +350,13 @@ class CCContent : JavaPlugin(), Listener {
             if (::breweryFeature.isInitialized) {
                 breweryFeature.shutdown()
             }
-            arenaQuestService?.shutdown()
+            arenaMissionService?.shutdown()
             arenaSessionInfoMenu = null
             arenaEnchantPedestalMenu = null
             if (::arenaManager.isInitialized) {
-                arenaManager.setQuestService(null)
+                arenaManager.setMissionService(null)
             }
-            arenaQuestService = null
+            arenaMissionService = null
             if (::arenaManager.isInitialized) {
                 arenaManager.shutdown()
             }

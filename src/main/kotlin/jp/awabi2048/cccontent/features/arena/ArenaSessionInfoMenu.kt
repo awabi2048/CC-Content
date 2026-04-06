@@ -102,7 +102,7 @@ class ArenaSessionInfoMenu(
         val item = ItemStack(themeIcon)
         val meta = item.itemMeta ?: return item
 
-        val title = session.inviteQuestTitle
+        val title = session.inviteMissionTitle
             ?: ArenaI18n.text(null, "arena.ui.broadcast.default_title", "\u00a7f\u30a2\u30ea\u30fc\u30ca\u30af\u30a8\u30b9\u30c8")
         meta.setDisplayName(title)
 

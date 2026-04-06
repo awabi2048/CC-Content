@@ -125,7 +125,7 @@ sukima_dungeon:
   gui_talisman_confirm_button_lore:
     - "&7Clicking this will make all players"
     - "&7leave the dungeon midway."
-    - "&c*Items are not lost, but quest fails."
+    - "&c*Items are not lost, but mission fails."
   gui_talisman_cancel_button: "&a&lStay"
 
   talisman_cannot_use_here: "&cYou cannot use the talisman here."
@@ -533,8 +533,8 @@ custom_items:
           join_area_not_found: '&cCannot start because no join area marker exists nearby'
           lobby_marker_not_found: '&cCannot start because no lobby marker exists in loaded chunks'
       multiplayer:
-        invite_window_started: '§6Quest accepted!§7 Preparing the lift...'
-        invite_window_hint: '§7Left-click to invite other players to your quest'
+        invite_window_started: '§6Mission accepted!§7 Preparing the lift...'
+        invite_window_hint: '§7Left-click to invite other players to your mission'
         wait_area_hint: '&7Invited players enter waiting state by standing in the join area with the owner'
         waiting_entered: '&aYou entered the waiting area. Stay here until the grace time ends'
         waiting_exited: '&cYou stepped off the lift. Stay on it if you want to join!'
@@ -547,7 +547,7 @@ custom_items:
         invite_window_closed: '&cThe invitation window has ended'
         invite_failed_world: '&cYou can only invite players in the same world'
         invite_failed_in_session: '&c{player} is already in another arena session'
-        invite_failed_full: '&cCannot invite because this quest reached max participants'
+        invite_failed_full: '&cCannot invite because this mission reached max participants'
         invite_failed_already_locked: '&c{player} is already invited by someone else'
         declined_self: '&eYou declined the invitation'
         declined_notify_owner: '&e{player} declined the invitation'
@@ -584,7 +584,7 @@ custom_items:
         lift_ready:
           - '§f"Please wait on the lift until it is ready~"'
     ui:
-      quest:
+      mission:
         difficulty_inline: '§f❙ §7Difficulty §f{difficulty}'
         memo_inline: '§f❙ §7Memo §f{memo}'
     bossbar:
@@ -644,7 +644,22 @@ arena:
     command:
       help:
         pedestal: '&f/arenaa pedestal'
+    mission:
+      license_insufficient: '&cYou need the {required} license to start this mission (current: {current})'
+    license:
+      promoted: '&aYour license has been upgraded! &f-> {tier}'
   ui:
+    separator: '§8§m――――――――――――――――――――'
+    license_card:
+      title: '§bLicense Card'
+      current_license: '§f❙ §7Current License §e{tier}'
+      allowed_difficulty: '§f❙ §7Allowed Difficulty §c{difficulty} §7or below'
+      next_header: '§f❙ §7To next license'
+      max_reached: '  §8- §aAll licenses unlocked'
+      requirement:
+        mission_clear: '  §8- §fComplete missions {progress}'
+        mob_kill: '  §8- §fDefeat monsters (total) {progress}'
+        strong_enemy_kill: '  §8- §fDefeat strong enemies (total) {progress}'
     pedestal:
       title: '§8Mysterious Altar'
       blank: ' '
@@ -665,3 +680,15 @@ arena:
         waiting_lore: '§7Execution unlocks when conditions are met'
     sidebar:
       defeat: "§c§lDEFEAT"
+    license:
+      tier:
+        paper: 'Paper'
+        bronze: 'Bronze'
+        silver: 'Silver'
+        gold: 'Gold'
+  license:
+    tier:
+      paper: 'Paper'
+      bronze: 'Bronze'
+      silver: 'Silver'
+      gold: 'Gold'

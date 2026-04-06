@@ -12,6 +12,7 @@ import java.util.jar.JarFile
 object LanguageFileValidator {
     fun validateAll(plugin: JavaPlugin) {
         val errors = mutableListOf<String>()
+        val resourceMaps = mutableMapOf<String, Map<*, *>>()
 
         val resourceLangPaths = discoverResourceLangPaths(plugin)
         if (resourceLangPaths.isEmpty()) {
@@ -24,7 +25,8 @@ object LanguageFileValidator {
                     ?: throw IllegalStateException("リソースを取得できません: $resourcePath")
                 resource.use { input ->
                     InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
-                        validateYaml(reader.readText(), "resource:$resourcePath")
+                        val parsed = validateYaml(reader.readText(), "resource:$resourcePath")
+                        resourceMaps[resourcePath] = parsed
                     }
                 }
             } catch (e: Exception) {
@@ -40,7 +42,22 @@ object LanguageFileValidator {
 
             for (file in files) {
                 try {
-                    validateYaml(file.readText(Charsets.UTF_8), "file:${file.absolutePath}")
+                    val parsed = validateYaml(file.readText(Charsets.UTF_8), "file:${file.absolutePath}")
+                    val resourcePath = "lang/${file.name}"
+                    val resourceMap = resourceMaps[resourcePath]
+                    if (resourceMap != null) {
+                        val structuralErrors = mutableListOf<String>()
+                        validateStructure(
+                            expected = resourceMap,
+                            actual = parsed,
+                            path = "",
+                            errors = structuralErrors
+                        )
+                        if (structuralErrors.isNotEmpty()) {
+                            val detail = structuralErrors.joinToString("\n") { "  - $it" }
+                            errors += "file:${file.absolutePath} -> リソースとの整合性エラー:\n$detail"
+                        }
+                    }
                 } catch (e: Exception) {
                     errors += "file:${file.absolutePath} -> ${e.message}"
                 }
@@ -53,7 +70,7 @@ object LanguageFileValidator {
         }
     }
 
-    private fun validateYaml(content: String, source: String) {
+    private fun validateYaml(content: String, source: String): Map<*, *> {
         val options = LoaderOptions().apply {
             isAllowDuplicateKeys = false
             maxAliasesForCollections = 50
@@ -62,6 +79,45 @@ object LanguageFileValidator {
         val loaded = yaml.load<Any?>(content)
         if (loaded !is Map<*, *>) {
             throw IllegalStateException("YAMLのルートがMapではありません: $source")
+        }
+        return loaded
+    }
+
+    private fun validateStructure(
+        expected: Any?,
+        actual: Any?,
+        path: String,
+        errors: MutableList<String>
+    ) {
+        val expectedType = nodeType(expected)
+        val actualType = nodeType(actual)
+        val displayPath = if (path.isBlank()) "<root>" else path
+
+        if (expectedType != actualType) {
+            errors += "$displayPath: 型不一致 expected=$expectedType actual=$actualType"
+            return
+        }
+
+        if (expected is Map<*, *> && actual is Map<*, *>) {
+            for ((key, expectedValue) in expected) {
+                if (key !is String) continue
+                if (!actual.containsKey(key)) {
+                    val missingPath = if (path.isBlank()) key else "$path.$key"
+                    errors += "$missingPath: キー不足"
+                    continue
+                }
+                val childPath = if (path.isBlank()) key else "$path.$key"
+                validateStructure(expectedValue, actual[key], childPath, errors)
+            }
+        }
+    }
+
+    private fun nodeType(value: Any?): String {
+        return when (value) {
+            is Map<*, *> -> "Map"
+            is List<*> -> "List"
+            null -> "Null"
+            else -> "Scalar"
         }
     }
 

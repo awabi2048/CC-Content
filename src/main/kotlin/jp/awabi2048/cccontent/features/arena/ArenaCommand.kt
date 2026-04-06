@@ -6,11 +6,11 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
-import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestService
+import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 
 class ArenaCommand(
     private val arenaManagerProvider: () -> ArenaManager? = { null },
-    private val questService: ArenaQuestService? = null,
+    private val missionService: ArenaMissionService? = null,
     private val sessionInfoMenu: ArenaSessionInfoMenu? = null,
     private val pedestalMenu: ArenaEnchantPedestalMenu? = null,
     private val featureEnabledProvider: () -> Boolean = { true },
@@ -68,7 +68,7 @@ class ArenaCommand(
             return true
         }
 
-        val service = questService
+        val service = missionService
         if (service == null) {
             sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.menu_open_failed", "§cアリーナメニューを開けませんでした"))
             return true

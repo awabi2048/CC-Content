@@ -8,8 +8,8 @@ import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeLoader
 import jp.awabi2048.cccontent.features.arena.generator.ArenaDoorAnimationPlacement
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeWeightedMobEntry
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
-import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestModifiers
-import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestService
+import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionModifiers
+import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.items.CustomItemManager
@@ -342,7 +342,7 @@ class ArenaManager(
     private var finalWaveTimeLimitSeconds = FINAL_WAVE_TIME_LIMIT_SECONDS_DEFAULT
     private var arenaDoorAnimationSoundKey = "minecraft:block.iron_door.open"
     private var arenaDoorAnimationSoundPitch = 1.0f
-    private var arenaQuestService: ArenaQuestService? = null
+    private var arenaMissionService: ArenaMissionService? = null
     private var arenaBgmConfig = ArenaBgmConfig(
         normal = ArenaBgmTrackConfig(
             soundKey = ARENA_BGM_NORMAL_KEY_DEFAULT,
@@ -567,8 +567,8 @@ class ArenaManager(
         }
     }
 
-    fun setQuestService(questService: ArenaQuestService?) {
-        arenaQuestService = questService
+    fun setMissionService(missionService: ArenaMissionService?) {
+        arenaMissionService = missionService
     }
 
     private fun loadMobDefinitions() {
@@ -641,10 +641,10 @@ class ArenaManager(
         difficultyId: String,
         requestedTheme: String,
         initialParticipants: List<Player> = emptyList(),
-        questModifiers: ArenaQuestModifiers = ArenaQuestModifiers.NONE,
+        missionModifiers: ArenaMissionModifiers = ArenaMissionModifiers.NONE,
         enableMultiplayerJoin: Boolean = false,
-        inviteQuestTitle: String? = null,
-        inviteQuestLore: List<String> = emptyList(),
+        inviteMissionTitle: String? = null,
+        inviteMissionLore: List<String> = emptyList(),
         maxParticipants: Int = MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT,
         showSessionStartedMessage: Boolean = true,
         onCompleted: ((Long) -> Unit)? = null
@@ -758,7 +758,7 @@ class ArenaManager(
             themeId = theme.id,
             difficultyId = difficulty.id,
             waves = difficulty.waves,
-            questModifiers = questModifiers,
+            missionModifiers = missionModifiers,
             maxParticipants = sanitizedMaxParticipants,
             participants = participantPlayers.mapTo(mutableSetOf()) { it.uniqueId },
             returnLocations = returnLocations,
@@ -786,8 +786,8 @@ class ArenaManager(
             joinGraceStartMillis = if (enableMultiplayerJoin) now else 0L,
             joinGraceDurationMillis = if (enableMultiplayerJoin) multiplayerJoinGraceSeconds * 1000L else 0L,
             joinGraceEndMillis = if (enableMultiplayerJoin) now + (multiplayerJoinGraceSeconds * 1000L) else 0L,
-            inviteQuestTitle = inviteQuestTitle,
-            inviteQuestLore = inviteQuestLore,
+            inviteMissionTitle = inviteMissionTitle,
+            inviteMissionLore = inviteMissionLore,
             stageGenerationCompleted = !enableMultiplayerJoin,
             reviveMaxPerPlayer = difficulty.reviveMaxPerPlayer,
             reviveTimeLimitSeconds = difficulty.reviveTimeLimitSeconds,
@@ -811,14 +811,14 @@ class ArenaManager(
                     ArenaI18n.text(
                         target,
                         "arena.messages.multiplayer.invite_window_started",
-                        "§6クエストを受注しました！§7リフトを準備中です..."
+                        "§6ミッションを受注しました！§7リフトを準備中です..."
                     )
                 )
                 target.sendMessage(
                     ArenaI18n.text(
                         target,
                         "arena.messages.multiplayer.invite_window_hint",
-                        "§7左クリックでほかのプレイヤーをクエストに誘うことができます"
+                        "§7左クリックでほかのプレイヤーをミッションに誘うことができます"
                     )
                 )
 
@@ -1268,8 +1268,9 @@ class ArenaManager(
         }
         val countKill = killAwardParticipantIds.isNotEmpty()
         if (countKill) {
+            val definitionTypeId = mobToDefinitionTypeId[entityId] ?: event.entity.type.name
             killAwardParticipantIds.forEach { participantId ->
-                arenaQuestService?.recordMobKill(participantId)
+                arenaMissionService?.recordMobKill(participantId, definitionTypeId)
             }
         }
         consumeMob(session, entityId, countKill = countKill)
@@ -1673,7 +1674,7 @@ class ArenaManager(
                 ArenaI18n.text(
                     owner,
                     "arena.messages.multiplayer.invite_failed_full",
-                    "&cこのクエストの最大参加人数に達しているため招待できません"
+                    "&cこのミッションの最大参加人数に達しているため招待できません"
                 )
             )
             return
@@ -1751,27 +1752,27 @@ class ArenaManager(
     }
 
     private fun buildInviteMessageComponent(ownerName: String, session: ArenaSession): Component {
-        val questTitle = session.inviteQuestTitle
-        if (questTitle.isNullOrBlank()) {
+        val missionTitle = session.inviteMissionTitle
+        if (missionTitle.isNullOrBlank()) {
             return legacySerializer.deserialize(
                 ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_simple", "§8§l«§c§lArena§8§l» §7{owner}さんがあなたをアリーナに招待しました！", "owner" to ownerName)
             )
         }
 
-        val hoverText = if (session.inviteQuestLore.isEmpty()) {
+        val hoverText = if (session.inviteMissionLore.isEmpty()) {
             ArenaI18n.text(null, "arena.messages.multiplayer.no_description", "§7説明はありません")
         } else {
-            session.inviteQuestLore.joinToString("\n")
+            session.inviteMissionLore.joinToString("\n")
         }
 
-        val prefix = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_prefix", "§8§l«§c§lArena§8§l» §7{owner}さんがあなたをクエスト§e", "owner" to ownerName))
-        val questPart = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_quest", "§e【{quest}】", "quest" to questTitle))
+        val prefix = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_prefix", "§8§l«§c§lArena§8§l» §7{owner}さんがあなたをミッション§e", "owner" to ownerName))
+        val missionPart = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_mission", "§e【{mission}】", "mission" to missionTitle))
             .hoverEvent(HoverEvent.showText(legacySerializer.deserialize(hoverText)))
         val suffix = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_suffix", "§7に招待しました！"))
 
         return Component.empty()
             .append(prefix)
-            .append(questPart)
+            .append(missionPart)
             .append(suffix)
     }
 
@@ -3170,7 +3171,7 @@ class ArenaManager(
             return
         }
 
-        val clearTarget = calculateWaveCount(theme.mobSpawnConfig.clearMobCount, difficulty, wave, session.questModifiers.clearMobCountMultiplier, session.sessionVariance)
+        val clearTarget = calculateWaveCount(theme.mobSpawnConfig.clearMobCount, difficulty, wave, session.missionModifiers.clearMobCountMultiplier, session.sessionVariance)
 
         session.lastClearedWaveForBossBar = null
         session.startedWaves.add(wave)
@@ -3202,8 +3203,8 @@ class ArenaManager(
         location.pitch = 0.0f
     }
 
-    private fun calculateWaveCount(base: Int, difficulty: ArenaDifficultyConfig, wave: Int, questMultiplier: Double, sessionVariance: Double = 1.0): Int {
-        val scaled = base * difficulty.mobCountMultiplier * difficulty.waveScale(wave) * questMultiplier * sessionVariance
+    private fun calculateWaveCount(base: Int, difficulty: ArenaDifficultyConfig, wave: Int, missionMultiplier: Double, sessionVariance: Double = 1.0): Int {
+        val scaled = base * difficulty.mobCountMultiplier * difficulty.waveScale(wave) * missionMultiplier * sessionVariance
         return ceil(scaled).toInt().coerceAtLeast(1)
     }
 
@@ -3215,7 +3216,7 @@ class ArenaManager(
         spawns: List<Location>,
         intervalScale: Double = 1.0
     ) {
-        val interval = (difficulty.mobSpawnIntervalTicks * session.sessionVariance * session.questModifiers.spawnIntervalMultiplier * intervalScale)
+        val interval = (difficulty.mobSpawnIntervalTicks * session.sessionVariance * session.missionModifiers.spawnIntervalMultiplier * intervalScale)
             .roundToLong()
             .coerceAtLeast(1L)
         val task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
@@ -3733,7 +3734,7 @@ class ArenaManager(
         enforceAdultMob(entity)
         spawnMobAppearParticles(world, entity.location)
 
-        applyMobStats(entity, definition, difficulty, session.sessionVariance, session.questModifiers)
+        applyMobStats(entity, definition, difficulty, session.sessionVariance, session.missionModifiers)
 
         if (entity is Mob) {
             entity.target = findNearestParticipant(session, entity.location)
@@ -3752,11 +3753,11 @@ class ArenaManager(
         definition: MobDefinition,
         difficulty: ArenaDifficultyConfig,
         sessionVariance: Double,
-        questModifiers: ArenaQuestModifiers
+        missionModifiers: ArenaMissionModifiers
     ) {
-        val maxHealth = (difficulty.mobStatsMaxHealth * sessionVariance * questModifiers.mobHealthMultiplier)
+        val maxHealth = (difficulty.mobStatsMaxHealth * sessionVariance * missionModifiers.mobHealthMultiplier)
             .coerceAtLeast(1.0)
-        val attack = (difficulty.mobStatsMaxAttack * sessionVariance * questModifiers.mobAttackMultiplier)
+        val attack = (difficulty.mobStatsMaxAttack * sessionVariance * missionModifiers.mobAttackMultiplier)
             .coerceAtLeast(0.0)
         val speed = difficulty.mobStatsMaxMovementSpeed.coerceAtLeast(0.01)
         val armor = (difficulty.mobStatsMaxArmor * sessionVariance).coerceAtLeast(0.0)
@@ -4033,7 +4034,7 @@ class ArenaManager(
             theme.mobSpawnConfig.maxSummonCount,
             difficulty,
             session.waves,
-            session.questModifiers.maxSummonCountMultiplier,
+            session.missionModifiers.maxSummonCountMultiplier,
             session.sessionVariance
         )
         return minOf(sharedWaveMaxAlive, calculated).coerceAtLeast(1)
@@ -4423,7 +4424,7 @@ class ArenaManager(
         val spawnPoints = session.roomMobSpawns[session.waves].orEmpty()
         if (spawnPoints.isEmpty()) return
 
-        val normalInterval = (difficulty.mobSpawnIntervalTicks * session.sessionVariance * session.questModifiers.spawnIntervalMultiplier)
+        val normalInterval = (difficulty.mobSpawnIntervalTicks * session.sessionVariance * session.missionModifiers.spawnIntervalMultiplier)
             .roundToLong()
             .coerceAtLeast(1L)
         val interval = (normalInterval / 2.0).roundToLong().coerceAtLeast(1L)
@@ -4432,7 +4433,7 @@ class ArenaManager(
             theme.mobSpawnConfig.maxSummonCount,
             difficulty,
             session.waves,
-            session.questModifiers.maxSummonCountMultiplier,
+            session.missionModifiers.maxSummonCountMultiplier,
             session.sessionVariance
         )
         val defenseMaxAlive = if (normalMaxAlive <= 1) 1 else (normalMaxAlive / 2.0).roundToInt().coerceIn(1, normalMaxAlive - 1)
@@ -4526,7 +4527,7 @@ class ArenaManager(
         entity.removeWhenFarAway = false
         entity.canPickupItems = false
         enforceAdultMob(entity)
-        applyMobStats(entity, definition, difficulty, session.sessionVariance, session.questModifiers)
+        applyMobStats(entity, definition, difficulty, session.sessionVariance, session.missionModifiers)
         spawnMobAppearParticles(spawnPoint.world ?: return, spawnPoint)
         val isTargetingBarrier = random.nextDouble() < BARRIER_DEFENSE_TARGET_RATIO
         if (isTargetingBarrier) {
@@ -4570,7 +4571,7 @@ class ArenaManager(
         playSoundAtBarrier(session, Sound.BLOCK_BEACON_ACTIVATE, 5.0f, 0.5f)
         val world = Bukkit.getWorld(session.worldName) ?: return
         spawnBarrierRestartSuccessParticles(world, session)
-        arenaQuestService?.recordBarrierRestart(session.participants)
+        arenaMissionService?.recordBarrierRestart(session.participants)
 
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
@@ -6952,11 +6953,11 @@ class ArenaManager(
     private fun buildRecruitmentSidebarLines(session: ArenaSession): List<String> {
         val now = System.currentTimeMillis()
         val remainingSeconds = (session.joinGraceEndMillis - now).coerceAtLeast(0L) / 1000L
-        val questTitle = session.inviteQuestTitle?.takeIf { it.isNotBlank() } ?: ArenaI18n.text(null, "arena.ui.recruitment.default_quest_title", "アリーナクエスト")
+        val missionTitle = session.inviteMissionTitle?.takeIf { it.isNotBlank() } ?: ArenaI18n.text(null, "arena.ui.recruitment.default_mission_title", "アリーナミッション")
 
         val lines = mutableListOf<String>()
         lines += ""
-        lines += ArenaI18n.text(null, "arena.ui.recruitment.title", "§6【{questTitle}】", "questTitle" to questTitle)
+        lines += ArenaI18n.text(null, "arena.ui.recruitment.title", "§6【{missionTitle}】", "missionTitle" to missionTitle)
         lines += ""
         lines += ArenaI18n.text(null, "arena.ui.recruitment.remaining", "§f開始まで §e{seconds} 秒", "seconds" to remainingSeconds)
         lines += ""
