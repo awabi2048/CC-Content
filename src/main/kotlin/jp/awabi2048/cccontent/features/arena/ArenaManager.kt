@@ -1459,6 +1459,15 @@ class ArenaManager(
         if (!sessionsByWorld.containsKey(worldName)) {
             return
         }
+        if (event.action == Action.LEFT_CLICK_BLOCK && clicked.type == Material.COBWEB) {
+            if (PeriodicCobwebAbility.consumeArenaPlacedCobweb(clicked)) {
+                clicked.type = Material.AIR
+                event.isCancelled = true
+                event.setUseInteractedBlock(Event.Result.DENY)
+                event.setUseItemInHand(Event.Result.DENY)
+            }
+            return
+        }
         if (event.action != Action.RIGHT_CLICK_BLOCK) {
             return
         }
@@ -2697,20 +2706,13 @@ class ArenaManager(
             }
 
             val missingKeys = mutableListOf<String>()
-            if (!config.isString("custom_items.arena.mob_token.display_format")) {
-                missingKeys += "custom_items.arena.mob_token.display_format"
-            }
             if (!config.isList("custom_items.arena.mob_token.lore")) {
                 missingKeys += "custom_items.arena.mob_token.lore"
             }
 
             requiredTypeIds.forEach { typeId ->
                 val normalizedTypeId = normalizeMobTokenLanguageTypeId(typeId)
-                val key = if (usesHeadTokenDisplayName(normalizedTypeId)) {
-                    "custom_items.arena.mob_token.mob_names.$normalizedTypeId"
-                } else {
-                    "custom_items.arena.mob_token.drop_names.$normalizedTypeId"
-                }
+                val key = "custom_items.arena.mob_token.token_names.$normalizedTypeId"
                 if (!config.isString(key)) {
                     missingKeys += key
                 }
@@ -2722,13 +2724,6 @@ class ArenaManager(
                     plugin.logger.warning("[Arena]   - $key")
                 }
             }
-        }
-    }
-
-    private fun usesHeadTokenDisplayName(typeId: String): Boolean {
-        return when (typeId) {
-            "skeleton", "zombie", "creeper", "piglin", "ender_dragon" -> true
-            else -> false
         }
     }
 
@@ -5595,7 +5590,7 @@ class ArenaManager(
             setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false)
             setGameRule(GameRule.DO_WEATHER_CYCLE, false)
             setGameRule(GameRule.KEEP_INVENTORY, true)
-            time = 6000
+            time = 18000
             WorldSettingsHelper.applyDistanceSettings(plugin, this, "arena.world_settings")
         }
     }

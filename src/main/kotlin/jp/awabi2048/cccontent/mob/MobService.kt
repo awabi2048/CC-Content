@@ -81,6 +81,7 @@ import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieNormalMobType
 import jp.awabi2048.cccontent.mob.type.ZombieShieldOnlyMobType
+import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
 import jp.awabi2048.cccontent.mob.ability.BoomerangService
 import jp.awabi2048.cccontent.mob.ability.HomingArrowService
 import jp.awabi2048.cccontent.mob.ability.ThrownWeaponService
@@ -518,8 +519,12 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun resolveCustomMobDisplayNameByDamager(damager: Entity, viewer: Player?): String? {
         val activeMob = resolveActiveMobByDamager(damager) ?: return null
-        val key = "arena.mob_token.mob_names.${activeMob.mobType.id}"
-        return ArenaI18n.text(viewer, key, activeMob.mobType.id)
+        val categoryId = when (activeMob.mobType.id) {
+            "ashen_spirit", "water_spirit" -> "spirit"
+            else -> ArenaMobTokenItem.resolveTokenCategoryTypeId(activeMob.mobType.baseEntityType.name)
+        }
+        val key = "custom_items.arena.mob_token.token_names.$categoryId"
+        return ArenaI18n.text(viewer, key, categoryId)
     }
 
     private fun resolveActiveMobByDamager(damager: Entity): ActiveMob? {
@@ -667,7 +672,7 @@ class MobService(private val plugin: JavaPlugin) {
         }
         val zombie = event.entity as? Zombie ?: return
         val activeMob = activeMobs[zombie.uniqueId] ?: return
-        if (activeMob.mobType.id != "zombie_ocean_normal" && activeMob.mobType.id != "zombie_ocean_warrior") {
+        if (activeMob.mobType.id != "drowned_normal" && activeMob.mobType.id != "drowned_warrior") {
             return
         }
         event.isCancelled = true

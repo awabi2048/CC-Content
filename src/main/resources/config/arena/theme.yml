@@ -163,10 +163,10 @@ ocean_monument:
     key: minecraft:block.iron_door.open
     pitch: 1.0
   mobs:
-    zombie_ocean_normal:
+    drowned_normal:
       weight: 8
       wave: 1..
-    zombie_ocean_warrior:
+    drowned_warrior:
       weight: 12
       wave: 2..
     drowned_grudge:

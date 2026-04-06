@@ -98,21 +98,10 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
         val item = ItemStack(Material.POISONOUS_POTATO, amount.coerceAtLeast(1))
         val meta = item.itemMeta ?: return item
         val normalizedTypeId = resolveTokenCategoryTypeId(mobTypeId)
-        val usesHeadDisplayName = usesHeadDisplayName(normalizedTypeId)
-        val mobNamePath = if (usesHeadDisplayName) {
-            "custom_items.arena.mob_token.mob_names.$normalizedTypeId"
-        } else {
-            "custom_items.arena.mob_token.drop_names.$normalizedTypeId"
-        }
-        val mobName = CustomItemI18n.text(
+        val tokenName = CustomItemI18n.text(
             player,
-            mobNamePath,
+            "custom_items.arena.mob_token.token_names.$normalizedTypeId",
             normalizedTypeId
-        )
-        val displayFormat = CustomItemI18n.text(
-            player,
-            "custom_items.arena.mob_token.display_format",
-            "{mob}の頭"
         )
         val localizedLore = CustomItemI18n.list(
             player,
@@ -120,13 +109,7 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
             listOf("§7アリーナに出現するモンスターが落としたアイテム", "§7アリーナロビーで報酬と交換しよう！")
         )
 
-        val resolvedDisplayName = if (usesHeadDisplayName) {
-            displayFormat.replace("{mob}", mobName)
-        } else {
-            mobName
-        }
-        val decoratedDisplayName = if (resolvedDisplayName.startsWith("§6")) resolvedDisplayName else "§6$resolvedDisplayName"
-        meta.displayName(Component.text(decoratedDisplayName))
+        meta.displayName(Component.text("§6$tokenName"))
         meta.lore(localizedLore.map { Component.text(it) })
         meta.setItemModel(itemModel)
         meta.persistentDataContainer.set(arenaItemKey, PersistentDataType.STRING, id)
@@ -153,13 +136,6 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
         }
 
         fun supportedTokenCategoryTypeIds(): Set<String> = SUPPORTED_TOKEN_CATEGORY_TYPE_IDS
-
-        private fun usesHeadDisplayName(typeId: String): Boolean {
-            return when (typeId) {
-                "skeleton", "zombie", "creeper", "piglin", "ender_dragon" -> true
-                else -> false
-            }
-        }
 
         private fun resolveItemModel(typeId: String): NamespacedKey {
             val normalized = resolveTokenCategoryTypeId(typeId)

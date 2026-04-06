@@ -1261,8 +1261,8 @@ class BlazeBeamMobType : EquipmentMobType(
 )
 
 class DrownedNormalMobType : EquipmentMobType(
-    id = "zombie_ocean_normal",
-    baseEntityType = EntityType.ZOMBIE,
+    id = "drowned_normal",
+    baseEntityType = EntityType.DROWNED,
     abilities = listOf(
         DrownedAquaticPursuitAbility(id = "drowned_normal_aquatic_pursuit"),
         PlayerTargetAssistAbility(id = "drowned_normal_target_assist")
@@ -1271,8 +1271,8 @@ class DrownedNormalMobType : EquipmentMobType(
 )
 
 class DrownedWarriorMobType : EquipmentMobType(
-    id = "zombie_ocean_warrior",
-    baseEntityType = EntityType.ZOMBIE,
+    id = "drowned_warrior",
+    baseEntityType = EntityType.DROWNED,
     abilities = listOf(
         DrownedAquaticPursuitAbility(id = "drowned_warrior_aquatic_pursuit"),
         PlayerTargetAssistAbility(id = "drowned_warrior_target_assist"),
