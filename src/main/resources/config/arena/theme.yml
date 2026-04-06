@@ -345,3 +345,46 @@ nether:
     straight_entry: south
     corridor_entry: south
     goal_entry: west
+
+end:
+  icon: END_STONE
+  max_summon_count: 10
+  clear_mob_count: 20
+  door_open_sound:
+    key: minecraft:block.end_portal.spawn
+    pitch: 1.0
+  mobs:
+    enderman_phase:
+      weight: 8
+      wave: 1..
+    enderman_drain:
+      weight: 7
+      wave: 2..
+    enderman_mirror:
+      weight: 6
+      wave: 3..
+    enderman_eye_summoner:
+      weight: 3
+      wave: 4..
+    shulker_rhythm:
+      weight: 7
+      wave: 1..
+    shulker_laser:
+      weight: 6
+      wave: 3..
+    shulker_disruptor:
+      weight: 4
+      wave: 5..
+    ender_eye_hunter:
+      weight: 5
+      wave: 2..
+    ender_eye_orbit:
+      weight: 4
+      wave: 4..
+  orientation:
+    entrance_exit: north
+    corner_entry: south
+    corner_exit: east
+    straight_entry: south
+    corridor_entry: south
+    goal_entry: west

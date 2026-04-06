@@ -3748,7 +3748,11 @@ class ArenaManager(
                 featureId = "arena",
                 sessionKey = "arena:${session.worldName}",
                 combatActiveProvider = { true },
-                metadata = mapOf("world" to session.worldName, "wave" to wave.toString())
+                metadata = mapOf(
+                    "world" to session.worldName,
+                    "wave" to wave.toString(),
+                    "total_waves" to session.waves.toString()
+                )
             )
         ) ?: return
         entity.removeWhenFarAway = false

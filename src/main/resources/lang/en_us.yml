@@ -447,6 +447,7 @@ custom_items:
         - "§7Exchange it for rewards in the arena lobby!"
       token_names:
         zombie: "Zombie Head"
+        creeper: "Creeper Gunpowder Pouch"
         skeleton: "Skeleton Skull"
         wither_skeleton: "Wither Skeleton Bone Fragment"
         husk: "Husk Tunic"
@@ -464,6 +465,8 @@ custom_items:
         stray: "Frozen Skeleton"
         bat: "Great Bat Membrane"
         allay: "Spirit Shard"
+        enderman: "Enderman Remnant"
+        shulker: "Shulker Shell"
         spirit: "Spirit Tear"
         frog: "Great Frog Liver"
     theme:
@@ -477,6 +480,8 @@ custom_items:
         name: "Lush Cave"
       nether:
         name: "Nether Fortress"
+      end:
+        name: "The End"
     marker:
       current_mode: '&f§l| §7Current Mode §a{mode}'
       mode_changed: '&7Placement mode changed to §a{mode}§7.'

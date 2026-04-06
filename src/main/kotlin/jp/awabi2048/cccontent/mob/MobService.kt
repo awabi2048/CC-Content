@@ -76,6 +76,15 @@ import jp.awabi2048.cccontent.mob.type.WaterSpiritEliteMobType
 import jp.awabi2048.cccontent.mob.type.WaterSpiritMobType
 import jp.awabi2048.cccontent.mob.type.WitchEliteMobType
 import jp.awabi2048.cccontent.mob.type.WitchNormalMobType
+import jp.awabi2048.cccontent.mob.type.EndermanPhaseMobType
+import jp.awabi2048.cccontent.mob.type.EndermanDrainMobType
+import jp.awabi2048.cccontent.mob.type.EndermanMirrorMobType
+import jp.awabi2048.cccontent.mob.type.EndermanEyeSummonerMobType
+import jp.awabi2048.cccontent.mob.type.ShulkerRhythmMobType
+import jp.awabi2048.cccontent.mob.type.ShulkerLaserMobType
+import jp.awabi2048.cccontent.mob.type.ShulkerDisruptorMobType
+import jp.awabi2048.cccontent.mob.type.EnderEyeHunterMobType
+import jp.awabi2048.cccontent.mob.type.EnderEyeOrbitMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
@@ -120,6 +129,7 @@ import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.entity.ProjectileHitEvent
 import org.bukkit.event.entity.EntityTransformEvent
+import org.bukkit.event.entity.EntityTeleportEvent
 import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.PotionMeta
@@ -198,6 +208,9 @@ class MobService(private val plugin: JavaPlugin) {
     private val blazeDirectHitAppliedKey = NamespacedKey(plugin, "blaze_direct_hit_applied")
     private val downgradeAoEProtectUntilTickKey = NamespacedKey(plugin, "downgrade_aoe_protect_until")
     private val stealthFangKey = NamespacedKey(plugin, "stealth_fang")
+    private val shulkerLevitationBulletKey = NamespacedKey(plugin, "shulker_levitation_bullet")
+    private val shulkerLevitationAmplifierKey = NamespacedKey(plugin, "shulker_levitation_bullet_amp")
+    private val shulkerLevitationDurationKey = NamespacedKey(plugin, "shulker_levitation_bullet_duration")
     private var tickTask: BukkitTask? = null
 
     private val ELITE_WITCH_MAGIC_CONVERT_CHANCE = 0.3
@@ -308,6 +321,15 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(WitchNormalMobType())
         registerMobType(WitchEliteMobType())
         registerMobType(BatVenomMobType())
+        registerMobType(EndermanPhaseMobType())
+        registerMobType(EndermanDrainMobType())
+        registerMobType(EndermanMirrorMobType())
+        registerMobType(EndermanEyeSummonerMobType())
+        registerMobType(ShulkerRhythmMobType())
+        registerMobType(ShulkerLaserMobType())
+        registerMobType(ShulkerDisruptorMobType())
+        registerMobType(EnderEyeHunterMobType())
+        registerMobType(EnderEyeOrbitMobType())
     }
 
     fun registerMobType(mobType: MobType) {
@@ -559,6 +581,13 @@ class MobService(private val plugin: JavaPlugin) {
         fangs.persistentDataContainer.set(stealthFangKey, PersistentDataType.BYTE, 1)
     }
 
+    fun markShulkerLevitationBullet(projectile: Projectile, amplifier: Int, durationTicks: Int) {
+        val container = projectile.persistentDataContainer
+        container.set(shulkerLevitationBulletKey, PersistentDataType.BYTE, 1)
+        container.set(shulkerLevitationAmplifierKey, PersistentDataType.INTEGER, amplifier.coerceAtLeast(0))
+        container.set(shulkerLevitationDurationKey, PersistentDataType.INTEGER, durationTicks.coerceAtLeast(1))
+    }
+
     fun handleStealthFangDamage(event: EntityDamageByEntityEvent) {
         val fangs = event.damager as? EvokerFangs ?: return
         if (!fangs.persistentDataContainer.has(stealthFangKey, PersistentDataType.BYTE)) return
@@ -653,6 +682,15 @@ class MobService(private val plugin: JavaPlugin) {
             activeMob.mobType.id != "drowned_trident_guard" &&
             activeMob.mobType.id != "drowned_raider_axe"
         ) {
+            return
+        }
+        event.isCancelled = true
+    }
+
+    fun handleEntityTeleport(event: EntityTeleportEvent) {
+        val living = event.entity as? LivingEntity ?: return
+        val activeMob = activeMobs[living.uniqueId] ?: return
+        if (!activeMob.mobType.id.startsWith("enderman_")) {
             return
         }
         event.isCancelled = true
@@ -938,6 +976,8 @@ class MobService(private val plugin: JavaPlugin) {
         val projectile = event.entity
         HomingArrowService.getInstance(plugin).handleHit(projectile.uniqueId)
 
+        applyShulkerLevitationHit(projectile, event.hitEntity as? LivingEntity)
+
         applyBlazeDirectHitDamage(projectile, event.hitEntity as? LivingEntity)
 
         val arrow = projectile as? AbstractArrow ?: return
@@ -945,6 +985,17 @@ class MobService(private val plugin: JavaPlugin) {
             return
         }
         arrow.remove()
+    }
+
+    private fun applyShulkerLevitationHit(projectile: Projectile, hitEntity: LivingEntity?) {
+        if (hitEntity == null) return
+        val container = projectile.persistentDataContainer
+        if (container.get(shulkerLevitationBulletKey, PersistentDataType.BYTE)?.toInt() != 1) {
+            return
+        }
+        val amp = container.get(shulkerLevitationAmplifierKey, PersistentDataType.INTEGER) ?: 2
+        val duration = container.get(shulkerLevitationDurationKey, PersistentDataType.INTEGER) ?: 10
+        hitEntity.addPotionEffect(PotionEffect(PotionEffectType.LEVITATION, duration.coerceAtLeast(1), amp.coerceAtLeast(0), false, true, true))
     }
 
     private fun applyBlazeDirectHitDamage(projectile: Projectile, hitEntity: LivingEntity?) {

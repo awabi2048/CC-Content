@@ -158,6 +158,8 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
                 "spirit" -> NamespacedKey.minecraft("ghast_tear")
                 "witch" -> NamespacedKey.minecraft("leather_chestplate")
                 "bat" -> NamespacedKey.minecraft("phantom_membrane")
+                "enderman" -> NamespacedKey.minecraft("ender_pearl")
+                "shulker" -> NamespacedKey.minecraft("shulker_shell")
                 "bogged" -> NamespacedKey.minecraft("skeleton_skull")
                 "stray" -> NamespacedKey.minecraft("skeleton_skull")
                 "frog" -> NamespacedKey.minecraft("resin_clump")
@@ -188,6 +190,8 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
             "stray",
             "bat",
             "allay",
+            "enderman",
+            "shulker",
             "spirit",
             "frog"
         )
