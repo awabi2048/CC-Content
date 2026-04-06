@@ -435,10 +435,10 @@ party:
     specify_name: '{prefix} &c{action} するプレイヤー名を指定してください。'
     specify_party_name: '{prefix} &c参加するパーティのリーダー名を指定してください。'
 
-# Quest関連
-quest:
+# Mission関連
+mission:
   accept:
-    success: '&aクエストを受注しました！'
+    success: '&aミッションを受注しました！'
   complete:
     success: '&a&lクエスト達成！'
 
@@ -1161,7 +1161,7 @@ custom_items:
         broadcast: '&f/arenaa broadcast'
         pedestal: '&f/arenaa pedestal'
     menu:
-      open_failed: '&cアリーナクエストを開けませんでした'
+      open_failed: '&cアリーナミッションを開けませんでした'
       open_failed_detail: '&cアリーナメニューを開けませんでした: {message}'
       start_error:
         already_in_session: '&c{player} はすでにアリーナセッション中です'
@@ -1173,15 +1173,18 @@ custom_items:
         stage_build_failed: '&c{message}'
         join_area_not_found: '&c開始待機エリアの参加マーカーが近くに存在しないため開始できません'
         lobby_marker_not_found: '&cロビーマーカーが見つからないため開始できません'
-    quest:
-      already_completed: '&eこのクエストはすでに完了済みです'
-      already_in_quest: '&cすでに進行中のクエストがあります'
-      not_found: '&cアリーナクエストが見つかりません'
-      start_cancelled: '&cクエスト開始はキャンセルされました'
+    mission:
+      already_completed: '&eこのミッションはすでに完了済みです'
+      already_in_mission: '&cすでに進行中のミッションがあります'
+      not_found: '&cアリーナミッションが見つかりません'
+      start_cancelled: '&cミッション開始はキャンセルされました'
+      license_insufficient: '&cあなたのライセンスでは、このミッションはまだ受けられません'
       stage_build_failed_internal: '&cステージの生成に失敗しました。スタッフに報告してください。(STRUCTURE_ERROR)'
+    license:
+      promoted: '&aライセンスが昇格しました！ &f→ {tier}'
     multiplayer:
-      invite_window_started: '§6クエストを受注しました！§7リフトを準備中です...'
-      invite_window_hint: '§7左クリックでほかのプレイヤーをクエストに誘うことができます'
+      invite_window_started: '§6ミッションを受注しました！§7リフトを準備中です...'
+      invite_window_hint: '§7左クリックでほかのプレイヤーをミッションに誘うことができます'
       wait_area_hint: '&7招待したプレイヤーと開始待機エリアに入ると待機状態になります'
       waiting_entered: '&a開始待機エリアに入りました。猶予終了まで待機してください'
       waiting_exited: '§cリフトから降りました。参加する場合は乗って待機してください！'
@@ -1196,7 +1199,7 @@ custom_items:
       invite_window_closed: '&c募集時間は終了しました'
       invite_failed_world: '&c同じワールド内のプレイヤーのみ招待できます'
       invite_failed_in_session: '&c{player} はすでに別のアリーナに参加しています'
-      invite_failed_full: '&cこのクエストの最大参加人数に達しているため招待できません'
+      invite_failed_full: '&cこのミッションの最大参加人数に達しているため招待できません'
       invite_failed_already_locked: '&c{player} はすでに他の招待を受けています'
       declined_self: '&e招待を辞退しました'
       declined_notify_owner: '&e{player} が招待を辞退しました'
@@ -1205,8 +1208,8 @@ custom_items:
       cancelled_owner_not_waiting: '&cオーナーが開始待機エリアにいないため開始を中止しました'
       invite_message_simple: '§8§l«§c§lArena§8§l» §7{owner}さんがあなたをアリーナに招待しました！'
       no_description: '&7説明はありません'
-      invite_message_prefix: '§8§l«§c§lArena§8§l» §7{owner}さんがあなたをクエスト§e'
-      invite_message_quest: '§e【{quest}】'
+      invite_message_prefix: '§8§l«§c§lArena§8§l» §7{owner}さんがあなたをミッション§e'
+      invite_message_mission: '§e【{mission}】'
       invite_message_suffix: '&7に招待しました！'
     down:
       entered: '§cダウン！§7他の方が蘇生すると復活できます'
@@ -1298,23 +1301,33 @@ custom_items:
     confirm_title: '§8参加確認'
     separator: '§8§m――――――――――――――――――――'
     coming_soon: '§7Coming Soon!'
+    license_card:
+      title: '§bライセンスカード'
+      current_license: '§f❙ §7現在のライセンス §e{tier}'
+      allowed_difficulty: '§f❙ §7入場許可難易度 §c{difficulty} §7まで'
+      next_header: '§f❙ §7次のライセンスまで'
+      max_reached: '  §8- §a全ライセンスを解放済み'
+      requirement:
+        mission_clear: '  §8- §fミッションを完了する {progress}'
+        mob_kill: '  §8- §fモンスターを討伐する（累計） {progress}'
+        strong_enemy_kill: '  §8- §f強敵を討伐する（累計） {progress}'
     info_title: '§bInfo'
     info:
       lines:
-        - '§71日1回、§e24時§7にクエストが更新されます'
+        - '§71日1回、§e24時§7にミッションが更新されます'
         - '§7みんなで協力して、おあげちゃんを助けてあげましょう'
-        - '§7クエストを達成するとおあげちゃんから§eご褒美§7が貰えるほか、'
+        - '§7ミッションを達成するとおあげちゃんから§eご褒美§7が貰えるほか、'
         - '§7アリーナのモンスターは§dレアなアイテム§7を落とすことがあります'
     confirm:
       ok_name: '§aOK'
       ok_lore:
-        - '§7このクエストを開始します'
+        - '§7このミッションを開始します'
       cancel_name: '§cキャンセル'
       cancel_lore:
-        - '§7クエスト開始を取り消します'
-    quest:
-      item_name: '§a{quest}'
-      completed_item_name: '§a§m{quest}'
+        - '§7ミッション開始を取り消します'
+    mission:
+      item_name: '§a{mission}'
+      completed_item_name: '§a§m{mission}'
       mission_title: '§f❙ §7ミッション内容'
       difficulty_inline: '§f❙ §7難易度 §f{difficulty}'
       memo_inline: '§f❙ §7メモ §f{memo}'
@@ -1323,8 +1336,8 @@ custom_items:
       mob_kills: '§f❙ §7倒したモブ §e{count} 体'
       barrier_restarts: '§f❙ §7結界石を再起動した回数 §e{count} 回'
     recruitment:
-      default_quest_title: 'アリーナクエスト'
-      title: '§6【{questTitle}】'
+      default_mission_title: 'アリーナミッション'
+      title: '§6【{missionTitle}】'
       remaining: '§f開始まで §e{seconds} 秒'
       waiting_participant: '§b✦ {name}'
       normal_participant: '§7✧ {name}'
@@ -1352,12 +1365,12 @@ custom_items:
     wave_clear_dynamic: '§7- §6{waveLabel} §7- §bCLEAR'
     last_wave_progress: '§7- §6Last Wave §7- §8(§7{activated}/§b{total}§8)'
     wave_progress: '§7- §6{waveLabel} §7- §8(§c{kills}§7/{target}§8)'
-  quest:
+  mission:
     memo_choices:
       - '§eがんばってください！'
       - '§e安全第一でお願いします！'
       - '§eみんなで協力しましょう！'
-    mission:
+    type:
       barrier_restart:
         name: '結界石の再起動'
         hints:
@@ -1390,6 +1403,12 @@ custom_items:
         name: '樹海'
       maze:
         name: '立体迷宮'
+  license:
+    tier:
+      paper: 'ペーパー'
+      bronze: 'ブロンズ'
+      silver: 'シルバー'
+      gold: 'ゴールド'
       end:
         name: 'エンド'
   brewery:
@@ -1410,7 +1429,7 @@ custom_items:
     ui:
       broadcast:
         title: '§8アリーナ実況'
-        default_title: '§fアリーナクエスト'
+        default_title: '§fアリーナミッション'
         empty_slot: '§e余裕あり'
         info:
           name: '§bInfo'
@@ -1485,7 +1504,7 @@ arena:
         broadcast: '&f/arenaa broadcast'
         pedestal: '&f/arenaa pedestal'
     menu:
-      open_failed: '&cアリーナクエストを開けませんでした'
+      open_failed: '&cアリーナミッションを開けませんでした'
       open_failed_detail: '&cアリーナメニューを開けませんでした: {message}'
       start_error:
         already_in_session: '&c{player} はすでにアリーナセッション中です'
@@ -1497,15 +1516,18 @@ arena:
         stage_build_failed: '&c{message}'
         join_area_not_found: '&c開始待機エリアの参加マーカーが近くに存在しないため開始できません'
         lobby_marker_not_found: '&cロビーマーカーが見つからないため開始できません'
-    quest:
-      already_completed: '&eこのクエストはすでに完了済みです'
-      already_in_quest: '&cすでに進行中のクエストがあります'
-      not_found: '&cアリーナクエストが見つかりません'
-      start_cancelled: '&cクエスト開始はキャンセルされました'
+    mission:
+      already_completed: '&eこのミッションはすでに完了済みです'
+      already_in_mission: '&cすでに進行中のミッションがあります'
+      not_found: '&cアリーナミッションが見つかりません'
+      start_cancelled: '&cミッション開始はキャンセルされました'
+      license_insufficient: '&cあなたのライセンスでは、このミッションはまだ受けられません'
       stage_build_failed_internal: '&cステージの生成に失敗しました。スタッフに報告してください。(STRUCTURE_ERROR)'
+    license:
+      promoted: '&aライセンスが昇格しました！ &f→ {tier}'
     multiplayer:
-      invite_window_started: '§6クエストを受注しました！§7リフトを準備中です...'
-      invite_window_hint: '§7左クリックでほかのプレイヤーをクエストに誘うことができます'
+      invite_window_started: '§6ミッションを受注しました！§7リフトを準備中です...'
+      invite_window_hint: '§7左クリックでほかのプレイヤーをミッションに誘うことができます'
       wait_area_hint: '&7招待したプレイヤーと開始待機エリアに入ると待機状態になります'
       waiting_entered: '&a開始待機エリアに入りました。猶予終了まで待機してください'
       waiting_exited: '§cリフトから降りました。参加する場合は乗って待機してください！'
@@ -1520,7 +1542,7 @@ arena:
       invite_window_closed: '&c募集時間は終了しました'
       invite_failed_world: '&c同じワールド内のプレイヤーのみ招待できます'
       invite_failed_in_session: '&c{player} はすでに別のアリーナに参加しています'
-      invite_failed_full: '&cこのクエストの最大参加人数に達しているため招待できません'
+      invite_failed_full: '&cこのミッションの最大参加人数に達しているため招待できません'
       invite_failed_already_locked: '&c{player} はすでに他の招待を受けています'
       declined_self: '&e招待を辞退しました'
       declined_notify_owner: '&e{player} が招待を辞退しました'
@@ -1529,8 +1551,8 @@ arena:
       cancelled_owner_not_waiting: '&cオーナーが開始待機エリアにいないため開始を中止しました'
       invite_message_simple: '§8§l«§c§lArena§8§l» §7{owner}さんがあなたをアリーナに招待しました！'
       no_description: '&7説明はありません'
-      invite_message_prefix: '§8§l«§c§lArena§8§l» §7{owner}さんがあなたをクエスト§e'
-      invite_message_quest: '§e【{quest}】'
+      invite_message_prefix: '§8§l«§c§lArena§8§l» §7{owner}さんがあなたをミッション§e'
+      invite_message_mission: '§e【{mission}】'
       invite_message_suffix: '&7に招待しました！'
     down:
       entered: '§cダウン！§7他の方が蘇生すると復活できます'
@@ -1637,23 +1659,33 @@ arena:
         waiting_lore: '§7条件を満たすと実行できます'
     separator: '§8§m――――――――――――――――――――'
     coming_soon: '§7Coming Soon!'
+    license_card:
+      title: '§bライセンスカード'
+      current_license: '§f❙ §7現在のライセンス §e{tier}'
+      allowed_difficulty: '§f❙ §7入場許可難易度 §c{difficulty} §7まで'
+      next_header: '§f❙ §7次のライセンスまで'
+      max_reached: '  §8- §a全ライセンスを解放済み'
+      requirement:
+        mission_clear: '  §8- §fミッションを完了する {progress}'
+        mob_kill: '  §8- §fモンスターを討伐する（累計） {progress}'
+        strong_enemy_kill: '  §8- §f強敵を討伐する（累計） {progress}'
     info_title: '§bInfo'
     info:
       lines:
-        - '§71日1回、§e24時§7にクエストが更新されます'
+        - '§71日1回、§e24時§7にミッションが更新されます'
         - '§7みんなで協力して、おあげちゃんを助けてあげましょう'
-        - '§7クエストを達成するとおあげちゃんから§eご褒美§7が貰えるほか、'
+        - '§7ミッションを達成するとおあげちゃんから§eご褒美§7が貰えるほか、'
         - '§7アリーナのモンスターは§dレアなアイテム§7を落とすことがあります'
     confirm:
       ok_name: '§aOK'
       ok_lore:
-        - '§7このクエストを開始します'
+        - '§7このミッションを開始します'
       cancel_name: '§cキャンセル'
       cancel_lore:
-        - '§7クエスト開始を取り消します'
-    quest:
-      item_name: '§a{quest}'
-      completed_item_name: '§a§m{quest}'
+        - '§7ミッション開始を取り消します'
+    mission:
+      item_name: '§a{mission}'
+      completed_item_name: '§a§m{mission}'
       mission_title: '§f❙ §7ミッション内容'
       difficulty_inline: '§f❙ §7難易度 §f{difficulty}'
       memo_inline: '§f❙ §7メモ §f{memo}'
@@ -1662,8 +1694,8 @@ arena:
       mob_kills: '§f❙ §7倒したモブ §e{count} 体'
       barrier_restarts: '§f❙ §7結界石を再起動した回数 §e{count} 回'
     recruitment:
-      default_quest_title: 'アリーナクエスト'
-      title: '§6【{questTitle}】'
+      default_mission_title: 'アリーナミッション'
+      title: '§6【{missionTitle}】'
       remaining: '§f開始まで §e{seconds} 秒'
       waiting_participant: '§b✦ {name}'
       normal_participant: '§7✧ {name}'
@@ -1679,9 +1711,15 @@ arena:
       status_alive: '§aALIVE'
       status_preparing: '§dPREPARING'
       status_dead: '§cDEAD'
+    license:
+      tier:
+        paper: 'ペーパー'
+        bronze: 'ブロンズ'
+        silver: 'シルバー'
+        gold: 'ゴールド'
     broadcast:
       title: '§8アリーナ実況'
-      default_title: '§fアリーナクエスト'
+      default_title: '§fアリーナミッション'
       empty_slot: '§e余裕あり'
       info:
         name: '§bInfo'
@@ -1701,24 +1739,24 @@ arena:
         normal: '§7« §6Wave {wave} §7»'
         last: '§7« §6Wave ◯ (Last Wave) §7»'
         clear: '§dCLEAR'
-  bossbar:
-    join_countdown: '§f開始まで §e{seconds} 秒'
-    revive:
-      downed: '§7{reviver}さんが蘇生中...'
-      reviver: '§7{downed}さんを蘇生中...'
-    barrier_restart: '§7- §6Last Wave §7- §d再起動中...'
-    wave_clear: '§7- §6Wave {wave} §7- §bCLEAR'
-    last_wave_label: 'Last Wave'
-    wave_label: 'Wave {wave}'
-    wave_clear_dynamic: '§7- §6{waveLabel} §7- §bCLEAR'
-    last_wave_progress: '§7- §6Last Wave §7- §8(§7{activated}/§b{total}§8)'
-    wave_progress: '§7- §6{waveLabel} §7- §8(§c{kills}§7/{target}§8)'
-  quest:
+    bossbar:
+      join_countdown: '§f開始まで §e{seconds} 秒'
+      revive:
+        downed: '§7{reviver}さんが蘇生中...'
+        reviver: '§7{downed}さんを蘇生中...'
+      barrier_restart: '§7- §6Last Wave §7- §d再起動中...'
+      wave_clear: '§7- §6Wave {wave} §7- §bCLEAR'
+      last_wave_label: 'Last Wave'
+      wave_label: 'Wave {wave}'
+      wave_clear_dynamic: '§7- §6{waveLabel} §7- §bCLEAR'
+      last_wave_progress: '§7- §6Last Wave §7- §8(§7{activated}/§b{total}§8)'
+      wave_progress: '§7- §6{waveLabel} §7- §8(§c{kills}§7/{target}§8)'
+  mission:
     memo_choices:
       - '§eがんばってください！'
       - '§e安全第一でお願いします！'
       - '§eみんなで協力しましょう！'
-    mission:
+    type:
       barrier_restart:
         name: '結界石の再起動'
         hints:
@@ -1732,10 +1770,10 @@ arena:
         name: '掃討'
         hints:
           - '§7たくさん湧いているので倒そう'
-    boss:
-      name: 'ボス'
-      hints:
-        - '§7ボスがいて困るので倒そう'
+      boss:
+        name: 'ボス'
+        hints:
+          - '§7ボスがいて困るので倒そう'
   theme:
     test:
       name: 'テスト'

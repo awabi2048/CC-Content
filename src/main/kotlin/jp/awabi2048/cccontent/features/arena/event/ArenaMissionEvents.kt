@@ -1,16 +1,16 @@
 package jp.awabi2048.cccontent.features.arena.event
 
-import jp.awabi2048.cccontent.features.arena.quest.ArenaDailyQuestEntry
-import jp.awabi2048.cccontent.features.arena.quest.ArenaDailyQuestSet
+import jp.awabi2048.cccontent.features.arena.mission.ArenaDailyMissionEntry
+import jp.awabi2048.cccontent.features.arena.mission.ArenaDailyMissionSet
 import org.bukkit.entity.Player
 import org.bukkit.event.Cancellable
 import org.bukkit.event.Event
 import org.bukkit.event.HandlerList
 import java.util.UUID
 
-class ArenaDailyQuestGeneratedEvent(
+class ArenaDailyMissionGeneratedEvent(
     val dateKey: String,
-    val questSet: ArenaDailyQuestSet
+    val missionSet: ArenaDailyMissionSet
 ) : Event() {
     override fun getHandlers(): HandlerList = HANDLERS
 
@@ -23,10 +23,10 @@ class ArenaDailyQuestGeneratedEvent(
     }
 }
 
-class ArenaQuestStartRequestEvent(
+class ArenaMissionStartRequestEvent(
     val player: Player,
     val dateKey: String,
-    val quest: ArenaDailyQuestEntry
+    val mission: ArenaDailyMissionEntry
 ) : Event(), Cancellable {
     private var cancelled = false
 

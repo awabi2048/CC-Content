@@ -4,7 +4,7 @@ import net.kyori.adventure.bossbar.BossBar
 import jp.awabi2048.cccontent.features.arena.generator.ArenaDoorAnimationPlacement
 import org.bukkit.Location
 import org.bukkit.scheduler.BukkitTask
-import jp.awabi2048.cccontent.features.arena.quest.ArenaQuestModifiers
+import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionModifiers
 import java.util.UUID
 import kotlin.random.Random
 
@@ -87,7 +87,7 @@ data class ArenaSession(
     val difficultyId: String,
     val sessionVariance: Double = Random.nextDouble(0.85, 1.15),
     val waves: Int,
-    val questModifiers: ArenaQuestModifiers = ArenaQuestModifiers.NONE,
+    val missionModifiers: ArenaMissionModifiers = ArenaMissionModifiers.NONE,
     var maxParticipants: Int = 6,
     val participants: MutableSet<UUID>,
     val returnLocations: MutableMap<UUID, Location>,
@@ -116,8 +116,8 @@ data class ArenaSession(
     var joinGraceStartMillis: Long = 0L,
     var joinGraceDurationMillis: Long = 0L,
     var joinGraceEndMillis: Long = 0L,
-    var inviteQuestTitle: String? = null,
-    var inviteQuestLore: List<String> = emptyList(),
+    var inviteMissionTitle: String? = null,
+    var inviteMissionLore: List<String> = emptyList(),
     var phase: ArenaPhase = ArenaPhase.PREPARING,
     var stageGenerationCompleted: Boolean = true,
     var stageGenerationWaitTitleShown: Boolean = false,
