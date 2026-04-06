@@ -48,6 +48,14 @@ import jp.awabi2048.cccontent.mob.ability.MagmaLandingBurstAbility
 import jp.awabi2048.cccontent.mob.ability.MagmaStageDeathAbility
 import jp.awabi2048.cccontent.mob.ability.TriFlameShotAbility
 import jp.awabi2048.cccontent.mob.ability.WitherBoomerangAbility
+import jp.awabi2048.cccontent.mob.ability.EndermanPhaseDefenseAbility
+import jp.awabi2048.cccontent.mob.ability.EndermanRayTeleportAbility
+import jp.awabi2048.cccontent.mob.ability.EndermanStrikeWarpAbility
+import jp.awabi2048.cccontent.mob.ability.ShulkerCarrierArtilleryAbility
+import jp.awabi2048.cccontent.mob.ability.ShulkerBurstShotAbility
+import jp.awabi2048.cccontent.mob.ability.ShulkerEndRodLaserAbility
+import jp.awabi2048.cccontent.mob.ability.EnderEyeHunterAbility
+import jp.awabi2048.cccontent.mob.ability.EnderEyeSummonerAbility
 import org.bukkit.Bukkit
 import org.bukkit.Color
 import org.bukkit.Particle
@@ -1453,6 +1461,109 @@ class WitchEliteMobType : EquipmentMobType(
                 BuffEffectEntry(PotionEffectType.SPEED, 120, 0),
                 BuffEffectEntry(PotionEffectType.REGENERATION, 120, 0)
             )
+        )
+    )
+)
+
+class EndermanPhaseMobType : EquipmentMobType(
+    id = "enderman_phase",
+    baseEntityType = EntityType.ENDERMAN,
+    abilities = listOf(
+        EndermanPhaseDefenseAbility(id = "enderman_phase_defense", projectileNegateChance = 0.0),
+        EndermanRayTeleportAbility(id = "enderman_phase_ray"),
+        EndermanStrikeWarpAbility(id = "enderman_phase_strike", swapChance = 0.16)
+    )
+)
+
+class EndermanDrainMobType : EquipmentMobType(
+    id = "enderman_drain",
+    baseEntityType = EntityType.ENDERMAN,
+    abilities = listOf(
+        EndermanPhaseDefenseAbility(id = "enderman_drain_defense", projectileNegateChance = 0.45),
+        EndermanRayTeleportAbility(id = "enderman_drain_ray"),
+        EndermanStrikeWarpAbility(id = "enderman_drain_strike", swapChance = 0.24)
+    )
+)
+
+class EndermanMirrorMobType : EquipmentMobType(
+    id = "enderman_mirror",
+    baseEntityType = EntityType.ENDERMAN,
+    abilities = listOf(
+        EndermanPhaseDefenseAbility(id = "enderman_mirror_defense", projectileNegateChance = 1.0),
+        EndermanRayTeleportAbility(id = "enderman_mirror_ray"),
+        EndermanStrikeWarpAbility(id = "enderman_mirror_strike", swapChance = 0.32)
+    )
+)
+
+class EndermanEyeSummonerMobType : EquipmentMobType(
+    id = "enderman_eye_summoner",
+    baseEntityType = EntityType.ENDERMAN,
+    abilities = listOf(
+        EndermanPhaseDefenseAbility(id = "enderman_eye_summoner_defense", projectileNegateChance = 0.6),
+        EndermanRayTeleportAbility(id = "enderman_eye_summoner_ray"),
+        EndermanStrikeWarpAbility(id = "enderman_eye_summoner_strike", swapChance = 0.2),
+        EnderEyeSummonerAbility(id = "enderman_eye_summoner_spawn")
+    )
+)
+
+class ShulkerRhythmMobType : EquipmentMobType(
+    id = "shulker_rhythm",
+    baseEntityType = EntityType.SHULKER,
+    abilities = listOf(
+        ShulkerCarrierArtilleryAbility(
+            id = "shulker_rhythm_carrier",
+            teleportIntervalTicks = 180L,
+            prioritizeBarrierMarkerOnFinalWave = false
+        ),
+        ShulkerBurstShotAbility(id = "shulker_rhythm_burst", cooldownTicks = 40L, burstCount = 3, burstIntervalTicks = 5L)
+    )
+)
+
+class ShulkerLaserMobType : EquipmentMobType(
+    id = "shulker_laser",
+    baseEntityType = EntityType.SHULKER,
+    abilities = listOf(
+        ShulkerCarrierArtilleryAbility(
+            id = "shulker_laser_carrier",
+            teleportIntervalTicks = 220L,
+            prioritizeBarrierMarkerOnFinalWave = false
+        ),
+        ShulkerBurstShotAbility(id = "shulker_laser_burst", cooldownTicks = 38L, burstCount = 3, burstIntervalTicks = 5L),
+        ShulkerEndRodLaserAbility(id = "shulker_laser_end_rod", burstCount = 3, burstIntervalTicks = 5L)
+    )
+)
+
+class ShulkerDisruptorMobType : EquipmentMobType(
+    id = "shulker_disruptor",
+    baseEntityType = EntityType.SHULKER,
+    abilities = listOf(
+        ShulkerCarrierArtilleryAbility(
+            id = "shulker_disruptor_carrier",
+            teleportIntervalTicks = 180L,
+            prioritizeBarrierMarkerOnFinalWave = true
+        ),
+        ShulkerBurstShotAbility(id = "shulker_disruptor_burst", cooldownTicks = 36L, burstCount = 3, burstIntervalTicks = 5L),
+        ShulkerEndRodLaserAbility(id = "shulker_disruptor_end_rod", burstCount = 2, burstIntervalTicks = 6L, cooldownTicks = 88L)
+    )
+)
+
+class EnderEyeHunterMobType : EquipmentMobType(
+    id = "ender_eye_hunter",
+    baseEntityType = EntityType.ALLAY,
+    abilities = listOf(
+        EnderEyeHunterAbility(id = "ender_eye_hunter_ai")
+    )
+)
+
+class EnderEyeOrbitMobType : EquipmentMobType(
+    id = "ender_eye_orbit",
+    baseEntityType = EntityType.ALLAY,
+    abilities = listOf(
+        EnderEyeHunterAbility(
+            id = "ender_eye_orbit_ai",
+            orbitRadius = 5.0,
+            orbitHeightOffset = 2.0,
+            shotCooldownTicks = 54L
         )
     )
 )

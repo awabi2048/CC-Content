@@ -16,6 +16,7 @@ import org.bukkit.event.entity.EntityTransformEvent
 import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.event.entity.SlimeSplitEvent
+import org.bukkit.event.entity.EntityTeleportEvent
 
 class MobEventListener(private val mobService: MobService) : Listener {
 
@@ -120,5 +121,10 @@ class MobEventListener(private val mobService: MobService) : Listener {
     @EventHandler(ignoreCancelled = true)
     fun onEntityTransform(event: EntityTransformEvent) {
         mobService.handleEntityTransform(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityTeleport(event: EntityTeleportEvent) {
+        mobService.handleEntityTeleport(event)
     }
 }

@@ -1077,6 +1077,7 @@ custom_items:
         - '§7アリーナロビーで報酬と交換しよう！'
       token_names:
         zombie: 'ゾンビの頭'
+        creeper: 'クリーパーの火薬袋'
         skeleton: 'スケルトンの頭'
         wither_skeleton: 'ウィザースケルトンの骨のかけら'
         husk: 'ハスクのかたびら'
@@ -1094,6 +1095,8 @@ custom_items:
         stray: '凍てついたガイコツ'
         bat: '大コウモリの皮膜'
         allay: '水精の欠片'
+        enderman: 'エンダーマンの残滓'
+        shulker: 'シュルカーの殻'
         spirit: '精霊の涙'
         frog: '大カエルの肝'
     theme:
@@ -1107,6 +1110,8 @@ custom_items:
       name: '繁茂した洞窟'
     nether:
       name: 'ネザー要塞'
+    end:
+      name: 'エンド'
   marker:
     current_mode: '&f§l| §7現在のモード §a{mode}'
     mode_changed: '&7設置モードを §a{mode} §7に変更しました。'
@@ -1380,6 +1385,8 @@ custom_items:
         name: '樹海'
       maze:
         name: '立体迷宮'
+      end:
+        name: 'エンド'
   brewery:
     sample_filter:
       name: '§e蒸留フィルター（試作）'

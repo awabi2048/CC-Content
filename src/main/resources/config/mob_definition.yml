@@ -534,3 +534,66 @@ bat_venom:
   attack: 5.0
   movement_speed: 0.30
   armor: 5.0
+
+enderman_phase:
+  type: enderman_phase
+  health: 42.0
+  attack: 6.0
+  movement_speed: 0.27
+  armor: 4.0
+
+enderman_drain:
+  type: enderman_drain
+  health: 46.0
+  attack: 6.5
+  movement_speed: 0.27
+  armor: 4.5
+
+enderman_mirror:
+  type: enderman_mirror
+  health: 44.0
+  attack: 6.2
+  movement_speed: 0.28
+  armor: 4.2
+
+enderman_eye_summoner:
+  type: enderman_eye_summoner
+  health: 52.0
+  attack: 6.0
+  movement_speed: 0.25
+  armor: 5.0
+
+shulker_rhythm:
+  type: shulker_rhythm
+  health: 34.0
+  attack: 5.4
+  movement_speed: 0.22
+  armor: 6.0
+
+shulker_laser:
+  type: shulker_laser
+  health: 38.0
+  attack: 5.8
+  movement_speed: 0.21
+  armor: 7.0
+
+shulker_disruptor:
+  type: shulker_disruptor
+  health: 40.0
+  attack: 6.2
+  movement_speed: 0.21
+  armor: 7.5
+
+ender_eye_hunter:
+  type: ender_eye_hunter
+  health: 24.0
+  attack: 4.5
+  movement_speed: 0.28
+  armor: 2.0
+
+ender_eye_orbit:
+  type: ender_eye_orbit
+  health: 26.0
+  attack: 4.8
+  movement_speed: 0.29
+  armor: 2.5
