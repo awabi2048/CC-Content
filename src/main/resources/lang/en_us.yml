@@ -519,6 +519,7 @@ custom_items:
       modes:
         mob: '&cMob'
         entrance: '&aEntrance'
+        checkpoint: '&aCheckpoint'
         join_area: '&fJoin Area'
         lobby: '&bLobby'
         lift: '&dLift'

@@ -1150,6 +1150,7 @@ custom_items:
     modes:
       mob: '&cモブ'
       entrance: '&a入口'
+      checkpoint: '&aチェックポイント'
       join_area: '&f参加エリア'
       lobby: '&bロビー'
       lift: '&dリフト'
@@ -1466,6 +1467,7 @@ arena:
     modes:
       mob: '&cモブ'
       entrance: '&a入口'
+      checkpoint: '&aチェックポイント'
       join_area: '&f参加エリア'
       lobby: '&bロビー'
       lift: '&dリフト'

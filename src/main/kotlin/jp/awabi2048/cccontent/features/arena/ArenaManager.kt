@@ -791,10 +791,14 @@ class ArenaManager(
             originalGameModes = originalGameModes,
             playerSpawn = placeholderLocation.clone(),
             entranceLocation = placeholderLocation.clone(),
+            entranceCheckpoint = placeholderLocation.clone(),
+            goalCheckpoint = placeholderLocation.clone(),
             stageBounds = placeholderBounds,
             roomBounds = mutableMapOf(),
             corridorBounds = mutableMapOf(),
             roomMobSpawns = mutableMapOf(),
+            roomCheckpoints = mutableMapOf(),
+            activatedRoomCheckpoints = mutableMapOf(),
             corridorDoorBlocks = mutableMapOf(),
             doorAnimationPlacements = mutableMapOf(),
             barrierLocation = placeholderLocation.clone(),
@@ -1072,6 +1076,8 @@ class ArenaManager(
     private fun applyStageBuildResult(session: ArenaSession, stage: jp.awabi2048.cccontent.features.arena.generator.ArenaStageBuildResult) {
         session.playerSpawn = stage.playerSpawn.clone()
         session.entranceLocation = stage.entranceLocation.clone()
+        session.entranceCheckpoint = stage.entranceCheckpoint.clone()
+        session.goalCheckpoint = stage.goalCheckpoint.clone()
         session.stageBounds = stage.stageBounds
         session.roomBounds.clear()
         session.roomBounds.putAll(stage.roomBounds)
@@ -1079,6 +1085,9 @@ class ArenaManager(
         session.corridorBounds.putAll(stage.corridorBounds)
         session.roomMobSpawns.clear()
         session.roomMobSpawns.putAll(stage.roomMobSpawns)
+        session.roomCheckpoints.clear()
+        session.roomCheckpoints.putAll(stage.roomCheckpoints.mapValues { (_, checkpoint) -> checkpoint.clone() })
+        session.activatedRoomCheckpoints.clear()
         session.corridorDoorBlocks.clear()
         session.corridorDoorBlocks.putAll(stage.corridorDoorBlocks)
         session.doorAnimationPlacements.clear()
@@ -1183,7 +1192,7 @@ class ArenaManager(
 
                 val currentWave = session.currentWave.coerceAtLeast(1)
                 if (location.world?.name != world.name || !session.stageBounds.contains(location.x, location.y, location.z)) {
-                    teleportToLatestDoorMarker(player, session, world, currentWave)
+                    teleportOnOutOfBounds(player, session, world, currentWave)
                     continue
                 }
 
@@ -3335,6 +3344,68 @@ class ArenaManager(
         player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 15, 0, false, false, false))
     }
 
+    private enum class OutOfBoundsOrigin {
+        ENTRANCE,
+        ROOM,
+        CORRIDOR,
+        GOAL,
+        UNKNOWN
+    }
+
+    private fun teleportOnOutOfBounds(player: Player, session: ArenaSession, world: World, currentWave: Int) {
+        val origin = resolveOutOfBoundsOrigin(session, player)
+        val destination = resolveOutOfBoundsCheckpoint(session, world, origin)
+        if (destination == null) {
+            teleportToLatestDoorMarker(player, session, world, currentWave)
+            return
+        }
+        destination.yaw = player.location.yaw
+        destination.pitch = player.location.pitch
+        player.teleport(destination)
+        player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 15, 0, false, false, false))
+    }
+
+    private fun resolveOutOfBoundsOrigin(session: ArenaSession, player: Player): OutOfBoundsOrigin {
+        val latestValidLocation = session.participantLocationHistory[player.uniqueId]
+            ?.lastOrNull()
+            ?.location
+            ?: return OutOfBoundsOrigin.UNKNOWN
+
+        val corridorWave = locateCorridorTargetWave(session, latestValidLocation)
+        if (corridorWave != null) {
+            return OutOfBoundsOrigin.CORRIDOR
+        }
+
+        val room = locateRoom(session, latestValidLocation) ?: return OutOfBoundsOrigin.UNKNOWN
+        return when {
+            room <= 0 -> OutOfBoundsOrigin.ENTRANCE
+            room >= session.waves -> OutOfBoundsOrigin.GOAL
+            else -> OutOfBoundsOrigin.ROOM
+        }
+    }
+
+    private fun resolveOutOfBoundsCheckpoint(
+        session: ArenaSession,
+        world: World,
+        origin: OutOfBoundsOrigin
+    ): Location? {
+        return when (origin) {
+            OutOfBoundsOrigin.ENTRANCE -> session.entranceCheckpoint.clone().apply { this.world = world }
+            OutOfBoundsOrigin.GOAL -> session.goalCheckpoint.clone().apply { this.world = world }
+            OutOfBoundsOrigin.CORRIDOR,
+            OutOfBoundsOrigin.ROOM -> resolveLatestRoomCheckpoint(session, world)
+                ?: session.entranceCheckpoint.clone().apply { this.world = world }
+            OutOfBoundsOrigin.UNKNOWN -> resolveLatestRoomCheckpoint(session, world)
+                ?: session.entranceCheckpoint.clone().apply { this.world = world }
+        }
+    }
+
+    private fun resolveLatestRoomCheckpoint(session: ArenaSession, world: World): Location? {
+        val latestWave = latestEnteredWave(session) ?: return null
+        val checkpoint = session.activatedRoomCheckpoints[latestWave] ?: return null
+        return checkpoint.clone().apply { this.world = world }
+    }
+
     private fun teleportToRecentValidPosition(
         player: Player,
         session: ArenaSession,
@@ -3457,6 +3528,9 @@ class ArenaManager(
 
         val now = System.currentTimeMillis()
         session.waveEnteredAtMillis[wave] = now
+        session.roomCheckpoints[wave]?.let { checkpoint ->
+            session.activatedRoomCheckpoints[wave] = checkpoint.clone()
+        }
 
         val catchupTargets = findPlayersInPreviousWaveOrEarlierRooms(session, wave, excludePlayerId = entrant.uniqueId)
         catchupTargets.forEach { target ->
