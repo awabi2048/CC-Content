@@ -1,5 +1,6 @@
 # テーマIDごとに向きを定義します。
 # theme_id:
+#   weight: 5
 #   icon: STONE
 #   max_summon_count: 10
 #   clear_mob_count: 20
@@ -22,6 +23,7 @@
 #     goal_entry: north
 
 ruins:
+  weight: 5
   base_difficulty_star: 1
   icon: STONE
   max_summon_count: 10
@@ -78,6 +80,7 @@ ruins:
     goal_entry: west
 
 desert_temple:
+  weight: 5
   base_difficulty_star: 1
   icon: CHISELED_SANDSTONE
   max_summon_count: 10
@@ -158,6 +161,7 @@ desert_temple:
     goal_entry: east
 
 ocean_monument:
+  weight: 4
   base_difficulty_star: 2
   icon: PRISMARINE_BRICKS
   max_summon_count: 10
@@ -204,6 +208,7 @@ ocean_monument:
     goal_entry: west
 
 natura:
+  weight: 4
   base_difficulty_star: 2
   icon: MOSSY_COBBLESTONE
   max_summon_count: 10
@@ -302,6 +307,7 @@ natura:
     goal_entry: west
 
 nether:
+  weight: 1
   base_difficulty_star: 3
   icon: NETHER_BRICKS
   max_summon_count: 10
@@ -352,6 +358,7 @@ nether:
     goal_entry: west
 
 end:
+  weight: 1
   base_difficulty_star: 3
   icon: END_STONE
   max_summon_count: 10

@@ -15,6 +15,7 @@ data class ArenaTheme(
     val id: String,
     val path: String,
     val iconMaterial: Material,
+    val weight: Int,
     val baseDifficultyStar: Int,
     val mobSpawnConfig: ArenaThemeMobSpawnConfig,
     val doorOpenSound: ArenaThemeDoorOpenSound,
@@ -99,6 +100,7 @@ enum class ArenaStructureType(val keyword: String, val supportsAnimation: Boolea
 class ArenaThemeLoader(private val plugin: JavaPlugin) {
     private data class ParsedThemeConfig(
         val iconMaterial: Material,
+        val weight: Int,
         val baseDifficultyStar: Int,
         val mobSpawnConfig: ArenaThemeMobSpawnConfig,
         val doorOpenSound: ArenaThemeDoorOpenSound,
@@ -215,6 +217,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 id = themeId,
                 path = folder.name,
                 iconMaterial = parsedThemeConfig.iconMaterial,
+                weight = parsedThemeConfig.weight,
                 baseDifficultyStar = parsedThemeConfig.baseDifficultyStar,
                 mobSpawnConfig = parsedThemeConfig.mobSpawnConfig,
                 doorOpenSound = parsedThemeConfig.doorOpenSound,
@@ -259,6 +262,15 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
         val baseDifficultyStar = section.getInt("base_difficulty_star", -1)
         if (baseDifficultyStar < 1 || baseDifficultyStar > 4) {
             throw IllegalStateException("[Arena] theme.yml の base_difficulty_star は1〜4である必要があります: theme=$themeId base_difficulty_star=$baseDifficultyStar")
+        }
+
+        val weight = if (section.contains("weight")) {
+            section.getInt("weight", 1)
+        } else {
+            1
+        }
+        if (weight <= 0) {
+            throw IllegalStateException("[Arena] theme.yml の weight は1以上である必要があります: theme=$themeId weight=$weight")
         }
 
         val iconName = (section.getString("icon") ?: Material.PAPER.name).trim()
@@ -380,6 +392,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
 
         return ParsedThemeConfig(
             iconMaterial = iconMaterial,
+            weight = weight,
             baseDifficultyStar = baseDifficultyStar,
             mobSpawnConfig = ArenaThemeMobSpawnConfig(
                 maxSummonCount = maxSummonCount,
