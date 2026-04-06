@@ -7,6 +7,7 @@ import jp.awabi2048.cccontent.features.arena.ArenaStartResult
 import jp.awabi2048.cccontent.features.arena.event.ArenaDailyMissionGeneratedEvent
 import jp.awabi2048.cccontent.features.arena.event.ArenaMissionStartRequestEvent
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
+import jp.awabi2048.cccontent.features.arena.generator.ArenaTheme
 import jp.awabi2048.cccontent.util.OageMessageSender
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -469,15 +470,23 @@ class ArenaMissionService(
     }
 
     private fun generateMissionSet(dateKey: String): ArenaDailyMissionSet {
-        val themeIds = arenaManager.getThemeIds().map { it.trim() }.filter { it.isNotBlank() }.sorted()
+        val weightedThemes = arenaManager.getThemeIds()
+            .mapNotNull { themeId ->
+                val theme = arenaManager.getTheme(themeId) ?: return@mapNotNull null
+                if (theme.weight <= 0) return@mapNotNull null
+                theme
+            }
+        if (weightedThemes.isEmpty()) {
+            throw IllegalStateException("有効なテーマが0件のためミッションを生成できません")
+        }
         val random = Random(dateKey.toEpochSeed())
         val promotionProbability = loadPromotionProbability()
 
         val missions = (0 until generateCount).map { index ->
-            val themeId = themeIds.random(random)
+            val theme = selectWeightedTheme(weightedThemes, random)
+            val themeId = theme.id
             val missionType = ArenaMissionType.BARRIER_RESTART
-            val theme = arenaManager.getTheme(themeId)
-            val baseStar = theme?.baseDifficultyStar ?: 1
+            val baseStar = theme.baseDifficultyStar
             val promotedStar = if (random.nextDouble() < promotionProbability) baseStar + 1 else baseStar
             val difficultyId = "star_$promotedStar"
 
@@ -609,6 +618,22 @@ class ArenaMissionService(
         if (maxParticipants !in 1..6) {
             throw IllegalStateException("max_participants が不正です: $maxParticipants")
         }
+    }
+
+    private fun selectWeightedTheme(themes: List<ArenaTheme>, random: Random): ArenaTheme {
+        val totalWeight = themes.sumOf { it.weight.coerceAtLeast(0) }
+        if (totalWeight <= 0) {
+            throw IllegalStateException("有効なテーマweightがありません")
+        }
+
+        var roll = random.nextInt(totalWeight)
+        for (theme in themes) {
+            roll -= theme.weight
+            if (roll < 0) {
+                return theme
+            }
+        }
+        return themes.last()
     }
 
     private fun ensureMissionSet(dateKey: String): ArenaDailyMissionSet {
