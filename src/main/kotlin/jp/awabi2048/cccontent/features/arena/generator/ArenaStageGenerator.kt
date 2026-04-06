@@ -70,10 +70,13 @@ class ArenaStageBuildException(
 data class ArenaStageBuildResult(
     val playerSpawn: Location,
     val entranceLocation: Location,
+    val entranceCheckpoint: Location,
     val stageBounds: ArenaBounds,
     val roomBounds: Map<Int, ArenaBounds>,
     val corridorBounds: Map<Int, ArenaBounds>,
     val roomMobSpawns: Map<Int, List<Location>>,
+    val roomCheckpoints: Map<Int, Location>,
+    val goalCheckpoint: Location,
     val corridorDoorBlocks: Map<Int, List<Location>>,
     val doorAnimationPlacements: Map<Int, List<ArenaDoorAnimationPlacement>>,
     val barrierLocation: Location,
@@ -125,8 +128,11 @@ class ArenaStageGenerator {
         val roomBounds: MutableMap<Int, ArenaBounds> = mutableMapOf(),
         val corridorBounds: MutableMap<Int, ArenaBounds> = mutableMapOf(),
         val roomMobSpawns: MutableMap<Int, List<Location>> = mutableMapOf(),
+        val roomCheckpoints: MutableMap<Int, Location> = mutableMapOf(),
         val corridorDoorBlocks: MutableMap<Int, List<Location>> = mutableMapOf(),
         var entranceLocation: Location? = null,
+        var entranceCheckpoint: Location? = null,
+        var goalCheckpoint: Location? = null,
         var barrierLocation: Location? = null,
         var barrierPointLocations: List<Location> = emptyList(),
         var doorAnimationPlacements: Map<Int, List<ArenaDoorAnimationPlacement>> = emptyMap(),
@@ -340,6 +346,42 @@ class ArenaStageGenerator {
             }
         }
 
+        when (roomPlacement.structureType) {
+            ArenaStructureType.ENTRANCE,
+            ArenaStructureType.STRAIGHT,
+            ArenaStructureType.GOAL -> {
+                val checkpointReason = validateSingleRequiredMarker(markers.checkpoints, "arena.marker.checkpoint")
+                if (checkpointReason != null) {
+                    job.validationIssues.add(
+                        ArenaStageValidationIssue(
+                            structureName = templateName,
+                            missingMarkers = listOf(checkpointReason)
+                        )
+                    )
+                } else {
+                    val checkpoint = markers.checkpoints.first()
+                    when (roomPlacement.structureType) {
+                        ArenaStructureType.ENTRANCE -> {
+                            job.entranceCheckpoint = checkpoint
+                        }
+                        ArenaStructureType.STRAIGHT -> {
+                            job.roomCheckpoints[roomIndex] = checkpoint
+                        }
+                        ArenaStructureType.GOAL -> {
+                            job.goalCheckpoint = checkpoint
+                            job.roomCheckpoints[roomIndex] = checkpoint
+                        }
+                        else -> {
+                            // no-op
+                        }
+                    }
+                }
+            }
+            else -> {
+                // CORRIDOR/CORNER では checkpoint を必須化しない
+            }
+        }
+
         val targetWave = when (roomPlacement.structureType) {
             ArenaStructureType.ENTRANCE -> 1
             ArenaStructureType.STRAIGHT -> roomIndex + 1
@@ -375,9 +417,10 @@ class ArenaStageGenerator {
             return
         }
 
+        val bounds = job.placementBoundsByIndex[corridorPlacement.index]
+
         val targetWave = (corridorPlacement.index + 1) / 2
         if (targetWave in 1..job.waves) {
-            val bounds = job.placementBoundsByIndex[corridorPlacement.index]
             if (bounds != null) {
                 job.corridorBounds[targetWave] = bounds
             }
@@ -414,15 +457,25 @@ class ArenaStageGenerator {
         }
 
         val firstRoomPlacement = roomPlacements.firstOrNull() ?: error("[Arena] 開始部屋が見つかりません")
-        val firstRoomBounds = job.placementBoundsByIndex[firstRoomPlacement.index]
-            ?: error("[Arena] 開始部屋の境界が見つかりません")
-        val firstRoomMarkers = findMarkers(job.world, firstRoomBounds)
-        val entranceLocation = firstRoomMarkers.entrance
-        if (entranceLocation == null) {
+        if (job.placementBoundsByIndex[firstRoomPlacement.index] == null) {
+            error("[Arena] 開始部屋の境界が見つかりません")
+        }
+        val entranceCheckpoint = job.entranceCheckpoint
+        if (entranceCheckpoint == null) {
             job.validationIssues.add(
                 ArenaStageValidationIssue(
                     structureName = job.selectedByPlacementIndex[firstRoomPlacement.index]?.baseTemplate?.name ?: "unknown",
-                    missingMarkers = listOf("arena.marker.entrance")
+                    missingMarkers = listOf("arena.marker.checkpoint")
+                )
+            )
+        }
+
+        val goalCheckpoint = job.goalCheckpoint
+        if (job.waves > 0 && goalCheckpoint == null) {
+            job.validationIssues.add(
+                ArenaStageValidationIssue(
+                    structureName = job.selectedByPlacementIndex[finalRoomPlacement.index]?.baseTemplate?.name ?: "unknown",
+                    missingMarkers = listOf("arena.marker.checkpoint")
                 )
             )
         }
@@ -438,21 +491,28 @@ class ArenaStageGenerator {
             throw ArenaStageBuildException(job.validationIssues)
         }
 
-        val resolvedEntranceLocation = entranceLocation ?: error("[Arena] 開始部屋の entrance マーカーが見つかりません")
+        val resolvedEntranceCheckpoint = entranceCheckpoint ?: error("[Arena] 開始部屋の checkpoint マーカーが見つかりません")
+        val resolvedEntranceLocation = resolvedEntranceCheckpoint
+        val resolvedGoalCheckpoint = goalCheckpoint ?: resolvedEntranceCheckpoint
         val resolvedBarrierLocation = finalMarkers.barrierCores.firstOrNull()
             ?: error("[Arena] 最終部屋の barrier_core マーカーが見つかりません")
         val resolvedBarrierPoints = finalMarkers.barrierPoints
 
         job.entranceLocation = resolvedEntranceLocation
+        job.entranceCheckpoint = resolvedEntranceCheckpoint
+        job.goalCheckpoint = resolvedGoalCheckpoint
         job.barrierLocation = resolvedBarrierLocation
         job.barrierPointLocations = resolvedBarrierPoints
         job.result = ArenaStageBuildResult(
             playerSpawn = resolvedEntranceLocation.clone(),
             entranceLocation = resolvedEntranceLocation,
+            entranceCheckpoint = resolvedEntranceCheckpoint,
             stageBounds = job.stageBounds ?: error("[Arena] ステージ境界が見つかりません"),
             roomBounds = job.roomBounds,
             corridorBounds = job.corridorBounds,
             roomMobSpawns = job.roomMobSpawns,
+            roomCheckpoints = job.roomCheckpoints,
+            goalCheckpoint = resolvedGoalCheckpoint,
             corridorDoorBlocks = job.corridorDoorBlocks,
             doorAnimationPlacements = job.doorAnimationPlacements,
             barrierLocation = resolvedBarrierLocation,
@@ -1101,11 +1161,20 @@ class ArenaStageGenerator {
 
     private data class TileMarkers(
         val mobSpawns: List<Location>,
-        val entrance: Location?,
+        val checkpoints: List<Location>,
         val doorBlocks: List<Location>,
         val barrierCores: List<Location>,
         val barrierPoints: List<Location>
     )
+
+    private fun validateSingleRequiredMarker(markers: List<Location>, markerTag: String): String? {
+        if (markers.size == 1) return null
+        return if (markers.isEmpty()) {
+            markerTag
+        } else {
+            "$markerTag(single_required)"
+        }
+    }
 
     private fun findMarkers(world: World, bounds: ArenaBounds): TileMarkers {
         val minX = bounds.minX
@@ -1121,7 +1190,7 @@ class ArenaStageGenerator {
         val maxChunkZ = maxZ shr 4
 
         val mobs = mutableListOf<Location>()
-        var entrance: Location? = null
+        val checkpoints = mutableListOf<Location>()
         val doorBlocks = mutableListOf<Location>()
         val barrierCores = mutableListOf<Location>()
         val barrierPoints = mutableListOf<Location>()
@@ -1141,8 +1210,8 @@ class ArenaStageGenerator {
                         if (entity.scoreboardTags.contains("arena.marker.mob")) {
                             mobs.add(loc.clone())
                         }
-                        if (entity.scoreboardTags.contains("arena.marker.entrance")) {
-                            entrance = loc.clone()
+                        if (entity.scoreboardTags.contains("arena.marker.checkpoint")) {
+                            checkpoints.add(loc.clone())
                         }
                         if (entity.scoreboardTags.contains("arena.marker.door_block")) {
                             doorBlocks.add(loc.clone())
@@ -1158,7 +1227,7 @@ class ArenaStageGenerator {
             }
         }
 
-        return TileMarkers(mobs, entrance, doorBlocks, barrierCores, barrierPoints)
+        return TileMarkers(mobs, checkpoints, doorBlocks, barrierCores, barrierPoints)
     }
 
     private fun locationForTile(origin: Location, point: TilePoint, gridPitch: Int): Location {
