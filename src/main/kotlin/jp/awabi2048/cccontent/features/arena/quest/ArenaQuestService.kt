@@ -241,7 +241,6 @@ class ArenaQuestService(
                 player,
                 quest.difficultyId,
                 quest.themeId,
-                difficultyScore = quest.difficultyScore,
                 enableMultiplayerJoin = true,
                 inviteQuestTitle = inviteQuestTitle,
                 inviteQuestLore = inviteQuestLore,
@@ -350,13 +349,10 @@ class ArenaQuestService(
 
         for (difficultyId in config.getKeys(false)) {
             val section = config.getConfigurationSection(difficultyId) ?: continue
-            val range = parseDifficultyRange(section.getString("difficulty_range"))
-                ?: throw IllegalStateException("difficulty_range が不正です: $difficultyId")
             val display = section.getString("display", difficultyId) ?: difficultyId
             parsed.add(
                 ArenaDifficultyDefinition(
                     id = difficultyId,
-                    difficultyRange = range,
                     display = display
                 )
             )
@@ -364,22 +360,6 @@ class ArenaQuestService(
 
         if (parsed.isEmpty()) {
             throw IllegalStateException("difficulty.yml が空のためアリーナクエストを生成できません")
-        }
-
-        val sortedByRange = parsed.sortedWith(
-            compareBy<ArenaDifficultyDefinition> { it.difficultyRange.start }
-                .thenBy { it.difficultyRange.endInclusive }
-                .thenBy { it.id }
-        )
-
-        for (index in 1 until sortedByRange.size) {
-            val previous = sortedByRange[index - 1]
-            val current = sortedByRange[index]
-            if (current.difficultyRange.start <= previous.difficultyRange.endInclusive) {
-                throw IllegalStateException(
-                    "difficulty_range が重複しています: ${previous.id}=${previous.difficultyRange} / ${current.id}=${current.difficultyRange}"
-                )
-            }
         }
 
         difficultyDefinitions = parsed.sortedBy { it.id }
@@ -422,19 +402,24 @@ class ArenaQuestService(
     private fun generateQuestSet(dateKey: String): ArenaDailyQuestSet {
         val themeIds = arenaManager.getThemeIds().map { it.trim() }.filter { it.isNotBlank() }.sorted()
         val random = Random(dateKey.toEpochSeed())
+        val promotionProbability = loadPromotionProbability()
 
         val quests = (0 until generateCount).map { index ->
             val themeId = themeIds.random(random)
             val missionType = ArenaQuestMissionType.BARRIER_RESTART
-            val difficulty = difficultyDefinitions.random(random)
-            val score = randomDifficultyScore(difficulty, random)
-            val resolvedDifficultyId = resolveDifficultyId(score) ?: difficulty.id
+            val theme = arenaManager.getTheme(themeId)
+            val baseStar = theme?.baseDifficultyStar ?: 1
+            val promotedStar = if (random.nextDouble() < promotionProbability) baseStar + 1 else baseStar
+            val difficultyId = "star_$promotedStar"
+
+            if (!difficultyDisplayMap.containsKey(difficultyId)) {
+                throw IllegalStateException("上位難易度 $difficultyId が difficulty.yml に定義されていません")
+            }
 
             ArenaDailyQuestEntry(
                 index = index,
                 missionTypeId = missionType.id,
-                difficultyScore = score,
-                difficultyId = resolvedDifficultyId,
+                difficultyId = difficultyId,
                 themeId = themeId,
                 maxParticipants = 6
             )
@@ -447,17 +432,13 @@ class ArenaQuestService(
         )
     }
 
-    private fun randomDifficultyScore(definition: ArenaDifficultyDefinition, random: Random): Double {
-        val start = definition.difficultyRange.start
-        val end = definition.difficultyRange.endInclusive
-        if (end <= start) {
-            return start
+    private fun loadPromotionProbability(): Double {
+        val coreConfig = currentCoreConfig()
+        val value = coreConfig.getDouble("arena.quest.promotion_probability", -1.0)
+        if (value < 0.0 || value > 1.0) {
+            throw IllegalStateException("arena.quest.promotion_probability は0.0〜1.0である必要があります: $value")
         }
-        return start + (end - start) * random.nextDouble()
-    }
-
-    private fun resolveDifficultyId(score: Double): String? {
-        return difficultyDefinitions.firstOrNull { it.difficultyRange.contains(score) }?.id
+        return value
     }
 
     private fun saveQuestSet(questSet: ArenaDailyQuestSet) {
@@ -471,7 +452,6 @@ class ArenaQuestService(
                 linkedMapOf(
                     "index" to quest.index,
                     "mission_type_id" to quest.missionTypeId,
-                    "difficulty_score" to quest.difficultyScore,
                     "difficulty_id" to quest.difficultyId,
                     "theme_id" to quest.themeId,
                     "max_participants" to quest.maxParticipants
@@ -506,17 +486,15 @@ class ArenaQuestService(
         val quests = questMaps.mapNotNull { map ->
             val index = map["index"]?.toString()?.toIntOrNull() ?: return@mapNotNull null
             val missionTypeId = map["mission_type_id"]?.toString()?.trim().orEmpty()
-            val difficultyScore = map["difficulty_score"]?.toString()?.toDoubleOrNull() ?: return@mapNotNull null
             val difficultyId = map["difficulty_id"]?.toString()?.trim().orEmpty()
             val themeId = map["theme_id"]?.toString()?.trim().orEmpty()
             val maxParticipants = map["max_participants"]?.toString()?.toIntOrNull() ?: 6
 
-            validateStoredQuest(index, missionTypeId, difficultyScore, difficultyId, themeId, maxParticipants)
+            validateStoredQuest(index, missionTypeId, difficultyId, themeId, maxParticipants)
 
             ArenaDailyQuestEntry(
                 index = index,
                 missionTypeId = missionTypeId,
-                difficultyScore = difficultyScore,
                 difficultyId = difficultyId,
                 themeId = themeId,
                 maxParticipants = maxParticipants
@@ -539,7 +517,6 @@ class ArenaQuestService(
     private fun validateStoredQuest(
         index: Int,
         missionTypeId: String,
-        difficultyScore: Double,
         difficultyId: String,
         themeId: String,
         maxParticipants: Int
@@ -556,11 +533,8 @@ class ArenaQuestService(
             throw IllegalStateException("theme_id が不正です: $themeId")
         }
 
-        val difficulty = difficultyDefinitions.firstOrNull { it.id == difficultyId }
-            ?: throw IllegalStateException("difficulty_id が不正です: $difficultyId")
-
-        if (!difficulty.difficultyRange.contains(difficultyScore)) {
-            throw IllegalStateException("difficulty_score が範囲外です: id=$difficultyId score=$difficultyScore range=${difficulty.difficultyRange}")
+        if (!difficultyDisplayMap.containsKey(difficultyId)) {
+            throw IllegalStateException("difficulty_id が不正です: $difficultyId")
         }
 
         if (maxParticipants !in 1..6) {
@@ -867,16 +841,6 @@ class ArenaQuestService(
 
     private fun String.toEpochSeed(): Int {
         return LocalDate.parse(this, DATE_FORMATTER).toEpochDay().toInt()
-    }
-
-    private fun parseDifficultyRange(text: String?): ClosedFloatingPointRange<Double>? {
-        val raw = text?.trim().orEmpty()
-        val matched = Regex("^([0-9]+(?:\\.[0-9]+)?)\\.\\.([0-9]+(?:\\.[0-9]+)?)$").matchEntire(raw) ?: return null
-        val min = matched.groupValues[1].toDoubleOrNull() ?: return null
-        val max = matched.groupValues[2].toDoubleOrNull() ?: return null
-        if (min <= 0.0) return null
-        if (max < min) return null
-        return min..max
     }
 
 }

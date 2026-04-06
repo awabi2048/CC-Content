@@ -22,6 +22,7 @@
 #     goal_entry: north
 
 ruins:
+  base_difficulty_star: 1
   icon: STONE
   max_summon_count: 10
   clear_mob_count: 20
@@ -77,6 +78,7 @@ ruins:
     goal_entry: west
 
 desert_temple:
+  base_difficulty_star: 1
   icon: CHISELED_SANDSTONE
   max_summon_count: 10
   clear_mob_count: 20
@@ -156,6 +158,7 @@ desert_temple:
     goal_entry: east
 
 ocean_monument:
+  base_difficulty_star: 2
   icon: PRISMARINE_BRICKS
   max_summon_count: 10
   clear_mob_count: 20
@@ -201,6 +204,7 @@ ocean_monument:
     goal_entry: west
 
 natura:
+  base_difficulty_star: 2
   icon: MOSSY_COBBLESTONE
   max_summon_count: 10
   clear_mob_count: 20
@@ -298,6 +302,7 @@ natura:
     goal_entry: west
 
 nether:
+  base_difficulty_star: 3
   icon: NETHER_BRICKS
   max_summon_count: 10
   clear_mob_count: 20
@@ -347,6 +352,7 @@ nether:
     goal_entry: west
 
 end:
+  base_difficulty_star: 3
   icon: END_STONE
   max_summon_count: 10
   clear_mob_count: 20

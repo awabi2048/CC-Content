@@ -512,12 +512,12 @@ custom_items:
         theme_none: '&eNo themes are available'
         theme_list: '&6[Arena] Available themes: {themes}'
         usage:
-          start: '&cUsage: /arenaa start <player|@s> <mob_type> <difficulty> [theme]'
+          start: '&cUsage: /arenaa start <player|@s|@near> <star_count> <theme>'
           stop: '&cUsage: /arenaa stop <player>'
           theme: '&cUsage: /arenaa theme list'
         help:
           header: '&6=== Arena Admin Commands ==='
-          start: '&f/arenaa start <player|@s> <mob_type> <difficulty> [theme]'
+          start: '&f/arenaa start <player|@s|@near> <star_count> <theme>'
           stop: '&f/arenaa stop <player>'
           theme: '&f/arenaa theme list'
         start_error:

@@ -15,6 +15,7 @@ data class ArenaTheme(
     val id: String,
     val path: String,
     val iconMaterial: Material,
+    val baseDifficultyStar: Int,
     val mobSpawnConfig: ArenaThemeMobSpawnConfig,
     val doorOpenSound: ArenaThemeDoorOpenSound,
     val orientation: ArenaStructureOrientation,
@@ -98,6 +99,7 @@ enum class ArenaStructureType(val keyword: String, val supportsAnimation: Boolea
 class ArenaThemeLoader(private val plugin: JavaPlugin) {
     private data class ParsedThemeConfig(
         val iconMaterial: Material,
+        val baseDifficultyStar: Int,
         val mobSpawnConfig: ArenaThemeMobSpawnConfig,
         val doorOpenSound: ArenaThemeDoorOpenSound,
         val orientation: ArenaStructureOrientation
@@ -213,6 +215,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 id = themeId,
                 path = folder.name,
                 iconMaterial = parsedThemeConfig.iconMaterial,
+                baseDifficultyStar = parsedThemeConfig.baseDifficultyStar,
                 mobSpawnConfig = parsedThemeConfig.mobSpawnConfig,
                 doorOpenSound = parsedThemeConfig.doorOpenSound,
                 orientation = parsedThemeConfig.orientation,
@@ -248,6 +251,14 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             plugin.logger.warning(warning)
             warnings.add(warning)
             return null
+        }
+
+        if (!section.contains("base_difficulty_star")) {
+            throw IllegalStateException("[Arena] theme.yml の base_difficulty_star が未設定です: theme=$themeId")
+        }
+        val baseDifficultyStar = section.getInt("base_difficulty_star", -1)
+        if (baseDifficultyStar < 1 || baseDifficultyStar > 4) {
+            throw IllegalStateException("[Arena] theme.yml の base_difficulty_star は1〜4である必要があります: theme=$themeId base_difficulty_star=$baseDifficultyStar")
         }
 
         val iconName = (section.getString("icon") ?: Material.PAPER.name).trim()
@@ -369,6 +380,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
 
         return ParsedThemeConfig(
             iconMaterial = iconMaterial,
+            baseDifficultyStar = baseDifficultyStar,
             mobSpawnConfig = ArenaThemeMobSpawnConfig(
                 maxSummonCount = maxSummonCount,
                 clearMobCount = clearMobCount,

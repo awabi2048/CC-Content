@@ -140,7 +140,6 @@ private data class ArenaWorldCleanupJob(
 
 private data class ArenaDifficultyConfig(
     val id: String,
-    val difficultyRange: ClosedFloatingPointRange<Double>,
     val mobSpawnIntervalTicks: Long,
     val mobCountMultiplier: Double,
     val waveMultiplier: Double,
@@ -153,9 +152,6 @@ private data class ArenaDifficultyConfig(
     val mobStatsMaxMovementSpeed: Double,
     val mobStatsMaxArmor: Double
 ) {
-    val difficultyValue: Double
-        get() = (difficultyRange.start + difficultyRange.endInclusive) / 2.0
-
     fun waveScale(wave: Int): Double {
         return (1.0 + waveMultiplier * wave).coerceAtLeast(0.0)
     }
@@ -534,11 +530,6 @@ class ArenaManager(
                 continue
             }
 
-            val difficultyRange = parseDifficultyRange(section.getString("difficulty_range"))
-            if (difficultyRange == null) {
-                plugin.logger.severe("[Arena] difficulty.yml の difficulty_range が不正です: $difficultyId")
-                continue
-            }
             val mobSpawnIntervalTicks = section.getLong("mob_spawn_interval", 20L).coerceAtLeast(1L)
             val mobCountMultiplier = section.getDouble("mob_count_multiplier", 1.0).coerceAtLeast(0.01)
             val waveMultiplier = section.getDouble("wave_multiplier", 0.0)
@@ -554,7 +545,6 @@ class ArenaManager(
 
             loaded[difficultyId] = ArenaDifficultyConfig(
                 id = difficultyId,
-                difficultyRange = difficultyRange,
                 mobSpawnIntervalTicks = mobSpawnIntervalTicks,
                 mobCountMultiplier = mobCountMultiplier,
                 waveMultiplier = waveMultiplier,
@@ -646,23 +636,12 @@ class ArenaManager(
         return fixed to fixed
     }
 
-    private fun parseDifficultyRange(text: String?): ClosedFloatingPointRange<Double>? {
-        val raw = text?.trim().orEmpty()
-        val matched = Regex("^([0-9]+(?:\\.[0-9]+)?)\\.\\.([0-9]+(?:\\.[0-9]+)?)$").matchEntire(raw) ?: return null
-        val min = matched.groupValues[1].toDoubleOrNull() ?: return null
-        val max = matched.groupValues[2].toDoubleOrNull() ?: return null
-        if (min <= 0.0) return null
-        if (max < min) return null
-        return min..max
-    }
-
     fun startSession(
         target: Player,
         difficultyId: String,
-        requestedTheme: String?,
+        requestedTheme: String,
         initialParticipants: List<Player> = emptyList(),
         questModifiers: ArenaQuestModifiers = ArenaQuestModifiers.NONE,
-        difficultyScore: Double? = null,
         enableMultiplayerJoin: Boolean = false,
         inviteQuestTitle: String? = null,
         inviteQuestLore: List<String> = emptyList(),
@@ -703,14 +682,11 @@ class ArenaManager(
                 arrayOf("difficulty" to difficultyId)
             ))
 
-        val theme = if (requestedTheme.isNullOrBlank()) {
-            themeLoader.getRandomTheme(random)
-        } else {
-            themeLoader.getTheme(requestedTheme)
-        } ?: return completed(ArenaStartResult.Error(
-            "arena.messages.command.start_error.theme_not_found",
-            "&c有効なテーマが見つかりません"
-        ))
+        val theme = themeLoader.getTheme(requestedTheme)
+            ?: return completed(ArenaStartResult.Error(
+                "arena.messages.command.start_error.theme_not_found",
+                "&c有効なテーマが見つかりません"
+            ))
 
         val undefinedWave = (1..difficulty.waves).firstOrNull { wave ->
             selectSpawnCandidates(theme, wave).isEmpty()
@@ -781,8 +757,6 @@ class ArenaManager(
             worldName = world.name,
             themeId = theme.id,
             difficultyId = difficulty.id,
-            difficultyValue = difficulty.difficultyValue,
-            difficultyScore = difficultyScore ?: difficulty.difficultyValue,
             waves = difficulty.waves,
             questModifiers = questModifiers,
             maxParticipants = sanitizedMaxParticipants,
@@ -2884,7 +2858,7 @@ class ArenaManager(
                 worldName = session.worldName,
                 themeId = session.themeId,
                 difficultyId = session.difficultyId,
-                difficultyValue = session.difficultyValue,
+                starCount = session.difficultyId.removePrefix("star_").toIntOrNull() ?: 1,
                 waves = session.waves,
                 success = success
             )
@@ -3196,7 +3170,7 @@ class ArenaManager(
             return
         }
 
-        val clearTarget = calculateWaveCount(theme.mobSpawnConfig.clearMobCount, difficulty, wave, session.questModifiers.clearMobCountMultiplier)
+        val clearTarget = calculateWaveCount(theme.mobSpawnConfig.clearMobCount, difficulty, wave, session.questModifiers.clearMobCountMultiplier, session.sessionVariance)
 
         session.lastClearedWaveForBossBar = null
         session.startedWaves.add(wave)
@@ -3228,8 +3202,8 @@ class ArenaManager(
         location.pitch = 0.0f
     }
 
-    private fun calculateWaveCount(base: Int, difficulty: ArenaDifficultyConfig, wave: Int, questMultiplier: Double): Int {
-        val scaled = base * difficulty.mobCountMultiplier * difficulty.waveScale(wave) * questMultiplier
+    private fun calculateWaveCount(base: Int, difficulty: ArenaDifficultyConfig, wave: Int, questMultiplier: Double, sessionVariance: Double = 1.0): Int {
+        val scaled = base * difficulty.mobCountMultiplier * difficulty.waveScale(wave) * questMultiplier * sessionVariance
         return ceil(scaled).toInt().coerceAtLeast(1)
     }
 
@@ -3241,7 +3215,7 @@ class ArenaManager(
         spawns: List<Location>,
         intervalScale: Double = 1.0
     ) {
-        val interval = (difficulty.mobSpawnIntervalTicks * session.questModifiers.spawnIntervalMultiplier * intervalScale)
+        val interval = (difficulty.mobSpawnIntervalTicks * session.sessionVariance * session.questModifiers.spawnIntervalMultiplier * intervalScale)
             .roundToLong()
             .coerceAtLeast(1L)
         val task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
@@ -3759,7 +3733,7 @@ class ArenaManager(
         enforceAdultMob(entity)
         spawnMobAppearParticles(world, entity.location)
 
-        applyMobStats(entity, definition, difficulty, session.difficultyValue, session.questModifiers)
+        applyMobStats(entity, definition, difficulty, session.sessionVariance, session.questModifiers)
 
         if (entity is Mob) {
             entity.target = findNearestParticipant(session, entity.location)
@@ -3777,16 +3751,15 @@ class ArenaManager(
         entity: LivingEntity,
         definition: MobDefinition,
         difficulty: ArenaDifficultyConfig,
-        difficultyValue: Double,
+        sessionVariance: Double,
         questModifiers: ArenaQuestModifiers
     ) {
-        val progress = difficultyProgress(difficulty.difficultyRange, difficultyValue)
-        val maxHealth = (interpolate(definition.health, difficulty.mobStatsMaxHealth, progress) * questModifiers.mobHealthMultiplier)
+        val maxHealth = (difficulty.mobStatsMaxHealth * sessionVariance * questModifiers.mobHealthMultiplier)
             .coerceAtLeast(1.0)
-        val attack = (interpolate(definition.attack, difficulty.mobStatsMaxAttack, progress) * questModifiers.mobAttackMultiplier)
+        val attack = (difficulty.mobStatsMaxAttack * sessionVariance * questModifiers.mobAttackMultiplier)
             .coerceAtLeast(0.0)
-        val speed = interpolate(definition.movementSpeed, difficulty.mobStatsMaxMovementSpeed, progress).coerceAtLeast(0.01)
-        val armor = interpolate(definition.armor, difficulty.mobStatsMaxArmor, progress).coerceAtLeast(0.0)
+        val speed = difficulty.mobStatsMaxMovementSpeed.coerceAtLeast(0.01)
+        val armor = (difficulty.mobStatsMaxArmor * sessionVariance).coerceAtLeast(0.0)
 
         entity.getAttribute(Attribute.MAX_HEALTH)?.baseValue = maxHealth
         entity.getAttribute(Attribute.ATTACK_DAMAGE)?.baseValue = attack
@@ -3833,16 +3806,6 @@ class ArenaManager(
     private fun spawnMobAppearParticles(world: World, location: Location) {
         world.spawnParticle(Particle.WITCH, location, 10, 1.0, 1.0, 1.0, 0.0)
         world.spawnParticle(Particle.SMOKE, location, 10, 1.0, 1.0, 1.0, 0.0)
-    }
-
-    private fun interpolate(base: Double, maximum: Double, progress: Double): Double {
-        return base + (maximum - base) * progress.coerceIn(0.0, 1.0)
-    }
-
-    private fun difficultyProgress(range: ClosedFloatingPointRange<Double>, difficultyValue: Double): Double {
-        val width = range.endInclusive - range.start
-        if (width <= 0.0) return 1.0
-        return ((difficultyValue - range.start) / width).coerceIn(0.0, 1.0)
     }
 
     private fun consumeMob(session: ArenaSession, mobId: UUID, countKill: Boolean) {
@@ -4070,7 +4033,8 @@ class ArenaManager(
             theme.mobSpawnConfig.maxSummonCount,
             difficulty,
             session.waves,
-            session.questModifiers.maxSummonCountMultiplier
+            session.questModifiers.maxSummonCountMultiplier,
+            session.sessionVariance
         )
         return minOf(sharedWaveMaxAlive, calculated).coerceAtLeast(1)
     }
@@ -4243,7 +4207,7 @@ class ArenaManager(
         if (session.barrierRestarting) return
 
         val world = Bukkit.getWorld(session.worldName) ?: return
-        val durationMillis = ((barrierRestartConfig.defaultDurationSeconds * session.difficultyScore) * 1000.0)
+        val durationMillis = ((barrierRestartConfig.defaultDurationSeconds * session.sessionVariance) * 1000.0)
             .roundToLong()
             .coerceAtLeast(1000L)
 
@@ -4459,7 +4423,7 @@ class ArenaManager(
         val spawnPoints = session.roomMobSpawns[session.waves].orEmpty()
         if (spawnPoints.isEmpty()) return
 
-        val normalInterval = (difficulty.mobSpawnIntervalTicks * session.questModifiers.spawnIntervalMultiplier)
+        val normalInterval = (difficulty.mobSpawnIntervalTicks * session.sessionVariance * session.questModifiers.spawnIntervalMultiplier)
             .roundToLong()
             .coerceAtLeast(1L)
         val interval = (normalInterval / 2.0).roundToLong().coerceAtLeast(1L)
@@ -4468,7 +4432,8 @@ class ArenaManager(
             theme.mobSpawnConfig.maxSummonCount,
             difficulty,
             session.waves,
-            session.questModifiers.maxSummonCountMultiplier
+            session.questModifiers.maxSummonCountMultiplier,
+            session.sessionVariance
         )
         val defenseMaxAlive = if (normalMaxAlive <= 1) 1 else (normalMaxAlive / 2.0).roundToInt().coerceIn(1, normalMaxAlive - 1)
 
@@ -4561,7 +4526,7 @@ class ArenaManager(
         entity.removeWhenFarAway = false
         entity.canPickupItems = false
         enforceAdultMob(entity)
-        applyMobStats(entity, definition, difficulty, session.difficultyValue, session.questModifiers)
+        applyMobStats(entity, definition, difficulty, session.sessionVariance, session.questModifiers)
         spawnMobAppearParticles(spawnPoint.world ?: return, spawnPoint)
         val isTargetingBarrier = random.nextDouble() < BARRIER_DEFENSE_TARGET_RATIO
         if (isTargetingBarrier) {
