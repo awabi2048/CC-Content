@@ -56,6 +56,7 @@ import jp.awabi2048.cccontent.mob.type.SkeletonNormalMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonRapidShotMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonShieldMobType
 import jp.awabi2048.cccontent.mob.type.SkeletonWeaponThrowCloseMobType
+import jp.awabi2048.cccontent.mob.type.RaidenCreeperMobType
 import jp.awabi2048.cccontent.mob.type.SpiderBroodlingMobType
 import jp.awabi2048.cccontent.mob.type.SpiderBroodmotherMobType
 import jp.awabi2048.cccontent.mob.type.SpiderFerociousMobType
@@ -238,6 +239,7 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(HuskBowSwapMobType())
         registerMobType(HuskShieldOnlyMobType())
         registerMobType(HuskWeakeningAuraMobType())
+        registerMobType(RaidenCreeperMobType())
         registerMobType(SkeletonNormalMobType())
         registerMobType(SkeletonPlainMobType())
         registerMobType(SkeletonFastArrowMobType())

@@ -1,6 +1,8 @@
 package jp.awabi2048.cccontent.mob.type
 
+import com.destroystokyo.paper.entity.ai.VanillaGoal
 import jp.awabi2048.cccontent.mob.CustomMobRuntime
+import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import jp.awabi2048.cccontent.mob.MobSpawnContext
 import jp.awabi2048.cccontent.mob.ability.AreaEffectPulseAbility
 import jp.awabi2048.cccontent.mob.ability.ArmorMagnetPullAbility
@@ -15,6 +17,7 @@ import jp.awabi2048.cccontent.mob.ability.DrownedAquaticPursuitAbility
 import jp.awabi2048.cccontent.mob.ability.GenericBeamAbility
 import jp.awabi2048.cccontent.mob.ability.GuardianBeamAbility
 import jp.awabi2048.cccontent.mob.ability.LeapAbility
+import jp.awabi2048.cccontent.mob.ability.LightningBranchAbility
 import jp.awabi2048.cccontent.mob.ability.LinearProjectileAbility
 import jp.awabi2048.cccontent.mob.ability.MeleeKnockbackBoostAbility
 import jp.awabi2048.cccontent.mob.ability.MobShootUtil
@@ -43,12 +46,14 @@ import jp.awabi2048.cccontent.mob.ability.MagmaLandingBurstAbility
 import jp.awabi2048.cccontent.mob.ability.MagmaStageDeathAbility
 import jp.awabi2048.cccontent.mob.ability.TriFlameShotAbility
 import jp.awabi2048.cccontent.mob.ability.WitherBoomerangAbility
+import org.bukkit.Bukkit
 import org.bukkit.Color
 import org.bukkit.Particle
 import org.bukkit.Sound
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.Material
 import org.bukkit.entity.EntityType
+import org.bukkit.entity.Creeper
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.potion.PotionEffect
@@ -187,6 +192,44 @@ class HuskWeakeningAuraMobType : EquipmentMobType(
     defaultMainHand = Material.STONE_SWORD,
     defaultHelmet = Material.CHAINMAIL_HELMET
 )
+
+class RaidenCreeperMobType : EquipmentMobType(
+    id = "creeper_raiden",
+    baseEntityType = EntityType.CREEPER,
+    abilities = listOf(
+        LightningBranchAbility(
+            id = "creeper_raiden_lightning",
+            boltCount = 4,
+            damagedBoltCount = 8,
+            cooldownTicks = 20L,
+            minRange = 0.0,
+            maxRange = 5.0,
+            preCastTicks = 6L,
+            postCastFreezeTicks = 6L,
+            branchProbability = 0.35,
+            branchLengthDecay = 0.65,
+            damageMultiplier = 2.0
+        )
+    )
+) {
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val creeper = context.entity as? Creeper ?: return
+        Bukkit.getMobGoals().removeGoal(creeper, VanillaGoal.CREEPER_SWELL)
+        creeper.isPowered = true
+        creeper.explosionRadius = 0
+        creeper.maxFuseTicks = Int.MAX_VALUE
+        creeper.fuseTicks = 0
+        creeper.isIgnited = false
+    }
+
+    override fun onTick(context: MobRuntimeContext, runtime: CustomMobRuntime?) {
+        super.onTick(context, runtime)
+        val creeper = context.entity as? Creeper ?: return
+        creeper.fuseTicks = 0
+        creeper.isIgnited = false
+    }
+}
 
 class IronGolemNormalMobType : EquipmentMobType(
     id = "iron_golem_normal",

@@ -104,6 +104,13 @@ husk_weakening_aura:
   movement_speed: 0.24
   armor: 3.0
 
+raiden_creeper:
+  type: creeper_raiden
+  health: 30.0
+  attack: 6.0
+  movement_speed: 0.27
+  armor: 2.0
+
 skeleton_plain:
   type: skeleton_plain
   health: 15.0
