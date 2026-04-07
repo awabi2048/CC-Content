@@ -257,7 +257,7 @@ class ArenaManager(
         const val MOB_TOKEN_DROP_CHANCE = 0.30
         const val MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT = 0.033
         const val FINAL_WAVE_TIME_LIMIT_SECONDS_DEFAULT = 600
-        const val STAGE_TRANSFER_BLINDNESS_TICKS = 20
+        const val STAGE_TRANSFER_BLINDNESS_TICKS = 60
         const val BARRIER_RETURN_HOLD_TICKS = 60
         const val MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT = 45
         const val MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT = 16.0
@@ -265,6 +265,8 @@ class ArenaManager(
         const val WAVE_START_COMBAT_BGM_DELAY_TICKS = 0L
         const val ENTRANCE_BGM_START_DELAY_TICKS = 30L
         const val MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS = 5L
+        const val MULTIPLAYER_WAITING_EXIT_GRACE_TICKS = 10
+        const val MULTIPLAYER_LIFT_AREA_MARGIN = 0.15
         const val OAGE_FOLLOWUP_DELAY_TICKS = 60L
         const val OAGE_COMBAT_MONITOR_INTERVAL_TICKS = 1200L
         const val WAVE_CATCHUP_TELEPORT_DELAY_MILLIS = 30_000L
@@ -280,8 +282,8 @@ class ArenaManager(
         const val ARENA_SIDEBAR_MAX_LINES = 15
         const val ENTRANCE_LIFT_STRUCTURE_PATH = "structures/arena/lift.nbt"
         const val ENTRANCE_LIFT_INTERVAL_TICKS_DEFAULT = 10L
-        const val ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT = 2
-        const val ENTRANCE_LIFT_MAX_RISE_BLOCKS_DEFAULT = 6
+        const val ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT = 10
+        const val ENTRANCE_LIFT_MAX_RISE_BLOCKS_DEFAULT = 17
         const val ELDER_CURSE_DAMAGE = 10.0
         const val ELDER_CURSE_DURATION_TICKS = 100
         const val ELDER_CURSE_AMPLIFIER = 2
@@ -1114,6 +1116,7 @@ class ArenaManager(
         session.waitingNotifiedParticipants.clear()
         session.waitingParticipants.clear()
         session.waitingSubtitleNextTickByPlayer.clear()
+        session.waitingOutsideTicksByPlayer.clear()
         session.invitedParticipants.clear()
     }
 
@@ -1122,6 +1125,7 @@ class ArenaManager(
         session.waitingParticipants.remove(invitedId)
         session.waitingNotifiedParticipants.remove(invitedId)
         session.waitingSubtitleNextTickByPlayer.remove(invitedId)
+        session.waitingOutsideTicksByPlayer.remove(invitedId)
         hideJoinCountdownBossBar(session, invitedId)
         releaseInvitedPlayerLock(invitedId)
         removeArenaSidebar(invitedId)
@@ -1577,8 +1581,6 @@ class ArenaManager(
 
         val ownerSession = getSession(player)
         if (ownerSession != null && ownerSession.multiplayerJoinEnabled && ownerSession.ownerPlayerId == player.uniqueId) {
-            inviteSwingCooldownUntilTick[player.uniqueId] = currentTick + MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS
-
             if (System.currentTimeMillis() >= ownerSession.joinGraceEndMillis) {
                 player.sendMessage(
                     ArenaI18n.text(
@@ -1591,6 +1593,7 @@ class ArenaManager(
             }
 
             val invited = rayTraceTargetPlayer(player) ?: return
+            inviteSwingCooldownUntilTick[player.uniqueId] = currentTick + MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS
             trySendMultiplayerInvite(player, invited, ownerSession)
             return
         }
@@ -1613,11 +1616,11 @@ class ArenaManager(
             return
         }
 
-        inviteSwingCooldownUntilTick[player.uniqueId] = currentTick + MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS
         val target = rayTraceTargetPlayer(player) ?: return
         if (target.uniqueId != owner.uniqueId) {
             return
         }
+        inviteSwingCooldownUntilTick[player.uniqueId] = currentTick + MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS
         declineInvitedParticipant(invitedSession, player)
     }
 
@@ -1630,7 +1633,7 @@ class ArenaManager(
             maxDistance,
             FluidCollisionMode.NEVER,
             true,
-            0.0
+            0.1
         ) { candidate ->
             candidate is Player && candidate.uniqueId != source.uniqueId
         }
@@ -1799,6 +1802,13 @@ class ArenaManager(
         val worldName = mobToSessionWorld[mob.uniqueId] ?: return
         val session = sessionsByWorld[worldName] ?: return
 
+        if (event.target == null) {
+            if (mob.type == EntityType.SPIDER || mob.type == EntityType.CAVE_SPIDER) {
+                mob.target = selectNearestParticipant(session, mob.location)
+            }
+            return
+        }
+
         val target = event.target as? LivingEntity ?: return
         if (target !is Player) {
             val targetWorld = mobToSessionWorld[target.uniqueId]
@@ -1890,6 +1900,7 @@ class ArenaManager(
             return
         }
 
+        stopArenaBgm(session)
         transitionSessionPhase(session, ArenaPhase.GAME_OVER)
         updateArenaSidebars()
     }
@@ -2830,6 +2841,7 @@ class ArenaManager(
         session.waitingParticipants.remove(playerId)
         session.waitingNotifiedParticipants.remove(playerId)
         session.waitingSubtitleNextTickByPlayer.remove(playerId)
+        session.waitingOutsideTicksByPlayer.remove(playerId)
         session.entranceLiftLockedParticipants.remove(playerId)
         session.arenaPreparingUntilMillisByParticipant.remove(playerId)
         hideJoinCountdownBossBar(session, playerId)
@@ -2967,6 +2979,7 @@ class ArenaManager(
         session.waitingParticipants.clear()
         session.waitingNotifiedParticipants.clear()
         session.waitingSubtitleNextTickByPlayer.clear()
+        session.waitingOutsideTicksByPlayer.clear()
         session.arenaPreparingUntilMillisByParticipant.clear()
         session.entranceLiftLockedParticipants.clear()
         session.joinCountdownBossBars.clear()
@@ -5369,6 +5382,13 @@ class ArenaManager(
     private fun updateArenaBgmTransitions() {
         val currentTick = Bukkit.getCurrentTick().toLong()
         sessionsByWorld.values.forEach { session ->
+            if (session.phase == ArenaPhase.GAME_OVER || session.phase == ArenaPhase.TERMINATING) {
+                if (session.arenaBgmMode != ArenaBgmMode.STOPPED || session.arenaBgmSwitchRequest != null) {
+                    stopArenaBgm(session)
+                }
+                return@forEach
+            }
+
             val hasAliveCombatMob = hasAnyAliveCombatMob(session)
             if (session.stageStarted && !session.barrierRestarting && !session.barrierRestartCompleted) {
                 if (hasAliveCombatMob) {
@@ -5910,7 +5930,11 @@ class ArenaManager(
     }
 
     private fun initializeActionMarkers(session: ArenaSession) {
-        val world = Bukkit.getWorld(session.worldName) ?: return
+        val world = Bukkit.getWorld(session.worldName)
+        if (world == null) {
+            plugin.logger.warning("[Arena] アクションマーカー初期化スキップ: ワールド未取得 world=${session.worldName}")
+            return
+        }
         val markers = mutableMapOf<UUID, ArenaActionMarker>()
 
         session.barrierPointLocations.forEach { location ->
@@ -5938,6 +5962,7 @@ class ArenaManager(
         session.actionMarkers.clear()
         session.actionMarkers.putAll(markers)
         session.actionMarkerHoldStates.clear()
+        plugin.logger.info("[Arena] アクションマーカー初期化: world=${session.worldName} total=${markers.size} barrier=${markers.values.count { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }}")
     }
 
     private fun ensureDoorActionMarkersForTargetWave(session: ArenaSession, targetWave: Int) {
@@ -6119,17 +6144,36 @@ class ArenaManager(
         candidateIds += ownerId
         candidateIds += session.invitedParticipants
 
-        val waitingNow = candidateIds
-            .asSequence()
-            .mapNotNull { Bukkit.getPlayer(it) }
-            .filter { it.isOnline }
-            .filter { player ->
-                session.liftMarkerLocations.any { markerLocation ->
-                    isInsideLiftArea(markerLocation, player.location)
-                }
+        val waitingNow = mutableSetOf<UUID>()
+        candidateIds.forEach { candidateId ->
+            val player = Bukkit.getPlayer(candidateId)
+            if (player == null || !player.isOnline) {
+                session.waitingOutsideTicksByPlayer.remove(candidateId)
+                return@forEach
             }
-            .map { it.uniqueId }
-            .toSet()
+
+            val insideLiftArea = session.liftMarkerLocations.any { markerLocation ->
+                isInsideLiftArea(markerLocation, player.location, margin = MULTIPLAYER_LIFT_AREA_MARGIN)
+            }
+            if (insideLiftArea) {
+                waitingNow += candidateId
+                session.waitingOutsideTicksByPlayer.remove(candidateId)
+                return@forEach
+            }
+
+            if (session.waitingParticipants.contains(candidateId)) {
+                val outsideTicks = (session.waitingOutsideTicksByPlayer[candidateId] ?: 0) + 1
+                if (outsideTicks < MULTIPLAYER_WAITING_EXIT_GRACE_TICKS) {
+                    waitingNow += candidateId
+                    session.waitingOutsideTicksByPlayer[candidateId] = outsideTicks
+                } else {
+                    session.waitingOutsideTicksByPlayer.remove(candidateId)
+                }
+            } else {
+                session.waitingOutsideTicksByPlayer.remove(candidateId)
+            }
+        }
+        session.waitingOutsideTicksByPlayer.keys.removeIf { it !in candidateIds }
 
         val entered = waitingNow - session.waitingParticipants
         val exited = session.waitingParticipants - waitingNow
@@ -6159,6 +6203,7 @@ class ArenaManager(
         exited.forEach { playerId ->
             session.waitingNotifiedParticipants.remove(playerId)
             session.waitingSubtitleNextTickByPlayer.remove(playerId)
+            session.waitingOutsideTicksByPlayer.remove(playerId)
             val player = Bukkit.getPlayer(playerId) ?: return@forEach
             player.sendMessage(
                 ArenaI18n.text(
@@ -6316,6 +6361,7 @@ class ArenaManager(
         var currentRise = 0
         var peakHoldTicksRemaining = 0L
         var initialLiftPlaced = false
+        var transferBlindnessApplied = false
 
         val playerUnits = mutableListOf<LiftPlayerUnit>()
 
@@ -6362,6 +6408,15 @@ class ArenaManager(
             }
 
             val transferRise = entranceLiftTransferRiseBlocks.coerceIn(0, maxRise)
+            val transferBlindnessRise = (transferRise - 1).coerceAtLeast(0)
+
+            if (!transferBlindnessApplied && currentRise >= transferBlindnessRise) {
+                transferBlindnessApplied = true
+                participants.forEach { player ->
+                    if (!player.isOnline || player.world.uid != introWorld.uid) return@forEach
+                    player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, STAGE_TRANSFER_BLINDNESS_TICKS, 0, false, false, false))
+                }
+            }
 
             if (!transferred && currentRise >= transferRise) {
                 transferred = true
@@ -6374,6 +6429,7 @@ class ArenaManager(
                 session.participantSpawnProtectionUntilMillis = System.currentTimeMillis() + 4000L
                 setDoorActionMarkersReadySilently(session, 1)
                 broadcastStageStartMessage(session)
+                updateSessionProgressBossBar(session)
             }
 
             if (!descending && currentRise >= maxRise) {
@@ -6671,7 +6727,6 @@ class ArenaManager(
             world.getChunkAt(spawnLocation.blockX shr 4, spawnLocation.blockZ shr 4).load(true)
             applyStageStartFacingYaw(session, spawnLocation)
             player.teleport(spawnLocation)
-            player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, STAGE_TRANSFER_BLINDNESS_TICKS, 0, false, false, false))
             applySessionGameMode(session, player)
             playStageEntrySoundsLater(player)
             session.participantLocationHistory[player.uniqueId] = ArrayDeque<TimedPlayerLocation>().apply {
@@ -6738,7 +6793,7 @@ class ArenaManager(
             .toList()
     }
 
-    private fun isInsideLiftArea(markerLocation: Location, playerLocation: Location): Boolean {
+    private fun isInsideLiftArea(markerLocation: Location, playerLocation: Location, margin: Double = 0.0): Boolean {
         val markerWorld = markerLocation.world ?: return false
         if (playerLocation.world?.uid != markerWorld.uid) return false
 
@@ -6752,9 +6807,9 @@ class ArenaManager(
         val y = playerLocation.y
         val z = playerLocation.z
 
-        return x >= blockX && x < blockX + template.sizeX.toDouble() &&
-            z >= blockZ && z < blockZ + template.sizeZ.toDouble() &&
-            y >= blockY - 1.0 && y < blockY + template.sizeY.toDouble() + 1.0
+        return x >= blockX - margin && x < blockX + template.sizeX.toDouble() + margin &&
+            z >= blockZ - margin && z < blockZ + template.sizeZ.toDouble() + margin &&
+            y >= blockY - 1.0 - margin && y < blockY + template.sizeY.toDouble() + 1.0 + margin
     }
 
     private fun updateActionMarkers() {

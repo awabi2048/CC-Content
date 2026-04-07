@@ -179,6 +179,7 @@ data class ArenaSession(
     val waitingParticipants: MutableSet<UUID> = mutableSetOf(),
     val waitingNotifiedParticipants: MutableSet<UUID> = mutableSetOf(),
     val waitingSubtitleNextTickByPlayer: MutableMap<UUID, Long> = mutableMapOf(),
+    val waitingOutsideTicksByPlayer: MutableMap<UUID, Int> = mutableMapOf(),
     val entranceLiftLockedParticipants: MutableSet<UUID> = mutableSetOf(),
     var entranceLiftChunkTicketWorldName: String? = null,
     val entranceLiftChunkTicketKeys: MutableSet<Long> = mutableSetOf(),

@@ -10,7 +10,26 @@ import java.nio.charset.StandardCharsets
 import java.util.jar.JarFile
 
 object LanguageFileValidator {
+    data class ValidationResult(
+        val errors: List<String>
+    ) {
+        val hasErrors: Boolean
+            get() = errors.isNotEmpty()
+
+        fun throwIfInvalid() {
+            if (errors.isEmpty()) {
+                return
+            }
+            val detail = errors.joinToString("\n") { "- $it" }
+            throw IllegalStateException("言語ファイル検証に失敗しました:\n$detail")
+        }
+    }
+
     fun validateAll(plugin: JavaPlugin) {
+        validateAndCollect(plugin).throwIfInvalid()
+    }
+
+    fun validateAndCollect(plugin: JavaPlugin): ValidationResult {
         val errors = mutableListOf<String>()
         val resourceMaps = mutableMapOf<String, Map<*, *>>()
 
@@ -64,10 +83,7 @@ object LanguageFileValidator {
             }
         }
 
-        if (errors.isNotEmpty()) {
-            val detail = errors.joinToString("\n") { "- $it" }
-            throw IllegalStateException("言語ファイル検証に失敗しました:\n$detail")
-        }
+        return ValidationResult(errors)
     }
 
     private fun validateYaml(content: String, source: String): Map<*, *> {
