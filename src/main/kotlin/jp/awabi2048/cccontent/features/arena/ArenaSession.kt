@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.arena
 
 import net.kyori.adventure.bossbar.BossBar
 import jp.awabi2048.cccontent.features.arena.generator.ArenaDoorAnimationPlacement
+import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
 import org.bukkit.Location
 import org.bukkit.scheduler.BukkitTask
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionModifiers
@@ -205,5 +206,12 @@ data class ArenaSession(
     var hadAliveCombatMobs: Boolean = false,
     var combatMobEmptySinceTick: Long? = null,
     val transitionTasks: MutableList<BukkitTask> = mutableListOf(),
-    val waveSpawnTasks: MutableMap<Int, BukkitTask> = mutableMapOf()
+    val waveSpawnTasks: MutableMap<Int, BukkitTask> = mutableMapOf(),
+    // 掃討ミッション用フィールド
+    var missionTypeId: ArenaMissionType = ArenaMissionType.BARRIER_RESTART,
+    val clearingBossLocations: MutableList<Location> = mutableListOf(),
+    var clearingBossSpawned: Boolean = false,
+    val clearingBossEntityIds: MutableSet<UUID> = mutableSetOf(),
+    var firstDoorOpenedAtMillis: Long? = null,
+    var clearingBossTimeLimitSeconds: Int = 180
 )

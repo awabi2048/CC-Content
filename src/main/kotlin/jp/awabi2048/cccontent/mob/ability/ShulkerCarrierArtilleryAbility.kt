@@ -73,10 +73,7 @@ class ShulkerCarrierArtilleryAbility(
 
         val nextY = anchor.y + sin(rt.elapsedTicks.toDouble() * oscillationFrequency) * oscillationAmplitude
         val lifted = anchor.clone().apply { y = nextY }
-        carrier.teleport(lifted)
-        if (!carrier.passengers.any { it.uniqueId == shulker.uniqueId }) {
-            carrier.addPassenger(shulker)
-        }
+        teleportMountedPair(carrier, shulker, lifted)
 
         if (!context.isCombatActive()) {
             return
@@ -91,9 +88,18 @@ class ShulkerCarrierArtilleryAbility(
             ?: return
 
         rt.anchor = destination.clone()
-        carrier.teleport(destination)
+        teleportMountedPair(carrier, shulker, destination)
         rt.teleportCooldownTicks = teleportIntervalTicks
         shulker.world.playSound(destination, org.bukkit.Sound.ENTITY_SHULKER_TELEPORT, 0.9f, 1.35f)
+    }
+
+    private fun teleportMountedPair(carrier: ArmorStand, shulker: Shulker, destination: Location) {
+        val safeDestination = destination.clone()
+        carrier.teleport(safeDestination)
+        shulker.teleport(safeDestination)
+        if (!carrier.passengers.any { it.uniqueId == shulker.uniqueId }) {
+            carrier.addPassenger(shulker)
+        }
     }
 
     private fun ensureCarrier(shulker: Shulker, runtime: Runtime): ArmorStand? {

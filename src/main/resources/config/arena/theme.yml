@@ -367,36 +367,26 @@ end:
     key: minecraft:block.end_portal.spawn
     pitch: 1.0
   mobs:
-    enderman_phase:
+    enderman_mist_delay:
+      weight: 7
+      wave: 1..
+    enderman_small_backstab:
       weight: 8
-      wave: 1..
-    enderman_drain:
-      weight: 7
       wave: 2..
-    enderman_mirror:
+    endermite_poison:
       weight: 6
-      wave: 3..
-    enderman_eye_summoner:
+      wave: 2..
+    shulker_turret_sniper:
       weight: 3
-      wave: 4..
-    shulker_rhythm:
-      weight: 7
-      wave: 1..
-    shulker_laser:
-      weight: 6
       wave: 3..
-    shulker_disruptor:
-      weight: 4
-      wave: 5..
+    shulker_turret_barrage:
+      weight: 5
+      wave: 4..
     raiden_creeper:
       weight: 3
       wave: 3..
-    ender_eye_hunter:
+    ender_eye_beam:
       weight: 5
-      wave: 2..
-      max_alive: 1
-    ender_eye_orbit:
-      weight: 4
       wave: 4..
       max_alive: 1
   orientation:

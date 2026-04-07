@@ -1096,6 +1096,7 @@ custom_items:
         bat: '大コウモリの皮膜'
         allay: '水精の欠片'
         enderman: 'エンダーマンの残滓'
+        endermite: 'エンダーマイトの甲殻'
         shulker: 'シュルカーの殻'
         spirit: '精霊の涙'
         frog: '大カエルの肝'
@@ -1147,15 +1148,16 @@ custom_items:
       theme_none: '&e利用可能なテーマがありません'
       theme_list: '&6[Arena] 利用可能テーマ: {themes}'
       usage:
-        start: '&c使用法: /arenaa start <player|@s|@near> <star_count> <theme>'
+        start: '&c使用法: /arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
         stop: '&c使用法: /arenaa stop <player>'
         theme: '&c使用法: /arenaa theme list'
       start_error:
         lift_not_ready: '&cリフトの準備ができていないため開始できません'
         lift_occupied: '&cリフトが使用中のため開始できません'
+        invalid_mission_type: '&c無効なミッションタイプです: {type}'
       help:
         header: '&6=== Arena 管理コマンド ==='
-        start: '&f/arenaa start <player|@s|@near> <star_count> <theme>'
+        start: '&f/arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
         stop: '&f/arenaa stop <player>'
         theme: '&f/arenaa theme list'
         broadcast: '&f/arenaa broadcast'
@@ -1173,6 +1175,7 @@ custom_items:
         stage_build_failed: '&c{message}'
         join_area_not_found: '&c開始待機エリアの参加マーカーが近くに存在しないため開始できません'
         lobby_marker_not_found: '&cロビーマーカーが見つからないため開始できません'
+        invalid_mission_type: '&c無効なミッションタイプです: {type}'
     mission:
       already_completed: '&eこのミッションはすでに完了済みです'
       already_in_mission: '&cすでに進行中のミッションがあります'
@@ -1293,6 +1296,10 @@ custom_items:
       title: '§7- §6Wave {wave} §7-'
       last_title: '&7- §6Last Wave §7-'
       player_advanced: '§7{player} さんが §6Wave {wave}§7 に突入しました！'
+    clearing:
+      boss_spawned: '§5掃討ボスが出現しました！制限時間内に倒してください！'
+      boss_defeated: '§a掃討ボスを討伐しました！ミッションクリア！'
+      time_expired: '§c時間切れ！掃討ボスを倒せませんでした...'
     mock:
       door_animation_start: '&7{message}'
       corridor_door_reinstall: '&7{message}'
@@ -1343,6 +1350,7 @@ custom_items:
       normal_participant: '§7✧ {name}'
     sidebar:
       title: '§7« §cARENA §7»'
+      elapsed_time: '§7経過: §f{time}'
       get_ready: '§7§lGet Ready!'
       defeat: '§c§lDEFEAT'
       participant_line: '§7◯ §b{name} {status}'
@@ -1355,6 +1363,7 @@ custom_items:
       status_dead: '§cDEAD'
   bossbar:
     join_countdown: '§f開始まで §e{seconds} 秒'
+    clearing_boss: '§7- §5掃討ボス §7- §c{time} §8(§7残り§b{alive}§8体)'
     revive:
       downed: '§7{reviver}さんが蘇生中...'
       reviver: '§7{downed}さんを蘇生中...'
@@ -1388,6 +1397,11 @@ custom_items:
         name: 'ボス'
         hints:
           - '§7ボスがいて困るので倒そう'
+      clearing:
+        name: 'とにかくいっぱい倒して！'
+        hints:
+          - '§f弱体化した大量のモンスターを倒して進め！'
+          - '§f最奥に待ち受けるボスを討伐するとクリア！'
     theme:
       test:
         name: 'テスト'
@@ -1490,15 +1504,16 @@ arena:
       theme_none: '&e利用可能なテーマがありません'
       theme_list: '&6[Arena] 利用可能テーマ: {themes}'
       usage:
-        start: '&c使用法: /arenaa start <player|@s|@near> <star_count> <theme>'
+        start: '&c使用法: /arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
         stop: '&c使用法: /arenaa stop <player>'
         theme: '&c使用法: /arenaa theme list'
       start_error:
         lift_not_ready: '&cリフトの準備ができていないため開始できません'
         lift_occupied: '&cリフトが使用中のため開始できません'
+        invalid_mission_type: '&c無効なミッションタイプです: {type}'
       help:
         header: '&6=== Arena 管理コマンド ==='
-        start: '&f/arenaa start <player|@s|@near> <star_count> <theme>'
+        start: '&f/arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
         stop: '&f/arenaa stop <player>'
         theme: '&f/arenaa theme list'
         broadcast: '&f/arenaa broadcast'
@@ -1516,6 +1531,7 @@ arena:
         stage_build_failed: '&c{message}'
         join_area_not_found: '&c開始待機エリアの参加マーカーが近くに存在しないため開始できません'
         lobby_marker_not_found: '&cロビーマーカーが見つからないため開始できません'
+        invalid_mission_type: '&c無効なミッションタイプです: {type}'
     mission:
       already_completed: '&eこのミッションはすでに完了済みです'
       already_in_mission: '&cすでに進行中のミッションがあります'
@@ -1633,6 +1649,10 @@ arena:
       title: '§7- §6Wave {wave} §7-'
       last_title: '&7- §6Last Wave §7-'
       player_advanced: '§7{player} さんが §6Wave {wave}§7 に突入しました！'
+    clearing:
+      boss_spawned: '§5掃討ボスが出現しました！制限時間内に倒してください！'
+      boss_defeated: '§a掃討ボスを討伐しました！ミッションクリア！'
+      time_expired: '§c時間切れ！掃討ボスを倒せませんでした...'
     mock:
       door_animation_start: '&7{message}'
       corridor_door_reinstall: '&7{message}'
@@ -1701,6 +1721,7 @@ arena:
       normal_participant: '§7✧ {name}'
     sidebar:
       title: '§7« §cARENA §7»'
+      elapsed_time: '§7経過: §f{time}'
       get_ready: '§7§lGet Ready!'
       defeat: '§c§lDEFEAT'
       participant_line: '§7◯ §b{name} {status}'
@@ -1741,6 +1762,7 @@ arena:
         clear: '§dCLEAR'
     bossbar:
       join_countdown: '§f開始まで §e{seconds} 秒'
+      clearing_boss: '§7- §5掃討ボス §7- §c{time} §8(§7残り§b{alive}§8体)'
       revive:
         downed: '§7{reviver}さんが蘇生中...'
         reviver: '§7{downed}さんを蘇生中...'
@@ -1774,6 +1796,11 @@ arena:
         name: 'ボス'
         hints:
           - '§7ボスがいて困るので倒そう'
+      clearing:
+        name: 'とにかくいっぱい倒して！'
+        hints:
+          - '§f弱体化した大量のモンスターを倒して進め！'
+          - '§f最奥に待ち受けるボスを討伐するとクリア！'
   theme:
     test:
       name: 'テスト'
@@ -1799,4 +1826,3 @@ arena:
       name: 'ネザー要塞'
     end:
       name: 'エンド'
-

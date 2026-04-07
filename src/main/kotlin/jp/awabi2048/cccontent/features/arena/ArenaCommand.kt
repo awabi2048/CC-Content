@@ -7,6 +7,7 @@ import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
+import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
 
 class ArenaCommand(
     private val arenaManagerProvider: () -> ArenaManager? = { null },
@@ -79,12 +80,12 @@ class ArenaCommand(
     }
 
     private fun handleStart(sender: CommandSender, args: Array<out String>): Boolean {
-        if (args.size < 4) {
+        if (args.size < 5) {
             sender.sendMessage(
                 ArenaI18n.text(
                     sender,
                     "arena.messages.command.usage.start",
-                    "&c使用法: /arenaa start <player|@s|@near> <star_count> <theme>"
+                    "&c使用法: /arenaa start <player|@s|@near> <star_count(1-4)> <theme> <mission_type>"
                 )
             )
             return true
@@ -129,18 +130,24 @@ class ArenaCommand(
 
         val starCount = args[2].toIntOrNull()
         if (starCount == null || starCount < 1 || starCount > 4) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.usage.start", "&c使用法: /arenaa start <player|@s|@near> <star_count(1-4)> <theme>"))
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.usage.start", "&c使用法: /arenaa start <player|@s|@near> <star_count(1-4)> <theme> <mission_type>"))
             return true
         }
         val difficultyId = "star_$starCount"
         val theme = args[3]
+        val missionType = ArenaMissionType.fromId(args[4].lowercase())
+        if (missionType == null) {
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.start_error.invalid_mission_type", "&c無効なミッションタイプです: {type}", "type" to args[4]))
+            return true
+        }
 
         val startedAt = System.nanoTime()
         when (val result = manager.startSession(
             target,
             difficultyId,
             theme,
-            initialParticipants = initialParticipants
+            initialParticipants = initialParticipants,
+            missionTypeId = missionType
         )) {
             is ArenaStartResult.Success -> {
                 sender.sendMessage(
@@ -281,7 +288,7 @@ class ArenaCommand(
     private fun showUsage(sender: CommandSender) {
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.header", "&6=== Arena 管理コマンド ==="))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.menu", "&f/arenaa menu"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s|@near> <star_count> <theme>"))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s|@near> <star_count> <theme> <mission_type>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop", "&f/arenaa stop <player>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.theme", "&f/arenaa theme list"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.broadcast", "&f/arenaa broadcast"))
@@ -312,6 +319,10 @@ class ArenaCommand(
             }
             4 -> when (args[0].lowercase()) {
                 "start" -> arenaManagerProvider()?.getThemeIds()?.filter { it.startsWith(args[3], ignoreCase = true) } ?: emptyList()
+                else -> emptyList()
+            }
+            5 -> when (args[0].lowercase()) {
+                "start" -> ArenaMissionType.entries.map { it.id }.filter { it.startsWith(args[4], ignoreCase = true) }
                 else -> emptyList()
             }
             else -> emptyList()

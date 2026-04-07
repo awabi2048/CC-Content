@@ -140,6 +140,11 @@ enum class ArenaMissionType(
         id = "boss",
         displayNameKey = "arena.mission.type.boss.name",
         missionGuideHintsKey = "arena.mission.type.boss.hints"
+    ),
+    CLEARING(
+        id = "clearing",
+        displayNameKey = "arena.mission.type.clearing.name",
+        missionGuideHintsKey = "arena.mission.type.clearing.hints"
     );
 
     companion object {
@@ -166,6 +171,16 @@ data class ArenaMissionModifiers(
             maxSummonCountMultiplier = 1.0,
             clearMobCountMultiplier = 1.0,
             mobHealthMultiplier = 1.0,
+            mobAttackMultiplier = 1.0
+        )
+
+        val CLEARING = ArenaMissionModifiers(
+            charactorId = "clearing",
+            displayName = "掃討戦",
+            spawnIntervalMultiplier = 1.0,
+            maxSummonCountMultiplier = 2.0,
+            clearMobCountMultiplier = 2.0,
+            mobHealthMultiplier = 0.5,
             mobAttackMultiplier = 1.0
         )
     }

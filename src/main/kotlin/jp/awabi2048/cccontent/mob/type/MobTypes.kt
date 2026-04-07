@@ -52,9 +52,16 @@ import jp.awabi2048.cccontent.mob.ability.EndermanPhaseDefenseAbility
 import jp.awabi2048.cccontent.mob.ability.EndermanRayTeleportAbility
 import jp.awabi2048.cccontent.mob.ability.EndermanStrikeWarpAbility
 import jp.awabi2048.cccontent.mob.ability.EndermanAmbientParticleAbility
+import jp.awabi2048.cccontent.mob.ability.EndermanBackstabTeleportAbility
+import jp.awabi2048.cccontent.mob.ability.EndermanMistDelayTeleportAbility
+import jp.awabi2048.cccontent.mob.ability.EndermitePoisonAssaultAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerCarrierArtilleryAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerBurstShotAbility
+import jp.awabi2048.cccontent.mob.ability.ShulkerCloseDefenseBarrageAbility
+import jp.awabi2048.cccontent.mob.ability.ShulkerProximitySparkZoneAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerEndRodLaserAbility
+import jp.awabi2048.cccontent.mob.ability.ShulkerSniperShotAbility
+import jp.awabi2048.cccontent.mob.ability.EnderEyeBeamOrbitAbility
 import jp.awabi2048.cccontent.mob.ability.EnderEyeHunterAbility
 import jp.awabi2048.cccontent.mob.ability.EnderEyeSummonerAbility
 import org.bukkit.Bukkit
@@ -1620,6 +1627,101 @@ class EnderEyeOrbitMobType : EquipmentMobType(
             ambientParticle = Particle.TRIAL_SPAWNER_DETECTION_OMINOUS,
             ambientParticleCount = 3,
             ambientParticleRadius = 0.5
+        )
+    )
+)
+
+class EndermanMistDelayMobType : EquipmentMobType(
+    id = "enderman_mist_delay",
+    baseEntityType = EntityType.ENDERMAN,
+    abilities = listOf(
+        EndermanAmbientParticleAbility(
+            id = "enderman_mist_delay_ambient",
+            portalCount = 6,
+            dustCount = 4,
+            innerColor = Color.fromRGB(188, 170, 220),
+            outerColor = Color.fromRGB(80, 74, 96),
+            dustSize = 0.95f
+        ),
+        EndermanMistDelayTeleportAbility(id = "enderman_mist_delay_teleport"),
+        EndermanStrikeWarpAbility(id = "enderman_mist_delay_strike", swapChance = 0.18)
+    )
+)
+
+class EndermanSmallBackstabMobType : EquipmentMobType(
+    id = "enderman_small_backstab",
+    baseEntityType = EntityType.ENDERMAN,
+    abilities = listOf(
+        EndermanAmbientParticleAbility(
+            id = "enderman_small_backstab_ambient",
+            portalCount = 3,
+            dustCount = 3,
+            innerColor = Color.fromRGB(164, 112, 230),
+            outerColor = Color.fromRGB(52, 24, 96),
+            dustSize = 0.72f
+        ),
+        EndermanBackstabTeleportAbility(id = "enderman_small_backstab_teleport", triggerChance = 0.32),
+        EndermanPhaseDefenseAbility(id = "enderman_small_backstab_defense", evadeRadius = 0.6)
+    )
+)
+
+class EndermitePoisonMobType : EquipmentMobType(
+    id = "endermite_poison",
+    baseEntityType = EntityType.ENDERMITE,
+    abilities = listOf(
+        EndermitePoisonAssaultAbility(id = "endermite_poison_assault")
+    )
+)
+
+class ShulkerTurretSniperMobType : EquipmentMobType(
+    id = "shulker_turret_sniper",
+    baseEntityType = EntityType.SHULKER,
+    abilities = listOf(
+        ShulkerCarrierArtilleryAbility(
+            id = "shulker_turret_sniper_carrier",
+            teleportIntervalTicks = 170L,
+            prioritizeBarrierMarkerOnFinalWave = false
+        ),
+        ShulkerProximitySparkZoneAbility(id = "shulker_turret_sniper_zone_spark"),
+        ShulkerSniperShotAbility(id = "shulker_turret_sniper_shot")
+    )
+)
+
+class ShulkerTurretBarrageMobType : EquipmentMobType(
+    id = "shulker_turret_barrage",
+    baseEntityType = EntityType.SHULKER,
+    abilities = listOf(
+        ShulkerCarrierArtilleryAbility(
+            id = "shulker_turret_barrage_carrier",
+            teleportIntervalTicks = 190L,
+            prioritizeBarrierMarkerOnFinalWave = false
+        ),
+        ShulkerProximitySparkZoneAbility(id = "shulker_turret_barrage_zone_spark"),
+        ShulkerCloseDefenseBarrageAbility(id = "shulker_turret_barrage_barrage")
+    )
+)
+
+class EnderEyeBeamMobType : EquipmentMobType(
+    id = "ender_eye_beam",
+    baseEntityType = EntityType.GUARDIAN,
+    abilities = listOf(
+        EnderEyeBeamOrbitAbility(id = "ender_eye_beam_orbit", orbitRadius = 3.0),
+        GuardianBeamAbility(
+            id = "ender_eye_beam_guardian_laser",
+            cooldownTicks = 72L,
+            chargeTicks = 22L,
+            minRange = 2.0,
+            maxRange = 15.0,
+            directDamageMultiplier = 0.0,
+            directBonusDamage = 0.0,
+            directKnockback = 0.0,
+            splashKnockback = 0.0,
+            chargePulseIntervalTicks = 10L,
+            chargePulseDamage = 2.0,
+            chargePulseSound = Sound.ENTITY_GUARDIAN_ATTACK,
+            chargePulseSoundVolume = 0.6f,
+            chargePulseSoundPitch = 1.4f,
+            chargeParticle = Particle.PORTAL
         )
     )
 )
