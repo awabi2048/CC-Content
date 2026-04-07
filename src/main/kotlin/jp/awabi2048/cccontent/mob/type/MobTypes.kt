@@ -569,7 +569,8 @@ class SkeletonWeaponThrowCloseMobType : EquipmentMobType(
         WeaponThrowAbility(id = "skeleton_weapon_throw_close")
     ),
     defaultHelmet = Material.LEATHER_HELMET,
-    defaultChestplate = Material.CHAINMAIL_CHESTPLATE
+    defaultChestplate = Material.CHAINMAIL_CHESTPLATE,
+    defaultHelmetTexture = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZTk3ZDYwMmIwYWYwNmU5MzRlYjQ2NDQyMzQ5ZTE1ZTFiOGQ1YWFmY2Q1ZmQ4Zjg2ZDc5NWNkNGVlOWNhMDY0ZSJ9fX0="
 ) {
     override fun applyDefaultEquipment(context: MobSpawnContext, runtime: CustomMobRuntime?) {
         super.applyDefaultEquipment(context, runtime)
