@@ -80,7 +80,8 @@ data class ArenaStageBuildResult(
     val corridorDoorBlocks: Map<Int, List<Location>>,
     val doorAnimationPlacements: Map<Int, List<ArenaDoorAnimationPlacement>>,
     val barrierLocation: Location,
-    val barrierPointLocations: List<Location>
+    val barrierPointLocations: List<Location>,
+    val clearingBossLocations: List<Location> = emptyList()
 )
 
 data class ArenaDoorAnimationPlacement(
@@ -135,6 +136,7 @@ class ArenaStageGenerator {
         var goalCheckpoint: Location? = null,
         var barrierLocation: Location? = null,
         var barrierPointLocations: List<Location> = emptyList(),
+        var clearingBossLocations: List<Location> = emptyList(),
         var doorAnimationPlacements: Map<Int, List<ArenaDoorAnimationPlacement>> = emptyMap(),
         var placementCursor: Int = 0,
         var roomCursor: Int = 0,
@@ -497,12 +499,14 @@ class ArenaStageGenerator {
         val resolvedBarrierLocation = finalMarkers.barrierCores.firstOrNull()
             ?: error("[Arena] 最終部屋の barrier_core マーカーが見つかりません")
         val resolvedBarrierPoints = finalMarkers.barrierPoints
+        val resolvedClearingBossLocations = finalMarkers.clearingBosses
 
         job.entranceLocation = resolvedEntranceLocation
         job.entranceCheckpoint = resolvedEntranceCheckpoint
         job.goalCheckpoint = resolvedGoalCheckpoint
         job.barrierLocation = resolvedBarrierLocation
         job.barrierPointLocations = resolvedBarrierPoints
+        job.clearingBossLocations = resolvedClearingBossLocations
         job.result = ArenaStageBuildResult(
             playerSpawn = resolvedEntranceLocation.clone(),
             entranceLocation = resolvedEntranceLocation,
@@ -516,7 +520,8 @@ class ArenaStageGenerator {
             corridorDoorBlocks = job.corridorDoorBlocks,
             doorAnimationPlacements = job.doorAnimationPlacements,
             barrierLocation = resolvedBarrierLocation,
-            barrierPointLocations = resolvedBarrierPoints
+            barrierPointLocations = resolvedBarrierPoints,
+            clearingBossLocations = resolvedClearingBossLocations
         )
         job.phase = BuildPhase.COMPLETE
     }
@@ -1164,7 +1169,8 @@ class ArenaStageGenerator {
         val checkpoints: List<Location>,
         val doorBlocks: List<Location>,
         val barrierCores: List<Location>,
-        val barrierPoints: List<Location>
+        val barrierPoints: List<Location>,
+        val clearingBosses: List<Location> = emptyList()
     )
 
     private fun validateSingleRequiredMarker(markers: List<Location>, markerTag: String): String? {
@@ -1194,6 +1200,7 @@ class ArenaStageGenerator {
         val doorBlocks = mutableListOf<Location>()
         val barrierCores = mutableListOf<Location>()
         val barrierPoints = mutableListOf<Location>()
+        val clearingBosses = mutableListOf<Location>()
 
         for (cx in minChunkX..maxChunkX) {
             for (cz in minChunkZ..maxChunkZ) {
@@ -1222,12 +1229,15 @@ class ArenaStageGenerator {
                         if (entity.scoreboardTags.contains("arena.marker.barrier_point")) {
                             barrierPoints.add(loc.clone())
                         }
+                        if (entity.scoreboardTags.contains("arena.marker.clearing_boss")) {
+                            clearingBosses.add(loc.clone())
+                        }
                     }
                 }
             }
         }
 
-        return TileMarkers(mobs, checkpoints, doorBlocks, barrierCores, barrierPoints)
+        return TileMarkers(mobs, checkpoints, doorBlocks, barrierCores, barrierPoints, clearingBosses)
     }
 
     private fun locationForTile(origin: Location, point: TilePoint, gridPitch: Int): Location {

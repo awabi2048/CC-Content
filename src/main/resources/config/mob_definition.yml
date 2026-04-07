@@ -535,65 +535,44 @@ bat_venom:
   movement_speed: 0.30
   armor: 5.0
 
-enderman_phase:
-  type: enderman_phase
-  health: 42.0
-  attack: 6.0
-  movement_speed: 0.27
-  armor: 4.0
-
-enderman_drain:
-  type: enderman_drain
-  health: 46.0
-  attack: 6.5
-  movement_speed: 0.27
-  armor: 4.5
-
-enderman_mirror:
-  type: enderman_mirror
+enderman_mist_delay:
+  type: enderman_mist_delay
   health: 44.0
   attack: 6.2
-  movement_speed: 0.28
+  movement_speed: 0.27
   armor: 4.2
 
-enderman_eye_summoner:
-  type: enderman_eye_summoner
-  health: 52.0
-  attack: 6.0
-  movement_speed: 0.25
-  armor: 5.0
-
-shulker_rhythm:
-  type: shulker_rhythm
+enderman_small_backstab:
+  type: enderman_small_backstab
   health: 34.0
   attack: 5.4
-  movement_speed: 0.22
-  armor: 6.0
+  movement_speed: 0.30
+  armor: 2.5
 
-shulker_laser:
-  type: shulker_laser
+endermite_poison:
+  type: endermite_poison
+  health: 24.0
+  attack: 4.4
+  movement_speed: 0.34
+  armor: 1.0
+
+shulker_turret_sniper:
+  type: shulker_turret_sniper
+  health: 40.0
+  attack: 6.6
+  movement_speed: 0.20
+  armor: 7.2
+
+shulker_turret_barrage:
+  type: shulker_turret_barrage
   health: 38.0
   attack: 5.8
-  movement_speed: 0.21
-  armor: 7.0
+  movement_speed: 0.20
+  armor: 6.8
 
-shulker_disruptor:
-  type: shulker_disruptor
-  health: 40.0
-  attack: 6.2
-  movement_speed: 0.21
-  armor: 7.5
-
-ender_eye_hunter:
-  type: ender_eye_hunter
-  health: 24.0
-  attack: 4.5
-  movement_speed: 0.0933333333
-  armor: 2.0
-
-ender_eye_orbit:
-  type: ender_eye_orbit
-  health: 26.0
-  attack: 4.8
-  movement_speed: 0.0966666667
+ender_eye_beam:
+  type: ender_eye_beam
+  health: 28.0
+  attack: 5.2
+  movement_speed: 0.08
   armor: 2.5

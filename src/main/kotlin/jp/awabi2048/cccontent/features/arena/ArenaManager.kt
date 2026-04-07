@@ -10,6 +10,7 @@ import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeWeightedMobEntr
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionModifiers
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
+import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
 import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.items.CustomItemManager
@@ -642,6 +643,7 @@ class ArenaManager(
         requestedTheme: String,
         initialParticipants: List<Player> = emptyList(),
         missionModifiers: ArenaMissionModifiers = ArenaMissionModifiers.NONE,
+        missionTypeId: ArenaMissionType = ArenaMissionType.BARRIER_RESTART,
         enableMultiplayerJoin: Boolean = false,
         inviteMissionTitle: String? = null,
         inviteMissionLore: List<String> = emptyList(),
@@ -759,6 +761,7 @@ class ArenaManager(
             difficultyId = difficulty.id,
             waves = difficulty.waves,
             missionModifiers = missionModifiers,
+            missionTypeId = missionTypeId,
             maxParticipants = sanitizedMaxParticipants,
             participants = participantPlayers.mapTo(mutableSetOf()) { it.uniqueId },
             returnLocations = returnLocations,
@@ -1070,6 +1073,10 @@ class ArenaManager(
         session.barrierPointLocations.clear()
         session.barrierPointLocations.addAll(stage.barrierPointLocations.map { it.clone() })
 
+        // 掃討ミッション用: ボススポーン位置をコピー
+        session.clearingBossLocations.clear()
+        session.clearingBossLocations.addAll(stage.clearingBossLocations.map { it.clone() })
+
         val now = System.currentTimeMillis()
         session.participantLocationHistory[session.ownerPlayerId] = ArrayDeque<TimedPlayerLocation>().apply {
             addLast(TimedPlayerLocation(now, session.entranceLocation.clone()))
@@ -1152,6 +1159,17 @@ class ArenaManager(
                 continue
             }
             val world = Bukkit.getWorld(session.worldName) ?: continue
+
+            // 掃討ミッション: 時間切れチェック
+            if (isClearingMission(session) && isClearingBossTimeExpired(session)) {
+                onClearingBossTimeExpired(session)
+                continue
+            }
+
+            // 掃討ミッション: ボスバー更新（時間表示のため）
+            if (isClearingMission(session) && session.clearingBossSpawned) {
+                updateSessionProgressBossBar(session)
+            }
 
             for (participantId in session.participants.toList()) {
                 val player = Bukkit.getPlayer(participantId)
@@ -3177,6 +3195,12 @@ class ArenaManager(
         if (wave == session.waves && session.finalWaveStartedAtMillis <= 0L) {
             session.finalWaveStartedAtMillis = System.currentTimeMillis()
         }
+
+        // 掃討ミッション: 最終ウェーブでボスをスポーン
+        if (wave == session.waves && isClearingMission(session)) {
+            spawnClearingBosses(session)
+        }
+
         requestWaveStartCombatBgm(session)
         session.waveKillCount.putIfAbsent(wave, 0)
         session.waveClearTargets[wave] = clearTarget
@@ -3823,6 +3847,15 @@ class ArenaManager(
 
         schedulePendingWaveClearedMessageIfReady(session)
 
+        // 掃討ボス死亡チェック
+        if (session.clearingBossEntityIds.contains(mobId)) {
+            session.clearingBossEntityIds.remove(mobId)
+            if (checkClearingBossesDefeated(session)) {
+                onClearingBossDefeated(session)
+                return
+            }
+        }
+
         if (!countKill || wave == null) {
             return
         }
@@ -3932,6 +3965,215 @@ class ArenaManager(
         return session.actionMarkers.values.any { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }
     }
 
+    private fun isClearingMission(session: ArenaSession): Boolean {
+        return session.missionTypeId == ArenaMissionType.CLEARING
+    }
+
+    private fun spawnClearingBosses(session: ArenaSession) {
+        if (!isClearingMission(session)) return
+        if (session.clearingBossSpawned) return
+        if (session.clearingBossLocations.isEmpty()) {
+            plugin.logger.warning("[Arena] CLEARING ミッションですが clearingBossLocations が空です: world=${session.worldName}")
+            return
+        }
+
+        val theme = themeLoader.getTheme(session.themeId)
+        val bossMobId = theme?.clearingBossMobId
+        if (bossMobId.isNullOrBlank()) {
+            plugin.logger.warning("[Arena] CLEARING ミッションですが clearingBossMobId が未定義です: theme=${session.themeId}")
+            return
+        }
+
+        val definition = mobDefinitions[bossMobId]
+        if (definition == null) {
+            plugin.logger.severe("[Arena] clearingBossMobId=$bossMobId のモブ定義が見つかりません")
+            return
+        }
+
+        val world = Bukkit.getWorld(session.worldName)
+        if (world == null) {
+            plugin.logger.severe("[Arena] 掃討ボススポーン失敗: ワールドが見つかりません world=${session.worldName}")
+            return
+        }
+
+        val difficulty = difficultyConfigs[session.difficultyId]
+
+        // 掃討ミッション用の時間制限を設定
+        session.clearingBossTimeLimitSeconds = calculateClearingBossTimeLimitSeconds(session.difficultyId)
+
+        session.clearingBossLocations.forEach { location ->
+            val spawnLocation = location.clone().apply { this.world = world }
+            spawnLocation.add(0.5, 0.0, 0.5)
+
+            val entity = mobService.spawn(
+                definition,
+                spawnLocation,
+                MobSpawnOptions(
+                    featureId = "arena",
+                    sessionKey = "arena:${session.worldName}",
+                    combatActiveProvider = { true },
+                    metadata = mapOf(
+                        "world" to session.worldName,
+                        "wave" to session.waves.toString(),
+                        "total_waves" to session.waves.toString(),
+                        "clearing_boss" to "true"
+                    )
+                )
+            )
+
+            if (entity != null) {
+                entity.removeWhenFarAway = false
+                entity.canPickupItems = false
+                enforceAdultMob(entity)
+                spawnMobAppearParticles(world, entity.location)
+
+                // ボスのステータスを適用（通常のモブとは異なりHP修飾子は適用しない）
+                if (difficulty != null) {
+                    applyMobStats(entity, definition, difficulty, session.sessionVariance, ArenaMissionModifiers.NONE)
+                }
+
+                if (entity is Mob) {
+                    entity.target = findNearestParticipant(session, entity.location)
+                }
+
+                session.clearingBossEntityIds.add(entity.uniqueId)
+                session.activeMobs.add(entity.uniqueId)
+                mobToSessionWorld[entity.uniqueId] = session.worldName
+                mobToDefinitionTypeId[entity.uniqueId] = definition.typeId.trim().lowercase(Locale.ROOT)
+                plugin.logger.info("[Arena] 掃討ボスをスポーン: mobId=$bossMobId location=${spawnLocation.blockX},${spawnLocation.blockY},${spawnLocation.blockZ}")
+            } else {
+                plugin.logger.warning("[Arena] 掃討ボスのスポーンに失敗: mobId=$bossMobId")
+            }
+        }
+
+        session.clearingBossSpawned = true
+        broadcastClearingBossSpawnedMessage(session)
+        updateSessionProgressBossBar(session)
+    }
+
+    private fun broadcastClearingBossSpawnedMessage(session: ArenaSession) {
+        val world = Bukkit.getWorld(session.worldName) ?: return
+        session.participants.forEach { participantId ->
+            val player = Bukkit.getPlayer(participantId)
+            if (player != null && player.isOnline && player.world.name == session.worldName) {
+                player.sendMessage(
+                    ArenaI18n.text(
+                        player,
+                        "arena.messages.clearing.boss_spawned",
+                        "§c§l⚠ 掃討ボスが出現しました！"
+                    )
+                )
+                player.playSound(player.location, Sound.ENTITY_WITHER_SPAWN, 0.7f, 1.2f)
+            }
+        }
+    }
+
+    private fun checkClearingBossesDefeated(session: ArenaSession): Boolean {
+        if (!isClearingMission(session)) return false
+        if (!session.clearingBossSpawned) return false
+        if (session.clearingBossEntityIds.isEmpty()) return true
+
+        val allDefeated = session.clearingBossEntityIds.all { bossId ->
+            val entity = Bukkit.getEntity(bossId)
+            entity == null || entity.isDead || !entity.isValid
+        }
+
+        return allDefeated
+    }
+
+    private fun onClearingBossDefeated(session: ArenaSession) {
+        if (session.phase == ArenaPhase.TERMINATING) return
+
+        plugin.logger.info("[Arena] 掃討ボス全滅: world=${session.worldName}")
+
+        session.participants.forEach { participantId ->
+            val player = Bukkit.getPlayer(participantId)
+            if (player != null && player.isOnline && player.world.name == session.worldName) {
+                player.sendMessage(
+                    ArenaI18n.text(
+                        player,
+                        "arena.messages.clearing.boss_defeated",
+                        "§a§l✓ 掃討ボスを全て倒しました！"
+                    )
+                )
+                player.playSound(player.location, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f)
+            }
+        }
+
+        // 最終ウェーブをクリア扱いにしてミッション成功へ
+        clearWave(session, session.waves)
+    }
+
+    private fun calculateClearingBossTimeLimitSeconds(difficultyId: String): Int {
+        // 難易度IDから★の数を取得（star_1, star_2, etc.）
+        val starMatch = Regex("star_(\\d+)").find(difficultyId)
+        val starLevel = starMatch?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 1
+
+        return when (starLevel) {
+            1 -> 600   // ★1: 10分
+            2 -> 480   // ★2: 8分
+            3 -> 300   // ★3: 5分
+            4 -> 240   // ★4: 4分
+            else -> 600
+        }
+    }
+
+    private fun formatTimeRemaining(seconds: Int): String {
+        val minutes = seconds / 60
+        val secs = seconds % 60
+        return "%02d:%02d".format(minutes, secs)
+    }
+
+    private fun getClearingBossTimeRemainingSeconds(session: ArenaSession): Int {
+        if (!isClearingMission(session)) return -1
+        if (!session.clearingBossSpawned) return -1
+        if (session.finalWaveStartedAtMillis <= 0L) return session.clearingBossTimeLimitSeconds
+
+        val elapsedMillis = (System.currentTimeMillis() - session.finalWaveStartedAtMillis).coerceAtLeast(0L)
+        val elapsedSeconds = (elapsedMillis / 1000).toInt()
+        val remaining = (session.clearingBossTimeLimitSeconds - elapsedSeconds).coerceAtLeast(0)
+        return remaining
+    }
+
+    private fun isClearingBossTimeExpired(session: ArenaSession): Boolean {
+        if (!isClearingMission(session)) return false
+        if (!session.clearingBossSpawned) return false
+        return getClearingBossTimeRemainingSeconds(session) <= 0
+    }
+
+    private fun onClearingBossTimeExpired(session: ArenaSession) {
+        if (session.phase == ArenaPhase.TERMINATING) return
+        if (session.phase == ArenaPhase.GAME_OVER) return
+
+        plugin.logger.info("[Arena] 掃討ミッション時間切れ: world=${session.worldName}")
+
+        session.participants.forEach { participantId ->
+            val player = Bukkit.getPlayer(participantId)
+            if (player != null && player.isOnline && player.world.name == session.worldName) {
+                player.sendMessage(
+                    ArenaI18n.text(
+                        player,
+                        "arena.messages.clearing.time_expired",
+                        "§c§l⚠ 時間切れです！ミッション失敗..."
+                    )
+                )
+                player.playSound(player.location, Sound.ENTITY_WITHER_DEATH, 0.7f, 0.5f)
+            }
+        }
+
+        // 全員をダウン状態にしてゲームオーバー
+        session.phase = ArenaPhase.GAME_OVER
+        session.participants.forEach { participantId ->
+            val player = Bukkit.getPlayer(participantId)
+            if (player != null && player.isOnline && player.world.name == session.worldName) {
+                if (!isPlayerDowned(session, participantId)) {
+                    setPlayerDown(session, player, reviveDisabled = true)
+                }
+            }
+        }
+        convertDownedPlayersToGameOver(session)
+    }
+
     private fun startDoorAnimation(session: ArenaSession, targetWave: Int) {
         if (targetWave <= 0 || targetWave > session.waves) return
         if (!session.animatingDoorWaves.add(targetWave)) return
@@ -4018,6 +4260,7 @@ class ArenaManager(
         onCorridorOpened(session, targetWave)
         if (targetWave == 1 && !session.stageStarted) {
             session.stageStarted = true
+            session.firstDoorOpenedAtMillis = System.currentTimeMillis()
             transitionSessionPhase(session, ArenaPhase.IN_PROGRESS)
         }
         playDoorAnimationSound(session)
@@ -4699,6 +4942,28 @@ class ArenaManager(
         }
 
         val wave = session.currentWave.coerceIn(1, session.waves)
+
+        // 掃討ミッション: 最終ウェーブでボスバーに残り時間を表示
+        if (wave == session.waves && isClearingMission(session) && session.clearingBossSpawned) {
+            val remainingSeconds = getClearingBossTimeRemainingSeconds(session)
+            val timeText = formatTimeRemaining(remainingSeconds)
+            val bossCount = session.clearingBossEntityIds.size
+            val aliveBossCount = session.clearingBossEntityIds.count { bossId ->
+                val entity = Bukkit.getEntity(bossId)
+                entity != null && !entity.isDead && entity.isValid
+            }
+            val progress = if (bossCount > 0) {
+                (1.0 - (aliveBossCount.toDouble() / bossCount.toDouble())).toFloat().coerceIn(0.0f, 1.0f)
+            } else {
+                1.0f
+            }
+            val barColor = if (remainingSeconds <= 60) BossBar.Color.RED else BossBar.Color.PURPLE
+            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.clearing_boss", "§7- §5掃討ボス §7- §c{time} §8(§7残り§b{alive}§8体)", "time" to timeText, "alive" to aliveBossCount)))
+            bossBar.color(barColor)
+            bossBar.progress(progress)
+            return
+        }
+
         if (wave == session.waves && hasBarrierActivationObjective(session)) {
             val total = session.actionMarkers.values.count { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }.coerceAtLeast(1)
             val activated = session.actionMarkers.values.count {
@@ -6962,6 +7227,15 @@ class ArenaManager(
             inGetReady -> ArenaI18n.text(null, "arena.ui.sidebar.get_ready", "§7§lGet Ready!")
             else -> buildWaveSidebarHeader(session, sidebarWave ?: session.currentWave.coerceAtLeast(1))
         }
+
+        // 掃討ミッション: 経過時間を表示
+        if (isClearingMission(session) && session.firstDoorOpenedAtMillis != null) {
+            val elapsedMillis = System.currentTimeMillis() - session.firstDoorOpenedAtMillis!!
+            val elapsedSeconds = (elapsedMillis / 1000).toInt().coerceAtLeast(0)
+            val elapsedTimeText = formatTimeRemaining(elapsedSeconds)
+            lines += ArenaI18n.text(null, "arena.ui.sidebar.elapsed_time", "§7経過: §f{time}", "time" to elapsedTimeText)
+        }
+
         lines += ""
 
         val participantOrder = if (session.sidebarParticipantOrder.isNotEmpty()) {

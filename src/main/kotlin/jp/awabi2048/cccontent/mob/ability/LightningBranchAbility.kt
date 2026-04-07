@@ -36,11 +36,13 @@ class LightningBranchAbility(
     private val damageRadius: Double = 1.2,
     private val damageMultiplier: Double = 1.0,
     private val cooldownTicks: Long = 120L,
-    private val renderDurationTicks: Int = 8,
     private val minRange: Double = 2.0,
     private val maxRange: Double = 14.0,
     private val preCastTicks: Long = 15L,
     private val postCastFreezeTicks: Long = 10L,
+    private val triggerOnDamaged: Boolean = true,
+    private val requireLineOfSight: Boolean = true,
+    private val allowNearestPlayerFallback: Boolean = false,
 ) : MobAbility {
 
     override fun tickIntervalTicks(): Long = 1L
@@ -108,10 +110,10 @@ class LightningBranchAbility(
 
         if (Random.nextDouble() < context.loadSnapshot.abilityExecutionSkipChance) return
 
-        val target = MobAbilityUtils.resolveTarget(entity) ?: return
+        val target = resolveTarget(entity) ?: return
         val distance = entity.location.distance(target.location)
         if (distance < minRange || distance > maxRange) return
-        if (!entity.hasLineOfSight(target)) return
+        if (requireLineOfSight && !entity.hasLineOfSight(target)) return
 
         rt.isPreCasting = true
         rt.targetId = target.uniqueId
@@ -120,6 +122,7 @@ class LightningBranchAbility(
     }
 
     override fun onDamaged(context: MobDamagedContext, runtime: MobAbilityRuntime?) {
+        if (!triggerOnDamaged) return
         val rt = runtime as? Runtime ?: return
         if (!context.isCombatActive()) return
         if (context.event.isCancelled) return
@@ -168,7 +171,7 @@ class LightningBranchAbility(
                 sin(pitch),
                 sin(yaw) * cos(pitch)
             ).normalize()
-            generateBranch(origin.toVector().clone(), direction, maxBoltLength, 0, segments)
+            generateBranch(origin.toVector().clone(), direction, maxBoltLength, 0, 0, segments)
         }
 
         entity.world.playSound(entity.location, Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 1.0f, 2.0f)
@@ -198,6 +201,7 @@ class LightningBranchAbility(
         direction: Vector,
         remainingLength: Double,
         depth: Int,
+        delayTicks: Int,
         result: MutableList<BoltSegment>
     ) {
         var current = start.clone()
@@ -217,7 +221,7 @@ class LightningBranchAbility(
             val step = segmentLength.coerceAtMost(remaining)
             val next = current.clone().add(currentDir.clone().multiply(step))
 
-            result.add(BoltSegment(current.clone(), next.clone(), depth))
+            result.add(BoltSegment(current.clone(), next.clone(), depth, delayTicks))
 
             if (depth < maxBranchDepth && Random.nextDouble() < branchProbability) {
                 val branchDir = Vector(
@@ -233,6 +237,7 @@ class LightningBranchAbility(
                     branchDir,
                     remaining * branchLengthDecay,
                     depth + 1,
+                    delayTicks + 1,
                     result
                 )
             }
@@ -332,62 +337,70 @@ class LightningBranchAbility(
 
     private fun startRenderTask(plugin: JavaPlugin, entity: LivingEntity, segments: List<BoltSegment>) {
         val world = entity.world
-        var tick = 0
-
-        object : BukkitRunnable() {
-            override fun run() {
+        val byDelay = segments.groupBy { it.delayTicks }.toSortedMap()
+        byDelay.forEach { (delayTicks, delayedSegments) ->
+            Bukkit.getScheduler().runTaskLater(plugin, Runnable {
                 if (!entity.isValid || entity.isDead) {
-                    cancel()
-                    return
+                    return@Runnable
                 }
+                delayedSegments.forEach { segment -> renderSegment(world, segment) }
+            }, delayTicks.toLong().coerceAtLeast(0L))
+        }
+    }
 
-                val fade = 1.0 - (tick.toDouble() / renderDurationTicks)
-                if (fade <= 0.0) {
-                    cancel()
-                    return
-                }
-
-                for (segment in segments) {
-                    val segVec = segment.end.clone().subtract(segment.start)
-                    val segLen = segVec.length()
-                    if (segLen < 0.01) continue
-
-                    val stepVec = segVec.normalize().multiply(RENDER_STEP)
-                    val steps = (segLen / RENDER_STEP).toInt().coerceAtLeast(1)
-                    var cursor = segment.start.clone()
-
-                    repeat(steps) {
-                        val loc = Location(world, cursor.x, cursor.y, cursor.z)
-
-                        world.spawnParticle(Particle.SOUL_FIRE_FLAME, loc, 1, 0.05, 0.05, 0.05, 0.02)
-                        world.spawnParticle(
-                            Particle.DUST_COLOR_TRANSITION, loc, 1,
-                            0.06, 0.06, 0.06, 0.0,
-                            if (segment.depth == 0) {
-                                Particle.DustTransition(
-                                    Color.fromRGB(100, 200, 255),
-                                    Color.fromRGB(220, 240, 255),
-                                    1.3f
-                                )
-                            } else {
-                                Particle.DustTransition(
-                                    Color.fromRGB(140, 210, 255),
-                                    Color.fromRGB(230, 245, 255),
-                                    1.3f
-                                )
-                            }
-                        )
-
-                        cursor.add(stepVec)
-                    }
-                }
-
-                tick++
-                if (tick >= renderDurationTicks) {
-                    cancel()
-                }
+    private fun resolveTarget(entity: LivingEntity): LivingEntity? {
+        val fixedTarget = MobAbilityUtils.resolveTarget(entity)
+        if (fixedTarget != null) {
+            return fixedTarget
+        }
+        if (!allowNearestPlayerFallback) {
+            return null
+        }
+        val horizontalRange = maxRange.coerceAtLeast(1.0)
+        val verticalRange = (maxRange * 0.75).coerceAtLeast(1.0)
+        return entity.getNearbyEntities(horizontalRange, verticalRange, horizontalRange)
+            .asSequence()
+            .filterIsInstance<Player>()
+            .filter {
+                it.isValid &&
+                    !it.isDead &&
+                    it.world.uid == entity.world.uid &&
+                    it.gameMode != org.bukkit.GameMode.SPECTATOR
             }
-        }.runTaskTimer(plugin, 0L, 1L)
+            .minByOrNull { it.location.distanceSquared(entity.location) }
+    }
+
+    private fun renderSegment(world: org.bukkit.World, segment: BoltSegment) {
+        val segVec = segment.end.clone().subtract(segment.start)
+        val segLen = segVec.length()
+        if (segLen < 0.01) return
+
+        val stepVec = segVec.normalize().multiply(RENDER_STEP)
+        val steps = (segLen / RENDER_STEP).toInt().coerceAtLeast(1)
+        var cursor = segment.start.clone()
+
+        repeat(steps) {
+            val loc = Location(world, cursor.x, cursor.y, cursor.z)
+            world.spawnParticle(Particle.SOUL_FIRE_FLAME, loc, 1, 0.05, 0.05, 0.05, 0.02)
+            world.spawnParticle(
+                Particle.DUST_COLOR_TRANSITION, loc, 1,
+                0.06, 0.06, 0.06, 0.0,
+                if (segment.depth == 0) {
+                    Particle.DustTransition(
+                        Color.fromRGB(100, 200, 255),
+                        Color.fromRGB(220, 240, 255),
+                        1.3f
+                    )
+                } else {
+                    Particle.DustTransition(
+                        Color.fromRGB(140, 210, 255),
+                        Color.fromRGB(230, 245, 255),
+                        1.3f
+                    )
+                }
+            )
+            cursor.add(stepVec)
+        }
     }
 
     private fun renderChargeEffect(entity: LivingEntity) {
@@ -412,7 +425,12 @@ class LightningBranchAbility(
         return point.distance(closest)
     }
 
-    private data class BoltSegment(val start: Vector, val end: Vector, val depth: Int)
+    private data class BoltSegment(
+        val start: Vector,
+        val end: Vector,
+        val depth: Int,
+        val delayTicks: Int
+    )
 
     companion object {
         private const val SEARCH_PHASE_VARIANTS = 16

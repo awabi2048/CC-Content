@@ -22,7 +22,8 @@ data class ArenaTheme(
     val orientation: ArenaStructureOrientation,
     val gridPitch: Int,
     val staticStructures: Map<ArenaStructureType, List<ArenaStaticStructureVariant>>,
-    val animatedStructures: Map<ArenaStructureType, List<ArenaAnimatedStructureVariant>>
+    val animatedStructures: Map<ArenaStructureType, List<ArenaAnimatedStructureVariant>>,
+    val clearingBossMobId: String? = null
 )
 
 data class ArenaThemeDoorOpenSound(
@@ -104,7 +105,8 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
         val baseDifficultyStar: Int,
         val mobSpawnConfig: ArenaThemeMobSpawnConfig,
         val doorOpenSound: ArenaThemeDoorOpenSound,
-        val orientation: ArenaStructureOrientation
+        val orientation: ArenaStructureOrientation,
+        val clearingBossMobId: String? = null
     )
 
     private sealed interface StructureState {
@@ -224,7 +226,8 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 orientation = parsedThemeConfig.orientation,
                 gridPitch = gridPitch,
                 staticStructures = loaded.staticStructures,
-                animatedStructures = loaded.animatedStructures
+                animatedStructures = loaded.animatedStructures,
+                clearingBossMobId = parsedThemeConfig.clearingBossMobId
             )
         }
 
@@ -390,6 +393,8 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             return null
         }
 
+        val clearingBossMobId = section.getString("clearing_boss_mob_id")?.trim()?.takeIf { it.isNotBlank() }
+
         return ParsedThemeConfig(
             iconMaterial = iconMaterial,
             weight = weight,
@@ -410,7 +415,8 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 straightEntry = straightEntry,
                 corridorEntry = corridorEntry,
                 goalEntry = goalEntry
-            )
+            ),
+            clearingBossMobId = clearingBossMobId
         )
     }
 

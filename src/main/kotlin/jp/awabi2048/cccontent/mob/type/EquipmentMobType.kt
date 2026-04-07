@@ -129,7 +129,11 @@ open class EquipmentMobType(
             "enderman_phase" to 0.95,
             "enderman_drain" to 1.05,
             "enderman_mirror" to 1.15,
-            "enderman_eye_summoner" to 1.25
+            "enderman_eye_summoner" to 1.25,
+            "enderman_mist_delay" to 1.0,
+            "enderman_small_backstab" to 0.75,
+            "endermite_poison" to 1.5,
+            "shulker_turret_sniper" to 1.5
         )
     }
 }

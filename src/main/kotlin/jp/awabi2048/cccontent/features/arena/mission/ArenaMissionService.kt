@@ -281,6 +281,13 @@ class ArenaMissionService(
             val inviteMissionTitle = "${missionDisplayName(mission.missionTypeId)}＠${themeDisplayName(player, mission.themeId)}"
             val inviteMissionLore = buildMissionConfirmLore(player, mission)
 
+            // ミッションタイプに基づいてミッション修飾子を決定
+            val missionType = ArenaMissionType.fromId(mission.missionTypeId) ?: ArenaMissionType.BARRIER_RESTART
+            val missionModifiers = when (missionType) {
+                ArenaMissionType.CLEARING -> ArenaMissionModifiers.CLEARING
+                else -> ArenaMissionModifiers.NONE
+            }
+
             when (val result = arenaManager.startSession(
                 player,
                 mission.difficultyId,
@@ -289,7 +296,9 @@ class ArenaMissionService(
                 inviteMissionTitle = inviteMissionTitle,
                 inviteMissionLore = inviteMissionLore,
                 maxParticipants = mission.maxParticipants,
-                showSessionStartedMessage = false
+                showSessionStartedMessage = false,
+                missionModifiers = missionModifiers,
+                missionTypeId = missionType
             )) {
                 is ArenaStartResult.Success -> {
                     activeMissions[player.uniqueId] = ArenaActiveMissionRecord(dateKey, mission.index, mission)

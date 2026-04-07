@@ -80,11 +80,17 @@ import jp.awabi2048.cccontent.mob.type.EndermanPhaseMobType
 import jp.awabi2048.cccontent.mob.type.EndermanDrainMobType
 import jp.awabi2048.cccontent.mob.type.EndermanMirrorMobType
 import jp.awabi2048.cccontent.mob.type.EndermanEyeSummonerMobType
+import jp.awabi2048.cccontent.mob.type.EndermanMistDelayMobType
+import jp.awabi2048.cccontent.mob.type.EndermanSmallBackstabMobType
+import jp.awabi2048.cccontent.mob.type.EndermitePoisonMobType
 import jp.awabi2048.cccontent.mob.type.ShulkerRhythmMobType
 import jp.awabi2048.cccontent.mob.type.ShulkerLaserMobType
 import jp.awabi2048.cccontent.mob.type.ShulkerDisruptorMobType
+import jp.awabi2048.cccontent.mob.type.ShulkerTurretSniperMobType
+import jp.awabi2048.cccontent.mob.type.ShulkerTurretBarrageMobType
 import jp.awabi2048.cccontent.mob.type.EnderEyeHunterMobType
 import jp.awabi2048.cccontent.mob.type.EnderEyeOrbitMobType
+import jp.awabi2048.cccontent.mob.type.EnderEyeBeamMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
@@ -114,6 +120,7 @@ import org.bukkit.entity.Fireball
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Player
 import org.bukkit.entity.Projectile
+import org.bukkit.entity.ShulkerBullet
 import org.bukkit.entity.SmallFireball
 import org.bukkit.entity.Slime
 import org.bukkit.entity.LingeringPotion
@@ -158,6 +165,7 @@ class MobService(private val plugin: JavaPlugin) {
 
     companion object {
         private val instances = WeakHashMap<JavaPlugin, MobService>()
+        private const val VISUAL_SHULKER_BULLET_TAG = "cc.mob.visual_shulker_bullet"
         private const val STEALTH_FANG_KNOCKUP = 0.55
 
         fun getInstance(plugin: JavaPlugin): MobService? {
@@ -327,11 +335,17 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(EndermanDrainMobType())
         registerMobType(EndermanMirrorMobType())
         registerMobType(EndermanEyeSummonerMobType())
+        registerMobType(EndermanMistDelayMobType())
+        registerMobType(EndermanSmallBackstabMobType())
+        registerMobType(EndermitePoisonMobType())
         registerMobType(ShulkerRhythmMobType())
         registerMobType(ShulkerLaserMobType())
         registerMobType(ShulkerDisruptorMobType())
+        registerMobType(ShulkerTurretSniperMobType())
+        registerMobType(ShulkerTurretBarrageMobType())
         registerMobType(EnderEyeHunterMobType())
         registerMobType(EnderEyeOrbitMobType())
+        registerMobType(EnderEyeBeamMobType())
     }
 
     fun registerMobType(mobType: MobType) {
@@ -708,6 +722,9 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun handleProjectileLaunch(event: ProjectileLaunchEvent) {
         val projectile = event.entity as? Projectile ?: return
+        if (projectile is ShulkerBullet && projectile.scoreboardTags.contains(VISUAL_SHULKER_BULLET_TAG)) {
+            return
+        }
         val shooter = projectile.shooter as? LivingEntity ?: return
         val activeMob = activeMobs[shooter.uniqueId] ?: return
 
