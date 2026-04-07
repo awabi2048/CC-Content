@@ -1,13 +1,17 @@
 package jp.awabi2048.cccontent.mob.type
 
+import com.destroystokyo.paper.profile.ProfileProperty
 import jp.awabi2048.cccontent.mob.CustomMobRuntime
 import jp.awabi2048.cccontent.mob.MobSpawnContext
 import jp.awabi2048.cccontent.mob.ability.MobAbility
+import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.attribute.Attribute
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.Slime
 import org.bukkit.inventory.ItemStack
+import org.bukkit.inventory.meta.SkullMeta
+import java.util.UUID
 
 open class EquipmentMobType(
     id: String,
@@ -18,7 +22,8 @@ open class EquipmentMobType(
     private val defaultHelmet: Material? = null,
     private val defaultChestplate: Material? = null,
     private val defaultLeggings: Material? = null,
-    private val defaultBoots: Material? = null
+    private val defaultBoots: Material? = null,
+    private val defaultHelmetTexture: String? = null
 ) : AbilityMobType(
     id = id,
     baseEntityType = baseEntityType,
@@ -39,10 +44,26 @@ open class EquipmentMobType(
         if (offHand != null) {
             equipment.setItemInOffHand(ItemStack(offHand))
         }
-        val helmet = defaultHelmet
-        if (helmet != null) {
-            equipment.helmet = ItemStack(helmet)
+
+        val helmetTexture = defaultHelmetTexture
+        if (helmetTexture != null) {
+            val skull = ItemStack(Material.PLAYER_HEAD)
+            val skullMeta = skull.itemMeta as? SkullMeta
+            if (skullMeta != null) {
+                val profile = Bukkit.createProfile(UUID.randomUUID(), "cc_static_head")
+                profile.setProperty(ProfileProperty("textures", helmetTexture))
+                skullMeta.playerProfile = profile
+                skull.itemMeta = skullMeta
+            }
+            equipment.helmet = skull
+            equipment.helmetDropChance = 0.0f
+        } else {
+            val helmet = defaultHelmet
+            if (helmet != null) {
+                equipment.helmet = ItemStack(helmet)
+            }
         }
+
         val chestplate = defaultChestplate
         if (chestplate != null) {
             equipment.chestplate = ItemStack(chestplate)
