@@ -109,6 +109,7 @@ class CCContent : JavaPlugin(), Listener {
     private var persistenceFlushTask: BukkitTask? = null
     private lateinit var featureInitLogger: FeatureInitializationLogger
     private lateinit var coreConfig: YamlConfiguration
+    private var arenaLanguageValidationErrors: List<String> = emptyList()
     
     // SukimaDungeon マネージャー (GitHub版)
     private lateinit var structureLoader: StructureLoader
@@ -150,7 +151,19 @@ class CCContent : JavaPlugin(), Listener {
     private fun startPlugin() {
         instance = this
         coreConfig = CoreConfigManager.load(this)
-        LanguageFileValidator.validateAll(this)
+        val languageValidationResult = LanguageFileValidator.validateAndCollect(this)
+        val (arenaErrors, nonArenaErrors) = splitArenaLanguageErrors(languageValidationResult.errors)
+        arenaLanguageValidationErrors = arenaErrors
+        if (nonArenaErrors.isNotEmpty()) {
+            val detail = nonArenaErrors.joinToString("\n") { "- $it" }
+            throw IllegalStateException("言語ファイル検証に失敗しました:\n$detail")
+        }
+        if (arenaErrors.isNotEmpty()) {
+            logger.warning("[Arena] 言語ファイル検証でArena領域のエラーを検出したため、Arena機能を無効化します")
+            arenaErrors.forEach { error -> logger.warning("[Arena][Lang] $error") }
+            arenaFeatureReady = false
+            arenaFeatureFailureReason = "Arena言語ファイルの検証エラーにより無効化"
+        }
         contentEnabledAtStartup = loadContentEnabledSettings()
 
         featureInitLogger = FeatureInitializationLogger(logger)
@@ -186,6 +199,15 @@ class CCContent : JavaPlugin(), Listener {
         }
 
         initializeFeatureIfEnabled("Arena", "arena") {
+            if (arenaLanguageValidationErrors.isNotEmpty()) {
+                arenaFeatureReady = false
+                if (arenaFeatureFailureReason.isNullOrBlank()) {
+                    arenaFeatureFailureReason = "Arena言語ファイルの検証エラーにより無効化"
+                }
+                featureInitLogger.setStatus("Arena", FeatureInitializationLogger.Status.WARNING)
+                featureInitLogger.addSummaryMessage("Arena", "言語ファイル検証エラーにより無効化")
+                return@initializeFeatureIfEnabled
+            }
             try {
                 arenaFeatureReady = false
                 arenaFeatureFailureReason = null
@@ -806,7 +828,35 @@ class CCContent : JavaPlugin(), Listener {
      */
     private fun reloadConfigFiles() {
         coreConfig = CoreConfigManager.load(this)
-        LanguageFileValidator.validateAll(this)
+        val languageValidationResult = LanguageFileValidator.validateAndCollect(this)
+        val (arenaErrors, nonArenaErrors) = splitArenaLanguageErrors(languageValidationResult.errors)
+        if (nonArenaErrors.isNotEmpty()) {
+            val detail = nonArenaErrors.joinToString("\n") { "- $it" }
+            throw IllegalStateException("言語ファイル検証に失敗しました:\n$detail")
+        }
+
+        arenaLanguageValidationErrors = arenaErrors
+        if (arenaErrors.isNotEmpty()) {
+            if (arenaFeatureReady) {
+                arenaMissionService?.shutdown()
+                arenaSessionInfoMenu = null
+                arenaEnchantPedestalMenu = null
+                if (::arenaManager.isInitialized) {
+                    arenaManager.setMissionService(null)
+                    arenaManager.shutdown()
+                }
+            }
+            arenaFeatureReady = false
+            arenaFeatureFailureReason = "Arena言語ファイルの検証エラーにより無効化"
+            logger.warning("[Arena] 言語ファイル検証エラーを検出したためArena機能を停止します")
+            arenaErrors.forEach { error -> logger.warning("[Arena][Lang] $error") }
+            logger.info("[CCContent] config 配下の再読込を完了しました(Arena無効)")
+            return
+        }
+
+        if (!arenaFeatureReady && isContentEnabledAtStartup("arena") && arenaFeatureFailureReason != null) {
+            logger.warning("[Arena] 現在Arena機能は無効です。再有効化にはサーバー再起動が必要です")
+        }
         logContentEnabledChangeIfNeeded(loadContentEnabledSettings())
         SukimaConfigHelper.reload(this)
         MessageManager.load(this)
@@ -836,6 +886,26 @@ class CCContent : JavaPlugin(), Listener {
         }
 
         logger.info("[CCContent] config 配下の再読込を完了しました")
+    }
+
+    private fun splitArenaLanguageErrors(errors: List<String>): Pair<List<String>, List<String>> {
+        if (errors.isEmpty()) {
+            return emptyList<String>() to emptyList()
+        }
+        val arenaErrors = mutableListOf<String>()
+        val nonArenaErrors = mutableListOf<String>()
+        errors.forEach { error ->
+            val isArenaRelated =
+                error.contains("arena.") ||
+                    error.contains("resource:lang/arena", ignoreCase = true) ||
+                    error.contains("file:", ignoreCase = true) && error.contains("lang") && error.contains("arena", ignoreCase = true)
+            if (isArenaRelated) {
+                arenaErrors += error
+            } else {
+                nonArenaErrors += error
+            }
+        }
+        return arenaErrors to nonArenaErrors
     }
 
     /**

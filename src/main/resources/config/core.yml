@@ -129,8 +129,8 @@ arena:
     stage_build_steps_per_tick: 1
   entrance_lift:
     interval_ticks: 10
-    transfer_rise_blocks: 2
-    max_rise_blocks: 6
+    transfer_rise_blocks: 10
+    max_rise_blocks: 17
   session:
     max_concurrent: 3
   world_pool:

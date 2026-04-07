@@ -4,6 +4,8 @@ import org.bukkit.Bukkit
 import org.bukkit.Particle
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.potion.PotionEffect
+import org.bukkit.potion.PotionEffectType
 import java.util.UUID
 import kotlin.random.Random
 
@@ -25,11 +27,14 @@ class ConfusionManager(private val plugin: JavaPlugin) {
         val currentTick = Bukkit.getCurrentTick().toLong()
         val state = states[playerId]
         val newExpire = currentTick + durationTicks
+        val player = Bukkit.getPlayer(playerId)
+        if (player != null && player.isOnline) {
+            applyNauseaEffect(player)
+        }
         if (state != null) {
             states[playerId] = state.copy(expireAtTick = maxOf(state.expireAtTick, newExpire))
         } else {
             states[playerId] = ConfusionState(expireAtTick = newExpire)
-            val player = Bukkit.getPlayer(playerId)
             if (player != null && player.isOnline) {
                 player.world.spawnParticle(
                     Particle.ANGRY_VILLAGER,
@@ -92,11 +97,19 @@ class ConfusionManager(private val plugin: JavaPlugin) {
         )
     }
 
+    private fun applyNauseaEffect(player: Player) {
+        val nauseaType = PotionEffectType.getByName("NAUSEA")
+            ?: PotionEffectType.getByName("CONFUSION")
+            ?: return
+        player.addPotionEffect(PotionEffect(nauseaType, CONFUSION_NAUSEA_TICKS, 0, false, false, false), true)
+    }
+
     companion object {
         private const val MOVEMENT_NOISE_INTERVAL_TICKS = 10L
         private const val MOVEMENT_NOISE_CHANCE = 0.5
         private const val MOVEMENT_NOISE_MIN = 0.2
         private const val MOVEMENT_NOISE_MAX = 0.35
         private const val PARTICLE_INTERVAL_TICKS = 20L
+        private const val CONFUSION_NAUSEA_TICKS = 20
     }
 }
