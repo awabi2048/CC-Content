@@ -832,6 +832,7 @@ class ArenaManager(
                     world = world,
                     origin = origin,
                     theme = theme,
+                    missionTypeId = missionTypeId,
                     waves = difficulty.waves,
                     random = random,
                     stepsPerTick = multiplayerStageBuildStepsPerTick
@@ -868,7 +869,7 @@ class ArenaManager(
                         }
                 }
             } else {
-                val stage = stageGenerator.build(world, origin, theme, difficulty.waves, random)
+                val stage = stageGenerator.build(world, origin, theme, missionTypeId, difficulty.waves, random)
                 applyStageBuildResult(session, stage)
                 initializeActionMarkers(session)
                 initializeBarrierRestartState(session)
@@ -1182,7 +1183,7 @@ class ArenaManager(
                 val location = player.location
                 applyFinalWaveOvertimeWither(session, player, now)
 
-                if (session.barrierRestartCompleted) {
+                if (session.barrierRestartCompleted || session.missionCompleted) {
                     continue
                 }
 
@@ -1225,7 +1226,7 @@ class ArenaManager(
     }
 
     private fun applyFinalWaveOvertimeWither(session: ArenaSession, player: Player, nowMillis: Long) {
-        if (session.barrierRestartCompleted) return
+        if (session.barrierRestartCompleted || session.missionCompleted) return
         if (session.finalWaveStartedAtMillis <= 0L) return
         if (!session.startedWaves.contains(session.waves)) return
         if (player.world.name != session.worldName) return
@@ -2867,7 +2868,7 @@ class ArenaManager(
         }
 
         if (session.participants.isEmpty()) {
-            terminateSession(session, false)
+            terminateSession(session, session.missionCompleted)
         }
         return true
     }
@@ -3873,6 +3874,10 @@ class ArenaManager(
             return
         }
 
+        if (isClearingMission(session) && wave == session.waves) {
+            return
+        }
+
         session.totalKillCount += 1
 
         if (session.clearedWaves.contains(wave)) {
@@ -3975,6 +3980,9 @@ class ArenaManager(
     }
 
     private fun hasBarrierActivationObjective(session: ArenaSession): Boolean {
+        if (isClearingMission(session)) {
+            return false
+        }
         return session.actionMarkers.values.any { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }
     }
 
@@ -3991,10 +3999,11 @@ class ArenaManager(
         }
 
         val theme = themeLoader.getTheme(session.themeId)
-        val bossMobId = theme?.clearingBossMobId
-        if (bossMobId.isNullOrBlank()) {
-            plugin.logger.warning("[Arena] CLEARING ミッションですが clearingBossMobId が未定義です: theme=${session.themeId}")
-            return
+        val bossMobId = if (!theme?.clearingBossMobId.isNullOrBlank()) {
+            theme!!.clearingBossMobId!!
+        } else {
+            plugin.logger.warning("[Arena] CLEARING ミッション: clearingBossMobId が未定義のためデフォルトmobId=zombie を使用: theme=${session.themeId}")
+            "zombie"
         }
 
         val definition = mobDefinitions[bossMobId]
@@ -4060,6 +4069,7 @@ class ArenaManager(
         }
 
         session.clearingBossSpawned = true
+        session.clearingBossTotalCount = session.clearingBossEntityIds.size
         broadcastClearingBossSpawnedMessage(session)
         updateSessionProgressBossBar(session)
     }
@@ -4099,22 +4109,64 @@ class ArenaManager(
 
         plugin.logger.info("[Arena] 掃討ボス全滅: world=${session.worldName}")
 
+        completeClearingMission(session)
+    }
+
+    private fun completeClearingMission(session: ArenaSession) {
+        if (session.missionCompleted) return
+
+        requestArenaBgmMode(session, ArenaBgmMode.STOPPED, strictNextBoundary = true)
+
+        session.missionCompleted = true
+        session.finalWaveStartedAtMillis = 0L
+        stopWaveSpawning(session, session.waves)
+
+        removeRemainingWaveMobs(session)
+        removeAllMobsInArenaWorld(session, smoke = true)
+        session.lastClearedWaveForBossBar = session.waves
+        updateSessionProgressBossBar(session)
+        updateArenaSidebars()
+
+        val world = Bukkit.getWorld(session.worldName)
+
         session.participants.forEach { participantId ->
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline && player.world.name == session.worldName) {
                 player.sendMessage(
                     ArenaI18n.text(
                         player,
-                        "arena.messages.clearing.boss_defeated",
-                        "§a§l✓ 掃討ボスを全て倒しました！"
+                        "arena.messages.clearing.success",
+                        "§a§l掃討ボスを全て討伐しました！ミッションクリア！"
                     )
                 )
+                player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 2.0f)
                 player.playSound(player.location, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f)
+                if (world != null) {
+                    spawnMobAppearParticles(world, player.location)
+                }
             }
         }
 
-        // 最終ウェーブをクリア扱いにしてミッション成功へ
-        clearWave(session, session.waves)
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
+            if (!activeSession.missionCompleted) return@Runnable
+            activeSession.participants.forEach { participantId ->
+                val player = Bukkit.getPlayer(participantId)
+                if (player != null && player.isOnline && player.world.name == activeSession.worldName) {
+                    player.sendTitle(
+                        "",
+                        ArenaI18n.text(
+                            player,
+                            "arena.messages.mission.return_hint",
+                            "§7Shift長押しでロビーに帰還できます"
+                        ),
+                        0,
+                        50,
+                        10
+                    )
+                }
+            }
+        }, 200L)
     }
 
     private fun calculateClearingBossTimeLimitSeconds(difficultyId: String): Int {
@@ -4160,6 +4212,8 @@ class ArenaManager(
 
         plugin.logger.info("[Arena] 掃討ミッション時間切れ: world=${session.worldName}")
 
+        stopWaveSpawning(session, session.waves)
+
         session.participants.forEach { participantId ->
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline && player.world.name == session.worldName) {
@@ -4174,8 +4228,6 @@ class ArenaManager(
             }
         }
 
-        // 全員をダウン状態にしてゲームオーバー
-        session.phase = ArenaPhase.GAME_OVER
         session.participants.forEach { participantId ->
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline && player.world.name == session.worldName) {
@@ -4960,16 +5012,13 @@ class ArenaManager(
         if (wave == session.waves && isClearingMission(session) && session.clearingBossSpawned) {
             val remainingSeconds = getClearingBossTimeRemainingSeconds(session)
             val timeText = formatTimeRemaining(remainingSeconds)
-            val bossCount = session.clearingBossEntityIds.size
+            val bossCount = session.clearingBossTotalCount.coerceAtLeast(1)
             val aliveBossCount = session.clearingBossEntityIds.count { bossId ->
                 val entity = Bukkit.getEntity(bossId)
                 entity != null && !entity.isDead && entity.isValid
             }
-            val progress = if (bossCount > 0) {
-                (1.0 - (aliveBossCount.toDouble() / bossCount.toDouble())).toFloat().coerceIn(0.0f, 1.0f)
-            } else {
-                1.0f
-            }
+            val defeatedCount = bossCount - aliveBossCount
+            val progress = (defeatedCount.toDouble() / bossCount.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
             val barColor = if (remainingSeconds <= 60) BossBar.Color.RED else BossBar.Color.PURPLE
             bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.clearing_boss", "§7- §5掃討ボス §7- §c{time} §8(§7残り§b{alive}§8体)", "time" to timeText, "alive" to aliveBossCount)))
             bossBar.color(barColor)
@@ -5292,7 +5341,7 @@ class ArenaManager(
     private fun scheduleStartEntranceNormalBgm(session: ArenaSession, delayTicks: Long = 0L) {
         val task = Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             val activeSession = sessionsByWorld[session.worldName] ?: return@Runnable
-            if (!activeSession.stageStarted || activeSession.barrierRestartCompleted) {
+            if (!activeSession.stageStarted || activeSession.barrierRestartCompleted || activeSession.missionCompleted) {
                 return@Runnable
             }
             if (activeSession.entranceNormalBgmStarted) {
@@ -5313,7 +5362,7 @@ class ArenaManager(
     }
 
     private fun requestArenaBgmMode(session: ArenaSession, targetMode: ArenaBgmMode, strictNextBoundary: Boolean = false) {
-        if (session.barrierRestartCompleted && targetMode != ArenaBgmMode.STOPPED) {
+        if ((session.barrierRestartCompleted || session.missionCompleted) && targetMode != ArenaBgmMode.STOPPED) {
             return
         }
         if (targetMode != ArenaBgmMode.COMBAT) {
@@ -5390,7 +5439,7 @@ class ArenaManager(
             }
 
             val hasAliveCombatMob = hasAnyAliveCombatMob(session)
-            if (session.stageStarted && !session.barrierRestarting && !session.barrierRestartCompleted) {
+            if (session.stageStarted && !session.barrierRestarting && !session.barrierRestartCompleted && !session.missionCompleted) {
                 if (hasAliveCombatMob) {
                     session.hadAliveCombatMobs = true
                     session.combatMobEmptySinceTick = null
@@ -5937,26 +5986,28 @@ class ArenaManager(
         }
         val markers = mutableMapOf<UUID, ArenaActionMarker>()
 
-        session.barrierPointLocations.forEach { location ->
-            val marker = ArenaActionMarker(
-                id = UUID.randomUUID(),
-                type = ArenaActionMarkerType.BARRIER_ACTIVATE,
-                center = location.clone().apply {
-                    this.world = world
-                    y += ACTION_MARKER_CENTER_Y_OFFSET
-                },
-                holdTicksRequired = BARRIER_MARKER_HOLD_TICKS,
-                stateColors = mapOf(
-                    ArenaActionMarkerState.PRE_ACTIVATED to Color.fromRGB(255, 216, 64),
-                    ArenaActionMarkerState.READY to Color.fromRGB(255, 216, 64),
-                    ArenaActionMarkerState.RUNNING to Color.fromRGB(128, 220, 255)
-                ),
-                state = ArenaActionMarkerState.READY
-            )
-            marker.colorTransitionFrom = marker.colorFor(ArenaActionMarkerState.READY)
-            marker.colorTransitionTo = marker.colorFor(ArenaActionMarkerState.READY)
-            marker.colorTransitionStartTick = Bukkit.getCurrentTick().toLong()
-            markers[marker.id] = marker
+        if (!isClearingMission(session)) {
+            session.barrierPointLocations.forEach { location ->
+                val marker = ArenaActionMarker(
+                    id = UUID.randomUUID(),
+                    type = ArenaActionMarkerType.BARRIER_ACTIVATE,
+                    center = location.clone().apply {
+                        this.world = world
+                        y += ACTION_MARKER_CENTER_Y_OFFSET
+                    },
+                    holdTicksRequired = BARRIER_MARKER_HOLD_TICKS,
+                    stateColors = mapOf(
+                        ArenaActionMarkerState.PRE_ACTIVATED to Color.fromRGB(255, 216, 64),
+                        ArenaActionMarkerState.READY to Color.fromRGB(255, 216, 64),
+                        ArenaActionMarkerState.RUNNING to Color.fromRGB(128, 220, 255)
+                    ),
+                    state = ArenaActionMarkerState.READY
+                )
+                marker.colorTransitionFrom = marker.colorFor(ArenaActionMarkerState.READY)
+                marker.colorTransitionTo = marker.colorFor(ArenaActionMarkerState.READY)
+                marker.colorTransitionStartTick = Bukkit.getCurrentTick().toLong()
+                markers[marker.id] = marker
+            }
         }
 
         session.actionMarkers.clear()
@@ -6846,7 +6897,8 @@ class ArenaManager(
 
     private fun updateBarrierReturnHoldStates(currentTick: Long) {
         for (session in sessionsByWorld.values) {
-            if (!session.barrierRestartCompleted) {
+            val canReturn = session.barrierRestartCompleted || session.missionCompleted
+            if (!canReturn) {
                 if (session.barrierReturnHoldTicksByParticipant.isNotEmpty()) {
                     session.barrierReturnHoldTicksByParticipant.clear()
                     session.barrierReturnSubtitleNextTickByParticipant.clear()
@@ -6875,12 +6927,14 @@ class ArenaManager(
                 if (currentTick >= nextSubtitleTick) {
                     val remainingSeconds = ((BARRIER_RETURN_HOLD_TICKS - holdTicks).coerceAtLeast(0)).toDouble() / 20.0
                     val formatted = String.format(Locale.US, "%.1f", remainingSeconds)
+                    val countdownKey = if (session.missionCompleted) "arena.messages.mission.return_countdown" else "arena.messages.barrier.return_countdown"
+                    val countdownFallback = "§7帰還中 §e{seconds} 秒"
                     player.sendTitle(
                         "",
                         ArenaI18n.text(
                             player,
-                            "arena.messages.barrier.return_countdown",
-                            "§7帰還中 §e{seconds} 秒",
+                            countdownKey,
+                            countdownFallback,
                             "seconds" to formatted
                         ),
                         0,
@@ -6896,9 +6950,11 @@ class ArenaManager(
 
                 session.barrierReturnHoldTicksByParticipant.remove(participantId)
                 session.barrierReturnSubtitleNextTickByParticipant.remove(participantId)
+                val returnKey = if (session.missionCompleted) "arena.messages.mission.returned" else "arena.messages.barrier.returned"
+                val returnFallback = "&aロビーへ帰還しました"
                 stopSessionToLobbyById(
                     participantId,
-                    ArenaI18n.text(player, "arena.messages.barrier.returned", "&aロビーへ帰還しました")
+                    ArenaI18n.text(player, returnKey, returnFallback)
                 )
             }
         }
@@ -6991,6 +7047,7 @@ class ArenaManager(
                 startDoorAnimation(session, targetWave)
             }
             ArenaActionMarkerType.BARRIER_ACTIVATE -> {
+                if (isClearingMission(session)) return
                 playBarrierPointActivatedEffect(session, marker)
                 if (!session.startedWaves.contains(session.waves)) return
                 val total = session.actionMarkers.values.count { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }

@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.arena.generator
 
 import jp.awabi2048.cccontent.features.arena.ArenaBounds
+import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
 import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.World
@@ -114,6 +115,7 @@ class ArenaStageGenerator {
         val world: World,
         val origin: Location,
         val theme: ArenaTheme,
+        val missionTypeId: ArenaMissionType,
         val waves: Int,
         val random: Random,
         val placements: List<TilePlacement>,
@@ -149,10 +151,11 @@ class ArenaStageGenerator {
         world: World,
         origin: Location,
         theme: ArenaTheme,
+        missionTypeId: ArenaMissionType = ArenaMissionType.BARRIER_RESTART,
         waves: Int,
         random: Random = Random.Default
     ): ArenaStageBuildResult {
-        val job = createBuildJob(world, origin, theme, waves, random)
+        val job = createBuildJob(world, origin, theme, missionTypeId, waves, random)
         while (job.phase != BuildPhase.COMPLETE) {
             stepBuildJob(job)
         }
@@ -164,12 +167,13 @@ class ArenaStageGenerator {
         world: World,
         origin: Location,
         theme: ArenaTheme,
+        missionTypeId: ArenaMissionType = ArenaMissionType.BARRIER_RESTART,
         waves: Int,
         random: Random = Random.Default,
         stepsPerTick: Int = 1,
         onComplete: (Result<ArenaStageBuildResult>) -> Unit
     ): BukkitTask {
-        val job = createBuildJob(world, origin, theme, waves, random)
+        val job = createBuildJob(world, origin, theme, missionTypeId, waves, random)
         val safeStepsPerTick = stepsPerTick.coerceAtLeast(1)
         lateinit var task: BukkitTask
         task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
@@ -195,6 +199,7 @@ class ArenaStageGenerator {
         world: World,
         origin: Location,
         theme: ArenaTheme,
+        missionTypeId: ArenaMissionType,
         waves: Int,
         random: Random
     ): BuildJob {
@@ -203,6 +208,7 @@ class ArenaStageGenerator {
             world = world,
             origin = origin,
             theme = theme,
+            missionTypeId = missionTypeId,
             waves = waves,
             random = random,
             placements = placements
@@ -765,6 +771,19 @@ class ArenaStageGenerator {
         val theme = job.theme
         val random = job.random
         val lastVariantKey = job.lastSelectedVariantKeyByType[placement.structureType]
+
+        if (placement.structureType == ArenaStructureType.GOAL) {
+            val requiredVariation = job.missionTypeId.id
+            val variant = theme.staticStructures[ArenaStructureType.GOAL]
+                .orEmpty()
+                .firstOrNull { it.variation == requiredVariation }
+                ?: error("[Arena] goal.${requiredVariation}.nbt が見つかりません: theme=${theme.id}")
+            return SelectedStructureVariant(
+                baseTemplate = variant.template,
+                animatedVariant = null,
+                variantKey = variant.variation ?: variant.template.name
+            )
+        }
 
         return if (placement.structureType.supportsAnimation) {
             val variants = theme.animatedStructures[placement.structureType].orEmpty()
