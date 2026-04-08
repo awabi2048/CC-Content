@@ -6,6 +6,7 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
+import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionModifiers
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
 
@@ -142,11 +143,16 @@ class ArenaCommand(
         }
 
         val startedAt = System.nanoTime()
+        val missionModifiers = when (missionType) {
+            ArenaMissionType.CLEARING -> ArenaMissionModifiers.CLEARING
+            else -> ArenaMissionModifiers.NONE
+        }
         when (val result = manager.startSession(
             target,
             difficultyId,
             theme,
             initialParticipants = initialParticipants,
+            missionModifiers = missionModifiers,
             missionTypeId = missionType
         )) {
             is ArenaStartResult.Success -> {

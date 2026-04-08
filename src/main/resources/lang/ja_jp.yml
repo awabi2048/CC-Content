@@ -1185,6 +1185,10 @@ custom_items:
       start_cancelled: '&cミッション開始はキャンセルされました'
       license_insufficient: '&cあなたのライセンスでは、このミッションはまだ受けられません'
       stage_build_failed_internal: '&cステージの生成に失敗しました。スタッフに報告してください。(STRUCTURE_ERROR)'
+      completed: '&aミッションクリア！'
+      return_hint: '§7Shift長押しでロビーに帰還できます'
+      return_countdown: '§7帰還中 §e{seconds} 秒'
+      returned: '&aロビーへ帰還しました'
     license:
       promoted: '&aライセンスが昇格しました！ &f→ {tier}'
     multiplayer:
@@ -1307,12 +1311,31 @@ custom_items:
       boss_spawned: '§5掃討ボスが出現しました！制限時間内に倒してください！'
       boss_defeated: '§a掃討ボスを討伐しました！ミッションクリア！'
       time_expired: '§c時間切れ！掃討ボスを倒せませんでした...'
+      success: '§a§l掃討ボスを全て討伐しました！ミッションクリア！'
     mock:
       door_animation_start: '&7{message}'
       corridor_door_reinstall: '&7{message}'
   ui:
     menu_title: '§8アリーナ掲示板'
     confirm_title: '§8参加確認'
+    pedestal:
+      title: '§8不思議な祭壇'
+      blank: ' '
+      placeholder:
+        left: '§a触媒の導線'
+        right: '§a情報の導線'
+      exp:
+        name: '§e必要経験値'
+        waiting: '§7触媒をセットすると必要レベルが表示されます'
+        required: '§7必要レベル: §e{value}'
+        current: '§7所持レベル: §f{value}'
+        ready: '§a条件達成'
+        not_ready: '§cレベル不足'
+      execute:
+        ready: '§aオーバーエンチャント実行'
+        waiting: '§cオーバーエンチャント実行'
+        ready_lore: '§7クリックで実行'
+        waiting_lore: '§7条件を満たすと実行できます'
     separator: '§8§m――――――――――――――――――――'
     coming_soon: '§7Coming Soon!'
     license_card:
@@ -1548,6 +1571,10 @@ arena:
       start_cancelled: '&cミッション開始はキャンセルされました'
       license_insufficient: '&cあなたのライセンスでは、このミッションはまだ受けられません'
       stage_build_failed_internal: '&cステージの生成に失敗しました。スタッフに報告してください。(STRUCTURE_ERROR)'
+      completed: '&aミッションクリア！'
+      return_hint: '§7Shift長押しでロビーに帰還できます'
+      return_countdown: '§7帰還中 §e{seconds} 秒'
+      returned: '&aロビーへ帰還しました'
     license:
       promoted: '&aライセンスが昇格しました！ &f→ {tier}'
     multiplayer:
@@ -1667,6 +1694,7 @@ arena:
       boss_spawned: '§5掃討ボスが出現しました！制限時間内に倒してください！'
       boss_defeated: '§a掃討ボスを討伐しました！ミッションクリア！'
       time_expired: '§c時間切れ！掃討ボスを倒せませんでした...'
+      success: '§a§l掃討ボスを全て討伐しました！ミッションクリア！'
     mock:
       door_animation_start: '&7{message}'
       corridor_door_reinstall: '&7{message}'

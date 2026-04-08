@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.arena.generator
 
 import jp.awabi2048.cccontent.config.CoreConfigManager
+import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -99,6 +100,13 @@ enum class ArenaStructureType(val keyword: String, val supportsAnimation: Boolea
 }
 
 class ArenaThemeLoader(private val plugin: JavaPlugin) {
+    private companion object {
+        val REQUIRED_GOAL_MISSION_TYPES = listOf(
+            ArenaMissionType.BARRIER_RESTART,
+            ArenaMissionType.CLEARING
+        )
+    }
+
     private data class ParsedThemeConfig(
         val iconMaterial: Material,
         val weight: Int,
@@ -187,15 +195,28 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             val folder = folderById[themeId] ?: continue
             val parsedThemeConfig = parseThemeConfig(themeConfig, themeId, warnings) ?: continue
             val loaded = loadStructures(folder, warnings)
-            val missing = ArenaStructureType.entries.filter { type ->
-                if (type.supportsAnimation) {
-                    loaded.animatedStructures[type].isNullOrEmpty()
+            val missing = mutableListOf<String>()
+            ArenaStructureType.entries.forEach { type ->
+                if (type == ArenaStructureType.GOAL) {
+                    val goalVariations = loaded.staticStructures[ArenaStructureType.GOAL].orEmpty()
+                    REQUIRED_GOAL_MISSION_TYPES.forEach { missionType ->
+                        if (goalVariations.none { it.variation == missionType.id }) {
+                            missing += "goal.${missionType.id}"
+                        }
+                    }
                 } else {
-                    loaded.staticStructures[type].isNullOrEmpty()
+                    val unavailable = if (type.supportsAnimation) {
+                        loaded.animatedStructures[type].isNullOrEmpty()
+                    } else {
+                        loaded.staticStructures[type].isNullOrEmpty()
+                    }
+                    if (unavailable) {
+                        missing += type.keyword
+                    }
                 }
             }
             if (missing.isNotEmpty()) {
-                val warning = "[Arena] 必須ストラクチャー不足のためスキップ: $themeId (${missing.joinToString { it.keyword }})"
+                val warning = "[Arena] 必須ストラクチャー不足のためスキップ: $themeId (${missing.joinToString()})"
                 plugin.logger.warning(warning)
                 warnings.add(warning)
                 continue
