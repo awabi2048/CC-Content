@@ -129,6 +129,17 @@ class ArenaMissionService(
         }
     }
 
+    fun recordOverEnchantSuccess(playerId: UUID, amount: Int = 1) {
+        if (amount <= 0) return
+        val playerData = getPlayerData(playerId)
+        playerData.addOverEnchantSuccessCount(amount)
+        savePlayerData(playerId)
+    }
+
+    fun getOverEnchantSuccessCount(playerId: UUID): Int {
+        return getPlayerData(playerId).totalOverEnchantSuccessCount.coerceAtLeast(0)
+    }
+
     private fun openMenu(player: Player, dateKey: String): Boolean {
         return try {
             val missionSet = ensureMissionSet(dateKey)
@@ -1014,6 +1025,7 @@ class ArenaMissionService(
         config.set("arena.total_clear_count", data.totalMissionClearCount)
         config.set("arena.total_mob_kill_count", data.totalMobKillCount)
         config.set("arena.total_strong_enemy_kill_count", data.totalStrongEnemyKillCount)
+        config.set("arena.total_over_enchant_success_count", data.totalOverEnchantSuccessCount)
         config.set("arena.barrier_restart_count", data.barrierRestartCount)
         config.set("arena.license_tier", data.licenseTier.id)
         val completedSection = linkedMapOf<String, List<Int>>()
@@ -1029,6 +1041,7 @@ class ArenaMissionService(
         val totalMissionClearCount = config.getInt("arena.total_clear_count", 0).coerceAtLeast(0)
         val totalMobKillCount = config.getInt("arena.total_mob_kill_count", 0).coerceAtLeast(0)
         val totalStrongEnemyKillCount = config.getInt("arena.total_strong_enemy_kill_count", 0).coerceAtLeast(0)
+        val totalOverEnchantSuccessCount = config.getInt("arena.total_over_enchant_success_count", 0).coerceAtLeast(0)
         val barrierRestartCount = config.getInt("arena.barrier_restart_count", 0).coerceAtLeast(0)
         val licenseTier = ArenaLicenseTier.fromId(config.getString("arena.license_tier", ArenaLicenseTier.PAPER.id).orEmpty())
             ?: ArenaLicenseTier.PAPER
@@ -1043,6 +1056,7 @@ class ArenaMissionService(
             totalMissionClearCount = totalMissionClearCount,
             totalMobKillCount = totalMobKillCount,
             totalStrongEnemyKillCount = totalStrongEnemyKillCount,
+            totalOverEnchantSuccessCount = totalOverEnchantSuccessCount,
             barrierRestartCount = barrierRestartCount,
             licenseTier = licenseTier,
             completedByDate = completedByDate

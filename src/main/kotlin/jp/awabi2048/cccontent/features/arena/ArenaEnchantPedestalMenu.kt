@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.arena
 
 import jp.awabi2048.cccontent.items.arena.ArenaOverEnchanterCatalystData
 import jp.awabi2048.cccontent.items.arena.ArenaOverEnchanterMode
+import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -29,30 +30,25 @@ import java.util.UUID
 
 private object ArenaEnchantPedestalLayout {
     const val MENU_SIZE = 45
-    const val CATALYST_SLOT = 19
     const val TOOL_SLOT = 22
     const val EXP_SLOT = 25
     const val EXECUTE_SLOT = 40
-    const val LEFT_PLACEHOLDER_SLOT = 37
-    const val RIGHT_PLACEHOLDER_SLOT = 43
+    const val PROGRESS_SLOT = 37
+    const val INFO_SLOT = 43
+    val CATALYST_SLOTS: List<Int> = listOf(10, 19, 28)
+    const val REINFORCE_SLOT = 19
+    val CENTER_WHITE_SLOTS: Set<Int> = setOf(12, 13, 14, 18, 20, 21, 23, 24, 26, 30, 31, 32)
+    val ACTIVE_BACKGROUND_SLOTS: Set<Int> = (9..35).toSet() - setOf(TOOL_SLOT)
     val TITLE: String
         get() = ArenaI18n.text(null, "arena.ui.pedestal.title", "§8不思議な祭壇")
 
-    val CATALYST_STEPS: List<List<Int>> = listOf(
-        listOf(18),
-        listOf(20),
-        listOf(12, 21, 30),
-        listOf(13)
+    val REVEAL_STEPS: List<List<Int>> = listOf(
+        listOf(13, 31),
+        listOf(12, 14, 21, 23, 30, 32),
+        listOf(11, 15, 20, 24, 29, 33),
+        listOf(10, 16, 18, 19, 25, 26, 28, 34)
     )
-
-    val EXP_STEPS: List<List<Int>> = listOf(
-        listOf(26),
-        listOf(24),
-        listOf(14, 23, 32),
-        listOf(31)
-    )
-
-    val PANEL_SLOTS: Set<Int> = (CATALYST_STEPS.flatten() + EXP_STEPS.flatten()).toSet()
+    val COLLAPSE_STEPS: List<List<Int>> = REVEAL_STEPS.reversed()
 }
 
 private class ArenaEnchantPedestalHolder(
@@ -66,10 +62,24 @@ private class ArenaEnchantPedestalHolder(
 }
 
 private enum class PanelColor {
-    WHITE,
     PURPLE,
-    GREEN
+    BLUE,
+    RED,
+    GRAY
 }
+
+private enum class PedestalUiState {
+    NO_TOOL,
+    TOOL_NO_OVER,
+    TOOL_HAS_OVER
+}
+
+private data class PreparedCatalyst(
+    val slot: Int,
+    val item: ItemStack,
+    val catalyst: ArenaOverEnchanterCatalystData.Catalyst,
+    val requiredLevel: Int
+)
 
 private data class PedestalEvaluation(
     val catalystReady: Boolean,
@@ -78,30 +88,58 @@ private data class PedestalEvaluation(
     val executable: Boolean,
     val requiredLevel: Int?,
     val missingLevel: Int?,
-    val mode: ArenaOverEnchanterMode?
+    val uiState: PedestalUiState,
+    val unlockedSlotCount: Int,
+    val usedSlotCount: Int,
+    val preparedCatalysts: List<PreparedCatalyst>
+)
+
+private data class SlotUnlockProgress(
+    val successCount: Int,
+    val unlockedSlotCount: Int,
+    val currentThreshold: Int,
+    val nextThreshold: Int?
+)
+
+private data class OverEnchantState(
+    val entries: Map<String, Int>
 )
 
 private data class ViewerRuntime(
     var panelAnimationTask: BukkitTask? = null,
     var forgeAnimationTask: BukkitTask? = null,
-    var routeGlintTask: BukkitTask? = null,
     var isForging: Boolean = false,
-    var routeGlintEnabled: Boolean = false,
     var lastExecutable: Boolean = false
 )
 
 class ArenaEnchantPedestalMenu(
     private val plugin: JavaPlugin,
-    private val coreConfigProvider: () -> FileConfiguration
+    private val coreConfigProvider: () -> FileConfiguration,
+    private val missionServiceProvider: () -> ArenaMissionService?
 ) : Listener {
     private companion object {
         val PROTECTION_IDS: Set<String> = setOf("protection", "fire_protection", "blast_protection", "projectile_protection")
         val DAMAGE_IDS: Set<String> = setOf("sharpness", "smite", "bane_of_arthropods")
+        val DEFAULT_SLOT_UNLOCKS: Map<Int, Int> = mapOf(1 to 0, 2 to 30, 3 to 100)
+        val ENCHANTMENT_SYMBOLS: Map<String, String> = mapOf(
+            "sharpness" to "⚔",
+            "smite" to "☠",
+            "bane_of_arthropods" to "✢",
+            "protection" to "⛨",
+            "fire_protection" to "♨",
+            "blast_protection" to "✹",
+            "projectile_protection" to "➶",
+            "multishot" to "✣",
+            "piercing" to "❖",
+            "mending" to "✚",
+            "infinity" to "∞",
+            "breach" to "⛏"
+        )
     }
 
     private val runtimes = mutableMapOf<UUID, ViewerRuntime>()
-    private val routeModeKey = NamespacedKey(plugin, "over_enchanter_route_mode")
-    private val overStackingUsedKey = NamespacedKey(plugin, "over_enchanter_over_stacking_used")
+    private val overEnchantEntriesKey = NamespacedKey(plugin, "over_enchanter_entries")
+    private val overEnchantLoreManagedKey = NamespacedKey(plugin, "over_enchanter_lore_managed")
     private val inputPlaceholderKey = NamespacedKey(plugin, "pedestal_input_placeholder")
 
     fun openMenu(player: Player) {
@@ -160,7 +198,12 @@ class ArenaEnchantPedestalMenu(
             return
         }
 
-        if (rawSlot !in setOf(ArenaEnchantPedestalLayout.CATALYST_SLOT, ArenaEnchantPedestalLayout.TOOL_SLOT)) {
+        if (rawSlot == ArenaEnchantPedestalLayout.PROGRESS_SLOT || rawSlot == ArenaEnchantPedestalLayout.INFO_SLOT || rawSlot == ArenaEnchantPedestalLayout.EXP_SLOT) {
+            event.isCancelled = true
+            return
+        }
+
+        if (rawSlot != ArenaEnchantPedestalLayout.TOOL_SLOT && rawSlot !in ArenaEnchantPedestalLayout.CATALYST_SLOTS) {
             event.isCancelled = true
             return
         }
@@ -189,7 +232,7 @@ class ArenaEnchantPedestalMenu(
             val wasEmpty = true
             Bukkit.getScheduler().runTask(plugin, Runnable {
                 val nowEmpty = getInputItem(top, rawSlot).isNullOrAir()
-                processInputStateChange(player, top, rawSlot, wasEmpty, nowEmpty)
+                processInputStateChange(player, top, wasEmpty, nowEmpty)
             })
             return
         }
@@ -202,7 +245,7 @@ class ArenaEnchantPedestalMenu(
         val wasEmpty = getInputItem(top, rawSlot).isNullOrAir()
         Bukkit.getScheduler().runTask(plugin, Runnable {
             val nowEmpty = getInputItem(top, rawSlot).isNullOrAir()
-            processInputStateChange(player, top, rawSlot, wasEmpty, nowEmpty)
+            processInputStateChange(player, top, wasEmpty, nowEmpty)
         })
     }
 
@@ -213,14 +256,15 @@ class ArenaEnchantPedestalMenu(
         val runtime = runtimes.remove(holder.ownerId)
         runtime?.panelAnimationTask?.cancel()
         runtime?.forgeAnimationTask?.cancel()
-        runtime?.routeGlintTask?.cancel()
         runtime?.isForging = false
 
         playSound(player, "minecraft:block.ender_chest.close", 0.5f)
         playSound(player, "minecraft:entity.allay.item_thrown", 0.5f)
 
         val top = event.inventory
-        returnItemToPlayer(player, top, ArenaEnchantPedestalLayout.CATALYST_SLOT)
+        ArenaEnchantPedestalLayout.CATALYST_SLOTS.forEach { slot ->
+            returnItemToPlayer(player, top, slot)
+        }
         returnItemToPlayer(player, top, ArenaEnchantPedestalLayout.TOOL_SLOT)
     }
 
@@ -255,9 +299,10 @@ class ArenaEnchantPedestalMenu(
         top: Inventory,
         clickedTop: Boolean
     ) {
+        val evaluation = evaluate(player, top)
         if (clickedTop) {
             val rawSlot = event.rawSlot
-            if (rawSlot !in setOf(ArenaEnchantPedestalLayout.CATALYST_SLOT, ArenaEnchantPedestalLayout.TOOL_SLOT)) {
+            if (rawSlot != ArenaEnchantPedestalLayout.TOOL_SLOT && rawSlot !in ArenaEnchantPedestalLayout.CATALYST_SLOTS) {
                 event.isCancelled = true
                 return
             }
@@ -269,13 +314,13 @@ class ArenaEnchantPedestalMenu(
             val wasEmpty = getInputItem(top, rawSlot).isNullOrAir()
             Bukkit.getScheduler().runTask(plugin, Runnable {
                 val nowEmpty = getInputItem(top, rawSlot).isNullOrAir()
-                processInputStateChange(player, top, rawSlot, wasEmpty, nowEmpty)
+                processInputStateChange(player, top, wasEmpty, nowEmpty)
             })
             return
         }
 
         val moving = event.currentItem?.takeUnless { it.type.isAir } ?: return
-        val targetSlot = resolveInputSlotForItem(moving)
+        val targetSlot = resolveInputSlotForItem(moving, top, evaluation)
         if (targetSlot == null || !isInputSlotAvailableForInsert(top, targetSlot)) {
             event.isCancelled = true
             return
@@ -283,14 +328,30 @@ class ArenaEnchantPedestalMenu(
 
         event.isCancelled = true
         val source = event.clickedInventory ?: return
-        source.setItem(event.slot, null)
-        top.setItem(targetSlot, moving.clone())
+        val placed = moving.clone().apply { amount = 1 }
+        top.setItem(targetSlot, placed)
+        if (moving.amount <= 1) {
+            source.setItem(event.slot, null)
+        } else {
+            moving.amount -= 1
+            source.setItem(event.slot, moving)
+        }
         playSound(player, "minecraft:block.enchantment_table.use", 1.7f)
         playSound(player, "minecraft:block.end_portal_frame.fill", 0.75f)
         animatePanelTransition(player, top)
     }
 
     private fun isTopSlotOperationAllowed(event: InventoryClickEvent, topSlot: Int): Boolean {
+        val player = event.whoClicked as? Player ?: return false
+        val top = event.view.topInventory
+        val evaluation = evaluate(player, top)
+        val activeCatalystSlots = resolveActiveCatalystSlots(evaluation)
+        val isToolSlot = topSlot == ArenaEnchantPedestalLayout.TOOL_SLOT
+        val isAnyCatalystSlot = topSlot in ArenaEnchantPedestalLayout.CATALYST_SLOTS
+        if (!isToolSlot && !isAnyCatalystSlot) {
+            return false
+        }
+
         val cursor = event.cursor
         val action = event.action
         val placing = when (action) {
@@ -302,19 +363,25 @@ class ArenaEnchantPedestalMenu(
             else -> false
         }
         if (!placing) {
-            return true
+            return getInputItem(top, topSlot) != null
         }
-        val placeItem = cursor?.takeUnless { it.type.isAir } ?: return false
+        val isActiveCatalystSlot = topSlot in activeCatalystSlots
+        val placeItem = cursor.takeUnless { it.type.isAir } ?: return false
         return when (topSlot) {
-            ArenaEnchantPedestalLayout.CATALYST_SLOT -> isCatalystItem(placeItem)
             ArenaEnchantPedestalLayout.TOOL_SLOT -> isToolCandidateItem(placeItem)
+            in ArenaEnchantPedestalLayout.CATALYST_SLOTS -> isActiveCatalystSlot && canInsertCatalystIntoSlot(placeItem, top, topSlot)
             else -> false
         }
     }
 
-    private fun resolveInputSlotForItem(item: ItemStack): Int? {
+    private fun resolveInputSlotForItem(item: ItemStack, inventory: Inventory, evaluation: PedestalEvaluation): Int? {
         return when {
-            isCatalystItem(item) -> ArenaEnchantPedestalLayout.CATALYST_SLOT
+            isCatalystItem(item) -> {
+                val activeCatalystSlots = resolveActiveCatalystSlots(evaluation)
+                activeCatalystSlots.firstOrNull { slot ->
+                    isInputSlotAvailableForInsert(inventory, slot) && canInsertCatalystIntoSlot(item, inventory, slot)
+                }
+            }
             isToolCandidateItem(item) -> ArenaEnchantPedestalLayout.TOOL_SLOT
             else -> null
         }
@@ -323,7 +390,6 @@ class ArenaEnchantPedestalMenu(
     private fun processInputStateChange(
         player: Player,
         inventory: Inventory,
-        rawSlot: Int,
         wasEmpty: Boolean,
         nowEmpty: Boolean
     ) {
@@ -334,23 +400,22 @@ class ArenaEnchantPedestalMenu(
         if (nowEmpty) {
             playSound(player, "minecraft:block.enchantment_table.use", 0.85f)
             playSound(player, "minecraft:block.end_portal_frame.fill", 0.5f)
+            animatePanelTransition(player, inventory, reversed = true)
         } else {
             playSound(player, "minecraft:block.enchantment_table.use", 1.7f)
             playSound(player, "minecraft:block.end_portal_frame.fill", 0.75f)
+            animatePanelTransition(player, inventory, reversed = false)
         }
-        animatePanelTransition(player, inventory)
     }
 
     private fun handleExecuteClick(player: Player, inventory: Inventory, runtime: ViewerRuntime) {
         val evaluation = evaluate(player, inventory)
-        if (!evaluation.executable || evaluation.requiredLevel == null || evaluation.mode == null) {
+        if (!evaluation.executable || evaluation.requiredLevel == null || evaluation.preparedCatalysts.isEmpty()) {
             renderStatic(player, inventory)
             return
         }
 
         runtime.panelAnimationTask?.cancel()
-        runtime.routeGlintTask?.cancel()
-        runtime.routeGlintTask = null
         runtime.isForging = true
         playSound(player, "minecraft:block.end_portal_frame.fill", 2.0f)
         playSound(player, "minecraft:item.trident.thunder", 1.5f)
@@ -365,11 +430,8 @@ class ArenaEnchantPedestalMenu(
                 return@Runnable
             }
 
-            if (stepIndex < 4) {
-                ArenaEnchantPedestalLayout.CATALYST_STEPS[stepIndex].forEach { slot ->
-                    inventory.setItem(slot, buildForgeProgressItem(player))
-                }
-                ArenaEnchantPedestalLayout.EXP_STEPS[stepIndex].forEach { slot ->
+            if (stepIndex < ArenaEnchantPedestalLayout.REVEAL_STEPS.size) {
+                ArenaEnchantPedestalLayout.REVEAL_STEPS[stepIndex].forEach { slot ->
                     inventory.setItem(slot, buildForgeProgressItem(player))
                 }
                 stepIndex += 1
@@ -389,146 +451,192 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun executeForge(player: Player, inventory: Inventory) {
-        val catalystItem = getInputItem(inventory, ArenaEnchantPedestalLayout.CATALYST_SLOT) ?: return
         val toolItem = getInputItem(inventory, ArenaEnchantPedestalLayout.TOOL_SLOT) ?: return
-        val catalyst = ArenaOverEnchanterCatalystData.read(catalystItem) ?: return
-        val targetEnchant = resolveEnchantment(catalyst.targetEnchantmentId) ?: return
 
         val eval = evaluate(player, inventory)
         val requiredLevel = eval.requiredLevel ?: return
-        if (!eval.executable) {
+        val prepared = eval.preparedCatalysts
+        if (!eval.executable || prepared.isEmpty()) {
             return
         }
         if (player.level < requiredLevel) {
             return
         }
 
-        val resultingLevel = when (catalyst.mode) {
-            ArenaOverEnchanterMode.LIMIT_BREAKING -> {
-                val overLevel = catalyst.overLevel ?: return
-                targetEnchant.maxLevel + overLevel
+        val workingTool = toolItem.clone()
+        var state = getOverEnchantState(workingTool)
+        prepared.sortedBy { it.slot }.forEach { preparedCatalyst ->
+            val catalyst = preparedCatalyst.catalyst
+            val targetEnchant = resolveEnchantment(catalyst.targetEnchantmentId) ?: return@forEach
+            val resultingLevel = when (catalyst.mode) {
+                ArenaOverEnchanterMode.LIMIT_BREAKING -> {
+                    val overLevel = catalyst.overLevel ?: return@forEach
+                    targetEnchant.maxLevel + overLevel
+                }
+
+                ArenaOverEnchanterMode.OVER_STACKING,
+                ArenaOverEnchanterMode.EXOTIC_ATTACH -> targetEnchant.maxLevel
             }
-
-            ArenaOverEnchanterMode.OVER_STACKING,
-            ArenaOverEnchanterMode.EXOTIC_ATTACH -> targetEnchant.maxLevel
+            workingTool.addUnsafeEnchantment(targetEnchant, resultingLevel)
+            val appliedOverLevel = resolveAppliedOverLevel(catalyst)
+            state = applyOverEnchantEntry(state, catalyst.targetEnchantmentId, appliedOverLevel)
+            consumeOneCatalyst(inventory, preparedCatalyst.slot)
         }
 
-        toolItem.addUnsafeEnchantment(targetEnchant, resultingLevel)
-        val modeValue = when (catalyst.mode) {
-            ArenaOverEnchanterMode.LIMIT_BREAKING -> "limit_breaking"
-            ArenaOverEnchanterMode.OVER_STACKING,
-            ArenaOverEnchanterMode.EXOTIC_ATTACH -> "over_path"
-        }
-        setRouteMode(toolItem, modeValue)
-        if (catalyst.mode == ArenaOverEnchanterMode.OVER_STACKING || catalyst.mode == ArenaOverEnchanterMode.EXOTIC_ATTACH) {
-            setOverStackingUsed(toolItem, true)
-        }
+        setOverEnchantState(workingTool, state)
+        applyOverEnchantLore(workingTool, state)
 
         player.level = (player.level - requiredLevel).coerceAtLeast(0)
-
-        if (catalystItem.amount > 1) {
-            catalystItem.amount -= 1
-        } else {
-            inventory.setItem(ArenaEnchantPedestalLayout.CATALYST_SLOT, null)
-        }
-        inventory.setItem(ArenaEnchantPedestalLayout.TOOL_SLOT, toolItem)
+        missionServiceProvider()?.recordOverEnchantSuccess(player.uniqueId, prepared.size)
+        inventory.setItem(ArenaEnchantPedestalLayout.TOOL_SLOT, workingTool)
     }
 
-    private fun animatePanelTransition(player: Player, inventory: Inventory) {
+    private fun animatePanelTransition(player: Player, inventory: Inventory, reversed: Boolean = false) {
         val holder = inventory.holder as? ArenaEnchantPedestalHolder ?: return
         val runtime = runtimes.getOrPut(holder.ownerId) { ViewerRuntime() }
         runtime.panelAnimationTask?.cancel()
-
         val evaluation = evaluate(player, inventory)
-        val targetLeft = if (evaluation.catalystReady) PanelColor.PURPLE else PanelColor.WHITE
-        val targetRight = if (evaluation.expReady) PanelColor.GREEN else PanelColor.WHITE
+        val displayState = buildDisplayState(player, inventory, evaluation)
+        val allSlots = ArenaEnchantPedestalLayout.REVEAL_STEPS.flatten().toSet()
+        val hiddenPane = buildHiddenAnimationPane(player)
+        val protectedSlots = resolveProtectedInputSlots(inventory)
 
-        var stepIndex = 0
-        runtime.panelAnimationTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
-            if (!player.isOnline || player.openInventory.topInventory != inventory) {
+        if (!reversed) {
+            for (slot in allSlots) {
+                if (slot in protectedSlots) continue
+                inventory.setItem(slot, hiddenPane)
+            }
+            val steps = ArenaEnchantPedestalLayout.REVEAL_STEPS
+            var stepIndex = 0
+            runtime.panelAnimationTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+                if (!player.isOnline || player.openInventory.topInventory != inventory) {
+                    runtime.panelAnimationTask?.cancel()
+                    runtime.panelAnimationTask = null
+                    return@Runnable
+                }
+                if (stepIndex < steps.size) {
+                    steps[stepIndex].forEach { slot ->
+                        if (slot in protectedSlots) return@forEach
+                        displayState[slot]?.let { inventory.setItem(slot, it) }
+                    }
+                    stepIndex += 1
+                    return@Runnable
+                }
                 runtime.panelAnimationTask?.cancel()
                 runtime.panelAnimationTask = null
-                return@Runnable
-            }
-
-            if (stepIndex < 4) {
-                ArenaEnchantPedestalLayout.CATALYST_STEPS[stepIndex].forEach { slot ->
-                    inventory.setItem(slot, buildPanelItem(player, targetLeft, glint = false))
+                applyDisplayState(inventory, displayState)
+            }, 0L, 3L)
+        } else {
+            val steps = ArenaEnchantPedestalLayout.COLLAPSE_STEPS
+            var stepIndex = 0
+            runtime.panelAnimationTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+                if (!player.isOnline || player.openInventory.topInventory != inventory) {
+                    runtime.panelAnimationTask?.cancel()
+                    runtime.panelAnimationTask = null
+                    return@Runnable
                 }
-                ArenaEnchantPedestalLayout.EXP_STEPS[stepIndex].forEach { slot ->
-                    inventory.setItem(slot, buildPanelItem(player, targetRight, glint = false))
+                if (stepIndex < steps.size) {
+                    steps[stepIndex].forEach { slot ->
+                        if (slot in protectedSlots) return@forEach
+                        inventory.setItem(slot, hiddenPane)
+                    }
+                    stepIndex += 1
+                    return@Runnable
                 }
-                stepIndex += 1
-                return@Runnable
-            }
-
-            runtime.panelAnimationTask?.cancel()
-            runtime.panelAnimationTask = null
-            renderStatic(player, inventory)
-        }, 0L, 3L)
+                runtime.panelAnimationTask?.cancel()
+                runtime.panelAnimationTask = null
+                applyDisplayState(inventory, displayState)
+            }, 0L, 3L)
+        }
     }
 
     private fun renderStatic(player: Player, inventory: Inventory) {
-        val headerFooter = buildSimplePane(player, Material.BLACK_STAINED_GLASS_PANE)
-        val neutral = buildSimplePane(player, Material.GRAY_STAINED_GLASS_PANE)
-
-        for (slot in 0..8) {
-            if (slot != ArenaEnchantPedestalLayout.CATALYST_SLOT && slot != ArenaEnchantPedestalLayout.TOOL_SLOT && slot != ArenaEnchantPedestalLayout.EXP_SLOT && slot != ArenaEnchantPedestalLayout.EXECUTE_SLOT) {
-                inventory.setItem(slot, headerFooter)
-            }
-        }
-        for (slot in 36..44) {
-            if (slot != ArenaEnchantPedestalLayout.CATALYST_SLOT && slot != ArenaEnchantPedestalLayout.TOOL_SLOT && slot != ArenaEnchantPedestalLayout.EXP_SLOT && slot != ArenaEnchantPedestalLayout.EXECUTE_SLOT) {
-                inventory.setItem(slot, headerFooter)
-            }
-        }
-
-        for (slot in 9..35) {
-            if (slot !in ArenaEnchantPedestalLayout.PANEL_SLOTS && slot != ArenaEnchantPedestalLayout.CATALYST_SLOT && slot != ArenaEnchantPedestalLayout.TOOL_SLOT && slot != ArenaEnchantPedestalLayout.EXP_SLOT && slot != ArenaEnchantPedestalLayout.EXECUTE_SLOT) {
-                inventory.setItem(slot, neutral)
-            }
-        }
-
         val evaluation = evaluate(player, inventory)
-        val leftColor = if (evaluation.catalystReady) PanelColor.PURPLE else PanelColor.WHITE
-        val rightColor = if (evaluation.expReady) PanelColor.GREEN else PanelColor.WHITE
-
         val holder = inventory.holder as? ArenaEnchantPedestalHolder
         val runtime = holder?.let { runtimes.getOrPut(it.ownerId) { ViewerRuntime() } }
-        val routeGlint = runtime?.routeGlintEnabled == true && evaluation.executable
         if (runtime != null) {
             val wasExecutable = runtime.lastExecutable
             if (!wasExecutable && evaluation.executable) {
                 playSound(player, "minecraft:block.trial_spawner.ominous_activate", 0.75f)
                 playSound(player, "minecraft:block.beacon.power_select", 0.75f)
-                startReadyRouteGlintAnimation(player, inventory, runtime, leftColor, rightColor)
             }
             if (wasExecutable && !evaluation.executable) {
-                runtime.routeGlintTask?.cancel()
-                runtime.routeGlintTask = null
-                runtime.routeGlintEnabled = false
                 playSound(player, "minecraft:block.beacon.deactivate", 0.8f)
                 playSound(player, "minecraft:block.ender_chest.close", 0.8f)
             }
             runtime.lastExecutable = evaluation.executable
         }
+        val displayState = buildDisplayState(player, inventory, evaluation)
+        applyDisplayState(inventory, displayState)
+    }
 
-        ArenaEnchantPedestalLayout.CATALYST_STEPS.flatten().forEach { slot ->
-            inventory.setItem(slot, buildPanelItem(player, leftColor, glint = routeGlint))
-        }
-        ArenaEnchantPedestalLayout.EXP_STEPS.flatten().forEach { slot ->
-            inventory.setItem(slot, buildPanelItem(player, rightColor, glint = routeGlint))
+    private fun buildDisplayState(
+        player: Player,
+        inventory: Inventory,
+        evaluation: PedestalEvaluation
+    ): Map<Int, ItemStack> {
+        val framePane = buildSimplePane(player, Material.BLACK_STAINED_GLASS_PANE)
+        val neutralPane = buildSimplePane(player, Material.GRAY_STAINED_GLASS_PANE)
+        val reservedSlots = setOf(
+            ArenaEnchantPedestalLayout.TOOL_SLOT,
+            ArenaEnchantPedestalLayout.EXP_SLOT,
+            ArenaEnchantPedestalLayout.EXECUTE_SLOT,
+            ArenaEnchantPedestalLayout.PROGRESS_SLOT,
+            ArenaEnchantPedestalLayout.INFO_SLOT
+        ) + ArenaEnchantPedestalLayout.CATALYST_SLOTS
+        val display = mutableMapOf<Int, ItemStack>()
+
+        for (slot in 0 until ArenaEnchantPedestalLayout.MENU_SIZE) {
+            if (slot in reservedSlots) {
+                continue
+            }
+            display[slot] = when {
+                slot in 0..8 || slot in 36..44 -> framePane
+                slot in ArenaEnchantPedestalLayout.CENTER_WHITE_SLOTS && evaluation.uiState != PedestalUiState.NO_TOOL -> buildSimplePane(player, Material.WHITE_STAINED_GLASS_PANE)
+                slot in ArenaEnchantPedestalLayout.ACTIVE_BACKGROUND_SLOTS -> neutralPane
+                else -> neutralPane
+            }
         }
 
-        if (getInputItem(inventory, ArenaEnchantPedestalLayout.CATALYST_SLOT).isNullOrAir()) {
-            inventory.setItem(ArenaEnchantPedestalLayout.CATALYST_SLOT, buildInputSlotPlaceholder(player))
-        }
         if (getInputItem(inventory, ArenaEnchantPedestalLayout.TOOL_SLOT).isNullOrAir()) {
-            inventory.setItem(ArenaEnchantPedestalLayout.TOOL_SLOT, buildInputSlotPlaceholder(player))
+            display[ArenaEnchantPedestalLayout.TOOL_SLOT] = buildInputSlotPlaceholder(player)
         }
 
-        inventory.setItem(ArenaEnchantPedestalLayout.EXP_SLOT, buildExpInfoItem(player, evaluation))
-        inventory.setItem(ArenaEnchantPedestalLayout.EXECUTE_SLOT, buildExecuteItem(player, evaluation.executable))
+        ArenaEnchantPedestalLayout.CATALYST_SLOTS.forEach { slot ->
+            if (getInputItem(inventory, slot).isNullOrAir()) {
+                display[slot] = buildCatalystPlaceholderForSlot(player, evaluation, slot)
+            }
+        }
+
+        display[ArenaEnchantPedestalLayout.EXP_SLOT] = if (evaluation.uiState == PedestalUiState.NO_TOOL) {
+            buildSimplePane(player, Material.GRAY_STAINED_GLASS_PANE)
+        } else {
+            buildExpInfoItem(player, evaluation)
+        }
+        val progress = resolveSlotUnlockProgress(player)
+        display[ArenaEnchantPedestalLayout.PROGRESS_SLOT] = buildProgressGaugeItem(player, progress)
+        display[ArenaEnchantPedestalLayout.INFO_SLOT] = buildInfoItem(player)
+        display[ArenaEnchantPedestalLayout.EXECUTE_SLOT] = buildExecuteItem(player, evaluation)
+        return display
+    }
+
+    private fun applyDisplayState(inventory: Inventory, displayState: Map<Int, ItemStack>) {
+        displayState.forEach { (slot, item) ->
+            inventory.setItem(slot, item)
+        }
+    }
+
+    private fun resolveProtectedInputSlots(inventory: Inventory): Set<Int> {
+        val protected = mutableSetOf<Int>()
+        if (getInputItem(inventory, ArenaEnchantPedestalLayout.TOOL_SLOT) != null) {
+            protected += ArenaEnchantPedestalLayout.TOOL_SLOT
+        }
+        ArenaEnchantPedestalLayout.CATALYST_SLOTS.forEach { slot ->
+            if (getInputItem(inventory, slot) != null) {
+                protected += slot
+            }
+        }
+        return protected
     }
 
     private fun buildExpInfoItem(player: Player, evaluation: PedestalEvaluation): ItemStack {
@@ -539,30 +647,153 @@ class ArenaEnchantPedestalMenu(
             meta.lore = null
         } else if (evaluation.missingLevel != null && evaluation.missingLevel > 0) {
             meta.setDisplayName("§c智力が足りません")
-            meta.lore = listOf("§8あと §a${evaluation.missingLevel} レベル §8必要です")
+            meta.lore = listOf(
+                ArenaI18n.text(
+                    player,
+                    "arena.ui.pedestal.execute.missing_level",
+                    "§8あと §a{value} レベル §8必要です",
+                    "value" to evaluation.missingLevel
+                )
+            )
         } else {
             val consume = evaluation.requiredLevel ?: 0
-            meta.setDisplayName("§4智力は十分です")
-            meta.lore = listOf("§8合成によって §a$consume レベル §8を消費します")
+            meta.setDisplayName("§a智力は十分です")
+            meta.lore = listOf(
+                ArenaI18n.text(
+                    player,
+                    "arena.ui.pedestal.execute.consume_level",
+                    "§8合成によって §a{value} レベル §8を消費します",
+                    "value" to consume
+                )
+            )
         }
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return item
     }
 
-    private fun buildExecuteItem(player: Player, executable: Boolean): ItemStack {
+    private fun buildProgressGaugeItem(player: Player, progress: SlotUnlockProgress): ItemStack {
+        val item = ItemStack(Material.END_CRYSTAL)
+        val meta = item.itemMeta ?: return item
+        val gaugeLine = buildGaugeLine(progress)
+        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank", " "))
+        meta.lore = listOf(gaugeLine)
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        item.itemMeta = meta
+        return item
+    }
+
+    private fun buildInfoItem(player: Player): ItemStack {
+        val item = ItemStack(Material.MAP)
+        val meta = item.itemMeta ?: return item
+        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank", " "))
+        meta.lore = ArenaI18n.stringList(
+            player,
+            "arena.ui.pedestal.info.dummy",
+            listOf(
+                "§7ダミーテキスト1",
+                "§7ダミーテキスト2",
+                "§7ダミーテキスト3"
+            )
+        )
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        item.itemMeta = meta
+        return item
+    }
+
+    private fun buildExecuteItem(player: Player, evaluation: PedestalEvaluation): ItemStack {
         val item = ItemStack(Material.ENCHANTING_TABLE)
         val meta = item.itemMeta ?: return item
-        meta.setDisplayName(if (executable) "§d力を解放する" else "§d§kaaaaaa")
-        meta.lore = null
+        val executable = evaluation.executable
+        if (!evaluation.processable) {
+            meta.setDisplayName("§5オーバーエンチャント")
+            meta.lore = listOf(
+                ArenaI18n.text(
+                    player,
+                    "arena.ui.pedestal.execute.waiting_lore",
+                    "§7条件を満たすと実行できます"
+                )
+            )
+        } else if (evaluation.missingLevel != null && evaluation.missingLevel > 0) {
+            meta.setDisplayName("§5オーバーエンチャント")
+            meta.lore = listOf(
+                ArenaI18n.text(
+                    player,
+                    "arena.ui.pedestal.execute.missing_level",
+                    "§8あと §a{value} レベル §8必要です",
+                    "value" to evaluation.missingLevel
+                )
+            )
+        } else {
+            meta.setDisplayName("§d力を解放する")
+            val consume = evaluation.requiredLevel ?: 0
+            meta.lore = listOf(
+                ArenaI18n.text(
+                    player,
+                    "arena.ui.pedestal.execute.consume_level",
+                    "§8合成によって §a{value} レベル §8を消費します",
+                    "value" to consume
+                )
+            )
+        }
         meta.setEnchantmentGlintOverride(executable)
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         item.itemMeta = meta
         return item
     }
 
+    private fun buildCatalystPlaceholderForSlot(player: Player, evaluation: PedestalEvaluation, slot: Int): ItemStack {
+        val index = ArenaEnchantPedestalLayout.CATALYST_SLOTS.indexOf(slot)
+        return when (evaluation.uiState) {
+            PedestalUiState.NO_TOOL -> buildCatalystSlotPlaceholder(player, PanelColor.GRAY)
+            PedestalUiState.TOOL_NO_OVER -> {
+                if (index >= 0 && index < evaluation.unlockedSlotCount) {
+                    buildCatalystSlotPlaceholder(player, PanelColor.PURPLE)
+                } else {
+                    buildCatalystSlotPlaceholder(player, PanelColor.RED)
+                }
+            }
+            PedestalUiState.TOOL_HAS_OVER -> {
+                if (slot == ArenaEnchantPedestalLayout.REINFORCE_SLOT) {
+                    buildCatalystSlotPlaceholder(player, PanelColor.BLUE)
+                } else {
+                    buildCatalystSlotPlaceholder(player, PanelColor.GRAY)
+                }
+            }
+        }
+    }
+
+    private fun buildCatalystSlotPlaceholder(player: Player, color: PanelColor): ItemStack {
+        val material = when (color) {
+            PanelColor.PURPLE -> Material.PURPLE_STAINED_GLASS_PANE
+            PanelColor.BLUE -> Material.LIGHT_BLUE_STAINED_GLASS_PANE
+            PanelColor.RED -> Material.RED_STAINED_GLASS_PANE
+            else -> Material.GRAY_STAINED_GLASS_PANE
+        }
+        val item = ItemStack(material)
+        val meta = item.itemMeta ?: return item
+        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank", " "))
+        meta.lore = null
+        meta.persistentDataContainer.set(inputPlaceholderKey, PersistentDataType.BYTE, 1)
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        applyExplicitTooltipHide(meta)
+        item.itemMeta = meta
+        return item
+    }
+
     private fun buildInputSlotPlaceholder(player: Player): ItemStack {
         val item = ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE)
+        val meta = item.itemMeta ?: return item
+        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank", " "))
+        meta.persistentDataContainer.set(inputPlaceholderKey, PersistentDataType.BYTE, 1)
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+        applyExplicitTooltipHide(meta)
+        item.itemMeta = meta
+        return item
+    }
+
+    private fun buildHiddenAnimationPane(player: Player): ItemStack {
+        val item = ItemStack(Material.GRAY_STAINED_GLASS_PANE)
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank", " "))
         meta.persistentDataContainer.set(inputPlaceholderKey, PersistentDataType.BYTE, 1)
@@ -582,32 +813,6 @@ class ArenaEnchantPedestalMenu(
         return item
     }
 
-    private fun buildSimpleItem(player: Player, material: Material, nameKey: String, fallback: String): ItemStack {
-        val item = ItemStack(material)
-        val meta = item.itemMeta ?: return item
-        meta.setDisplayName(ArenaI18n.text(player, nameKey, fallback))
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        applyExplicitTooltipHide(meta)
-        item.itemMeta = meta
-        return item
-    }
-
-    private fun buildPanelItem(player: Player, color: PanelColor, glint: Boolean): ItemStack {
-        val material = when (color) {
-            PanelColor.WHITE -> Material.WHITE_STAINED_GLASS_PANE
-            PanelColor.PURPLE -> Material.PURPLE_STAINED_GLASS_PANE
-            PanelColor.GREEN -> Material.LIME_STAINED_GLASS_PANE
-        }
-        val item = ItemStack(material)
-        val meta = item.itemMeta ?: return item
-        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank", " "))
-        meta.setEnchantmentGlintOverride(glint)
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
-        applyExplicitTooltipHide(meta)
-        item.itemMeta = meta
-        return item
-    }
-
     private fun buildForgeProgressItem(player: Player): ItemStack {
         val item = ItemStack(Material.YELLOW_STAINED_GLASS_PANE)
         val meta = item.itemMeta ?: return item
@@ -619,10 +824,18 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun evaluate(player: Player, inventory: Inventory): PedestalEvaluation {
-        val catalystItem = getInputItem(inventory, ArenaEnchantPedestalLayout.CATALYST_SLOT)
+        val unlockProgress = resolveSlotUnlockProgress(player)
         val toolItem = getInputItem(inventory, ArenaEnchantPedestalLayout.TOOL_SLOT)
-        val catalyst = catalystItem?.let { ArenaOverEnchanterCatalystData.read(it) }
-        if (catalyst == null) {
+        val state = toolItem?.let { getOverEnchantState(it) } ?: OverEnchantState(entries = emptyMap())
+        val uiState = when {
+            toolItem == null -> PedestalUiState.NO_TOOL
+            state.entries.isEmpty() -> PedestalUiState.TOOL_NO_OVER
+            else -> PedestalUiState.TOOL_HAS_OVER
+        }
+        val activeCatalystSlots = resolveActiveCatalystSlots(uiState, unlockProgress.unlockedSlotCount)
+        val prepared = mutableListOf<PreparedCatalyst>()
+        val usedSlotCount = usedOverEnchantSlotCount(state)
+        if (toolItem == null) {
             return PedestalEvaluation(
                 catalystReady = false,
                 processable = false,
@@ -630,103 +843,174 @@ class ArenaEnchantPedestalMenu(
                 executable = false,
                 requiredLevel = null,
                 missingLevel = null,
-                mode = null
+                uiState = uiState,
+                unlockedSlotCount = unlockProgress.unlockedSlotCount,
+                usedSlotCount = usedSlotCount,
+                preparedCatalysts = emptyList()
             )
         }
 
-        val requiredLevel = resolveRequiredLevel(catalyst)
-        val hasRequiredLevel = requiredLevel != null
-        val tool = toolItem?.takeUnless { it.type.isAir }?.clone()
-
-        val catalystReady = hasRequiredLevel
-        if (tool == null || !hasRequiredLevel || requiredLevel == null) {
+        val candidates = activeCatalystSlots
+            .mapNotNull { slot -> getInputItem(inventory, slot)?.let { slot to it } }
+            .sortedBy { it.first }
+        if (candidates.isEmpty()) {
             return PedestalEvaluation(
-                catalystReady = catalystReady,
+                catalystReady = false,
                 processable = false,
                 expReady = false,
                 executable = false,
-                requiredLevel = requiredLevel,
+                requiredLevel = null,
                 missingLevel = null,
-                mode = catalyst.mode
+                uiState = uiState,
+                unlockedSlotCount = unlockProgress.unlockedSlotCount,
+                usedSlotCount = usedSlotCount,
+                preparedCatalysts = emptyList()
             )
         }
 
-        val toolValid = validateToolByMode(tool, catalyst)
-        val routeValid = validateRouteCompatibility(tool, catalyst.mode)
-        val processable = catalystReady && toolValid && routeValid
-        val expReady = processable && player.level >= requiredLevel
-        val missingLevel = if (processable && player.level < requiredLevel) requiredLevel - player.level else null
+        val seenIds = mutableSetOf<String>()
+        var workingTool = toolItem.clone()
+        var workingState = state
+        var totalRequired = 0
+        for ((slot, item) in candidates) {
+            val catalyst = ArenaOverEnchanterCatalystData.read(item)
+                ?: return PedestalEvaluation(
+                    catalystReady = true,
+                    processable = false,
+                    expReady = false,
+                    executable = false,
+                    requiredLevel = null,
+                    missingLevel = null,
+                    uiState = uiState,
+                    unlockedSlotCount = unlockProgress.unlockedSlotCount,
+                    usedSlotCount = usedSlotCount,
+                    preparedCatalysts = emptyList()
+                )
+            val normalizedId = catalyst.targetEnchantmentId.trim().lowercase(Locale.ROOT)
+            if (!seenIds.add(normalizedId)) {
+                return PedestalEvaluation(
+                    catalystReady = true,
+                    processable = false,
+                    expReady = false,
+                    executable = false,
+                    requiredLevel = null,
+                    missingLevel = null,
+                    uiState = uiState,
+                    unlockedSlotCount = unlockProgress.unlockedSlotCount,
+                    usedSlotCount = usedSlotCount,
+                    preparedCatalysts = emptyList()
+                )
+            }
+            val required = resolveRequiredLevel(catalyst)
+                ?: return PedestalEvaluation(
+                    catalystReady = true,
+                    processable = false,
+                    expReady = false,
+                    executable = false,
+                    requiredLevel = null,
+                    missingLevel = null,
+                    uiState = uiState,
+                    unlockedSlotCount = unlockProgress.unlockedSlotCount,
+                    usedSlotCount = usedSlotCount,
+                    preparedCatalysts = emptyList()
+                )
+
+            if (!validateRouteCompatibility(workingState, catalyst, uiState, unlockProgress.unlockedSlotCount)) {
+                return PedestalEvaluation(
+                    catalystReady = true,
+                    processable = false,
+                    expReady = false,
+                    executable = false,
+                    requiredLevel = null,
+                    missingLevel = null,
+                    uiState = uiState,
+                    unlockedSlotCount = unlockProgress.unlockedSlotCount,
+                    usedSlotCount = usedSlotCount,
+                    preparedCatalysts = emptyList()
+                )
+            }
+            if (!validateToolByMode(workingTool, workingState, catalyst, uiState)) {
+                return PedestalEvaluation(
+                    catalystReady = true,
+                    processable = false,
+                    expReady = false,
+                    executable = false,
+                    requiredLevel = null,
+                    missingLevel = null,
+                    uiState = uiState,
+                    unlockedSlotCount = unlockProgress.unlockedSlotCount,
+                    usedSlotCount = usedSlotCount,
+                    preparedCatalysts = emptyList()
+                )
+            }
+
+            prepared += PreparedCatalyst(slot = slot, item = item, catalyst = catalyst, requiredLevel = required)
+            totalRequired += required
+
+            val simulated = simulateApply(workingTool, workingState, catalyst)
+            workingTool = simulated.first
+            workingState = simulated.second
+        }
+
+        val expReady = player.level >= totalRequired
+        val missingLevel = if (expReady) null else (totalRequired - player.level)
         return PedestalEvaluation(
-            catalystReady = catalystReady,
-            processable = processable,
+            catalystReady = true,
+            processable = true,
             expReady = expReady,
             executable = expReady,
-            requiredLevel = requiredLevel,
+            requiredLevel = totalRequired,
             missingLevel = missingLevel,
-            mode = catalyst.mode
+            uiState = uiState,
+            unlockedSlotCount = unlockProgress.unlockedSlotCount,
+            usedSlotCount = usedSlotCount,
+            preparedCatalysts = prepared
         )
     }
 
-    private fun startReadyRouteGlintAnimation(
-        player: Player,
-        inventory: Inventory,
-        runtime: ViewerRuntime,
-        leftColor: PanelColor,
-        rightColor: PanelColor
-    ) {
-        runtime.routeGlintTask?.cancel()
-        runtime.routeGlintEnabled = false
-        var stepIndex = 0
-        runtime.routeGlintTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
-            if (!player.isOnline || player.openInventory.topInventory != inventory) {
-                runtime.routeGlintTask?.cancel()
-                runtime.routeGlintTask = null
-                runtime.routeGlintEnabled = false
-                return@Runnable
+    private fun validateRouteCompatibility(
+        state: OverEnchantState,
+        catalyst: ArenaOverEnchanterCatalystData.Catalyst,
+        uiState: PedestalUiState,
+        unlockedSlotCount: Int
+    ): Boolean {
+        val targetId = catalyst.targetEnchantmentId.trim().lowercase(Locale.ROOT)
+        return when (uiState) {
+            PedestalUiState.NO_TOOL -> false
+            PedestalUiState.TOOL_NO_OVER -> {
+                val targetAlreadyExists = state.entries.containsKey(targetId)
+                targetAlreadyExists || state.entries.size < unlockedSlotCount
             }
 
-            if (runtime.isForging || !evaluate(player, inventory).executable) {
-                runtime.routeGlintTask?.cancel()
-                runtime.routeGlintTask = null
-                runtime.routeGlintEnabled = false
-                return@Runnable
-            }
-
-            if (stepIndex < ArenaEnchantPedestalLayout.CATALYST_STEPS.size) {
-                ArenaEnchantPedestalLayout.CATALYST_STEPS[stepIndex].forEach { slot ->
-                    inventory.setItem(slot, buildPanelItem(player, leftColor, glint = true))
-                }
-                ArenaEnchantPedestalLayout.EXP_STEPS[stepIndex].forEach { slot ->
-                    inventory.setItem(slot, buildPanelItem(player, rightColor, glint = true))
-                }
-                stepIndex += 1
-                return@Runnable
-            }
-
-            runtime.routeGlintTask?.cancel()
-            runtime.routeGlintTask = null
-            runtime.routeGlintEnabled = true
-        }, 0L, 1L)
-    }
-
-    private fun validateRouteCompatibility(tool: ItemStack, mode: ArenaOverEnchanterMode): Boolean {
-        val route = getRouteMode(tool)
-        val overUsed = isOverStackingUsed(tool)
-        return when (mode) {
-            ArenaOverEnchanterMode.LIMIT_BREAKING -> route != "over_path" && !overUsed
-            ArenaOverEnchanterMode.OVER_STACKING,
-            ArenaOverEnchanterMode.EXOTIC_ATTACH -> route != "limit_breaking" && !overUsed
+            PedestalUiState.TOOL_HAS_OVER -> state.entries.containsKey(targetId)
         }
     }
 
-    private fun validateToolByMode(tool: ItemStack, catalyst: ArenaOverEnchanterCatalystData.Catalyst): Boolean {
+    private fun validateToolByMode(
+        tool: ItemStack,
+        state: OverEnchantState,
+        catalyst: ArenaOverEnchanterCatalystData.Catalyst,
+        uiState: PedestalUiState
+    ): Boolean {
         val targetEnchant = resolveEnchantment(catalyst.targetEnchantmentId) ?: return false
         val currentTargetLevel = tool.getEnchantmentLevel(targetEnchant)
+        val targetId = catalyst.targetEnchantmentId.trim().lowercase(Locale.ROOT)
+        val currentOverLevel = state.entries[targetId] ?: 0
 
         return when (catalyst.mode) {
             ArenaOverEnchanterMode.LIMIT_BREAKING -> {
                 val overLevel = catalyst.overLevel ?: return false
                 if (!targetEnchant.canEnchantItem(tool)) {
+                    return false
+                }
+                if (uiState == PedestalUiState.TOOL_HAS_OVER && !state.entries.containsKey(targetId)) {
+                    return false
+                }
+                val expectedCurrentOver = overLevel - 1
+                if (expectedCurrentOver > 0 && currentOverLevel != expectedCurrentOver) {
+                    return false
+                }
+                if (expectedCurrentOver <= 0 && currentOverLevel > 0) {
                     return false
                 }
                 val requiredCurrent = targetEnchant.maxLevel + overLevel - 1
@@ -747,6 +1031,28 @@ class ArenaEnchantPedestalMenu(
                 validateExoticAttach(tool, catalyst.targetEnchantmentId)
             }
         }
+    }
+
+    private fun simulateApply(
+        tool: ItemStack,
+        state: OverEnchantState,
+        catalyst: ArenaOverEnchanterCatalystData.Catalyst
+    ): Pair<ItemStack, OverEnchantState> {
+        val targetEnchant = resolveEnchantment(catalyst.targetEnchantmentId) ?: return tool to state
+        val resultingLevel = when (catalyst.mode) {
+            ArenaOverEnchanterMode.LIMIT_BREAKING -> {
+                val overLevel = catalyst.overLevel ?: return tool to state
+                targetEnchant.maxLevel + overLevel
+            }
+
+            ArenaOverEnchanterMode.OVER_STACKING,
+            ArenaOverEnchanterMode.EXOTIC_ATTACH -> targetEnchant.maxLevel
+        }
+        val cloned = tool.clone()
+        cloned.addUnsafeEnchantment(targetEnchant, resultingLevel)
+        val appliedOverLevel = resolveAppliedOverLevel(catalyst)
+        val nextState = applyOverEnchantEntry(state, catalyst.targetEnchantmentId, appliedOverLevel)
+        return cloned to nextState
     }
 
     private fun validateOverStackingBase(tool: ItemStack, targetEnchantmentId: String): Boolean {
@@ -821,26 +1127,188 @@ class ArenaEnchantPedestalMenu(
         return name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE") || name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS")
     }
 
-    private fun getRouteMode(item: ItemStack): String? {
-        val meta = item.itemMeta ?: return null
-        return meta.persistentDataContainer.get(routeModeKey, PersistentDataType.STRING)
+    private fun resolveAppliedOverLevel(catalyst: ArenaOverEnchanterCatalystData.Catalyst): Int {
+        return when (catalyst.mode) {
+            ArenaOverEnchanterMode.LIMIT_BREAKING -> catalyst.overLevel ?: 0
+            ArenaOverEnchanterMode.OVER_STACKING,
+            ArenaOverEnchanterMode.EXOTIC_ATTACH -> 1
+        }
     }
 
-    private fun setRouteMode(item: ItemStack, mode: String) {
+    private fun applyOverEnchantEntry(
+        state: OverEnchantState,
+        enchantmentId: String,
+        overLevel: Int
+    ): OverEnchantState {
+        val normalizedId = enchantmentId.trim().lowercase(Locale.ROOT)
+        val nextEntries = state.entries.toMutableMap()
+        nextEntries[normalizedId] = overLevel.coerceAtLeast(1)
+        return OverEnchantState(entries = nextEntries)
+    }
+
+    private fun getOverEnchantState(item: ItemStack): OverEnchantState {
+        val meta = item.itemMeta ?: return OverEnchantState(entries = emptyMap())
+        val pdc = meta.persistentDataContainer
+        val rawEntries = pdc.get(overEnchantEntriesKey, PersistentDataType.STRING).orEmpty()
+        val entries = parseOverEnchantEntries(rawEntries)
+        return OverEnchantState(entries = entries)
+    }
+
+    private fun setOverEnchantState(item: ItemStack, state: OverEnchantState) {
         val meta = item.itemMeta ?: return
-        meta.persistentDataContainer.set(routeModeKey, PersistentDataType.STRING, mode)
+        val pdc = meta.persistentDataContainer
+        val serialized = serializeOverEnchantEntries(state.entries)
+        if (serialized.isBlank()) {
+            pdc.remove(overEnchantEntriesKey)
+        } else {
+            pdc.set(overEnchantEntriesKey, PersistentDataType.STRING, serialized)
+        }
         item.itemMeta = meta
     }
 
-    private fun isOverStackingUsed(item: ItemStack): Boolean {
-        val meta = item.itemMeta ?: return false
-        return meta.persistentDataContainer.get(overStackingUsedKey, PersistentDataType.BYTE)?.toInt() == 1
+    private fun parseOverEnchantEntries(raw: String): Map<String, Int> {
+        if (raw.isBlank()) {
+            return emptyMap()
+        }
+        return buildMap {
+            raw.split('|').forEach { token ->
+                val parts = token.split(':', limit = 2)
+                if (parts.size != 2) {
+                    return@forEach
+                }
+                val id = parts[0].trim().lowercase(Locale.ROOT)
+                val level = parts[1].trim().toIntOrNull() ?: return@forEach
+                if (id.isBlank() || level <= 0) {
+                    return@forEach
+                }
+                put(id, level)
+            }
+        }
     }
 
-    private fun setOverStackingUsed(item: ItemStack, used: Boolean) {
+    private fun serializeOverEnchantEntries(entries: Map<String, Int>): String {
+        if (entries.isEmpty()) {
+            return ""
+        }
+        return entries.entries
+            .sortedBy { it.key }
+            .joinToString("|") { "${it.key}:${it.value.coerceAtLeast(1)}" }
+    }
+
+    private fun usedOverEnchantSlotCount(state: OverEnchantState): Int {
+        return state.entries.size.coerceAtLeast(0)
+    }
+
+    private fun orderedOverEnchantEntries(state: OverEnchantState): List<Pair<String, Int>> {
+        return state.entries.entries
+            .sortedBy { it.key }
+            .map { it.key to it.value }
+    }
+
+    private fun buildOverEnchantToken(enchantmentId: String, overLevel: Int): String {
+        val symbol = ENCHANTMENT_SYMBOLS[enchantmentId.trim().lowercase(Locale.ROOT)] ?: "?"
+        val color = when (overLevel) {
+            1 -> "§6"
+            2 -> "§d"
+            3 -> "§b"
+            else -> "§f"
+        }
+        return "$color〚$symbol〛"
+    }
+
+    private fun applyOverEnchantLore(item: ItemStack, state: OverEnchantState) {
         val meta = item.itemMeta ?: return
-        meta.persistentDataContainer.set(overStackingUsedKey, PersistentDataType.BYTE, if (used) 1 else 0)
+        val ordered = orderedOverEnchantEntries(state)
+        val line = ordered.joinToString(" ") { (id, level) ->
+            buildOverEnchantToken(id, level)
+        }
+
+        val existing = meta.lore?.toMutableList() ?: mutableListOf()
+        val managed = meta.persistentDataContainer.get(overEnchantLoreManagedKey, PersistentDataType.BYTE)?.toInt() == 1
+
+        if (line.isBlank()) {
+            if (managed && existing.isNotEmpty()) {
+                existing.removeAt(0)
+            }
+            if (existing.isEmpty()) {
+                meta.lore = null
+            } else {
+                meta.lore = existing
+            }
+            meta.persistentDataContainer.remove(overEnchantLoreManagedKey)
+            item.itemMeta = meta
+            return
+        }
+
+        if (managed && existing.isNotEmpty()) {
+            existing[0] = line
+        } else {
+            existing.add(0, line)
+        }
+        meta.lore = existing
+        meta.persistentDataContainer.set(overEnchantLoreManagedKey, PersistentDataType.BYTE, 1)
         item.itemMeta = meta
+    }
+
+    private fun resolveSlotUnlockProgress(player: Player): SlotUnlockProgress {
+        val successCount = missionServiceProvider()?.getOverEnchantSuccessCount(player.uniqueId) ?: 0
+        val thresholds = resolveSlotUnlockThresholds()
+        val unlockedSlotCount = thresholds.entries
+            .filter { successCount >= it.value }
+            .maxOfOrNull { it.key }
+            ?.coerceIn(1, 3)
+            ?: 1
+        val currentThreshold = thresholds[unlockedSlotCount] ?: 0
+        val nextThreshold = thresholds[unlockedSlotCount + 1]
+        return SlotUnlockProgress(
+            successCount = successCount.coerceAtLeast(0),
+            unlockedSlotCount = unlockedSlotCount,
+            currentThreshold = currentThreshold,
+            nextThreshold = nextThreshold
+        )
+    }
+
+    private fun resolveSlotUnlockThresholds(): Map<Int, Int> {
+        val section = coreConfigProvider().getConfigurationSection("arena.over_enchanter.slot_unlocks")
+        if (section == null) {
+            return DEFAULT_SLOT_UNLOCKS
+        }
+        val parsed = mutableMapOf<Int, Int>()
+        section.getKeys(false).forEach { rawKey ->
+            val slot = rawKey.toIntOrNull() ?: return@forEach
+            if (slot !in 1..3) {
+                return@forEach
+            }
+            val threshold = section.getInt(rawKey, -1)
+            if (threshold < 0) {
+                return@forEach
+            }
+            parsed[slot] = threshold
+        }
+        if (parsed[1] == null) {
+            parsed[1] = 0
+        }
+        if (parsed[2] == null) {
+            parsed[2] = DEFAULT_SLOT_UNLOCKS[2] ?: 30
+        }
+        if (parsed[3] == null) {
+            parsed[3] = DEFAULT_SLOT_UNLOCKS[3] ?: 100
+        }
+        return parsed.toSortedMap()
+    }
+
+    private fun buildGaugeLine(progress: SlotUnlockProgress): String {
+        val totalBars = 30
+        val next = progress.nextThreshold
+        if (next == null) {
+            return "§a" + "❚".repeat(totalBars)
+        }
+        val span = (next - progress.currentThreshold).coerceAtLeast(1)
+        val currentInSpan = (progress.successCount - progress.currentThreshold).coerceIn(0, span)
+        val fillRatio = currentInSpan.toDouble() / span.toDouble()
+        val filled = (fillRatio * totalBars).toInt().coerceIn(0, totalBars)
+        val empty = (totalBars - filled).coerceAtLeast(0)
+        return "§a" + "❚".repeat(filled) + "§7" + "❚".repeat(empty)
     }
 
     private fun returnItemToPlayer(player: Player, inventory: Inventory, slot: Int) {
@@ -850,6 +1318,54 @@ class ArenaEnchantPedestalMenu(
         leftovers.values.forEach { leftover ->
             player.world.dropItemNaturally(player.location, leftover)
         }
+    }
+
+    private fun consumeOneCatalyst(inventory: Inventory, slot: Int) {
+        val item = getInputItem(inventory, slot) ?: return
+        if (item.amount > 1) {
+            item.amount -= 1
+        } else {
+            inventory.setItem(slot, null)
+        }
+    }
+
+    private fun resolveActiveCatalystSlots(evaluation: PedestalEvaluation): List<Int> {
+        return resolveActiveCatalystSlots(evaluation.uiState, evaluation.unlockedSlotCount)
+    }
+
+    private fun resolveActiveCatalystSlots(uiState: PedestalUiState, unlockedSlotCount: Int): List<Int> {
+        return when (uiState) {
+            PedestalUiState.NO_TOOL -> emptyList()
+            PedestalUiState.TOOL_NO_OVER -> ArenaEnchantPedestalLayout.CATALYST_SLOTS.take(unlockedSlotCount.coerceIn(1, 3))
+            PedestalUiState.TOOL_HAS_OVER -> listOf(ArenaEnchantPedestalLayout.REINFORCE_SLOT)
+        }
+    }
+
+    private fun canInsertCatalystIntoSlot(item: ItemStack, inventory: Inventory, slot: Int): Boolean {
+        val incoming = ArenaOverEnchanterCatalystData.read(item) ?: return false
+        val incomingId = incoming.targetEnchantmentId.trim().lowercase(Locale.ROOT)
+        val player = inventory.viewers.firstOrNull() as? Player
+        val evaluation = player?.let { evaluate(it, inventory) }
+        if (evaluation != null && slot !in resolveActiveCatalystSlots(evaluation)) {
+            return false
+        }
+        if (evaluation?.uiState == PedestalUiState.TOOL_HAS_OVER) {
+            val tool = getInputItem(inventory, ArenaEnchantPedestalLayout.TOOL_SLOT) ?: return false
+            val state = getOverEnchantState(tool)
+            if (!state.entries.containsKey(incomingId)) {
+                return false
+            }
+        }
+
+        val activeSlots = (evaluation?.let { resolveActiveCatalystSlots(it) } ?: ArenaEnchantPedestalLayout.CATALYST_SLOTS).filter { s ->
+            if (s == slot) {
+                return@filter true
+            }
+            val existing = getInputItem(inventory, s) ?: return@filter true
+            val existingCatalyst = ArenaOverEnchanterCatalystData.read(existing) ?: return@filter true
+            existingCatalyst.targetEnchantmentId.trim().lowercase(Locale.ROOT) != incomingId
+        }
+        return activeSlots.size == (evaluation?.let { resolveActiveCatalystSlots(it).size } ?: ArenaEnchantPedestalLayout.CATALYST_SLOTS.size)
     }
 
     private fun isInputSlotAvailableForInsert(inventory: Inventory, slot: Int): Boolean {
@@ -874,7 +1390,7 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun placeFromCursorIntoInputSlot(event: InventoryClickEvent, inventory: Inventory, slot: Int) {
-        val cursor = event.cursor?.clone()?.takeUnless { it.type.isAir } ?: return
+        val cursor = event.cursor.clone().takeUnless { it.type.isAir } ?: return
         val insertAmount = 1
         val placed = cursor.clone().apply { amount = insertAmount }
         inventory.setItem(slot, placed)

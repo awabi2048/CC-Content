@@ -157,6 +157,10 @@ arena:
   mob_token_drop_chance: 0.30
   mob_token_looting_bonus_per_level: 0.033
   over_enchanter:
+    slot_unlocks:
+      1: 0
+      2: 30
+      3: 100
     limit_breaking:
       sharpness:
         1: 50

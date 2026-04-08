@@ -217,7 +217,11 @@ class CCContent : JavaPlugin(), Listener {
                 arenaManager.setMissionService(arenaMissionService)
                 arenaMissionService?.initialize()
                 arenaSessionInfoMenu = ArenaSessionInfoMenu(this, arenaManager)
-                arenaEnchantPedestalMenu = ArenaEnchantPedestalMenu(this) { coreConfig }
+                arenaEnchantPedestalMenu = ArenaEnchantPedestalMenu(
+                    plugin = this,
+                    coreConfigProvider = { coreConfig },
+                    missionServiceProvider = { arenaMissionService }
+                )
                 arenaFeatureReady = true
             } catch (e: Exception) {
                 runCatching { arenaMissionService?.shutdown() }
