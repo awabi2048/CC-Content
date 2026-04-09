@@ -754,6 +754,7 @@ class ArenaEnchantPedestalMenu(
             return
         }
 
+        // TODO: executeForge() の成否を返す形にして、失敗時は成功SE/演出を分岐させる。
         runtime.panelAnimationTask?.cancel()
         runtime.isForging = true
         playSound(player, "minecraft:block.end_portal_frame.fill", 2.0f)
@@ -1033,6 +1034,7 @@ class ArenaEnchantPedestalMenu(
         val holder = inventory.holder as? ArenaEnchantPedestalHolder
         val runtime = holder?.let { runtimes.getOrPut(it.ownerId) { ViewerRuntime() } }
         if (runtime != null) {
+            // TODO: 実機で挙動が固まったら、frozenRemovalDisplayState を含む状態機械を整理する。
             if (evaluation.uiState == PedestalUiState.NO_TOOL && !runtime.isPanelAnimating) {
                 resetPathState(runtime)
             }
