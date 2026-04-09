@@ -576,3 +576,17 @@ ender_eye_beam:
   attack: 5.2
   movement_speed: 0.08
   armor: 2.5
+
+ender_ghost:
+  type: ender_ghost
+  health: 18.0
+  attack: 4.5
+  movement_speed: 0.0
+  armor: 1.0
+
+ender_shooter:
+  type: ender_shooter
+  health: 35.0
+  attack: 6.0
+  movement_speed: 0.0
+  armor: 4.0

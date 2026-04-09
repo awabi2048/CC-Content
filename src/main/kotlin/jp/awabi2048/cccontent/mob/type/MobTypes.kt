@@ -61,9 +61,12 @@ import jp.awabi2048.cccontent.mob.ability.ShulkerCloseDefenseBarrageAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerProximitySparkZoneAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerEndRodLaserAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerSniperShotAbility
+import jp.awabi2048.cccontent.mob.ability.ConeAttackAbility
 import jp.awabi2048.cccontent.mob.ability.EnderEyeBeamOrbitAbility
 import jp.awabi2048.cccontent.mob.ability.EnderEyeHunterAbility
 import jp.awabi2048.cccontent.mob.ability.EnderEyeSummonerAbility
+import jp.awabi2048.cccontent.mob.ability.FloatingHeadVisualAbility
+import jp.awabi2048.cccontent.mob.ability.StationaryTurretVisualAbility
 import org.bukkit.Bukkit
 import org.bukkit.Color
 import org.bukkit.Particle
@@ -1721,6 +1724,58 @@ class EnderEyeBeamMobType : EquipmentMobType(
             chargePulseSound = Sound.ENTITY_GUARDIAN_ATTACK,
             chargePulseSoundVolume = 0.6f,
             chargePulseSoundPitch = 1.4f,
+            chargeParticle = Particle.PORTAL
+        )
+    )
+)
+
+private const val ENDER_GHOST_HEAD_TEXTURE =
+    "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNjg4MzM0MjJmZDBlYmFhMzMxNWU5NTEwMGE5Y2IyOTA4OWQ0N2FkYzQ5OWMzMzA1MWVhOGE5OGM4MDc2ZGFjYSJ9fX0="
+
+private const val ENDER_SHOOTER_HEAD_TEXTURE =
+    "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvYTg4YjFjZDk1NzQ2NzJlOGUzMjYyZjIxMGMwZGRkYmMwODJlYTc1NjllOGU3MGYwYzA3YjRiZWU3NWUzMmY2MiJ9fX0="
+
+class EnderGhostMobType : EquipmentMobType(
+    id = "ender_ghost",
+    baseEntityType = EntityType.VEX,
+    abilities = listOf(
+        FloatingHeadVisualAbility(
+            id = "ender_ghost_visual",
+            headTextureValue = ENDER_GHOST_HEAD_TEXTURE
+        ),
+        ConeAttackAbility(
+            id = "ender_ghost_cone_attack",
+            range = 4.0,
+            coneHalfAngleDegrees = 30.0,
+            cooldownTicks = 20L,
+            damageMultiplier = 1.0
+        )
+    )
+)
+
+class EnderShooterMobType : EquipmentMobType(
+    id = "ender_shooter",
+    baseEntityType = EntityType.GUARDIAN,
+    abilities = listOf(
+        StationaryTurretVisualAbility(
+            id = "ender_shooter_visual",
+            headTextureValue = ENDER_SHOOTER_HEAD_TEXTURE
+        ),
+        GuardianBeamAbility(
+            id = "ender_shooter_guardian_laser",
+            cooldownTicks = 80L,
+            chargeTicks = 30L,
+            minRange = 2.0,
+            maxRange = 16.0,
+            directDamageMultiplier = 0.0,
+            directBonusDamage = 0.0,
+            directKnockback = 0.8,
+            splashKnockback = 0.0,
+            chargePulseIntervalTicks = 10L,
+            chargePulseDamage = 2.5,
+            chargePulseSound = Sound.ENTITY_GUARDIAN_ATTACK,
+            chargePulseSoundVolume = 0.7f,
+            chargePulseSoundPitch = 1.2f,
             chargeParticle = Particle.PORTAL
         )
     )

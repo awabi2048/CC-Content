@@ -91,6 +91,8 @@ import jp.awabi2048.cccontent.mob.type.ShulkerTurretBarrageMobType
 import jp.awabi2048.cccontent.mob.type.EnderEyeHunterMobType
 import jp.awabi2048.cccontent.mob.type.EnderEyeOrbitMobType
 import jp.awabi2048.cccontent.mob.type.EnderEyeBeamMobType
+import jp.awabi2048.cccontent.mob.type.EnderGhostMobType
+import jp.awabi2048.cccontent.mob.type.EnderShooterMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
@@ -346,6 +348,8 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(EnderEyeHunterMobType())
         registerMobType(EnderEyeOrbitMobType())
         registerMobType(EnderEyeBeamMobType())
+        registerMobType(EnderGhostMobType())
+        registerMobType(EnderShooterMobType())
     }
 
     fun registerMobType(mobType: MobType) {
@@ -1089,7 +1093,9 @@ class MobService(private val plugin: JavaPlugin) {
                 addCpuNanos(activeMob.sessionKey, elapsedNanos)
             }
             staleIds.forEach { staleId ->
-                activeMobs.remove(staleId)
+                val activeMob = activeMobs.remove(staleId) ?: return@forEach
+                val entity = Bukkit.getEntity(staleId) as? LivingEntity ?: return@forEach
+                runDeathCallbacks(activeMob, entity)
             }
 
             refreshSessionLoadSnapshots(activeCountBySession)
@@ -1099,6 +1105,8 @@ class MobService(private val plugin: JavaPlugin) {
     fun shutdown() {
         tickTask?.cancel()
         tickTask = null
+        val trackedMobIds = activeMobs.keys.toList()
+        trackedMobIds.forEach { despawnTrackedMob(it) }
         activeMobs.clear()
         managedProjectilePermits.clear()
         directDamagePermits.clear()
