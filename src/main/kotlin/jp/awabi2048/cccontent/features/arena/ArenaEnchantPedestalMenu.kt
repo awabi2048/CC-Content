@@ -69,7 +69,7 @@ private object ArenaEnchantPedestalLayout {
     )
     val FORGE_STEPS: List<List<Int>> = listOf(
         listOf(18, 26),
-        listOf(20, 24, 25),
+        listOf(20, 24),
         listOf(12, 14, 21, 23, 30, 32),
         listOf(13, 31)
     )
