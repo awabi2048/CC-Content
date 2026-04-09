@@ -617,6 +617,8 @@ class ArenaEnchantPedestalMenu(
         val glintCollapse = before.executable && !after.executable
 
         if (glintCollapse && runtime.glintPathLevel > 0) {
+            playSound(player, "minecraft:block.beacon.deactivate", 0.8f)
+            playSound(player, "minecraft:block.ender_chest.close", 0.8f)
             queued += PathAnimationRequest(
                 kind = PanelAnimationKind.GLINT,
                 reveal = false,
@@ -665,6 +667,8 @@ class ArenaEnchantPedestalMenu(
             }
         }
         if (glintReveal) {
+            playSound(player, "minecraft:block.trial_spawner.ominous_activate", 0.75f)
+            playSound(player, "minecraft:block.beacon.power_select", 0.75f)
             queued += PathAnimationRequest(PanelAnimationKind.GLINT, reveal = true)
         }
 
@@ -690,6 +694,11 @@ class ArenaEnchantPedestalMenu(
         runtime.activeAnimationDirection = 1
         runtime.pendingPathAnimations.clear()
         runtime.returnCatalystsBeforeFullCollapse = true
+
+        if (runtime.glintPathLevel > 0) {
+            playSound(player, "minecraft:block.beacon.deactivate", 0.8f)
+            playSound(player, "minecraft:block.ender_chest.close", 0.8f)
+        }
 
         if (activeKind == PanelAnimationKind.FULL) {
             runtime.pendingPathAnimations += PathAnimationRequest(
@@ -1026,15 +1035,6 @@ class ArenaEnchantPedestalMenu(
         if (runtime != null) {
             if (evaluation.uiState == PedestalUiState.NO_TOOL && !runtime.isPanelAnimating) {
                 resetPathState(runtime)
-            }
-            val wasExecutable = runtime.lastExecutable
-            if (!wasExecutable && evaluation.executable) {
-                playSound(player, "minecraft:block.trial_spawner.ominous_activate", 0.75f)
-                playSound(player, "minecraft:block.beacon.power_select", 0.75f)
-            }
-            if (wasExecutable && !evaluation.executable) {
-                playSound(player, "minecraft:block.beacon.deactivate", 0.8f)
-                playSound(player, "minecraft:block.ender_chest.close", 0.8f)
             }
             runtime.lastExecutable = evaluation.executable
         }
