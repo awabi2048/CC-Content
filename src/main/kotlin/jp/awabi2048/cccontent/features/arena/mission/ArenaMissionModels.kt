@@ -24,6 +24,7 @@ data class ArenaPlayerMissionData(
     var totalMissionClearCount: Int = 0,
     var totalMobKillCount: Int = 0,
     var totalStrongEnemyKillCount: Int = 0,
+    var totalOverEnchantSuccessCount: Int = 0,
     var barrierRestartCount: Int = 0,
     var licenseTier: ArenaLicenseTier = ArenaLicenseTier.PAPER,
     val completedByDate: MutableMap<String, MutableSet<Int>> = mutableMapOf()
@@ -49,6 +50,11 @@ data class ArenaPlayerMissionData(
     fun addStrongEnemyKillCount(amount: Int = 1) {
         if (amount <= 0) return
         totalStrongEnemyKillCount += amount
+    }
+
+    fun addOverEnchantSuccessCount(amount: Int = 1) {
+        if (amount <= 0) return
+        totalOverEnchantSuccessCount += amount
     }
 
     fun addBarrierRestartCount(amount: Int = 1) {

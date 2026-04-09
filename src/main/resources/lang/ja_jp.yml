@@ -1704,6 +1704,11 @@ arena:
     pedestal:
       title: '§8不思議な祭壇'
       blank: ' '
+      info:
+        dummy:
+          - '§7ダミーテキスト1'
+          - '§7ダミーテキスト2'
+          - '§7ダミーテキスト3'
       placeholder:
         left: '§a触媒の導線'
         right: '§a情報の導線'
@@ -1719,6 +1724,8 @@ arena:
         waiting: '§cオーバーエンチャント実行'
         ready_lore: '§7クリックで実行'
         waiting_lore: '§7条件を満たすと実行できます'
+        missing_level: '§8あと §a{value} レベル §8必要です'
+        consume_level: '§8合成によって §a{value} レベル §8を消費します'
     separator: '§8§m――――――――――――――――――――'
     coming_soon: '§7Coming Soon!'
     license_card:
