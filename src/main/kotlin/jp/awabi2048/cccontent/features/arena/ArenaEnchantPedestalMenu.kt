@@ -162,6 +162,8 @@ private data class ViewerRuntime(
     var leftPathLevel: Int = 0,
     var rightPathLevel: Int = 0,
     var glintPathLevel: Int = 0,
+    var frozenRemovalDisplayState: Map<Int, ItemStack>? = null,
+    var returnCatalystsBeforeFullCollapse: Boolean = false,
     val pendingPathAnimations: MutableList<PathAnimationRequest> = mutableListOf()
 )
 
@@ -268,6 +270,8 @@ class ArenaEnchantPedestalMenu(
             return
         }
 
+        captureRemovalDisplayStateIfNeeded(event, player, top, runtime, rawSlot)
+
         if (handleReverseOnToolRemovalDuringAnimation(event, player, top, runtime, rawSlot)) {
             return
         }
@@ -321,6 +325,8 @@ class ArenaEnchantPedestalMenu(
         runtime?.panelAnimationTask?.cancel()
         runtime?.forgeAnimationTask?.cancel()
         runtime?.isForging = false
+        runtime?.frozenRemovalDisplayState = null
+        runtime?.returnCatalystsBeforeFullCollapse = false
 
         playSound(player, "minecraft:block.ender_chest.close", 0.5f)
         playSound(player, "minecraft:entity.allay.item_thrown", 0.5f)
@@ -364,14 +370,17 @@ class ArenaEnchantPedestalMenu(
         clickedTop: Boolean
     ) {
         val evaluation = evaluate(player, top)
+        val holder = top.holder as? ArenaEnchantPedestalHolder
+        val runtime = holder?.let { runtimes.getOrPut(it.ownerId) { ViewerRuntime() } }
         if (clickedTop) {
             val rawSlot = event.rawSlot
             if (rawSlot != ArenaEnchantPedestalLayout.TOOL_SLOT && rawSlot !in ArenaEnchantPedestalLayout.CATALYST_SLOTS) {
                 event.isCancelled = true
                 return
             }
-            val holder = top.holder as? ArenaEnchantPedestalHolder
-            val runtime = holder?.let { runtimes.getOrPut(it.ownerId) { ViewerRuntime() } }
+            if (runtime != null) {
+                captureRemovalDisplayStateIfNeeded(event, player, top, runtime, rawSlot)
+            }
             if (runtime != null && handleReverseOnToolRemovalDuringAnimation(event, player, top, runtime, rawSlot)) {
                 return
             }
@@ -385,6 +394,11 @@ class ArenaEnchantPedestalMenu(
                 val after = captureSnapshot(player, top)
                 processInputStateChange(player, top, before, after)
             })
+            return
+        }
+
+        if (runtime?.isPanelAnimating == true) {
+            event.isCancelled = true
             return
         }
 
@@ -486,15 +500,42 @@ class ArenaEnchantPedestalMenu(
             if (getInputItem(top, ArenaEnchantPedestalLayout.TOOL_SLOT) != null) {
                 return@Runnable
             }
-            val progress = runtime.activeAnimationProgress
-            startAnimation(player, top, runtime, PanelAnimationKind.FULL, reveal = false, startProgress = progress)
+            startToolRemovalSequence(player, top, runtime)
         })
         return true
     }
 
+    private fun captureRemovalDisplayStateIfNeeded(
+        event: InventoryClickEvent,
+        player: Player,
+        top: Inventory,
+        runtime: ViewerRuntime,
+        rawSlot: Int
+    ) {
+        if (rawSlot != ArenaEnchantPedestalLayout.TOOL_SLOT) {
+            return
+        }
+        val item = top.getItem(rawSlot) ?: return
+        if (item.type.isAir || isInputPlaceholder(item)) {
+            return
+        }
+        val placing = when (event.action) {
+            InventoryAction.PLACE_ALL,
+            InventoryAction.PLACE_ONE,
+            InventoryAction.PLACE_SOME,
+            InventoryAction.SWAP_WITH_CURSOR -> true
+
+            else -> false
+        }
+        if (placing) {
+            return
+        }
+        runtime.frozenRemovalDisplayState = buildFrozenRemovalDisplayState(player, top, runtime)
+    }
+
     private fun isAllowedDuringPanelAnimation(event: InventoryClickEvent, top: Inventory, clickedTop: Boolean): Boolean {
         if (!clickedTop) {
-            return false
+            return true
         }
         val rawSlot = event.rawSlot
         if (rawSlot != ArenaEnchantPedestalLayout.TOOL_SLOT) {
@@ -536,6 +577,13 @@ class ArenaEnchantPedestalMenu(
         val holder = inventory.holder as? ArenaEnchantPedestalHolder ?: return
         val runtime = runtimes.getOrPut(holder.ownerId) { ViewerRuntime() }
 
+        if (before.hasTool && !after.hasTool) {
+            playSound(player, "minecraft:block.enchantment_table.use", 0.85f)
+            playSound(player, "minecraft:block.end_portal_frame.fill", 0.5f)
+            startToolRemovalSequence(player, inventory, runtime)
+            return
+        }
+
         if (!before.hasAnyInput && after.hasAnyInput) {
             playSound(player, "minecraft:block.enchantment_table.use", 1.7f)
             playSound(player, "minecraft:block.end_portal_frame.fill", 0.75f)
@@ -549,13 +597,6 @@ class ArenaEnchantPedestalMenu(
             return
         }
 
-        if (before.hasTool && !after.hasTool) {
-            playSound(player, "minecraft:block.enchantment_table.use", 0.85f)
-            playSound(player, "minecraft:block.end_portal_frame.fill", 0.5f)
-            startToolRemovalSequence(player, inventory, runtime)
-            return
-        }
-
         if (runtime.isPanelAnimating) {
             renderStatic(player, inventory)
             return
@@ -563,16 +604,44 @@ class ArenaEnchantPedestalMenu(
 
         val queued = mutableListOf<PathAnimationRequest>()
         val leftReveal = before.shardCount == 0 && after.shardCount > 0
+        val leftCollapse = before.shardCount > 0 && after.shardCount == 0
         val rightReveal = !before.expReady && after.expReady
         val rightCollapse = before.expReady && !after.expReady
+        val glintReveal = !before.executable && after.executable
+        val glintCollapse = before.executable && !after.executable
+
+        if (glintCollapse && runtime.glintPathLevel > 0) {
+            queued += PathAnimationRequest(
+                kind = PanelAnimationKind.GLINT,
+                reveal = false,
+                startProgress = runtime.glintPathLevel
+            )
+        }
 
         when {
             leftReveal && rightReveal -> {
                 queued += PathAnimationRequest(PanelAnimationKind.LEFT_RIGHT, reveal = true)
             }
 
+            leftCollapse && rightCollapse -> {
+                val start = maxOf(runtime.leftPathLevel, runtime.rightPathLevel)
+                if (start > 0) {
+                    queued += PathAnimationRequest(PanelAnimationKind.LEFT_RIGHT, reveal = false, startProgress = start)
+                }
+            }
+
             leftReveal -> {
                 queued += PathAnimationRequest(PanelAnimationKind.LEFT, reveal = true)
+            }
+
+            leftCollapse -> {
+                if (runtime.leftPathLevel > 0) {
+                    queued += PathAnimationRequest(
+                        PanelAnimationKind.LEFT,
+                        reveal = false,
+                        startProgress = runtime.leftPathLevel
+                    )
+                }
             }
 
             rightReveal -> {
@@ -580,13 +649,17 @@ class ArenaEnchantPedestalMenu(
             }
 
             rightCollapse -> {
-                queued += PathAnimationRequest(PanelAnimationKind.RIGHT, reveal = false)
+                if (runtime.rightPathLevel > 0) {
+                    queued += PathAnimationRequest(
+                        PanelAnimationKind.RIGHT,
+                        reveal = false,
+                        startProgress = runtime.rightPathLevel
+                    )
+                }
             }
         }
-        if (!before.executable && after.executable) {
+        if (glintReveal) {
             queued += PathAnimationRequest(PanelAnimationKind.GLINT, reveal = true)
-        } else if (before.executable && !after.executable) {
-            queued += PathAnimationRequest(PanelAnimationKind.GLINT, reveal = false)
         }
 
         if (queued.isEmpty()) {
@@ -601,11 +674,27 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun startToolRemovalSequence(player: Player, inventory: Inventory, runtime: ViewerRuntime) {
+        val activeKind = runtime.activeAnimationKind
+        val activeProgress = runtime.activeAnimationProgress
         runtime.panelAnimationTask?.cancel()
         runtime.panelAnimationTask = null
         runtime.isPanelAnimating = false
         runtime.activeAnimationKind = null
+        runtime.activeAnimationProgress = 0
+        runtime.activeAnimationDirection = 1
         runtime.pendingPathAnimations.clear()
+        runtime.returnCatalystsBeforeFullCollapse = true
+
+        if (activeKind == PanelAnimationKind.FULL) {
+            runtime.pendingPathAnimations += PathAnimationRequest(
+                kind = PanelAnimationKind.FULL,
+                reveal = false,
+                startProgress = activeProgress.coerceIn(0, ArenaEnchantPedestalLayout.REVEAL_STEPS.size)
+            )
+            val first = runtime.pendingPathAnimations.removeAt(0)
+            startAnimation(player, inventory, runtime, first.kind, first.reveal, first.startProgress)
+            return
+        }
 
         if (runtime.glintPathLevel > 0) {
             runtime.pendingPathAnimations += PathAnimationRequest(
@@ -635,6 +724,10 @@ class ArenaEnchantPedestalMenu(
         }
 
         runtime.pendingPathAnimations += PathAnimationRequest(kind = PanelAnimationKind.FULL, reveal = false)
+        if (runtime.pendingPathAnimations.first().kind == PanelAnimationKind.FULL && runtime.returnCatalystsBeforeFullCollapse) {
+            returnAllCatalystsToPlayer(player, inventory)
+            runtime.returnCatalystsBeforeFullCollapse = false
+        }
         val first = runtime.pendingPathAnimations.removeAt(0)
         startAnimation(player, inventory, runtime, first.kind, first.reveal, first.startProgress)
     }
@@ -754,32 +847,38 @@ class ArenaEnchantPedestalMenu(
             val evaluation = evaluate(player, inventory)
             val displayState = buildDisplayState(player, inventory, evaluation, runtime)
 
-            val currentProgress = runtime.activeAnimationProgress.coerceIn(0, max)
-            applyAnimationView(player, inventory, runtime, displayState, kind, currentProgress)
-
-            val nextProgress = (currentProgress + runtime.activeAnimationDirection).coerceIn(0, max)
+            val nextProgress = (runtime.activeAnimationProgress + runtime.activeAnimationDirection).coerceIn(0, max)
             runtime.activeAnimationProgress = nextProgress
+            applyAnimationView(player, inventory, runtime, displayState, kind, nextProgress)
 
-            val complete = if (runtime.activeAnimationDirection > 0) currentProgress >= max else currentProgress <= 0
+            val complete = nextProgress == if (runtime.activeAnimationDirection > 0) max else 0
             if (!complete) {
                 return@Runnable
             }
 
             when (kind) {
-                PanelAnimationKind.LEFT -> runtime.leftPathLevel = currentProgress
-                PanelAnimationKind.RIGHT -> runtime.rightPathLevel = currentProgress
+                PanelAnimationKind.LEFT -> runtime.leftPathLevel = nextProgress
+                PanelAnimationKind.RIGHT -> runtime.rightPathLevel = nextProgress
                 PanelAnimationKind.LEFT_RIGHT -> {
-                    runtime.leftPathLevel = minOf(currentProgress, runtime.leftRightStartLeft)
-                    runtime.rightPathLevel = minOf(currentProgress, runtime.leftRightStartRight)
+                    runtime.leftPathLevel = minOf(nextProgress, runtime.leftRightStartLeft)
+                    runtime.rightPathLevel = minOf(nextProgress, runtime.leftRightStartRight)
                 }
-                PanelAnimationKind.GLINT -> runtime.glintPathLevel = currentProgress
+                PanelAnimationKind.GLINT -> runtime.glintPathLevel = nextProgress
                 PanelAnimationKind.FULL -> Unit
+            }
+
+            if (kind == PanelAnimationKind.FULL && evaluation.uiState == PedestalUiState.NO_TOOL) {
+                resetPathState(runtime)
+                runtime.returnCatalystsBeforeFullCollapse = false
+                runtime.frozenRemovalDisplayState = null
             }
 
             runtime.panelAnimationTask?.cancel()
             runtime.panelAnimationTask = null
             runtime.isPanelAnimating = false
             runtime.activeAnimationKind = null
+            runtime.activeAnimationProgress = 0
+            runtime.activeAnimationDirection = 1
             applyDisplayState(inventory, buildDisplayState(player, inventory, evaluate(player, inventory), runtime))
             runNextPendingPathAnimation(player, inventory, runtime)
         }, 0L, periodTicks)
@@ -809,8 +908,9 @@ class ArenaEnchantPedestalMenu(
         if (runtime.pendingPathAnimations.isEmpty()) {
             return
         }
-        if (runtime.pendingPathAnimations.first().kind == PanelAnimationKind.FULL) {
+        if (runtime.returnCatalystsBeforeFullCollapse && runtime.pendingPathAnimations.first().kind == PanelAnimationKind.FULL) {
             returnAllCatalystsToPlayer(player, inventory)
+            runtime.returnCatalystsBeforeFullCollapse = false
         }
         val next = runtime.pendingPathAnimations.removeAt(0)
         startAnimation(player, inventory, runtime, next.kind, next.reveal, next.startProgress)
@@ -918,6 +1018,9 @@ class ArenaEnchantPedestalMenu(
         val holder = inventory.holder as? ArenaEnchantPedestalHolder
         val runtime = holder?.let { runtimes.getOrPut(it.ownerId) { ViewerRuntime() } }
         if (runtime != null) {
+            if (evaluation.uiState == PedestalUiState.NO_TOOL && !runtime.isPanelAnimating) {
+                resetPathState(runtime)
+            }
             val wasExecutable = runtime.lastExecutable
             if (!wasExecutable && evaluation.executable) {
                 playSound(player, "minecraft:block.trial_spawner.ominous_activate", 0.75f)
@@ -939,42 +1042,15 @@ class ArenaEnchantPedestalMenu(
         evaluation: PedestalEvaluation,
         runtime: ViewerRuntime? = null
     ): Map<Int, ItemStack> {
-        val framePane = buildSimplePane(player, Material.BLACK_STAINED_GLASS_PANE)
-        val neutralPane = buildSimplePane(player, Material.GRAY_STAINED_GLASS_PANE)
-        val reservedSlots = setOf(
-            ArenaEnchantPedestalLayout.TOOL_SLOT,
-            ArenaEnchantPedestalLayout.EXP_SLOT,
-            ArenaEnchantPedestalLayout.EXECUTE_SLOT,
-            ArenaEnchantPedestalLayout.PROGRESS_SLOT,
-            ArenaEnchantPedestalLayout.INFO_SLOT
-        ) + ArenaEnchantPedestalLayout.CATALYST_SLOTS
-        val display = mutableMapOf<Int, ItemStack>()
+        val display = runtime?.frozenRemovalDisplayState
+            ?.mapValues { (_, item) -> item.clone() }
+            ?.toMutableMap()
+            ?: buildBaseDisplayState(player, inventory, evaluation)
 
-        for (slot in 0 until ArenaEnchantPedestalLayout.MENU_SIZE) {
-            if (slot in reservedSlots) {
-                continue
-            }
-            display[slot] = when {
-                slot in 0..8 || slot in 36..44 -> framePane
-                slot in ArenaEnchantPedestalLayout.CENTER_WHITE_SLOTS && evaluation.uiState != PedestalUiState.NO_TOOL -> buildSimplePane(player, Material.WHITE_STAINED_GLASS_PANE)
-                slot in ArenaEnchantPedestalLayout.ACTIVE_BACKGROUND_SLOTS -> neutralPane
-                else -> neutralPane
-            }
-        }
-
-        if (getInputItem(inventory, ArenaEnchantPedestalLayout.TOOL_SLOT).isNullOrAir()) {
-            display[ArenaEnchantPedestalLayout.TOOL_SLOT] = buildInputSlotPlaceholder(player)
-        }
-
-        ArenaEnchantPedestalLayout.CATALYST_SLOTS.forEach { slot ->
-            if (getInputItem(inventory, slot).isNullOrAir()) {
-                display[slot] = buildCatalystPlaceholderForSlot(player, evaluation, slot)
-            }
-        }
-
-        val leftCount = runtime?.leftPathLevel ?: 0
-        val rightCount = runtime?.rightPathLevel ?: 0
-        val glintCount = runtime?.glintPathLevel ?: 0
+        val usePathOverlay = runtime?.frozenRemovalDisplayState != null || evaluation.uiState != PedestalUiState.NO_TOOL
+        val leftCount = if (usePathOverlay) runtime?.leftPathLevel ?: 0 else 0
+        val rightCount = if (usePathOverlay) runtime?.rightPathLevel ?: 0 else 0
+        val glintCount = if (usePathOverlay) runtime?.glintPathLevel ?: 0 else 0
 
         ArenaEnchantPedestalLayout.LEFT_PATH_STEPS.take(leftCount.coerceIn(0, ArenaEnchantPedestalLayout.LEFT_PATH_STEPS.size)).flatten().forEach { slot ->
             if (getInputItem(inventory, slot) == null) {
@@ -1009,10 +1085,86 @@ class ArenaEnchantPedestalMenu(
         return display
     }
 
+    private fun buildBaseDisplayState(
+        player: Player,
+        inventory: Inventory,
+        evaluation: PedestalEvaluation
+    ): MutableMap<Int, ItemStack> {
+        val framePane = buildSimplePane(player, Material.BLACK_STAINED_GLASS_PANE)
+        val neutralPane = buildSimplePane(player, Material.GRAY_STAINED_GLASS_PANE)
+        val reservedSlots = setOf(
+            ArenaEnchantPedestalLayout.TOOL_SLOT,
+            ArenaEnchantPedestalLayout.EXP_SLOT,
+            ArenaEnchantPedestalLayout.EXECUTE_SLOT,
+            ArenaEnchantPedestalLayout.PROGRESS_SLOT,
+            ArenaEnchantPedestalLayout.INFO_SLOT
+        ) + ArenaEnchantPedestalLayout.CATALYST_SLOTS
+        val display = mutableMapOf<Int, ItemStack>()
+
+        for (slot in 0 until ArenaEnchantPedestalLayout.MENU_SIZE) {
+            if (slot in reservedSlots) {
+                continue
+            }
+            display[slot] = when {
+                slot in 0..8 || slot in 36..44 -> framePane
+                slot in ArenaEnchantPedestalLayout.CENTER_WHITE_SLOTS && evaluation.uiState != PedestalUiState.NO_TOOL -> buildSimplePane(player, Material.WHITE_STAINED_GLASS_PANE)
+                slot in ArenaEnchantPedestalLayout.ACTIVE_BACKGROUND_SLOTS -> neutralPane
+                else -> neutralPane
+            }
+        }
+
+        if (getInputItem(inventory, ArenaEnchantPedestalLayout.TOOL_SLOT).isNullOrAir()) {
+            display[ArenaEnchantPedestalLayout.TOOL_SLOT] = buildInputSlotPlaceholder(player)
+        }
+
+        ArenaEnchantPedestalLayout.CATALYST_SLOTS.forEach { slot ->
+            if (getInputItem(inventory, slot).isNullOrAir()) {
+                display[slot] = buildCatalystPlaceholderForSlot(player, evaluation, slot)
+            }
+        }
+
+        display[ArenaEnchantPedestalLayout.EXP_SLOT] = if (evaluation.uiState == PedestalUiState.NO_TOOL) {
+            buildSimplePane(player, Material.GRAY_STAINED_GLASS_PANE)
+        } else {
+            buildExpInfoItem(player, evaluation)
+        }
+        val progress = resolveSlotUnlockProgress(player)
+        display[ArenaEnchantPedestalLayout.PROGRESS_SLOT] = buildProgressGaugeItem(player, progress)
+        display[ArenaEnchantPedestalLayout.INFO_SLOT] = buildInfoItem(player)
+        display[ArenaEnchantPedestalLayout.EXECUTE_SLOT] = buildExecuteItem(player, evaluation)
+        return display
+    }
+
+    private fun buildFrozenRemovalDisplayState(player: Player, inventory: Inventory, runtime: ViewerRuntime): Map<Int, ItemStack> {
+        val frozenRuntime = runtime.copy(
+            panelAnimationTask = null,
+            forgeAnimationTask = null,
+            isPanelAnimating = false,
+            activeAnimationKind = null,
+            activeAnimationProgress = 0,
+            activeAnimationDirection = 1,
+            glintPathLevel = 0,
+            frozenRemovalDisplayState = null,
+            returnCatalystsBeforeFullCollapse = false,
+            pendingPathAnimations = mutableListOf()
+        )
+        return buildDisplayState(player, inventory, evaluate(player, inventory), frozenRuntime)
+            .mapValues { (_, item) -> item.clone() }
+    }
+
     private fun applyDisplayState(inventory: Inventory, displayState: Map<Int, ItemStack>) {
         displayState.forEach { (slot, item) ->
             inventory.setItem(slot, item)
         }
+    }
+
+    private fun resetPathState(runtime: ViewerRuntime) {
+        runtime.leftRightStartLeft = 0
+        runtime.leftRightStartRight = 0
+        runtime.leftPathLevel = 0
+        runtime.rightPathLevel = 0
+        runtime.glintPathLevel = 0
+        runtime.frozenRemovalDisplayState = null
     }
 
     private fun captureSnapshot(player: Player, inventory: Inventory): InputSnapshot {
