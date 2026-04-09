@@ -67,6 +67,12 @@ private object ArenaEnchantPedestalLayout {
         listOf(12, 14, 21, 23, 30, 32),
         listOf(13, 31)
     )
+    val FORGE_STEPS: List<List<Int>> = listOf(
+        listOf(18, 26),
+        listOf(20, 24, 25),
+        listOf(12, 14, 21, 23, 30, 32),
+        listOf(13, 31)
+    )
     val LEFT_PATH_SLOTS: Set<Int> = LEFT_PATH_STEPS.flatten().toSet()
     val RIGHT_PATH_SLOTS: Set<Int> = RIGHT_PATH_STEPS.flatten().toSet()
     val GLINT_PATH_SLOTS: Set<Int> = GLINT_PATH_STEPS.flatten().toSet()
@@ -754,8 +760,8 @@ class ArenaEnchantPedestalMenu(
                 return@Runnable
             }
 
-            if (stepIndex < ArenaEnchantPedestalLayout.REVEAL_STEPS.size) {
-                ArenaEnchantPedestalLayout.REVEAL_STEPS[stepIndex].forEach { slot ->
+            if (stepIndex < ArenaEnchantPedestalLayout.FORGE_STEPS.size) {
+                ArenaEnchantPedestalLayout.FORGE_STEPS[stepIndex].forEach { slot ->
                     inventory.setItem(slot, buildForgeProgressItem(player))
                 }
                 stepIndex += 1
