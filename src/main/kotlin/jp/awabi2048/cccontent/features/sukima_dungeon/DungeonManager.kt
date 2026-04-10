@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent.features.sukima_dungeon
 import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.CCContent
+import jp.awabi2048.cccontent.util.ContentLocaleResolver
 import jp.awabi2048.cccontent.world.WorldSettingsHelper
 import org.bukkit.Bukkit
 import org.bukkit.World
@@ -111,9 +112,9 @@ object DungeonManager {
             if (reason != null) {
                 p.sendMessage(reason)
             } else {
-                 val msg = MessageManager.getMessage(p, "prefix") + if (PlayerDataManager.getPlayerData(p).lang == "ja_jp") {
+                 val msg = MessageManager.getMessage(p, "prefix") + if (ContentLocaleResolver.resolve(p) == "ja_jp") {
                     "§oおあげちゃんの御札の力で、スキマから脱出しました..."
-                } else {
+                 } else {
                     "§oWith the power of Oage-chan's Talisman, you escaped from the sukima..."
                 }
                 p.sendMessage(msg)

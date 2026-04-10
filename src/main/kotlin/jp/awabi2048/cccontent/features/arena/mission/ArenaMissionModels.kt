@@ -27,7 +27,8 @@ data class ArenaPlayerMissionData(
     var totalOverEnchantSuccessCount: Int = 0,
     var barrierRestartCount: Int = 0,
     var licenseTier: ArenaLicenseTier = ArenaLicenseTier.PAPER,
-    val completedByDate: MutableMap<String, MutableSet<Int>> = mutableMapOf()
+    val completedByDate: MutableMap<String, MutableSet<Int>> = mutableMapOf(),
+    val enchantShardKillCounters: MutableMap<String, MutableMap<String, Int>> = mutableMapOf()
 ) {
     fun isCompleted(dateKey: String, missionIndex: Int): Boolean {
         return completedByDate[dateKey]?.contains(missionIndex) == true
@@ -60,6 +61,23 @@ data class ArenaPlayerMissionData(
     fun addBarrierRestartCount(amount: Int = 1) {
         if (amount <= 0) return
         barrierRestartCount += amount
+    }
+
+    fun getEnchantShardKillCount(shardKey: String, mobDefinitionId: String): Int {
+        return enchantShardKillCounters[shardKey]?.get(mobDefinitionId)?.coerceAtLeast(0) ?: 0
+    }
+
+    fun recordEnchantShardFailure(shardKey: String, mobDefinitionId: String, attemptCount: Int) {
+        if (attemptCount <= 0) return
+        enchantShardKillCounters.getOrPut(shardKey) { mutableMapOf() }[mobDefinitionId] = attemptCount
+    }
+
+    fun resetEnchantShardCounter(shardKey: String, mobDefinitionId: String) {
+        val byMob = enchantShardKillCounters[shardKey] ?: return
+        byMob.remove(mobDefinitionId)
+        if (byMob.isEmpty()) {
+            enchantShardKillCounters.remove(shardKey)
+        }
     }
 }
 

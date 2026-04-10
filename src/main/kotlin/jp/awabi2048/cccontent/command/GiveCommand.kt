@@ -1,6 +1,8 @@
 package jp.awabi2048.cccontent.command
 
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardItem
+import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardRegistry
 import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
 import org.bukkit.Bukkit
 import org.bukkit.command.Command
@@ -62,21 +64,32 @@ class GiveCommand : CommandExecutor, TabCompleter {
             return true
         }
         
-        val arenaTokenCategory = parseArenaTokenCategory(fullId)
-        if (arenaTokenCategory == null && CustomItemManager.getItem(fullId) == null) {
-            sender.sendMessage("§cアイテムID '§f$fullId§c' が見つかりません")
-            return true
-        }
+         val arenaTokenCategory = parseArenaTokenCategory(fullId)
+         val arenaEnchantShard = parseArenaEnchantShard(fullId)
+         if (arenaEnchantShard == null && fullId == "arena.enchant_shard") {
+             sender.sendMessage("§cエンチャントシャードは 'arena.enchant_shard#limit_breaking:sharpness:1' の形式で指定してください")
+             return true
+         }
+         if (arenaTokenCategory == null && arenaEnchantShard == null && CustomItemManager.getItem(fullId) == null) {
+             sender.sendMessage("§cアイテムID '§f$fullId§c' が見つかりません")
+             return true
+         }
 
         // プレイヤーに配布
         targetPlayers.forEach { player ->
-            val item = if (arenaTokenCategory != null) {
-                CustomItemManager.createItemForPlayer(ArenaMobTokenItem(arenaTokenCategory), player, amount)
+            if (arenaEnchantShard != null) {
+                repeat(amount) {
+                    player.inventory.addItem(ArenaEnchantShardItem.createShard(player, arenaEnchantShard, 1))
+                }
             } else {
-                CustomItemManager.createItemForPlayer(fullId, player, amount)
-            }
-            if (item != null) {
-                player.inventory.addItem(item)
+                val item = if (arenaTokenCategory != null) {
+                    CustomItemManager.createItemForPlayer(ArenaMobTokenItem(arenaTokenCategory), player, amount)
+                } else {
+                    CustomItemManager.createItemForPlayer(fullId, player, amount)
+                }
+                if (item != null) {
+                    player.inventory.addItem(item)
+                }
             }
         }
         
@@ -107,22 +120,33 @@ class GiveCommand : CommandExecutor, TabCompleter {
              }
              // アイテムID補完（/cc give <player> [ここ]）
              2 -> {
-                  val itemPrefix = args[1].lowercase()
-                  val baseCandidates = CustomItemManager.getAllItemIds()
-                      .filter { it.lowercase().startsWith(itemPrefix) }
-                  val tokenCandidates = when {
-                      itemPrefix.startsWith("arena.mob_token#") -> {
+                   val itemPrefix = args[1].lowercase()
+                   val baseCandidates = CustomItemManager.getAllItemIds()
+                       .filterNot { it == "arena.enchant_shard" }
+                       .filter { it.lowercase().startsWith(itemPrefix) }
+                   val tokenCandidates = when {
+                       itemPrefix.startsWith("arena.mob_token#") -> {
                           val raw = itemPrefix.substringAfter("#", "")
                           ArenaMobTokenItem.supportedTokenCategoryTypeIds()
                               .sorted()
                               .map { "arena.mob_token#$it" }
                               .filter { it.startsWith("arena.mob_token#$raw") }
                       }
-                      "arena.mob_token#".startsWith(itemPrefix) -> listOf("arena.mob_token#")
-                      else -> emptyList()
-                  }
-                  (baseCandidates + tokenCandidates).distinct().toList()
-              }
+                       "arena.mob_token#".startsWith(itemPrefix) -> listOf("arena.mob_token#")
+                       else -> emptyList()
+                   }
+                   val shardCandidates = when {
+                       itemPrefix.startsWith("arena.enchant_shard#") -> {
+                           val raw = itemPrefix.substringAfter("#", "")
+                           ArenaEnchantShardRegistry.supportedSpecs()
+                               .map { "arena.enchant_shard#$it" }
+                               .filter { it.startsWith("arena.enchant_shard#$raw") }
+                       }
+                       "arena.enchant_shard#".startsWith(itemPrefix) -> listOf("arena.enchant_shard#")
+                       else -> emptyList()
+                   }
+                   (baseCandidates + tokenCandidates + shardCandidates).distinct().toList()
+               }
               else -> emptyList()
           }
       }
@@ -139,5 +163,10 @@ class GiveCommand : CommandExecutor, TabCompleter {
             return null
         }
         return ArenaMobTokenItem.resolveTokenCategoryTypeId(rawCategory)
+    }
+
+    private fun parseArenaEnchantShard(fullId: String) = when {
+        !fullId.startsWith("arena.enchant_shard#") -> null
+        else -> ArenaEnchantShardRegistry.findBySpec(fullId.substringAfter('#', ""))
     }
  }

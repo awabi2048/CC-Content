@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
 import jp.awabi2048.cccontent.CCContent
+import jp.awabi2048.cccontent.util.ContentLocaleResolver
 import jp.awabi2048.cccontent.util.OageMessageSender
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
@@ -12,11 +13,7 @@ object MessageManager {
     }
 
     fun getMessage(player: Player?, key: String, params: Map<String, String> = emptyMap()): String {
-        val lang = if (player != null) {
-            PlayerDataManager.getPlayerData(player).lang
-        } else {
-            "ja_jp"
-        }
+        val lang = ContentLocaleResolver.resolve(player)
         return LangManager.getMessage(lang, key, params)
     }
 
@@ -25,20 +22,12 @@ object MessageManager {
     }
 
     fun getList(player: Player?, key: String): List<String> {
-        val lang = if (player != null) {
-            PlayerDataManager.getPlayerData(player).lang
-        } else {
-            "ja_jp"
-        }
+        val lang = ContentLocaleResolver.resolve(player)
         return LangManager.getList(lang, key)
     }
 
     fun getTierName(player: Player?, tier: String): String {
-        val lang = if (player != null) {
-            PlayerDataManager.getPlayerData(player).lang
-        } else {
-            "ja_jp"
-        }
+        val lang = ContentLocaleResolver.resolve(player)
         return LangManager.getTierName(lang, tier)
     }
     

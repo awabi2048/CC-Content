@@ -140,6 +140,23 @@ class ArenaMissionService(
         return getPlayerData(playerId).totalOverEnchantSuccessCount.coerceAtLeast(0)
     }
 
+    fun getEnchantShardKillCount(playerId: UUID, shardKey: String, mobDefinitionId: String): Int {
+        return getPlayerData(playerId).getEnchantShardKillCount(shardKey, mobDefinitionId)
+    }
+
+    fun recordEnchantShardAttempts(playerId: UUID, mobDefinitionId: String, attemptCounts: Map<String, Int>, droppedShardKey: String?) {
+        if (attemptCounts.isEmpty()) return
+        val playerData = getPlayerData(playerId)
+        attemptCounts.forEach { (shardKey, attemptCount) ->
+            if (shardKey == droppedShardKey) {
+                playerData.resetEnchantShardCounter(shardKey, mobDefinitionId)
+            } else {
+                playerData.recordEnchantShardFailure(shardKey, mobDefinitionId, attemptCount)
+            }
+        }
+        savePlayerData(playerId)
+    }
+
     fun setLicenseTier(playerId: UUID, licenseTier: ArenaLicenseTier): ArenaLicenseTier {
         val playerData = getPlayerData(playerId)
         playerData.licenseTier = licenseTier
@@ -1040,6 +1057,13 @@ class ArenaMissionService(
             completedSection[dateKey] = indices.toList().sorted()
         }
         config.set("arena.completed", completedSection)
+        val shardCounterSection = linkedMapOf<String, Map<String, Int>>()
+        data.enchantShardKillCounters.toSortedMap().forEach { (shardKey, countsByMob) ->
+            shardCounterSection[shardKey] = countsByMob
+                .filterValues { it > 0 }
+                .toSortedMap()
+        }
+        config.set("arena.enchant_shard_kill_counters", shardCounterSection.filterValues { it.isNotEmpty() })
         config.save(file)
     }
 
@@ -1058,6 +1082,21 @@ class ArenaMissionService(
             val list = config.getIntegerList("arena.completed.$dateKey")
             completedByDate[dateKey] = list.toMutableSet()
         }
+        val enchantShardKillCounters = mutableMapOf<String, MutableMap<String, Int>>()
+        val rawCounters = config.getConfigurationSection("arena.enchant_shard_kill_counters")
+        rawCounters?.getKeys(false)?.forEach { shardKey ->
+            val byMob = rawCounters.getConfigurationSection(shardKey) ?: return@forEach
+            val counters = mutableMapOf<String, Int>()
+            byMob.getKeys(false).forEach { mobDefinitionId ->
+                val count = byMob.getInt(mobDefinitionId, 0).coerceAtLeast(0)
+                if (count > 0) {
+                    counters[mobDefinitionId] = count
+                }
+            }
+            if (counters.isNotEmpty()) {
+                enchantShardKillCounters[shardKey] = counters
+            }
+        }
 
         return ArenaPlayerMissionData(
             totalMissionClearCount = totalMissionClearCount,
@@ -1066,7 +1105,8 @@ class ArenaMissionService(
             totalOverEnchantSuccessCount = totalOverEnchantSuccessCount,
             barrierRestartCount = barrierRestartCount,
             licenseTier = licenseTier,
-            completedByDate = completedByDate
+            completedByDate = completedByDate,
+            enchantShardKillCounters = enchantShardKillCounters
         )
     }
 

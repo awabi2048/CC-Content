@@ -166,6 +166,53 @@ arena:
         1: 50
         2: 70
         3: 95
+      smite:
+        1: 50
+        2: 70
+      bane_of_arthropods:
+        1: 50
+        2: 70
+      power:
+        1: 50
+        2: 70
+      protection:
+        1: 55
+        2: 75
+      fire_protection:
+        1: 55
+        2: 75
+      projectile_protection:
+        1: 55
+        2: 75
+      sweeping_edge:
+        1: 50
+        2: 70
+      quick_charge:
+        1: 45
+        2: 60
+      unbreaking:
+        1: 48
+        2: 68
+      looting:
+        1: 58
+        2: 82
+      impaling:
+        1: 55
+        2: 75
+      knockback:
+        1: 45
+        2: 60
+        3: 80
+      fire_aspect:
+        1: 55
+        2: 75
+        3: 95
+      feather_falling:
+        1: 48
+        2: 68
+      blast_protection:
+        1: 55
+        2: 75
     over_stacking:
       infinity: 55
       mending: 55

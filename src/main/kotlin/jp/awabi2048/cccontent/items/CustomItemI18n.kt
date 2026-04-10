@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.items
 
+import jp.awabi2048.cccontent.util.ContentLocaleResolver
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
@@ -39,14 +40,7 @@ object CustomItemI18n {
     }
 
     fun resolveLocale(player: Player?): String {
-        val raw = player?.locale?.lowercase()?.replace('-', '_') ?: DEFAULT_LOCALE
-        return when {
-            raw == "ja_jp" -> "ja_jp"
-            raw == "en_us" -> "en_us"
-            raw.startsWith("ja") -> "ja_jp"
-            raw.startsWith("en") -> "en_us"
-            else -> DEFAULT_LOCALE
-        }
+        return ContentLocaleResolver.resolve(player)
     }
 
     private fun getConfig(locale: String): YamlConfiguration {

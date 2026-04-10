@@ -14,6 +14,9 @@ import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
 import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardDefinition
+import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardItem
+import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardRegistry
 import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
 import jp.awabi2048.cccontent.items.arena.BoomerangTokenItem
 import jp.awabi2048.cccontent.CCContent
@@ -2677,6 +2680,10 @@ class ArenaManager(
             rebuiltDrops += token
         }
 
+        createEnchantShardDrop(killer, normalizedTypeId)?.let { shard ->
+            rebuiltDrops += shard
+        }
+
         rebuiltDrops.forEach { stack ->
             if (stack.type.isAir || stack.amount <= 0) return@forEach
             entity.world.dropItemNaturally(entity.location.add(0.0, 0.5, 0.0), stack)
@@ -2738,6 +2745,42 @@ class ArenaManager(
         val categoryTypeId = resolveMobTokenCategoryTypeId(mobTypeId)
         return CustomItemManager.createItemForPlayer(ArenaMobTokenItem(categoryTypeId), killer, 1)
     }
+
+    private fun createEnchantShardDrop(killer: Player, mobDefinitionId: String): ItemStack? {
+        val missionService = arenaMissionService ?: return null
+        val candidateDefinitions = ArenaEnchantShardRegistry.getDropDefinitionsForMob(mobDefinitionId)
+        if (candidateDefinitions.isEmpty()) {
+            return null
+        }
+
+        val evaluated = candidateDefinitions.mapNotNull { definition ->
+            val baseChance = definition.baseDropChance ?: return@mapNotNull null
+            val previousCount = missionService.getEnchantShardKillCount(killer.uniqueId, definition.key, mobDefinitionId)
+            val attemptCount = previousCount + 1
+            val finalChance = ArenaEnchantShardRegistry.calculateDropChance(baseChance, attemptCount)
+            EvaluatedEnchantShardCandidate(definition, attemptCount, random.nextDouble() < finalChance)
+        }
+        if (evaluated.isEmpty()) {
+            return null
+        }
+
+        val successful = evaluated.filter { it.success }
+        val selected = successful.ifEmpty { null }?.let { it[random.nextInt(it.size)] }
+        missionService.recordEnchantShardAttempts(
+            playerId = killer.uniqueId,
+            mobDefinitionId = mobDefinitionId,
+            attemptCounts = evaluated.associate { it.definition.key to it.attemptCount },
+            droppedShardKey = selected?.definition?.key
+        )
+
+        return selected?.let { ArenaEnchantShardItem.createShard(killer, it.definition, 1) }
+    }
+
+    private data class EvaluatedEnchantShardCandidate(
+        val definition: ArenaEnchantShardDefinition,
+        val attemptCount: Int,
+        val success: Boolean
+    )
 
     private fun resolveMobTokenCategoryTypeId(mobTypeId: String): String {
         val normalized = sanitizeMobTypeId(mobTypeId)
