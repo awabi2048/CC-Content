@@ -1122,7 +1122,7 @@ class CCContent : JavaPlugin(), Listener {
         BGMManager.loadConfig()
     }
 
-    private fun summonConfiguredMob(definitionId: String, location: org.bukkit.Location): org.bukkit.entity.LivingEntity? {
+    private fun summonConfiguredMob(definitionId: String, location: org.bukkit.Location): org.bukkit.entity.Entity? {
         return sharedMobService.spawnByDefinitionId(
             definitionId,
             location,
@@ -1130,7 +1130,20 @@ class CCContent : JavaPlugin(), Listener {
                 featureId = "command",
                 metadata = mapOf("source" to "ccc_summon")
             )
+        ) ?: sharedMobService.spawnEntityByDefinitionId(
+            definitionId,
+            location,
+            jp.awabi2048.cccontent.mob.EntityMobSpawnOptions(
+                featureId = "command",
+                metadata = mapOf("source" to "ccc_summon")
+            )
         )
+    }
+
+    fun getArenaManagerOrNull(): ArenaManager? {
+        if (!arenaFeatureReady) return null
+        if (!::arenaManager.isInitialized) return null
+        return arenaManager
     }
     
     @EventHandler

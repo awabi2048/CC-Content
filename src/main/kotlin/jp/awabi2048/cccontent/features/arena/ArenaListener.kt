@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.arena
 
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.mob.ability.MobShootUtil
+import jp.awabi2048.cccontent.mob.event.CustomEntityMobSpawnEvent
 import jp.awabi2048.cccontent.mob.event.CustomMobSpawnEvent
 import org.bukkit.NamespacedKey
 import org.bukkit.Sound
@@ -20,6 +21,7 @@ import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.entity.EntityMountEvent
+import org.bukkit.event.entity.EntityRemoveEvent
 import org.bukkit.event.player.PlayerAnimationEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerInteractEntityEvent
@@ -34,9 +36,22 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
         arenaManager.handleMobDeath(event)
     }
 
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityRemove(event: EntityRemoveEvent) {
+        if (event.cause != EntityRemoveEvent.Cause.DEATH) {
+            return
+        }
+        arenaManager.handleEntityDeath(event.entity)
+    }
+
     @EventHandler
     fun onCustomMobSpawn(event: CustomMobSpawnEvent) {
         arenaManager.registerChildMob(event.entity, event.definition.typeId, event.options)
+    }
+
+    @EventHandler
+    fun onCustomEntityMobSpawn(event: CustomEntityMobSpawnEvent) {
+        arenaManager.registerChildEntityMob(event.entity, event.definition.typeId, event.options)
     }
 
     @EventHandler(ignoreCancelled = true)

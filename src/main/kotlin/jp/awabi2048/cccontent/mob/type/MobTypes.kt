@@ -62,6 +62,8 @@ import jp.awabi2048.cccontent.mob.ability.ShulkerProximitySparkZoneAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerEndRodLaserAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerSniperShotAbility
 import jp.awabi2048.cccontent.mob.ability.ConeAttackAbility
+import jp.awabi2048.cccontent.mob.ability.AttackBackstepAbility
+import jp.awabi2048.cccontent.mob.ability.EndWitherSentinelAbility
 import jp.awabi2048.cccontent.mob.ability.EnderEyeBeamOrbitAbility
 import jp.awabi2048.cccontent.mob.ability.EnderEyeHunterAbility
 import jp.awabi2048.cccontent.mob.ability.EnderEyeSummonerAbility
@@ -1115,6 +1117,38 @@ class WitherSkeletonWitherBoomerangMobType : EquipmentMobType(
     defaultMainHand = Material.BONE
 )
 
+class WitherKnightMobType : EquipmentMobType(
+    id = "wither_knight",
+    baseEntityType = EntityType.WITHER_SKELETON,
+    abilities = listOf(
+        LeapAbility(
+            id = "wither_knight_leap",
+            cooldownTicks = 70L,
+            minRangeSquared = 9.0,
+            maxRange = 8.0,
+            horizontalSpeed = 1.15,
+            verticalSpeed = 0.56
+        ),
+        AttackBackstepAbility(
+            id = "wither_knight_attack_backstep",
+            cooldownTicks = 45L,
+            horizontalSpeed = 0.92,
+            verticalSpeed = 0.34,
+            requireDirectMelee = true
+        )
+    ),
+    defaultMainHand = Material.DIAMOND_HOE,
+    defaultHelmetTexture = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZmVlNGVhYmViNzJmMTkwODhhZGU3ODI2NjE5MWM4Zjc3Mzk4Y2MwZDgwY2RkMjc1NjNhNWQ2NmI3MTkxMmIyOCJ9fX0="
+)
+
+class EndWitherSentinelMobType : EquipmentMobType(
+    id = "end_wither_sentinel",
+    baseEntityType = EntityType.WITHER,
+    abilities = listOf(
+        EndWitherSentinelAbility(id = "end_wither_sentinel_ai")
+    )
+)
+
 class SlimeSmallMobType : EquipmentMobType(
     id = "slime_merge_small",
     baseEntityType = EntityType.SLIME,
@@ -1480,75 +1514,50 @@ class WitchEliteMobType : EquipmentMobType(
 class EndermanPhaseMobType : EquipmentMobType(
     id = "enderman_phase",
     baseEntityType = EntityType.ENDERMAN,
-    abilities = listOf(
-        EndermanPhaseDefenseAbility(id = "enderman_phase_defense", evadeRadius = 0.5),
-        EndermanAmbientParticleAbility(
-            id = "enderman_phase_ambient",
-            portalCount = 4,
-            dustCount = 4,
-            innerColor = Color.fromRGB(118, 57, 197),
-            outerColor = Color.fromRGB(37, 12, 70),
-            dustSize = 0.88f
-        ),
-        EndermanRayTeleportAbility(id = "enderman_phase_ray"),
-        EndermanStrikeWarpAbility(id = "enderman_phase_strike", swapChance = 0.16)
-    )
-)
+    abilities = emptyList()
+) {
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val enderman = context.entity as? org.bukkit.entity.Enderman ?: return
+        configureVanillaEnderman(enderman, 0.95, Material.END_STONE)
+    }
+}
 
 class EndermanDrainMobType : EquipmentMobType(
     id = "enderman_drain",
     baseEntityType = EntityType.ENDERMAN,
-    abilities = listOf(
-        EndermanPhaseDefenseAbility(id = "enderman_drain_defense", evadeRadius = 0.5),
-        EndermanAmbientParticleAbility(
-            id = "enderman_drain_ambient",
-            portalCount = 5,
-            dustCount = 5,
-            innerColor = Color.fromRGB(156, 72, 214),
-            outerColor = Color.fromRGB(52, 20, 92),
-            dustSize = 0.95f
-        ),
-        EndermanRayTeleportAbility(id = "enderman_drain_ray"),
-        EndermanStrikeWarpAbility(id = "enderman_drain_strike", swapChance = 0.24)
-    )
-)
+    abilities = emptyList()
+) {
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val enderman = context.entity as? org.bukkit.entity.Enderman ?: return
+        configureVanillaEnderman(enderman, 1.05, Material.OBSIDIAN)
+    }
+}
 
 class EndermanMirrorMobType : EquipmentMobType(
     id = "enderman_mirror",
     baseEntityType = EntityType.ENDERMAN,
-    abilities = listOf(
-        EndermanPhaseDefenseAbility(id = "enderman_mirror_defense", evadeRadius = 0.5),
-        EndermanAmbientParticleAbility(
-            id = "enderman_mirror_ambient",
-            portalCount = 4,
-            dustCount = 6,
-            innerColor = Color.fromRGB(180, 95, 228),
-            outerColor = Color.fromRGB(73, 29, 126),
-            dustSize = 1.0f
-        ),
-        EndermanRayTeleportAbility(id = "enderman_mirror_ray"),
-        EndermanStrikeWarpAbility(id = "enderman_mirror_strike", swapChance = 0.32)
-    )
-)
+    abilities = emptyList()
+) {
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val enderman = context.entity as? org.bukkit.entity.Enderman ?: return
+        configureVanillaEnderman(enderman, 1.15, Material.PURPUR_BLOCK)
+    }
+}
 
 class EndermanEyeSummonerMobType : EquipmentMobType(
     id = "enderman_eye_summoner",
     baseEntityType = EntityType.ENDERMAN,
-    abilities = listOf(
-        EndermanPhaseDefenseAbility(id = "enderman_eye_summoner_defense", evadeRadius = 0.5),
-        EndermanAmbientParticleAbility(
-            id = "enderman_eye_summoner_ambient",
-            portalCount = 6,
-            dustCount = 7,
-            innerColor = Color.fromRGB(204, 116, 240),
-            outerColor = Color.fromRGB(92, 37, 153),
-            dustSize = 1.05f
-        ),
-        EndermanRayTeleportAbility(id = "enderman_eye_summoner_ray"),
-        EndermanStrikeWarpAbility(id = "enderman_eye_summoner_strike", swapChance = 0.2),
-        EnderEyeSummonerAbility(id = "enderman_eye_summoner_spawn")
-    )
-)
+    abilities = emptyList()
+) {
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val enderman = context.entity as? org.bukkit.entity.Enderman ?: return
+        configureVanillaEnderman(enderman, 1.25, Material.END_STONE_BRICKS)
+    }
+}
 
 class ShulkerRhythmMobType : EquipmentMobType(
     id = "shulker_rhythm",
@@ -1637,36 +1646,85 @@ class EnderEyeOrbitMobType : EquipmentMobType(
 class EndermanMistDelayMobType : EquipmentMobType(
     id = "enderman_mist_delay",
     baseEntityType = EntityType.ENDERMAN,
-    abilities = listOf(
-        EndermanAmbientParticleAbility(
-            id = "enderman_mist_delay_ambient",
-            portalCount = 6,
-            dustCount = 4,
-            innerColor = Color.fromRGB(188, 170, 220),
-            outerColor = Color.fromRGB(80, 74, 96),
-            dustSize = 0.95f
-        ),
-        EndermanMistDelayTeleportAbility(id = "enderman_mist_delay_teleport"),
-        EndermanStrikeWarpAbility(id = "enderman_mist_delay_strike", swapChance = 0.18)
-    )
-)
+    abilities = emptyList()
+) {
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val enderman = context.entity as? org.bukkit.entity.Enderman ?: return
+        configureVanillaEnderman(enderman, 1.0, Material.CHORUS_FLOWER)
+    }
+}
 
 class EndermanSmallBackstabMobType : EquipmentMobType(
     id = "enderman_small_backstab",
     baseEntityType = EntityType.ENDERMAN,
-    abilities = listOf(
-        EndermanAmbientParticleAbility(
-            id = "enderman_small_backstab_ambient",
-            portalCount = 3,
-            dustCount = 3,
-            innerColor = Color.fromRGB(164, 112, 230),
-            outerColor = Color.fromRGB(52, 24, 96),
-            dustSize = 0.72f
-        ),
-        EndermanBackstabTeleportAbility(id = "enderman_small_backstab_teleport", triggerChance = 0.32),
-        EndermanPhaseDefenseAbility(id = "enderman_small_backstab_defense", evadeRadius = 0.6)
-    )
-)
+    abilities = emptyList()
+) {
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val enderman = context.entity as? org.bukkit.entity.Enderman ?: return
+        configureVanillaEnderman(enderman, 0.8, Material.SCULK_VEIN)
+    }
+}
+
+class EndermanVoidCarrierMobType : EquipmentMobType(
+    id = "enderman_void_carrier",
+    baseEntityType = EntityType.ENDERMAN,
+    abilities = emptyList()
+) {
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val enderman = context.entity as? org.bukkit.entity.Enderman ?: return
+        configureVanillaEnderman(enderman, 1.2, Material.SCULK_SHRIEKER)
+    }
+}
+
+class EndermanRiftCarrierMobType : EquipmentMobType(
+    id = "enderman_rift_carrier",
+    baseEntityType = EntityType.ENDERMAN,
+    abilities = emptyList()
+) {
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val enderman = context.entity as? org.bukkit.entity.Enderman ?: return
+        configureVanillaEnderman(enderman, 1.4, Material.END_PORTAL_FRAME) { data ->
+            ((data as? org.bukkit.block.data.type.EndPortalFrame)?.also { it.setEye(true) }) ?: data
+        }
+    }
+}
+
+class EndermanGraveCarrierMobType : EquipmentMobType(
+    id = "enderman_grave_carrier",
+    baseEntityType = EntityType.ENDERMAN,
+    abilities = emptyList()
+) {
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val enderman = context.entity as? org.bukkit.entity.Enderman ?: return
+        configureVanillaEnderman(enderman, 1.0, Material.ENCHANTING_TABLE)
+    }
+}
+
+private fun configureVanillaEnderman(
+    mob: org.bukkit.entity.Enderman,
+    scale: Double,
+    carriedBlock: Material,
+    blockDataTransform: ((org.bukkit.block.data.BlockData) -> org.bukkit.block.data.BlockData)? = null
+) {
+    mob.getAttribute(org.bukkit.attribute.Attribute.SCALE)?.baseValue = scale
+    runCatching {
+        val baseData = carriedBlock.createBlockData()
+        val data = blockDataTransform?.invoke(baseData) ?: baseData
+        mob.javaClass.getMethod("setCarriedBlock", org.bukkit.block.data.BlockData::class.java).invoke(mob, data)
+    }
+    runCatching {
+        mob.javaClass.methods.firstOrNull { it.name == "setAware" && it.parameterTypes.contentEquals(arrayOf(Boolean::class.javaPrimitiveType)) }
+            ?.invoke(mob, true)
+    }
+    runCatching {
+        mob.setAI(true)
+    }
+}
 
 class EndermitePoisonMobType : EquipmentMobType(
     id = "endermite_poison",

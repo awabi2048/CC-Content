@@ -371,11 +371,31 @@ end:
       weight: 7
       wave: 1..
     enderman_small_backstab:
-      weight: 8
+      weight: 5
       wave: 2..
+    enderman_void_carrier:
+      weight: 6
+      wave: 2..
+    enderman_rift_carrier:
+      weight: 5
+      wave: 3..
+    enderman_grave_carrier:
+      weight: 4
+      wave: 4..
     endermite_poison:
       weight: 6
       wave: 2..
+    wither_knight:
+      weight: 3
+      wave: 3..
+    end_crystal_sentinel:
+      weight: 3
+      wave: 4..
+      max_alive: 1
+    end_wither_sentinel:
+      weight: 2
+      wave: 5..
+      max_alive: 1
     shulker_turret_sniper:
       weight: 3
       wave: 3..

@@ -131,7 +131,11 @@ open class EquipmentMobType(
             "enderman_mirror" to 1.15,
             "enderman_eye_summoner" to 1.25,
             "enderman_mist_delay" to 1.0,
-            "enderman_small_backstab" to 0.75,
+            "enderman_small_backstab" to 0.8,
+            "enderman_void_carrier" to 1.2,
+            "enderman_rift_carrier" to 1.4,
+            "enderman_grave_carrier" to 1.0,
+            "end_wither_sentinel" to 0.5,
             "endermite_poison" to 1.5,
             "shulker_turret_sniper" to 1.5
         )
