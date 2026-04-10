@@ -11,6 +11,7 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.ItemMeta
 import org.bukkit.persistence.PersistentDataType
 import java.util.Locale
+import kotlin.math.ceil
 
 private val arenaItemKey by lazy {
     NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "arena_item")
@@ -218,158 +219,353 @@ enum class ArenaOverEnchanterMode(val id: String) {
     }
 }
 
-object ArenaOverEnchanterCatalystData {
-    data class Catalyst(
+object ArenaEnchantShardData {
+    data class Shard(
         val mode: ArenaOverEnchanterMode,
         val targetEnchantmentId: String,
         val overLevel: Int?
     )
 
+    private val shardMarkerKey by lazy {
+        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "enchant_shard_marker")
+    }
+
+    private val specKey by lazy {
+        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "enchant_shard_spec")
+    }
+
     private val modeKey by lazy {
-        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "over_enchanter_mode")
+        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "enchant_shard_mode")
     }
 
     private val targetEnchantmentKey by lazy {
-        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "over_enchanter_target_enchantment")
+        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "enchant_shard_target_enchantment")
     }
 
     private val overLevelKey by lazy {
-        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "over_enchanter_over_level")
+        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "enchant_shard_over_level")
     }
 
-    fun apply(meta: ItemMeta, catalyst: Catalyst) {
-        meta.persistentDataContainer.set(modeKey, PersistentDataType.STRING, catalyst.mode.id)
-        meta.persistentDataContainer.set(targetEnchantmentKey, PersistentDataType.STRING, catalyst.targetEnchantmentId)
-        if (catalyst.overLevel != null) {
-            meta.persistentDataContainer.set(overLevelKey, PersistentDataType.INTEGER, catalyst.overLevel)
+    fun apply(meta: ItemMeta, definition: ArenaEnchantShardDefinition) {
+        meta.persistentDataContainer.set(shardMarkerKey, PersistentDataType.BYTE, 1)
+        meta.persistentDataContainer.set(specKey, PersistentDataType.STRING, definition.spec)
+        meta.persistentDataContainer.set(modeKey, PersistentDataType.STRING, definition.shard.mode.id)
+        meta.persistentDataContainer.set(targetEnchantmentKey, PersistentDataType.STRING, definition.shard.targetEnchantmentId)
+        if (definition.shard.overLevel != null) {
+            meta.persistentDataContainer.set(overLevelKey, PersistentDataType.INTEGER, definition.shard.overLevel)
         } else {
             meta.persistentDataContainer.remove(overLevelKey)
         }
     }
 
-    fun read(item: ItemStack): Catalyst? {
+    fun read(item: ItemStack): Shard? {
         val meta = item.itemMeta ?: return null
+        if (meta.persistentDataContainer.get(shardMarkerKey, PersistentDataType.BYTE)?.toInt() != 1) {
+            return null
+        }
         val modeId = meta.persistentDataContainer.get(modeKey, PersistentDataType.STRING) ?: return null
         val targetEnchantment = meta.persistentDataContainer.get(targetEnchantmentKey, PersistentDataType.STRING) ?: return null
         val mode = ArenaOverEnchanterMode.fromId(modeId) ?: return null
         val overLevel = meta.persistentDataContainer.get(overLevelKey, PersistentDataType.INTEGER)
-        return Catalyst(mode = mode, targetEnchantmentId = targetEnchantment, overLevel = overLevel)
+        return Shard(mode = mode, targetEnchantmentId = targetEnchantment, overLevel = overLevel)
+    }
+
+    fun readSpec(item: ItemStack): String? {
+        val meta = item.itemMeta ?: return null
+        if (meta.persistentDataContainer.get(shardMarkerKey, PersistentDataType.BYTE)?.toInt() != 1) {
+            return null
+        }
+        return meta.persistentDataContainer.get(specKey, PersistentDataType.STRING)
     }
 }
 
-class ArenaOverEnchanterCatalystItem(
-    id: String,
-    displayName: String,
-    lore: List<String>,
-    private val catalyst: ArenaOverEnchanterCatalystData.Catalyst,
-    private val fixedDisplayName: String,
-    private val fixedLore: List<String>,
-    material: Material
-) : ArenaSimpleItem(
-    material = material,
-    modelData = null,
-    id = id,
-    displayName = displayName,
-    lore = lore
-) {
-    override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        val item = super.createItemForPlayer(player, amount)
-        val meta = item.itemMeta ?: return item
-        item.amount = 1
-        meta.setMaxStackSize(1)
-        meta.displayName(Component.text(fixedDisplayName))
-        meta.lore(fixedLore.map { Component.text(it) })
-        ArenaOverEnchanterCatalystData.apply(meta, catalyst)
-        item.itemMeta = meta
-        return item
-    }
-}
+data class ArenaEnchantShardDefinition(
+    val key: String,
+    val spec: String,
+    val enchantLabel: String,
+    val shard: ArenaEnchantShardData.Shard,
+    val dropMobDefinitionIds: Set<String> = emptySet(),
+    val baseDropChance: Double? = null
+)
 
-private fun tierDecoration(tier: Int): String {
-    val normalized = tier.coerceIn(1, 4)
-    val active = "§d" + "❖".repeat(normalized)
-    val inactive = "§7" + "❖".repeat(4 - normalized)
-    return "§8【$active$inactive§8】"
-}
+object ArenaEnchantShardRegistry {
+    private val ALL_MOB_DEFINITION_IDS = setOf(
+        "zombie_normal", "skeleton_normal", "skeleton_rapid", "skeleton_curve_backstep", "skeleton_heavy_bow_shield",
+        "skeleton_throw_close", "zombie_light_leap", "zombie_archer", "zombie_archer_swap", "zombie_heavy_shield",
+        "husk_normal", "husk_light_leap", "husk_archer", "husk_archer_swap", "husk_heavy_shield", "husk_weakening_aura",
+        "raiden_creeper", "skeleton_plain", "spider_plain", "spider_stealth", "spider_broodmother", "spider_broodling",
+        "spider_swift", "spider_venom_frenzy", "spider_ferocious", "silverfish_plain", "silverfish_big_poison",
+        "silverfish_stealth_fang", "iron_golem_normal", "iron_golem_magnet", "guardian_normal", "guardian_small",
+        "guardian_beam_burst", "guardian_drain", "bogged_plain", "bogged_normal", "bogged_rapid", "bogged_curve_backstep",
+        "bogged_heavy_bow_shield", "bogged_throw_close", "bogged_boomerang", "stray_plain", "stray_normal", "stray_rapid",
+        "stray_curve_backstep", "stray_heavy_bow_shield", "stray_throw_close", "slime_merge_small", "slime_merge_medium",
+        "slime_merge_large", "slime_merge_mini", "slime_poison", "slime_wither", "drowned_unarmed", "drowned_trident_guard",
+        "drowned_raider_axe", "water_spirit", "water_spirit_elite", "ashen_spirit", "frog_big", "blaze_normal",
+        "blaze_power", "blaze_rapid", "blaze_melee", "blaze_beam", "magma_cube_large", "magma_cube_medium",
+        "magma_cube_small", "magma_cube_mini", "wither_skeleton_swap", "wither_skeleton_bow_guard",
+        "wither_skeleton_wither_boomerang", "witch_normal", "witch_elite", "bat_venom", "enderman_mist_delay",
+        "enderman_small_backstab", "endermite_poison", "shulker_turret_sniper", "shulker_turret_barrage", "ender_eye_beam"
+    )
 
-private fun catalystDisplayName(enchantLabel: String, tier: Int): String {
-    return "§b${enchantLabel}のかけら ${tierDecoration(tier)}"
-}
+    private val UNDEAD_MOB_DEFINITION_IDS = setOf(
+        "zombie_normal", "zombie_light_leap", "zombie_archer", "zombie_archer_swap", "zombie_heavy_shield",
+        "husk_normal", "husk_light_leap", "husk_archer", "husk_archer_swap", "husk_heavy_shield", "husk_weakening_aura",
+        "skeleton_plain", "skeleton_normal", "skeleton_rapid", "skeleton_curve_backstep", "skeleton_heavy_bow_shield",
+        "skeleton_throw_close", "bogged_plain", "bogged_normal", "bogged_rapid", "bogged_curve_backstep",
+        "bogged_heavy_bow_shield", "bogged_throw_close", "bogged_boomerang", "stray_plain", "stray_normal", "stray_rapid",
+        "stray_curve_backstep", "stray_heavy_bow_shield", "stray_throw_close", "drowned_unarmed", "drowned_trident_guard",
+        "drowned_raider_axe", "wither_skeleton_swap", "wither_skeleton_bow_guard", "wither_skeleton_wither_boomerang"
+    )
 
-fun arenaOverEnchanterCatalystItems(): List<ArenaOverEnchanterCatalystItem> {
-    val limitBreaking = listOf(
-        ArenaOverEnchanterCatalystItem(
-            id = "limit_breaking_sharpness_t1",
-            displayName = catalystDisplayName("ダメージ増加", 1),
-            lore = listOf("§7限界突破用だよ"),
-            catalyst = ArenaOverEnchanterCatalystData.Catalyst(ArenaOverEnchanterMode.LIMIT_BREAKING, "sharpness", 1),
-            fixedDisplayName = catalystDisplayName("ダメージ増加", 1),
-            fixedLore = listOf("§7限界突破用だよ"),
-            material = Material.BLAZE_POWDER
-        ),
-        ArenaOverEnchanterCatalystItem(
-            id = "limit_breaking_sharpness_t2",
-            displayName = catalystDisplayName("ダメージ増加", 2),
-            lore = listOf("§7限界突破用だよ"),
-            catalyst = ArenaOverEnchanterCatalystData.Catalyst(ArenaOverEnchanterMode.LIMIT_BREAKING, "sharpness", 2),
-            fixedDisplayName = catalystDisplayName("ダメージ増加", 2),
-            fixedLore = listOf("§7限界突破用だよ"),
-            material = Material.BLAZE_POWDER
-        ),
-        ArenaOverEnchanterCatalystItem(
-            id = "limit_breaking_sharpness_t3",
-            displayName = catalystDisplayName("ダメージ増加", 3),
-            lore = listOf("§7限界突破用だよ"),
-            catalyst = ArenaOverEnchanterCatalystData.Catalyst(ArenaOverEnchanterMode.LIMIT_BREAKING, "sharpness", 3),
-            fixedDisplayName = catalystDisplayName("ダメージ増加", 3),
-            fixedLore = listOf("§7限界突破用だよ"),
-            material = Material.BLAZE_POWDER
+    private val ARTHROPOD_MOB_DEFINITION_IDS = setOf(
+        "spider_plain", "spider_stealth", "spider_broodmother", "spider_broodling", "spider_swift", "spider_venom_frenzy",
+        "spider_ferocious", "silverfish_plain", "silverfish_big_poison", "silverfish_stealth_fang", "endermite_poison"
+    )
+
+    private val BOW_MOB_DEFINITION_IDS = setOf(
+        "zombie_archer", "zombie_archer_swap", "husk_archer", "husk_archer_swap", "skeleton_plain", "skeleton_normal",
+        "skeleton_rapid", "skeleton_curve_backstep", "skeleton_heavy_bow_shield", "bogged_plain", "bogged_normal",
+        "bogged_rapid", "bogged_curve_backstep", "bogged_heavy_bow_shield", "stray_plain", "stray_normal", "stray_rapid",
+        "stray_curve_backstep", "stray_heavy_bow_shield", "wither_skeleton_swap", "wither_skeleton_bow_guard"
+    )
+
+    private val EQUIPPED_MOB_DEFINITION_IDS = setOf(
+        "zombie_light_leap", "zombie_archer", "zombie_archer_swap", "zombie_heavy_shield", "husk_light_leap", "husk_archer",
+        "husk_archer_swap", "husk_heavy_shield", "husk_weakening_aura", "skeleton_plain", "skeleton_normal", "skeleton_rapid",
+        "skeleton_curve_backstep", "skeleton_heavy_bow_shield", "skeleton_throw_close", "bogged_plain", "bogged_normal",
+        "bogged_rapid", "bogged_curve_backstep", "bogged_heavy_bow_shield", "bogged_throw_close", "bogged_boomerang",
+        "stray_plain", "stray_normal", "stray_rapid", "stray_curve_backstep", "stray_heavy_bow_shield", "stray_throw_close",
+        "iron_golem_normal", "iron_golem_magnet", "drowned_unarmed", "drowned_trident_guard", "drowned_raider_axe",
+        "wither_skeleton_swap", "wither_skeleton_bow_guard", "wither_skeleton_wither_boomerang", "blaze_melee"
+    )
+
+    private val NETHER_EQUIPPED_MOB_DEFINITION_IDS = setOf(
+        "wither_skeleton_swap", "wither_skeleton_bow_guard", "wither_skeleton_wither_boomerang", "blaze_melee"
+    )
+
+    private val EQUIPPED_BOW_MOB_DEFINITION_IDS = setOf(
+        "zombie_archer", "zombie_archer_swap", "husk_archer", "husk_archer_swap", "skeleton_plain", "skeleton_normal",
+        "skeleton_rapid", "skeleton_curve_backstep", "skeleton_heavy_bow_shield", "bogged_plain", "bogged_normal",
+        "bogged_rapid", "bogged_curve_backstep", "bogged_heavy_bow_shield", "stray_plain", "stray_normal", "stray_rapid",
+        "stray_curve_backstep", "stray_heavy_bow_shield", "wither_skeleton_swap", "wither_skeleton_bow_guard"
+    )
+
+    private val SWORD_MOB_DEFINITION_IDS = setOf(
+        "zombie_light_leap", "zombie_archer_swap", "zombie_heavy_shield", "husk_light_leap", "husk_archer_swap",
+        "husk_heavy_shield", "husk_weakening_aura", "wither_skeleton_swap"
+    )
+
+    private val RAPID_SKELETON_MOB_DEFINITION_IDS = setOf("skeleton_rapid", "bogged_rapid", "stray_rapid")
+    private val GOLEM_MOB_DEFINITION_IDS = setOf("iron_golem_normal", "iron_golem_magnet")
+    private val WATER_SPIRIT_MOB_DEFINITION_IDS = setOf("water_spirit", "water_spirit_elite")
+    private val GUARDIAN_MOB_DEFINITION_IDS = setOf("guardian_normal", "guardian_small", "guardian_beam_burst", "guardian_drain")
+    private val SLIME_MOB_DEFINITION_IDS = setOf("slime_merge_small", "slime_merge_medium", "slime_merge_large", "slime_merge_mini", "slime_poison", "slime_wither")
+    private val BLAZE_MOB_DEFINITION_IDS = setOf("blaze_normal", "blaze_power", "blaze_rapid", "blaze_melee", "blaze_beam")
+    private val SHULKER_MOB_DEFINITION_IDS = setOf("shulker_turret_sniper", "shulker_turret_barrage")
+    private val CREEPER_MOB_DEFINITION_IDS = setOf("raiden_creeper")
+
+    private fun lb(key: String, enchantId: String, label: String, overLevel: Int, mobIds: Set<String>, chance: Double) =
+        ArenaEnchantShardDefinition(
+            key = key,
+            spec = "limit_breaking:$enchantId:$overLevel",
+            enchantLabel = label,
+            shard = ArenaEnchantShardData.Shard(
+                mode = ArenaOverEnchanterMode.LIMIT_BREAKING,
+                targetEnchantmentId = enchantId,
+                overLevel = overLevel
+            ),
+            dropMobDefinitionIds = mobIds,
+            baseDropChance = chance
+        )
+
+    private fun overStacking(enchantId: String, label: String) = ArenaEnchantShardDefinition(
+        key = "over_stacking_$enchantId",
+        spec = "over_stacking:$enchantId",
+        enchantLabel = label,
+        shard = ArenaEnchantShardData.Shard(
+            mode = ArenaOverEnchanterMode.OVER_STACKING,
+            targetEnchantmentId = enchantId,
+            overLevel = null
         )
     )
 
-    val overStackingTargets = listOf(
-        "infinity" to "無限",
-        "mending" to "修繕",
-        "sharpness" to "ダメージ増加",
-        "smite" to "アンデッド特攻",
-        "bane_of_arthropods" to "虫特攻",
-        "protection" to "防護",
-        "fire_protection" to "火炎耐性",
-        "blast_protection" to "爆発耐性",
-        "projectile_protection" to "飛び道具耐性",
-        "multishot" to "拡散",
-        "piercing" to "貫通"
-    ).map { (id, label) ->
-        ArenaOverEnchanterCatalystItem(
-            id = "over_stacking_$id",
-            displayName = catalystDisplayName(label, 1),
-            lore = listOf("§7競合エンチャント用だよ"),
-            catalyst = ArenaOverEnchanterCatalystData.Catalyst(ArenaOverEnchanterMode.OVER_STACKING, id, null),
-            fixedDisplayName = catalystDisplayName(label, 1),
-            fixedLore = listOf("§7競合エンチャント用だよ"),
-            material = Material.FERMENTED_SPIDER_EYE
+    private fun exoticAttach(enchantId: String, label: String) = ArenaEnchantShardDefinition(
+        key = "exotic_attach_$enchantId",
+        spec = "exotic_attach:$enchantId",
+        enchantLabel = label,
+        shard = ArenaEnchantShardData.Shard(
+            mode = ArenaOverEnchanterMode.EXOTIC_ATTACH,
+            targetEnchantmentId = enchantId,
+            overLevel = null
         )
+    )
+
+    val definitions: List<ArenaEnchantShardDefinition> = buildList {
+        add(lb("sharpness_1", "sharpness", "ダメージ増加", 1, ALL_MOB_DEFINITION_IDS, 0.005))
+        add(lb("sharpness_2", "sharpness", "ダメージ増加", 2, ALL_MOB_DEFINITION_IDS, 0.002))
+        add(lb("smite_1", "smite", "アンデッド特攻", 1, UNDEAD_MOB_DEFINITION_IDS, 0.005))
+        add(lb("smite_2", "smite", "アンデッド特攻", 2, UNDEAD_MOB_DEFINITION_IDS, 0.002))
+        add(lb("bane_of_arthropods_1", "bane_of_arthropods", "虫特攻", 1, ARTHROPOD_MOB_DEFINITION_IDS, 0.005))
+        add(lb("bane_of_arthropods_2", "bane_of_arthropods", "虫特攻", 2, ARTHROPOD_MOB_DEFINITION_IDS, 0.002))
+        add(lb("power_1", "power", "射撃ダメージ", 1, BOW_MOB_DEFINITION_IDS, 0.005))
+        add(lb("power_2", "power", "射撃ダメージ", 2, BOW_MOB_DEFINITION_IDS, 0.002))
+        add(lb("protection_1", "protection", "ダメージ軽減", 1, EQUIPPED_MOB_DEFINITION_IDS, 0.005))
+        add(lb("protection_2", "protection", "ダメージ軽減", 2, EQUIPPED_MOB_DEFINITION_IDS, 0.002))
+        add(lb("fire_protection_1", "fire_protection", "火炎耐性", 1, NETHER_EQUIPPED_MOB_DEFINITION_IDS, 0.005))
+        add(lb("fire_protection_2", "fire_protection", "火炎耐性", 2, NETHER_EQUIPPED_MOB_DEFINITION_IDS, 0.002))
+        add(lb("projectile_protection_1", "projectile_protection", "飛び道具耐性", 1, EQUIPPED_BOW_MOB_DEFINITION_IDS, 0.005))
+        add(lb("projectile_protection_2", "projectile_protection", "飛び道具耐性", 2, EQUIPPED_BOW_MOB_DEFINITION_IDS, 0.002))
+        add(lb("sweeping_edge_1", "sweeping_edge", "範囲ダメージ", 1, SWORD_MOB_DEFINITION_IDS, 0.005))
+        add(lb("sweeping_edge_2", "sweeping_edge", "範囲ダメージ", 2, SWORD_MOB_DEFINITION_IDS, 0.002))
+        add(lb("quick_charge_1", "quick_charge", "高速装填", 1, RAPID_SKELETON_MOB_DEFINITION_IDS, 0.008))
+        add(lb("quick_charge_2", "quick_charge", "高速装填", 2, RAPID_SKELETON_MOB_DEFINITION_IDS, 0.003))
+        add(lb("unbreaking_1", "unbreaking", "耐久", 1, GOLEM_MOB_DEFINITION_IDS, 0.01))
+        add(lb("unbreaking_2", "unbreaking", "耐久", 2, GOLEM_MOB_DEFINITION_IDS, 0.004))
+        add(lb("looting_1", "looting", "ドロップ増加", 1, WATER_SPIRIT_MOB_DEFINITION_IDS, 0.01))
+        add(lb("looting_2", "looting", "ドロップ増加", 2, WATER_SPIRIT_MOB_DEFINITION_IDS, 0.004))
+        add(lb("impaling_1", "impaling", "水棲特攻", 1, GUARDIAN_MOB_DEFINITION_IDS, 0.01))
+        add(lb("impaling_2", "impaling", "水棲特攻", 2, GUARDIAN_MOB_DEFINITION_IDS, 0.004))
+        add(lb("knockback_1", "knockback", "ノックバック", 1, SLIME_MOB_DEFINITION_IDS, 0.01))
+        add(lb("knockback_2", "knockback", "ノックバック", 2, SLIME_MOB_DEFINITION_IDS, 0.004))
+        add(lb("knockback_3", "knockback", "ノックバック", 3, SLIME_MOB_DEFINITION_IDS, 0.001))
+        add(lb("fire_aspect_1", "fire_aspect", "火属性", 1, BLAZE_MOB_DEFINITION_IDS, 0.01))
+        add(lb("fire_aspect_2", "fire_aspect", "火属性", 2, BLAZE_MOB_DEFINITION_IDS, 0.004))
+        add(lb("fire_aspect_3", "fire_aspect", "火属性", 3, BLAZE_MOB_DEFINITION_IDS, 0.001))
+        add(lb("feather_falling_1", "feather_falling", "落下耐性", 1, SHULKER_MOB_DEFINITION_IDS, 0.01))
+        add(lb("feather_falling_2", "feather_falling", "落下耐性", 2, SHULKER_MOB_DEFINITION_IDS, 0.004))
+        add(lb("blast_protection_1", "blast_protection", "爆発耐性", 1, CREEPER_MOB_DEFINITION_IDS, 0.01))
+        add(lb("blast_protection_2", "blast_protection", "爆発耐性", 2, CREEPER_MOB_DEFINITION_IDS, 0.004))
+
+        add(overStacking("infinity", "無限"))
+        add(overStacking("mending", "修繕"))
+        add(overStacking("sharpness", "ダメージ増加"))
+        add(overStacking("smite", "アンデッド特攻"))
+        add(overStacking("bane_of_arthropods", "虫特攻"))
+        add(overStacking("protection", "防護"))
+        add(overStacking("fire_protection", "火炎耐性"))
+        add(overStacking("blast_protection", "爆発耐性"))
+        add(overStacking("projectile_protection", "飛び道具耐性"))
+        add(overStacking("multishot", "拡散"))
+        add(overStacking("piercing", "貫通"))
+
+        add(exoticAttach("infinity", "無限"))
+        add(exoticAttach("sharpness", "ダメージ増加"))
+        add(exoticAttach("breach", "防具貫通"))
     }
 
-    val exoticAttach = listOf(
-        "infinity" to "無限",
-        "sharpness" to "ダメージ増加",
-        "breach" to "防具貫通"
-    ).map { (id, label) ->
-        ArenaOverEnchanterCatalystItem(
-            id = "exotic_attach_$id",
-            displayName = catalystDisplayName(label, 1),
-            lore = listOf("§7強制付加用だよ"),
-            catalyst = ArenaOverEnchanterCatalystData.Catalyst(ArenaOverEnchanterMode.EXOTIC_ATTACH, id, null),
-            fixedDisplayName = catalystDisplayName(label, 1),
-            fixedLore = listOf("§7強制付加用だよ"),
-            material = Material.NETHER_STAR
-        )
+    private val bySpec: Map<String, ArenaEnchantShardDefinition> = definitions.associateBy { it.spec }
+    private val byMobDefinitionId: Map<String, List<ArenaEnchantShardDefinition>> = buildMap {
+        definitions.filter { it.baseDropChance != null }.forEach { definition ->
+            definition.dropMobDefinitionIds.forEach { mobDefinitionId ->
+                put(mobDefinitionId, (get(mobDefinitionId).orEmpty() + definition))
+            }
+        }
     }
 
-    return buildList {
-        addAll(limitBreaking)
-        addAll(overStackingTargets)
-        addAll(exoticAttach)
+    fun findBySpec(spec: String): ArenaEnchantShardDefinition? {
+        return bySpec[normalizeSpec(spec)]
+    }
+
+    fun findByShard(shard: ArenaEnchantShardData.Shard): ArenaEnchantShardDefinition? {
+        return definitions.firstOrNull {
+            it.shard.mode == shard.mode &&
+                it.shard.targetEnchantmentId == shard.targetEnchantmentId &&
+                it.shard.overLevel == shard.overLevel
+        }
+    }
+
+    fun supportedSpecs(): List<String> = definitions.map { it.spec }.sorted()
+
+    fun getDropDefinitionsForMob(mobDefinitionId: String): List<ArenaEnchantShardDefinition> {
+        return byMobDefinitionId[mobDefinitionId.trim().lowercase(Locale.ROOT)].orEmpty()
+    }
+
+    fun calculateDropChance(baseChance: Double, attemptCount: Int): Double {
+        val normalizedBaseChance = baseChance.coerceIn(0.0, 1.0)
+        if (normalizedBaseChance <= 0.0) return 0.0
+        if (normalizedBaseChance >= 1.0) return 1.0
+        val threshold = ceil(1.0 / normalizedBaseChance).toInt().coerceAtLeast(1)
+        return when {
+            attemptCount < threshold -> normalizedBaseChance
+            attemptCount >= threshold * 2 -> 1.0
+            else -> {
+                val progress = (attemptCount - threshold).toDouble() / threshold.toDouble()
+                normalizedBaseChance + progress * (1.0 - normalizedBaseChance)
+            }
+        }.coerceIn(0.0, 1.0)
+    }
+
+    private fun normalizeSpec(spec: String): String {
+        return spec.trim().lowercase(Locale.ROOT)
+    }
+}
+
+class ArenaEnchantShardItem : ArenaSimpleItem(
+    material = Material.BLAZE_POWDER,
+    modelData = null,
+    id = "enchant_shard",
+    displayName = "§bエンチャントシャード",
+    lore = listOf("§7特殊なエンチャントの欠片")
+) {
+    override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
+        return super.createItemForPlayer(player, amount.coerceAtLeast(1))
+    }
+
+    override fun updateLocalization(item: ItemStack, player: Player?) {
+        val definition = ArenaEnchantShardData.readSpec(item)?.let { ArenaEnchantShardRegistry.findBySpec(it) }
+            ?: ArenaEnchantShardData.read(item)?.let { ArenaEnchantShardRegistry.findByShard(it) }
+            ?: return
+        val localized = createShard(player, definition, item.amount.coerceAtLeast(1))
+        item.itemMeta = localized.itemMeta
+    }
+
+    companion object {
+        fun createShard(player: Player?, definition: ArenaEnchantShardDefinition, amount: Int = 1): ItemStack {
+            val item = ItemStack(materialForMode(definition.shard.mode), amount.coerceAtLeast(1))
+            val meta = item.itemMeta ?: return item
+            meta.displayName(Component.text("§bエンチャントシャード§8【§d${definition.enchantLabel}§8】"))
+            meta.lore(buildLore(definition).map { Component.text(it) })
+            meta.setMaxStackSize(1)
+            meta.persistentDataContainer.set(arenaItemKey, PersistentDataType.STRING, "enchant_shard")
+            ArenaEnchantShardData.apply(meta, definition)
+            item.itemMeta = meta
+            return item
+        }
+
+        private fun buildLore(definition: ArenaEnchantShardDefinition): List<String> {
+            val tier = when (definition.shard.mode) {
+                ArenaOverEnchanterMode.LIMIT_BREAKING -> roman(definition.shard.overLevel ?: 1)
+                ArenaOverEnchanterMode.OVER_STACKING,
+                ArenaOverEnchanterMode.EXOTIC_ATTACH -> "I"
+            }
+            val modeLabel = when (definition.shard.mode) {
+                ArenaOverEnchanterMode.LIMIT_BREAKING -> "§7限界突破用"
+                ArenaOverEnchanterMode.OVER_STACKING -> "§7競合付与用"
+                ArenaOverEnchanterMode.EXOTIC_ATTACH -> "§7強制付与用"
+            }
+            return listOf(
+                "§7Tier $tier",
+                modeLabel
+            )
+        }
+
+        private fun roman(value: Int): String {
+            return when (value.coerceAtLeast(1)) {
+                1 -> "I"
+                2 -> "II"
+                3 -> "III"
+                4 -> "IV"
+                5 -> "V"
+                else -> value.toString()
+            }
+        }
+
+        private fun materialForMode(mode: ArenaOverEnchanterMode): Material {
+            return when (mode) {
+                ArenaOverEnchanterMode.LIMIT_BREAKING -> Material.BLAZE_POWDER
+                ArenaOverEnchanterMode.OVER_STACKING -> Material.FERMENTED_SPIDER_EYE
+                ArenaOverEnchanterMode.EXOTIC_ATTACH -> Material.NETHER_STAR
+            }
+        }
     }
 }

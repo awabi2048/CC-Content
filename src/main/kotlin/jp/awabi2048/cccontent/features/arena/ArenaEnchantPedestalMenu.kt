@@ -1,6 +1,6 @@
 package jp.awabi2048.cccontent.features.arena
 
-import jp.awabi2048.cccontent.items.arena.ArenaOverEnchanterCatalystData
+import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardData
 import jp.awabi2048.cccontent.items.arena.ArenaOverEnchanterMode
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import org.bukkit.Bukkit
@@ -112,7 +112,7 @@ private enum class PedestalUiState {
 private data class PreparedCatalyst(
     val slot: Int,
     val item: ItemStack,
-    val catalyst: ArenaOverEnchanterCatalystData.Catalyst,
+    val catalyst: ArenaEnchantShardData.Shard,
     val requiredLevel: Int
 )
 
@@ -1447,7 +1447,7 @@ class ArenaEnchantPedestalMenu(
         var workingState = state
         var totalRequired = 0
         for ((slot, item) in candidates) {
-            val catalyst = ArenaOverEnchanterCatalystData.read(item)
+            val catalyst = ArenaEnchantShardData.read(item)
                 ?: return PedestalEvaluation(
                     catalystReady = true,
                     processable = false,
@@ -1544,7 +1544,7 @@ class ArenaEnchantPedestalMenu(
 
     private fun validateRouteCompatibility(
         state: OverEnchantState,
-        catalyst: ArenaOverEnchanterCatalystData.Catalyst,
+        catalyst: ArenaEnchantShardData.Shard,
         uiState: PedestalUiState,
         unlockedSlotCount: Int
     ): Boolean {
@@ -1563,7 +1563,7 @@ class ArenaEnchantPedestalMenu(
     private fun validateToolByMode(
         tool: ItemStack,
         state: OverEnchantState,
-        catalyst: ArenaOverEnchanterCatalystData.Catalyst,
+        catalyst: ArenaEnchantShardData.Shard,
         uiState: PedestalUiState
     ): Boolean {
         val targetEnchant = resolveEnchantment(catalyst.targetEnchantmentId) ?: return false
@@ -1610,7 +1610,7 @@ class ArenaEnchantPedestalMenu(
     private fun simulateApply(
         tool: ItemStack,
         state: OverEnchantState,
-        catalyst: ArenaOverEnchanterCatalystData.Catalyst
+        catalyst: ArenaEnchantShardData.Shard
     ): Pair<ItemStack, OverEnchantState> {
         val targetEnchant = resolveEnchantment(catalyst.targetEnchantmentId) ?: return tool to state
         val resultingLevel = when (catalyst.mode) {
@@ -1655,7 +1655,7 @@ class ArenaEnchantPedestalMenu(
         }
     }
 
-    private fun resolveRequiredLevel(catalyst: ArenaOverEnchanterCatalystData.Catalyst): Int? {
+    private fun resolveRequiredLevel(catalyst: ArenaEnchantShardData.Shard): Int? {
         val path = when (catalyst.mode) {
             ArenaOverEnchanterMode.LIMIT_BREAKING -> {
                 val level = catalyst.overLevel ?: return null
@@ -1680,7 +1680,7 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun isCatalystItem(item: ItemStack): Boolean {
-        return ArenaOverEnchanterCatalystData.read(item) != null
+        return ArenaEnchantShardData.read(item) != null
     }
 
     private fun isToolCandidateItem(item: ItemStack): Boolean {
@@ -1701,7 +1701,7 @@ class ArenaEnchantPedestalMenu(
         return name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE") || name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS")
     }
 
-    private fun resolveAppliedOverLevel(catalyst: ArenaOverEnchanterCatalystData.Catalyst): Int {
+    private fun resolveAppliedOverLevel(catalyst: ArenaEnchantShardData.Shard): Int {
         return when (catalyst.mode) {
             ArenaOverEnchanterMode.LIMIT_BREAKING -> catalyst.overLevel ?: 0
             ArenaOverEnchanterMode.OVER_STACKING,
@@ -1922,7 +1922,7 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun canInsertCatalystIntoSlot(item: ItemStack, inventory: Inventory, slot: Int): Boolean {
-        val incoming = ArenaOverEnchanterCatalystData.read(item) ?: return false
+        val incoming = ArenaEnchantShardData.read(item) ?: return false
         val incomingId = incoming.targetEnchantmentId.trim().lowercase(Locale.ROOT)
         val player = inventory.viewers.firstOrNull() as? Player
         val evaluation = player?.let { evaluate(it, inventory) }
@@ -1942,7 +1942,7 @@ class ArenaEnchantPedestalMenu(
                 return@filter true
             }
             val existing = getInputItem(inventory, s) ?: return@filter true
-            val existingCatalyst = ArenaOverEnchanterCatalystData.read(existing) ?: return@filter true
+            val existingCatalyst = ArenaEnchantShardData.read(existing) ?: return@filter true
             existingCatalyst.targetEnchantmentId.trim().lowercase(Locale.ROOT) != incomingId
         }
         return activeSlots.size == (evaluation?.let { resolveActiveCatalystSlots(it).size } ?: ArenaEnchantPedestalLayout.CATALYST_SLOTS.size)

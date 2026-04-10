@@ -789,7 +789,7 @@ class CCContent : JavaPlugin(), Listener {
             CustomItemManager.register(ArenaStructureMarkerToolItem())
             CustomItemManager.register(ArenaOtherMarkerToolItem())
             CustomItemManager.register(ArenaLiftToolItem())
-            arenaOverEnchanterCatalystItems().forEach { CustomItemManager.register(it) }
+            CustomItemManager.register(ArenaEnchantShardItem())
         }
 
         if (isContentEnabledAtStartup("sukima_dungeon")) {
