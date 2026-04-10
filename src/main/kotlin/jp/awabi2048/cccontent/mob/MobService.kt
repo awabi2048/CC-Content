@@ -72,6 +72,8 @@ import jp.awabi2048.cccontent.mob.type.StrayWeaponThrowCloseMobType
 import jp.awabi2048.cccontent.mob.type.WitherSkeletonBowGuardMobType
 import jp.awabi2048.cccontent.mob.type.WitherSkeletonSwapMobType
 import jp.awabi2048.cccontent.mob.type.WitherSkeletonWitherBoomerangMobType
+import jp.awabi2048.cccontent.mob.type.WitherKnightMobType
+import jp.awabi2048.cccontent.mob.type.EndWitherSentinelMobType
 import jp.awabi2048.cccontent.mob.type.WaterSpiritEliteMobType
 import jp.awabi2048.cccontent.mob.type.WaterSpiritMobType
 import jp.awabi2048.cccontent.mob.type.WitchEliteMobType
@@ -82,6 +84,9 @@ import jp.awabi2048.cccontent.mob.type.EndermanMirrorMobType
 import jp.awabi2048.cccontent.mob.type.EndermanEyeSummonerMobType
 import jp.awabi2048.cccontent.mob.type.EndermanMistDelayMobType
 import jp.awabi2048.cccontent.mob.type.EndermanSmallBackstabMobType
+import jp.awabi2048.cccontent.mob.type.EndermanVoidCarrierMobType
+import jp.awabi2048.cccontent.mob.type.EndermanRiftCarrierMobType
+import jp.awabi2048.cccontent.mob.type.EndermanGraveCarrierMobType
 import jp.awabi2048.cccontent.mob.type.EndermitePoisonMobType
 import jp.awabi2048.cccontent.mob.type.ShulkerRhythmMobType
 import jp.awabi2048.cccontent.mob.type.ShulkerLaserMobType
@@ -93,6 +98,7 @@ import jp.awabi2048.cccontent.mob.type.EnderEyeOrbitMobType
 import jp.awabi2048.cccontent.mob.type.EnderEyeBeamMobType
 import jp.awabi2048.cccontent.mob.type.EnderGhostMobType
 import jp.awabi2048.cccontent.mob.type.EnderShooterMobType
+import jp.awabi2048.cccontent.mob.type.EndCrystalSentinelMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
@@ -202,7 +208,9 @@ class MobService(private val plugin: JavaPlugin) {
     private val PROJECTILE_WEIGHT = 0.10
 
     private val customMobTypes = mutableMapOf<String, MobType>()
+    private val customEntityMobTypes = mutableMapOf<String, EntityMobType>()
     private val activeMobs = mutableMapOf<UUID, ActiveMob>()
+    private val activeEntityMobs = mutableMapOf<UUID, ActiveEntityMob>()
     private val definitions = mutableMapOf<String, MobDefinition>()
     private val sessionLoadMetrics = mutableMapOf<String, SessionLoadMetrics>()
     private val managedProjectilePermits = mutableMapOf<UUID, Int>()
@@ -312,6 +320,7 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(WitherSkeletonSwapMobType())
         registerMobType(WitherSkeletonBowGuardMobType())
         registerMobType(WitherSkeletonWitherBoomerangMobType())
+        registerMobType(WitherKnightMobType())
         registerMobType(SlimeSmallMobType())
         registerMobType(SlimeMediumMobType())
         registerMobType(SlimeLargeMobType())
@@ -339,6 +348,10 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(EndermanEyeSummonerMobType())
         registerMobType(EndermanMistDelayMobType())
         registerMobType(EndermanSmallBackstabMobType())
+        registerMobType(EndermanVoidCarrierMobType())
+        registerMobType(EndermanRiftCarrierMobType())
+        registerMobType(EndermanGraveCarrierMobType())
+        registerMobType(EndWitherSentinelMobType())
         registerMobType(EndermitePoisonMobType())
         registerMobType(ShulkerRhythmMobType())
         registerMobType(ShulkerLaserMobType())
@@ -350,10 +363,15 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(EnderEyeBeamMobType())
         registerMobType(EnderGhostMobType())
         registerMobType(EnderShooterMobType())
+        registerEntityMobType(EndCrystalSentinelMobType())
     }
 
     fun registerMobType(mobType: MobType) {
         customMobTypes[mobType.id.lowercase()] = mobType
+    }
+
+    fun registerEntityMobType(mobType: EntityMobType) {
+        customEntityMobTypes[mobType.id.lowercase()] = mobType
     }
 
     fun resolveMobType(typeId: String): MobType? {
@@ -370,6 +388,18 @@ class MobService(private val plugin: JavaPlugin) {
         }
 
         return VanillaMobType(entityType.name, entityType)
+    }
+
+    fun resolveEntityMobType(typeId: String): EntityMobType? {
+        customEntityMobTypes[typeId.trim().lowercase()]?.let { return it }
+
+        val entityType = try {
+            EntityType.valueOf(typeId.trim().uppercase())
+        } catch (_: IllegalArgumentException) {
+            return null
+        }
+
+        return VanillaEntityMobType(entityType.name, entityType)
     }
 
     fun reloadDefinitions(): Map<String, MobDefinition> {
@@ -431,6 +461,15 @@ class MobService(private val plugin: JavaPlugin) {
         return spawn(definition, location, options)
     }
 
+    fun spawnEntityByDefinitionId(
+        definitionId: String,
+        location: Location,
+        options: EntityMobSpawnOptions
+    ): Entity? {
+        val definition = getDefinition(definitionId) ?: return null
+        return spawnEntity(definition, location, options)
+    }
+
     fun loadDefinitions(file: File, rootPath: String? = null, logPrefix: String): Map<String, MobDefinition> {
         val config = YamlConfiguration.loadConfiguration(file)
         val section = if (rootPath.isNullOrBlank()) {
@@ -457,8 +496,9 @@ class MobService(private val plugin: JavaPlugin) {
                 plugin.logger.severe("$logPrefix mob_definition.yml の type が空です: $mobId")
                 continue
             }
-            val resolvedType = resolveMobType(typeId)
-            if (resolvedType == null) {
+            val resolvedTypeId = resolveMobType(typeId)?.id
+                ?: resolveEntityMobType(typeId)?.id
+            if (resolvedTypeId == null) {
                 plugin.logger.severe("$logPrefix mob_definition.yml の type が不正です: $mobId type=$typeId")
                 continue
             }
@@ -467,7 +507,7 @@ class MobService(private val plugin: JavaPlugin) {
             val spawnConditions = parseSpawnConditions(mobId, mobSection, logPrefix)
             loaded[mobId] = MobDefinition(
                 id = mobId,
-                typeId = resolvedType.id,
+                typeId = resolvedTypeId,
                 health = mobSection.getDouble("health", 20.0).coerceAtLeast(1.0),
                 attack = mobSection.getDouble("attack", 1.0).coerceAtLeast(0.0),
                 movementSpeed = mobSection.getDouble("movement_speed", 0.23).coerceAtLeast(0.01),
@@ -554,8 +594,48 @@ class MobService(private val plugin: JavaPlugin) {
         return entity
     }
 
+    fun spawnEntity(definition: MobDefinition, location: Location, options: EntityMobSpawnOptions): Entity? {
+        val world = location.world ?: return null
+        val mobType = resolveEntityMobType(definition.typeId)
+        if (mobType == null) {
+            plugin.logger.warning("[MobService] 未登録の entity mob type です: ${definition.typeId}")
+            return null
+        }
+        val sessionKey = resolveEntitySessionKey(options, world.name)
+
+        val entity = world.spawnEntity(location, mobType.baseEntityType)
+        markEntityLike(entity, definition, mobType, options)
+
+        val spawnContext = EntityMobSpawnContext(plugin, entity, definition, mobType, options)
+        val runtime = mobType.createRuntime(spawnContext)
+        activeEntityMobs[entity.uniqueId] = ActiveEntityMob(
+            entityId = entity.uniqueId,
+            definition = definition,
+            mobType = mobType,
+            featureId = options.featureId,
+            sessionKey = sessionKey,
+            combatActiveProvider = options.combatActiveProvider,
+            metadata = options.metadata,
+            runtime = runtime
+        )
+
+        mobType.onSpawn(spawnContext, runtime)
+
+        if (plugin.isEnabled) {
+            Bukkit.getPluginManager().callEvent(
+                jp.awabi2048.cccontent.mob.event.CustomEntityMobSpawnEvent(entity, definition, options)
+            )
+        }
+
+        return entity
+    }
+
     fun getActiveMob(entityId: UUID): ActiveMob? {
         return activeMobs[entityId]
+    }
+
+    fun getActiveEntityMob(entityId: UUID): ActiveEntityMob? {
+        return activeEntityMobs[entityId]
     }
 
     fun resolveCustomMobDisplayNameByDamager(damager: Entity, viewer: Player?): String? {
@@ -682,6 +762,24 @@ class MobService(private val plugin: JavaPlugin) {
         target.addPotionEffect(PotionEffect(effectType, durationTicks, amplifier, false, true, true))
     }
 
+    fun handleEntityDamaged(event: EntityDamageByEntityEvent, damaged: Entity) {
+        val activeMob = activeEntityMobs[damaged.uniqueId] ?: return
+        val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
+        val startedAt = System.nanoTime()
+        activeMob.mobType.onDamaged(
+            EntityMobDamagedContext(
+                plugin = plugin,
+                entity = damaged,
+                activeMob = activeMob,
+                event = event,
+                attacker = event.damager as? LivingEntity,
+                loadSnapshot = snapshot
+            ),
+            activeMob.runtime
+        )
+        addCpuNanos(activeMob.sessionKey, System.nanoTime() - startedAt)
+    }
+
     private fun clearImplicitEquipmentIfNeeded(entity: LivingEntity, mobType: MobType) {
         val equipment = entity.equipment ?: return
         equipment.setItemInMainHand(ItemStack(Material.AIR))
@@ -710,10 +808,7 @@ class MobService(private val plugin: JavaPlugin) {
     fun handleEntityTeleport(event: EntityTeleportEvent) {
         val living = event.entity as? LivingEntity ?: return
         val activeMob = activeMobs[living.uniqueId] ?: return
-        if (!activeMob.mobType.id.startsWith("enderman_")) {
-            return
-        }
-        event.isCancelled = true
+        if (!activeMob.mobType.id.startsWith("enderman_")) return
     }
 
     fun handleShootBow(event: EntityShootBowEvent) {
@@ -1092,10 +1187,43 @@ class MobService(private val plugin: JavaPlugin) {
                 val elapsedNanos = System.nanoTime() - startedAt
                 addCpuNanos(activeMob.sessionKey, elapsedNanos)
             }
+            val activeEntityMobSnapshot = activeEntityMobs.values.toList()
+            for (activeMob in activeEntityMobSnapshot) {
+                if (activeEntityMobs[activeMob.entityId] !== activeMob) {
+                    continue
+                }
+                val entity = Bukkit.getEntity(activeMob.entityId)
+                if (entity == null || !entity.isValid || entity.isDead) {
+                    staleIds.add(activeMob.entityId)
+                    continue
+                }
+                activeCountBySession[activeMob.sessionKey] = (activeCountBySession[activeMob.sessionKey] ?: 0) + 1
+
+                activeMob.tickCount += intervalTicks
+                val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
+                val startedAt = System.nanoTime()
+                activeMob.mobType.onTick(
+                    EntityMobRuntimeContext(plugin, entity, activeMob, snapshot, tickDelta = intervalTicks),
+                    activeMob.runtime
+                )
+                val elapsedNanos = System.nanoTime() - startedAt
+                addCpuNanos(activeMob.sessionKey, elapsedNanos)
+            }
             staleIds.forEach { staleId ->
-                val activeMob = activeMobs.remove(staleId) ?: return@forEach
-                val entity = Bukkit.getEntity(staleId) as? LivingEntity ?: return@forEach
-                runDeathCallbacks(activeMob, entity)
+                val activeMob = activeMobs.remove(staleId)
+                if (activeMob != null) {
+                    val entity = Bukkit.getEntity(staleId) as? LivingEntity
+                    if (entity != null) {
+                        runDeathCallbacks(activeMob, entity)
+                    }
+                }
+                val activeEntityMob = activeEntityMobs.remove(staleId)
+                if (activeEntityMob != null) {
+                    val entity = Bukkit.getEntity(staleId)
+                    if (entity != null) {
+                        runEntityDeathCallbacks(activeEntityMob, entity)
+                    }
+                }
             }
 
             refreshSessionLoadSnapshots(activeCountBySession)
@@ -1107,7 +1235,10 @@ class MobService(private val plugin: JavaPlugin) {
         tickTask = null
         val trackedMobIds = activeMobs.keys.toList()
         trackedMobIds.forEach { despawnTrackedMob(it) }
+        val trackedEntityMobIds = activeEntityMobs.keys.toList()
+        trackedEntityMobIds.forEach { despawnTrackedEntityMob(it) }
         activeMobs.clear()
+        activeEntityMobs.clear()
         managedProjectilePermits.clear()
         directDamagePermits.clear()
         sessionLoadMetrics.clear()
@@ -1121,6 +1252,7 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun untrack(entityId: UUID) {
         activeMobs.remove(entityId)
+        activeEntityMobs.remove(entityId)
     }
 
     fun despawnTrackedMob(entityId: UUID) {
@@ -1141,6 +1273,24 @@ class MobService(private val plugin: JavaPlugin) {
         }
     }
 
+    fun despawnTrackedEntityMob(entityId: UUID) {
+        val activeMob = activeEntityMobs.remove(entityId) ?: run {
+            val entity = Bukkit.getEntity(entityId)
+            if (entity != null && entity.isValid && !entity.isDead) {
+                entity.remove()
+            }
+            return
+        }
+
+        val entity = Bukkit.getEntity(entityId)
+        if (entity != null) {
+            runEntityDeathCallbacks(activeMob, entity)
+            if (entity.isValid && !entity.isDead) {
+                entity.remove()
+            }
+        }
+    }
+
     fun despawnTrackedMobsByMetadata(definitionId: String, metadataKey: String, metadataValue: String) {
         val targets = activeMobs.values
             .asSequence()
@@ -1150,6 +1300,17 @@ class MobService(private val plugin: JavaPlugin) {
             .toList()
 
         targets.forEach { despawnTrackedMob(it) }
+    }
+
+    fun despawnTrackedEntityMobsByMetadata(definitionId: String, metadataKey: String, metadataValue: String) {
+        val targets = activeEntityMobs.values
+            .asSequence()
+            .filter { it.definition.id == definitionId }
+            .filter { it.metadata[metadataKey] == metadataValue }
+            .map { it.entityId }
+            .toList()
+
+        targets.forEach { despawnTrackedEntityMob(it) }
     }
 
     fun handleAttack(event: EntityDamageByEntityEvent, attacker: LivingEntity) {
@@ -1249,6 +1410,11 @@ class MobService(private val plugin: JavaPlugin) {
         runDeathCallbacks(activeMob, entity, event)
     }
 
+    fun handleEntityDeath(entity: Entity) {
+        val activeMob = activeEntityMobs.remove(entity.uniqueId) ?: return
+        runEntityDeathCallbacks(activeMob, entity, null)
+    }
+
     private fun runDeathCallbacks(activeMob: ActiveMob, entity: LivingEntity, event: EntityDeathEvent? = null) {
         val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
         val startedAt = System.nanoTime()
@@ -1259,6 +1425,16 @@ class MobService(private val plugin: JavaPlugin) {
         )
         activeMob.mobType.onDeath(
             MobDeathContext(plugin, entity, activeMob, deathEvent, snapshot),
+            activeMob.runtime
+        )
+        addCpuNanos(activeMob.sessionKey, System.nanoTime() - startedAt)
+    }
+
+    private fun runEntityDeathCallbacks(activeMob: ActiveEntityMob, entity: Entity, event: EntityDeathEvent? = null) {
+        val snapshot = getSessionLoadSnapshot(activeMob.sessionKey)
+        val startedAt = System.nanoTime()
+        activeMob.mobType.onDeath(
+            EntityMobDeathContext(plugin, entity, activeMob, event, snapshot),
             activeMob.runtime
         )
         addCpuNanos(activeMob.sessionKey, System.nanoTime() - startedAt)
@@ -1389,6 +1565,20 @@ class MobService(private val plugin: JavaPlugin) {
         return normalizeSessionKey("${options.featureId}:global")
     }
 
+    private fun resolveEntitySessionKey(options: EntityMobSpawnOptions, worldName: String?): String {
+        val explicit = options.sessionKey?.trim().orEmpty()
+        if (explicit.isNotBlank()) {
+            return normalizeSessionKey(explicit)
+        }
+
+        val metadataWorld = options.metadata["world"]?.trim().orEmpty().ifBlank { worldName.orEmpty() }
+        if (metadataWorld.isNotBlank()) {
+            return normalizeSessionKey("${options.featureId}:$metadataWorld")
+        }
+
+        return normalizeSessionKey("${options.featureId}:global")
+    }
+
     private fun normalizeSessionKey(sessionKey: String?): String {
         return sessionKey?.trim()?.takeIf { it.isNotBlank() }?.lowercase() ?: "global:default"
     }
@@ -1407,6 +1597,19 @@ class MobService(private val plugin: JavaPlugin) {
             val protectUntil = Bukkit.getCurrentTick().toLong() + DOWNGRADE_AOE_PROTECTION_TICKS
             container.set(downgradeAoEProtectUntilTickKey, PersistentDataType.LONG, protectUntil)
         }
+    }
+
+    private fun markEntityLike(
+        entity: Entity,
+        definition: MobDefinition,
+        mobType: EntityMobType,
+        options: EntityMobSpawnOptions
+    ) {
+        val container = entity.persistentDataContainer
+        container.set(mobTypeKey, PersistentDataType.STRING, mobType.id)
+        container.set(mobDefinitionKey, PersistentDataType.STRING, definition.id)
+        container.set(mobFeatureKey, PersistentDataType.STRING, options.featureId)
+        container.set(customMobKey, PersistentDataType.BYTE, if (mobType.isCustom) 1 else 0)
     }
 
     private fun shouldBlockDowngradedAoEDamage(entity: LivingEntity, cause: EntityDamageEvent.DamageCause): Boolean {

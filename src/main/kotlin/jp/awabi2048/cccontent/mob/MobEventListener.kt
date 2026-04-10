@@ -13,6 +13,7 @@ import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.entity.ProjectileHitEvent
 import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.entity.EntityTransformEvent
+import org.bukkit.event.entity.EntityRemoveEvent
 import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.event.entity.SlimeSplitEvent
@@ -24,6 +25,8 @@ class MobEventListener(private val mobService: MobService) : Listener {
     fun onEntityDamage(event: EntityDamageByEntityEvent) {
         mobService.handleProjectileEffects(event)
         mobService.handleStealthFangDamage(event)
+
+        mobService.handleEntityDamaged(event, event.entity)
 
         val damaged = event.entity as? LivingEntity
         if (damaged != null) {
@@ -54,6 +57,14 @@ class MobEventListener(private val mobService: MobService) : Listener {
     @EventHandler
     fun onEntityDeath(event: EntityDeathEvent) {
         mobService.handleDeath(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityGenericDeath(event: EntityRemoveEvent) {
+        if (event.cause != EntityRemoveEvent.Cause.DEATH) {
+            return
+        }
+        mobService.handleEntityDeath(event.entity)
     }
 
     @EventHandler

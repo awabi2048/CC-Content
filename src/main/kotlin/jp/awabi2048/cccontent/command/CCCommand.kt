@@ -8,7 +8,6 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Entity
-import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Player
 import org.bukkit.util.Vector
 import kotlin.math.max
@@ -23,7 +22,7 @@ class CCCommand(
     private val onRestart: (() -> Unit)? = null,
     private val onClearBlockPlacementData: (() -> Unit)? = null,
     private val mobDefinitionIdsProvider: (() -> Collection<String>)? = null,
-    private val onSummonMob: ((String, Location) -> LivingEntity?)? = null,
+    private val onSummonMob: ((String, Location) -> Entity?)? = null,
     private val onBatchBreakDebug: ((Player, String, Int, Int, Boolean) -> Boolean)? = null,
     private val onBlastMineDebug: ((Player, Double, Int, Boolean, Double) -> Boolean)? = null,
     private val onUpdateDay: ((String?) -> Boolean)? = null,

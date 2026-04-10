@@ -514,6 +514,13 @@ wither_skeleton_wither_boomerang:
   movement_speed: 0.24
   armor: 3.5
 
+wither_knight:
+  type: wither_knight
+  health: 28.0
+  attack: 5.2
+  movement_speed: 0.26
+  armor: 6.0
+
 witch_normal:
   type: witch_normal
   health: 26.0
@@ -548,6 +555,41 @@ enderman_small_backstab:
   attack: 5.4
   movement_speed: 0.30
   armor: 2.5
+
+enderman_void_carrier:
+  type: enderman_void_carrier
+  health: 42.0
+  attack: 6.0
+  movement_speed: 0.29
+  armor: 3.8
+
+enderman_rift_carrier:
+  type: enderman_rift_carrier
+  health: 48.0
+  attack: 6.6
+  movement_speed: 0.27
+  armor: 4.4
+
+enderman_grave_carrier:
+  type: enderman_grave_carrier
+  health: 56.0
+  attack: 7.0
+  movement_speed: 0.25
+  armor: 5.4
+
+end_crystal_sentinel:
+  type: end_crystal_sentinel
+  health: 100.0
+  attack: 6.5
+  movement_speed: 0.2
+  armor: 4.0
+
+end_wither_sentinel:
+  type: end_wither_sentinel
+  health: 120.0
+  attack: 7.2
+  movement_speed: 0.0
+  armor: 8.0
 
 endermite_poison:
   type: endermite_poison

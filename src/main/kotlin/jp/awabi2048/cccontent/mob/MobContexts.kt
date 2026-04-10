@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.mob
 
+import org.bukkit.entity.Entity
 import org.bukkit.entity.LivingEntity
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityDamageEvent
@@ -9,6 +10,13 @@ import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
 
 data class MobSpawnOptions(
+    val featureId: String,
+    val sessionKey: String? = null,
+    val combatActiveProvider: (() -> Boolean)? = null,
+    val metadata: Map<String, String> = emptyMap()
+)
+
+data class EntityMobSpawnOptions(
     val featureId: String,
     val sessionKey: String? = null,
     val combatActiveProvider: (() -> Boolean)? = null,
@@ -65,12 +73,46 @@ data class ActiveMob(
     }
 }
 
+data class ActiveEntityMob(
+    val entityId: UUID,
+    val definition: MobDefinition,
+    val mobType: EntityMobType,
+    val featureId: String,
+    val sessionKey: String,
+    val combatActiveProvider: (() -> Boolean)?,
+    val metadata: Map<String, String>,
+    val runtime: CustomMobRuntime?,
+    var tickCount: Long = 0L
+) {
+    fun isCombatActive(): Boolean {
+        return combatActiveProvider?.invoke() ?: true
+    }
+}
+
 data class MobSpawnContext(
     val plugin: JavaPlugin,
     val entity: LivingEntity,
     val definition: MobDefinition,
     val mobType: MobType,
     val options: MobSpawnOptions
+) {
+    val featureId: String
+        get() = options.featureId
+
+    val sessionKey: String?
+        get() = options.sessionKey
+
+    fun isCombatActive(): Boolean {
+        return options.combatActiveProvider?.invoke() ?: true
+    }
+}
+
+data class EntityMobSpawnContext(
+    val plugin: JavaPlugin,
+    val entity: Entity,
+    val definition: MobDefinition,
+    val mobType: EntityMobType,
+    val options: EntityMobSpawnOptions
 ) {
     val featureId: String
         get() = options.featureId
@@ -94,6 +136,30 @@ data class MobRuntimeContext(
         get() = activeMob.definition
     val mobType: MobType
         get() = activeMob.mobType
+    val featureId: String
+        get() = activeMob.featureId
+
+    val sessionKey: String
+        get() = activeMob.sessionKey
+
+    fun isCombatActive(): Boolean {
+        return activeMob.isCombatActive()
+    }
+}
+
+data class EntityMobRuntimeContext(
+    val plugin: JavaPlugin,
+    val entity: Entity,
+    val activeMob: ActiveEntityMob,
+    val loadSnapshot: MobLoadSnapshot,
+    val tickDelta: Long = 1L
+) {
+    val definition: MobDefinition
+        get() = activeMob.definition
+
+    val mobType: EntityMobType
+        get() = activeMob.mobType
+
     val featureId: String
         get() = activeMob.featureId
 
@@ -143,6 +209,25 @@ data class MobDamagedContext(
         get() = activeMob.sessionKey
 }
 
+data class EntityMobDamagedContext(
+    val plugin: JavaPlugin,
+    val entity: Entity,
+    val activeMob: ActiveEntityMob,
+    val event: EntityDamageByEntityEvent,
+    val attacker: LivingEntity?,
+    val loadSnapshot: MobLoadSnapshot
+) {
+    val definition: MobDefinition
+        get() = activeMob.definition
+
+    fun isCombatActive(): Boolean {
+        return activeMob.isCombatActive()
+    }
+
+    val sessionKey: String
+        get() = activeMob.sessionKey
+}
+
 data class MobGenericDamagedContext(
     val plugin: JavaPlugin,
     val entity: LivingEntity,
@@ -166,6 +251,20 @@ data class MobDeathContext(
     val entity: LivingEntity,
     val activeMob: ActiveMob,
     val event: EntityDeathEvent,
+    val loadSnapshot: MobLoadSnapshot
+) {
+    val definition: MobDefinition
+        get() = activeMob.definition
+
+    val sessionKey: String
+        get() = activeMob.sessionKey
+}
+
+data class EntityMobDeathContext(
+    val plugin: JavaPlugin,
+    val entity: Entity,
+    val activeMob: ActiveEntityMob,
+    val event: EntityDeathEvent?,
     val loadSnapshot: MobLoadSnapshot
 ) {
     val definition: MobDefinition

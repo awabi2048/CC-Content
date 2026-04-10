@@ -16,6 +16,8 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerat
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
 import jp.awabi2048.cccontent.items.arena.BoomerangTokenItem
+import jp.awabi2048.cccontent.CCContent
+import jp.awabi2048.cccontent.mob.EntityMobSpawnOptions
 import jp.awabi2048.cccontent.mob.MobDefinition
 import jp.awabi2048.cccontent.mob.MobSpawnCondition
 import jp.awabi2048.cccontent.mob.MobService
@@ -302,6 +304,7 @@ class ArenaManager(
     private val sessionsByWorld = mutableMapOf<String, ArenaSession>()
     private val playerToSessionWorld = mutableMapOf<UUID, String>()
     private val mobToSessionWorld = mutableMapOf<UUID, String>()
+    private val entityMobToSessionWorld = mutableMapOf<UUID, String>()
     private val pendingWorldDeletions = mutableMapOf<String, PendingWorldDeletion>()
     private val readyArenaWorldNames = ArrayDeque<String>()
     private val arenaWorldStates = mutableMapOf<String, ArenaPoolWorldState>()
@@ -314,6 +317,7 @@ class ArenaManager(
     private val mobDefinitions = mutableMapOf<String, MobDefinition>()
     private val knownMobTypeIds = mutableSetOf<String>()
     private val mobToDefinitionTypeId = mutableMapOf<UUID, String>()
+    private val entityMobToDefinitionTypeId = mutableMapOf<UUID, String>()
     private val elderCurseCooldownUntilMillis = mutableMapOf<UUID, Long>()
     private val liftOccupiedMarkerKeys = mutableSetOf<String>()
     private val liftOccupiedWaiters = mutableSetOf<UUID>()
@@ -994,7 +998,9 @@ class ArenaManager(
         sessionsByWorld.clear()
         playerToSessionWorld.clear()
         mobToSessionWorld.clear()
+        entityMobToSessionWorld.clear()
         mobToDefinitionTypeId.clear()
+        entityMobToDefinitionTypeId.clear()
         cleanupWorldJobs.clear()
         readyArenaWorldNames.clear()
         confusionManager.clearAll()
@@ -1273,7 +1279,9 @@ class ArenaManager(
         } catch (exception: Exception) {
             plugin.logger.log(Level.SEVERE, "[Arena] モブドロップ処理に失敗しましたが討伐進行は継続します: entityId=$entityId", exception)
         }
-        val worldName = mobToSessionWorld.remove(entityId) ?: return
+        val worldName = mobToSessionWorld.remove(entityId)
+            ?: entityMobToSessionWorld.remove(entityId)
+            ?: return
         val session = sessionsByWorld[worldName] ?: return
         session.barrierDefenseMobIds.remove(entityId)
         session.barrierDefenseTargetMobIds.remove(entityId)
@@ -1291,12 +1299,40 @@ class ArenaManager(
         }
         val countKill = killAwardParticipantIds.isNotEmpty()
         if (countKill) {
-            val definitionTypeId = mobToDefinitionTypeId[entityId] ?: event.entity.type.name
+            val definitionTypeId = mobToDefinitionTypeId[entityId]
+                ?: entityMobToDefinitionTypeId[entityId]
+                ?: event.entity.type.name
             killAwardParticipantIds.forEach { participantId ->
                 arenaMissionService?.recordMobKill(participantId, definitionTypeId)
             }
         }
         consumeMob(session, entityId, countKill = countKill)
+    }
+
+    fun handleEntityDeath(entity: Entity) {
+        val entityId = entity.uniqueId
+        val worldName = entityMobToSessionWorld.remove(entityId) ?: return
+        val session = sessionsByWorld[worldName] ?: return
+        session.barrierDefenseMobIds.remove(entityId)
+        session.barrierDefenseTargetMobIds.remove(entityId)
+        session.barrierDefenseAssaultMobIds.remove(entityId)
+        consumeMob(session, entityId, countKill = true)
+    }
+
+    fun getUnactivatedBarrierPointLocations(worldName: String): List<Location> {
+        val session = sessionsByWorld[worldName] ?: return emptyList()
+        if (!session.barrierRestarting) return emptyList()
+        return session.actionMarkers.values
+            .asSequence()
+            .filter { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }
+            .filter { it.state != ArenaActionMarkerState.RUNNING }
+            .map { it.center.clone() }
+            .toList()
+    }
+
+    fun isArenaParticipant(worldName: String, playerId: UUID): Boolean {
+        val session = sessionsByWorld[worldName] ?: return false
+        return session.participants.contains(playerId)
     }
 
     fun registerChildMob(entity: LivingEntity, definitionTypeId: String, options: MobSpawnOptions) {
@@ -1306,6 +1342,24 @@ class ArenaManager(
         val entityId = entity.uniqueId
         mobToSessionWorld[entityId] = worldName
         mobToDefinitionTypeId[entityId] = definitionTypeId
+        session.activeMobs.add(entityId)
+
+        val wave = options.metadata["wave"]?.toIntOrNull()
+            ?: session.currentWave.takeIf { it > 0 }
+            ?: session.startedWaves.maxOrNull()
+        if (wave != null) {
+            session.mobWaveMap[entityId] = wave
+            session.waveMobIds.getOrPut(wave) { mutableSetOf() }.add(entityId)
+        }
+    }
+
+    fun registerChildEntityMob(entity: Entity, definitionTypeId: String, options: EntityMobSpawnOptions) {
+        if (options.featureId != "arena") return
+        val worldName = entity.world.name
+        val session = sessionsByWorld[worldName] ?: return
+        val entityId = entity.uniqueId
+        entityMobToSessionWorld[entityId] = worldName
+        entityMobToDefinitionTypeId[entityId] = definitionTypeId
         session.activeMobs.add(entityId)
 
         val wave = options.metadata["wave"]?.toIntOrNull()
@@ -1531,28 +1585,34 @@ class ArenaManager(
 
     fun handleMobFallDamage(event: EntityDamageEvent) {
         if (event.cause != EntityDamageEvent.DamageCause.FALL) return
-        val entity = event.entity as? LivingEntity ?: return
+        val entity = event.entity
         if (entity is Player) return
-        if (!mobToSessionWorld.containsKey(entity.uniqueId)) return
+        if (!mobToSessionWorld.containsKey(entity.uniqueId) && !entityMobToSessionWorld.containsKey(entity.uniqueId)) return
         event.isCancelled = true
     }
 
     fun handleMobFriendlyFire(event: EntityDamageByEntityEvent) {
-        val damaged = event.entity as? LivingEntity ?: return
+        val damaged = event.entity
         if (damaged is Player) return
 
-        val damagedWorld = mobToSessionWorld[damaged.uniqueId] ?: return
+        val damagedWorld = mobToSessionWorld[damaged.uniqueId]
+            ?: entityMobToSessionWorld[damaged.uniqueId]
+            ?: return
         val attackerMobId = resolveArenaMobAttackerId(event) ?: return
-        val attackerWorld = mobToSessionWorld[attackerMobId] ?: return
+        val attackerWorld = mobToSessionWorld[attackerMobId]
+            ?: entityMobToSessionWorld[attackerMobId]
+            ?: return
         if (damagedWorld != attackerWorld) return
         event.isCancelled = true
     }
 
     fun handleMobDamagedByParticipant(event: EntityDamageByEntityEvent) {
-        val damaged = event.entity as? LivingEntity ?: return
+        val damaged = event.entity
         if (damaged is Player) return
 
-        val worldName = mobToSessionWorld[damaged.uniqueId] ?: return
+        val worldName = mobToSessionWorld[damaged.uniqueId]
+            ?: entityMobToSessionWorld[damaged.uniqueId]
+            ?: return
         val session = sessionsByWorld[worldName] ?: return
         val attacker = resolveDamagerPlayer(event) ?: return
         if (!session.participants.contains(attacker.uniqueId)) return
@@ -1800,7 +1860,9 @@ class ArenaManager(
 
     fun handleMobTarget(event: EntityTargetLivingEntityEvent) {
         val mob = event.entity as? Mob ?: return
-        val worldName = mobToSessionWorld[mob.uniqueId] ?: return
+        val worldName = mobToSessionWorld[mob.uniqueId]
+            ?: entityMobToSessionWorld[mob.uniqueId]
+            ?: return
         val session = sessionsByWorld[worldName] ?: return
 
         if (event.target == null) {
@@ -1813,6 +1875,7 @@ class ArenaManager(
         val target = event.target as? LivingEntity ?: return
         if (target !is Player) {
             val targetWorld = mobToSessionWorld[target.uniqueId]
+                ?: entityMobToSessionWorld[target.uniqueId]
             if (targetWorld == worldName) {
                 event.isCancelled = true
                 mob.target = selectNearestParticipant(session, mob.location)
@@ -1832,10 +1895,17 @@ class ArenaManager(
         if (damager is LivingEntity && damager !is Player) {
             return damager.uniqueId
         }
+        if (entityMobToSessionWorld.containsKey(damager.uniqueId)) {
+            return damager.uniqueId
+        }
 
         if (damager is Projectile) {
-            val shooter = damager.shooter as? LivingEntity ?: return null
-            if (shooter is Player) return null
+            val shooterEntity = damager.shooter as? Entity ?: return null
+            if (shooterEntity is Player) return null
+            if (entityMobToSessionWorld.containsKey(shooterEntity.uniqueId)) {
+                return shooterEntity.uniqueId
+            }
+            val shooter = shooterEntity as? LivingEntity ?: return null
             return shooter.uniqueId
         }
 
@@ -2581,7 +2651,7 @@ class ArenaManager(
 
     private fun applyArenaMobDrop(event: EntityDeathEvent) {
         val entity = event.entity
-        if (!mobToSessionWorld.containsKey(entity.uniqueId)) {
+        if (!mobToSessionWorld.containsKey(entity.uniqueId) && !entityMobToSessionWorld.containsKey(entity.uniqueId)) {
             return
         }
 
@@ -2594,7 +2664,9 @@ class ArenaManager(
             return
         }
 
-        val definitionTypeId = mobToDefinitionTypeId[entity.uniqueId] ?: entity.type.name
+        val definitionTypeId = mobToDefinitionTypeId[entity.uniqueId]
+            ?: entityMobToDefinitionTypeId[entity.uniqueId]
+            ?: entity.type.name
         val normalizedTypeId = definitionTypeId.trim().lowercase(Locale.ROOT)
         val lootingLevel = resolveLootingLevel(killer.inventory)
 
@@ -3022,15 +3094,22 @@ class ArenaManager(
         session.barrierRestartCompleted = false
 
         session.activeMobs.toList().forEach { mobId ->
+            val wasEntityMob = entityMobToSessionWorld.containsKey(mobId)
             mobToSessionWorld.remove(mobId)
+            entityMobToSessionWorld.remove(mobId)
             mobToDefinitionTypeId.remove(mobId)
+            entityMobToDefinitionTypeId.remove(mobId)
             session.mobWaveMap.remove(mobId)
             session.mobDamagedParticipants.remove(mobId)
             val entity = Bukkit.getEntity(mobId)
             if (entity != null && entity.isValid && !entity.isDead) {
                 spawnMobDisappearSmoke(entity.location)
             }
-            mobService.despawnTrackedMob(mobId)
+            if (wasEntityMob) {
+                mobService.despawnTrackedEntityMob(mobId)
+            } else {
+                mobService.despawnTrackedMob(mobId)
+            }
             session.activeMobs.remove(mobId)
         }
         session.waveMobIds.clear()
@@ -3697,7 +3776,8 @@ class ArenaManager(
 
     private fun countAliveMobsByDefinitionTypeId(session: ArenaSession, definitionTypeId: String): Int {
         return session.activeMobs.count { mobId ->
-            if (mobToDefinitionTypeId[mobId] != definitionTypeId) {
+            val mappedType = mobToDefinitionTypeId[mobId] ?: entityMobToDefinitionTypeId[mobId]
+            if (mappedType != definitionTypeId) {
                 return@count false
             }
             val entity = Bukkit.getEntity(mobId)
@@ -3752,37 +3832,68 @@ class ArenaManager(
         definition: MobDefinition,
         difficulty: ArenaDifficultyConfig
     ) {
-        val entity = mobService.spawn(
+        val metadata = mapOf(
+            "world" to session.worldName,
+            "wave" to wave.toString(),
+            "total_waves" to session.waves.toString()
+        )
+
+        val typeId = definition.typeId.trim().lowercase(Locale.ROOT)
+        if (mobService.resolveMobType(typeId) != null) {
+            val entity = mobService.spawn(
+                definition,
+                spawn,
+                MobSpawnOptions(
+                    featureId = "arena",
+                    sessionKey = "arena:${session.worldName}",
+                    combatActiveProvider = { true },
+                    metadata = metadata
+                )
+            ) ?: return
+            entity.removeWhenFarAway = false
+            entity.canPickupItems = false
+            enforceAdultMob(entity)
+            spawnMobAppearParticles(world, entity.location)
+
+            applyMobStats(entity, definition, difficulty, session.sessionVariance, session.missionModifiers)
+
+            if (entity is Mob) {
+                entity.target = findNearestParticipant(session, entity.location)
+            }
+
+            val entityId = entity.uniqueId
+            session.activeMobs.add(entityId)
+            session.waveMobIds.getOrPut(wave) { mutableSetOf() }.add(entityId)
+            session.mobWaveMap[entityId] = wave
+            mobToSessionWorld[entityId] = session.worldName
+            entityMobToSessionWorld.remove(entityId)
+            mobToDefinitionTypeId[entityId] = definition.typeId
+            entityMobToDefinitionTypeId.remove(entityId)
+            return
+        }
+
+        val entity = mobService.spawnEntity(
             definition,
             spawn,
-            MobSpawnOptions(
+            EntityMobSpawnOptions(
                 featureId = "arena",
                 sessionKey = "arena:${session.worldName}",
                 combatActiveProvider = { true },
-                metadata = mapOf(
-                    "world" to session.worldName,
-                    "wave" to wave.toString(),
-                    "total_waves" to session.waves.toString()
-                )
+                metadata = metadata
             )
         ) ?: return
-        entity.removeWhenFarAway = false
-        entity.canPickupItems = false
-        enforceAdultMob(entity)
+
+        entity.isPersistent = true
         spawnMobAppearParticles(world, entity.location)
-
-        applyMobStats(entity, definition, difficulty, session.sessionVariance, session.missionModifiers)
-
-        if (entity is Mob) {
-            entity.target = findNearestParticipant(session, entity.location)
-        }
 
         val entityId = entity.uniqueId
         session.activeMobs.add(entityId)
         session.waveMobIds.getOrPut(wave) { mutableSetOf() }.add(entityId)
         session.mobWaveMap[entityId] = wave
-        mobToSessionWorld[entityId] = session.worldName
-        mobToDefinitionTypeId[entityId] = definition.typeId
+        mobToSessionWorld.remove(entityId)
+        entityMobToSessionWorld[entityId] = session.worldName
+        mobToDefinitionTypeId.remove(entityId)
+        entityMobToDefinitionTypeId[entityId] = definition.typeId
     }
 
     private fun applyMobStats(
@@ -3850,8 +3961,11 @@ class ArenaManager(
         val removed = session.activeMobs.remove(mobId)
         if (!removed) return
 
+        val wasEntityMob = entityMobToSessionWorld.containsKey(mobId)
         mobToSessionWorld.remove(mobId)
+        entityMobToSessionWorld.remove(mobId)
         mobToDefinitionTypeId.remove(mobId)
+        entityMobToDefinitionTypeId.remove(mobId)
         val wave = session.mobWaveMap.remove(mobId)
         session.mobDamagedParticipants.remove(mobId)
         if (wave != null) {
@@ -3871,6 +3985,10 @@ class ArenaManager(
         }
 
         if (!countKill || wave == null) {
+            return
+        }
+
+        if (wasEntityMob) {
             return
         }
 
@@ -4061,7 +4179,9 @@ class ArenaManager(
                 session.clearingBossEntityIds.add(entity.uniqueId)
                 session.activeMobs.add(entity.uniqueId)
                 mobToSessionWorld[entity.uniqueId] = session.worldName
+                entityMobToSessionWorld.remove(entity.uniqueId)
                 mobToDefinitionTypeId[entity.uniqueId] = definition.typeId.trim().lowercase(Locale.ROOT)
+                entityMobToDefinitionTypeId.remove(entity.uniqueId)
                 plugin.logger.info("[Arena] 掃討ボスをスポーン: mobId=$bossMobId location=${spawnLocation.blockX},${spawnLocation.blockY},${spawnLocation.blockZ}")
             } else {
                 plugin.logger.warning("[Arena] 掃討ボスのスポーンに失敗: mobId=$bossMobId")
@@ -4434,13 +4554,20 @@ class ArenaManager(
             session.activeMobs.remove(mobId)
             session.mobWaveMap.remove(mobId)
             session.mobDamagedParticipants.remove(mobId)
+            val wasEntityMob = entityMobToSessionWorld.containsKey(mobId)
             mobToSessionWorld.remove(mobId)
+            entityMobToSessionWorld.remove(mobId)
             mobToDefinitionTypeId.remove(mobId)
+            entityMobToDefinitionTypeId.remove(mobId)
             val entity = Bukkit.getEntity(mobId)
             if (entity != null && entity.isValid && !entity.isDead) {
                 spawnMobDisappearSmoke(entity.location)
             }
-            mobService.despawnTrackedMob(mobId)
+            if (wasEntityMob) {
+                mobService.despawnTrackedEntityMob(mobId)
+            } else {
+                mobService.despawnTrackedMob(mobId)
+            }
         }
 
         if (remaining.isEmpty()) {
@@ -4453,8 +4580,9 @@ class ArenaManager(
     }
 
     private fun shouldKeepWaveMob(session: ArenaSession, mobId: UUID): Boolean {
-        val mob = Bukkit.getEntity(mobId) as? Mob ?: return false
+        val mob = Bukkit.getEntity(mobId) ?: return false
         if (!mob.isValid || mob.isDead) return false
+        if (mob !is Mob) return false
         val targetPlayer = mob.target as? Player ?: return false
         return session.participants.contains(targetPlayer.uniqueId)
     }
@@ -4905,15 +5033,22 @@ class ArenaManager(
 
     private fun removeRemainingWaveMobs(session: ArenaSession) {
         session.activeMobs.toList().forEach { mobId ->
-            val entity = Bukkit.getEntity(mobId) as? LivingEntity
+            val entity = Bukkit.getEntity(mobId)
             if (entity != null && entity.isValid && !entity.isDead) {
                 spawnSmoke(entity.location)
             }
+            val wasEntityMob = entityMobToSessionWorld.containsKey(mobId)
             mobToSessionWorld.remove(mobId)
+            entityMobToSessionWorld.remove(mobId)
             mobToDefinitionTypeId.remove(mobId)
+            entityMobToDefinitionTypeId.remove(mobId)
             session.mobWaveMap.remove(mobId)
             session.mobDamagedParticipants.remove(mobId)
-            mobService.despawnTrackedMob(mobId)
+            if (wasEntityMob) {
+                mobService.despawnTrackedEntityMob(mobId)
+            } else {
+                mobService.despawnTrackedMob(mobId)
+            }
             session.activeMobs.remove(mobId)
         }
 
@@ -4926,10 +5061,13 @@ class ArenaManager(
         val world = Bukkit.getWorld(session.worldName) ?: return
         world.entities
             .asSequence()
-            .filterIsInstance<Mob>()
             .filter { it.isValid && !it.isDead }
-            .forEach { mob ->
-                val mobId = mob.uniqueId
+            .filter {
+                mobToSessionWorld.containsKey(it.uniqueId) ||
+                    entityMobToSessionWorld.containsKey(it.uniqueId)
+            }
+            .forEach { trackedEntity ->
+                val mobId = trackedEntity.uniqueId
                 session.activeMobs.remove(mobId)
                 session.mobWaveMap.remove(mobId)
                 session.mobDamagedParticipants.remove(mobId)
@@ -4937,12 +5075,19 @@ class ArenaManager(
                 session.barrierDefenseMobIds.remove(mobId)
                 session.barrierDefenseTargetMobIds.remove(mobId)
                 session.barrierDefenseAssaultMobIds.remove(mobId)
+                val wasEntityMob = entityMobToSessionWorld.containsKey(mobId)
                 mobToSessionWorld.remove(mobId)
+                entityMobToSessionWorld.remove(mobId)
                 mobToDefinitionTypeId.remove(mobId)
+                entityMobToDefinitionTypeId.remove(mobId)
                 if (smoke) {
-                    spawnSmoke(mob.location)
+                    spawnSmoke(trackedEntity.location)
                 }
-                mobService.despawnTrackedMob(mobId)
+                if (wasEntityMob) {
+                    mobService.despawnTrackedEntityMob(mobId)
+                } else {
+                    mobService.despawnTrackedMob(mobId)
+                }
             }
     }
 
@@ -5098,19 +5243,26 @@ class ArenaManager(
     private fun removeBarrierDefenseMobs(session: ArenaSession, smoke: Boolean) {
         val ids = session.barrierDefenseMobIds.toList()
         ids.forEach { mobId ->
+            val wasEntityMob = entityMobToSessionWorld.containsKey(mobId)
             mobToSessionWorld.remove(mobId)
+            entityMobToSessionWorld.remove(mobId)
             mobToDefinitionTypeId.remove(mobId)
+            entityMobToDefinitionTypeId.remove(mobId)
             session.mobDamagedParticipants.remove(mobId)
             session.barrierDefenseTargetMobIds.remove(mobId)
             session.barrierDefenseAssaultMobIds.remove(mobId)
 
-            val entity = Bukkit.getEntity(mobId) as? LivingEntity
+            val entity = Bukkit.getEntity(mobId)
             if (entity != null && entity.isValid && !entity.isDead) {
                 if (smoke) {
                     spawnSmoke(entity.location)
                 }
             }
-            mobService.despawnTrackedMob(mobId)
+            if (wasEntityMob) {
+                mobService.despawnTrackedEntityMob(mobId)
+            } else {
+                mobService.despawnTrackedMob(mobId)
+            }
             session.barrierDefenseMobIds.remove(mobId)
         }
     }
