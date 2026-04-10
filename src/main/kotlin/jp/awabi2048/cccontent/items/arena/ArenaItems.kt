@@ -2,8 +2,11 @@ package jp.awabi2048.cccontent.items.arena
 
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.CustomItemI18n
+import jp.awabi2048.cccontent.items.CustomItemManager
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
+import org.bukkit.enchantments.Enchantment
+import org.bukkit.inventory.ItemFlag
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
@@ -501,7 +504,7 @@ object ArenaEnchantShardRegistry {
 }
 
 class ArenaEnchantShardItem : ArenaSimpleItem(
-    material = Material.BLAZE_POWDER,
+    material = Material.RESIN_CLUMP,
     modelData = null,
     id = "enchant_shard",
     displayName = "§bエンチャントシャード",
@@ -521,15 +524,26 @@ class ArenaEnchantShardItem : ArenaSimpleItem(
 
     companion object {
         fun createShard(player: Player?, definition: ArenaEnchantShardDefinition, amount: Int = 1): ItemStack {
-            val item = ItemStack(materialForMode(definition.shard.mode), amount.coerceAtLeast(1))
+            val item = CustomItemManager.createItemForPlayer(ArenaEnchantShardItem(), player, amount.coerceAtLeast(1))
+            item.type = materialForShard(definition)
             val meta = item.itemMeta ?: return item
+            applyShardPresentation(meta, definition)
+            applyShardData(meta, definition)
+            item.itemMeta = meta
+            return item
+        }
+
+        private fun applyShardPresentation(meta: ItemMeta, definition: ArenaEnchantShardDefinition) {
             meta.displayName(Component.text("§bエンチャントシャード§8【§d${definition.enchantLabel}§8】"))
             meta.lore(buildLore(definition).map { Component.text(it) })
             meta.setMaxStackSize(1)
+            meta.addEnchant(Enchantment.UNBREAKING, 1, true)
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS)
+        }
+
+        private fun applyShardData(meta: ItemMeta, definition: ArenaEnchantShardDefinition) {
             meta.persistentDataContainer.set(arenaItemKey, PersistentDataType.STRING, "enchant_shard")
             ArenaEnchantShardData.apply(meta, definition)
-            item.itemMeta = meta
-            return item
         }
 
         private fun buildLore(definition: ArenaEnchantShardDefinition): List<String> {
@@ -560,9 +574,13 @@ class ArenaEnchantShardItem : ArenaSimpleItem(
             }
         }
 
-        private fun materialForMode(mode: ArenaOverEnchanterMode): Material {
-            return when (mode) {
-                ArenaOverEnchanterMode.LIMIT_BREAKING -> Material.BLAZE_POWDER
+        private fun materialForShard(definition: ArenaEnchantShardDefinition): Material {
+            return when (definition.shard.mode) {
+                ArenaOverEnchanterMode.LIMIT_BREAKING -> when ((definition.shard.overLevel ?: 1).coerceAtLeast(1)) {
+                    1 -> Material.RESIN_CLUMP
+                    2 -> Material.AMETHYST_SHARD
+                    else -> Material.ECHO_SHARD
+                }
                 ArenaOverEnchanterMode.OVER_STACKING -> Material.FERMENTED_SPIDER_EYE
                 ArenaOverEnchanterMode.EXOTIC_ATTACH -> Material.NETHER_STAR
             }
