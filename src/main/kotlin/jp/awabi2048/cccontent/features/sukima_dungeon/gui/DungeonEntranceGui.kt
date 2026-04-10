@@ -5,6 +5,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureLoader
 import jp.awabi2048.cccontent.features.sukima_dungeon.LangManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.PlayerDataManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
+import jp.awabi2048.cccontent.util.ContentLocaleResolver
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -129,7 +130,7 @@ class DungeonEntranceGui(private val loader: StructureLoader, val tier: DungeonT
             // ---------------------------------------------
             // Slot 40: Info
             // ---------------------------------------------
-            val sizeName = LangManager.getMessage(PlayerDataManager.getPlayerData(player).lang, "sizes.$sizeKey")
+            val sizeName = LangManager.getMessage(ContentLocaleResolver.resolve(player), "sizes.$sizeKey")
             val infoItem = createGuiItem(Material.SPYGLASS, 
                 "§aInfo", 
                 bar,
