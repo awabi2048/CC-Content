@@ -1145,11 +1145,13 @@ custom_items:
       start_success: '&a{player} のアリーナを開始しました (mob_type={mob_type}, difficulty={difficulty}, theme={theme}, waves={waves})'
       stop_success: '&a{player} のアリーナを停止しました'
       stop_not_in_session: '&e{player} はアリーナセッションに参加していません'
+      license_set_success: '&a{player} のライセンスを {tier} に設定しました'
       theme_none: '&e利用可能なテーマがありません'
       theme_list: '&6[Arena] 利用可能テーマ: {themes}'
       usage:
         start: '&c使用法: /arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
         stop: '&c使用法: /arenaa stop <player>'
+        license: '&c使用法: /arenaa license set <player> <paper|bronze|silver|gold>'
         theme: '&c使用法: /arenaa theme list'
       start_error:
         lift_not_ready: '&cリフトの準備ができていないため開始できません'
@@ -1160,6 +1162,7 @@ custom_items:
         header: '&6=== Arena 管理コマンド ==='
         start: '&f/arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
         stop: '&f/arenaa stop <player>'
+        license: '&f/arenaa license set <player> <paper|bronze|silver|gold>'
         theme: '&f/arenaa theme list'
         broadcast: '&f/arenaa broadcast'
         menu: '&f/arenaa menu'

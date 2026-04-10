@@ -140,6 +140,13 @@ class ArenaMissionService(
         return getPlayerData(playerId).totalOverEnchantSuccessCount.coerceAtLeast(0)
     }
 
+    fun setLicenseTier(playerId: UUID, licenseTier: ArenaLicenseTier): ArenaLicenseTier {
+        val playerData = getPlayerData(playerId)
+        playerData.licenseTier = licenseTier
+        savePlayerData(playerId)
+        return playerData.licenseTier
+    }
+
     private fun openMenu(player: Player, dateKey: String): Boolean {
         return try {
             val missionSet = ensureMissionSet(dateKey)

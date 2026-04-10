@@ -530,11 +530,13 @@ arena:
       start_success: '&aStarted arena for {player} (mob_type={mob_type}, difficulty={difficulty}, theme={theme}, waves={waves})'
       stop_success: '&aStopped arena for {player}'
       stop_not_in_session: '&e{player} is not in an arena session'
+      license_set_success: '&aSet {player}''s license to {tier}'
       theme_none: '&eNo themes are available'
       theme_list: '&6[Arena] Available themes: {themes}'
       usage:
         start: '&cUsage: /arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
         stop: '&cUsage: /arenaa stop <player>'
+        license: '&cUsage: /arenaa license set <player> <paper|bronze|silver|gold>'
         theme: '&cUsage: /arenaa theme list'
       start_error:
         lift_not_ready: '&cCannot start because the lift is not ready'
@@ -545,6 +547,7 @@ arena:
         header: '&6=== Arena Admin Commands ==='
         start: '&f/arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
         stop: '&f/arenaa stop <player>'
+        license: '&f/arenaa license set <player> <paper|bronze|silver|gold>'
         theme: '&f/arenaa theme list'
         broadcast: '&f/arenaa broadcast'
         menu: '&f/arenaa menu'

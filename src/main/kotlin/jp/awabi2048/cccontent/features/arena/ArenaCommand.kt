@@ -6,6 +6,7 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Player
+import jp.awabi2048.cccontent.features.arena.mission.ArenaLicenseTier
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionModifiers
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
@@ -40,6 +41,7 @@ class ArenaCommand(
             "menu" -> handleMenu(sender)
             "start" -> handleStart(sender, args)
             "stop" -> handleStop(sender, args)
+            "license" -> handleLicense(sender, args)
             "theme" -> handleTheme(sender, args)
             "broadcast" -> handleBroadcast(sender)
             "pedestal" -> handlePedestal(sender)
@@ -257,6 +259,56 @@ class ArenaCommand(
         return true
     }
 
+    private fun handleLicense(sender: CommandSender, args: Array<out String>): Boolean {
+        if (args.size != 4 || !args[1].equals("set", ignoreCase = true)) {
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.usage.license",
+                    "&c使用法: /arenaa license set <player> <paper|bronze|silver|gold>"
+                )
+            )
+            return true
+        }
+
+        val target = Bukkit.getPlayer(args[2])
+        if (target == null) {
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found", "&c対象プレイヤーが見つかりません"))
+            return true
+        }
+
+        val service = missionService
+        if (service == null) {
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable", "§cArena feature は初期化に失敗したため利用できません"))
+            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "§7理由: {reason}", "reason" to it)) }
+            return true
+        }
+
+        val licenseTier = ArenaLicenseTier.fromId(args[3])
+        if (licenseTier == null) {
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.usage.license",
+                    "&c使用法: /arenaa license set <player> <paper|bronze|silver|gold>"
+                )
+            )
+            return true
+        }
+
+        val updatedTier = service.setLicenseTier(target.uniqueId, licenseTier)
+        sender.sendMessage(
+            ArenaI18n.text(
+                sender,
+                "arena.messages.command.license_set_success",
+                "&a{player} のライセンスを {tier} に設定しました",
+                "player" to target.name,
+                "tier" to ArenaI18n.text(sender, updatedTier.displayNameKey, updatedTier.id)
+            )
+        )
+        return true
+    }
+
     private fun handleBroadcast(sender: CommandSender): Boolean {
         val player = sender as? Player
         if (player == null) {
@@ -296,6 +348,7 @@ class ArenaCommand(
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.menu", "&f/arenaa menu"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s|@near> <star_count> <theme> <mission_type>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop", "&f/arenaa stop <player>"))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.license", "&f/arenaa license set <player> <paper|bronze|silver|gold>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.theme", "&f/arenaa theme list"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.broadcast", "&f/arenaa broadcast"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.pedestal", "&f/arenaa pedestal"))
@@ -311,20 +364,31 @@ class ArenaCommand(
         if (!featureEnabledProvider()) return emptyList()
 
         return when (args.size) {
-            1 -> listOf("menu", "start", "stop", "theme", "broadcast", "pedestal").filter { it.startsWith(args[0], ignoreCase = true) }
+            1 -> listOf("menu", "start", "stop", "license", "theme", "broadcast", "pedestal").filter { it.startsWith(args[0], ignoreCase = true) }
             2 -> when (args[0].lowercase()) {
                 "menu" -> emptyList()
                 "start" -> listOf("@s", "@near") + Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], ignoreCase = true) }
                 "stop" -> arenaManagerProvider()?.getActiveSessionPlayerNames()?.filter { it.startsWith(args[1], ignoreCase = true) } ?: emptyList()
+                "license" -> listOf("set").filter { it.startsWith(args[1], ignoreCase = true) }
                 "theme" -> listOf("list").filter { it.startsWith(args[1], ignoreCase = true) }
                 else -> emptyList()
             }
             3 -> when (args[0].lowercase()) {
                 "start" -> listOf("1", "2", "3", "4").filter { it.startsWith(args[2], ignoreCase = true) }
+                "license" -> if (args[1].equals("set", ignoreCase = true)) {
+                    Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[2], ignoreCase = true) }
+                } else {
+                    emptyList()
+                }
                 else -> emptyList()
             }
             4 -> when (args[0].lowercase()) {
                 "start" -> arenaManagerProvider()?.getThemeIds()?.filter { it.startsWith(args[3], ignoreCase = true) } ?: emptyList()
+                "license" -> if (args[1].equals("set", ignoreCase = true)) {
+                    ArenaLicenseTier.entries.map { it.id }.filter { it.startsWith(args[3], ignoreCase = true) }
+                } else {
+                    emptyList()
+                }
                 else -> emptyList()
             }
             5 -> when (args[0].lowercase()) {
