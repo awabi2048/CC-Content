@@ -1796,7 +1796,7 @@ private const val SHULKER_MIMIC_HEAD_TEXTURE =
 
 class ShulkerMimicMobType : AbilityMobType(
     id = "shulker_mimic",
-    baseEntityType = EntityType.GUARDIAN,
+    baseEntityType = EntityType.SLIME,
     abilities = listOf(
         ShulkerMimicBoltAbility(
             id = "shulker_mimic_bolt",
