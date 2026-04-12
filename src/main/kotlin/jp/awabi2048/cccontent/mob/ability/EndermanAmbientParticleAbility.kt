@@ -10,6 +10,7 @@ class EndermanAmbientParticleAbility(
     private val intervalTicks: Long = 2L,
     private val portalCount: Int = 3,
     private val dustCount: Int = 2,
+    private val smokeCount: Int = 0,
     private val innerColor: Color,
     private val outerColor: Color,
     private val dustSize: Float = 0.85f
@@ -46,5 +47,8 @@ class EndermanAmbientParticleAbility(
             0.0,
             Particle.DustTransition(innerColor, outerColor, dustSize)
         )
+        if (smokeCount > 0) {
+            world.spawnParticle(Particle.SMOKE, center, smokeCount, 0.22, 0.18, 0.22, 0.01)
+        }
     }
 }

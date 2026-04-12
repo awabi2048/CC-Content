@@ -29,8 +29,8 @@ ruins:
   max_summon_count: 10
   clear_mob_count: 20
   door_open_sound:
-    key: minecraft:block.iron_door.open
-    pitch: 1.0
+    key: minecraft:block.wood.break
+    pitch: 0.5
   mobs:
     zombie_normal:
       weight: 8
@@ -86,8 +86,8 @@ desert_temple:
   max_summon_count: 10
   clear_mob_count: 20
   door_open_sound:
-    key: minecraft:block.iron_door.open
-    pitch: 1.0
+    key: minecraft:block.sand.break
+    pitch: 0.5
   mobs:
     husk_normal:
       weight: 8
@@ -167,8 +167,8 @@ ocean_monument:
   max_summon_count: 10
   clear_mob_count: 20
   door_open_sound:
-    key: minecraft:block.iron_door.open
-    pitch: 1.0
+    key: minecraft:item.bucket.empty
+    pitch: 0.5
   mobs:
     drowned_unarmed:
       weight: 8
@@ -214,8 +214,8 @@ natura:
   max_summon_count: 10
   clear_mob_count: 20
   door_open_sound:
-    key: minecraft:block.iron_door.open
-    pitch: 1.0
+    key: minecraft:block.stone.break
+    pitch: 0.8
   mobs:
     zombie_normal:
       weight: 8
@@ -360,18 +360,18 @@ nether:
 end:
   weight: 1
   base_difficulty_star: 3
-  icon: END_STONE
-  max_summon_count: 10
-  clear_mob_count: 20
+  icon: PURPUR_PILLAR
+  max_summon_count: 5
+  clear_mob_count: 10
   door_open_sound:
-    key: minecraft:block.end_portal.spawn
-    pitch: 1.0
+    key: minecraft:block.glass.break
+    pitch: 0.66
   mobs:
     wither_ghost:
       weight: 4
       wave: 1..5
     enderman_mist_delay:
-      weight: 2
+      weight: 1
       wave: 1..1
     endermite_poison:
       weight: 1
@@ -380,19 +380,19 @@ end:
       weight: 4
       wave: 2..5
     enderman_small_backstab:
-      weight: 2
+      weight: 1
       wave: 2..2
     enderman_void_carrier:
-      weight: 2
+      weight: 1
       wave: 2..2
     shulker_mimic:
       weight: 1
       wave: 2..4
     enderman_rift_carrier:
-      weight: 2
+      weight: 1
       wave: 3..3
     enderman_grave_carrier:
-      weight: 2
+      weight: 1
       wave: 3..3
     raiden_creeper:
       weight: 1
@@ -404,19 +404,19 @@ end:
       weight: 1
       wave: 5..5
     enderman_phase:
-      weight: 2
+      weight: 1
       wave: 4..4
     enderman_drain:
-      weight: 2
+      weight: 1
       wave: 4..4
     ender_eye_beam:
       weight: 1
       wave: 5..5
     enderman_mirror:
-      weight: 2
+      weight: 1
       wave: 5..5
     enderman_eye_summoner:
-      weight: 2
+      weight: 1
       wave: 5..5
   orientation:
     entrance_exit: north

@@ -137,7 +137,8 @@ open class EquipmentMobType(
             "enderman_grave_carrier" to 1.0,
             "end_wither_sentinel" to 0.5,
             "endermite_poison" to 1.5,
-            "wither_ghost" to 0.8,
+            "wither_knight" to 1.1,
+            "wither_ghost" to 0.95,
         )
     }
 }

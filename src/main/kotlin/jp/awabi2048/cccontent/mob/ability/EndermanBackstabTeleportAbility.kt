@@ -4,6 +4,7 @@ import jp.awabi2048.cccontent.mob.MobDamagedContext
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import org.bukkit.Location
 import org.bukkit.Particle
+import org.bukkit.Sound
 import org.bukkit.attribute.Attribute
 import org.bukkit.entity.Player
 import org.bukkit.entity.Projectile
@@ -16,7 +17,9 @@ class EndermanBackstabTeleportAbility(
     private val triggerChance: Double = 0.28,
     private val behindDistance: Double = 1.8,
     private val cooldownTicks: Long = 60L,
-    private val healPercentOfMaxHealth: Double = 0.06
+    private val healPercentOfMaxHealth: Double = 0.06,
+    private val teleportSoundVolume: Float = 1.0f,
+    private val teleportSoundPitch: Float = 2.0f
 ) : MobAbility {
 
     data class Runtime(var cooldownRemainingTicks: Long = 0L) : MobAbilityRuntime
@@ -50,10 +53,10 @@ class EndermanBackstabTeleportAbility(
             ?: return
 
         val world = context.entity.world
-        EndThemeEffects.playTeleportSound(world, context.entity.location)
+        world.playSound(context.entity.location, Sound.ENTITY_ENDERMAN_TELEPORT, teleportSoundVolume, teleportSoundPitch)
         world.spawnParticle(Particle.PORTAL, context.entity.location.clone().add(0.0, 1.0, 0.0), 26, 0.45, 0.45, 0.45, 0.02)
         context.entity.teleport(destination)
-        EndThemeEffects.playTeleportSound(world, destination)
+        world.playSound(destination, Sound.ENTITY_ENDERMAN_TELEPORT, teleportSoundVolume, teleportSoundPitch)
         world.spawnParticle(Particle.PORTAL, destination.clone().add(0.0, 1.0, 0.0), 22, 0.35, 0.35, 0.35, 0.02)
 
         val maxHealth = context.entity.getAttribute(Attribute.MAX_HEALTH)?.value ?: context.entity.maxHealth

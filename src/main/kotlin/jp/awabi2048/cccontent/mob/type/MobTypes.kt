@@ -3,6 +3,10 @@ package jp.awabi2048.cccontent.mob.type
 import com.destroystokyo.paper.profile.ProfileProperty
 import com.destroystokyo.paper.entity.ai.VanillaGoal
 import jp.awabi2048.cccontent.mob.CustomMobRuntime
+import jp.awabi2048.cccontent.mob.MobDamagedContext
+import jp.awabi2048.cccontent.mob.MobDeathContext
+import jp.awabi2048.cccontent.mob.MobCombustContext
+import jp.awabi2048.cccontent.mob.MobGenericDamagedContext
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import jp.awabi2048.cccontent.mob.MobSpawnContext
 import jp.awabi2048.cccontent.mob.ability.AreaEffectPulseAbility
@@ -55,6 +59,7 @@ import jp.awabi2048.cccontent.mob.ability.EndermanStrikeWarpAbility
 import jp.awabi2048.cccontent.mob.ability.EndermanAmbientParticleAbility
 import jp.awabi2048.cccontent.mob.ability.EndermanBackstabTeleportAbility
 import jp.awabi2048.cccontent.mob.ability.EndermanMistDelayTeleportAbility
+import jp.awabi2048.cccontent.mob.ability.WitherGhostTeleportAbility
 import jp.awabi2048.cccontent.mob.ability.EndermitePoisonAssaultAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerCarrierArtilleryAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerBurstShotAbility
@@ -77,6 +82,7 @@ import org.bukkit.Particle
 import org.bukkit.Sound
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.Material
+import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.Creeper
 import org.bukkit.entity.Zombie
@@ -1141,6 +1147,23 @@ class WitherKnightMobType : EquipmentMobType(
             horizontalSpeed = 0.92,
             verticalSpeed = 0.34,
             requireDirectMelee = true
+        ),
+        EndermanAmbientParticleAbility(
+            id = "wither_knight_ambient",
+            intervalTicks = 2L,
+            portalCount = 4,
+            dustCount = 2,
+            smokeCount = 2,
+            innerColor = Color.fromRGB(96, 38, 156),
+            outerColor = Color.fromRGB(0, 0, 0),
+            dustSize = 0.82f
+        ),
+        EndermanBackstabTeleportAbility(
+            id = "wither_knight_teleport",
+            triggerChance = 0.28,
+            behindDistance = 1.8,
+            cooldownTicks = 60L,
+            healPercentOfMaxHealth = 0.06
         )
     ),
     defaultMainHand = Material.DIAMOND_HOE,
@@ -1151,24 +1174,87 @@ class WitherGhostMobType : EquipmentMobType(
     id = "wither_ghost",
     baseEntityType = EntityType.ZOMBIE,
     abilities = listOf(
-        LeapAbility(
-            id = "wither_ghost_leap",
-            cooldownTicks = 64L,
-            minRangeSquared = 9.0,
-            maxRange = 8.0,
-            horizontalSpeed = 1.12,
-            verticalSpeed = 0.56
+        EndermanAmbientParticleAbility(
+            id = "wither_ghost_ambient",
+            intervalTicks = 2L,
+            portalCount = 4,
+            dustCount = 2,
+            smokeCount = 2,
+            innerColor = Color.fromRGB(96, 38, 156),
+            outerColor = Color.fromRGB(0, 0, 0),
+            dustSize = 0.82f
         ),
-        AttackBackstepAbility(
-            id = "wither_ghost_attack_backstep",
-            cooldownTicks = 50L,
-            horizontalSpeed = 0.90,
-            verticalSpeed = 0.32,
-            requireDirectMelee = true
+        WitherGhostTeleportAbility(id = "wither_ghost_periodic_teleport"),
+        EndermanBackstabTeleportAbility(
+            id = "wither_ghost_teleport",
+            triggerChance = 0.28,
+            behindDistance = 1.8,
+            cooldownTicks = 60L,
+            healPercentOfMaxHealth = 0.06,
+            teleportSoundPitch = 0.6f
         )
     )
 ) {
     override val rewardCategoryId: String = "wither_skeleton"
+
+    override fun onCombust(context: MobCombustContext, runtime: CustomMobRuntime?) {
+        context.event.isCancelled = true
+        super.onCombust(context, runtime)
+    }
+
+    override fun onGenericDamaged(context: MobGenericDamagedContext, runtime: CustomMobRuntime?) {
+        if (FIRE_DAMAGE_CAUSES.contains(context.event.cause)) {
+            context.event.isCancelled = true
+        }
+        super.onGenericDamaged(context, runtime)
+    }
+
+    override fun onTick(context: MobRuntimeContext, runtime: CustomMobRuntime?) {
+        val zombie = context.entity as? Zombie
+        if (zombie != null) {
+            zombie.fireTicks = 0
+        }
+
+        val abilityRuntime = (runtime as? AbilityMobType.Runtime)?.abilityRuntimes
+            ?.filterIsInstance<WitherGhostTeleportAbility.Runtime>()
+            ?.firstOrNull()
+        if (abilityRuntime != null && abilityRuntime.lastTeleportTick >= 0L) {
+            val elapsed = context.activeMob.tickCount - abilityRuntime.lastTeleportTick
+            val fadeOutTicks = 20L
+            val fadeInTicks = 100L
+            val totalTicks = fadeOutTicks + fadeInTicks
+            if (elapsed < totalTicks) {
+                val t: Double = if (elapsed <= fadeOutTicks) {
+                    (elapsed.toDouble() / fadeOutTicks.toDouble()).coerceIn(0.0, 1.0)
+                } else {
+                    1.0 - ((elapsed - fadeOutTicks).toDouble() / fadeInTicks.toDouble()).coerceIn(0.0, 1.0)
+                }
+                val equipment = context.entity.equipment
+                if (equipment != null) {
+                    updateLeatherColor(equipment.chestplate, CHESTPLATE_COLOR, t)
+                    updateLeatherColor(equipment.leggings, LEGGINGS_COLOR, t)
+                    updateLeatherColor(equipment.boots, BOOTS_COLOR, t)
+                }
+            }
+        }
+
+        super.onTick(context, runtime)
+    }
+
+    override fun onDamaged(context: MobDamagedContext, runtime: CustomMobRuntime?) {
+        if (context.event.isCancelled) return
+        if (context.event.finalDamage <= 0.0) return
+        val loc = context.entity.location.clone().add(0.0, 0.5, 0.0)
+        context.entity.world.playSound(loc, Sound.BLOCK_CREAKING_HEART_BREAK, 0.9f, 0.8f)
+        context.entity.world.playSound(loc, Sound.ENTITY_ENDERMAN_HURT, 1.0f, 1.3f)
+        super.onDamaged(context, runtime)
+    }
+
+    override fun onDeath(context: MobDeathContext, runtime: CustomMobRuntime?) {
+        val loc = context.entity.location.clone().add(0.0, 0.5, 0.0)
+        context.entity.world.playSound(loc, Sound.ENTITY_GUARDIAN_DEATH, 1.0f, 1.6f)
+        super.onDeath(context, runtime)
+    }
 
     override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
         val zombie = context.entity as? Zombie ?: return
@@ -1176,6 +1262,7 @@ class WitherGhostMobType : EquipmentMobType(
         zombie.isSilent = true
         zombie.isPersistent = true
         zombie.isBaby = false
+        zombie.fireTicks = 0
         super.onSpawn(context, runtime)
     }
 
@@ -1187,16 +1274,40 @@ class WitherGhostMobType : EquipmentMobType(
         equipment.helmet = skullHeadItem(
             "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZjRiYWRlZjYzZTE1YzM5N2UyMTE1MDcwZTJiYmQwMDIxNDQ3NjRjNDQxZWJkZjg4YzAxZWFhYmY5YTc2NzY0NSJ9fX0="
         )
-        equipment.chestplate = coloredLeatherArmor(Material.LEATHER_CHESTPLATE, Color.fromRGB(124, 74, 219))
-        equipment.leggings = coloredLeatherArmor(Material.LEATHER_LEGGINGS, Color.fromRGB(92, 44, 163))
-        equipment.boots = coloredLeatherArmor(Material.LEATHER_BOOTS, Color.fromRGB(60, 27, 109))
+        equipment.chestplate = coloredLeatherArmor(Material.LEATHER_CHESTPLATE, CHESTPLATE_COLOR)
+        equipment.leggings = coloredLeatherArmor(Material.LEATHER_LEGGINGS, LEGGINGS_COLOR)
+        equipment.boots = coloredLeatherArmor(Material.LEATHER_BOOTS, BOOTS_COLOR)
 
         equipment.helmetDropChance = 0.0f
         equipment.chestplateDropChance = 0.0f
         equipment.leggingsDropChance = 0.0f
         equipment.bootsDropChance = 0.0f
     }
+
+    companion object {
+        private val CHESTPLATE_COLOR = Color.fromRGB(124, 74, 219)
+        private val LEGGINGS_COLOR = Color.fromRGB(92, 44, 163)
+        private val BOOTS_COLOR = Color.fromRGB(60, 27, 109)
+        private val BLACK = Color.fromRGB(8, 2, 14)
+
+        private fun updateLeatherColor(item: ItemStack?, original: Color, t: Double) {
+            val meta = item?.itemMeta as? LeatherArmorMeta ?: return
+            val r = (BLACK.red + (original.red - BLACK.red) * t).toInt().coerceIn(0, 255)
+            val g = (BLACK.green + (original.green - BLACK.green) * t).toInt().coerceIn(0, 255)
+            val b = (BLACK.blue + (original.blue - BLACK.blue) * t).toInt().coerceIn(0, 255)
+            meta.setColor(Color.fromRGB(r, g, b))
+            item.itemMeta = meta
+        }
+    }
 }
+
+private val FIRE_DAMAGE_CAUSES = setOf(
+    EntityDamageEvent.DamageCause.FIRE,
+    EntityDamageEvent.DamageCause.FIRE_TICK,
+    EntityDamageEvent.DamageCause.LAVA,
+    EntityDamageEvent.DamageCause.HOT_FLOOR,
+    EntityDamageEvent.DamageCause.CAMPFIRE
+)
 
 class EndWitherSentinelMobType : EquipmentMobType(
     id = "end_wither_sentinel",
