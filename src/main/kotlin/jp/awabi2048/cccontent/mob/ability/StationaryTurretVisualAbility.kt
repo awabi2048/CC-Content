@@ -67,12 +67,7 @@ class StationaryTurretVisualAbility(
         headDisplay.interpolationDuration = 2
         headDisplay.teleportDuration = 2
         headDisplay.brightness = Display.Brightness(15, 15)
-        headDisplay.transformation = Transformation(
-            Vector3f(0f, 0f, 0f),
-            Quaternionf(),
-            Vector3f(headScale, headScale, headScale),
-            Quaternionf()
-        )
+        headDisplay.transformation = headDisplayTransformation(headScale)
         headDisplay.addScoreboardTag("cc.mob.ender_shooter_head")
         rt.headDisplayId = headDisplay.uniqueId
 

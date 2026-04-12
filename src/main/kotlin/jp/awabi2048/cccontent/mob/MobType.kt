@@ -8,6 +8,8 @@ interface CustomMobRuntime
 interface MobType {
     val id: String
     val baseEntityType: EntityType
+    val rewardCategoryId: String
+        get() = MobRewardCategory.resolveEntityCategoryId(baseEntityType)
     val isCustom: Boolean
         get() = true
 
@@ -35,6 +37,8 @@ interface MobType {
 interface EntityMobType {
     val id: String
     val baseEntityType: EntityType
+    val rewardCategoryId: String
+        get() = MobRewardCategory.resolveEntityCategoryId(baseEntityType)
     val isCustom: Boolean
         get() = true
 

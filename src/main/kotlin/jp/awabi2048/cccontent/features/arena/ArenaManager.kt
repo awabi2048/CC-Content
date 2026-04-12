@@ -2784,20 +2784,19 @@ class ArenaManager(
 
     private fun resolveMobTokenCategoryTypeId(mobTypeId: String): String {
         val normalized = sanitizeMobTypeId(mobTypeId)
-        when (normalized) {
-            "ashen_spirit", "water_spirit", "water_spirit_elite" -> return "spirit"
-        }
+        mobService.resolveRewardCategoryId(normalized)?.let { return it }
+
         val baseEntityType = mobService.resolveMobType(normalized)?.baseEntityType
         if (baseEntityType != null) {
-            return sanitizeMobTypeId(baseEntityType.name)
+            return ArenaMobTokenItem.resolveTokenCategoryTypeId(baseEntityType.name)
         }
 
         val fallbackEntityType = runCatching { EntityType.valueOf(normalized.uppercase(Locale.ROOT)) }.getOrNull()
         if (fallbackEntityType != null) {
-            return sanitizeMobTypeId(fallbackEntityType.name)
+            return ArenaMobTokenItem.resolveTokenCategoryTypeId(fallbackEntityType.name)
         }
 
-        return normalized
+        return ArenaMobTokenItem.resolveTokenCategoryTypeId(normalized)
     }
 
     private fun sanitizeMobTypeId(typeId: String): String {

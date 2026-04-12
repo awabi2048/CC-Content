@@ -306,8 +306,11 @@ object ArenaEnchantShardRegistry {
         "drowned_raider_axe", "water_spirit", "water_spirit_elite", "ashen_spirit", "frog_big", "blaze_normal",
         "blaze_power", "blaze_rapid", "blaze_melee", "blaze_beam", "magma_cube_large", "magma_cube_medium",
         "magma_cube_small", "magma_cube_mini", "wither_skeleton_swap", "wither_skeleton_bow_guard",
-        "wither_skeleton_wither_boomerang", "witch_normal", "witch_elite", "bat_venom", "enderman_mist_delay",
-        "enderman_small_backstab", "endermite_poison", "shulker_turret_sniper", "shulker_turret_barrage", "ender_eye_beam"
+        "wither_skeleton_wither_boomerang", "wither_knight", "wither_ghost", "end_crystal_sentinel",
+        "end_wither_sentinel", "witch_normal", "witch_elite", "bat_venom", "enderman_mist_delay",
+        "enderman_small_backstab", "enderman_void_carrier", "enderman_phase", "enderman_drain", "enderman_rift_carrier",
+        "enderman_grave_carrier", "enderman_mirror", "enderman_eye_summoner", "endermite_poison",
+        "shulker_mimic", "ender_eye_beam"
     )
 
     private val UNDEAD_MOB_DEFINITION_IDS = setOf(
@@ -317,7 +320,8 @@ object ArenaEnchantShardRegistry {
         "skeleton_throw_close", "bogged_plain", "bogged_normal", "bogged_rapid", "bogged_curve_backstep",
         "bogged_heavy_bow_shield", "bogged_throw_close", "bogged_boomerang", "stray_plain", "stray_normal", "stray_rapid",
         "stray_curve_backstep", "stray_heavy_bow_shield", "stray_throw_close", "drowned_unarmed", "drowned_trident_guard",
-        "drowned_raider_axe", "wither_skeleton_swap", "wither_skeleton_bow_guard", "wither_skeleton_wither_boomerang"
+        "drowned_raider_axe", "wither_skeleton_swap", "wither_skeleton_bow_guard", "wither_skeleton_wither_boomerang",
+        "wither_knight", "wither_ghost", "end_wither_sentinel"
     )
 
     private val ARTHROPOD_MOB_DEFINITION_IDS = setOf(
@@ -339,7 +343,8 @@ object ArenaEnchantShardRegistry {
         "bogged_rapid", "bogged_curve_backstep", "bogged_heavy_bow_shield", "bogged_throw_close", "bogged_boomerang",
         "stray_plain", "stray_normal", "stray_rapid", "stray_curve_backstep", "stray_heavy_bow_shield", "stray_throw_close",
         "iron_golem_normal", "iron_golem_magnet", "drowned_unarmed", "drowned_trident_guard", "drowned_raider_axe",
-        "wither_skeleton_swap", "wither_skeleton_bow_guard", "wither_skeleton_wither_boomerang", "blaze_melee"
+        "wither_skeleton_swap", "wither_skeleton_bow_guard", "wither_skeleton_wither_boomerang", "wither_knight",
+        "wither_ghost", "blaze_melee"
     )
 
     private val NETHER_EQUIPPED_MOB_DEFINITION_IDS = setOf(
@@ -364,7 +369,7 @@ object ArenaEnchantShardRegistry {
     private val GUARDIAN_MOB_DEFINITION_IDS = setOf("guardian_normal", "guardian_small", "guardian_beam_burst", "guardian_drain")
     private val SLIME_MOB_DEFINITION_IDS = setOf("slime_merge_small", "slime_merge_medium", "slime_merge_large", "slime_merge_mini", "slime_poison", "slime_wither")
     private val BLAZE_MOB_DEFINITION_IDS = setOf("blaze_normal", "blaze_power", "blaze_rapid", "blaze_melee", "blaze_beam")
-    private val SHULKER_MOB_DEFINITION_IDS = setOf("shulker_turret_sniper", "shulker_turret_barrage")
+    private val SHULKER_MOB_DEFINITION_IDS = setOf("shulker_mimic")
     private val CREEPER_MOB_DEFINITION_IDS = setOf("raiden_creeper")
 
     private fun lb(key: String, enchantId: String, label: String, overLevel: Int, mobIds: Set<String>, chance: Double) =

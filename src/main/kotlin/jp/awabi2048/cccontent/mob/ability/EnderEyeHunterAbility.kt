@@ -96,12 +96,7 @@ class EnderEyeHunterAbility(
         display.interpolationDuration = 1
         display.teleportDuration = 1
         display.brightness = Display.Brightness(15, 15)
-        display.transformation = Transformation(
-            Vector3f(0f, 0f, 0f),
-            Quaternionf(),
-            Vector3f(1.6f, 1.6f, 1.6f),
-            Quaternionf()
-        )
+        display.transformation = headDisplayTransformation(1.6f)
         display.addScoreboardTag("cc.mob.ender_eye_display")
         rt.displayId = display.uniqueId
     }

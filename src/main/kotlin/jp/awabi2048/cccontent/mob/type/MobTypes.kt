@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.mob.type
 
+import com.destroystokyo.paper.profile.ProfileProperty
 import com.destroystokyo.paper.entity.ai.VanillaGoal
 import jp.awabi2048.cccontent.mob.CustomMobRuntime
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
@@ -61,6 +62,7 @@ import jp.awabi2048.cccontent.mob.ability.ShulkerCloseDefenseBarrageAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerProximitySparkZoneAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerEndRodLaserAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerSniperShotAbility
+import jp.awabi2048.cccontent.mob.ability.ShulkerMimicBoltAbility
 import jp.awabi2048.cccontent.mob.ability.ConeAttackAbility
 import jp.awabi2048.cccontent.mob.ability.AttackBackstepAbility
 import jp.awabi2048.cccontent.mob.ability.EndWitherSentinelAbility
@@ -77,10 +79,14 @@ import org.bukkit.enchantments.Enchantment
 import org.bukkit.Material
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.Creeper
+import org.bukkit.entity.Zombie
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
+import org.bukkit.inventory.meta.LeatherArmorMeta
+import org.bukkit.inventory.meta.SkullMeta
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
+import java.util.UUID
 import kotlin.random.Random
 
 class ZombieNormalMobType : EquipmentMobType(
@@ -1141,6 +1147,57 @@ class WitherKnightMobType : EquipmentMobType(
     defaultHelmetTexture = "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZmVlNGVhYmViNzJmMTkwODhhZGU3ODI2NjE5MWM4Zjc3Mzk4Y2MwZDgwY2RkMjc1NjNhNWQ2NmI3MTkxMmIyOCJ9fX0="
 )
 
+class WitherGhostMobType : EquipmentMobType(
+    id = "wither_ghost",
+    baseEntityType = EntityType.ZOMBIE,
+    abilities = listOf(
+        LeapAbility(
+            id = "wither_ghost_leap",
+            cooldownTicks = 64L,
+            minRangeSquared = 9.0,
+            maxRange = 8.0,
+            horizontalSpeed = 1.12,
+            verticalSpeed = 0.56
+        ),
+        AttackBackstepAbility(
+            id = "wither_ghost_attack_backstep",
+            cooldownTicks = 50L,
+            horizontalSpeed = 0.90,
+            verticalSpeed = 0.32,
+            requireDirectMelee = true
+        )
+    )
+) {
+    override val rewardCategoryId: String = "wither_skeleton"
+
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        val zombie = context.entity as? Zombie ?: return
+        zombie.isInvisible = true
+        zombie.isSilent = true
+        zombie.isPersistent = true
+        zombie.isBaby = false
+        super.onSpawn(context, runtime)
+    }
+
+    override fun applyDefaultEquipment(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        val equipment = context.entity.equipment ?: return
+        equipment.setItemInMainHand(ItemStack(Material.DIAMOND_HOE))
+        equipment.setItemInMainHandDropChance(0.0f)
+
+        equipment.helmet = skullHeadItem(
+            "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZjRiYWRlZjYzZTE1YzM5N2UyMTE1MDcwZTJiYmQwMDIxNDQ3NjRjNDQxZWJkZjg4YzAxZWFhYmY5YTc2NzY0NSJ9fX0="
+        )
+        equipment.chestplate = coloredLeatherArmor(Material.LEATHER_CHESTPLATE, Color.fromRGB(124, 74, 219))
+        equipment.leggings = coloredLeatherArmor(Material.LEATHER_LEGGINGS, Color.fromRGB(92, 44, 163))
+        equipment.boots = coloredLeatherArmor(Material.LEATHER_BOOTS, Color.fromRGB(60, 27, 109))
+
+        equipment.helmetDropChance = 0.0f
+        equipment.chestplateDropChance = 0.0f
+        equipment.leggingsDropChance = 0.0f
+        equipment.bootsDropChance = 0.0f
+    }
+}
+
 class EndWitherSentinelMobType : EquipmentMobType(
     id = "end_wither_sentinel",
     baseEntityType = EntityType.WITHER,
@@ -1734,33 +1791,21 @@ class EndermitePoisonMobType : EquipmentMobType(
     )
 )
 
-class ShulkerTurretSniperMobType : EquipmentMobType(
-    id = "shulker_turret_sniper",
-    baseEntityType = EntityType.SHULKER,
-    abilities = listOf(
-        ShulkerCarrierArtilleryAbility(
-            id = "shulker_turret_sniper_carrier",
-            teleportIntervalTicks = 170L,
-            prioritizeBarrierMarkerOnFinalWave = false
-        ),
-        ShulkerProximitySparkZoneAbility(id = "shulker_turret_sniper_zone_spark"),
-        ShulkerSniperShotAbility(id = "shulker_turret_sniper_shot")
-    )
-)
+private const val SHULKER_MIMIC_HEAD_TEXTURE =
+    "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvNTNkNGE2ZjAyMDhhMjZiNGQ3ZTE0ZGFiNzNiYmJhZmM4YzJhYmI2ODU2MDU3NzQxMDYxZDQxMzU4MzY3ZDY2ZiJ9fX0="
 
-class ShulkerTurretBarrageMobType : EquipmentMobType(
-    id = "shulker_turret_barrage",
-    baseEntityType = EntityType.SHULKER,
+class ShulkerMimicMobType : AbilityMobType(
+    id = "shulker_mimic",
+    baseEntityType = EntityType.GUARDIAN,
     abilities = listOf(
-        ShulkerCarrierArtilleryAbility(
-            id = "shulker_turret_barrage_carrier",
-            teleportIntervalTicks = 190L,
-            prioritizeBarrierMarkerOnFinalWave = false
-        ),
-        ShulkerProximitySparkZoneAbility(id = "shulker_turret_barrage_zone_spark"),
-        ShulkerCloseDefenseBarrageAbility(id = "shulker_turret_barrage_barrage")
+        ShulkerMimicBoltAbility(
+            id = "shulker_mimic_bolt",
+            headTextureValue = SHULKER_MIMIC_HEAD_TEXTURE
+        )
     )
-)
+) {
+    override val rewardCategoryId: String = "shulker"
+}
 
 class EnderEyeBeamMobType : EquipmentMobType(
     id = "ender_eye_beam",
@@ -1848,6 +1893,24 @@ private fun applyGlintBow(mainHand: ItemStack?) {
     val meta = item.itemMeta ?: return
     meta.addItemFlags(ItemFlag.HIDE_ENCHANTS)
     item.itemMeta = meta
+}
+
+private fun coloredLeatherArmor(material: Material, color: Color): ItemStack {
+    val item = ItemStack(material)
+    val meta = item.itemMeta as? LeatherArmorMeta ?: return item
+    meta.setColor(color)
+    item.itemMeta = meta
+    return item
+}
+
+private fun skullHeadItem(textureValue: String): ItemStack {
+    val item = ItemStack(Material.PLAYER_HEAD)
+    val meta = item.itemMeta as? SkullMeta ?: return item
+    val profile = Bukkit.createProfile(UUID.randomUUID(), "cc_static_head")
+    profile.setProperty(ProfileProperty("textures", textureValue))
+    meta.playerProfile = profile
+    item.itemMeta = meta
+    return item
 }
 
 private fun resolveMiningFatigueEffectType(): PotionEffectType? {

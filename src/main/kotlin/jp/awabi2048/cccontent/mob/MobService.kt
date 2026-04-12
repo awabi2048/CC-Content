@@ -91,20 +91,19 @@ import jp.awabi2048.cccontent.mob.type.EndermitePoisonMobType
 import jp.awabi2048.cccontent.mob.type.ShulkerRhythmMobType
 import jp.awabi2048.cccontent.mob.type.ShulkerLaserMobType
 import jp.awabi2048.cccontent.mob.type.ShulkerDisruptorMobType
-import jp.awabi2048.cccontent.mob.type.ShulkerTurretSniperMobType
-import jp.awabi2048.cccontent.mob.type.ShulkerTurretBarrageMobType
+import jp.awabi2048.cccontent.mob.type.ShulkerMimicMobType
 import jp.awabi2048.cccontent.mob.type.EnderEyeHunterMobType
 import jp.awabi2048.cccontent.mob.type.EnderEyeOrbitMobType
 import jp.awabi2048.cccontent.mob.type.EnderEyeBeamMobType
 import jp.awabi2048.cccontent.mob.type.EnderGhostMobType
 import jp.awabi2048.cccontent.mob.type.EnderShooterMobType
 import jp.awabi2048.cccontent.mob.type.EndCrystalSentinelMobType
+import jp.awabi2048.cccontent.mob.type.WitherGhostMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.ZombieLeapOnlyMobType
 import jp.awabi2048.cccontent.mob.type.ZombieNormalMobType
 import jp.awabi2048.cccontent.mob.type.ZombieShieldOnlyMobType
-import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
 import jp.awabi2048.cccontent.mob.ability.BoomerangService
 import jp.awabi2048.cccontent.mob.ability.HomingArrowService
 import jp.awabi2048.cccontent.mob.ability.ThrownWeaponService
@@ -160,6 +159,7 @@ import org.bukkit.damage.DamageSource
 import org.bukkit.damage.DamageType
 import kotlin.random.Random
 import java.io.File
+import java.util.Locale
 import java.util.UUID
 import java.util.WeakHashMap
 
@@ -356,8 +356,8 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(ShulkerRhythmMobType())
         registerMobType(ShulkerLaserMobType())
         registerMobType(ShulkerDisruptorMobType())
-        registerMobType(ShulkerTurretSniperMobType())
-        registerMobType(ShulkerTurretBarrageMobType())
+        registerMobType(WitherGhostMobType())
+        registerMobType(ShulkerMimicMobType())
         registerMobType(EnderEyeHunterMobType())
         registerMobType(EnderEyeOrbitMobType())
         registerMobType(EnderEyeBeamMobType())
@@ -400,6 +400,28 @@ class MobService(private val plugin: JavaPlugin) {
         }
 
         return VanillaEntityMobType(entityType.name, entityType)
+    }
+
+    fun resolveRewardCategoryId(typeId: String): String? {
+        val normalized = typeId.trim().lowercase(Locale.ROOT)
+        if (normalized.isBlank()) {
+            return null
+        }
+
+        customMobTypes[normalized]?.let { return it.rewardCategoryId }
+        customEntityMobTypes[normalized]?.let { return it.rewardCategoryId }
+
+        val entityType = try {
+            EntityType.valueOf(normalized.uppercase(Locale.ROOT))
+        } catch (_: IllegalArgumentException) {
+            return null
+        }
+
+        if (!entityType.isAlive) {
+            return null
+        }
+
+        return MobRewardCategory.resolveEntityCategoryId(entityType)
     }
 
     fun reloadDefinitions(): Map<String, MobDefinition> {
@@ -640,10 +662,7 @@ class MobService(private val plugin: JavaPlugin) {
 
     fun resolveCustomMobDisplayNameByDamager(damager: Entity, viewer: Player?): String? {
         val activeMob = resolveActiveMobByDamager(damager) ?: return null
-        val categoryId = when (activeMob.mobType.id) {
-            "ashen_spirit", "water_spirit", "water_spirit_elite" -> "spirit"
-            else -> ArenaMobTokenItem.resolveTokenCategoryTypeId(activeMob.mobType.baseEntityType.name)
-        }
+        val categoryId = activeMob.mobType.rewardCategoryId
         val key = "custom_items.arena.mob_token.token_names.$categoryId"
         return ArenaI18n.text(viewer, key, categoryId)
     }

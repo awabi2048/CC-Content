@@ -88,12 +88,7 @@ class EnderEyeBeamOrbitAbility(
         display.interpolationDuration = 1
         display.teleportDuration = 1
         display.brightness = Display.Brightness(15, 15)
-        display.transformation = Transformation(
-            Vector3f(0f, 0f, 0f),
-            Quaternionf(),
-            Vector3f(displayScale, displayScale, displayScale),
-            Quaternionf()
-        )
+        display.transformation = headDisplayTransformation(displayScale)
         display.addScoreboardTag("cc.mob.ender_eye_beam_display")
         rt.displayId = display.uniqueId
     }

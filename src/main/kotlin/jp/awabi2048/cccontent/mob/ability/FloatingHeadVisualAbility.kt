@@ -77,12 +77,7 @@ class FloatingHeadVisualAbility(
         display.interpolationDuration = 2
         display.teleportDuration = 2
         display.brightness = Display.Brightness(15, 15)
-        display.transformation = Transformation(
-            Vector3f(0f, 0f, 0f),
-            Quaternionf(),
-            Vector3f(displayScale, displayScale, displayScale),
-            Quaternionf()
-        )
+        display.transformation = headDisplayTransformation(displayScale)
         display.addScoreboardTag("cc.mob.ender_ghost_display")
         rt.displayId = display.uniqueId
     }

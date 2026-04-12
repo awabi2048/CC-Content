@@ -521,6 +521,13 @@ wither_knight:
   movement_speed: 0.26
   armor: 6.0
 
+wither_ghost:
+  type: wither_ghost
+  health: 26.0
+  attack: 5.0
+  movement_speed: 0.28
+  armor: 4.8
+
 witch_normal:
   type: witch_normal
   health: 26.0
@@ -598,19 +605,12 @@ endermite_poison:
   movement_speed: 0.34
   armor: 1.0
 
-shulker_turret_sniper:
-  type: shulker_turret_sniper
+shulker_mimic:
+  type: shulker_mimic
   health: 40.0
-  attack: 6.6
-  movement_speed: 0.20
-  armor: 7.2
-
-shulker_turret_barrage:
-  type: shulker_turret_barrage
-  health: 38.0
-  attack: 5.8
-  movement_speed: 0.20
-  armor: 6.8
+  attack: 6.2
+  movement_speed: 0.01
+  armor: 7.0
 
 ender_eye_beam:
   type: ender_eye_beam

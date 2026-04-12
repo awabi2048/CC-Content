@@ -367,48 +367,57 @@ end:
     key: minecraft:block.end_portal.spawn
     pitch: 1.0
   mobs:
-    enderman_mist_delay:
-      weight: 7
-      wave: 1..
-    enderman_small_backstab:
-      weight: 5
-      wave: 2..
-    enderman_void_carrier:
-      weight: 6
-      wave: 2..
-    enderman_rift_carrier:
-      weight: 5
-      wave: 3..
-    enderman_grave_carrier:
+    wither_ghost:
       weight: 4
-      wave: 4..
-    endermite_poison:
-      weight: 6
-      wave: 2..
-    wither_knight:
-      weight: 3
-      wave: 3..
-    end_crystal_sentinel:
-      weight: 3
-      wave: 4..
-      max_alive: 1
-    end_wither_sentinel:
+      wave: 1..5
+    enderman_mist_delay:
       weight: 2
-      wave: 5..
-      max_alive: 1
-    shulker_turret_sniper:
-      weight: 3
-      wave: 3..
-    shulker_turret_barrage:
-      weight: 5
-      wave: 4..
+      wave: 1..1
+    endermite_poison:
+      weight: 1
+      wave: 1..2
+    wither_knight:
+      weight: 4
+      wave: 2..5
+    enderman_small_backstab:
+      weight: 2
+      wave: 2..2
+    enderman_void_carrier:
+      weight: 2
+      wave: 2..2
+    shulker_mimic:
+      weight: 1
+      wave: 2..4
+    enderman_rift_carrier:
+      weight: 2
+      wave: 3..3
+    enderman_grave_carrier:
+      weight: 2
+      wave: 3..3
     raiden_creeper:
-      weight: 3
-      wave: 3..
+      weight: 1
+      wave: 3..3
+    end_crystal_sentinel:
+      weight: 1
+      wave: 4..4
+    end_wither_sentinel:
+      weight: 1
+      wave: 5..5
+    enderman_phase:
+      weight: 2
+      wave: 4..4
+    enderman_drain:
+      weight: 2
+      wave: 4..4
     ender_eye_beam:
-      weight: 5
-      wave: 4..
-      max_alive: 1
+      weight: 1
+      wave: 5..5
+    enderman_mirror:
+      weight: 2
+      wave: 5..5
+    enderman_eye_summoner:
+      weight: 2
+      wave: 5..5
   orientation:
     entrance_exit: north
     corner_entry: south
