@@ -24,6 +24,7 @@ import jp.awabi2048.cccontent.mob.type.BlazeRapidMobType
 import jp.awabi2048.cccontent.mob.type.DrownedRaiderAxeMobType
 import jp.awabi2048.cccontent.mob.type.DrownedTridentGuardMobType
 import jp.awabi2048.cccontent.mob.type.DrownedUnarmedMobType
+import jp.awabi2048.cccontent.mob.type.DesertTempleSandGolemMobType
 import jp.awabi2048.cccontent.mob.type.GuardianBeamBurstMobType
 import jp.awabi2048.cccontent.mob.type.GuardianDrainMobType
 import jp.awabi2048.cccontent.mob.type.GuardianNormalMobType
@@ -296,6 +297,7 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(SilverfishStealthFangMobType())
         registerMobType(IronGolemNormalMobType())
         registerMobType(IronGolemMagnetMobType())
+        registerMobType(DesertTempleSandGolemMobType())
         registerMobType(GuardianNormalMobType())
         registerMobType(GuardianSmallMobType())
         registerMobType(GuardianBeamBurstMobType())

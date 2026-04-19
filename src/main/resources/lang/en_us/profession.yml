@@ -1,0 +1,30 @@
+profession:
+  level_up: §a{profession} leveled up! §eLv.{old} -> Lv.{new} §7(+{gained})
+  new_unlock: 'New unlockable skills available ({count}): {skills} [Click to open skill tree]'
+  lumberjack:
+    name: 木こり
+    description: 木を伐採して経験値を得る職業
+  brewer:
+    name: 醸造家
+    description: ポーション醸造で経験値を得る職業
+  miner:
+    name: 鉱夫
+    description: 鉱石採掘で経験値を得る職業
+  cook:
+    name: 料理人
+    description: 料理を作って経験値を得る職業
+  swordsman:
+    name: 剣士
+    description: モンスター討伐で経験値を得る職業
+  warrior:
+    name: 戦士
+    description: 近接戦闘で経験値を得る職業
+  farmer:
+    name: 農家
+    description: 作物の収穫で経験値を得る職業
+  gardener:
+    name: 庭師
+    description: 装飾的なブロック設置で経験値を得る職業
+  carpenter:
+    name: 大工
+    description: 建築で経験値を得る職業

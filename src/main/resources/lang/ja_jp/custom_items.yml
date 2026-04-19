@@ -1,0 +1,604 @@
+custom_items:
+  misc:
+    big_light:
+      name: §dビッグライト
+      lore:
+      - §e§n右クリックを長押し§7して、体を大きくすることができます！
+      - §e§nShift + 右クリック§7で元の大きさに戻ることができます。
+    small_light:
+      name: §dスモールライト
+      lore:
+      - §e§n右クリックを長押し§7して、体を縮ませることができます！
+      - §e§nShift + 右クリック§7で元の大きさに戻ることができます。
+    auto_ignition_booster:
+      name: §6自動点火ブースター
+      lore:
+      - §7足装備に着用中、§eShift§7で起動します。
+      - §7滑空中は花火を1個消費して前方へ加速します。
+      - §7非滑空時は同等速度を§a上方向§7へ変換して跳躍します。
+    air_cannon:
+      name: §b空気砲
+      lore:
+      - §7右クリックで前方の空間を圧縮して放出します。
+      - §7前方の対象を§f前方+上方向§7へ吹き飛ばします。
+      - §7使用者も§f後ろ上方§7に小さく反動します。
+    invisible_item_frame:
+      name: §f透明な額縁
+      lore:
+      - §7設置すると透明になります。
+      - §7手に持って§eスニーク§7中は周囲の透明額縁が見えるようになります。
+    invisible_glow_item_frame:
+      name: §b透明な光る額縁
+      lore:
+      - §7設置すると透明になります。
+      - §7手に持って§eスニーク§7中は周囲の透明額縁が見えるようになります。
+    radio_cassette_player:
+      name: §6ラジカセ
+      lore:
+      - §7右クリックでラジカセメニューを開きます
+      - §7カセットを挿入して再生開始すると
+      - §7停止するまでループ再生します
+    storage_box_single:
+      name: §6ストレージボックス(1)
+      lore:
+      - §7大量のアイテムを格納できます。
+      - §7手に持って§eShiftを2回§7でメニューを開きます。
+    storage_box_triple:
+      name: §6ストレージボックス(3)
+      lore:
+      - §7最大3種類のアイテムを大量に格納できます。
+      - §7手に持って§eShiftを2回§7でメニューを開きます。
+      - §7§eShift+スクロール§7で使用対象を切り替えます。
+  arena:
+    structure_marker_tool:
+      name: §6アリーナ構造マーカーツール
+      lore:
+      - §7アリーナ構造用マーカーを設置します
+    other_marker_tool:
+      name: §6アリーナ補助マーカーツール
+      lore:
+      - §7待機/ロビー用マーカーを設置します
+    lift_tool:
+      name: §6アリーナリフト設置ツール
+      lore:
+      - §7リフトマーカー専用ツール
+    ticket:
+      name: §6アリーナチケット
+      lore:
+      - §7アリーナへの参加チケット
+    medal:
+      name: §6アリーナメダル
+      lore:
+      - §7アリーナでの戦いの証
+    prize:
+      name: §6アリーナ報酬箱
+      lore:
+      - §7アリーナでの勝利報酬
+    limit_breaking_sharpness_t1:
+      name: '§d限界突破触媒: ダメージ増加 T1'
+      lore:
+      - §7ダメージ増加の限界突破に使用
+      - '§7目標: Sharpness +1'
+    limit_breaking_sharpness_t2:
+      name: '§d限界突破触媒: ダメージ増加 T2'
+      lore:
+      - §7ダメージ増加の限界突破に使用
+      - '§7目標: Sharpness +2'
+    limit_breaking_sharpness_t3:
+      name: '§d限界突破触媒: ダメージ増加 T3'
+      lore:
+      - §7ダメージ増加の限界突破に使用
+      - '§7目標: Sharpness +3'
+    over_stacking_infinity:
+      name: '§5競合無視触媒: 無限'
+      lore:
+      - §7競合エンチャントの追加付与に使用
+      - §7このルートは1回のみ
+    over_stacking_mending:
+      name: '§5競合無視触媒: 修繕'
+      lore:
+      - §7競合エンチャントの追加付与に使用
+      - §7このルートは1回のみ
+    over_stacking_sharpness:
+      name: '§5競合無視触媒: ダメージ増加'
+      lore:
+      - §7競合エンチャントの追加付与に使用
+      - §7このルートは1回のみ
+    over_stacking_smite:
+      name: '§5競合無視触媒: アンデッド特攻'
+      lore:
+      - §7競合エンチャントの追加付与に使用
+      - §7このルートは1回のみ
+    over_stacking_bane_of_arthropods:
+      name: '§5競合無視触媒: 虫特攻'
+      lore:
+      - §7競合エンチャントの追加付与に使用
+      - §7このルートは1回のみ
+    over_stacking_protection:
+      name: '§5競合無視触媒: 防護'
+      lore:
+      - §7競合エンチャントの追加付与に使用
+      - §7このルートは1回のみ
+    over_stacking_fire_protection:
+      name: '§5競合無視触媒: 火炎耐性'
+      lore:
+      - §7競合エンチャントの追加付与に使用
+      - §7このルートは1回のみ
+    over_stacking_blast_protection:
+      name: '§5競合無視触媒: 爆発耐性'
+      lore:
+      - §7競合エンチャントの追加付与に使用
+      - §7このルートは1回のみ
+    over_stacking_projectile_protection:
+      name: '§5競合無視触媒: 飛び道具耐性'
+      lore:
+      - §7競合エンチャントの追加付与に使用
+      - §7このルートは1回のみ
+    over_stacking_multishot:
+      name: '§5競合無視触媒: 拡散'
+      lore:
+      - §7競合エンチャントの追加付与に使用
+      - §7このルートは1回のみ
+    over_stacking_piercing:
+      name: '§5競合無視触媒: 貫通'
+      lore:
+      - §7競合エンチャントの追加付与に使用
+      - §7このルートは1回のみ
+    exotic_attach_infinity:
+      name: '§b特殊付与触媒: 無限'
+      lore:
+      - §7通常付与できないエンチャントを追加
+      - §7このルートは1回のみ
+    exotic_attach_sharpness:
+      name: '§b特殊付与触媒: ダメージ増加'
+      lore:
+      - §7通常付与できないエンチャントを追加
+      - §7このルートは1回のみ
+    exotic_attach_breach:
+      name: '§b特殊付与触媒: 防具貫通'
+      lore:
+      - §7通常付与できないエンチャントを追加
+      - §7このルートは1回のみ
+    mob_token:
+      lore:
+      - §7アリーナに出現するモンスターが落としたアイテム
+      - §7アリーナロビーで報酬と交換しよう！
+      token_names:
+        zombie: ゾンビの頭
+        creeper: クリーパーの火薬袋
+        skeleton: スケルトンの頭
+        wither_skeleton: ウィザースケルトンの骨のかけら
+        husk: ハスクのかたびら
+        iron_golem: ゴーレムのコア
+        guardian: ガーディアンのとげ
+        elder_guardian: エルダーガーディアンのとげ
+        silverfish: シルバーフィッシュの殻
+        spider: クモのハサミ
+        drowned: ひどく錆びた銅インゴット
+        witch: ウィッチのローブ
+        blaze: ブレイズの残り火
+        magma_cube: マグマキューブのコア
+        slime: スライムのコア
+        bogged: きのこの生えたガイコツ
+        stray: 凍てついたガイコツ
+        bat: 大コウモリの皮膜
+        allay: 水精の欠片
+        enderman: エンダーマンの残滓
+        endermite: エンダーマイトの甲殻
+        shulker: シュルカーの殻
+        spirit: 精霊の涙
+        frog: 大カエルの肝
+    theme:
+      ruins:
+        name: 遺跡
+      desert_temple:
+        name: 砂漠の寺院
+      ocean_monument:
+        name: 海底神殿
+      natura:
+        name: 繁茂した洞窟
+      nether:
+        name: ネザー要塞
+      end:
+        name: エンド
+    ruins:
+      name: 遺跡
+    desert_temple:
+      name: 砂漠の寺院
+    ocean_monument:
+      name: 海底神殿
+    natura:
+      name: 繁茂した洞窟
+    nether:
+      name: ネザー要塞
+    end:
+      name: エンド
+  marker:
+    current_mode: '&f§l| §7現在のモード §a{mode}'
+    mode_changed: '&7設置モードを §a{mode} §7に変更しました。'
+    placed: '&b[Marker] {mode} §fマーカーを設置しました。'
+    removed: '&b[Marker] {mode} §fマーカーを削除しました。'
+    usage:
+      place: '&e右クリック(ブロック)§7 クリック面の外側にマーカーを設置'
+      delete: '&eShift + 右クリック§7 視線上のマーカーを削除'
+      switch: '&eFキー§7 次のモードへ変更'
+    modes:
+      mob: '&cモブ'
+      entrance: '&a入口'
+      checkpoint: '&aチェックポイント'
+      join_area: '&f参加エリア'
+      lobby: '&bロビー'
+      lift: '&dリフト'
+      connection: '&6接続部'
+      door_block: '&e扉'
+      barrier_core: '&b結界核'
+      barrier_point: '&3結界起動点'
+  messages:
+    command:
+      no_permission: '&c権限がありません'
+      target_not_found: '&c対象プレイヤーが見つかりません'
+      feature_unavailable: '&cArena feature は初期化に失敗したため利用できません'
+      feature_unavailable_reason: '&7理由: {reason}'
+      player_only: '&cこのコマンドはプレイヤーのみ実行できます'
+      menu_open_failed: '&cアリーナメニューを開けませんでした'
+      menu_open_failed_detail: '&cアリーナメニューを開けませんでした: {message}'
+      start_success: '&a{player} のアリーナを開始しました (mob_type={mob_type}, difficulty={difficulty}, theme={theme}, waves={waves})'
+      stop_success: '&a{player} のアリーナを停止しました'
+      stop_not_in_session: '&e{player} はアリーナセッションに参加していません'
+      license_set_success: '&a{player} のライセンスを {tier} に設定しました'
+      theme_none: '&e利用可能なテーマがありません'
+      theme_list: '&6[Arena] 利用可能テーマ: {themes}'
+      usage:
+        start: '&c使用法: /arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
+        stop: '&c使用法: /arenaa stop <player>'
+        license: '&c使用法: /arenaa license set <player> <paper|bronze|silver|gold>'
+        theme: '&c使用法: /arenaa theme list'
+      start_error:
+        lift_not_ready: '&cリフトの準備ができていないため開始できません'
+        lift_occupied: '&cリフトが使用中のため開始できません'
+        stage_build_failed: '&c{message}'
+        invalid_mission_type: '&c無効なミッションタイプです: {type}'
+      help:
+        header: '&6=== Arena 管理コマンド ==='
+        start: '&f/arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
+        stop: '&f/arenaa stop <player>'
+        license: '&f/arenaa license set <player> <paper|bronze|silver|gold>'
+        theme: '&f/arenaa theme list'
+        broadcast: '&f/arenaa broadcast'
+        menu: '&f/arenaa menu'
+        pedestal: '&f/arenaa pedestal'
+    menu:
+      open_failed: '&cアリーナミッションを開けませんでした'
+      open_failed_detail: '&cアリーナメニューを開けませんでした: {message}'
+      start_error:
+        already_in_session: '&c{player} はすでにアリーナセッション中です'
+        mob_type_not_found: '&cmob_type が見つかりません: {mob_type}'
+        difficulty_not_found: '&cdifficulty が見つかりません: {difficulty}'
+        undefined_wave_spawn: '&cmob_type ''{mob_type}'' は wave {wave} のスポーンが未定義です'
+        theme_not_found: '&c有効なテーマが見つかりません'
+        world_create_failed: '&cアリーナ用ワールド作成に失敗しました'
+        stage_build_failed: '&c{message}'
+        join_area_not_found: '&c開始待機エリアの参加マーカーが近くに存在しないため開始できません'
+        lobby_marker_not_found: '&cロビーマーカーが見つからないため開始できません'
+        invalid_mission_type: '&c無効なミッションタイプです: {type}'
+    mission:
+      already_completed: '&eこのミッションはすでに完了済みです'
+      already_in_mission: '&cすでに進行中のミッションがあります'
+      not_found: '&cアリーナミッションが見つかりません'
+      start_cancelled: '&cミッション開始はキャンセルされました'
+      license_insufficient: '&cあなたのライセンスでは、このミッションはまだ受けられません'
+      stage_build_failed_internal: '&cステージの生成に失敗しました。スタッフに報告してください。(STRUCTURE_ERROR)'
+      completed: '&aミッションクリア！'
+      return_hint: §7Shift長押しでロビーに帰還できます
+      return_countdown: §7帰還中 §e{seconds} 秒
+      returned: '&aロビーへ帰還しました'
+    license:
+      promoted: '&aライセンスが昇格しました！ &f→ {tier}'
+    multiplayer:
+      invite_window_started: §6ミッションを受注しました！§7リフトを準備中です...
+      invite_window_hint: §7左クリックでほかのプレイヤーをミッションに誘うことができます
+      wait_area_hint: '&7招待したプレイヤーと開始待機エリアに入ると待機状態になります'
+      waiting_entered: '&a開始待機エリアに入りました。猶予終了まで待機してください'
+      waiting_exited: §cリフトから降りました。参加する場合は乗って待機してください！
+      lift_not_ready_oage: §f「リフトの準備が出来ていないみたいです！ちょっとまってね！」
+      lift_occupied_oage: §f「リフトが空くまでちょっとまってね！」
+      waiting_title: '&7参加待機中'
+      stage_wait_title: '&7アリーナを準備中...'
+      invite_sent: '&a{player} に招待を送信しました'
+      invited: '&6{owner} からアリーナ招待が届きました。開始待機エリアに入ってください'
+      invited_decline_hint: '&7辞退する場合は、招待者を左クリックしてください'
+      already_invited: '&e{player} はすでに招待済みです'
+      invite_window_closed: '&c募集時間は終了しました'
+      invite_failed_world: '&c同じワールド内のプレイヤーのみ招待できます'
+      invite_failed_in_session: '&c{player} はすでに別のアリーナに参加しています'
+      invite_failed_full: '&cこのミッションの最大参加人数に達しているため招待できません'
+      invite_failed_already_locked: '&c{player} はすでに他の招待を受けています'
+      declined_self: '&e招待を辞退しました'
+      declined_notify_owner: '&e{player} が招待を辞退しました'
+      stage_intro: '&6ステージ転送を開始します...'
+      cancelled_owner_offline: '&cオーナーが不在のためマルチ参加募集を終了しました'
+      cancelled_owner_not_waiting: '&cオーナーが開始待機エリアにいないため開始を中止しました'
+      invite_cancelled_offline: '&e{player} はオフラインのため招待を取り消しました'
+      invite_auto_declined_far: '&e{player} が待機エリアから離れたため招待を取り消しました'
+      invite_auto_declined_far_owner: '&e{player} が待機エリアから離れたため招待を取り消しました'
+      invite_message_simple: §8§l«§c§lArena§8§l» §7{owner}さんがあなたをアリーナに招待しました！
+      no_description: '&7説明はありません'
+      invite_message_prefix: §8§l«§c§lArena§8§l» §7{owner}さんがあなたをミッション§e
+      invite_message_mission: §e【{mission}】
+      invite_message_suffix: '&7に招待しました！'
+    down:
+      entered: §cダウン！§7他の方が蘇生すると復活できます
+      recovered: '&a蘇生されました！'
+      revive_success: '&a{player} を蘇生しました'
+      timeout: '&cダウン時間切れです。ロビーへ転送されます'
+      game_over: '&c目の前がまっくらになった...！
+
+        &7おあげちゃんが救出中...'
+      participant_died: §4{player}さんが倒れました... §7（おあげちゃんが救出に向かいます）
+      needs_revive: '&c{player}さんがダウンしました！蘇生が必要です！'
+    oage:
+      stage_start:
+      - §f現地に到着しました！
+      combat_all_engaged:
+      - なかなか手強いですね…！
+      combat_all_calm:
+      - いい感じです！この調子でがんばりましょう！
+      wave_cleared:
+      - ひとまず安全ですね！態勢を整えて次のウェーブに進みましょう！
+      wave_cleared_full_room:
+      - 今です！行きましょう！
+      wave_clear_wait:
+      - 扉の前のマーカーに近づくと、何かわかりそうです！
+      final_wave_start:
+      - 真ん中のものが結界石です！周囲のマーカーをすべて活性化させると再起動が始まります！
+      barrier_restart_started:
+      - 結界解除後はモンスターが寄り付きやすくなります！気をつけて！
+      barrier_restart_remaining_2_3:
+      - 再起動は順調です！持ちこたえてくださいー！
+      barrier_restart_remaining_1_3:
+      - あとちょっとです...！
+      game_over_followup:
+      - いま行きます！ちょっと待ってね
+      game_over_with_survivors:
+      - おつかれさま！他の方の様子はここからでも確認できます！
+      game_over_all_wiped:
+      - おつかれさま！間に合って良かったです！
+      participant_died_followup:
+      - いま助けに行きますー！
+      down_with_survivors:
+      - お疲れさま！他のみなさんの様子はここからでも確認できますよ！
+      lift_ready:
+      - §f「おねがいします！準備ができるまでリフトに乗ってお待ちください～」
+      lift_occupied_done:
+      - §f「リフトの準備ができました！どうぞ乗ってください〜！」
+    barrier:
+      cannot_break: '&c結界石は破壊できません'
+      cannot_place_on: '&c結界石の上には設置できません'
+      not_ready: '&cまだ結界石を再起動できません。全ウェーブをクリアしてください'
+      activating: '&e結界石を再起動中です'
+      ready_subtitle: '&b結界石を右クリックして再起動'
+      activating_title: '&b結界石を再起動中...'
+      activation_complete_title: '&a再起動完了'
+      restart_started: '&c結界石の再起動を開始しました！結界を一時的に解除します！'
+      restart_success: '&a結界石の再起動に成功しました！'
+      restart_confirmed: 結界の再起動を確認しました！
+      return_hint: §7Shift長押しでロビーに帰還できます
+      return_countdown: §7帰還中 §e{seconds} 秒
+      returned: '&aロビーへ帰還しました'
+    session:
+      starting: '&6[Arena] アリーナを開始します...'
+      started: '&6[Arena] セッション開始: theme={theme}, mob_type={mob_type}, difficulty={difficulty}, waves={waves}'
+      retry_hint: '&7管理コマンドで mob_type / difficulty / theme を指定して再挑戦できます'
+      cleared: '&aアリーナクリア！'
+      ended: '&cアリーナセッションが終了しました'
+      ended_by_logout: '&cログアウトしたためアリーナを終了しました'
+      ended_by_death: '&c死亡したためアリーナを終了しました'
+      ended_by_warp: '&cワープしたため死亡扱いでアリーナを終了しました'
+      ended_by_shutdown: '&cサーバー停止によりアリーナを終了しました'
+      stopped_by_admin: '&c管理コマンドによりアリーナを停止しました'
+    theme:
+      end:
+        name: エンド
+    stage:
+      already_started: '&eステージはすでに開始しています'
+      start_subtitle: '&6ステージ開始'
+    door:
+      animating: '&e開扉中です'
+      corridor_opened: '&aWave {wave} への通路が解放されました'
+      corridor_opened_subtitle: '&a次の通路が開きました'
+      open_hint: Shift長押しで扉を開く
+      corridor_opened_notice: '&3次のウェーブへの道が開かれました...'
+    wave:
+      title: §7- §6Wave {wave} §7-
+      last_title: '&7- §6Last Wave §7-'
+      player_advanced: §7{player} さんが §6Wave {wave}§7 に突入しました！
+    clearing:
+      boss_spawned: §5掃討ボスが出現しました！制限時間内に倒してください！
+      boss_defeated: §a掃討ボスを討伐しました！ミッションクリア！
+      time_expired: §c時間切れ！掃討ボスを倒せませんでした...
+      success: §a§l掃討ボスを全て討伐しました！ミッションクリア！
+    mock:
+      door_animation_start: '&7{message}'
+      corridor_door_reinstall: '&7{message}'
+  ui:
+    menu_title: §8アリーナ掲示板
+    confirm_title: §8参加確認
+    pedestal:
+      title: §8不思議な祭壇
+      blank: ' '
+      placeholder:
+        left: §a触媒の導線
+        right: §a情報の導線
+      exp:
+        name: §e必要経験値
+        waiting: §7触媒をセットすると必要レベルが表示されます
+        required: '§7必要レベル: §e{value}'
+        current: '§7所持レベル: §f{value}'
+        ready: §a条件達成
+        not_ready: §cレベル不足
+      execute:
+        ready: §aオーバーエンチャント実行
+        waiting: §cオーバーエンチャント実行
+        ready_lore: §7クリックで実行
+        waiting_lore: §7条件を満たすと実行できます
+    separator: §8§m――――――――――――――――――――
+    coming_soon: §7Coming Soon!
+    license_card:
+      title: §bライセンスカード
+      current_license: §f❙ §7現在のライセンス §e{tier}
+      allowed_difficulty: §f❙ §7入場許可難易度 §c{difficulty} §7まで
+      next_header: §f❙ §7次のライセンスまで
+      max_reached: '  §8- §a全ライセンスを解放済み'
+      requirement:
+        mission_clear: '  §8- §fミッションを完了する {progress}'
+        mob_kill: '  §8- §fモンスターを討伐する（累計） {progress}'
+        strong_enemy_kill: '  §8- §f強敵を討伐する（累計） {progress}'
+    info_title: §bInfo
+    info:
+      lines:
+      - §71日1回、§e24時§7にミッションが更新されます
+      - §7みんなで協力して、おあげちゃんを助けてあげましょう
+      - §7ミッションを達成するとおあげちゃんから§eご褒美§7が貰えるほか、
+      - §7アリーナのモンスターは§dレアなアイテム§7を落とすことがあります
+    confirm:
+      ok_name: §aOK
+      ok_lore:
+      - §7このミッションを開始します
+      cancel_name: §cキャンセル
+      cancel_lore:
+      - §7ミッション開始を取り消します
+    mission:
+      item_name: §a{mission}
+      completed_item_name: §a§m{mission}
+      mission_title: §f❙ §7ミッション内容
+      difficulty_inline: §f❙ §7難易度 §f{difficulty}
+      memo_inline: §f❙ §7メモ §f{memo}
+    player:
+      name_format: §6{player}
+      mob_kills: §f❙ §7倒したモブ §e{count} 体
+      barrier_restarts: §f❙ §7結界石を再起動した回数 §e{count} 回
+    recruitment:
+      default_mission_title: アリーナミッション
+      title: §6【{missionTitle}】
+      remaining: §f開始まで §e{seconds} 秒
+      waiting_participant: §b✦ {name}
+      normal_participant: §7✧ {name}
+    sidebar:
+      title: §7« §cARENA §7»
+      elapsed_time: '§7経過: §f{time}'
+      get_ready: §7§lGet Ready!
+      defeat: §c§lDEFEAT
+      participant_line: §7◯ §b{name} {status}
+      last_wave: §7» §6§lLast Wave §7«
+      wave: §7» §6§lWave {wave} §7«
+      clear: §dCLEAR
+      status_down: §eDOWN
+      status_alive: §aALIVE
+      status_preparing: §dPREPARING
+      status_dead: §cDEAD
+  bossbar:
+    join_countdown: §f開始まで §e{seconds} 秒
+    clearing_boss: §7- §5掃討ボス §7- §c{time} §8(§7残り§b{alive}§8体)
+    revive:
+      downed: §7{reviver}さんが蘇生中...
+      reviver: §7{downed}さんを蘇生中...
+    barrier_restart: §7- §6Last Wave §7- §d再起動中...
+    wave_clear: §7- §6Wave {wave} §7- §bCLEAR
+    last_wave_label: Last Wave
+    wave_label: Wave {wave}
+    wave_clear_dynamic: §7- §6{waveLabel} §7- §bCLEAR
+    last_wave_progress: §7- §6Last Wave §7- §8(§7{activated}/§b{total}§8)
+    wave_progress: §7- §6{waveLabel} §7- §8(§c{kills}§7/{target}§8)
+  mission:
+    memo_choices:
+    - §eがんばってください！
+    - §e安全第一でお願いします！
+    - §eみんなで協力しましょう！
+    type:
+      barrier_restart:
+        name: 結界石の再起動
+        hints:
+        - §fエリアをモンスターから守っている§d結界石§fの調子が悪いみたいです
+        - §f現地に行って、結界石を§f§n再起動§fして来てほしいです！
+      barrier_deploy:
+        name: 結界石の展開
+        hints:
+        - §7結界石を展開して安全を確保しよう
+      sweep:
+        name: 掃討
+        hints:
+        - §7たくさん湧いているので倒そう
+      boss:
+        name: ボス
+        hints:
+        - §7ボスがいて困るので倒そう
+      clearing:
+        name: とにかくいっぱい倒して！
+        hints:
+        - §f弱体化した大量のモンスターを倒して進め！
+        - §f最奥に待ち受けるボスを討伐するとクリア！
+    theme:
+      test:
+        name: テスト
+      cave:
+        name: 洞窟
+      mineshaft:
+        name: 廃坑
+      library:
+        name: 図書館
+      ruins:
+        name: 遺跡
+      see_of_trees:
+        name: 樹海
+      maze:
+        name: 立体迷宮
+  license:
+    tier:
+      paper: ペーパー
+      bronze: ブロンズ
+      silver: シルバー
+      gold: ゴールド
+      end:
+        name: エンド
+  brewery:
+    sample_filter:
+      name: §e蒸留フィルター（試作）
+      lore:
+      - §7蒸留時間 -15%
+      - §71蒸留ごとに耐久を1消費
+    mock_clock:
+      name: §bふしぎな時計（モック）
+      lore:
+      - §7熟成GUIの時計スロット用（効果なし）
+    mock_yeast:
+      name: §a培養済み酵母（モック）
+      lore:
+      - §7発酵GUIの酵母スロット用（効果なし）
+  arena_broadcast:
+    ui:
+      broadcast:
+        title: §8アリーナ実況
+        default_title: §fアリーナミッション
+        empty_slot: §e余裕あり
+        info:
+          name: §bInfo
+          lore:
+          - §7おあげちゃんが基地から
+          - §7サポートを行っています
+        lift:
+          no_session: §8-
+          occupied: §cリフト使用中
+          ready: §aリフト使用可
+          preparing: §eリフト準備中
+        players_header: §f❙ §7参加プレイヤー
+        player_line: §7・ §b{name} {status}
+        radio_header: §f❙ §7無線
+        wave:
+          get_ready: §7« §6Wave ◯ (Last Wave) §7» §e到着！
+          normal: §7« §6Wave {wave} §7»
+          last: §7« §6Wave ◯ (Last Wave) §7»
+          clear: §dCLEAR
+      messages:
+        command:
+          help:
+            broadcast: '&f/arenaa broadcast'

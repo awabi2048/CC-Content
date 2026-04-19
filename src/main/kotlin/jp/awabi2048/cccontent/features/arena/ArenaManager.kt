@@ -96,6 +96,7 @@ import java.util.logging.Level
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.floor
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlin.math.sin
@@ -144,12 +145,21 @@ private data class ArenaWorldCleanupJob(
     var lastProgressLogAtMillis: Long
 )
 
+private data class ArenaLobbyMarkerSnapshot(
+    val returnLobby: List<Location>,
+    val main: List<Location>,
+    val tutorialStart: List<Location>,
+    val tutorialSteps: List<Location>,
+    val pedestal: List<Location>
+)
+
 private data class ArenaDifficultyConfig(
     val id: String,
     val mobSpawnIntervalTicks: Long,
     val mobCountMultiplier: Double,
     val waveMultiplier: Double,
     val waves: Int,
+    val maxParticipants: Int,
     val display: String,
     val reviveMaxPerPlayer: Int,
     val reviveTimeLimitSeconds: Int,
@@ -198,8 +208,20 @@ private data class ArenaBgmTrackConfig(
 
 private data class ArenaBgmConfig(
     val normal: ArenaBgmTrackConfig,
-    val combat: ArenaBgmTrackConfig
+    val combat: ArenaBgmTrackConfig,
+    val lobby: ArenaBgmTrackConfig
 )
+
+private data class ArenaLobbyTutorialState(
+    var stepIndex: Int = 0,
+    var stepLocations: List<Location> = emptyList()
+)
+
+private enum class ArenaLobbyTargetType {
+    AUTO,
+    MAIN,
+    TUTORIAL
+}
 
 private data class EntranceLiftTemplate(
     val sizeX: Int,
@@ -244,8 +266,10 @@ class ArenaManager(
         const val POSITION_HISTORY_MAX_SAMPLES = 24
         const val ARENA_BGM_NORMAL_KEY_DEFAULT = "kota_server:ost_3.sukima_dungeon"
         const val ARENA_BGM_COMBAT_KEY_DEFAULT = "kota_server:ost_4.arena"
+        const val ARENA_BGM_LOBBY_KEY_DEFAULT = "kota_server:ost_3.sukima_dungeon"
         const val ARENA_BGM_NORMAL_BPM_DEFAULT = 120.0
         const val ARENA_BGM_COMBAT_BPM_DEFAULT = 140.0
+        const val ARENA_BGM_LOBBY_BPM_DEFAULT = 120.0
         const val ARENA_BGM_LOOP_BEATS_DEFAULT = 384
         const val ARENA_BGM_SWITCH_INTERVAL_BEATS_DEFAULT = 8
         const val ACTION_MARKER_RADIUS = 1.0
@@ -261,7 +285,6 @@ class ArenaManager(
         const val MIDDLE_RING_MAX_ANGULAR_VELOCITY = 0.14
         const val MOB_TOKEN_DROP_CHANCE = 0.30
         const val MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT = 0.033
-        const val FINAL_WAVE_TIME_LIMIT_SECONDS_DEFAULT = 600
         const val STAGE_TRANSFER_BLINDNESS_TICKS = 60
         const val BARRIER_RETURN_HOLD_TICKS = 60
         const val MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT = 45
@@ -293,6 +316,20 @@ class ArenaManager(
         const val ELDER_CURSE_DURATION_TICKS = 100
         const val ELDER_CURSE_AMPLIFIER = 2
         const val ELDER_CURSE_PLAYER_COOLDOWN_MILLIS = 60_000L
+        const val FINAL_WAVE_OVERTIME_TRIGGER_DELAY_MILLIS = 5L * 60L * 1000L
+        const val FINAL_WAVE_OVERTIME_INTERVAL_MILLIS = 30L * 1000L
+        const val FINAL_WAVE_OVERTIME_DISCHARGE_RADIUS_BASE = 8.0
+        const val FINAL_WAVE_OVERTIME_DISCHARGE_DAMAGE_BASE = 4.0
+        const val FINAL_WAVE_OVERTIME_DISCHARGE_KNOCKBACK_BASE = 0.75
+        const val LOBBY_TUTORIAL_HOLD_TICKS = 40
+        const val LOBBY_TUTORIAL_COMPLETE_DELAY_TICKS = 40L
+        const val LOBBY_BGM_TUTORIAL_COMPLETE_PITCH = 0.8409f
+        const val LOBBY_MARKER_TAG_RETURN = "arena.marker.lobby"
+        const val LOBBY_MARKER_TAG_MAIN = "arena.marker.lobby_main"
+        const val LOBBY_MARKER_TAG_TUTORIAL_START = "arena.marker.lobby_tutorial_start"
+        const val LOBBY_MARKER_TAG_TUTORIAL_STEP = "arena.marker.lobby_tutorial_step"
+        const val LOBBY_MARKER_TAG_PEDESTAL = "arena.marker.pedestal"
+        const val LOBBY_TUTORIAL_STEP_INDEX_TAG_PREFIX = "arena.marker.lobby_tutorial_step.index."
 
         fun defaultSwitchIntervalBeats(): Int {
             return ARENA_BGM_SWITCH_INTERVAL_BEATS_DEFAULT
@@ -322,6 +359,11 @@ class ArenaManager(
     private val mobToDefinitionTypeId = mutableMapOf<UUID, String>()
     private val entityMobToDefinitionTypeId = mutableMapOf<UUID, String>()
     private val elderCurseCooldownUntilMillis = mutableMapOf<UUID, Long>()
+    private val lobbyVisitedParticipants = mutableSetOf<UUID>()
+    private val tutorialCompletedParticipants = mutableSetOf<UUID>()
+    private val lobbyTutorialStates = mutableMapOf<UUID, ArenaLobbyTutorialState>()
+    private val lobbyTutorialMarkers = mutableMapOf<UUID, ArenaActionMarker>()
+    private val lobbyTutorialHoldStates = mutableMapOf<UUID, ArenaActionMarkerHoldState>()
     private val liftOccupiedMarkerKeys = mutableSetOf<String>()
     private val liftOccupiedWaiters = mutableSetOf<UUID>()
     private var maintenanceTask: BukkitTask? = null
@@ -349,7 +391,6 @@ class ArenaManager(
     private var sharedWaveMaxAlive = SHARED_WAVE_MAX_ALIVE_DEFAULT
     private var mobTokenDropChance = MOB_TOKEN_DROP_CHANCE
     private var mobTokenLootingBonusPerLevel = MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT
-    private var finalWaveTimeLimitSeconds = FINAL_WAVE_TIME_LIMIT_SECONDS_DEFAULT
     private var arenaDoorAnimationSoundKey = "minecraft:block.iron_door.open"
     private var arenaDoorAnimationSoundPitch = 1.0f
     private var arenaMissionService: ArenaMissionService? = null
@@ -365,6 +406,12 @@ class ArenaManager(
             bpm = ARENA_BGM_COMBAT_BPM_DEFAULT,
             loopBeats = ARENA_BGM_LOOP_BEATS_DEFAULT,
             switchIntervalBeats = defaultSwitchIntervalBeats()
+        ),
+        lobby = ArenaBgmTrackConfig(
+            soundKey = ARENA_BGM_LOBBY_KEY_DEFAULT,
+            bpm = ARENA_BGM_LOBBY_BPM_DEFAULT,
+            loopBeats = ARENA_BGM_LOOP_BEATS_DEFAULT,
+            switchIntervalBeats = defaultSwitchIntervalBeats()
         )
     )
     private var dropConfig = ArenaDropConfig(
@@ -374,6 +421,7 @@ class ArenaManager(
         mockExpBonusRate = 1.0,
         mockRarity = "common"
     )
+    private var pedestalMenuProvider: (() -> ArenaEnchantPedestalMenu?)? = null
 
     fun initialize(featureInitLogger: FeatureInitializationLogger? = null) {
         loadBattleConfigs()
@@ -460,9 +508,6 @@ class ArenaManager(
         mobTokenLootingBonusPerLevel = config
             .getDouble("arena.mob_token_looting_bonus_per_level", MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT)
             .coerceAtLeast(0.0)
-        finalWaveTimeLimitSeconds = config
-            .getInt("arena.final_wave_time_limit_seconds", FINAL_WAVE_TIME_LIMIT_SECONDS_DEFAULT)
-            .coerceAtLeast(1)
         maxConcurrentSessions = config
             .getInt("arena.session.max_concurrent", ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT)
             .coerceAtLeast(1)
@@ -489,6 +534,13 @@ class ArenaManager(
                 "arena.bgm.combat",
                 ARENA_BGM_COMBAT_KEY_DEFAULT,
                 ARENA_BGM_COMBAT_BPM_DEFAULT,
+                ARENA_BGM_LOOP_BEATS_DEFAULT
+            ),
+            lobby = parseArenaBgmTrackConfig(
+                config,
+                "arena.bgm.lobby",
+                ARENA_BGM_LOBBY_KEY_DEFAULT,
+                ARENA_BGM_LOBBY_BPM_DEFAULT,
                 ARENA_BGM_LOOP_BEATS_DEFAULT
             )
         )
@@ -544,6 +596,8 @@ class ArenaManager(
             val mobCountMultiplier = section.getDouble("mob_count_multiplier", 1.0).coerceAtLeast(0.01)
             val waveMultiplier = section.getDouble("wave_multiplier", 0.0)
             val waves = section.getInt("wave", 5).coerceAtLeast(1)
+            val maxParticipants = section.getInt("max_participants", MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
+                .coerceIn(1, MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
             val display = section.getString("display", difficultyId) ?: difficultyId
             val reviveMaxPerPlayerRaw = section.getInt("revive_max_per_player", -1)
             val reviveMaxPerPlayer = if (reviveMaxPerPlayerRaw <= 0) Int.MAX_VALUE else reviveMaxPerPlayerRaw
@@ -559,6 +613,7 @@ class ArenaManager(
                 mobCountMultiplier = mobCountMultiplier,
                 waveMultiplier = waveMultiplier,
                 waves = waves,
+                maxParticipants = maxParticipants,
                 display = display,
                 reviveMaxPerPlayer = reviveMaxPerPlayer,
                 reviveTimeLimitSeconds = reviveTimeLimitSeconds,
@@ -579,6 +634,10 @@ class ArenaManager(
 
     fun setMissionService(missionService: ArenaMissionService?) {
         arenaMissionService = missionService
+    }
+
+    fun setPedestalMenuProvider(provider: (() -> ArenaEnchantPedestalMenu?)?) {
+        pedestalMenuProvider = provider
     }
 
     private fun loadMobDefinitions() {
@@ -714,7 +773,8 @@ class ArenaManager(
             ))
         }
 
-        val sanitizedMaxParticipants = maxParticipants.coerceIn(1, MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
+        val difficultyMaxParticipants = difficulty.maxParticipants.coerceIn(1, MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
+        val sanitizedMaxParticipants = maxParticipants.coerceIn(1, difficultyMaxParticipants)
         if (participantPlayers.size > sanitizedMaxParticipants) {
             return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.too_many_participants",
@@ -743,8 +803,8 @@ class ArenaManager(
             ))
         }
 
-        val lobbyMarkers = findLoadedLobbyMarkers(target.world)
-        if (lobbyMarkers.isEmpty()) {
+        val lobbyMarkers = findLoadedLobbyMarkerSnapshot(target.world)
+        if (lobbyMarkers.returnLobby.isEmpty()) {
             return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.lobby_marker_not_found",
                 "&cロビーマーカーが見つからないため開始できません"
@@ -791,7 +851,10 @@ class ArenaManager(
             barrierPointLocations = mutableListOf(),
             joinAreaMarkerLocations = mutableListOf(),
             liftMarkerLocations = liftMarkers.map { it.clone() }.toMutableList(),
-            lobbyMarkerLocations = lobbyMarkers.map { it.clone() }.toMutableList(),
+            lobbyMarkerLocations = lobbyMarkers.returnLobby.map { it.clone() }.toMutableList(),
+            lobbyMainMarkerLocations = lobbyMarkers.main.map { it.clone() }.toMutableList(),
+            lobbyTutorialStartMarkerLocations = lobbyMarkers.tutorialStart.map { it.clone() }.toMutableList(),
+            lobbyTutorialStepMarkerLocations = lobbyMarkers.tutorialSteps.map { it.clone() }.toMutableList(),
             participantSpawnProtectionUntilMillis = if (enableMultiplayerJoin) Long.MAX_VALUE else now + 4000L,
             multiplayerJoinEnabled = enableMultiplayerJoin,
             phase = if (enableMultiplayerJoin) ArenaPhase.RECRUITING else ArenaPhase.PREPARING,
@@ -940,7 +1003,11 @@ class ArenaManager(
     fun stopSessionToLobby(player: Player, reason: String = ArenaI18n.text(player, "arena.messages.session.ended", "&cアリーナセッションが終了しました")): Boolean {
         val session = getSession(player)
         val destination = if (session != null) resolveSessionLobbyLocation(session) else null
-        return leavePlayerFromSession(player.uniqueId, reason, destination)
+        val stopped = leavePlayerFromSession(player.uniqueId, reason, destination)
+        if (stopped && destination != null) {
+            lobbyVisitedParticipants.add(player.uniqueId)
+        }
+        return stopped
     }
 
     fun stopSessionById(playerId: UUID, reason: String? = null): Boolean {
@@ -955,7 +1022,183 @@ class ArenaManager(
         val worldName = playerToSessionWorld[playerId]
         val session = worldName?.let { sessionsByWorld[it] }
         val destination = if (session != null) resolveSessionLobbyLocation(session) else null
-        return leavePlayerFromSession(playerId, localizedReason, destination)
+        val stopped = leavePlayerFromSession(playerId, localizedReason, destination)
+        if (stopped && destination != null) {
+            lobbyVisitedParticipants.add(playerId)
+        }
+        return stopped
+    }
+
+    fun sendPlayerToLobby(target: Player, lobbyType: String?): Boolean {
+        if (!target.isOnline) {
+            return false
+        }
+
+        val targetType = resolveLobbyTargetType(target.uniqueId, lobbyType)
+        val destinationResolved = resolveLobbyDestination(target.world, targetType) ?: return false
+        val snapshot = destinationResolved.first
+        val destination = destinationResolved.second
+
+        clearLobbyTutorialState(target.uniqueId)
+        val moved = if (getSession(target) != null) {
+            leavePlayerFromSession(target.uniqueId, "", destination)
+        } else {
+            target.teleport(destination)
+        }
+        if (!moved) {
+            return false
+        }
+
+        lobbyVisitedParticipants.add(target.uniqueId)
+        playLobbyBgm(target)
+
+        if (targetType == ArenaLobbyTargetType.TUTORIAL) {
+            startLobbyTutorial(target, snapshot)
+        }
+        return true
+    }
+
+    private fun resolveLobbyTargetType(playerId: UUID, lobbyType: String?): ArenaLobbyTargetType {
+        return when (lobbyType?.lowercase(Locale.ROOT)) {
+            "tutorial" -> ArenaLobbyTargetType.TUTORIAL
+            "main" -> ArenaLobbyTargetType.MAIN
+            else -> {
+                if (tutorialCompletedParticipants.contains(playerId) || lobbyVisitedParticipants.contains(playerId)) {
+                    ArenaLobbyTargetType.MAIN
+                } else {
+                    ArenaLobbyTargetType.TUTORIAL
+                }
+            }
+        }
+    }
+
+    private fun resolveLobbyDestination(
+        preferredWorld: World?,
+        targetType: ArenaLobbyTargetType
+    ): Pair<ArenaLobbyMarkerSnapshot, Location>? {
+        val worlds = linkedSetOf<World>()
+        if (preferredWorld != null) {
+            worlds += preferredWorld
+        }
+        worlds += Bukkit.getWorlds()
+
+        worlds.forEach { world ->
+            val snapshot = findLoadedLobbyMarkerSnapshot(world)
+            if (snapshot.returnLobby.isEmpty()) {
+                return@forEach
+            }
+
+            val candidates = when (targetType) {
+                ArenaLobbyTargetType.MAIN -> if (snapshot.main.isNotEmpty()) snapshot.main else snapshot.returnLobby
+                ArenaLobbyTargetType.TUTORIAL -> snapshot.tutorialStart
+                ArenaLobbyTargetType.AUTO -> snapshot.returnLobby
+            }
+            if (candidates.isEmpty()) {
+                return@forEach
+            }
+            val picked = candidates[random.nextInt(candidates.size)].clone()
+            return snapshot to picked
+        }
+
+        return null
+    }
+
+    private fun playLobbyBgm(player: Player, pitch: Float = 1.0f) {
+        val track = arenaBgmConfig.lobby
+        BGMManager.playPrecise(player, track.soundKey, track.loopTicks, pitch)
+    }
+
+    private fun clearLobbyTutorialState(playerId: UUID) {
+        lobbyTutorialStates.remove(playerId)
+        lobbyTutorialMarkers.remove(playerId)
+        lobbyTutorialHoldStates.remove(playerId)
+    }
+
+    private fun startLobbyTutorial(player: Player, snapshot: ArenaLobbyMarkerSnapshot) {
+        if (!player.isOnline) {
+            return
+        }
+
+        val stepPairs = snapshot.tutorialSteps
+            .map { location ->
+                val marker = location.world
+                    ?.getNearbyEntities(location, 0.25, 0.25, 0.25)
+                    ?.filterIsInstance<Marker>()
+                    ?.firstOrNull { candidate ->
+                        candidate.scoreboardTags.contains(LOBBY_MARKER_TAG_TUTORIAL_STEP)
+                    }
+                marker to location.clone().apply { this.world = player.world }
+            }
+
+        val steps = stepPairs
+            .sortedWith(
+                compareBy<Pair<Marker?, Location>> {
+                    val marker = it.first
+                    if (marker == null) Int.MAX_VALUE else extractTutorialStepIndex(marker) ?: Int.MAX_VALUE
+                }.thenBy { it.second.blockX }
+                    .thenBy { it.second.blockY }
+                    .thenBy { it.second.blockZ }
+            )
+            .map { it.second }
+
+        if (steps.isEmpty()) {
+            tutorialCompletedParticipants.add(player.uniqueId)
+            showLobbyTutorialCompletedEffect(player)
+            return
+        }
+
+        val state = ArenaLobbyTutorialState(stepIndex = 0, stepLocations = steps)
+        lobbyTutorialStates[player.uniqueId] = state
+        tutorialCompletedParticipants.remove(player.uniqueId)
+        spawnLobbyTutorialMarker(player, state)
+    }
+
+    private fun spawnLobbyTutorialMarker(player: Player, state: ArenaLobbyTutorialState) {
+        val stepLocation = state.stepLocations.getOrNull(state.stepIndex) ?: run {
+            completeLobbyTutorial(player)
+            return
+        }
+
+        val marker = ArenaActionMarker(
+            id = UUID.randomUUID(),
+            type = ArenaActionMarkerType.TUTORIAL_PROGRESS,
+            center = stepLocation.clone().add(0.0, ACTION_MARKER_CENTER_Y_OFFSET, 0.0),
+            holdTicksRequired = LOBBY_TUTORIAL_HOLD_TICKS,
+            state = ArenaActionMarkerState.READY
+        )
+        marker.colorTransitionFrom = marker.colorFor(ArenaActionMarkerState.READY)
+        marker.colorTransitionTo = marker.colorFor(ArenaActionMarkerState.READY)
+        marker.colorTransitionStartTick = Bukkit.getCurrentTick().toLong()
+        lobbyTutorialMarkers[player.uniqueId] = marker
+        lobbyTutorialHoldStates.remove(player.uniqueId)
+    }
+
+    private fun completeLobbyTutorial(player: Player) {
+        clearLobbyTutorialState(player.uniqueId)
+        tutorialCompletedParticipants.add(player.uniqueId)
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            if (!player.isOnline) {
+                return@Runnable
+            }
+            showLobbyTutorialCompletedEffect(player)
+        }, LOBBY_TUTORIAL_COMPLETE_DELAY_TICKS)
+    }
+
+    private fun showLobbyTutorialCompletedEffect(player: Player) {
+        player.sendTitle(
+            "",
+            "§7«§6Arena§7»",
+            0,
+            60,
+            10
+        )
+        playLobbyBgm(player, LOBBY_BGM_TUTORIAL_COMPLETE_PITCH)
+    }
+
+    private fun extractTutorialStepIndex(marker: Marker): Int? {
+        val tag = marker.scoreboardTags.firstOrNull { it.startsWith(LOBBY_TUTORIAL_STEP_INDEX_TAG_PREFIX) }
+            ?: return null
+        return tag.removePrefix(LOBBY_TUTORIAL_STEP_INDEX_TAG_PREFIX).toIntOrNull()
     }
 
     fun notifyParticipantDeath(player: Player) {
@@ -1013,6 +1256,11 @@ class ArenaManager(
         inviteSwingCooldownUntilTick.clear()
         liftOccupiedMarkerKeys.clear()
         liftOccupiedWaiters.clear()
+        lobbyVisitedParticipants.clear()
+        tutorialCompletedParticipants.clear()
+        lobbyTutorialStates.clear()
+        lobbyTutorialMarkers.clear()
+        lobbyTutorialHoldStates.clear()
         processPendingWorldDeletions()
     }
 
@@ -1185,12 +1433,13 @@ class ArenaManager(
                 updateSessionProgressBossBar(session)
             }
 
+            tickFinalWaveOvertimeDischarge(session, now)
+
             for (participantId in session.participants.toList()) {
                 val player = Bukkit.getPlayer(participantId)
                 if (player == null || !player.isOnline) continue
 
                 val location = player.location
-                applyFinalWaveOvertimeWither(session, player, now)
 
                 if (session.barrierRestartCompleted || session.missionCompleted) {
                     continue
@@ -1234,21 +1483,75 @@ class ArenaManager(
         }
     }
 
-    private fun applyFinalWaveOvertimeWither(session: ArenaSession, player: Player, nowMillis: Long) {
+    private fun tickFinalWaveOvertimeDischarge(session: ArenaSession, nowMillis: Long) {
         if (session.barrierRestartCompleted || session.missionCompleted) return
         if (session.finalWaveStartedAtMillis <= 0L) return
         if (!session.startedWaves.contains(session.waves)) return
-        if (player.world.name != session.worldName) return
-        if (isPlayerDowned(session, player.uniqueId)) return
 
-        val limitMillis = finalWaveTimeLimitSeconds.toLong().coerceAtLeast(1L) * 1000L
-        val elapsedMillis = (nowMillis - session.finalWaveStartedAtMillis).coerceAtLeast(0L)
-        if (elapsedMillis <= limitMillis) return
+        if (session.overtimeDischargeState.nextTriggerAtMillis <= 0L) {
+            session.overtimeDischargeState.nextTriggerAtMillis =
+                session.finalWaveStartedAtMillis + FINAL_WAVE_OVERTIME_TRIGGER_DELAY_MILLIS
+        }
 
-        val overtimeMillis = elapsedMillis - limitMillis
-        val overtimeLevel = (overtimeMillis / 60_000L).toInt().coerceAtLeast(0) + 1
-        val amplifier = (overtimeLevel - 1).coerceAtLeast(0)
-        player.addPotionEffect(PotionEffect(PotionEffectType.WITHER, 40, amplifier, false, true, true))
+        while (nowMillis >= session.overtimeDischargeState.nextTriggerAtMillis) {
+            triggerFinalWaveOvertimeDischarge(session, session.overtimeDischargeState.triggerCount)
+            session.overtimeDischargeState.triggerCount += 1
+            session.overtimeDischargeState.nextTriggerAtMillis += FINAL_WAVE_OVERTIME_INTERVAL_MILLIS
+        }
+    }
+
+    private fun triggerFinalWaveOvertimeDischarge(session: ArenaSession, triggerCount: Int) {
+        val world = Bukkit.getWorld(session.worldName) ?: return
+        val center = session.barrierLocation.clone().apply { this.world = world }.add(0.5, 1.0, 0.5)
+        val scale = 1.1.pow(triggerCount.toDouble())
+        val radius = (FINAL_WAVE_OVERTIME_DISCHARGE_RADIUS_BASE * scale).coerceAtLeast(0.5)
+        val damage = (FINAL_WAVE_OVERTIME_DISCHARGE_DAMAGE_BASE * scale).coerceAtLeast(0.0)
+        val knockback = (FINAL_WAVE_OVERTIME_DISCHARGE_KNOCKBACK_BASE * scale).coerceAtLeast(0.0)
+
+        world.spawnParticle(Particle.ELECTRIC_SPARK, center, 96, 0.6, 0.4, 0.6, 0.2)
+        world.playSound(center, Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.9f, 1.5f)
+        world.playSound(center, Sound.ENTITY_LIGHTNING_BOLT_IMPACT, 0.9f, 1.25f)
+
+        val lines = 16
+        repeat(lines) { index ->
+            val angle = (Math.PI * 2.0) * (index.toDouble() / lines.toDouble())
+            val direction = Vector(cos(angle), 0.0, sin(angle))
+            val steps = 14
+            for (step in 0..steps) {
+                val ratio = step.toDouble() / steps.toDouble()
+                val point = center.clone().add(direction.clone().multiply(radius * ratio))
+                world.spawnParticle(Particle.ELECTRIC_SPARK, point, 1, 0.03, 0.03, 0.03, 0.0)
+            }
+        }
+
+        session.participants
+            .asSequence()
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .filter { it.isOnline && it.world.uid == world.uid }
+            .filter { !isPlayerDowned(session, it.uniqueId) }
+            .forEach { participant ->
+                val participantLocation = participant.location
+                val distance = participantLocation.distance(center)
+                if (distance > radius) {
+                    return@forEach
+                }
+
+                if (damage > 0.0) {
+                    participant.damage(damage)
+                }
+
+                val push = participantLocation.toVector().subtract(center.toVector())
+                val horizontal = if (push.lengthSquared() <= 0.0001) {
+                    participantLocation.direction.clone().setY(0.0)
+                } else {
+                    push.setY(0.0)
+                }
+                if (horizontal.lengthSquared() > 0.0001 && knockback > 0.0) {
+                    val velocity = horizontal.normalize().multiply(knockback).setY(0.25)
+                    participant.velocity = participant.velocity.add(velocity)
+                }
+                participant.playSound(participant.location, Sound.ENTITY_LIGHTNING_BOLT_IMPACT, 0.8f, 1.2f)
+            }
     }
 
     private fun clearPreviousRoomMobTargetsOnCorridorEntry(session: ArenaSession, corridorWave: Int) {
@@ -1536,11 +1839,40 @@ class ArenaManager(
 
     fun handleArenaInteractEntity(event: PlayerInteractEntityEvent) {
         val player = event.player
+        val clicked = event.rightClicked
+
+        if (clicked is Marker && clicked.scoreboardTags.contains(LOBBY_MARKER_TAG_PEDESTAL)) {
+            event.isCancelled = true
+            if (!ArenaPermissions.hasPedestalMenuPermission(player)) {
+                player.sendMessage(
+                    ArenaI18n.text(
+                        player,
+                        "arena.messages.command.menu_permission_denied",
+                        "&cこのメニューを開く権限がありません"
+                    )
+                )
+                return
+            }
+            val menu = pedestalMenuProvider?.invoke()
+            if (menu == null) {
+                player.sendMessage(
+                    ArenaI18n.text(
+                        player,
+                        "arena.messages.command.feature_unavailable",
+                        "§cArena feature は初期化に失敗したため利用できません"
+                    )
+                )
+                return
+            }
+            menu.openMenu(player)
+            return
+        }
+
         val session = getSession(player) ?: return
         if (!session.participants.contains(player.uniqueId)) return
         if (isPlayerDowned(session, player.uniqueId)) return
 
-        val shulker = event.rightClicked as? Shulker ?: return
+        val shulker = clicked as? Shulker ?: return
         val downedId = findDownedPlayerIdByShulker(session, shulker.uniqueId) ?: return
         val downed = Bukkit.getPlayer(downedId) ?: return
         if (!downed.isOnline || downed.world.uid != player.world.uid) return
@@ -1753,8 +2085,8 @@ class ArenaManager(
     }
 
     private fun trySendMultiplayerInvite(owner: Player, invited: Player, session: ArenaSession) {
-        val currentInvitableCount = 1 + session.invitedParticipants.size
-        if (currentInvitableCount >= session.maxParticipants) {
+        val reservedSeats = session.participants.size + session.invitedParticipants.size
+        if (reservedSeats >= session.maxParticipants) {
             owner.sendMessage(
                 ArenaI18n.text(
                     owner,
@@ -2858,9 +3190,9 @@ class ArenaManager(
 
         val langDir = File(plugin.dataFolder, "lang")
         if (langDir.exists()) {
-            val fromDataFolder = langDir.listFiles { file ->
-                file.isFile && file.extension.equals("yml", ignoreCase = true)
-            }.orEmpty().map { it.nameWithoutExtension.lowercase(Locale.ROOT) }
+            val fromDataFolder = langDir.listFiles { file -> file.isDirectory }
+                .orEmpty()
+                .map { it.name.lowercase(Locale.ROOT) }
             locales.addAll(fromDataFolder)
         }
 
@@ -2869,12 +3201,12 @@ class ArenaManager(
 
     private fun loadLangConfig(locale: String): YamlConfiguration? {
         val normalized = locale.lowercase(Locale.ROOT)
-        val fromDataFolder = File(plugin.dataFolder, "lang/$normalized.yml")
+        val fromDataFolder = File(plugin.dataFolder, "lang/$normalized/custom_items.yml")
         if (fromDataFolder.exists()) {
             return YamlConfiguration.loadConfiguration(fromDataFolder)
         }
 
-        val resource = plugin.getResource("lang/$normalized.yml") ?: return null
+        val resource = plugin.getResource("lang/$normalized/custom_items.yml") ?: return null
         resource.use { input ->
             InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
                 return YamlConfiguration.loadConfiguration(reader)
@@ -3070,6 +3402,12 @@ class ArenaManager(
         }
 
         session.participants.clear()
+        if (session.lobbyVisitedParticipants.isNotEmpty()) {
+            lobbyVisitedParticipants.addAll(session.lobbyVisitedParticipants)
+        }
+        if (session.tutorialCompletedParticipants.isNotEmpty()) {
+            tutorialCompletedParticipants.addAll(session.tutorialCompletedParticipants)
+        }
         session.barrierReturnHoldTicksByParticipant.clear()
         session.barrierReturnSubtitleNextTickByParticipant.clear()
         session.returnLocations.clear()
@@ -3103,6 +3441,15 @@ class ArenaManager(
         liftOccupiedWaiters.clear()
         session.liftMarkerLocations.clear()
         session.lobbyMarkerLocations.clear()
+        session.lobbyMainMarkerLocations.clear()
+        session.lobbyTutorialStartMarkerLocations.clear()
+        session.lobbyTutorialStepMarkerLocations.clear()
+        session.lobbyVisitedParticipants.clear()
+        session.tutorialCompletedParticipants.clear()
+        session.tutorialProgressByParticipant.clear()
+        session.tutorialActiveParticipants.clear()
+        session.tutorialMarkers.clear()
+        session.tutorialHoldStates.clear()
         session.entranceLiftChunkTicketWorldName = null
         session.entranceLiftChunkTicketKeys.clear()
         session.multiplayerJoinEnabled = false
@@ -3329,6 +3676,10 @@ class ArenaManager(
         session.startedWaves.add(wave)
         if (wave == session.waves && session.finalWaveStartedAtMillis <= 0L) {
             session.finalWaveStartedAtMillis = System.currentTimeMillis()
+            session.overtimeDischargeState = ArenaOvertimeDischargeState(
+                nextTriggerAtMillis = session.finalWaveStartedAtMillis + FINAL_WAVE_OVERTIME_TRIGGER_DELAY_MILLIS,
+                triggerCount = 0
+            )
         }
 
         // 掃討ミッション: 最終ウェーブでボスをスポーン
@@ -5400,7 +5751,8 @@ class ArenaManager(
             "arena.messages.oage.game_over_with_survivors",
             "arena.messages.oage.game_over_all_wiped",
             "arena.messages.oage.participant_died_followup",
-            "arena.messages.oage.down_with_survivors" -> 1.0
+            "arena.messages.oage.down_with_survivors",
+            "arena.messages.oage.mission_returned_followup" -> 1.0
             else -> 0.5
         }
     }
@@ -5412,7 +5764,14 @@ class ArenaManager(
         force: Boolean = false
     ) {
         if (!force && random.nextDouble() >= oageMessageChance(key)) return
-        OageMessageSender.send(player, "§f「$message」", plugin)
+        OageMessageSender.send(
+            player,
+            "§f「$message」",
+            plugin,
+            sound = Sound.ENTITY_ALLAY_AMBIENT_WITHOUT_ITEM,
+            volume = 1.0f,
+            pitch = 1.15f
+        )
     }
 
     private fun scheduleOageMessage(
@@ -5898,7 +6257,7 @@ class ArenaManager(
     }
 
     private fun arenaBgmKeys(): Set<String> {
-        return setOf(arenaBgmConfig.normal.soundKey, arenaBgmConfig.combat.soundKey)
+        return setOf(arenaBgmConfig.normal.soundKey, arenaBgmConfig.combat.soundKey, arenaBgmConfig.lobby.soundKey)
     }
 
     private fun prepareArenaWorldPoolAtStartup() {
@@ -7016,7 +7375,10 @@ class ArenaManager(
                         "arena.messages.oage.lift_occupied_done",
                         "§f「リフトの準備が終わりました！」"
                     ),
-                    plugin
+                    plugin,
+                    sound = Sound.ENTITY_ALLAY_AMBIENT_WITHOUT_ITEM,
+                    volume = 1.0f,
+                    pitch = 1.15f
                 )
             }
         }
@@ -7030,12 +7392,47 @@ class ArenaManager(
         return template.sizeX > 0 && template.sizeY > 0 && template.sizeZ > 0
     }
 
-    private fun findLoadedLobbyMarkers(world: World): List<Location> {
-        return world.getEntitiesByClass(Marker::class.java)
-            .asSequence()
-            .filter { marker -> marker.scoreboardTags.contains("arena.marker.lobby") }
-            .map { marker -> marker.location.clone() }
-            .toList()
+    private fun findLoadedLobbyMarkerSnapshot(world: World): ArenaLobbyMarkerSnapshot {
+        val returnLobby = mutableListOf<Location>()
+        val main = mutableListOf<Location>()
+        val tutorialStart = mutableListOf<Location>()
+        val tutorialSteps = mutableListOf<Location>()
+        val pedestal = mutableListOf<Location>()
+
+        world.getEntitiesByClass(Marker::class.java).forEach { marker ->
+            val tags = marker.scoreboardTags
+            val location = marker.location.clone()
+            when {
+                tags.contains(LOBBY_MARKER_TAG_RETURN) -> returnLobby += location
+                tags.contains(LOBBY_MARKER_TAG_MAIN) -> main += location
+                tags.contains(LOBBY_MARKER_TAG_TUTORIAL_START) -> tutorialStart += location
+                tags.contains(LOBBY_MARKER_TAG_TUTORIAL_STEP) -> tutorialSteps += location
+                tags.contains(LOBBY_MARKER_TAG_PEDESTAL) -> pedestal += location
+            }
+        }
+
+        if (main.isEmpty() && returnLobby.isNotEmpty()) {
+            main += returnLobby.map { it.clone() }
+        }
+
+        val sortedTutorialSteps = tutorialSteps
+            .sortedBy { location ->
+                val marker = world
+                    .getNearbyEntities(location, 0.25, 0.25, 0.25)
+                    .filterIsInstance<Marker>()
+                    .firstOrNull { candidate ->
+                        candidate.scoreboardTags.contains(LOBBY_MARKER_TAG_TUTORIAL_STEP)
+                    }
+                if (marker == null) Int.MAX_VALUE else extractTutorialStepIndex(marker) ?: Int.MAX_VALUE
+            }
+
+        return ArenaLobbyMarkerSnapshot(
+            returnLobby = returnLobby,
+            main = main,
+            tutorialStart = tutorialStart,
+            tutorialSteps = sortedTutorialSteps,
+            pedestal = pedestal
+        )
     }
 
     private fun isInsideLiftArea(markerLocation: Location, playerLocation: Location, margin: Double = 0.0): Boolean {
@@ -7087,6 +7484,84 @@ class ArenaManager(
                 !session.participants.contains(entry.key) || isPlayerDowned(session, entry.key)
             }
         }
+
+        updateLobbyTutorialMarkers(currentTick)
+    }
+
+    private fun updateLobbyTutorialMarkers(currentTick: Long) {
+        val snapshot = lobbyTutorialMarkers.toMap()
+        snapshot.forEach { (playerId, marker) ->
+            val player = Bukkit.getPlayer(playerId)
+            if (player == null || !player.isOnline || player.world.uid != marker.center.world?.uid) {
+                clearLobbyTutorialState(playerId)
+                return@forEach
+            }
+
+            val holdProgress = markerHoldProgress(marker, lobbyTutorialHoldStates[playerId])
+            advanceMarkerMiddleRingRotation(marker, holdProgress)
+            val color = resolveActionMarkerDisplayColor(marker, currentTick, holdProgress)
+            renderActionMarkerParticles(player, marker, color)
+            updateLobbyTutorialHoldState(player, marker, currentTick)
+        }
+    }
+
+    private fun updateLobbyTutorialHoldState(player: Player, marker: ArenaActionMarker, currentTick: Long) {
+        val playerId = player.uniqueId
+        if (!player.isSneaking) {
+            val holdState = lobbyTutorialHoldStates[playerId]
+            if (holdState != null && holdState.heldTicks >= 20) {
+                player.playSound(player.location, Sound.BLOCK_BEACON_DEACTIVATE, 1.0f, 2.0f)
+            }
+            lobbyTutorialHoldStates.remove(playerId)
+            return
+        }
+
+        val holdState = lobbyTutorialHoldStates.getOrPut(playerId) { ArenaActionMarkerHoldState() }
+        if (holdState.markerId != marker.id) {
+            holdState.markerId = marker.id
+            holdState.heldTicks = 0
+            holdState.startSoundPlayed = false
+        }
+
+        if (!holdState.startSoundPlayed) {
+            player.playSound(marker.center, Sound.BLOCK_RESPAWN_ANCHOR_CHARGE, 0.7f, 1.2f)
+            holdState.startSoundPlayed = true
+        }
+
+        holdState.heldTicks = (holdState.heldTicks + 1).coerceAtMost(marker.holdTicksRequired)
+        if (holdState.heldTicks < marker.holdTicksRequired) {
+            return
+        }
+
+        transitionActionMarkerState(
+            marker,
+            ArenaActionMarkerState.RUNNING,
+            currentTick,
+            fromColor = resolveActionMarkerHoldColor(marker, 1.0)
+        )
+        player.playSound(marker.center, Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 2.0f)
+
+        val tutorialState = lobbyTutorialStates[playerId]
+        val stepIndex = tutorialState?.stepIndex ?: 0
+        val stepMessages = ArenaI18n.stringList(player, "arena.messages.lobby.tutorial.steps", emptyList())
+        stepMessages.getOrNull(stepIndex)
+            ?.takeIf { it.isNotBlank() }
+            ?.let { player.sendMessage(it) }
+
+        lobbyTutorialHoldStates.remove(playerId)
+        if (tutorialState == null) {
+            completeLobbyTutorial(player)
+            return
+        }
+
+        tutorialState.stepIndex += 1
+        if (tutorialState.stepIndex >= tutorialState.stepLocations.size) {
+            lobbyTutorialMarkers.remove(playerId)
+            completeLobbyTutorial(player)
+            return
+        }
+
+        spawnLobbyTutorialMarker(player, tutorialState)
     }
 
     private fun updateBarrierReturnHoldStates(currentTick: Long) {
@@ -7146,10 +7621,27 @@ class ArenaManager(
                 session.barrierReturnSubtitleNextTickByParticipant.remove(participantId)
                 val returnKey = if (session.missionCompleted) "arena.messages.mission.returned" else "arena.messages.barrier.returned"
                 val returnFallback = "&aロビーへ帰還しました"
-                stopSessionToLobbyById(
+                val returnedToLobby = stopSessionToLobbyById(
                     participantId,
                     ArenaI18n.text(player, returnKey, returnFallback)
                 )
+                if (returnedToLobby && session.missionCompleted) {
+                    val lobbyPlayer = Bukkit.getPlayer(participantId)
+                    if (lobbyPlayer != null && lobbyPlayer.isOnline) {
+                        val followupMessage = ArenaI18n.stringList(
+                            lobbyPlayer,
+                            "arena.messages.oage.mission_returned_followup",
+                            listOf("おかえりなさい！ゆっくり休んでくださいね")
+                        ).randomOrNull()
+                        if (!followupMessage.isNullOrBlank()) {
+                            sendOageMessage(
+                                lobbyPlayer,
+                                "arena.messages.oage.mission_returned_followup",
+                                followupMessage
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -7229,6 +7721,12 @@ class ArenaManager(
         return (highestHold.toDouble() / required.toDouble()).coerceIn(0.0, 1.0)
     }
 
+    private fun markerHoldProgress(marker: ArenaActionMarker, holdState: ArenaActionMarkerHoldState?): Double {
+        val required = marker.holdTicksRequired.coerceAtLeast(1)
+        val heldTicks = holdState?.heldTicks ?: 0
+        return (heldTicks.toDouble() / required.toDouble()).coerceIn(0.0, 1.0)
+    }
+
     private fun advanceMarkerMiddleRingRotation(marker: ArenaActionMarker, holdProgress: Double) {
         val angularVelocity = MIDDLE_RING_MAX_ANGULAR_VELOCITY * holdProgress.coerceIn(0.0, 1.0)
         marker.middleRingAngleRadians = (marker.middleRingAngleRadians + angularVelocity) % (Math.PI * 2.0)
@@ -7252,6 +7750,9 @@ class ArenaManager(
                 if (total > 0 && activated >= total) {
                     onAllWavesCleared(session)
                 }
+            }
+            ArenaActionMarkerType.TUTORIAL_PROGRESS -> {
+                return
             }
         }
     }
@@ -7404,6 +7905,7 @@ class ArenaManager(
         val completeSound = when (marker.type) {
             ArenaActionMarkerType.BARRIER_ACTIVATE -> Sound.BLOCK_BEACON_POWER_SELECT
             ArenaActionMarkerType.DOOR_TOGGLE -> Sound.BLOCK_IRON_DOOR_OPEN
+            ArenaActionMarkerType.TUTORIAL_PROGRESS -> Sound.BLOCK_NOTE_BLOCK_PLING
         }
         session.participants
             .asSequence()

@@ -152,6 +152,9 @@ desert_temple:
     silverfish_stealth_fang:
       weight: 3
       wave: 4..
+    desert_temple_sand_golem:
+      weight: 2
+      wave: 4..
   orientation:
     entrance_exit: south
     corner_entry: north

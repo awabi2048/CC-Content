@@ -20,8 +20,23 @@ class ArenaCommand(
     private val featureFailureReasonProvider: () -> String? = { null }
 ) : CommandExecutor, TabCompleter {
 
+    private enum class ArenaMenuType(
+        val id: String,
+        val permissionCheck: (Player) -> Boolean
+    ) {
+        MISSION("mission", { player -> ArenaPermissions.hasMissionMenuPermission(player) }),
+        BROADCAST("broadcast", { player -> ArenaPermissions.hasBroadcastMenuPermission(player) }),
+        PEDESTAL("pedestal", { player -> ArenaPermissions.hasPedestalMenuPermission(player) });
+
+        companion object {
+            fun fromId(id: String): ArenaMenuType? {
+                return entries.firstOrNull { it.id.equals(id, ignoreCase = true) }
+            }
+        }
+    }
+
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
-        if (!sender.hasPermission("cc-content.arena.admin")) {
+        if (!ArenaPermissions.hasAdminAccess(sender)) {
             sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.no_permission", "&c権限がありません"))
             return true
         }
@@ -38,11 +53,12 @@ class ArenaCommand(
         }
 
         return when (args[0].lowercase()) {
-            "menu" -> handleMenu(sender)
+            "menu" -> handleMenu(sender, args)
             "start" -> handleStart(sender, args)
             "stop" -> handleStop(sender, args)
             "license" -> handleLicense(sender, args)
             "theme" -> handleTheme(sender, args)
+            "lobby" -> handleLobby(sender, args)
             "broadcast" -> handleBroadcast(sender)
             "pedestal" -> handlePedestal(sender)
             else -> {
@@ -52,16 +68,56 @@ class ArenaCommand(
         }
     }
 
-    private fun handleMenu(sender: CommandSender): Boolean {
-        val player = sender as? Player
-        if (player == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.player_only", "§cこのコマンドはプレイヤーのみ実行できます"))
+    private fun handleMenu(sender: CommandSender, args: Array<out String>): Boolean {
+        if (args.size < 2) {
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.usage.menu",
+                    "&c使用法: /arenaa menu <mission|broadcast|pedestal> [player]"
+                )
+            )
             return true
         }
 
-        if (!featureEnabledProvider()) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable", "§cArena feature は初期化に失敗したため利用できません"))
-            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "§7理由: {reason}", "reason" to it)) }
+        val menuType = ArenaMenuType.fromId(args[1])
+        if (menuType == null) {
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.usage.menu",
+                    "&c使用法: /arenaa menu <mission|broadcast|pedestal> [player]"
+                )
+            )
+            return true
+        }
+
+        val target = resolveTargetPlayer(sender, args.getOrNull(2)) ?: return true
+        val forcedByOther = sender !is Player || sender.uniqueId != target.uniqueId
+
+        if (!forcedByOther && !menuType.permissionCheck(target)) {
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.menu_permission_denied",
+                    "&cこのメニューを開く権限がありません"
+                )
+            )
+            return true
+        }
+
+        return openMenuByType(sender, target, menuType)
+    }
+
+    private fun handleLobby(sender: CommandSender, args: Array<out String>): Boolean {
+        if (args.size < 2) {
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.usage.lobby",
+                    "&c使用法: /arenaa lobby <player> [tutorial|main]"
+                )
+            )
             return true
         }
 
@@ -72,13 +128,50 @@ class ArenaCommand(
             return true
         }
 
-        val service = missionService
-        if (service == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.menu_open_failed", "§cアリーナメニューを開けませんでした"))
+        val target = Bukkit.getPlayer(args[1])
+        if (target == null) {
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found", "&c対象プレイヤーが見つかりません"))
+            return true
+        }
+        if (!target.isOnline) {
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found", "&c対象プレイヤーが見つかりません"))
             return true
         }
 
-        service.openMenu(player)
+        val lobbyTypeRaw = args.getOrNull(2)?.lowercase()
+        if (lobbyTypeRaw != null && lobbyTypeRaw != "tutorial" && lobbyTypeRaw != "main") {
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.usage.lobby",
+                    "&c使用法: /arenaa lobby <player> [tutorial|main]"
+                )
+            )
+            return true
+        }
+
+        val moved = manager.sendPlayerToLobby(target, lobbyTypeRaw)
+        if (!moved) {
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.lobby_failed",
+                    "&cロビー移動に失敗しました。マーカー設定を確認してください"
+                )
+            )
+            return true
+        }
+
+        val resolvedType = if (lobbyTypeRaw == "tutorial") "tutorial" else if (lobbyTypeRaw == "main") "main" else "auto"
+        sender.sendMessage(
+            ArenaI18n.text(
+                sender,
+                "arena.messages.command.lobby_success",
+                "&a{player} をロビーへ移動しました ({type})",
+                "player" to target.name,
+                "type" to resolvedType
+            )
+        )
         return true
     }
 
@@ -310,42 +403,117 @@ class ArenaCommand(
     }
 
     private fun handleBroadcast(sender: CommandSender): Boolean {
-        val player = sender as? Player
-        if (player == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.player_only", "§cこのコマンドはプレイヤーのみ実行できます"))
+        val target = sender as? Player
+        if (target == null) {
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.usage.menu",
+                    "&c使用法: /arenaa menu <mission|broadcast|pedestal> [player]"
+                )
+            )
             return true
         }
-
-        val menu = sessionInfoMenu
-        if (menu == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable", "§cArena feature は初期化に失敗したため利用できません"))
+        if (!ArenaPermissions.hasBroadcastMenuPermission(target)) {
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.menu_permission_denied",
+                    "&cこのメニューを開く権限がありません"
+                )
+            )
             return true
         }
-
-        menu.openMenu(player)
-        return true
+        return openMenuByType(sender, target, ArenaMenuType.BROADCAST)
     }
 
     private fun handlePedestal(sender: CommandSender): Boolean {
-        val player = sender as? Player
-        if (player == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.player_only", "§cこのコマンドはプレイヤーのみ実行できます"))
+        val target = sender as? Player
+        if (target == null) {
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.usage.menu",
+                    "&c使用法: /arenaa menu <mission|broadcast|pedestal> [player]"
+                )
+            )
             return true
         }
-
-        val menu = pedestalMenu
-        if (menu == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable", "§cArena feature は初期化に失敗したため利用できません"))
+        if (!ArenaPermissions.hasPedestalMenuPermission(target)) {
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.menu_permission_denied",
+                    "&cこのメニューを開く権限がありません"
+                )
+            )
             return true
         }
+        return openMenuByType(sender, target, ArenaMenuType.PEDESTAL)
+    }
 
-        menu.openMenu(player)
-        return true
+    private fun resolveTargetPlayer(sender: CommandSender, targetArg: String?): Player? {
+        if (targetArg.isNullOrBlank()) {
+            val self = sender as? Player
+            if (self == null) {
+                sender.sendMessage(
+                    ArenaI18n.text(
+                        sender,
+                        "arena.messages.command.target_required_from_console",
+                        "&cコンソール実行時は対象プレイヤーを指定してください"
+                    )
+                )
+                return null
+            }
+            return self
+        }
+
+        val target = Bukkit.getPlayer(targetArg)
+        if (target == null) {
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found", "&c対象プレイヤーが見つかりません"))
+            return null
+        }
+        return target
+    }
+
+    private fun openMenuByType(sender: CommandSender, target: Player, menuType: ArenaMenuType): Boolean {
+        return when (menuType) {
+            ArenaMenuType.MISSION -> {
+                val service = missionService
+                if (service == null) {
+                    sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.menu_open_failed", "§cアリーナメニューを開けませんでした"))
+                    return true
+                }
+                service.openMenu(target)
+                true
+            }
+
+            ArenaMenuType.BROADCAST -> {
+                val menu = sessionInfoMenu
+                if (menu == null) {
+                    sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable", "§cArena feature は初期化に失敗したため利用できません"))
+                    return true
+                }
+                menu.openMenu(target)
+                true
+            }
+
+            ArenaMenuType.PEDESTAL -> {
+                val menu = pedestalMenu
+                if (menu == null) {
+                    sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable", "§cArena feature は初期化に失敗したため利用できません"))
+                    return true
+                }
+                menu.openMenu(target)
+                true
+            }
+        }
     }
 
     private fun showUsage(sender: CommandSender) {
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.header", "&6=== Arena 管理コマンド ==="))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.menu", "&f/arenaa menu"))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.menu", "&f/arenaa menu <mission|broadcast|pedestal> [player]"))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.lobby", "&f/arenaa lobby <player> [tutorial|main]"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s|@near> <star_count> <theme> <mission_type>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop", "&f/arenaa stop <player>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.license", "&f/arenaa license set <player> <paper|bronze|silver|gold>"))
@@ -360,13 +528,14 @@ class ArenaCommand(
         alias: String,
         args: Array<out String>
     ): List<String> {
-        if (!sender.hasPermission("cc-content.arena.admin")) return emptyList()
+        if (!ArenaPermissions.hasAdminAccess(sender)) return emptyList()
         if (!featureEnabledProvider()) return emptyList()
 
         return when (args.size) {
-            1 -> listOf("menu", "start", "stop", "license", "theme", "broadcast", "pedestal").filter { it.startsWith(args[0], ignoreCase = true) }
+            1 -> listOf("menu", "lobby", "start", "stop", "license", "theme", "broadcast", "pedestal").filter { it.startsWith(args[0], ignoreCase = true) }
             2 -> when (args[0].lowercase()) {
-                "menu" -> emptyList()
+                "menu" -> ArenaMenuType.entries.map { it.id }.filter { it.startsWith(args[1], ignoreCase = true) }
+                "lobby" -> Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], ignoreCase = true) }
                 "start" -> listOf("@s", "@near") + Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], ignoreCase = true) }
                 "stop" -> arenaManagerProvider()?.getActiveSessionPlayerNames()?.filter { it.startsWith(args[1], ignoreCase = true) } ?: emptyList()
                 "license" -> listOf("set").filter { it.startsWith(args[1], ignoreCase = true) }
@@ -374,6 +543,8 @@ class ArenaCommand(
                 else -> emptyList()
             }
             3 -> when (args[0].lowercase()) {
+                "menu" -> Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[2], ignoreCase = true) }
+                "lobby" -> listOf("tutorial", "main").filter { it.startsWith(args[2], ignoreCase = true) }
                 "start" -> listOf("1", "2", "3", "4").filter { it.startsWith(args[2], ignoreCase = true) }
                 "license" -> if (args[1].equals("set", ignoreCase = true)) {
                     Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[2], ignoreCase = true) }

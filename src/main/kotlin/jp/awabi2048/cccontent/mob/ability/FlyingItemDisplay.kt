@@ -9,6 +9,7 @@ import org.bukkit.entity.Display
 import org.bukkit.entity.EntityType
 import org.bukkit.entity.ItemDisplay
 import org.bukkit.entity.LivingEntity
+import org.bukkit.entity.Projectile
 import org.bukkit.inventory.ItemStack
 import org.bukkit.util.Transformation
 import org.bukkit.util.Vector
@@ -21,6 +22,9 @@ class FlyingItemDisplay private constructor(
     private val display: ItemDisplay,
     private val itemStack: ItemStack
 ) {
+    private var lastDirection: Vector = Vector(0.0, 0.0, 1.0)
+    private var lastSpinAngle: Float = 0.0f
+
     companion object {
         private const val SPIN_SPEED = 30.0
         private const val DISC_RADIUS = 0.3
@@ -51,20 +55,29 @@ class FlyingItemDisplay private constructor(
         val dir = direction.clone()
         if (dir.lengthSquared() < 0.0001) return
         dir.normalize()
-        val yaw = kotlin.math.atan2(-dir.x, dir.z).toFloat()
         val spinAngle = (elapsedTicks.toDouble() * SPIN_SPEED).toFloat()
+        applyTransform(dir, spinAngle)
+    }
 
-        val spinRot = Quaternionf(AxisAngle4f(spinAngle, 0f, 0f, 1f))
-        val baseRot = Quaternionf(AxisAngle4f(BASE_ROTATION_ANGLE, 1f, 0f, 0f))
-        val dirRot = Quaternionf().rotateY(yaw)
-        val totalRot = dirRot.mul(baseRot.mul(spinRot))
+    fun freezeAt(position: Vector, impactDirection: Vector) {
+        if (!display.isValid) return
+        display.teleport(Location(display.world, position.x, position.y, position.z))
+        val dir = if (impactDirection.lengthSquared() > 0.0001) {
+            impactDirection.clone().normalize()
+        } else {
+            lastDirection.clone()
+        }
+        applyTransform(dir, lastSpinAngle)
+    }
 
-        display.transformation = Transformation(
-            Vector3f(0f, 0f, 0f),
-            totalRot,
-            Vector3f(0.55f, 0.55f, 0.55f),
-            Quaternionf()
-        )
+    fun syncFromProjectile(projectile: Projectile, elapsedTicks: Long) {
+        val velocity = projectile.velocity
+        val direction = if (velocity.lengthSquared() > 0.0001) {
+            velocity
+        } else {
+            projectile.location.direction
+        }
+        updatePosition(projectile.location.toVector(), direction, elapsedTicks)
     }
 
     fun checkHitsAlongSegment(
@@ -114,6 +127,29 @@ class FlyingItemDisplay private constructor(
     }
 
     fun isValid(): Boolean = display.isValid
+
+    private fun applyTransform(direction: Vector, spinAngle: Float) {
+        val normalized = if (direction.lengthSquared() > 0.0001) {
+            direction.clone().normalize()
+        } else {
+            lastDirection.clone()
+        }
+        val yaw = kotlin.math.atan2(-normalized.x, normalized.z).toFloat()
+
+        val spinRot = Quaternionf(AxisAngle4f(spinAngle, 0f, 0f, 1f))
+        val baseRot = Quaternionf(AxisAngle4f(BASE_ROTATION_ANGLE, 1f, 0f, 0f))
+        val dirRot = Quaternionf().rotateY(yaw)
+        val totalRot = dirRot.mul(baseRot.mul(spinRot))
+
+        display.transformation = Transformation(
+            Vector3f(0f, 0f, 0f),
+            totalRot,
+            Vector3f(0.55f, 0.55f, 0.55f),
+            Quaternionf()
+        )
+        lastDirection = normalized
+        lastSpinAngle = spinAngle
+    }
 
     private fun intersectsDisc(entity: LivingEntity, from: Vector, to: Vector): Boolean {
         val eyePos = entity.eyeLocation.toVector()

@@ -187,7 +187,7 @@ class WeaponThrowAbility(
         const val DEFAULT_SPREAD = 0.02
         const val DEFAULT_DAMAGE_MULTIPLIER = 2.0
         private const val PICKUP_SEARCH_RANGE = 12.0
-        private const val PICKUP_PATHFIND_SPEED = 2.3
+        private const val PICKUP_PATHFIND_SPEED = 1.15
         private const val SEARCH_PHASE_VARIANTS = 16
     }
 }

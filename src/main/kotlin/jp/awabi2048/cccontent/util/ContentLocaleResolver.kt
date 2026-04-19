@@ -5,25 +5,16 @@ import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 
 object ContentLocaleResolver {
-    private const val DEFAULT_LOCALE = "ja_jp"
-
     fun resolve(player: Player?): String {
         if (player == null) {
-            return DEFAULT_LOCALE
+            return CCSystem.getAPI().getSupportedLanguages().firstOrNull() ?: "ja_jp"
         }
 
         val ccSystemPlugin = Bukkit.getPluginManager().getPlugin("CC-System")
-        if (ccSystemPlugin != null && ccSystemPlugin.isEnabled) {
-            return CCSystem.getAPI().getPlayerLanguage(player)
+        if (ccSystemPlugin == null || !ccSystemPlugin.isEnabled) {
+            throw IllegalStateException("CC-System が有効化されていないため locale を解決できません")
         }
 
-        val raw = player.locale.lowercase().replace('-', '_')
-        return when {
-            raw == "ja_jp" -> "ja_jp"
-            raw == "en_us" -> "en_us"
-            raw.startsWith("ja") -> "ja_jp"
-            raw.startsWith("en") -> "en_us"
-            else -> DEFAULT_LOCALE
-        }
+        return CCSystem.getAPI().getPlayerLanguage(player)
     }
 }
