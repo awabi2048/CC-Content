@@ -81,6 +81,11 @@ data class ArenaBarrierRestartActivatedPoint(
     var nextRenderTick: Long
 )
 
+data class ArenaOvertimeDischargeState(
+    var nextTriggerAtMillis: Long = 0L,
+    var triggerCount: Int = 0
+)
+
 data class ArenaSession(
     val ownerPlayerId: UUID,
     val worldName: String,
@@ -110,6 +115,9 @@ data class ArenaSession(
     val joinAreaMarkerLocations: MutableList<Location> = mutableListOf(),
     val liftMarkerLocations: MutableList<Location> = mutableListOf(),
     val lobbyMarkerLocations: MutableList<Location> = mutableListOf(),
+    val lobbyMainMarkerLocations: MutableList<Location> = mutableListOf(),
+    val lobbyTutorialStartMarkerLocations: MutableList<Location> = mutableListOf(),
+    val lobbyTutorialStepMarkerLocations: MutableList<Location> = mutableListOf(),
     var participantSpawnProtectionUntilMillis: Long = 0L,
     var multiplayerJoinEnabled: Boolean = false,
     var multiplayerJoinFinalizeStarted: Boolean = false,
@@ -192,6 +200,13 @@ data class ArenaSession(
     val enteredWaves: MutableSet<Int> = mutableSetOf(),
     val waveEnteredAtMillis: MutableMap<Int, Long> = mutableMapOf(),
     var finalWaveStartedAtMillis: Long = 0L,
+    var overtimeDischargeState: ArenaOvertimeDischargeState = ArenaOvertimeDischargeState(),
+    val lobbyVisitedParticipants: MutableSet<UUID> = mutableSetOf(),
+    val tutorialCompletedParticipants: MutableSet<UUID> = mutableSetOf(),
+    val tutorialProgressByParticipant: MutableMap<UUID, Int> = mutableMapOf(),
+    val tutorialActiveParticipants: MutableSet<UUID> = mutableSetOf(),
+    val tutorialMarkers: MutableMap<UUID, ArenaActionMarker> = mutableMapOf(),
+    val tutorialHoldStates: MutableMap<UUID, ArenaActionMarkerHoldState> = mutableMapOf(),
     val playerWaveCatchupDeadlineMillis: MutableMap<UUID, Long> = mutableMapOf(),
     val barrierReturnHoldTicksByParticipant: MutableMap<UUID, Int> = mutableMapOf(),
     val barrierReturnSubtitleNextTickByParticipant: MutableMap<UUID, Long> = mutableMapOf(),

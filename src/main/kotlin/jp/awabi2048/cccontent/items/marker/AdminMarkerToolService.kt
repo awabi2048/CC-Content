@@ -119,7 +119,11 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             messageKeyPrefix = "marker",
             modes = listOf(
                 MarkerToolMode("join_area", "arena.marker.join_area", "modes.join_area", "§f参加エリア", Particle.END_ROD, Color.fromRGB(240, 240, 240)),
-                MarkerToolMode("lobby", "arena.marker.lobby", "modes.lobby", "§bロビー", Particle.SOUL, Color.fromRGB(96, 224, 255))
+                MarkerToolMode("lobby", "arena.marker.lobby", "modes.lobby", "§bロビー(帰還)", Particle.SOUL, Color.fromRGB(96, 224, 255)),
+                MarkerToolMode("lobby_main", "arena.marker.lobby_main", "modes.lobby_main", "§bロビー中央", Particle.SOUL_FIRE_FLAME, Color.fromRGB(96, 200, 255)),
+                MarkerToolMode("lobby_tutorial_start", "arena.marker.lobby_tutorial_start", "modes.lobby_tutorial_start", "§eチュートリアル開始", Particle.WAX_OFF, Color.fromRGB(255, 216, 96)),
+                MarkerToolMode("lobby_tutorial_step", "arena.marker.lobby_tutorial_step", "modes.lobby_tutorial_step", "§6チュートリアル途中", Particle.GLOW, Color.fromRGB(255, 176, 64)),
+                MarkerToolMode("pedestal", "arena.marker.pedestal", "modes.pedestal", "§d祭壇", Particle.END_ROD, Color.fromRGB(220, 160, 255))
             ),
             unavailableMessage = { null }
         ),
@@ -188,7 +192,35 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         val blockFace = event.blockFace
         val mode = getMode(item, definition)
         val placementLocation = resolvePlacementLocation(player, clickedBlock, blockFace)
-        spawnMarker(placementLocation, mode)
+        val marker = spawnMarker(placementLocation, mode)
+        if (definition.toolId == "arena.other_marker_tool" && mode.id == "lobby_tutorial_step") {
+            val world = placementLocation.world
+            if (world != null && marker != null) {
+                val maxIndex = world.getEntitiesByClass(Marker::class.java)
+                    .asSequence()
+                    .filter { it.uniqueId != marker.uniqueId }
+                    .filter { it.scoreboardTags.contains("arena.marker.lobby_tutorial_step") }
+                    .mapNotNull { existing ->
+                        existing.scoreboardTags
+                            .firstOrNull { it.startsWith("arena.marker.lobby_tutorial_step.index.") }
+                            ?.removePrefix("arena.marker.lobby_tutorial_step.index.")
+                            ?.toIntOrNull()
+                    }
+                    .maxOrNull()
+                    ?: 0
+                val nextIndex = maxIndex + 1
+                marker.addScoreboardTag("arena.marker.lobby_tutorial_step.index.$nextIndex")
+                player.sendMessage(
+                    text(
+                        definition,
+                        player,
+                        "tutorial_step_number_assigned",
+                        "§b[Marker] §fチュートリアル途中マーカー番号 §e{index} §fを設定しました。",
+                        "index" to nextIndex
+                    )
+                )
+            }
+        }
         player.sendMessage(text(definition, player, "placed", "§b[Marker] {mode} §fマーカーを設置しました。", "mode" to getModeDisplayName(player, definition, mode)))
         player.playSound(player.location, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.5f)
     }
@@ -292,11 +324,12 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         )
     }
 
-    private fun spawnMarker(markerLocation: Location, mode: MarkerToolMode) {
+    private fun spawnMarker(markerLocation: Location, mode: MarkerToolMode): Marker? {
         val world = markerLocation.world
-        if (world == null) return
+        if (world == null) return null
         val marker = world.spawnEntity(markerLocation, EntityType.MARKER) as Marker
         marker.addScoreboardTag(mode.tag)
+        return marker
     }
 
     private fun resolvePlacementLocation(player: Player, clickedBlock: Block, blockFace: BlockFace): Location {

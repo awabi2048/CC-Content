@@ -1,0 +1,160 @@
+sukima_dungeon:
+  prefix: §7[§dSukimaDungeon§7]
+  compass:
+    activate: §bWorld Sprout Compass [Tier %1] activated (§a%2 seconds§b)
+    deactivate: §cCompass deactivated
+    detected: '§aWorld Sprout detected! §7Distance: §e%1m §7Direction: §6%2'
+    cooldown: '§cCooldown: §e%1 seconds remaining'
+    no_sprouts: §cNo World Sprouts nearby
+  talisman:
+    use: §6Oage-chan's Talisman§7 used
+    escape: §d§lEscape!
+    cancelled: §cEscape cancelled
+  sprout:
+    harvest: §aWorld Sprout harvested
+  error:
+    not_in_dungeon: §cCan only be used inside SukimaDungeon
+    no_permission: §cNo permission
+    generic: §cAn error occurred
+  gui:
+    escape:
+      title: §8Escape Confirmation
+      confirm: §a§lEscape
+      cancel: §c§lCancel
+      lore:
+      - §7Escape from SukimaDungeon
+      - §7Are you sure?
+  item:
+    sprout:
+      name: §dWorld Sprout
+      description: World Sprout harvested from SukimaDungeon
+    compass:
+      name: §bWorld Sprout Compass
+      description: Compass that detects World Sprout locations
+    talisman:
+      name: §6Oage-chan's Talisman
+      description: Talisman to escape from SukimaDungeon
+  messages: null
+  command_player_only: This command can only be executed by players.
+  command_usage: '&e/sukima_dungeon <reload|add_item>'
+  command_reload_success: '&aReloaded settings and themes.'
+  command_bookmark_received: '&aReceived {tier} bookmark!'
+  bookmark_cannot_use_here: '&cYou cannot use the bookmark here.'
+  command_generate_usage: 'Usage: /sd generate <width> <length> [theme]'
+  command_generating: '&aGenerating dungeon...'
+  command_unknown: '&cUnknown sub-command.'
+  command_restricted: '&cThis command cannot be used inside the dungeon.'
+  command_generator_failed: '&cDungeon generation failed.'
+  common_bar: '&7&m――――――――――――――――――――――――――――――'
+  marker:
+    current_mode: '&f§l| §7Current Mode §a{mode}'
+    mode_changed: '&7Placement mode changed to §a{mode}§7.'
+    placed: '&b[Marker] {mode} §fmarker placed.'
+    removed: '&b[Marker] {mode} §fmarker removed.'
+    usage:
+      place: '&eRight click block§7 to place a marker on the outside of the face'
+      delete: '&eShift + right click§7 to remove the marker in your line of sight'
+      switch: '&eF key§7 to switch to the next mode'
+    modes:
+      mob: '&cMob'
+      npc: '&aNPC'
+      item: '&bItem'
+      sprout: '&dSprout'
+      spawn: '&fSpawn'
+  gui_entrance_title: '&5Connect Portals'
+  gui_entrance_button: '&b&lOpen Dungeon Portal'
+  gui_entrance_button_lore:
+  - '&7Click to open a portal to the dungeon!'
+  gui_style_button: '&6Select Play Style'
+  gui_style_multi: '&f§l| §7Current Setting §eGroup'
+  gui_style_single: '&f§l| §7Current Setting §eSolo'
+  gui_style_lore: '&7Click to switch'
+  gui_size_button: '&eSelect Size'
+  gui_size_small: '&f§l| §7Current Setting §eSmall'
+  gui_size_medium: '&f§l| §7Current Setting §eMedium'
+  gui_size_large: '&f§l| §7Current Setting §eLarge'
+  gui_size_huge: '&f§l| §7Current Setting §eHuge'
+  gui_size_lore: '&7Click to switch'
+  gui_theme_button: '&dPortal Destination'
+  gui_theme_current: '&f§l| §7Current Setting §d{theme} World'
+  gui_theme_lore: '&e§nClick to change'
+  gui_info_title: '&aInfo'
+  gui_info_theme: '&f§l| §7Portal Destination §d{theme} World'
+  gui_info_size: '&f§l| §7Size §e{size}'
+  gui_info_description: '&7The world of Sukima is very unstable. As a result, portals may lead to different worlds. &7Using higher-tier bookmarks makes it easier to reach your desired world.'
+  gui_theme_error: '&cTheme not found'
+  item_bookmark_name: '&d{tier} Bookmark'
+  item_talisman_name: '&6Oage-chan''s Talisman'
+  item_talisman_lore:
+  - '&7&m――――――――――――――――――――――――――――――'
+  - '&7An amulet given by Oage-chan to protect'
+  - '&7crafters sent to the Sukima Dungeon and'
+  - '&7to create a way back. Using it inside'
+  - '&7the dungeon allows you to &bescape&7.'
+  - '&7&m――――――――――――――――――――――――――――――'
+  gui_talisman_confirm_title: '&0&lReally escape?'
+  gui_talisman_confirm_button: '&c&lEscape'
+  gui_talisman_confirm_button_lore:
+  - '&7Clicking this will make all players'
+  - '&7leave the dungeon midway.'
+  - '&c*Items are not lost, but mission fails.'
+  gui_talisman_cancel_button: '&a&lStay'
+  talisman_cannot_use_here: '&cYou cannot use the talisman here.'
+  scoreboard_title: '&eSukima&6Dungeon'
+  scoreboard_sprouts: '&f&l| &7World Sprouts &a{count}&7/&a{total}'
+  scoreboard_remaining: '&f&l| &7Return in &b{time}'
+  oage_intro: '&6Oage-chan: &f"Umm, this is the entrance to Sukima Dungeon. Go defeat monsters and close the world!"'
+  oage_result: '&6Oage-chan: &f"Good job! Looks like you successfully cleared it. Here''s your reward!"'
+  oage_start_multi: '&a[Oage-chan] &f"Group it is! I''ll prepare {theme} ({tier})!"'
+  oage_start_single: '&a[Oage-chan] &f"Solo it is! I''ll prepare {theme} ({tier})!"'
+  trap_triggered: '&6Oage-chan: &f"Oops, caught again? You gotta be careful!"'
+  dungeon_closing: '&cThis dungeon will vanish shortly...'
+  tiers:
+    BROKEN: Tattered
+    WORN: Worn-out
+    FADED: Faded
+    NEW: Brand New
+  theme:
+    test:
+      name: Test
+      description: A test dungeon used for debugging.
+      oage_messages:
+      - Looks like this one is just a test!
+    cave:
+      name: Cave
+      description: A cave spreading in every direction. Watch your footing on the many ledges.
+      oage_messages:
+      - This cave stretches up, down, left, and right. You might need ladders to climb.
+      - There are lots of ledges here, so be careful not to lose your footing!
+    mineshaft:
+      name: Mineshaft
+      description: An abandoned mineshaft likely dug out by ancient people. What can be mined in this strange dimension?
+      oage_messages:
+      - This mineshaft looks like a place ancient people once excavated.
+      - Maybe you can find some unusual ores in the rift between dimensions...?
+    library:
+      name: Library
+      description: A quiet library where vast knowledge sleeps.
+      oage_messages:
+      - Keep it down... there are books everywhere!
+    ruin:
+      name: Ruins
+      description: Ruins left behind by ancient people. I wonder how they ever lived in such a maze-like place.
+      oage_messages:
+      - These look like ruins. I bet people used to live here once...
+      - I wonder what life in another dimension was like...?
+    see_of_trees:
+      name: Sea of Trees
+      description: A dense forest where thick trees block your view in every direction.
+      oage_messages:
+      - So many trees... it feels easy to get lost in here!
+    maze:
+      name: 3D Maze
+      description: A labyrinth-like space built from complex, intertwined paths.
+      oage_messages:
+      - Whoa... this place makes my head spin just looking at it!
+  sizes:
+    small: Small
+    medium: Medium
+    large: Large
+    huge: Huge

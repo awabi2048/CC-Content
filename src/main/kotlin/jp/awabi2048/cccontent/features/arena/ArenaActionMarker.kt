@@ -6,7 +6,8 @@ import java.util.UUID
 
 enum class ArenaActionMarkerType {
     DOOR_TOGGLE,
-    BARRIER_ACTIVATE
+    BARRIER_ACTIVATE,
+    TUTORIAL_PROGRESS
 }
 
 enum class ArenaActionMarkerState(val defaultColor: Color) {

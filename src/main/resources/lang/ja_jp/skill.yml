@@ -1,0 +1,298 @@
+skill:
+  lumberjack:
+    initial:
+      name: 木の気配
+      description: 木々と向き合う術を学び始める
+    speed_1:
+      name: 手早い伐採
+      description: 斧さばきが冴え 伐採が少し早くなる
+    harvest_1:
+      name: 実りの枝先
+      description: 木々から受け取る恵みが少し増える
+    speed_2:
+      name: 森を読む者
+      description: 木の流れを見極め 伐採がさらに冴える
+    harvest_2:
+      name: 年輪の恵み
+      description: 木々から受け取る恵みがさらに増える
+    cut_all_1:
+      name: 伐り拓く
+      description: まとめて伐る術を身につける
+    cut_all_2:
+      name: 倒れる音
+      description: 伐採の勢いが増し より広く木を倒せる
+    wind_gust:
+      name: 枝葉を払って
+      description: 風をまとい 葉を散らしやすくなる
+    replant:
+      name: 森は巡る
+      description: 伐ったあとにも 次の芽吹きを残せる
+    harvest_3:
+      name: 森の返礼
+      description: 木々から受け取る恵みが大きく増える
+    cut_all_3:
+      name: 深き森へ
+      description: 伐採の極みに近づき 回収までこなせる
+  farmer:
+    initial:
+      name: 土に触れて
+      description: 土の声を聞き 農の道へ踏み出す
+    harvest_1:
+      name: 実りのはじまり
+      description: 作物から得られる恵みが少し増える
+    area_tilling:
+      name: 畑をひらく
+      description: 鍬の扱いに慣れ 周囲を整えやすくなる
+    area_harvesting:
+      name: 穂波をなぞって
+      description: 実りをまとめて刈り取れるようになる
+    auto_replanting:
+      name: 種は巡る
+      description: 収穫のあとにも 次の芽吹きを繋げられる
+    harvest_2:
+      name: 豊かな実り
+      description: 作物から得られる恵みがさらに増える
+    tool:
+      name: 畑仕事の相棒
+      description: 新たな道具へ手を伸ばせるようになる
+    harvest_3:
+      name: 実りの最盛期
+      description: 作物から得られる恵みが大きく増える
+    special_loot_table_1:
+      name: 珍しき収穫
+      description: いつもとは違う実りに 出会えるようになる
+    special_loot_table_2:
+      name: 秘めたる収穫
+      description: 農の道の先にある 特別な実りへ届く
+  brewer:
+    initial:
+      name: 泡立つ薬瓶
+      description: 薬瓶の中に眠る力と向き合い始める
+    skill1:
+      name: 効き目の一滴
+      description: ひとしずくの冴えが 醸造の始まりを告げる
+    skill2:
+      name: 酒造の道
+      description: 酒の仕込みへと足を踏み入れる
+    skill3:
+      name: 醸造の道
+      description: 薬の調合へと足を踏み入れる
+    skill4:
+      name: 酵母を育てて
+      description: 仕込みの土台を整え 次の工程へ進む
+    skill5:
+      name: 火を絶やさず
+      description: 調合の流れを保ち 醸しを早める
+    skill6:
+      name: 頃合いを知る
+      description: 仕上がりの気配を 早く見抜けるようになる
+    skill7:
+      name: 混ざり合う滴
+      description: 異なる性質を なめらかに繋げられる
+    skill8:
+      name: 発酵は進む
+      description: 仕上げへ向かう工程が より良く巡る
+    skill9:
+      name: ひと振りの妙
+      description: 薬の出来を押し上げる ひと工夫を覚える
+    skill10:
+      name: 火は巡る
+      description: 醸しの勢いがさらに増していく
+    skill11:
+      name: 濃くなる一杯
+      description: 薬効の深みを さらに引き出せる
+    skill12:
+      name: 触れ合う薬効
+      description: 醸造の先にある 応用の扉へ手が届く
+  miner:
+    initial:
+      name: 石の中へ
+      description: 鉱夫としての一歩を踏み出す
+    speed_1:
+      name: 止まらぬ手
+      description: ツルハシさばきが冴え 採掘が少し早くなる
+    fortune_1:
+      name: 思わぬ収穫
+      description: 鉱石から受け取る恵みが少し増える
+    speed_2:
+      name: 岩を穿つ者
+      description: 石を読む目が育ち 採掘がさらに冴える
+    fortune_2:
+      name: 鉱脈を追って
+      description: 鉱石から受け取る恵みがさらに増える
+    durability_1:
+      name: 使い慣れた一振り
+      description: 道具を長く使う術を覚える
+    fortune_3:
+      name: 地底の寵愛
+      description: 鉱石から受け取る恵みが大きく増える
+    mineall_1:
+      name: 掘り進め！
+      description: まとめて掘り抜く術を身につける
+    mineall_2:
+      name: まとめて採掘
+      description: 採掘の勢いが増し 回収もこなしやすくなる
+    mineall_3:
+      name: 一気呵成
+      description: 掘削の極みに近づき 一息に掘り進める
+    blastmine_1:
+      name: 火薬の心得
+      description: 爆破を採掘へ活かす術を覚える
+    blastmine_2:
+      name: 粉砕採掘
+      description: 爆ぜる一撃で 広く採り尽くせる
+  cook:
+    initial:
+      name: 初心者の料理人
+      description: 基本的な料理法を学んだ
+    skill1:
+      name: 修行中の料理人
+      description: より高度な調理技術を習得
+    skill2:
+      name: 熟練の料理人（穀物の達人）
+      description: 穀物料理の専門家
+    skill3:
+      name: 穀物の大シェフ
+      description: 穀物料理を極めた者
+    skill4:
+      name: 熟練の料理人（スープ職人）
+      description: スープ料理の専門家
+    skill5:
+      name: スープの名職人
+      description: スープ料理を極めた者
+    skill6:
+      name: 野菜の達人
+      description: 野菜料理の極意を習得
+    skill7:
+      name: シチューの魔術師
+      description: シチュー作りの究極形態
+    skill8:
+      name: 食材の支配者
+      description: すべての食材特性を完全理解
+    skill9:
+      name: 料理神
+      description: 料理技術の最高位に達した者
+  swordsman:
+    initial:
+      name: 剣を取れ
+      description: 刃を手に取り 戦いの道へ踏み出す
+    power_1:
+      name: 研がれた刃
+      description: 一撃の重みが増し 刃が鋭さを帯びる
+    sweep_boost_1:
+      name: 薙ぎの型
+      description: 薙ぎ払いが冴え 群れを巻き込みやすくなる
+    power_2:
+      name: 冴える一閃
+      description: 刃筋が整い 一撃がさらに重くなる
+    buff_1:
+      name: 背水の構え
+      description: 劣勢の中で 立て直す力を得る
+    sweep_boost_2:
+      name: 薙ぎの極み
+      description: 剣技が深まり 複数を相手取りやすくなる
+    drain_1:
+      name: 奪い返す刃
+      description: 斬り結ぶほどに 体勢を取り戻せることがある
+    power_3:
+      name: 一太刀の重み
+      description: 剣の威が満ち 一撃が完成に近づく
+    buff_2:
+      name: 背水の境地
+      description: さらに厳しい戦況でも 折れずに踏みとどまる
+    reach_1:
+      name: 届く刃
+      description: 間合いを制し 少し遠くまで斬り結べる
+  warrior:
+    initial:
+      name: 戦支度
+      description: 武を整え 戦いの場へ踏み出す
+    power_1:
+      name: 重き一撃
+      description: まずは一打に重みを宿らせる
+    axe_power_1:
+      name: 荒ぶる刃
+      description: 斧の一撃が さらに荒々しさを増す
+    shock_wave_1:
+      name: 揺らぐ大地
+      description: 振り抜いた一撃が 余波を伴うようになる
+    self_buff_1:
+      name: 高ぶる血潮
+      description: 戦いのさなか 自らを奮い立たせる
+    shock_wave_2:
+      name: 震える一打
+      description: 重い一撃の余波が さらに強まっていく
+    attack_speed_1:
+      name: 絶えぬ連撃
+      description: 武器の振りが軽くなり 攻めを継ぎやすくなる
+    axe_power_2:
+      name: 猛き一閃
+      description: 斧の威がさらに研ぎ澄まされる
+    magnet_1:
+      name: 逃がさぬ間合い
+      description: 距離を詰め 相手を逃がしにくくする
+    critical_1:
+      name: 会心の刻
+      description: 一撃が深く刺さる瞬間を掴みやすくなる
+    axe_power_3:
+      name: 戦場の重み
+      description: 戦士の一撃が 完成の域へ近づく
+    bow_power_1:
+      name: 張りつめた弦
+      description: 矢の一撃が鋭さを増していく
+    snipe_1:
+      name: 遠くを見る目
+      description: 距離を取った射撃に 長けていく
+    3way_1:
+      name: 散りゆく矢羽
+      description: 複数の矢を放ち 前方を制しやすくなる
+    piercing_1:
+      name: 貫く矢
+      description: 矢が敵を抜けやすくなる
+    3way_2:
+      name: なおも散る矢
+      description: 放たれる矢がさらに戦場を覆う
+    bow_power_2:
+      name: 冴える射線
+      description: 弓の威がさらに増していく
+    arrow_saving_1:
+      name: 惜しまぬ矢筒
+      description: 矢を失わずに済むことがある
+    range_1:
+      name: 届く矢声
+      description: 遠くまで届く一射を扱いやすくなる
+    aiming_1:
+      name: 狙いは逸れず
+      description: 放った矢が 標的を捉えやすくなる
+  gardener:
+    initial:
+      name: 緑の手ほどき
+      description: 草花と向き合う術を学び始める
+    skill1:
+      name: 風をまとう
+      description: 空を使った作業が 少し楽になる
+    skill2:
+      name: 抱えきれぬほど
+      description: 道具や資材を より持ち運びやすくなる
+    skill3:
+      name: 手を広げて
+      description: まとめて整える術に 手が届く
+    skill4:
+      name: 届く指先
+      description: 少し離れた場所にも 手を届かせやすくなる
+    skill5:
+      name: 風と歩む
+      description: 庭仕事の先にある 道具へ手が届く
+  carpenter:
+    initial:
+      name: 木組みの心得
+      description: 材を見極め 組み上げる道へ踏み出す
+    skill1:
+      name: 型をなぞって
+      description: 建てるための型を 扱えるようになる
+    skill2:
+      name: 崩しの手順
+      description: まとめて外すための手際を覚える
+    skill3:
+      name: 型は手の内に
+      description: 建てる道具の奥行きが さらに増していく

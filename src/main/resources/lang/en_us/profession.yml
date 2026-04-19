@@ -1,0 +1,3 @@
+profession:
+  level_up: §a{profession} leveled up! §eLv.{old} -> Lv.{new} §7(+{gained})
+  new_unlock: 'New unlockable skills available ({count}): {skills} [Click to open skill tree]'

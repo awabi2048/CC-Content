@@ -11,6 +11,7 @@ import jp.awabi2048.cccontent.features.arena.generator.ArenaTheme
 import jp.awabi2048.cccontent.util.OageMessageSender
 import org.bukkit.Bukkit
 import org.bukkit.Material
+import org.bukkit.Sound
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -346,7 +347,10 @@ class ArenaMissionService(
                                     "arena.messages.oage.lift_ready",
                                     "§f「おねがいします！準備ができるまでリフトに乗ってお待ちください～」"
                                 ),
-                                plugin
+                                plugin,
+                                sound = Sound.ENTITY_ALLAY_AMBIENT_WITHOUT_ITEM,
+                                volume = 1.0f,
+                                pitch = 1.15f
                             )
                         }
                     }, 40L)
@@ -362,7 +366,10 @@ class ArenaMissionService(
                                 "arena.messages.multiplayer.lift_occupied_oage",
                                 "§f「リフトが空くまでちょっとまってね！」"
                             ),
-                            plugin
+                            plugin,
+                            sound = Sound.ENTITY_ALLAY_AMBIENT_WITHOUT_ITEM,
+                            volume = 1.0f,
+                            pitch = 1.15f
                         )
                     } else if (result.messageKey == "arena.messages.command.start_error.lift_not_ready") {
                         OageMessageSender.send(
@@ -372,7 +379,10 @@ class ArenaMissionService(
                                 "arena.messages.multiplayer.lift_not_ready_oage",
                                 "§f「リフトの準備が出来ていないみたいです！ちょっとまってね！」"
                             ),
-                            plugin
+                            plugin,
+                            sound = Sound.ENTITY_ALLAY_AMBIENT_WITHOUT_ITEM,
+                            volume = 1.0f,
+                            pitch = 1.15f
                         )
                     } else {
                         player.sendMessage(
@@ -437,7 +447,8 @@ class ArenaMissionService(
         data class ParsedDifficulty(
             val id: String,
             val display: String,
-            val explicitStar: Int
+            val explicitStar: Int,
+            val maxParticipants: Int
         )
 
         val parsed = mutableListOf<ParsedDifficulty>()
@@ -446,11 +457,13 @@ class ArenaMissionService(
             val section = config.getConfigurationSection(difficultyId) ?: continue
             val display = section.getString("display", difficultyId) ?: difficultyId
             val explicitStar = display.count { it == '★' }
+            val maxParticipants = section.getInt("max_participants", 6).coerceIn(1, 6)
             parsed.add(
                 ParsedDifficulty(
                     id = difficultyId,
                     display = display,
-                    explicitStar = explicitStar
+                    explicitStar = explicitStar,
+                    maxParticipants = maxParticipants
                 )
             )
         }
@@ -465,7 +478,8 @@ class ArenaMissionService(
             ArenaDifficultyDefinition(
                 id = definition.id,
                 display = definition.display,
-                starLevel = if (definition.explicitStar > 0) definition.explicitStar else fallbackStar
+                starLevel = if (definition.explicitStar > 0) definition.explicitStar else fallbackStar,
+                maxParticipants = definition.maxParticipants
             )
         }
         difficultyDisplayMap = difficultyDefinitions.associateBy { it.id }
@@ -537,13 +551,14 @@ class ArenaMissionService(
             if (!difficultyDisplayMap.containsKey(difficultyId)) {
                 throw IllegalStateException("上位難易度 $difficultyId が difficulty.yml に定義されていません")
             }
+            val maxParticipants = difficultyMaxParticipants(difficultyId)
 
             ArenaDailyMissionEntry(
                 index = index,
                 missionTypeId = missionType.id,
                 difficultyId = difficultyId,
                 themeId = themeId,
-                maxParticipants = 6
+                maxParticipants = maxParticipants
             )
         }
 
@@ -659,8 +674,9 @@ class ArenaMissionService(
             throw IllegalStateException("difficulty_id が不正です: $difficultyId")
         }
 
-        if (maxParticipants !in 1..6) {
-            throw IllegalStateException("max_participants が不正です: $maxParticipants")
+        val allowedMaxParticipants = difficultyMaxParticipants(difficultyId)
+        if (maxParticipants !in 1..allowedMaxParticipants) {
+            throw IllegalStateException("max_participants が不正です: $maxParticipants (difficulty=$difficultyId max=$allowedMaxParticipants)")
         }
     }
 
@@ -985,6 +1001,10 @@ class ArenaMissionService(
 
     private fun difficultyDisplay(difficultyId: String): String {
         return difficultyDisplayMap[difficultyId]?.display ?: difficultyId
+    }
+
+    private fun difficultyMaxParticipants(difficultyId: String): Int {
+        return difficultyDisplayMap[difficultyId]?.maxParticipants?.coerceIn(1, 6) ?: 6
     }
 
     private fun difficultyStar(difficultyId: String): Int {

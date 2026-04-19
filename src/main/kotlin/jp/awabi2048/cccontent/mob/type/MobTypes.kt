@@ -286,6 +286,41 @@ class IronGolemMagnetMobType : EquipmentMobType(
     )
 )
 
+class DesertTempleSandGolemMobType : EquipmentMobType(
+    id = "desert_temple_sand_golem",
+    baseEntityType = EntityType.MAGMA_CUBE,
+    abilities = listOf(
+        ProjectileAndFireImmunityAbility(id = "desert_temple_sand_golem_immunity", playSoundOnProjectileBlock = true),
+        MagmaLandingBurstAbility(
+            id = "desert_temple_sand_golem_landing_burst",
+            radius = 4.6,
+            fireTicks = 0,
+            damage = 4.5,
+            horizontalKnockback = 1.3,
+            verticalKnockback = 0.42
+        ),
+        LeapAbility(
+            id = "desert_temple_sand_golem_leap",
+            cooldownTicks = 34L,
+            minRangeSquared = 4.0,
+            maxRange = 12.0,
+            horizontalSpeed = 0.8,
+            verticalSpeed = 0.38,
+            farJumpStartRangeSquared = 49.0,
+            farHorizontalSpeed = 1.4,
+            farVerticalSpeed = 0.74
+        ),
+        MagmaStageDeathAbility(
+            id = "desert_temple_sand_golem_death",
+            explosionPower = 0.0f,
+            lavaRadius = 0,
+            lavaLevels = emptyList()
+        )
+    )
+) {
+    override val rewardCategoryId: String = "iron_golem"
+}
+
 class GuardianNormalMobType : EquipmentMobType(
     id = "guardian_normal",
     baseEntityType = EntityType.GUARDIAN,

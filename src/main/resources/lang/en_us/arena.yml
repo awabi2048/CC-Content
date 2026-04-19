@@ -1,0 +1,409 @@
+arena:
+  marker:
+    current_mode: '&f§l| §7Current Mode §a{mode}'
+    mode_changed: '&7Placement mode changed to §a{mode}§7.'
+    placed: '&b[Marker] {mode} §fmarker placed.'
+    removed: '&b[Marker] {mode} §fmarker removed.'
+    usage:
+      place: '&eRight click block§7 to place a marker on the outside of the face'
+      delete: '&eShift + right click§7 to remove the marker in your line of sight'
+      switch: '&eF key§7 to switch to the next mode'
+    modes:
+      mob: '&cMob'
+      entrance: '&aEntrance'
+      checkpoint: '&aCheckpoint'
+      join_area: '&fJoin Area'
+      lobby: '&bLobby'
+      lobby_main: '&bLobby Main'
+      lobby_tutorial_start: '&eTutorial Start'
+      lobby_tutorial_step: '&6Tutorial Step'
+      lift: '&dLift'
+      pedestal: '&dPedestal'
+      connection: '&6Connection'
+      door_block: '&eDoor'
+      barrier_core: '&bBarrier Core'
+      barrier_point: '&3Barrier Point'
+    tutorial_step_number_assigned: §b[Marker] §fAssigned tutorial step marker number §e{index}§f.
+  messages:
+    command:
+      no_permission: '&cYou do not have permission'
+      target_not_found: '&cTarget player not found'
+      feature_unavailable: '&cArena feature is unavailable because initialization failed'
+      feature_unavailable_reason: '&7Reason: {reason}'
+      player_only: '&cThis command can only be executed by a player'
+      menu_open_failed: '&cFailed to open the arena menu'
+      menu_open_failed_detail: '&cFailed to open the arena menu: {message}'
+      start_success: '&aStarted arena for {player} (mob_type={mob_type}, difficulty={difficulty}, theme={theme}, waves={waves})'
+      stop_success: '&aStopped arena for {player}'
+      stop_not_in_session: '&e{player} is not in an arena session'
+      license_set_success: '&aSet {player}''s license to {tier}'
+      menu_permission_denied: '&cYou do not have permission to open this menu'
+      target_required_from_console: '&cPlease specify a target player when running from console'
+      lobby_failed: '&cFailed to move to lobby. Please check marker settings'
+      lobby_success: '&aMoved {player} to lobby ({type})'
+      theme_none: '&eNo themes are available'
+      theme_list: '&6[Arena] Available themes: {themes}'
+      usage:
+        menu: '&cUsage: /arenaa menu <mission|broadcast|pedestal> [player]'
+        lobby: '&cUsage: /arenaa lobby <player> [tutorial|main]'
+        start: '&cUsage: /arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
+        stop: '&cUsage: /arenaa stop <player>'
+        license: '&cUsage: /arenaa license set <player> <paper|bronze|silver|gold>'
+        theme: '&cUsage: /arenaa theme list'
+      start_error:
+        already_in_session: '&c{player} is already in an arena session'
+        concurrent_limit_reached: '&cConcurrent session limit reached ({current}/{max})'
+        difficulty_not_found: '&cdifficulty not found: {difficulty}'
+        theme_not_found: '&cNo valid theme was found'
+        undefined_wave_spawn: '&ctheme ''{theme}'' has no spawn definition for wave {wave}'
+        too_many_participants: '&cToo many participants ({count}/{max})'
+        lift_not_ready: '&cCannot start because the lift is not ready'
+        lift_occupied: '&cCannot start because the lift is in use'
+        lobby_marker_not_found: '&cCannot start because no lobby marker exists in loaded chunks'
+        pool_world_unavailable: '&cCannot start because arena worlds are still preparing'
+        stage_build_failed: '&c{message}'
+        invalid_mission_type: '&cInvalid mission type: {type}'
+      help:
+        header: '&6=== Arena Admin Commands ==='
+        menu: '&f/arenaa menu <mission|broadcast|pedestal> [player]'
+        lobby: '&f/arenaa lobby <player> [tutorial|main]'
+        start: '&f/arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
+        stop: '&f/arenaa stop <player>'
+        license: '&f/arenaa license set <player> <paper|bronze|silver|gold>'
+        theme: '&f/arenaa theme list'
+        broadcast: '&f/arenaa broadcast'
+        pedestal: '&f/arenaa pedestal'
+    menu:
+      open_failed: '&cFailed to open the arena mission'
+      open_failed_detail: '&cFailed to open the arena menu: {message}'
+      start_error:
+        already_in_session: '&c{player} is already in an arena session'
+        mob_type_not_found: '&cmob_type not found: {mob_type}'
+        difficulty_not_found: '&cdifficulty not found: {difficulty}'
+        undefined_wave_spawn: '&cmob_type ''{mob_type}'' has no spawn definition for wave {wave}'
+        theme_not_found: '&cNo valid theme was found'
+        world_create_failed: '&cFailed to create arena world'
+        stage_build_failed: '&c{message}'
+        join_area_not_found: '&cCannot start because no join area marker exists nearby'
+        lobby_marker_not_found: '&cCannot start because no lobby marker exists in loaded chunks'
+        invalid_mission_type: '&cInvalid mission type: {type}'
+    mission:
+      already_completed: '&eThis mission has already been completed'
+      already_in_mission: '&cYou already have a mission in progress'
+      not_found: '&cArena mission not found'
+      start_cancelled: '&cMission start was cancelled'
+      license_insufficient: '&cYour license does not allow this mission yet'
+      stage_build_failed_internal: '&cStage generation failed. Please report to staff. (STRUCTURE_ERROR)'
+      return_hint: §7Hold Shift to return to lobby
+      return_countdown: §7Returning in §e{seconds} sec
+      returned: '&aReturned to lobby'
+    lobby:
+      tutorial:
+        steps:
+        - §f"This is the arena lobby! You can accept missions from the board."
+        - §f"From the lobby center, you can access each facility. Prepare before departure!"
+        - §f"The pedestal lets you enhance gear with specific materials."
+        - §f"When you are ready, choose a mission and board the lift."
+    license:
+      promoted: '&aYour license has been upgraded! &f-> {tier}'
+    multiplayer:
+      invite_window_started: §6Mission accepted!§7 Preparing the lift...
+      invite_window_hint: §7Left-click to invite other players to your mission
+      wait_area_hint: '&7Invited players enter waiting state by standing in the join area with the owner'
+      waiting_entered: '&aYou entered the waiting area. Stay here until the grace time ends'
+      waiting_exited: '&cYou stepped off the lift. Stay on it if you want to join!'
+      lift_not_ready_oage: §f"Looks like the lift is not ready yet! Please wait a little!"
+      lift_occupied_oage: §f"Please wait until the lift is free!"
+      waiting_title: '&7Waiting to start'
+      stage_wait_title: '&7Preparing arena...'
+      invite_sent: '&aInvitation sent to {player}'
+      invited: '&6You were invited to arena by {owner}. Please enter the waiting area'
+      invited_decline_hint: '&7To decline, left-click the inviter'
+      already_invited: '&e{player} is already invited'
+      invite_window_closed: '&cThe invitation window has ended'
+      invite_failed_world: '&cYou can only invite players in the same world'
+      invite_failed_in_session: '&c{player} is already in another arena session'
+      invite_failed_full: '&cCannot invite because this mission reached max participants'
+      invite_failed_already_locked: '&c{player} is already invited by someone else'
+      declined_self: '&eYou declined the invitation'
+      declined_notify_owner: '&e{player} declined the invitation'
+      stage_intro: '&6Starting stage transfer...'
+      cancelled_owner_offline: '&cMultiplayer recruitment ended because the owner is offline'
+      cancelled_owner_not_waiting: '&cStart canceled because the owner is not in the waiting area'
+      invite_cancelled_offline: '&eInvitation to {player} was cancelled because they went offline'
+      invite_auto_declined_far: '&eInvitation to {player} was cancelled because they moved away from the waiting area'
+      invite_auto_declined_far_owner: '&eInvitation to {player} was cancelled because they moved away from the waiting area'
+      invite_message_simple: §8§l«§c§lArena§8§l» §7{owner} invited you to the arena!
+      no_description: '&7No description'
+      invite_message_prefix: §8§l«§c§lArena§8§l» §7{owner} invited you to mission§e
+      invite_message_mission: §e【{mission}】
+      invite_message_suffix: '&7!'
+    down:
+      entered: '&cDowned! §7Teammates can revive you'
+      recovered: '&aYou have been revived!'
+      revive_success: '&aYou revived {player}'
+      timeout: '&cBleedout time expired. Teleporting to lobby'
+      game_over: '&cEverything went dark...!\n&7Game over. Teleporting to lobby'
+      participant_died: §4{player} has fallen... §7(Oage is heading to rescue)
+      needs_revive: '&c{player} is downed! Revive them!'
+    oage:
+      stage_start:
+      - §fWe have arrived on site!
+      combat_all_engaged:
+      - These enemies are quite tough...!
+      combat_all_calm:
+      - Looking good! Keep it up!
+      wave_cleared:
+      - It seems safe for now! Let's regroup and move on to the next wave!
+      wave_cleared_full_room:
+      - Now! Let's go!
+      wave_clear_wait:
+      - If you approach the marker in front of the door, we may figure something out!
+      final_wave_start:
+      - The object in the center is the barrier stone! Activating all the surrounding markers will start the restart!
+      barrier_restart_started:
+      - Monsters will be more aggressive while the barrier is down! Be careful!
+      barrier_restart_remaining_2_3:
+      - The restart is going smoothly! Please hang in there!
+      barrier_restart_remaining_1_3:
+      - Just a little more...!
+      barrier_restart_complete:
+      - The barrier stone restart is complete!
+      game_over_followup:
+      - §fOn my way! Just hang on!
+      game_over_with_survivors:
+      - §fGood work out there! You can still check on the others from here!
+      game_over_all_wiped:
+      - §fGood work! Glad I made it in time!
+      participant_died_followup:
+      - §fOn my way to rescue!
+      down_with_survivors:
+      - §fGood work! You can still check on the others from here!
+      lift_ready: §f"Please wait on the lift until it is ready~"
+      lift_occupied_done: §f"The lift is ready! Please board!"
+      mission_returned_followup:
+      - Welcome back! Please take a good rest first!
+      - Great work out there! Don't forget to claim your rewards!
+    barrier:
+      cannot_break: '&cThe barrier core cannot be broken'
+      cannot_place_on: '&cYou cannot place blocks on the barrier core'
+      not_ready: '&cThe barrier core cannot be reactivated yet. Clear all waves first'
+      activating: '&eBarrier core is already activating'
+      ready_subtitle: '&bRight-click the barrier core to reactivate it'
+      activating_title: '&bReactivating barrier core...'
+      activation_complete_title: '&aReactivation complete'
+      restart_started: '&cBarrier core restart has begun! Temporarily disabling the barrier!'
+      restart_success: '&aBarrier core restart succeeded!'
+      restart_confirmed: Barrier restart confirmed!
+      return_hint: §7Hold Shift to return to lobby
+      return_countdown: §7Returning in §e{seconds} sec
+      returned: '&aReturned to lobby'
+    session:
+      starting: '&6[Arena] Starting arena...'
+      started: '&6[Arena] Session started: theme={theme}, mob_type={mob_type}, difficulty={difficulty}, waves={waves}'
+      retry_hint: '&7You can retry with admin command by specifying mob_type / difficulty / theme'
+      cleared: '&aArena cleared!'
+      ended: '&cArena session ended'
+      ended_by_logout: '&cArena ended because you logged out'
+      ended_by_death: '&cArena ended because you died'
+      ended_by_warp: '&cArena ended as death because you warped'
+      ended_by_shutdown: '&cArena ended because the server is shutting down'
+      stopped_by_admin: '&cArena stopped by admin command'
+    stage:
+      already_started: '&eThe stage has already started'
+      start_subtitle: '&6Stage Start'
+    door:
+      animating: '&eDoor is opening'
+      corridor_opened: '&aCorridor to Wave {wave} is now open'
+      corridor_opened_subtitle: '&aThe next corridor has opened'
+      open_hint: Hold Shift to open the door
+      corridor_opened_notice: '&3The path to the next wave has opened...'
+    wave:
+      title: §7- §6Wave {wave} §7-
+      last_title: '&7- §6Last Wave §7-'
+      player_advanced: §7{player} has entered §6Wave {wave}§7!
+    clearing:
+      boss_spawned: §5Sweep boss has appeared! Defeat it within the time limit!
+      boss_defeated: §aSweep boss defeated! Mission clear!
+      time_expired: §cTime ran out! Could not defeat the sweep boss...
+      success: §a§lAll sweep bosses defeated! Mission clear!
+    mock:
+      door_animation_start: '&7{message}'
+      corridor_door_reinstall: '&7{message}'
+  ui:
+    menu_title: §8Arena Board
+    confirm_title: §8Confirm
+    pedestal:
+      title: §8Mysterious Altar
+      blank: ' '
+      info:
+        dummy:
+        - §7Dummy text 1
+        - §7Dummy text 2
+        - §7Dummy text 3
+      placeholder:
+        left: §aCatalyst Flow
+        right: §aInfo Flow
+      exp:
+        name: §eRequired Level
+        waiting: §7Insert a catalyst to see required level
+        required: '§7Required Level: §e{value}'
+        current: '§7Current Level: §f{value}'
+        ready: §aRequirement met
+        not_ready: §cInsufficient level
+      execute:
+        ready: §aRun Over Enchant
+        waiting: §cRun Over Enchant
+        ready_lore: §7Click to execute
+        waiting_lore: §7Execution unlocks when conditions are met
+        missing_level: §8Need §a{value} levels §8more
+        consume_level: §8Consumes §a{value} levels §8on forging
+    separator: §8§m――――――――――――――――――――
+    coming_soon: §7Coming Soon!
+    license_card:
+      title: §bLicense Card
+      current_license: §f❙ §7Current License §e{tier}
+      allowed_difficulty: §f❙ §7Allowed Difficulty §c{difficulty} §7or below
+      next_header: §f❙ §7To next license
+      max_reached: '  §8- §aAll licenses unlocked'
+      requirement:
+        mission_clear: '  §8- §fComplete missions {progress}'
+        mob_kill: '  §8- §fDefeat monsters (total) {progress}'
+        strong_enemy_kill: '  §8- §fDefeat strong enemies (total) {progress}'
+    info_title: §bInfo
+    info:
+      lines:
+      - §7Missions update once per day at §e24:00
+      - §7Work together to help Oage-chan
+      - §7Completing missions earns §erewards§7 from Oage-chan
+      - §7Arena monsters may drop §drare items
+    confirm:
+      ok_name: §aOK
+      ok_lore:
+      - §7Start this mission
+      cancel_name: §cCancel
+      cancel_lore:
+      - §7Cancel mission start
+    mission:
+      item_name: §a{mission}
+      completed_item_name: §a§m{mission}
+      mission_title: §f❙ §7Mission
+      difficulty_inline: §f❙ §7Difficulty §f{difficulty}
+      memo_inline: §f❙ §7Memo §f{memo}
+    player:
+      name_format: §6{player}
+      mob_kills: §f❙ §7Mobs defeated §e{count}
+      barrier_restarts: §f❙ §7Barrier restarts §e{count}
+    recruitment:
+      default_mission_title: Arena Mission
+      title: §6【{missionTitle}】
+      remaining: §fStarting in §e{seconds} sec
+      waiting_participant: §b✦ {name}
+      normal_participant: §7✧ {name}
+    sidebar:
+      title: §7« §cARENA §7»
+      elapsed_time: '§7Elapsed: §f{time}'
+      get_ready: §7§lGet Ready!
+      defeat: §c§lDEFEAT
+      participant_line: §7◯ §b{name} {status}
+      last_wave: §7» §6§lLast Wave §7«
+      wave: §7» §6§lWave {wave} §7«
+      clear: §dCLEAR
+      status_down: §eDOWN
+      status_alive: §aALIVE
+      status_preparing: §dPREPARING
+      status_dead: §cDEAD
+    license:
+      tier:
+        paper: Paper
+        bronze: Bronze
+        silver: Silver
+        gold: Gold
+    broadcast:
+      title: §8Arena Broadcast
+      default_title: §fArena Mission
+      empty_slot: §eAvailable
+      info:
+        name: §bInfo
+        lore:
+        - §7Oage-chan is supporting
+        - §7from the base
+      lift:
+        no_session: §8-
+        occupied: §cLift in use
+        ready: §aLift ready
+        preparing: §eLift preparing
+      players_header: §f❙ §7Players
+      player_line: §7・ §b{name} {status}
+      radio_header: §f❙ §7Radio
+      wave:
+        get_ready: §7« §6Wave ◯ (Last Wave) §7» §eArrived!
+        normal: §7« §6Wave {wave} §7»
+        last: §7« §6Wave ◯ (Last Wave) §7»
+        clear: §dCLEAR
+  bossbar:
+    join_countdown: §fStarting in §e{seconds} sec
+    clearing_boss: §7- §5Sweep Boss §7- §c{time} §8(§7remaining §b{alive}§8)
+    revive:
+      downed: §7{reviver} is reviving...
+      reviver: §7Reviving {downed}...
+    barrier_restart: §7- §6Last Wave §7- §dRestarting...
+    wave_clear: §7- §6Wave {wave} §7- §bCLEAR
+    last_wave_label: Last Wave
+    wave_label: Wave {wave}
+    wave_clear_dynamic: §7- §6{waveLabel} §7- §bCLEAR
+    last_wave_progress: §7- §6Last Wave §7- §8(§7{activated}/§b{total}§8)
+    wave_progress: §7- §6{waveLabel} §7- §8(§c{kills}§7/{target}§8)
+  mission:
+    memo_choices:
+    - §eGood luck!
+    - §eSafety first!
+    - §eLet's work together!
+    type:
+      barrier_restart:
+        name: Barrier Restart
+        hints:
+        - §fThe §dBarrier Stone§f protecting the area seems to be malfunctioning
+        - §fGo to the site and §f§nrestart§f the Barrier Stone!
+      barrier_deploy:
+        name: Barrier Deploy
+        hints:
+        - §7Deploy the Barrier Stone to secure the area
+      sweep:
+        name: Sweep
+        hints:
+        - §7Defeat the swarming enemies
+      boss:
+        name: Boss
+        hints:
+        - §7Defeat the boss
+      clearing:
+        name: Defeat Them All!
+        hints:
+        - §fDefeat weakened hordes of monsters!
+        - §fDefeat the boss in the depths to clear!
+  theme:
+    end:
+      name: The End
+    test:
+      name: Test
+    cave:
+      name: Cave
+    mineshaft:
+      name: Mineshaft
+    library:
+      name: Library
+    ruins:
+      name: Ruins
+    see_of_trees:
+      name: Sea of Trees
+    maze:
+      name: Maze
+    desert_temple:
+      name: Desert Temple
+    ocean_monument:
+      name: Ocean Monument
+    natura:
+      name: Lush Cave
+    nether:
+      name: Nether Fortress

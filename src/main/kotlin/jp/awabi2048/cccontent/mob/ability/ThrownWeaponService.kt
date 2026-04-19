@@ -7,7 +7,6 @@ import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Mob
 import org.bukkit.entity.Player
 import org.bukkit.entity.Projectile
-import org.bukkit.entity.Trident
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.entity.ProjectileHitEvent
@@ -15,6 +14,7 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
+import org.bukkit.util.Vector
 import java.util.UUID
 import java.util.WeakHashMap
 
@@ -40,6 +40,7 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
         val itemId: UUID,
         val weapon: ItemStack,
         val loaderKey: String,
+        val stuckDisplayId: UUID?,
         var ttlTicks: Long
     )
 
@@ -69,11 +70,8 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
         val projectile = spec.projectile
         val world = projectile.world
 
-        val flyingDisplay = if (projectile is Trident) {
-            null
-        } else {
-            FlyingItemDisplay.spawn(world, projectile.location, spec.weapon.clone())
-        }
+        val flyingDisplay = FlyingItemDisplay.spawn(world, projectile.location, spec.weapon.clone())
+        hideInternalProjectile(projectile)
 
         val active = ActiveThrownWeapon(
             ownerId = spec.ownerId,
@@ -113,7 +111,7 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
 
         event.damage = active.damage
         target.world.playSound(target.location, org.bukkit.Sound.ITEM_SHIELD_BREAK, 0.9f, 1.0f)
-        toGroundWeapon(active, projectile.location)
+        toGroundWeapon(active, projectile.location, resolveImpactDirection(projectile))
         projectile.remove()
         removeActive(projectile.uniqueId)
     }
@@ -121,7 +119,7 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
     fun handleProjectileHit(event: ProjectileHitEvent) {
         val active = activeThrows[event.entity.uniqueId] ?: return
         event.entity.world.playSound(event.entity.location, org.bukkit.Sound.ITEM_SHIELD_BREAK, 0.9f, 1.0f)
-        toGroundWeapon(active, event.entity.location)
+        toGroundWeapon(active, event.entity.location, resolveImpactDirection(event.entity))
         event.entity.remove()
         removeActive(event.entity.uniqueId)
     }
@@ -145,6 +143,7 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
         }
         groundWeapons.values.forEach { ground ->
             Bukkit.getEntity(ground.itemId)?.remove()
+            removeStuckDisplay(ground.stuckDisplayId)
         }
 
         activeThrows.clear()
@@ -175,6 +174,8 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
                 continue
             }
 
+            active.flyingDisplay?.syncFromProjectile(projectile, projectile.ticksLived.toLong())
+
             if (shouldUpdateDisplay) {
                 val vel = projectile.velocity
                 active.flyingDisplay?.updatePosition(
@@ -191,6 +192,7 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
             ground.ttlTicks -= 1L
             if (ground.ttlTicks <= 0L) {
                 Bukkit.getEntity(ground.itemId)?.remove()
+                removeStuckDisplay(ground.stuckDisplayId)
                 groundIterator.remove()
                 continue
             }
@@ -198,6 +200,7 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
             val item = Bukkit.getEntity(ground.itemId) as? Item
             if (item == null || !item.isValid || item.isDead) {
                 item?.remove()
+                removeStuckDisplay(ground.stuckDisplayId)
                 groundIterator.remove()
                 continue
             }
@@ -220,6 +223,7 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
                 loader.equipment?.setItemInMainHand(ground.weapon.clone())
                 loader.world.playSound(loader.location, org.bukkit.Sound.ENTITY_ITEM_PICKUP, 0.8f, 1.05f)
                 item.remove()
+                removeStuckDisplay(ground.stuckDisplayId)
                 groundIterator.remove()
             }
         }
@@ -230,15 +234,30 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
         }
     }
 
-    private fun toGroundWeapon(active: ActiveThrownWeapon, location: org.bukkit.Location) {
-        active.flyingDisplay?.cleanup()
+    private fun toGroundWeapon(active: ActiveThrownWeapon, location: org.bukkit.Location, impactDirection: Vector) {
+        val normalizedDirection = if (impactDirection.lengthSquared() > 1.0E-6) {
+            impactDirection.clone().normalize()
+        } else {
+            Vector(0.0, -1.0, 0.0)
+        }
 
         val world = location.world ?: return
         val dropLoc = location.clone().add(0.0, 0.1, 0.0)
+
+        val stuckDisplayId = active.flyingDisplay?.let { display ->
+            if (display.isValid()) {
+                display.freezeAt(dropLoc.toVector(), normalizedDirection)
+                display.id
+            } else {
+                display.cleanup()
+                null
+            }
+        }
+
         val droppedItem = world.dropItem(dropLoc, active.weapon.clone())
         droppedItem.pickupDelay = Int.MAX_VALUE
         droppedItem.isUnlimitedLifetime = true
-        droppedItem.velocity = org.bukkit.util.Vector(0.0, 0.0, 0.0)
+        droppedItem.velocity = Vector(0.0, 0.0, 0.0)
         droppedItem.persistentDataContainer.set(
             NamespacedKey(plugin, PLAYER_PICKUP_DISABLED_KEY),
             PersistentDataType.BYTE,
@@ -254,8 +273,37 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
             itemId = droppedItem.uniqueId,
             weapon = active.weapon.clone(),
             loaderKey = active.loaderKey,
+            stuckDisplayId = stuckDisplayId,
             ttlTicks = GROUND_TTL_TICKS
         )
+    }
+
+    private fun resolveImpactDirection(projectile: Projectile): Vector {
+        val velocity = projectile.velocity
+        if (velocity.lengthSquared() > 1.0E-6) {
+            return velocity
+        }
+        val fallback = projectile.location.direction
+        return if (fallback.lengthSquared() > 1.0E-6) fallback else Vector(0.0, -1.0, 0.0)
+    }
+
+    private fun removeStuckDisplay(stuckDisplayId: UUID?) {
+        if (stuckDisplayId == null) return
+        val entity = Bukkit.getEntity(stuckDisplayId)
+        if (entity != null && entity.isValid) {
+            entity.remove()
+        }
+    }
+
+    private fun hideInternalProjectile(projectile: Projectile) {
+        runCatching {
+            val method = projectile.javaClass.methods.firstOrNull { candidate ->
+                candidate.name == "setVisibleByDefault" &&
+                    candidate.parameterCount == 1 &&
+                    candidate.parameterTypes[0] == Boolean::class.javaPrimitiveType
+            }
+            method?.invoke(projectile, false)
+        }
     }
 
     private fun removeActive(projectileId: UUID) {

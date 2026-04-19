@@ -23,7 +23,18 @@ object OageMessageSender {
     }
 
     fun send(player: Player, message: String, plugin: JavaPlugin = CCContent.instance) {
+        send(player, message, plugin, sound = null, volume = 1f, pitch = 1f)
+    }
+
+    fun send(
+        player: Player,
+        message: String,
+        plugin: JavaPlugin = CCContent.instance,
+        sound: Sound? = null,
+        volume: Float = 1f,
+        pitch: Float = 1f
+    ) {
         player.sendMessage(getPrefix(plugin) + message)
-        player.playSound(player.location, getSound(plugin), 1f, 1f)
+        player.playSound(player.location, sound ?: getSound(plugin), volume, pitch)
     }
 }

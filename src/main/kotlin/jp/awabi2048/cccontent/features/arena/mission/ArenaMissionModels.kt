@@ -84,7 +84,8 @@ data class ArenaPlayerMissionData(
 data class ArenaDifficultyDefinition(
     val id: String,
     val display: String,
-    val starLevel: Int
+    val starLevel: Int,
+    val maxParticipants: Int
 )
 
 enum class ArenaLicenseTier(

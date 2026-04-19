@@ -111,6 +111,11 @@ arena:
       bpm: 140
       loop_beats: 384
       switch_interval_beats: 8
+    lobby:
+      key: "kota_server:ost_3.sukima_dungeon"
+      bpm: 120
+      loop_beats: 384
+      switch_interval_beats: 8
   mission:
     generate_count: 14
     promotion_probability: 0.25
@@ -229,7 +234,6 @@ arena:
       infinity: 75
       sharpness: 75
       breach: 80
-  final_wave_time_limit_seconds: 600
   barrier_restart:
     default_duration_seconds: 30
     corruption_ratio_base: 0.05

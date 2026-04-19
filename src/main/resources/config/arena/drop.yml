@@ -48,6 +48,9 @@ additional_drops:
     guardian:
       - item: PRISMARINE_SHARD
         amount: 0-2
+      - item: LIGHTNING_ROD
+        amount: 0-1
+        chance: 0.25
       - item: PRISMARINE_CRYSTALS
         amount: 0-1
         chance: 0.33

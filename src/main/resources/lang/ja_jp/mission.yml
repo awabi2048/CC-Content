@@ -1,0 +1,5 @@
+mission:
+  accept:
+    success: '&aミッションを受注しました！'
+  complete:
+    success: '&a&lクエスト達成！'

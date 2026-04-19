@@ -10,6 +10,7 @@ object BGMManager {
     private data class PrecisePlayback(
         val task: BukkitTask,
         val soundKey: String,
+        val pitch: Float,
         val startTick: Long,
         val loopDurationTicks: Long,
         @Volatile var nextPlayAtTick: Long,
@@ -75,18 +76,19 @@ object BGMManager {
         playPrecise(player, soundKey, loopTicks)
     }
 
-    fun playPrecise(player: Player, soundKey: String, loopTicks: Long) {
+    fun playPrecise(player: Player, soundKey: String, loopTicks: Long, pitch: Float = 1.0f) {
         val plugin = CCContent.instance
         if (loopTicks <= 0L) {
             plugin.logger.warning("BGM再生tickが不正です: key=$soundKey loopTicks=$loopTicks")
             return
         }
+        val normalizedPitch = pitch.coerceIn(0.1f, 2.0f)
 
         val startTick = Bukkit.getCurrentTick().toLong()
         val nextPlayAtTick = startTick + loopTicks
 
         // 初回即時再生
-        player.playSound(player.location, soundKey, 1.0f, 1.0f)
+        player.playSound(player.location, soundKey, 1.0f, normalizedPitch)
 
         val task = object : org.bukkit.scheduler.BukkitRunnable() {
             override fun run() {
@@ -98,7 +100,7 @@ object BGMManager {
                 val playback = activePlaybacks[player.uniqueId] ?: return
                 val currentTick = Bukkit.getCurrentTick().toLong()
                 if (currentTick >= playback.nextPlayAtTick) {
-                    player.playSound(player.location, soundKey, 1.0f, 1.0f)
+                    player.playSound(player.location, soundKey, 1.0f, playback.pitch)
                     var next = playback.nextPlayAtTick + playback.loopDurationTicks
                     while (next <= currentTick) {
                         next += playback.loopDurationTicks
@@ -109,7 +111,7 @@ object BGMManager {
             }
         }.runTaskTimer(plugin, 0L, 1L)
 
-        replaceActivePlayback(player, task, soundKey, startTick, loopTicks, nextPlayAtTick)
+        replaceActivePlayback(player, task, soundKey, normalizedPitch, startTick, loopTicks, nextPlayAtTick)
     }
 
     fun getElapsedNanos(player: Player): Long? {
@@ -150,6 +152,7 @@ object BGMManager {
         player: Player,
         task: BukkitTask,
         soundKey: String,
+        pitch: Float,
         startTick: Long,
         loopDurationTicks: Long,
         nextPlayAtTick: Long
@@ -161,6 +164,7 @@ object BGMManager {
         activePlaybacks[player.uniqueId] = PrecisePlayback(
             task = task,
             soundKey = soundKey,
+            pitch = pitch,
             startTick = startTick,
             loopDurationTicks = loopDurationTicks,
             nextPlayAtTick = nextPlayAtTick,

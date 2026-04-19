@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent
 
+import com.awabi2048.ccsystem.CCSystem
 import jp.awabi2048.cccontent.command.CCCommand
 import jp.awabi2048.cccontent.command.GiveCommand
 import jp.awabi2048.cccontent.config.CoreConfigManager
@@ -78,7 +79,6 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.tasks.SpecialTileTask
 import jp.awabi2048.cccontent.mob.MobEventListener
 import jp.awabi2048.cccontent.mob.MobService
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
-import jp.awabi2048.cccontent.util.LanguageFileValidator
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
@@ -90,6 +90,7 @@ import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.scheduler.BukkitTask
 import java.io.File
+import java.util.jar.JarFile
 
 class CCContent : JavaPlugin(), Listener {
     
@@ -109,7 +110,7 @@ class CCContent : JavaPlugin(), Listener {
     private var persistenceFlushTask: BukkitTask? = null
     private lateinit var featureInitLogger: FeatureInitializationLogger
     private lateinit var coreConfig: YamlConfiguration
-    private var arenaLanguageValidationErrors: List<String> = emptyList()
+    private var languageErrorsByFeature: Map<String, List<String>> = emptyMap()
     
     // SukimaDungeon マネージャー (GitHub版)
     private lateinit var structureLoader: StructureLoader
@@ -129,6 +130,7 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var contentEnabledAtStartup: ContentEnabledSettings
     private var arenaFeatureReady: Boolean = false
     private var arenaFeatureFailureReason: String? = null
+    private var customItemsLanguageAvailable: Boolean = true
 
     private data class ContentEnabledSettings(
         val arena: Boolean,
@@ -150,20 +152,10 @@ class CCContent : JavaPlugin(), Listener {
 
     private fun startPlugin() {
         instance = this
+        ensureCCSystemAvailable()
+        saveSplitLanguageResources()
         coreConfig = CoreConfigManager.load(this)
-        val languageValidationResult = LanguageFileValidator.validateAndCollect(this)
-        val (arenaErrors, nonArenaErrors) = splitArenaLanguageErrors(languageValidationResult.errors)
-        arenaLanguageValidationErrors = arenaErrors
-        if (nonArenaErrors.isNotEmpty()) {
-            val detail = nonArenaErrors.joinToString("\n") { "- $it" }
-            throw IllegalStateException("言語ファイル検証に失敗しました:\n$detail")
-        }
-        if (arenaErrors.isNotEmpty()) {
-            logger.warning("[Arena] 言語ファイル検証でArena領域のエラーを検出したため、Arena機能を無効化します")
-            arenaErrors.forEach { error -> logger.warning("[Arena][Lang] $error") }
-            arenaFeatureReady = false
-            arenaFeatureFailureReason = "Arena言語ファイルの検証エラーにより無効化"
-        }
+        validateAndRegisterLanguageSources()
         contentEnabledAtStartup = loadContentEnabledSettings()
 
         featureInitLogger = FeatureInitializationLogger(logger)
@@ -192,20 +184,32 @@ class CCContent : JavaPlugin(), Listener {
         server.pluginManager.registerEvents(adminMarkerToolService, this)
         adminMarkerToolService.start()
 
-        registerCustomItems()
+        if (customItemsLanguageAvailable) {
+            registerCustomItems()
+        } else {
+            logger.warning("[CustomItems] 言語ファイル検証エラーによりカスタムアイテム登録をスキップします")
+            languageErrorsFor("custom_items").forEach { error -> logger.warning("[CustomItems][Lang] $error") }
+        }
 
         initializeFeatureIfEnabled("Rank System", "rank") {
+            if (hasLanguageErrorsFor("rank")) {
+                featureInitLogger.setStatus("Rank System", FeatureInitializationLogger.Status.WARNING)
+                featureInitLogger.addSummaryMessage("Rank System", "言語ファイル検証エラーにより無効化")
+                languageErrorsFor("rank").forEach { error -> logger.warning("[Rank][Lang] $error") }
+                return@initializeFeatureIfEnabled
+            }
             initializeRankSystem()
         }
 
         initializeFeatureIfEnabled("Arena", "arena") {
-            if (arenaLanguageValidationErrors.isNotEmpty()) {
+            if (hasLanguageErrorsFor("arena")) {
                 arenaFeatureReady = false
                 if (arenaFeatureFailureReason.isNullOrBlank()) {
                     arenaFeatureFailureReason = "Arena言語ファイルの検証エラーにより無効化"
                 }
                 featureInitLogger.setStatus("Arena", FeatureInitializationLogger.Status.WARNING)
                 featureInitLogger.addSummaryMessage("Arena", "言語ファイル検証エラーにより無効化")
+                languageErrorsFor("arena").forEach { error -> logger.warning("[Arena][Lang] $error") }
                 return@initializeFeatureIfEnabled
             }
             try {
@@ -222,11 +226,13 @@ class CCContent : JavaPlugin(), Listener {
                     coreConfigProvider = { coreConfig },
                     missionServiceProvider = { arenaMissionService }
                 )
+                arenaManager.setPedestalMenuProvider { arenaEnchantPedestalMenu }
                 arenaFeatureReady = true
             } catch (e: Exception) {
                 runCatching { arenaMissionService?.shutdown() }
                 runCatching {
                     if (::arenaManager.isInitialized) {
+                        arenaManager.setPedestalMenuProvider(null)
                         arenaManager.setMissionService(null)
                         arenaManager.shutdown()
                     }
@@ -322,6 +328,12 @@ class CCContent : JavaPlugin(), Listener {
         }
 
         initializeFeatureIfEnabled("SukimaDungeon", "sukima_dungeon") {
+            if (hasLanguageErrorsFor("sukima_dungeon")) {
+                featureInitLogger.setStatus("SukimaDungeon", FeatureInitializationLogger.Status.WARNING)
+                featureInitLogger.addSummaryMessage("SukimaDungeon", "言語ファイル検証エラーにより無効化")
+                languageErrorsFor("sukima_dungeon").forEach { error -> logger.warning("[SukimaDungeon][Lang] $error") }
+                return@initializeFeatureIfEnabled
+            }
             initializeSukimaDungeon()
         }
 
@@ -380,6 +392,7 @@ class CCContent : JavaPlugin(), Listener {
             arenaSessionInfoMenu = null
             arenaEnchantPedestalMenu = null
             if (::arenaManager.isInitialized) {
+                arenaManager.setPedestalMenuProvider(null)
                 arenaManager.setMissionService(null)
             }
             arenaMissionService = null
@@ -409,6 +422,7 @@ class CCContent : JavaPlugin(), Listener {
             MenuCooldownManager.clearAll()
             CustomItemManager.clear()
             HeadDatabaseBridge.reset()
+            runCatching { unregisterLanguageSources() }
             rankManagerInstance = null
             ignoreBlockStoreInstance = null
             playTimeTrackerTaskId = -1
@@ -832,15 +846,8 @@ class CCContent : JavaPlugin(), Listener {
      */
     private fun reloadConfigFiles() {
         coreConfig = CoreConfigManager.load(this)
-        val languageValidationResult = LanguageFileValidator.validateAndCollect(this)
-        val (arenaErrors, nonArenaErrors) = splitArenaLanguageErrors(languageValidationResult.errors)
-        if (nonArenaErrors.isNotEmpty()) {
-            val detail = nonArenaErrors.joinToString("\n") { "- $it" }
-            throw IllegalStateException("言語ファイル検証に失敗しました:\n$detail")
-        }
-
-        arenaLanguageValidationErrors = arenaErrors
-        if (arenaErrors.isNotEmpty()) {
+        validateAndRegisterLanguageSources()
+        if (hasLanguageErrorsFor("arena")) {
             if (arenaFeatureReady) {
                 arenaMissionService?.shutdown()
                 arenaSessionInfoMenu = null
@@ -853,7 +860,7 @@ class CCContent : JavaPlugin(), Listener {
             arenaFeatureReady = false
             arenaFeatureFailureReason = "Arena言語ファイルの検証エラーにより無効化"
             logger.warning("[Arena] 言語ファイル検証エラーを検出したためArena機能を停止します")
-            arenaErrors.forEach { error -> logger.warning("[Arena][Lang] $error") }
+            languageErrorsFor("arena").forEach { error -> logger.warning("[Arena][Lang] $error") }
             logger.info("[CCContent] config 配下の再読込を完了しました(Arena無効)")
             return
         }
@@ -892,24 +899,84 @@ class CCContent : JavaPlugin(), Listener {
         logger.info("[CCContent] config 配下の再読込を完了しました")
     }
 
-    private fun splitArenaLanguageErrors(errors: List<String>): Pair<List<String>, List<String>> {
-        if (errors.isEmpty()) {
-            return emptyList<String>() to emptyList()
+    private fun ensureCCSystemAvailable() {
+        val ccSystemPlugin = server.pluginManager.getPlugin("CC-System")
+        if (ccSystemPlugin == null || !ccSystemPlugin.isEnabled) {
+            throw IllegalStateException("CC-System が有効化されていないため CC-Content を起動できません")
         }
-        val arenaErrors = mutableListOf<String>()
-        val nonArenaErrors = mutableListOf<String>()
-        errors.forEach { error ->
-            val isArenaRelated =
-                error.contains("arena.") ||
-                    error.contains("resource:lang/arena", ignoreCase = true) ||
-                    error.contains("file:", ignoreCase = true) && error.contains("lang") && error.contains("arena", ignoreCase = true)
-            if (isArenaRelated) {
-                arenaErrors += error
-            } else {
-                nonArenaErrors += error
+    }
+
+    private fun validateAndRegisterLanguageSources() {
+        val api = CCSystem.getAPI()
+        val validationResult = api.validateI18nSource(this, contentLanguageFeatureByFile())
+        languageErrorsByFeature = validationResult.errorsByFeature
+        customItemsLanguageAvailable = !hasLanguageErrorsFor("custom_items")
+
+        unregisterLanguageSources(api)
+
+        contentLanguageSources().forEach { (feature, fileNames) ->
+            if (!hasLanguageErrorsFor(feature)) {
+                api.registerI18nSource("CC-Content:$feature", this, fileNames)
             }
         }
-        return arenaErrors to nonArenaErrors
+    }
+
+    private fun unregisterLanguageSources(api: com.awabi2048.ccsystem.api.CCSystemAPI = CCSystem.getAPI()) {
+        contentLanguageSources().keys.forEach { feature ->
+            api.unregisterI18nSource("CC-Content:$feature")
+        }
+    }
+
+    private fun hasLanguageErrorsFor(feature: String): Boolean {
+        return languageErrorsFor(feature).isNotEmpty()
+    }
+
+    private fun languageErrorsFor(feature: String): List<String> {
+        return languageErrorsByFeature[feature].orEmpty()
+    }
+
+    private fun contentLanguageFeatureByFile(): Map<String, String> {
+        return buildMap {
+            put("arena.yml", "arena")
+            put("custom_items.yml", "custom_items")
+            put("sukima_dungeon.yml", "sukima_dungeon")
+            put("rank.yml", "rank")
+            put("profession.yml", "rank")
+            put("skill.yml", "rank")
+            put("tutorial_rank.yml", "rank")
+            put("mission.yml", "rank")
+            put("gui.yml", "rank")
+        }
+    }
+
+    private fun contentLanguageSources(): Map<String, Set<String>> {
+        return mapOf(
+            "arena" to setOf("arena.yml"),
+            "custom_items" to setOf("custom_items.yml"),
+            "sukima_dungeon" to setOf("sukima_dungeon.yml"),
+            "rank" to setOf("rank.yml", "profession.yml", "skill.yml", "tutorial_rank.yml", "mission.yml", "gui.yml")
+        )
+    }
+
+    private fun saveSplitLanguageResources() {
+        val codeSource = runCatching {
+            File(javaClass.protectionDomain.codeSource.location.toURI())
+        }.getOrNull() ?: return
+        if (!codeSource.isFile) {
+            return
+        }
+
+        JarFile(codeSource).use { jar ->
+            jar.entries().asSequence()
+                .filter { !it.isDirectory && it.name.startsWith("lang/") && it.name.endsWith(".yml") }
+                .forEach { entry ->
+                    val target = File(dataFolder, entry.name)
+                    if (!target.exists()) {
+                        target.parentFile?.mkdirs()
+                        saveResource(entry.name, false)
+                    }
+                }
+        }
     }
 
     /**

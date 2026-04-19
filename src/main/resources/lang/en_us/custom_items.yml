@@ -1,0 +1,216 @@
+custom_items:
+  misc:
+    big_light:
+      name: §dBig Light
+      lore:
+      - §e§nHold right click§7 to grow your body!
+      - §e§nShift + right click§7 to reset to normal size.
+    small_light:
+      name: §dSmall Light
+      lore:
+      - §e§nHold right click§7 to shrink your body!
+      - §e§nShift + right click§7 to reset to normal size.
+    auto_ignition_booster:
+      name: §6Auto Ignition Booster
+      lore:
+      - §7Activate with §eShift§7 while equipped on feet.
+      - §7While gliding, consumes 1 rocket and boosts forward.
+      - §7While not gliding, converts equal speed into §aupward§7 boost.
+    air_cannon:
+      name: §bAir Cannon
+      lore:
+      - §7Right click to compress and release the air ahead.
+      - §7Launches targets in front toward §fforward + upward§7.
+      - §7The user also receives a small §fback-upward§7 recoil.
+    invisible_item_frame:
+      name: §fTransparent Item Frame
+      lore:
+      - §7Turns invisible after placement.
+      - §7Hold it and §eSneak§7 to temporarily reveal nearby transparent frames.
+    invisible_glow_item_frame:
+      name: §bTransparent Glow Item Frame
+      lore:
+      - §7Turns invisible after placement.
+      - §7Hold it and §eSneak§7 to temporarily reveal nearby transparent frames.
+    radio_cassette_player:
+      name: §6Radio Cassette
+      lore:
+      - §7Right click to open the radio menu.
+      - §7Insert a cassette and start playback
+      - §7to loop until you stop it from the menu.
+    storage_box_single:
+      name: §6Storage Box (1)
+      lore:
+      - §7Stores a large amount of items.
+      - §7Hold it and press §eShift twice§7 to open the menu.
+    storage_box_triple:
+      name: §6Storage Box (3)
+      lore:
+      - §7Stores up to 3 item types in large quantities.
+      - §7Hold it and press §eShift twice§7 to open the menu.
+      - §7Use §eShift + scroll§7 to change selected item.
+  arena:
+    structure_marker_tool:
+      name: §6Arena Structure Marker Tool
+      lore:
+      - §7Places markers for arena structures
+    other_marker_tool:
+      name: §6Arena Utility Marker Tool
+      lore:
+      - §7Places waiting/lobby markers
+    lift_tool:
+      name: §6Arena Lift Placement Tool
+      lore:
+      - §7Tool dedicated to lift markers
+    ticket:
+      name: §6Arena Ticket
+      lore:
+      - §7Entry ticket for the arena
+    medal:
+      name: §6Arena Medal
+      lore:
+      - §7Proof of arena battles
+    prize:
+      name: §6Arena Prize Box
+      lore:
+      - §7Victory reward from the arena
+    limit_breaking_sharpness_t1:
+      name: '§dLimit Break Catalyst: Sharpness T1'
+      lore:
+      - §7Used for limit-breaking sharpness
+      - '§7Target: Sharpness +1'
+    limit_breaking_sharpness_t2:
+      name: '§dLimit Break Catalyst: Sharpness T2'
+      lore:
+      - §7Used for limit-breaking sharpness
+      - '§7Target: Sharpness +2'
+    limit_breaking_sharpness_t3:
+      name: '§dLimit Break Catalyst: Sharpness T3'
+      lore:
+      - §7Used for limit-breaking sharpness
+      - '§7Target: Sharpness +3'
+    over_stacking_infinity:
+      name: '§5Conflict Ignore Catalyst: Infinity'
+      lore:
+      - §7Adds a conflicting enchantment
+      - §7This route can be used once
+    over_stacking_mending:
+      name: '§5Conflict Ignore Catalyst: Mending'
+      lore:
+      - §7Adds a conflicting enchantment
+      - §7This route can be used once
+    over_stacking_sharpness:
+      name: '§5Conflict Ignore Catalyst: Sharpness'
+      lore:
+      - §7Adds a conflicting enchantment
+      - §7This route can be used once
+    over_stacking_smite:
+      name: '§5Conflict Ignore Catalyst: Smite'
+      lore:
+      - §7Adds a conflicting enchantment
+      - §7This route can be used once
+    over_stacking_bane_of_arthropods:
+      name: '§5Conflict Ignore Catalyst: Bane of Arthropods'
+      lore:
+      - §7Adds a conflicting enchantment
+      - §7This route can be used once
+    over_stacking_protection:
+      name: '§5Conflict Ignore Catalyst: Protection'
+      lore:
+      - §7Adds a conflicting enchantment
+      - §7This route can be used once
+    over_stacking_fire_protection:
+      name: '§5Conflict Ignore Catalyst: Fire Protection'
+      lore:
+      - §7Adds a conflicting enchantment
+      - §7This route can be used once
+    over_stacking_blast_protection:
+      name: '§5Conflict Ignore Catalyst: Blast Protection'
+      lore:
+      - §7Adds a conflicting enchantment
+      - §7This route can be used once
+    over_stacking_projectile_protection:
+      name: '§5Conflict Ignore Catalyst: Projectile Protection'
+      lore:
+      - §7Adds a conflicting enchantment
+      - §7This route can be used once
+    over_stacking_multishot:
+      name: '§5Conflict Ignore Catalyst: Multishot'
+      lore:
+      - §7Adds a conflicting enchantment
+      - §7This route can be used once
+    over_stacking_piercing:
+      name: '§5Conflict Ignore Catalyst: Piercing'
+      lore:
+      - §7Adds a conflicting enchantment
+      - §7This route can be used once
+    exotic_attach_infinity:
+      name: '§bExotic Attach Catalyst: Infinity'
+      lore:
+      - §7Adds a normally incompatible enchantment
+      - §7This route can be used once
+    exotic_attach_sharpness:
+      name: '§bExotic Attach Catalyst: Sharpness'
+      lore:
+      - §7Adds a normally incompatible enchantment
+      - §7This route can be used once
+    exotic_attach_breach:
+      name: '§bExotic Attach Catalyst: Breach'
+      lore:
+      - §7Adds a normally incompatible enchantment
+      - §7This route can be used once
+    mob_token:
+      lore:
+      - §7An item dropped by a monster that appears in the arena
+      - §7Exchange it for rewards in the arena lobby!
+      token_names:
+        zombie: Zombie Head
+        creeper: Creeper Gunpowder Pouch
+        skeleton: Skeleton Skull
+        wither_skeleton: Wither Skeleton Bone Fragment
+        husk: Husk Tunic
+        iron_golem: Golem Core
+        guardian: Guardian Spine
+        elder_guardian: Elder Guardian Spine
+        silverfish: Silverfish Shell
+        spider: Spider Claw
+        drowned: Heavily Tarnished Copper Ingot
+        witch: Witch Robe
+        blaze: Blaze Ember
+        magma_cube: Magma Cube Core
+        slime: Slime Core
+        bogged: Mossy Skeleton
+        stray: Frozen Skeleton
+        bat: Great Bat Membrane
+        allay: Spirit Shard
+        enderman: Enderman Remnant
+        shulker: Shulker Shell
+        spirit: Spirit Tear
+        frog: Great Frog Liver
+    theme:
+      ruins:
+        name: Ruins
+      desert_temple:
+        name: Desert Temple
+      ocean_monument:
+        name: Ocean Monument
+      natura:
+        name: Lush Cave
+      nether:
+        name: Nether Fortress
+      end:
+        name: The End
+  brewery:
+    sample_filter:
+      name: §eDistillation Filter (Prototype)
+      lore:
+      - §7Distillation time -15%
+      - §7Consumes 1 durability per distillation
+    mock_clock:
+      name: §bMysterious Clock (Mock)
+      lore:
+      - §7For aging GUI clock slot (no effect)
+    mock_yeast:
+      name: §aCultured Yeast (Mock)
+      lore:
+      - §7For fermentation GUI yeast slot (no effect)

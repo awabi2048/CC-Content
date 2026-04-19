@@ -202,6 +202,13 @@ iron_golem_magnet:
   movement_speed: 0.25
   armor: 8.0
 
+desert_temple_sand_golem:
+  type: desert_temple_sand_golem
+  health: 84.0
+  attack: 11.0
+  movement_speed: 0.24
+  armor: 9.0
+
 guardian_normal:
   type: guardian_normal
   health: 30.0
