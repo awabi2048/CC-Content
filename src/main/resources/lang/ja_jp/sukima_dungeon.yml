@@ -191,8 +191,7 @@ sukima_dungeon:
     huge: 極大
   oage_fail:
   - oage_fail
-  oage_result:
-  - お疲れ様！無事に全部集まったね！崩れる前に早く戻ってきてー！
+  oage_result: お疲れ様！無事に全部集まったね！崩れる前に早く戻ってきてー！
   tiers:
     BROKEN: ぼろぼろの
     WORN: 擦り切れた
@@ -237,3 +236,13 @@ sukima_dungeon:
       description: 複雑に組み合わさった迷路のような空間です。
       oage_messages:
       - うわぁ、目が回っちゃいそう！
+    ruin:
+      name: Ruins
+      description: Ruins left behind by ancient people. I wonder how they ever lived in such a maze-like place.
+      oage_messages:
+      - These look like ruins. I bet people used to live here once...
+      - I wonder what life in another dimension was like...?
+  oage_intro: '&6Oage-chan: &f"Umm, this is the entrance to Sukima Dungeon. Go defeat monsters and close the world!"'
+  oage_start_multi: '&a[Oage-chan] &f"Group it is! I''ll prepare {theme} ({tier})!"'
+  oage_start_single: '&a[Oage-chan] &f"Solo it is! I''ll prepare {theme} ({tier})!"'
+  trap_triggered: '&6Oage-chan: &f"Oops, caught again? You gotta be careful!"'

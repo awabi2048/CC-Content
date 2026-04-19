@@ -4,18 +4,20 @@ import com.awabi2048.ccsystem.CCSystem
 import org.bukkit.plugin.java.JavaPlugin
 
 object LangManager {
+    private const val SOURCE_ID = "CC-Content:sukima_dungeon"
+
     fun load(plugin: JavaPlugin) {
     }
 
     fun getMessage(lang: String, key: String, params: Map<String, String> = emptyMap()): String {
-        return CCSystem.getAPI().getI18nString(lang, "sukima_dungeon.$key", params).replace('&', '§')
+        return CCSystem.getAPI().getI18nString(SOURCE_ID, lang, "sukima_dungeon.$key", params).replace('&', '§')
     }
 
     fun getList(lang: String, key: String): List<String> {
-        return CCSystem.getAPI().getI18nStringList(lang, "sukima_dungeon.$key").map { it.replace('&', '§') }
+        return CCSystem.getAPI().getI18nStringList(SOURCE_ID, lang, "sukima_dungeon.$key").map { it.replace('&', '§') }
     }
 
     fun getTierName(lang: String, tier: String): String {
-        return CCSystem.getAPI().getI18nString(lang, "sukima_dungeon.tiers.$tier").replace('&', '§')
+        return CCSystem.getAPI().getI18nString(SOURCE_ID, lang, "sukima_dungeon.tiers.$tier").replace('&', '§')
     }
 }

@@ -97,6 +97,7 @@ arena:
       return_hint: §7Hold Shift to return to lobby
       return_countdown: §7Returning in §e{seconds} sec
       returned: '&aReturned to lobby'
+      completed: '&aミッションクリア！'
     lobby:
       tutorial:
         steps:

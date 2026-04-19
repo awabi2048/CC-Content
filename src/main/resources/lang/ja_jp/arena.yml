@@ -185,6 +185,8 @@ arena:
       mission_returned_followup:
       - おかえりなさい！まずはゆっくり休んでくださいね！
       - お疲れさまでした！報酬の受け取りを忘れずにお願いします！
+      barrier_restart_complete:
+      - The barrier stone restart is complete!
     barrier:
       cannot_break: '&c結界石は破壊できません'
       cannot_place_on: '&c結界石の上には設置できません'

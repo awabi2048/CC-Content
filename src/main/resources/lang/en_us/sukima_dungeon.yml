@@ -16,6 +16,7 @@ sukima_dungeon:
     not_in_dungeon: §cCan only be used inside SukimaDungeon
     no_permission: §cNo permission
     generic: §cAn error occurred
+    invalid_bookmark: §c無効なふしぎなしおりです
   gui:
     escape:
       title: §8Escape Confirmation
@@ -34,7 +35,26 @@ sukima_dungeon:
     talisman:
       name: §6Oage-chan's Talisman
       description: Talisman to escape from SukimaDungeon
-  messages: null
+    bookmark:
+      broken:
+        name: §5ぼろぼろのふしぎなしおり
+      worn:
+        name: §5擦り切れたふしぎなしおり
+      faded:
+        name: §5色褪せたふしぎなしおり
+      new:
+        name: §5新品のふしぎなしおり
+      lore: '§7§m――――――――――――――――――――――――――――――
+
+        §7スキマダンジョンに進入するための
+
+        §7ふしぎなしおり。
+
+        §7右クリックでダンジョンに入ることができる。
+
+        §7§m――――――――――――――――――――――――――――――
+
+        '
   command_player_only: This command can only be executed by players.
   command_usage: '&e/sukima_dungeon <reload|add_item>'
   command_reload_success: '&aReloaded settings and themes.'
@@ -137,7 +157,7 @@ sukima_dungeon:
       description: A quiet library where vast knowledge sleeps.
       oage_messages:
       - Keep it down... there are books everywhere!
-    ruin:
+    ruins:
       name: Ruins
       description: Ruins left behind by ancient people. I wonder how they ever lived in such a maze-like place.
       oage_messages:
@@ -158,3 +178,65 @@ sukima_dungeon:
     medium: Medium
     large: Large
     huge: Huge
+  no_permission: '&c権限がありません。'
+  gui_theme_random: ???
+  gui_entrance_confirm_title: '&0&l本当に冒険に出る？'
+  gui_entrance_confirm_button: '&b&n冒険に出る'
+  gui_entrance_confirm_button_lore:
+  - '&7&m――――――――――――――――――――――――――――――'
+  - '&7しおりを消費して、選択した設定で'
+  - '&7ダンジョンへの扉を開きます。'
+  - '&7&m――――――――――――――――――――――――――――――'
+  gui_entrance_cancel_button: '&c戻る'
+  gui_join_title: '&5ポータルの先へ'
+  gui_join_button_ready: '&b&n入場する'
+  gui_join_button_wait: '&7生成中...'
+  gui_join_button_lore:
+  - '&7&m――――――――――――――――――――――――――――――'
+  - '&f§l| §7行き先 §d{theme}'
+  - '&f§l| §7サイズ §e{size}'
+  - '&7&m――――――――――――――――――――――――――――――'
+  gui_join_cancel_button: '&c閉じる'
+  gui_exit_title: '&0&l本当に帰還する？'
+  gui_exit_button: '&c&n帰還する'
+  gui_exit_button_lore:
+  - '&7&m――――――――――――――――――――――――――――――'
+  - '&7クリックすると、すべてのプレイヤーが'
+  - '&7このダンジョンから離脱し、攻略を終了します。'
+  - '&7&m――――――――――――――――――――――――――――――'
+  gui_exit_cancel_button: '&aとどまる'
+  item_bookmark_lore:
+  - '&7&m――――――――――――――――――――――――――――――'
+  - §7ワールドのはざまにある§dスキマダンジョン§7への扉を開くためのしおり
+  - '&7&m――――――――――――――――――――――――――――――'
+  oage_waiting:
+  - では案内しますね！少々お待ちください～
+  - 入口の様子を確認中です！ちょっと待ってねっ
+  - 準備は大丈夫ですか？こちらはもうちょっとかかります…
+  oage_finished:
+  - ありがと～！！無事に帰ってこれて良かった！
+  - おかえりなさい！摘み取りありがとうございました～！
+  - 'おつかれさま！助かりました～！ '
+  oage_collapse_warn:
+  - 時間切れ間近です！いそいでー！
+  - 崩落が始まりそう！お早く！
+  oage_collapse:
+  - もうダメそう！呼び出しますー！！
+  - 壊れるー！！呼び出します！
+  - あー！！呼びます！！
+  oage_generate:
+  - では案内しますね！少々お待ちください～
+  oage_entry:
+  - こちらです！お気をつけてー！
+  oage_evacuate:
+  - 見つけました！緊急脱出します！
+  - ピンチを感じ取りました！逃げますよー！
+  oage_redirect:
+  - 接続が不安定みたい...別の場所に飛ばしますね！
+  compass_cannot_use_here: '&cここではワールドの芽の鼓動を感じられないようだ...'
+  compass_detect_start: '&b探知を開始しました...'
+  compass_detect_fail: '&8&oワールドの芽が見つかりませんでした'
+  compass_detect_stop: '&7探知を終了しました...'
+  compass_detect_interrupted_hunger: '&7お腹が空きすぎているため、使用を中止しました...'
+  oage_fail:
+  - oage_fail

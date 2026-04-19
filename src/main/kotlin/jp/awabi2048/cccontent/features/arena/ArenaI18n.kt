@@ -6,6 +6,8 @@ import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 
 object ArenaI18n {
+    private const val SOURCE_ID = "CC-Content:arena"
+
     fun initialize(plugin: JavaPlugin) {
     }
 
@@ -17,11 +19,11 @@ object ArenaI18n {
     }
 
     fun text(player: Player?, key: String, fallback: String, vararg placeholders: Pair<String, Any?>): String {
-        return CCSystem.getAPI().getI18nString(player, key, placeholdersMap(*placeholders)).replace('&', '§')
+        return CCSystem.getAPI().getI18nString(SOURCE_ID, player, key, placeholdersMap(*placeholders)).replace('&', '§')
     }
 
     fun stringList(player: Player?, key: String, fallback: List<String>, vararg placeholders: Pair<String, Any?>): List<String> {
-        return CCSystem.getAPI().getI18nStringList(player, key, placeholdersMap(*placeholders)).map { it.replace('&', '§') }
+        return CCSystem.getAPI().getI18nStringList(SOURCE_ID, player, key, placeholdersMap(*placeholders)).map { it.replace('&', '§') }
     }
 
     private fun placeholdersMap(vararg placeholders: Pair<String, Any?>): Map<String, Any> {

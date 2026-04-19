@@ -26,3 +26,5 @@ profession:
   carpenter:
     name: 大工
     description: 建築で経験値を得る職業
+  level_up: §a{profession} leveled up! §eLv.{old} -> Lv.{new} §7(+{gained})
+  new_unlock: 'New unlockable skills available ({count}): {skills} [Click to open skill tree]'

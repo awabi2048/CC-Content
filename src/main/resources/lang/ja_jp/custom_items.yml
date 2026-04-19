@@ -188,7 +188,19 @@ custom_items:
         shulker: シュルカーの殻
         spirit: 精霊の涙
         frog: 大カエルの肝
-    theme: null
+    theme:
+      ruins:
+        name: 遺跡
+      desert_temple:
+        name: 砂漠の寺院
+      ocean_monument:
+        name: 海底神殿
+      natura:
+        name: 繁茂した洞窟
+      nether:
+        name: ネザー要塞
+      end:
+        name: エンド
     ruins:
       name: 遺跡
     desert_temple:

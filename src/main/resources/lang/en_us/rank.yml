@@ -19,3 +19,72 @@ rank:
       percent: §8({percent}%)
       target_prefix: '{status} '
       target_suffix: '§7: {current}/{required}'
+  prestige:
+    cannot: §cプレステージ条件を満たしていません。
+    failed: §cプレステージの実行に失敗しました
+    dialog:
+      first:
+        title: §d§lプレステージの確認 (1/2)
+        body: '§f{profession} のプレステージレベル {level} でプレステージを実行します。
+
+
+          §c§l注意: プレステージを実行すると、通常レベル、スキル、経験値がリセットされます。'
+      second:
+        title: §d§lプレステージの最終確認 (2/2)
+        body: '§c本当にプレステージを実行しますか？
+
+
+          §f職業: {profession}
+
+          §fプレステージレベル: {level}
+
+
+          §7§o※思念アイテムを獲得し、プレステージスキルが使用可能になります'
+message:
+  rank_up: §a§l【ランクアップ！】§r§a{rank} になりました
+  profession_selected: §a§l【職業選択】§r§a職業 {profession} を選択しました
+  profession_changed: §a§l【職業変更】§r§a職業を {profession} に変更しました
+  skill_acquired: §a§l【スキル習得】§r§a{skill} を習得しました
+  experience_gained: §b経験値を {experience} 獲得しました
+  tutorial_rankup:
+  - §6§l==========================================
+  - §a§lランクアップ！
+  - §f{old_rank} → {new_rank}
+  - §6§l==========================================
+party:
+  create:
+    success: '{prefix} &aパーティ "{name}" を作成しました！'
+  join:
+    success: '{prefix} &aパーティに参加しました！'
+    broadcast: '{prefix} &7[&bパーティ&7] &6{player} &7がパーティに参加しました。'
+  leave:
+    success: '{prefix} &aパーティを抜けました。'
+    broadcast: '{prefix} &7[&bパーティ&7] &6{player} &7がパーティを抜けました。'
+  disband:
+    leader_left: '{prefix} &cリーダーが抜けたため、パーティは解散されました。'
+    success: '{prefix} &aパーティを解散しました。'
+  invite:
+    success: '{prefix} &6{player} &aを招待しました。'
+    received: '{prefix} &6{player} &7からパーティへの招待が届きました！'
+    click_to_join: '&7クリックして参加: &a/party join {party}'
+  kick:
+    success: '{prefix} &6{player} &aを追放しました。'
+    kicked: '{prefix} &cパーティから追放されました。'
+  list:
+    header: '&6=== パーティメンバー ({count}) ==='
+    leader: '&7リーダー: &e{leader}'
+    member: '&7- {member}'
+  chat:
+    format: '{prefix} &7[&bパーティ&7] {message}'
+  error:
+    already_in_party: '{prefix} &cすでにパーティに入っています。'
+    not_in_party: '{prefix} &cパーティに入っていません。'
+    not_leader: '{prefix} &cリーダーのみが {action} できます。'
+    player_not_found: '{prefix} &cプレイヤーが見つかりません。'
+    not_party_leader: '{prefix} &cそのプレイヤーはパーティリーダーではありません。'
+    not_invited: '{prefix} &c招待されていません。'
+    already_member: '{prefix} &cすでにパーティメンバーです。'
+    not_member: '{prefix} &cそのプレイヤーはパーティメンバーではありません。'
+    cannot_kick_self: '{prefix} &c自分自身を追放することはできません。'
+    specify_name: '{prefix} &c{action} するプレイヤー名を指定してください。'
+    specify_party_name: '{prefix} &c参加するパーティのリーダー名を指定してください。'
