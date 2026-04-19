@@ -3190,9 +3190,9 @@ class ArenaManager(
 
         val langDir = File(plugin.dataFolder, "lang")
         if (langDir.exists()) {
-            val fromDataFolder = langDir.listFiles { file ->
-                file.isFile && file.extension.equals("yml", ignoreCase = true)
-            }.orEmpty().map { it.nameWithoutExtension.lowercase(Locale.ROOT) }
+            val fromDataFolder = langDir.listFiles { file -> file.isDirectory }
+                .orEmpty()
+                .map { it.name.lowercase(Locale.ROOT) }
             locales.addAll(fromDataFolder)
         }
 
@@ -3201,12 +3201,12 @@ class ArenaManager(
 
     private fun loadLangConfig(locale: String): YamlConfiguration? {
         val normalized = locale.lowercase(Locale.ROOT)
-        val fromDataFolder = File(plugin.dataFolder, "lang/$normalized.yml")
+        val fromDataFolder = File(plugin.dataFolder, "lang/$normalized/custom_items.yml")
         if (fromDataFolder.exists()) {
             return YamlConfiguration.loadConfiguration(fromDataFolder)
         }
 
-        val resource = plugin.getResource("lang/$normalized.yml") ?: return null
+        val resource = plugin.getResource("lang/$normalized/custom_items.yml") ?: return null
         resource.use { input ->
             InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
                 return YamlConfiguration.loadConfiguration(reader)

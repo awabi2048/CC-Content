@@ -163,6 +163,12 @@ sukima_dungeon:
       oage_messages:
       - These look like ruins. I bet people used to live here once...
       - I wonder what life in another dimension was like...?
+    ruin:
+      name: Ruins
+      description: Ruins left behind by ancient people. I wonder how they ever lived in such a maze-like place.
+      oage_messages:
+      - These look like ruins. I bet people used to live here once...
+      - I wonder what life in another dimension was like...?
     see_of_trees:
       name: Sea of Trees
       description: A dense forest where thick trees block your view in every direction.
