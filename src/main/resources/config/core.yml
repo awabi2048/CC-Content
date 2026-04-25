@@ -106,16 +106,19 @@ arena:
       bpm: 120
       loop_beats: 384
       switch_interval_beats: 8
+      pitch: 1.0
     combat:
       key: "kota_server:ost_4.arena"
       bpm: 140
       loop_beats: 384
       switch_interval_beats: 8
+      pitch: 1.0
     lobby:
       key: "kota_server:ost_3.sukima_dungeon"
       bpm: 120
       loop_beats: 384
       switch_interval_beats: 8
+      pitch: 0.8409
   mission:
     generate_count: 14
     promotion_probability: 0.25
@@ -145,13 +148,6 @@ arena:
     revive_hold_seconds: 3
     revive_radius: 2.5
     shulker_follow_interval_ticks: 2
-  lobby:
-    world: ""
-    x: 0.0
-    y: 64.0
-    z: 0.0
-    yaw: 0.0
-    pitch: 0.0
   mob_spawn:
     system_max_alive: 128
   door_animation:

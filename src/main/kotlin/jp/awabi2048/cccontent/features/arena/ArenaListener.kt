@@ -23,6 +23,7 @@ import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.entity.EntityMountEvent
 import org.bukkit.event.entity.EntityRemoveEvent
 import org.bukkit.event.player.PlayerAnimationEvent
+import org.bukkit.event.player.PlayerChangedWorldEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerInteractEntityEvent
 import org.bukkit.event.player.PlayerQuitEvent
@@ -130,10 +131,16 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     @EventHandler
     fun onPlayerQuit(event: PlayerQuitEvent) {
         arenaManager.handleInviteTargetUnavailable(event.player)
+        arenaManager.clearLobbyTutorialState(event.player)
         arenaManager.stopSession(
             event.player,
             ArenaI18n.text(event.player, "arena.messages.session.ended_by_logout", "&cログアウトしたためアリーナを終了しました")
         )
+    }
+
+    @EventHandler
+    fun onPlayerChangedWorld(event: PlayerChangedWorldEvent) {
+        arenaManager.clearLobbyTutorialState(event.player)
     }
 
     @EventHandler

@@ -71,6 +71,7 @@ arena:
         stop: '&f/arenaa stop <player>'
         license: '&f/arenaa license set <player> <paper|bronze|silver|gold>'
         theme: '&f/arenaa theme list'
+        status: '&f/arenaa status'
         broadcast: '&f/arenaa broadcast'
         pedestal: '&f/arenaa pedestal'
     menu:
@@ -87,6 +88,8 @@ arena:
         join_area_not_found: '&c開始待機エリアの参加マーカーが近くに存在しないため開始できません'
         lobby_marker_not_found: '&cロビーマーカーが見つからないため開始できません'
         invalid_mission_type: '&c無効なミッションタイプです: {type}'
+      status:
+        title: '&6=== Arena Status ==='
     mission:
       already_completed: '&eこのミッションはすでに完了済みです'
       already_in_mission: '&cすでに進行中のミッションがあります'
@@ -100,6 +103,7 @@ arena:
       returned: '&aロビーへ帰還しました'
     lobby:
       tutorial:
+        hold_hint: Shift長押しで進む
         steps:
         - §f「ここがアリーナロビーです！ミッションは掲示板から受注できますよ！」
         - §f「ロビー中央から各設備にアクセスできます。必要な準備を整えましょう！」
@@ -217,9 +221,9 @@ arena:
       start_subtitle: '&6ステージ開始'
     door:
       animating: '&e開扉中です'
+      open_hint: '&7Shift長押しで扉を開く'
       corridor_opened: '&aWave {wave} への通路が解放されました'
       corridor_opened_subtitle: '&a次の通路が開きました'
-      open_hint: Shift長押しで扉を開く
       corridor_opened_notice: '&3次のウェーブへの道が開かれました...'
     wave:
       title: §7- §6Wave {wave} §7-

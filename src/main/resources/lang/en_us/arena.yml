@@ -71,6 +71,7 @@ arena:
         stop: '&f/arenaa stop <player>'
         license: '&f/arenaa license set <player> <paper|bronze|silver|gold>'
         theme: '&f/arenaa theme list'
+        status: '&f/arenaa status'
         broadcast: '&f/arenaa broadcast'
         pedestal: '&f/arenaa pedestal'
     menu:
@@ -87,6 +88,8 @@ arena:
         join_area_not_found: '&cCannot start because no join area marker exists nearby'
         lobby_marker_not_found: '&cCannot start because no lobby marker exists in loaded chunks'
         invalid_mission_type: '&cInvalid mission type: {type}'
+      status:
+        title: '&6=== Arena Status ==='
     mission:
       already_completed: '&eThis mission has already been completed'
       already_in_mission: '&cYou already have a mission in progress'
@@ -100,6 +103,7 @@ arena:
       completed: '&aミッションクリア！'
     lobby:
       tutorial:
+        hold_hint: Hold Shift to continue
         steps:
         - §f"This is the arena lobby! You can accept missions from the board."
         - §f"From the lobby center, you can access each facility. Prepare before departure!"
@@ -217,7 +221,7 @@ arena:
       animating: '&eDoor is opening'
       corridor_opened: '&aCorridor to Wave {wave} is now open'
       corridor_opened_subtitle: '&aThe next corridor has opened'
-      open_hint: Hold Shift to open the door
+      open_hint: '&7Hold Shift to open the door'
       corridor_opened_notice: '&3The path to the next wave has opened...'
     wave:
       title: §7- §6Wave {wave} §7-
