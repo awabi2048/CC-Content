@@ -4,7 +4,7 @@ import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.arena.ArenaManager
 import jp.awabi2048.cccontent.features.arena.ArenaStartResult
-import jp.awabi2048.cccontent.features.arena.event.ArenaDailyMissionGeneratedEvent
+import jp.awabi2048.cccontent.features.arena.event.ArenaMissionGeneratedEvent
 import jp.awabi2048.cccontent.features.arena.event.ArenaMissionStartRequestEvent
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
 import jp.awabi2048.cccontent.features.arena.generator.ArenaTheme
@@ -25,9 +25,6 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
 import kotlin.random.Random
@@ -37,9 +34,8 @@ class ArenaMissionService(
     private val arenaManager: ArenaManager
 ) : Listener {
     private companion object {
-        val TOKYO_ZONE: ZoneId = ZoneId.of("Asia/Tokyo")
-        val DATE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
         const val MISSION_SLOT_LIMIT = 14
+        const val CURRENT_MISSION_FILE_NAME = "current.yml"
         val DEFAULT_STRONG_ENEMY_MOB_TYPE_IDS = setOf(
             "witch_elite",
             "water_spirit",
@@ -73,7 +69,7 @@ class ArenaMissionService(
     private val baseDir = File(plugin.dataFolder, "data/arena")
     private val missionDir = File(baseDir, "missions")
     private val playerDir = File(baseDir, "players")
-    private val missionCache = mutableMapOf<String, ArenaDailyMissionSet>()
+    private var currentMissionSet: ArenaMissionSet? = null
     private val playerCache = mutableMapOf<UUID, ArenaPlayerMissionData>()
     private val activeMissions = mutableMapOf<UUID, ArenaActiveMissionRecord>()
     private var difficultyDefinitions: List<ArenaDifficultyDefinition> = emptyList()
@@ -87,7 +83,7 @@ class ArenaMissionService(
     }
 
     fun shutdown() {
-        missionCache.clear()
+        currentMissionSet = null
         playerCache.clear()
         activeMissions.clear()
     }
@@ -117,12 +113,12 @@ class ArenaMissionService(
 
     fun getStatusSnapshot(): ArenaStatusSnapshot {
         val playerFiles = playerDir.listFiles { file -> file.isFile && file.extension.equals("yml", ignoreCase = true) }?.toList().orEmpty()
-        val missionFiles = missionDir.listFiles { file -> file.isFile && file.extension.equals("yml", ignoreCase = true) }?.toList().orEmpty()
         val lobbyProgressCount = playerFiles.count { loadPlayerData(it).lobbyVisited }
         val lobbyTutorialCompletedCount = playerFiles.count { loadPlayerData(it).lobbyTutorialCompleted }
+        val missionSet = currentMissionSet ?: loadCurrentMissionSetOrNull()?.also { currentMissionSet = it }
         return ArenaStatusSnapshot(
-            missionCacheDateKey = missionFiles.maxByOrNull { it.lastModified() }?.nameWithoutExtension ?: missionCache.keys.maxOrNull(),
-            generatedMissionSets = if (missionFiles.isNotEmpty()) missionFiles.size else missionCache.size,
+            currentMissionGeneratedAtMillis = missionSet?.generatedAtMillis,
+            hasCurrentMissionSet = missionSet != null,
             loadedPlayerRecords = if (playerFiles.isNotEmpty()) playerFiles.size else playerCache.size,
             lobbyProgressCount = lobbyProgressCount,
             lobbyTutorialCompletedCount = lobbyTutorialCompletedCount,
@@ -134,21 +130,34 @@ class ArenaMissionService(
     }
 
     fun updateToday(): Boolean {
-        val dateKey = currentDateKey()
         return try {
             refreshDefinitions()
-            val missionSet = generateAndSave(dateKey)
-            missionCache[dateKey] = missionSet
+            val missionSet = generateAndSave()
+            currentMissionSet = missionSet
+            clearAllCurrentMissionCompletions()
             true
         } catch (e: Exception) {
-            plugin.logger.warning("[Arena] 日付更新に失敗しました: ${e.message}")
+            plugin.logger.warning("[Arena] ミッション更新に失敗しました: ${e.message}")
             e.printStackTrace()
             false
         }
     }
 
     fun openMenu(player: Player): Boolean {
-        return openMenu(player, currentDateKey())
+        return try {
+            val missionSet = ensureCurrentMissionSet()
+            val holder = ArenaMissionMenuHolder(player.uniqueId)
+            val inventory = Bukkit.createInventory(holder, ArenaMissionLayout.MENU_SIZE, ArenaMissionLayout.MENU_TITLE)
+            holder.backingInventory = inventory
+            renderMenu(player, inventory, missionSet)
+            player.openInventory(inventory)
+            true
+        } catch (e: Exception) {
+            plugin.logger.warning("[Arena] アリーナメニューの表示に失敗しました: message=${e.message}")
+            e.printStackTrace()
+            player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed_detail", "§cアリーナメニューを開けませんでした: {message}", "message" to (e.message ?: "unknown")))
+            false
+        }
     }
 
     fun recordMobKill(playerId: UUID, mobTypeId: String, amount: Int = 1) {
@@ -206,23 +215,6 @@ class ArenaMissionService(
         return playerData.licenseTier
     }
 
-    private fun openMenu(player: Player, dateKey: String): Boolean {
-        return try {
-            val missionSet = ensureMissionSet(dateKey)
-            val holder = ArenaMissionMenuHolder(player.uniqueId, dateKey)
-            val inventory = Bukkit.createInventory(holder, ArenaMissionLayout.MENU_SIZE, ArenaMissionLayout.MENU_TITLE)
-            holder.backingInventory = inventory
-            renderMenu(player, inventory, missionSet)
-            player.openInventory(inventory)
-            true
-        } catch (e: Exception) {
-            plugin.logger.warning("[Arena] アリーナメニューの表示に失敗しました: date=$dateKey message=${e.message}")
-            e.printStackTrace()
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed_detail", "§cアリーナメニューを開けませんでした: {message}", "message" to (e.message ?: "unknown")))
-            false
-        }
-    }
-
     fun handleMenuClick(player: Player, holder: ArenaMissionMenuHolder, rawSlot: Int): Boolean {
         if (player.uniqueId != holder.ownerId) {
             return false
@@ -233,7 +225,7 @@ class ArenaMissionService(
         }
 
         val missionIndex = ArenaMissionLayout.missionIndexForSlot(rawSlot) ?: return true
-        val missionSet = getMissionSet(holder.dateKey) ?: run {
+        val missionSet = getCurrentMissionSetOrNull() ?: run {
             player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed", "§cアリーナミッションを開けませんでした"))
             return true
         }
@@ -241,7 +233,7 @@ class ArenaMissionService(
 
         playUiClick(player)
 
-        if (isMissionCompleted(player.uniqueId, holder.dateKey, mission.index)) {
+        if (isMissionCompleted(player.uniqueId, mission.index)) {
             player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.already_completed", "§eこのミッションはすでに完了済みです"))
             return true
         }
@@ -255,7 +247,7 @@ class ArenaMissionService(
             return true
         }
 
-        if (!openMissionConfirmMenu(player, holder.dateKey, mission.index)) {
+        if (!openMissionConfirmMenu(player, mission.index)) {
             player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed", "§cアリーナミッションを開けませんでした"))
         }
         return true
@@ -269,12 +261,12 @@ class ArenaMissionService(
         return when (rawSlot) {
             ArenaMissionLayout.CONFIRM_OK_SLOT -> {
                 playUiClick(player)
-                startMission(player, holder.dateKey, holder.missionIndex)
+                startMission(player, holder.missionIndex)
                 true
             }
             ArenaMissionLayout.CONFIRM_CANCEL_SLOT -> {
                 playUiClick(player)
-                if (!openMenu(player, holder.dateKey)) {
+                if (!openMenu(player)) {
                     player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed", "§cアリーナメニューを開けませんでした"))
                 }
                 true
@@ -291,10 +283,10 @@ class ArenaMissionService(
         }
 
         val playerData = getPlayerData(event.ownerPlayerId)
-        if (playerData.markCompleted(activeRecord.dateKey, activeRecord.missionIndex)) {
+        if (playerData.markCompleted(activeRecord.missionIndex)) {
             evaluateLicensePromotion(event.ownerPlayerId, playerData)
             savePlayerData(event.ownerPlayerId)
-            plugin.logger.info("[Arena] ミッション完了を記録しました: player=${event.ownerPlayerId}, date=${activeRecord.dateKey}, mission=${activeRecord.missionIndex}")
+            plugin.logger.info("[Arena] ミッション完了を記録しました: player=${event.ownerPlayerId}, mission=${activeRecord.missionIndex}")
         }
     }
 
@@ -322,8 +314,8 @@ class ArenaMissionService(
         }
     }
 
-    private fun startMission(player: Player, dateKey: String, missionIndex: Int) {
-        val missionSet = getMissionSet(dateKey) ?: run {
+    private fun startMission(player: Player, missionIndex: Int) {
+        val missionSet = getCurrentMissionSetOrNull() ?: run {
             player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.not_found", "§cアリーナミッションが見つかりません"))
             return
         }
@@ -332,7 +324,7 @@ class ArenaMissionService(
             return
         }
 
-        if (isMissionCompleted(player.uniqueId, dateKey, mission.index)) {
+        if (isMissionCompleted(player.uniqueId, mission.index)) {
             player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.already_completed", "§eこのミッションはすでに完了済みです"))
             return
         }
@@ -341,7 +333,7 @@ class ArenaMissionService(
             return
         }
 
-        val requestEvent = ArenaMissionStartRequestEvent(player, dateKey, mission)
+        val requestEvent = ArenaMissionStartRequestEvent(player, mission)
         Bukkit.getPluginManager().callEvent(requestEvent)
         if (requestEvent.isCancelled) {
             player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.start_cancelled", "§cミッション開始はキャンセルされました"))
@@ -378,7 +370,7 @@ class ArenaMissionService(
                 missionTypeId = missionType
             )) {
                 is ArenaStartResult.Success -> {
-                    activeMissions[player.uniqueId] = ArenaActiveMissionRecord(dateKey, mission.index, mission)
+                    activeMissions[player.uniqueId] = ArenaActiveMissionRecord(mission.index, mission)
                     Bukkit.getScheduler().runTaskLater(plugin, Runnable {
                         if (player.isOnline) {
                             OageMessageSender.send(
@@ -561,14 +553,14 @@ class ArenaMissionService(
             ?: throw IllegalStateException("CCContent core config が利用できません")
     }
 
-    private fun generateAndSave(dateKey: String): ArenaDailyMissionSet {
-        val missionSet = generateMissionSet(dateKey)
+    private fun generateAndSave(): ArenaMissionSet {
+        val missionSet = generateMissionSet()
         saveMissionSet(missionSet)
-        Bukkit.getPluginManager().callEvent(ArenaDailyMissionGeneratedEvent(dateKey, missionSet))
+        Bukkit.getPluginManager().callEvent(ArenaMissionGeneratedEvent(missionSet))
         return missionSet
     }
 
-    private fun generateMissionSet(dateKey: String): ArenaDailyMissionSet {
+    private fun generateMissionSet(): ArenaMissionSet {
         val weightedThemes = arenaManager.getThemeIds()
             .mapNotNull { themeId ->
                 val theme = arenaManager.getTheme(themeId) ?: return@mapNotNull null
@@ -578,7 +570,7 @@ class ArenaMissionService(
         if (weightedThemes.isEmpty()) {
             throw IllegalStateException("有効なテーマが0件のためミッションを生成できません")
         }
-        val random = Random(dateKey.toEpochSeed())
+        val random = Random.Default
         val promotionProbability = loadPromotionProbability()
 
         val missions = (0 until generateCount).map { index ->
@@ -594,7 +586,7 @@ class ArenaMissionService(
             }
             val maxParticipants = difficultyMaxParticipants(difficultyId)
 
-            ArenaDailyMissionEntry(
+            ArenaMissionEntry(
                 index = index,
                 missionTypeId = missionType.id,
                 difficultyId = difficultyId,
@@ -603,9 +595,8 @@ class ArenaMissionService(
             )
         }
 
-        return ArenaDailyMissionSet(
-            dateKey = dateKey,
-            generatedAtMillis = dateKey.toEpochSeed().toLong(),
+        return ArenaMissionSet(
+            generatedAtMillis = System.currentTimeMillis(),
             missions = missions
         )
     }
@@ -619,10 +610,9 @@ class ArenaMissionService(
         return value
     }
 
-    private fun saveMissionSet(missionSet: ArenaDailyMissionSet) {
-        val file = File(missionDir, "${missionSet.dateKey}.yml")
+    private fun saveMissionSet(missionSet: ArenaMissionSet) {
+        val file = File(missionDir, CURRENT_MISSION_FILE_NAME)
         val config = YamlConfiguration()
-        config.set("date", missionSet.dateKey)
         config.set("generated_at", missionSet.generatedAtMillis)
         config.set(
             "missions",
@@ -639,23 +629,17 @@ class ArenaMissionService(
         config.save(file)
     }
 
-    private fun loadMissionSet(dateKey: String): ArenaDailyMissionSet {
-        val file = File(missionDir, "$dateKey.yml")
+    private fun loadCurrentMissionSet(): ArenaMissionSet {
+        val file = File(missionDir, CURRENT_MISSION_FILE_NAME)
         if (!file.exists()) {
-            throw IllegalStateException("アリーナミッションデータが見つかりません: $dateKey")
+            throw IllegalStateException("現在のアリーナミッションデータが見つかりません")
         }
 
         val config = YamlConfiguration.loadConfiguration(file)
-        val storedDate = config.getString("date")
-            ?: throw IllegalStateException("アリーナミッションのdateがありません: $dateKey")
-        if (storedDate != dateKey) {
-            throw IllegalStateException("アリーナミッションのdateが不正です: expected=$dateKey actual=$storedDate")
-        }
-
         val generatedAt = config.getLong("generated_at", 0L)
         val missionMaps = config.getMapList("missions")
         if (missionMaps.isEmpty()) {
-            throw IllegalStateException("アリーナミッションが空です: $dateKey")
+            throw IllegalStateException("現在のアリーナミッションが空です")
         }
         if (missionMaps.size > MISSION_SLOT_LIMIT) {
             throw IllegalStateException("アリーナミッション数がメニュー枠を超えています: ${missionMaps.size}")
@@ -670,7 +654,7 @@ class ArenaMissionService(
 
             validateStoredMission(index, missionTypeId, difficultyId, themeId, maxParticipants)
 
-            ArenaDailyMissionEntry(
+            ArenaMissionEntry(
                 index = index,
                 missionTypeId = missionTypeId,
                 difficultyId = difficultyId,
@@ -680,16 +664,16 @@ class ArenaMissionService(
         }.sortedBy { it.index }
 
         if (missions.size != missionMaps.size) {
-            throw IllegalStateException("アリーナミッションデータの読み込みに失敗しました: $dateKey")
+            throw IllegalStateException("現在のアリーナミッションデータの読み込みに失敗しました")
         }
 
         missions.forEachIndexed { expectedIndex, mission ->
             if (mission.index != expectedIndex) {
-                throw IllegalStateException("アリーナミッションのindexが連番ではありません: $dateKey")
+                throw IllegalStateException("現在のアリーナミッションのindexが連番ではありません")
             }
         }
 
-        return ArenaDailyMissionSet(dateKey = dateKey, generatedAtMillis = generatedAt, missions = missions)
+        return ArenaMissionSet(generatedAtMillis = generatedAt, missions = missions)
     }
 
     private fun validateStoredMission(
@@ -737,40 +721,44 @@ class ArenaMissionService(
         return themes.last()
     }
 
-    private fun ensureMissionSet(dateKey: String): ArenaDailyMissionSet {
-        missionCache[dateKey]?.let { return it }
-        val file = File(missionDir, "$dateKey.yml")
+    private fun ensureCurrentMissionSet(): ArenaMissionSet {
+        currentMissionSet?.let { return it }
+        val file = File(missionDir, CURRENT_MISSION_FILE_NAME)
         val set = if (file.exists()) {
             try {
-                loadMissionSet(dateKey)
+                loadCurrentMissionSet()
             } catch (e: Exception) {
-                plugin.logger.warning("[Arena] 旧形式または不正なミッションを再生成します: date=$dateKey message=${e.message}")
-                generateAndSave(dateKey)
+                plugin.logger.warning("[Arena] 旧形式または不正な現在ミッションを再生成します: message=${e.message}")
+                generateAndSave()
             }
         } else {
-            generateAndSave(dateKey)
+            generateAndSave()
         }
-        missionCache[dateKey] = set
+        currentMissionSet = set
         return set
     }
 
-    private fun getMissionSet(dateKey: String): ArenaDailyMissionSet? {
-        missionCache[dateKey]?.let { return it }
-        val file = File(missionDir, "$dateKey.yml")
+    private fun getCurrentMissionSetOrNull(): ArenaMissionSet? {
+        currentMissionSet?.let { return it }
+        return loadCurrentMissionSetOrNull()?.also { currentMissionSet = it }
+    }
+
+    private fun loadCurrentMissionSetOrNull(): ArenaMissionSet? {
+        val file = File(missionDir, CURRENT_MISSION_FILE_NAME)
         return try {
             if (file.exists()) {
-                loadMissionSet(dateKey).also { missionCache[dateKey] = it }
+                loadCurrentMissionSet()
             } else {
                 null
             }
         } catch (e: Exception) {
-            plugin.logger.warning("[Arena] アリーナミッションの読み込みに失敗しました: date=$dateKey message=${e.message}")
+            plugin.logger.warning("[Arena] 現在のアリーナミッションの読み込みに失敗しました: message=${e.message}")
             e.printStackTrace()
             null
         }
     }
 
-    private fun renderMenu(player: Player, inventory: Inventory, missionSet: ArenaDailyMissionSet) {
+    private fun renderMenu(player: Player, inventory: Inventory, missionSet: ArenaMissionSet) {
         fillMenuBackground(inventory)
 
         val playerData = getPlayerData(player.uniqueId)
@@ -781,7 +769,7 @@ class ArenaMissionService(
         inventory.setItem(ArenaMissionLayout.MENU_REFRESH_SLOT, createLicenseCardItem(player, playerData))
     }
 
-    private fun renderMissionSlots(player: Player, inventory: Inventory, playerId: UUID, missionSet: ArenaDailyMissionSet) {
+    private fun renderMissionSlots(player: Player, inventory: Inventory, playerId: UUID, missionSet: ArenaMissionSet) {
         for ((position, slot) in ArenaMissionLayout.MENU_MISSION_SLOTS.withIndex()) {
             val mission = missionSet.missions.getOrNull(position)
             if (mission == null) {
@@ -789,22 +777,22 @@ class ArenaMissionService(
                 continue
             }
 
-            inventory.setItem(slot, createMissionItem(player, mission, isMissionCompleted(playerId, missionSet.dateKey, mission.index)))
+            inventory.setItem(slot, createMissionItem(player, mission, isMissionCompleted(playerId, mission.index)))
         }
     }
 
-    private fun renderConfirmMenu(player: Player, inventory: Inventory, mission: ArenaDailyMissionEntry) {
+    private fun renderConfirmMenu(player: Player, inventory: Inventory, mission: ArenaMissionEntry) {
         fillConfirmBackground(inventory)
         inventory.setItem(ArenaMissionLayout.CONFIRM_OK_SLOT, createActionItem(Material.LIME_WOOL, ArenaI18n.text(player, "arena.ui.confirm.ok_name", "§aOK"), ArenaI18n.stringList(player, "arena.ui.confirm.ok_lore", listOf("§7このミッションを開始します"))))
         inventory.setItem(ArenaMissionLayout.CONFIRM_MISSION_SLOT, createMissionSummaryItem(player, mission))
         inventory.setItem(ArenaMissionLayout.CONFIRM_CANCEL_SLOT, createActionItem(Material.RED_WOOL, ArenaI18n.text(player, "arena.ui.confirm.cancel_name", "§cキャンセル"), ArenaI18n.stringList(player, "arena.ui.confirm.cancel_lore", listOf("§7ミッション開始を取り消します"))))
     }
 
-    private fun openMissionConfirmMenu(player: Player, dateKey: String, missionIndex: Int): Boolean {
-        val missionSet = getMissionSet(dateKey) ?: return false
+    private fun openMissionConfirmMenu(player: Player, missionIndex: Int): Boolean {
+        val missionSet = getCurrentMissionSetOrNull() ?: return false
         val mission = missionSet.missions.getOrNull(missionIndex) ?: return false
 
-        val holder = ArenaMissionConfirmHolder(player.uniqueId, dateKey, missionIndex)
+        val holder = ArenaMissionConfirmHolder(player.uniqueId, missionIndex)
         val inventory = Bukkit.createInventory(holder, ArenaMissionLayout.CONFIRM_SIZE, ArenaMissionLayout.CONFIRM_TITLE)
         holder.backingInventory = inventory
         renderConfirmMenu(player, inventory, mission)
@@ -856,7 +844,7 @@ class ArenaMissionService(
         return item
     }
 
-    private fun createMissionItem(player: Player, mission: ArenaDailyMissionEntry, isCompleted: Boolean): ItemStack {
+    private fun createMissionItem(player: Player, mission: ArenaMissionEntry, isCompleted: Boolean): ItemStack {
         val item = ItemStack(themeIconMaterial(mission.themeId))
         val meta = item.itemMeta ?: return item
         val title = "${missionDisplayName(mission.missionTypeId)}＠${themeDisplayName(player, mission.themeId)}"
@@ -872,7 +860,7 @@ class ArenaMissionService(
         return item
     }
 
-    private fun createMissionSummaryItem(player: Player, mission: ArenaDailyMissionEntry): ItemStack {
+    private fun createMissionSummaryItem(player: Player, mission: ArenaMissionEntry): ItemStack {
         return createActionItem(
             themeIconMaterial(mission.themeId),
             ArenaI18n.text(player, "arena.ui.mission.item_name", "§a{mission}", "mission" to "${missionDisplayName(mission.missionTypeId)}＠${themeDisplayName(player, mission.themeId)}"),
@@ -946,7 +934,7 @@ class ArenaMissionService(
         )
     }
 
-    private fun buildMissionLore(player: Player, mission: ArenaDailyMissionEntry): List<String> {
+    private fun buildMissionLore(player: Player, mission: ArenaMissionEntry): List<String> {
         val missionType = ArenaMissionType.fromId(mission.missionTypeId) ?: ArenaMissionType.BARRIER_RESTART
         val lore = mutableListOf<String>()
         lore += ArenaI18n.text(player, "arena.ui.separator", "§8§m――――――――――――――――――――")
@@ -958,7 +946,7 @@ class ArenaMissionService(
         return lore
     }
 
-    private fun buildMissionConfirmLore(player: Player, mission: ArenaDailyMissionEntry): List<String> {
+    private fun buildMissionConfirmLore(player: Player, mission: ArenaMissionEntry): List<String> {
         val missionType = ArenaMissionType.fromId(mission.missionTypeId) ?: ArenaMissionType.BARRIER_RESTART
         val memo = randomMissionMemo(player)
         val lore = mutableListOf<String>()
@@ -1081,8 +1069,8 @@ class ArenaMissionService(
         return false
     }
 
-    private fun isMissionCompleted(playerId: UUID, dateKey: String, missionIndex: Int): Boolean {
-        return getPlayerData(playerId).isCompleted(dateKey, missionIndex)
+    private fun isMissionCompleted(playerId: UUID, missionIndex: Int): Boolean {
+        return getPlayerData(playerId).isCompleted(missionIndex)
     }
 
     private fun getPlayerData(playerId: UUID): ArenaPlayerMissionData {
@@ -1115,11 +1103,7 @@ class ArenaMissionService(
         config.set("arena.lobby.visited", data.lobbyVisited)
         config.set("arena.lobby.tutorial_completed", data.lobbyTutorialCompleted)
         config.set("arena.license_tier", data.licenseTier.id)
-        val completedSection = linkedMapOf<String, List<Int>>()
-        data.completedByDate.toSortedMap().forEach { (dateKey, indices) ->
-            completedSection[dateKey] = indices.toList().sorted()
-        }
-        config.set("arena.completed", completedSection)
+        config.set("arena.completed", data.completedMissionIndices.toList().sorted())
         val shardCounterSection = linkedMapOf<String, Map<String, Int>>()
         data.enchantShardKillCounters.toSortedMap().forEach { (shardKey, countsByMob) ->
             shardCounterSection[shardKey] = countsByMob
@@ -1141,12 +1125,9 @@ class ArenaMissionService(
         val lobbyTutorialCompleted = config.getBoolean("arena.lobby.tutorial_completed", false)
         val licenseTier = ArenaLicenseTier.fromId(config.getString("arena.license_tier", ArenaLicenseTier.PAPER.id).orEmpty())
             ?: ArenaLicenseTier.PAPER
-        val completedByDate = mutableMapOf<String, MutableSet<Int>>()
-        val rawCompleted = config.getConfigurationSection("arena.completed")
-        rawCompleted?.getKeys(false)?.forEach { dateKey ->
-            val list = config.getIntegerList("arena.completed.$dateKey")
-            completedByDate[dateKey] = list.toMutableSet()
-        }
+        val completedMissionIndices = config.getIntegerList("arena.completed")
+            .filter { it >= 0 }
+            .toMutableSet()
         val enchantShardKillCounters = mutableMapOf<String, MutableMap<String, Int>>()
         val rawCounters = config.getConfigurationSection("arena.enchant_shard_kill_counters")
         rawCounters?.getKeys(false)?.forEach { shardKey ->
@@ -1172,9 +1153,25 @@ class ArenaMissionService(
             lobbyVisited = lobbyVisited,
             lobbyTutorialCompleted = lobbyTutorialCompleted,
             licenseTier = licenseTier,
-            completedByDate = completedByDate,
+            completedMissionIndices = completedMissionIndices,
             enchantShardKillCounters = enchantShardKillCounters
         )
+    }
+
+    private fun clearAllCurrentMissionCompletions() {
+        val playerIds = mutableSetOf<UUID>()
+        playerIds += playerCache.keys
+        val files = playerDir.listFiles { file -> file.isFile && file.extension.equals("yml", ignoreCase = true) }.orEmpty()
+        files.forEach { file ->
+            file.nameWithoutExtension.let { runCatching { UUID.fromString(it) }.getOrNull() }?.let { playerIds += it }
+        }
+        playerIds.forEach { playerId ->
+            val data = getPlayerData(playerId)
+            if (data.completedMissionIndices.isNotEmpty()) {
+                data.clearCurrentMissionCompletions()
+                savePlayerData(playerId)
+            }
+        }
     }
 
     private fun evaluateLicensePromotion(playerId: UUID, playerData: ArenaPlayerMissionData) {
@@ -1216,14 +1213,6 @@ class ArenaMissionService(
         val normalized = mobTypeId.trim().lowercase(Locale.ROOT)
         if (normalized.isBlank()) return false
         return strongEnemyMobTypeIds.contains(normalized)
-    }
-
-    private fun currentDateKey(): String {
-        return LocalDate.now(TOKYO_ZONE).format(DATE_FORMATTER)
-    }
-
-    private fun String.toEpochSeed(): Int {
-        return LocalDate.parse(this, DATE_FORMATTER).toEpochDay().toInt()
     }
 
 }
