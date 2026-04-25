@@ -92,6 +92,47 @@ class ArenaMissionService(
         activeMissions.clear()
     }
 
+    fun getLobbyProgress(playerId: UUID): Pair<Boolean, Boolean> {
+        val data = getPlayerData(playerId)
+        return data.lobbyVisited to data.lobbyTutorialCompleted
+    }
+
+    fun markLobbyVisited(playerId: UUID) {
+        val data = getPlayerData(playerId)
+        if (data.lobbyVisited) {
+            return
+        }
+        data.setLobbyVisited()
+        savePlayerData(playerId)
+    }
+
+    fun markLobbyTutorialCompleted(playerId: UUID) {
+        val data = getPlayerData(playerId)
+        if (data.lobbyVisited && data.lobbyTutorialCompleted) {
+            return
+        }
+        data.setLobbyTutorialCompleted()
+        savePlayerData(playerId)
+    }
+
+    fun getStatusSnapshot(): ArenaStatusSnapshot {
+        val playerFiles = playerDir.listFiles { file -> file.isFile && file.extension.equals("yml", ignoreCase = true) }?.toList().orEmpty()
+        val missionFiles = missionDir.listFiles { file -> file.isFile && file.extension.equals("yml", ignoreCase = true) }?.toList().orEmpty()
+        val lobbyProgressCount = playerFiles.count { loadPlayerData(it).lobbyVisited }
+        val lobbyTutorialCompletedCount = playerFiles.count { loadPlayerData(it).lobbyTutorialCompleted }
+        return ArenaStatusSnapshot(
+            missionCacheDateKey = missionFiles.maxByOrNull { it.lastModified() }?.nameWithoutExtension ?: missionCache.keys.maxOrNull(),
+            generatedMissionSets = if (missionFiles.isNotEmpty()) missionFiles.size else missionCache.size,
+            loadedPlayerRecords = if (playerFiles.isNotEmpty()) playerFiles.size else playerCache.size,
+            lobbyProgressCount = lobbyProgressCount,
+            lobbyTutorialCompletedCount = lobbyTutorialCompletedCount,
+            activeMissionCount = activeMissions.size,
+            strongEnemyMobTypeCount = strongEnemyMobTypeIds.size,
+            generateCount = generateCount,
+            difficultyCount = difficultyDefinitions.size
+        )
+    }
+
     fun updateToday(): Boolean {
         val dateKey = currentDateKey()
         return try {
@@ -1071,6 +1112,8 @@ class ArenaMissionService(
         config.set("arena.total_strong_enemy_kill_count", data.totalStrongEnemyKillCount)
         config.set("arena.total_over_enchant_success_count", data.totalOverEnchantSuccessCount)
         config.set("arena.barrier_restart_count", data.barrierRestartCount)
+        config.set("arena.lobby.visited", data.lobbyVisited)
+        config.set("arena.lobby.tutorial_completed", data.lobbyTutorialCompleted)
         config.set("arena.license_tier", data.licenseTier.id)
         val completedSection = linkedMapOf<String, List<Int>>()
         data.completedByDate.toSortedMap().forEach { (dateKey, indices) ->
@@ -1094,6 +1137,8 @@ class ArenaMissionService(
         val totalStrongEnemyKillCount = config.getInt("arena.total_strong_enemy_kill_count", 0).coerceAtLeast(0)
         val totalOverEnchantSuccessCount = config.getInt("arena.total_over_enchant_success_count", 0).coerceAtLeast(0)
         val barrierRestartCount = config.getInt("arena.barrier_restart_count", 0).coerceAtLeast(0)
+        val lobbyVisited = config.getBoolean("arena.lobby.visited", false)
+        val lobbyTutorialCompleted = config.getBoolean("arena.lobby.tutorial_completed", false)
         val licenseTier = ArenaLicenseTier.fromId(config.getString("arena.license_tier", ArenaLicenseTier.PAPER.id).orEmpty())
             ?: ArenaLicenseTier.PAPER
         val completedByDate = mutableMapOf<String, MutableSet<Int>>()
@@ -1124,6 +1169,8 @@ class ArenaMissionService(
             totalStrongEnemyKillCount = totalStrongEnemyKillCount,
             totalOverEnchantSuccessCount = totalOverEnchantSuccessCount,
             barrierRestartCount = barrierRestartCount,
+            lobbyVisited = lobbyVisited,
+            lobbyTutorialCompleted = lobbyTutorialCompleted,
             licenseTier = licenseTier,
             completedByDate = completedByDate,
             enchantShardKillCounters = enchantShardKillCounters

@@ -11,6 +11,7 @@ import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionModifiers
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
+import jp.awabi2048.cccontent.features.arena.mission.ArenaStatusSnapshot
 import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.items.CustomItemManager
@@ -93,6 +94,7 @@ import java.nio.charset.StandardCharsets
 import java.util.Locale
 import java.util.UUID
 import java.util.logging.Level
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.floor
@@ -198,7 +200,8 @@ private data class ArenaBgmTrackConfig(
     val soundKey: String,
     val bpm: Double,
     val loopBeats: Int,
-    val switchIntervalBeats: Int
+    val switchIntervalBeats: Int,
+    val pitch: Float
 ) {
     val beatTicks: Double
         get() = 1200.0 / bpm
@@ -216,6 +219,35 @@ private data class ArenaBgmConfig(
 private data class ArenaLobbyTutorialState(
     var stepIndex: Int = 0,
     var stepLocations: List<Location> = emptyList()
+)
+
+private data class ArenaLobbyProgress(
+    val visited: Boolean = false,
+    val tutorialCompleted: Boolean = false
+)
+
+data class ArenaStatusReport(
+    val readyWorldCount: Int,
+    val totalWorldCount: Int,
+    val inUseWorldCount: Int,
+    val cleaningWorldCount: Int,
+    val brokenWorldCount: Int,
+    val arenaWorldReady: Int,
+    val arenaWorldTotal: Int,
+    val liftReady: Boolean,
+    val lobbyReady: Boolean,
+    val lobbyMainReady: Boolean,
+    val lobbyTutorialReady: Boolean,
+    val returnLobbyCount: Int,
+    val mainLobbyCount: Int,
+    val tutorialStartCount: Int,
+    val tutorialStepCount: Int,
+    val pedestalCount: Int,
+    val activeSessionCount: Int,
+    val maxConcurrentSessions: Int,
+    val missionProgress: ArenaStatusSnapshot?,
+    val lobbyProgressVisitedCount: Int,
+    val lobbyProgressTutorialCompletedCount: Int
 )
 
 private enum class ArenaLobbyTargetType {
@@ -273,8 +305,11 @@ class ArenaManager(
         const val ARENA_BGM_LOBBY_BPM_DEFAULT = 120.0
         const val ARENA_BGM_LOOP_BEATS_DEFAULT = 384
         const val ARENA_BGM_SWITCH_INTERVAL_BEATS_DEFAULT = 8
+        const val ARENA_BGM_NORMAL_PITCH_DEFAULT = 1.0f
+        const val ARENA_BGM_COMBAT_PITCH_DEFAULT = 1.0f
         const val ACTION_MARKER_RADIUS = 1.0
         const val ACTION_MARKER_RADIUS_SQUARED = ACTION_MARKER_RADIUS * ACTION_MARKER_RADIUS
+        const val ACTION_MARKER_MAX_Y_DISTANCE = 0.5
         const val ACTION_MARKER_OUTER_RING_RADIUS = 1.0
         const val ACTION_MARKER_OUTER_RING_HEIGHT = 0.3
         const val ACTION_MARKER_INNER_RING_RADIUS = 0.75
@@ -324,7 +359,6 @@ class ArenaManager(
         const val FINAL_WAVE_OVERTIME_DISCHARGE_KNOCKBACK_BASE = 0.75
         const val LOBBY_TUTORIAL_HOLD_TICKS = 40
         const val LOBBY_TUTORIAL_COMPLETE_DELAY_TICKS = 40L
-        const val LOBBY_BGM_TUTORIAL_COMPLETE_PITCH = 0.8409f
         const val LOBBY_MARKER_TAG_RETURN = "arena.marker.lobby"
         const val LOBBY_MARKER_TAG_MAIN = "arena.marker.lobby_main"
         const val LOBBY_MARKER_TAG_TUTORIAL_START = "arena.marker.lobby_tutorial_start"
@@ -400,20 +434,23 @@ class ArenaManager(
             soundKey = ARENA_BGM_NORMAL_KEY_DEFAULT,
             bpm = ARENA_BGM_NORMAL_BPM_DEFAULT,
             loopBeats = ARENA_BGM_LOOP_BEATS_DEFAULT,
-            switchIntervalBeats = defaultSwitchIntervalBeats()
+            switchIntervalBeats = defaultSwitchIntervalBeats(),
+            pitch = ARENA_BGM_NORMAL_PITCH_DEFAULT
         ),
         combat = ArenaBgmTrackConfig(
             soundKey = ARENA_BGM_COMBAT_KEY_DEFAULT,
             bpm = ARENA_BGM_COMBAT_BPM_DEFAULT,
             loopBeats = ARENA_BGM_LOOP_BEATS_DEFAULT,
-            switchIntervalBeats = defaultSwitchIntervalBeats()
+            switchIntervalBeats = defaultSwitchIntervalBeats(),
+            pitch = ARENA_BGM_COMBAT_PITCH_DEFAULT
         ),
-        lobby = ArenaBgmTrackConfig(
-            soundKey = ARENA_BGM_LOBBY_KEY_DEFAULT,
-            bpm = ARENA_BGM_LOBBY_BPM_DEFAULT,
-            loopBeats = ARENA_BGM_LOOP_BEATS_DEFAULT,
-            switchIntervalBeats = defaultSwitchIntervalBeats()
-        )
+            lobby = ArenaBgmTrackConfig(
+                soundKey = ARENA_BGM_LOBBY_KEY_DEFAULT,
+                bpm = ARENA_BGM_LOBBY_BPM_DEFAULT,
+                loopBeats = ARENA_BGM_LOOP_BEATS_DEFAULT,
+                switchIntervalBeats = defaultSwitchIntervalBeats(),
+                pitch = 0.8409f
+            )
     )
     private var dropConfig = ArenaDropConfig(
         additionalDefaultDrops = emptyList(),
@@ -528,21 +565,24 @@ class ArenaManager(
                 "arena.bgm.normal",
                 ARENA_BGM_NORMAL_KEY_DEFAULT,
                 ARENA_BGM_NORMAL_BPM_DEFAULT,
-                ARENA_BGM_LOOP_BEATS_DEFAULT
+                ARENA_BGM_LOOP_BEATS_DEFAULT,
+                ARENA_BGM_NORMAL_PITCH_DEFAULT
             ),
             combat = parseArenaBgmTrackConfig(
                 config,
                 "arena.bgm.combat",
                 ARENA_BGM_COMBAT_KEY_DEFAULT,
                 ARENA_BGM_COMBAT_BPM_DEFAULT,
-                ARENA_BGM_LOOP_BEATS_DEFAULT
+                ARENA_BGM_LOOP_BEATS_DEFAULT,
+                ARENA_BGM_COMBAT_PITCH_DEFAULT
             ),
             lobby = parseArenaBgmTrackConfig(
                 config,
                 "arena.bgm.lobby",
                 ARENA_BGM_LOBBY_KEY_DEFAULT,
                 ARENA_BGM_LOBBY_BPM_DEFAULT,
-                ARENA_BGM_LOOP_BEATS_DEFAULT
+                ARENA_BGM_LOOP_BEATS_DEFAULT,
+                0.8409f
             )
         )
     }
@@ -552,7 +592,8 @@ class ArenaManager(
         path: String,
         defaultSoundKey: String,
         defaultBpm: Double,
-        defaultLoopBeats: Int
+        defaultLoopBeats: Int,
+        defaultPitch: Float
     ): ArenaBgmTrackConfig {
         val soundKey = config.getString("$path.key")
             ?.trim()
@@ -564,12 +605,16 @@ class ArenaManager(
             .coerceAtLeast(1)
         val switchIntervalBeats = config.getInt("$path.switch_interval_beats", defaultSwitchIntervalBeats())
             .coerceAtLeast(1)
+        val pitch = config.getDouble("$path.pitch", defaultPitch.toDouble())
+            .toFloat()
+            .coerceIn(0.1f, 2.0f)
 
         return ArenaBgmTrackConfig(
             soundKey = soundKey,
             bpm = bpm,
             loopBeats = loopBeats,
-            switchIntervalBeats = switchIntervalBeats
+            switchIntervalBeats = switchIntervalBeats,
+            pitch = pitch
         )
     }
 
@@ -1020,7 +1065,8 @@ class ArenaManager(
         val destination = if (session != null) resolveSessionLobbyLocation(session) else null
         val stopped = leavePlayerFromSession(player.uniqueId, reason, destination)
         if (stopped && destination != null) {
-            lobbyVisitedParticipants.add(player.uniqueId)
+            markLobbyVisited(player.uniqueId)
+            playLobbyBgm(player)
         }
         return stopped
     }
@@ -1039,7 +1085,10 @@ class ArenaManager(
         val destination = if (session != null) resolveSessionLobbyLocation(session) else null
         val stopped = leavePlayerFromSession(playerId, localizedReason, destination)
         if (stopped && destination != null) {
-            lobbyVisitedParticipants.add(playerId)
+            markLobbyVisited(playerId)
+            if (player != null && player.isOnline) {
+                playLobbyBgm(player)
+            }
         }
         return stopped
     }
@@ -1064,11 +1113,12 @@ class ArenaManager(
             return false
         }
 
-        lobbyVisitedParticipants.add(target.uniqueId)
-        playLobbyBgm(target)
+        markLobbyVisited(target.uniqueId)
 
         if (targetType == ArenaLobbyTargetType.TUTORIAL) {
             startLobbyTutorial(target, snapshot)
+        } else {
+            playLobbyBgm(target)
         }
         return true
     }
@@ -1077,13 +1127,7 @@ class ArenaManager(
         return when (lobbyType?.lowercase(Locale.ROOT)) {
             "tutorial" -> ArenaLobbyTargetType.TUTORIAL
             "main" -> ArenaLobbyTargetType.MAIN
-            else -> {
-                if (tutorialCompletedParticipants.contains(playerId) || lobbyVisitedParticipants.contains(playerId)) {
-                    ArenaLobbyTargetType.MAIN
-                } else {
-                    ArenaLobbyTargetType.TUTORIAL
-                }
-            }
+            else -> ArenaLobbyTargetType.MAIN
         }
     }
 
@@ -1099,14 +1143,11 @@ class ArenaManager(
 
         worlds.forEach { world ->
             val snapshot = findLoadedLobbyMarkerSnapshot(world)
-            if (snapshot.returnLobby.isEmpty()) {
-                return@forEach
-            }
 
             val candidates = when (targetType) {
-                ArenaLobbyTargetType.MAIN -> if (snapshot.main.isNotEmpty()) snapshot.main else snapshot.returnLobby
+                ArenaLobbyTargetType.MAIN -> snapshot.main
                 ArenaLobbyTargetType.TUTORIAL -> snapshot.tutorialStart
-                ArenaLobbyTargetType.AUTO -> snapshot.returnLobby
+                ArenaLobbyTargetType.AUTO -> snapshot.main
             }
             if (candidates.isEmpty()) {
                 return@forEach
@@ -1118,15 +1159,54 @@ class ArenaManager(
         return null
     }
 
-    private fun playLobbyBgm(player: Player, pitch: Float = 1.0f) {
+    private fun playLobbyBgm(player: Player) {
         val track = arenaBgmConfig.lobby
-        BGMManager.playPrecise(player, track.soundKey, track.loopTicks, pitch)
+        BGMManager.playPrecise(player, track.soundKey, track.loopTicks, track.pitch)
     }
 
     private fun clearLobbyTutorialState(playerId: UUID) {
         lobbyTutorialStates.remove(playerId)
         lobbyTutorialMarkers.remove(playerId)
         lobbyTutorialHoldStates.remove(playerId)
+    }
+
+    fun clearLobbyTutorialState(player: Player) {
+        clearLobbyTutorialState(player.uniqueId)
+    }
+
+    private fun markLobbyVisited(playerId: UUID) {
+        lobbyVisitedParticipants.add(playerId)
+        arenaMissionService?.markLobbyVisited(playerId)
+    }
+
+    private fun markLobbyTutorialCompleted(playerId: UUID) {
+        lobbyVisitedParticipants.add(playerId)
+        tutorialCompletedParticipants.add(playerId)
+        arenaMissionService?.markLobbyTutorialCompleted(playerId)
+    }
+
+    private fun loadLobbyProgress(playerId: UUID): ArenaLobbyProgress {
+        if (lobbyVisitedParticipants.contains(playerId) || tutorialCompletedParticipants.contains(playerId)) {
+            return ArenaLobbyProgress(
+                visited = lobbyVisitedParticipants.contains(playerId),
+                tutorialCompleted = tutorialCompletedParticipants.contains(playerId)
+            )
+        }
+
+        arenaMissionService?.getLobbyProgress(playerId)?.let { (visited, tutorialCompleted) ->
+            if (visited) {
+                lobbyVisitedParticipants.add(playerId)
+            }
+            if (tutorialCompleted) {
+                tutorialCompletedParticipants.add(playerId)
+            }
+            return ArenaLobbyProgress(visited = visited, tutorialCompleted = tutorialCompleted)
+        }
+
+        return ArenaLobbyProgress(
+            visited = lobbyVisitedParticipants.contains(playerId),
+            tutorialCompleted = tutorialCompletedParticipants.contains(playerId)
+        )
     }
 
     private fun startLobbyTutorial(player: Player, snapshot: ArenaLobbyMarkerSnapshot) {
@@ -1157,7 +1237,7 @@ class ArenaManager(
             .map { it.second }
 
         if (steps.isEmpty()) {
-            tutorialCompletedParticipants.add(player.uniqueId)
+            markLobbyTutorialCompleted(player.uniqueId)
             showLobbyTutorialCompletedEffect(player)
             return
         }
@@ -1190,7 +1270,7 @@ class ArenaManager(
 
     private fun completeLobbyTutorial(player: Player) {
         clearLobbyTutorialState(player.uniqueId)
-        tutorialCompletedParticipants.add(player.uniqueId)
+        markLobbyTutorialCompleted(player.uniqueId)
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             if (!player.isOnline) {
                 return@Runnable
@@ -1200,14 +1280,8 @@ class ArenaManager(
     }
 
     private fun showLobbyTutorialCompletedEffect(player: Player) {
-        player.sendTitle(
-            "",
-            "§7«§6Arena§7»",
-            0,
-            60,
-            10
-        )
-        playLobbyBgm(player, LOBBY_BGM_TUTORIAL_COMPLETE_PITCH)
+        player.sendTitle("", "§f« §6§lArena §f»", 10, 100, 10)
+        playLobbyBgm(player)
     }
 
     private fun extractTutorialStepIndex(marker: Marker): Int? {
@@ -6262,9 +6336,10 @@ class ArenaManager(
         val delayTicks = (beatsUntilNextBoundary.toDouble() * track.beatTicks)
             .roundToLong()
             .coerceAtLeast(1L)
+        val playbackStartNanos = BGMManager.getPlaybackStartNanos(player)
 
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
-            if (player.isOnline) {
+            if (player.isOnline && BGMManager.getPlaybackStartNanos(player) == playbackStartNanos) {
                 stopArenaBgmForPlayer(player)
             }
         }, delayTicks)
@@ -6288,8 +6363,8 @@ class ArenaManager(
         }
 
         arenaBgmPlaybackTargets(session).forEach { player ->
-            stopArenaBgmForPlayer(player)
-            BGMManager.playPrecise(player, track.soundKey, track.loopTicks)
+            stopAllArenaBgmForPlayer(player)
+            BGMManager.playPrecise(player, track.soundKey, track.loopTicks, track.pitch)
         }
         session.arenaBgmMode = mode
         session.arenaBgmModeStartedTick = startTick
@@ -6338,6 +6413,12 @@ class ArenaManager(
     }
 
     private fun stopArenaBgmForPlayer(player: Player) {
+        arenaSessionBgmKeys().forEach { soundKey ->
+            BGMManager.stop(player, soundKey)
+        }
+    }
+
+    private fun stopAllArenaBgmForPlayer(player: Player) {
         arenaBgmKeys().forEach { soundKey ->
             BGMManager.stop(player, soundKey)
         }
@@ -6353,6 +6434,10 @@ class ArenaManager(
 
     private fun arenaBgmKeys(): Set<String> {
         return setOf(arenaBgmConfig.normal.soundKey, arenaBgmConfig.combat.soundKey, arenaBgmConfig.lobby.soundKey)
+    }
+
+    private fun arenaSessionBgmKeys(): Set<String> {
+        return setOf(arenaBgmConfig.normal.soundKey, arenaBgmConfig.combat.soundKey)
     }
 
     private fun prepareArenaWorldPoolAtStartup() {
@@ -7506,10 +7591,6 @@ class ArenaManager(
             }
         }
 
-        if (main.isEmpty() && returnLobby.isNotEmpty()) {
-            main += returnLobby.map { it.clone() }
-        }
-
         val sortedTutorialSteps = tutorialSteps
             .sortedBy { location ->
                 val marker = world
@@ -7596,13 +7677,18 @@ class ArenaManager(
             advanceMarkerMiddleRingRotation(marker, holdProgress)
             val color = resolveActionMarkerDisplayColor(marker, currentTick, holdProgress)
             renderActionMarkerParticles(player, marker, color)
+            if (isInsideActionMarkerRange(player.location, marker.center)) {
+                player.sendActionBar(
+                    Component.text(ArenaI18n.text(player, "arena.messages.lobby.tutorial.hold_hint", "Shift長押しで進む"))
+                )
+            }
             updateLobbyTutorialHoldState(player, marker, currentTick)
         }
     }
 
     private fun updateLobbyTutorialHoldState(player: Player, marker: ArenaActionMarker, currentTick: Long) {
         val playerId = player.uniqueId
-        if (!player.isSneaking) {
+        if (!player.isSneaking || !isInsideActionMarkerRange(player.location, marker.center)) {
             val holdState = lobbyTutorialHoldStates[playerId]
             if (holdState != null && holdState.heldTicks >= 20) {
                 player.playSound(player.location, Sound.BLOCK_BEACON_DEACTIVATE, 1.0f, 2.0f)
@@ -7745,13 +7831,7 @@ class ArenaManager(
         val marker = findHoldableActionMarker(session, player.location)
         if (marker?.type == ArenaActionMarkerType.DOOR_TOGGLE) {
             player.sendActionBar(
-                Component.text(
-                    ArenaI18n.text(
-                        player,
-                        "arena.messages.door.open_hint",
-                        "Shift長押しで扉を開く"
-                    )
-                )
+                Component.text(ArenaI18n.text(player, "arena.messages.door.open_hint", "Shift長押しで扉を開く"))
             )
         }
         if (!player.isSneaking || marker == null) {
@@ -7853,21 +7933,59 @@ class ArenaManager(
     }
 
     private fun findHoldableActionMarker(session: ArenaSession, location: Location): ArenaActionMarker? {
-        val worldUid = location.world?.uid ?: return null
         return session.actionMarkers.values
             .asSequence()
             .filter { it.state == ArenaActionMarkerState.READY }
-            .filter { it.center.world?.uid == worldUid }
-            .filter { marker ->
-                val dx = location.x - marker.center.x
-                val dz = location.z - marker.center.z
-                (dx * dx) + (dz * dz) <= ACTION_MARKER_RADIUS_SQUARED
-            }
+            .filter { marker -> isInsideActionMarkerRange(location, marker.center) }
             .minByOrNull { marker ->
                 val dx = location.x - marker.center.x
                 val dz = location.z - marker.center.z
                 (dx * dx) + (dz * dz)
             }
+    }
+
+    private fun isInsideActionMarkerRange(location: Location, markerCenter: Location): Boolean {
+        val worldUid = location.world?.uid ?: return false
+        if (markerCenter.world?.uid != worldUid) return false
+        if (abs(location.y - (markerCenter.y - 0.5)) > ACTION_MARKER_MAX_Y_DISTANCE) return false
+
+        val dx = location.x - markerCenter.x
+        val dz = location.z - markerCenter.z
+        return (dx * dx) + (dz * dz) <= ACTION_MARKER_RADIUS_SQUARED
+    }
+
+    fun buildStatusReport(): ArenaStatusReport {
+        val worldStates = arenaWorldStates.values.groupingBy { it }.eachCount()
+        val lobbySnapshots = Bukkit.getWorlds().map { findLoadedLobbyMarkerSnapshot(it) }
+        val returnLobbyCount = lobbySnapshots.sumOf { it.returnLobby.size }
+        val mainLobbyCount = lobbySnapshots.sumOf { it.main.size }
+        val tutorialStartCount = lobbySnapshots.sumOf { it.tutorialStart.size }
+        val tutorialStepCount = lobbySnapshots.sumOf { it.tutorialSteps.size }
+        val pedestalCount = lobbySnapshots.sumOf { it.pedestal.size }
+        val missionSnapshot = arenaMissionService?.getStatusSnapshot()
+        return ArenaStatusReport(
+            readyWorldCount = worldStates[ArenaPoolWorldState.READY] ?: 0,
+            totalWorldCount = arenaWorldStates.size,
+            inUseWorldCount = worldStates[ArenaPoolWorldState.IN_USE] ?: 0,
+            cleaningWorldCount = worldStates[ArenaPoolWorldState.CLEANING] ?: 0,
+            brokenWorldCount = worldStates[ArenaPoolWorldState.BROKEN] ?: 0,
+            arenaWorldReady = readyArenaWorldNames.size,
+            arenaWorldTotal = arenaPoolSize,
+            liftReady = sessionsByWorld.values.any { getLiftStatusForSession(it) == ArenaLiftStatus.READY },
+            lobbyReady = mainLobbyCount > 0 && tutorialStartCount > 0,
+            lobbyMainReady = mainLobbyCount > 0,
+            lobbyTutorialReady = tutorialStartCount > 0,
+            returnLobbyCount = returnLobbyCount,
+            mainLobbyCount = mainLobbyCount,
+            tutorialStartCount = tutorialStartCount,
+            tutorialStepCount = tutorialStepCount,
+            pedestalCount = pedestalCount,
+            activeSessionCount = sessionsByWorld.size,
+            maxConcurrentSessions = maxConcurrentSessions,
+            missionProgress = missionSnapshot,
+            lobbyProgressVisitedCount = missionSnapshot?.lobbyProgressCount ?: lobbyVisitedParticipants.size,
+            lobbyProgressTutorialCompletedCount = missionSnapshot?.lobbyTutorialCompletedCount ?: tutorialCompletedParticipants.size
+        )
     }
 
     private fun resetActionMarkerHoldState(

@@ -59,6 +59,7 @@ class ArenaCommand(
             "license" -> handleLicense(sender, args)
             "theme" -> handleTheme(sender, args)
             "lobby" -> handleLobby(sender, args)
+            "status" -> handleStatus(sender)
             "broadcast" -> handleBroadcast(sender)
             "pedestal" -> handlePedestal(sender)
             else -> {
@@ -172,6 +173,31 @@ class ArenaCommand(
                 "type" to resolvedType
             )
         )
+        return true
+    }
+
+    private fun handleStatus(sender: CommandSender): Boolean {
+        val manager = arenaManagerProvider()
+        if (manager == null) {
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable", "§cArena feature は初期化に失敗したため利用できません"))
+            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "§7理由: {reason}", "reason" to it)) }
+            return true
+        }
+
+        val report = manager.buildStatusReport()
+        val mission = report.missionProgress
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.menu.status.title", "§6=== Arena Status ==="))
+        sender.sendMessage("§7sessions: §f${report.activeSessionCount}§7 / §f${report.maxConcurrentSessions}")
+        sender.sendMessage("§7arena worlds: §f${report.readyWorldCount} ready§7, §f${report.inUseWorldCount} in-use§7, §f${report.cleaningWorldCount} cleaning§7, §f${report.brokenWorldCount} broken")
+        sender.sendMessage("§7world pool: §f${report.arenaWorldReady}§7 / §f${report.arenaWorldTotal} ready")
+        sender.sendMessage("§7lift ready: ${if (report.liftReady) "§aYES" else "§cNO"}")
+        sender.sendMessage("§7lobby markers: main=${report.mainLobbyCount}, tutorial_start=${report.tutorialStartCount}, tutorial_step=${report.tutorialStepCount}, return=${report.returnLobbyCount}, pedestal=${report.pedestalCount}")
+        sender.sendMessage("§7lobby flow: main=${if (report.lobbyMainReady) "§aYES" else "§cNO"}, tutorial=${if (report.lobbyTutorialReady) "§aYES" else "§cNO"}")
+        sender.sendMessage("§7lobby progress: visited=${report.lobbyProgressVisitedCount}, tutorial_completed=${report.lobbyProgressTutorialCompletedCount}")
+        if (mission != null) {
+            sender.sendMessage("§7missions: cache=${mission.generatedMissionSets}, active=${mission.activeMissionCount}, players=${mission.loadedPlayerRecords}, difficulty=${mission.difficultyCount}, generate_count=${mission.generateCount}, strong_enemy_types=${mission.strongEnemyMobTypeCount}, lobby_visited=${mission.lobbyProgressCount}, lobby_tutorial_done=${mission.lobbyTutorialCompletedCount}")
+            sender.sendMessage("§7mission date: ${mission.missionCacheDateKey ?: "none"}")
+        }
         return true
     }
 
@@ -518,6 +544,7 @@ class ArenaCommand(
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop", "&f/arenaa stop <player>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.license", "&f/arenaa license set <player> <paper|bronze|silver|gold>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.theme", "&f/arenaa theme list"))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.status", "&f/arenaa status"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.broadcast", "&f/arenaa broadcast"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.pedestal", "&f/arenaa pedestal"))
     }
@@ -532,7 +559,7 @@ class ArenaCommand(
         if (!featureEnabledProvider()) return emptyList()
 
         return when (args.size) {
-            1 -> listOf("menu", "lobby", "start", "stop", "license", "theme", "broadcast", "pedestal").filter { it.startsWith(args[0], ignoreCase = true) }
+            1 -> listOf("menu", "lobby", "start", "stop", "license", "theme", "status", "broadcast", "pedestal").filter { it.startsWith(args[0], ignoreCase = true) }
             2 -> when (args[0].lowercase()) {
                 "menu" -> ArenaMenuType.entries.map { it.id }.filter { it.startsWith(args[1], ignoreCase = true) }
                 "lobby" -> Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], ignoreCase = true) }

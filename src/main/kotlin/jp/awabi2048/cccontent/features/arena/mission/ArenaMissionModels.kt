@@ -26,6 +26,8 @@ data class ArenaPlayerMissionData(
     var totalStrongEnemyKillCount: Int = 0,
     var totalOverEnchantSuccessCount: Int = 0,
     var barrierRestartCount: Int = 0,
+    var lobbyVisited: Boolean = false,
+    var lobbyTutorialCompleted: Boolean = false,
     var licenseTier: ArenaLicenseTier = ArenaLicenseTier.PAPER,
     val completedByDate: MutableMap<String, MutableSet<Int>> = mutableMapOf(),
     val enchantShardKillCounters: MutableMap<String, MutableMap<String, Int>> = mutableMapOf()
@@ -78,6 +80,15 @@ data class ArenaPlayerMissionData(
         if (byMob.isEmpty()) {
             enchantShardKillCounters.remove(shardKey)
         }
+    }
+
+    fun setLobbyVisited() {
+        lobbyVisited = true
+    }
+
+    fun setLobbyTutorialCompleted() {
+        lobbyVisited = true
+        lobbyTutorialCompleted = true
     }
 }
 
@@ -139,6 +150,18 @@ data class ArenaLicenseRequirement(
     val requiredMissionClearCount: Int,
     val requiredMobKillCount: Int,
     val requiredStrongEnemyKillCount: Int
+)
+
+data class ArenaStatusSnapshot(
+    val missionCacheDateKey: String?,
+    val generatedMissionSets: Int,
+    val loadedPlayerRecords: Int,
+    val lobbyProgressCount: Int,
+    val lobbyTutorialCompletedCount: Int,
+    val activeMissionCount: Int,
+    val strongEnemyMobTypeCount: Int,
+    val generateCount: Int,
+    val difficultyCount: Int
 )
 
 enum class ArenaMissionType(

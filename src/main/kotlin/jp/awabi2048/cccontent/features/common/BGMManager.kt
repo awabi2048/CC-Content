@@ -88,8 +88,6 @@ object BGMManager {
         val nextPlayAtTick = startTick + loopTicks
 
         // 初回即時再生
-        player.playSound(player.location, soundKey, 1.0f, normalizedPitch)
-
         val task = object : org.bukkit.scheduler.BukkitRunnable() {
             override fun run() {
                 if (!player.isOnline) {
@@ -112,6 +110,7 @@ object BGMManager {
         }.runTaskTimer(plugin, 0L, 1L)
 
         replaceActivePlayback(player, task, soundKey, normalizedPitch, startTick, loopTicks, nextPlayAtTick)
+        player.playSound(player.location, soundKey, 1.0f, normalizedPitch)
     }
 
     fun getElapsedNanos(player: Player): Long? {
