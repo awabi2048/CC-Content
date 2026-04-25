@@ -224,7 +224,8 @@ class CCContent : JavaPlugin(), Listener {
                 arenaEnchantPedestalMenu = ArenaEnchantPedestalMenu(
                     plugin = this,
                     coreConfigProvider = { coreConfig },
-                    missionServiceProvider = { arenaMissionService }
+                    missionServiceProvider = { arenaMissionService },
+                    arenaManagerProvider = { arenaManager }
                 )
                 arenaManager.setPedestalMenuProvider { arenaEnchantPedestalMenu }
                 arenaFeatureReady = true

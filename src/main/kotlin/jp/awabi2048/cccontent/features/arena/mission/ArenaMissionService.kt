@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.arena.mission
 
 import jp.awabi2048.cccontent.CCContent
+import jp.awabi2048.cccontent.features.arena.ArenaAuditLogger
 import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.arena.ArenaManager
 import jp.awabi2048.cccontent.features.arena.ArenaStartResult
@@ -69,6 +70,7 @@ class ArenaMissionService(
     private val baseDir = File(plugin.dataFolder, "data/arena")
     private val missionDir = File(baseDir, "missions")
     private val playerDir = File(baseDir, "players")
+    private val auditLogger = ArenaAuditLogger(plugin)
     private var currentMissionSet: ArenaMissionSet? = null
     private val playerCache = mutableMapOf<UUID, ArenaPlayerMissionData>()
     private val activeMissions = mutableMapOf<UUID, ArenaActiveMissionRecord>()
@@ -286,6 +288,9 @@ class ArenaMissionService(
         if (playerData.markCompleted(activeRecord.missionIndex)) {
             evaluateLicensePromotion(event.ownerPlayerId, playerData)
             savePlayerData(event.ownerPlayerId)
+            Bukkit.getPlayer(event.ownerPlayerId)?.let { player ->
+                player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.completed", "§aミッションクリア！"))
+            }
             plugin.logger.info("[Arena] ミッション完了を記録しました: player=${event.ownerPlayerId}, mission=${activeRecord.missionIndex}")
         }
     }
@@ -556,6 +561,15 @@ class ArenaMissionService(
     private fun generateAndSave(): ArenaMissionSet {
         val missionSet = generateMissionSet()
         saveMissionSet(missionSet)
+        auditLogger.logMissionUpdate(missionSet.missions.map { mission ->
+            linkedMapOf(
+                "index" to mission.index,
+                "missionTypeId" to mission.missionTypeId,
+                "difficultyId" to mission.difficultyId,
+                "themeId" to mission.themeId,
+                "maxParticipants" to mission.maxParticipants
+            )
+        })
         Bukkit.getPluginManager().callEvent(ArenaMissionGeneratedEvent(missionSet))
         return missionSet
     }

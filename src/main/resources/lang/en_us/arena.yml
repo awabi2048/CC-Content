@@ -261,6 +261,7 @@ arena:
         waiting: §cRun Over Enchant
         ready_lore: §7Click to execute
         waiting_lore: §7Execution unlocks when conditions are met
+        insufficient_power: §cThe altar lacks power
         missing_level: §8Need §a{value} levels §8more
         consume_level: §8Consumes §a{value} levels §8on forging
     separator: §8§m――――――――――――――――――――
