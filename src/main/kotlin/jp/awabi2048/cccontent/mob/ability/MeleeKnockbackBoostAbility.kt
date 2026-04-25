@@ -11,6 +11,7 @@ class MeleeKnockbackBoostAbility(
 
     override fun onAttack(context: MobAttackContext, runtime: MobAbilityRuntime?) {
         val target = context.target ?: return
+        if (target.hasMetadata(IGNORE_METADATA_KEY)) return
         if (!isDirectMeleeAttack(context)) return
 
         val direction = target.location.toVector().subtract(context.entity.location.toVector()).setY(0.0)
@@ -25,5 +26,9 @@ class MeleeKnockbackBoostAbility(
     private fun isDirectMeleeAttack(context: MobAttackContext): Boolean {
         val damager = context.event.damager as? LivingEntity ?: return false
         return damager.uniqueId == context.entity.uniqueId
+    }
+
+    companion object {
+        const val IGNORE_METADATA_KEY = "cccontent_ignore_melee_knockback_boost"
     }
 }

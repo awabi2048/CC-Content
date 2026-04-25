@@ -34,6 +34,7 @@ import jp.awabi2048.cccontent.mob.ability.PoisonOnMeleeHitAbility
 import jp.awabi2048.cccontent.mob.ability.PotionSlimeAbility
 import jp.awabi2048.cccontent.mob.ability.ProjectileAndFireImmunityAbility
 import jp.awabi2048.cccontent.mob.ability.ProximityFlamePulseAbility
+import jp.awabi2048.cccontent.mob.ability.SandShockwaveAbility
 import jp.awabi2048.cccontent.mob.ability.SlimeMergeAbility
 import jp.awabi2048.cccontent.mob.ability.RangedAttackAbility
 import jp.awabi2048.cccontent.mob.ability.RandomInvisibilityAbility
@@ -288,33 +289,23 @@ class IronGolemMagnetMobType : EquipmentMobType(
 
 class DesertTempleSandGolemMobType : EquipmentMobType(
     id = "desert_temple_sand_golem",
-    baseEntityType = EntityType.MAGMA_CUBE,
+    baseEntityType = EntityType.IRON_GOLEM,
     abilities = listOf(
         ProjectileAndFireImmunityAbility(id = "desert_temple_sand_golem_immunity", playSoundOnProjectileBlock = true),
-        MagmaLandingBurstAbility(
-            id = "desert_temple_sand_golem_landing_burst",
-            radius = 4.6,
-            fireTicks = 0,
-            damage = 4.5,
-            horizontalKnockback = 1.3,
-            verticalKnockback = 0.42
+        SandShockwaveAbility(
+            id = "desert_temple_sand_golem_shockwave",
+            cooldownTicks = 120L,
+            maxRadius = 16.0,
+            propagationBlocksPerSecond = 5.0,
+            angleSegments = 48,
+            updateIntervalTicks = 4L,
+            damage = 11.0,
+            horizontalKnockback = 1.0
         ),
-        LeapAbility(
-            id = "desert_temple_sand_golem_leap",
-            cooldownTicks = 34L,
-            minRangeSquared = 4.0,
-            maxRange = 12.0,
-            horizontalSpeed = 0.8,
-            verticalSpeed = 0.38,
-            farJumpStartRangeSquared = 49.0,
-            farHorizontalSpeed = 1.4,
-            farVerticalSpeed = 0.74
-        ),
-        MagmaStageDeathAbility(
-            id = "desert_temple_sand_golem_death",
-            explosionPower = 0.0f,
-            lavaRadius = 0,
-            lavaLevels = emptyList()
+        MeleeKnockbackBoostAbility(
+            id = "desert_temple_sand_golem_melee_knockback",
+            horizontalBoost = 4.5,
+            verticalBoost = 0.25
         )
     )
 ) {
