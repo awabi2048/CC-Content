@@ -159,6 +159,7 @@ private data class ArenaDifficultyConfig(
     val mobCountMultiplier: Double,
     val waveMultiplier: Double,
     val waves: Int,
+    val pedestalRoomProbability: Double,
     val maxParticipants: Int,
     val display: String,
     val reviveMaxPerPlayer: Int,
@@ -596,6 +597,7 @@ class ArenaManager(
             val mobCountMultiplier = section.getDouble("mob_count_multiplier", 1.0).coerceAtLeast(0.01)
             val waveMultiplier = section.getDouble("wave_multiplier", 0.0)
             val waves = section.getInt("wave", 5).coerceAtLeast(1)
+            val pedestalRoomProbability = section.getDouble("pedestal_room_probability", 0.0).coerceIn(0.0, 1.0)
             val maxParticipants = section.getInt("max_participants", MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
                 .coerceIn(1, MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
             val display = section.getString("display", difficultyId) ?: difficultyId
@@ -613,6 +615,7 @@ class ArenaManager(
                 mobCountMultiplier = mobCountMultiplier,
                 waveMultiplier = waveMultiplier,
                 waves = waves,
+                pedestalRoomProbability = pedestalRoomProbability,
                 maxParticipants = maxParticipants,
                 display = display,
                 reviveMaxPerPlayer = reviveMaxPerPlayer,
@@ -842,6 +845,9 @@ class ArenaManager(
             stageBounds = placeholderBounds,
             roomBounds = mutableMapOf(),
             corridorBounds = mutableMapOf(),
+            transitBounds = mutableMapOf(),
+            pedestalBounds = mutableMapOf(),
+            pedestalMarkerBlocks = mutableSetOf(),
             roomMobSpawns = mutableMapOf(),
             roomCheckpoints = mutableMapOf(),
             activatedRoomCheckpoints = mutableMapOf(),
@@ -904,6 +910,7 @@ class ArenaManager(
                     theme = theme,
                     missionTypeId = missionTypeId,
                     waves = difficulty.waves,
+                    pedestalRoomProbability = difficulty.pedestalRoomProbability,
                     random = random,
                     stepsPerTick = multiplayerStageBuildStepsPerTick
                 ) { buildResult ->
@@ -939,7 +946,15 @@ class ArenaManager(
                         }
                 }
             } else {
-                val stage = stageGenerator.build(world, origin, theme, missionTypeId, difficulty.waves, random)
+                val stage = stageGenerator.build(
+                    world,
+                    origin,
+                    theme,
+                    missionTypeId,
+                    difficulty.waves,
+                    difficulty.pedestalRoomProbability,
+                    random
+                )
                 applyStageBuildResult(session, stage)
                 initializeActionMarkers(session)
                 initializeBarrierRestartState(session)
@@ -1320,6 +1335,12 @@ class ArenaManager(
         session.roomBounds.putAll(stage.roomBounds)
         session.corridorBounds.clear()
         session.corridorBounds.putAll(stage.corridorBounds)
+        session.transitBounds.clear()
+        session.transitBounds.putAll(stage.transitBounds)
+        session.pedestalBounds.clear()
+        session.pedestalBounds.putAll(stage.pedestalBounds)
+        session.pedestalMarkerBlocks.clear()
+        session.pedestalMarkerBlocks.addAll(stage.pedestalMarkerBlocks)
         session.roomMobSpawns.clear()
         session.roomMobSpawns.putAll(stage.roomMobSpawns)
         session.roomCheckpoints.clear()
@@ -1814,9 +1835,7 @@ class ArenaManager(
     fun handleArenaInteract(event: PlayerInteractEvent) {
         val clicked = event.clickedBlock ?: return
         val worldName = clicked.world.name
-        if (!sessionsByWorld.containsKey(worldName)) {
-            return
-        }
+        val session = sessionsByWorld[worldName] ?: return
         if (event.action == Action.LEFT_CLICK_BLOCK && clicked.type == Material.COBWEB) {
             if (PeriodicCobwebAbility.consumeArenaPlacedCobweb(clicked)) {
                 clicked.type = Material.AIR
@@ -1827,6 +1846,13 @@ class ArenaManager(
             return
         }
         if (event.action != Action.RIGHT_CLICK_BLOCK) {
+            return
+        }
+        if (hasPedestalMarkerBlock(session, clicked.location)) {
+            event.isCancelled = true
+            event.setUseInteractedBlock(Event.Result.DENY)
+            event.setUseItemInHand(Event.Result.DENY)
+            openPedestalMenu(event.player)
             return
         }
         if (!clicked.type.isInteractable) {
@@ -1879,6 +1905,35 @@ class ArenaManager(
 
         handleReviveTargetSelection(session, player, downed)
         event.isCancelled = true
+    }
+
+    private fun hasPedestalMarkerBlock(session: ArenaSession, location: Location): Boolean {
+        return session.pedestalMarkerBlocks.contains(ArenaBlockKey.from(location))
+    }
+
+    private fun openPedestalMenu(player: Player) {
+        if (!ArenaPermissions.hasPedestalMenuPermission(player)) {
+            player.sendMessage(
+                ArenaI18n.text(
+                    player,
+                    "arena.messages.command.menu_permission_denied",
+                    "&c縺薙・繝｡繝九Η繝ｼ繧帝幕縺乗ｨｩ髯舌′縺ゅｊ縺ｾ縺帙ｓ"
+                )
+            )
+            return
+        }
+        val menu = pedestalMenuProvider?.invoke()
+        if (menu == null) {
+            player.sendMessage(
+                ArenaI18n.text(
+                    player,
+                    "arena.messages.command.feature_unavailable",
+                    "ﾂｧcArena feature 縺ｯ蛻晄悄蛹悶↓螟ｱ謨励＠縺溘◆繧∝茜逕ｨ縺ｧ縺阪∪縺帙ｓ"
+                )
+            )
+            return
+        }
+        menu.openMenu(player)
     }
 
     fun handleArenaEntityMount(event: EntityMountEvent) {
@@ -3564,6 +3619,12 @@ class ArenaManager(
         session.corridorBounds.values.forEach { value ->
             bounds[boundsKey(value)] = value
         }
+        session.transitBounds.values.forEach { value ->
+            bounds[boundsKey(value)] = value
+        }
+        session.pedestalBounds.values.forEach { value ->
+            bounds[boundsKey(value)] = value
+        }
         if (bounds.isEmpty()) {
             bounds[boundsKey(session.stageBounds)] = session.stageBounds
         }
@@ -3808,6 +3869,18 @@ class ArenaManager(
         }?.key
     }
 
+    private fun locateTransitWave(session: ArenaSession, location: Location): Int? {
+        return session.transitBounds.entries.firstOrNull { (_, bounds) ->
+            bounds.contains(location.x, location.y, location.z)
+        }?.key
+    }
+
+    private fun locatePedestalWave(session: ArenaSession, location: Location): Int? {
+        return session.pedestalBounds.entries.firstOrNull { (_, bounds) ->
+            bounds.contains(location.x, location.y, location.z)
+        }?.key
+    }
+
     private fun teleportToCurrentWavePosition(player: Player, session: ArenaSession, world: World, applyBlindness: Boolean = false) {
         val target = currentWavePosition(session, world)
         target.yaw = player.location.yaw
@@ -3828,6 +3901,8 @@ class ArenaManager(
         ENTRANCE,
         ROOM,
         CORRIDOR,
+        TRANSIT,
+        PEDESTAL,
         GOAL,
         UNKNOWN
     }
@@ -3856,6 +3931,14 @@ class ArenaManager(
             return OutOfBoundsOrigin.CORRIDOR
         }
 
+        if (locateTransitWave(session, latestValidLocation) != null) {
+            return OutOfBoundsOrigin.TRANSIT
+        }
+
+        if (locatePedestalWave(session, latestValidLocation) != null) {
+            return OutOfBoundsOrigin.PEDESTAL
+        }
+
         val room = locateRoom(session, latestValidLocation) ?: return OutOfBoundsOrigin.UNKNOWN
         return when {
             room <= 0 -> OutOfBoundsOrigin.ENTRANCE
@@ -3873,6 +3956,8 @@ class ArenaManager(
             OutOfBoundsOrigin.ENTRANCE -> session.entranceCheckpoint.clone().apply { this.world = world }
             OutOfBoundsOrigin.GOAL -> session.goalCheckpoint.clone().apply { this.world = world }
             OutOfBoundsOrigin.CORRIDOR,
+            OutOfBoundsOrigin.TRANSIT,
+            OutOfBoundsOrigin.PEDESTAL,
             OutOfBoundsOrigin.ROOM -> resolveLatestRoomCheckpoint(session, world)
                 ?: session.entranceCheckpoint.clone().apply { this.world = world }
             OutOfBoundsOrigin.UNKNOWN -> resolveLatestRoomCheckpoint(session, world)
@@ -3932,6 +4017,16 @@ class ArenaManager(
 
         val room = locateRoom(session, location)
         if (room != null && room > currentWave) return false
+
+        val transitWave = locateTransitWave(session, location)
+        if (transitWave != null) {
+            return transitWave <= currentWave
+        }
+
+        val pedestalWave = locatePedestalWave(session, location)
+        if (pedestalWave != null) {
+            return pedestalWave <= currentWave
+        }
 
         val corridorWave = locateCorridorTargetWave(session, location) ?: return true
         return session.openedCorridors.contains(corridorWave)
@@ -4875,7 +4970,7 @@ class ArenaManager(
             placement.placeOrigin.clone().apply { this.world = world },
             false,
             toStructureRotation(placement.rotationQuarter),
-            Mirror.NONE,
+            if (placement.mirrored) Mirror.LEFT_RIGHT else Mirror.NONE,
             0,
             1.0f,
             java.util.Random()

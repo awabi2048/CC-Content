@@ -21,6 +21,10 @@
 #     straight_entry: north
 #     corridor_entry: north
 #     goal_entry: north
+#     tjunction_entry: south
+#     tjunction_through: north
+#     tjunction_branch: east
+#     pedestal_entry: west
 
 ruins:
   weight: 5
@@ -78,6 +82,10 @@ ruins:
     straight_entry: south
     corridor_entry: south
     goal_entry: west
+    tjunction_entry: west
+    tjunction_through: east
+    tjunction_branch: south
+    pedestal_entry: south
 
 desert_temple:
   weight: 5
@@ -162,6 +170,10 @@ desert_temple:
     straight_entry: east
     corridor_entry: north
     goal_entry: east
+    tjunction_entry: east
+    tjunction_through: west
+    tjunction_branch: north
+    pedestal_entry: south
 
 ocean_monument:
   weight: 4
@@ -209,6 +221,10 @@ ocean_monument:
     straight_entry: south
     corridor_entry: south
     goal_entry: west
+    tjunction_entry: south
+    tjunction_through: north
+    tjunction_branch: east
+    pedestal_entry: west
 
 natura:
   weight: 4
@@ -308,6 +324,10 @@ natura:
     straight_entry: south
     corridor_entry: south
     goal_entry: west
+    tjunction_entry: south
+    tjunction_through: north
+    tjunction_branch: east
+    pedestal_entry: west
 
 nether:
   weight: 1
@@ -359,6 +379,10 @@ nether:
     straight_entry: south
     corridor_entry: south
     goal_entry: west
+    tjunction_entry: south
+    tjunction_through: north
+    tjunction_branch: east
+    pedestal_entry: west
 
 end:
   weight: 1
@@ -428,3 +452,7 @@ end:
     straight_entry: south
     corridor_entry: south
     goal_entry: west
+    tjunction_entry: south
+    tjunction_through: north
+    tjunction_branch: east
+    pedestal_entry: west

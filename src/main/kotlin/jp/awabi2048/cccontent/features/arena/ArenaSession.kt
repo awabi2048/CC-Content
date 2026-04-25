@@ -22,6 +22,18 @@ data class ArenaBounds(
     }
 }
 
+data class ArenaBlockKey(
+    val x: Int,
+    val y: Int,
+    val z: Int
+) {
+    companion object {
+        fun from(location: Location): ArenaBlockKey {
+            return ArenaBlockKey(location.blockX, location.blockY, location.blockZ)
+        }
+    }
+}
+
 data class TimedPlayerLocation(
     val timestampMillis: Long,
     val location: Location
@@ -105,6 +117,9 @@ data class ArenaSession(
     var stageBounds: ArenaBounds,
     val roomBounds: MutableMap<Int, ArenaBounds>,
     val corridorBounds: MutableMap<Int, ArenaBounds>,
+    val transitBounds: MutableMap<Int, ArenaBounds>,
+    val pedestalBounds: MutableMap<Int, ArenaBounds>,
+    val pedestalMarkerBlocks: MutableSet<ArenaBlockKey>,
     val roomMobSpawns: MutableMap<Int, List<Location>>,
     val roomCheckpoints: MutableMap<Int, Location>,
     val activatedRoomCheckpoints: MutableMap<Int, Location>,

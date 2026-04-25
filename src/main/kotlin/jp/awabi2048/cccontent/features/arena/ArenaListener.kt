@@ -112,7 +112,7 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
         arenaManager.handleArenaBlockPlace(event)
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler
     fun onPlayerInteract(event: PlayerInteractEvent) {
         arenaManager.handleArenaInteract(event)
     }

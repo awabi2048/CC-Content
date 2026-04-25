@@ -108,7 +108,8 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                 MarkerToolMode("connection", "arena.marker.connection", "modes.connection", "§6接続部", Particle.CRIT, Color.fromRGB(255, 176, 64)),
                 MarkerToolMode("door_block", "arena.marker.door_block", "modes.door_block", "§e扉", Particle.WAX_OFF, Color.fromRGB(255, 224, 96)),
                 MarkerToolMode("barrier_core", "arena.marker.barrier_core", "modes.barrier_core", "§b結界核", Particle.END_ROD, Color.fromRGB(96, 224, 255)),
-                MarkerToolMode("barrier_point", "arena.marker.barrier_point", "modes.barrier_point", "§3結界起動点", Particle.GLOW, Color.fromRGB(128, 200, 255))
+                MarkerToolMode("barrier_point", "arena.marker.barrier_point", "modes.barrier_point", "§3結界起動点", Particle.GLOW, Color.fromRGB(128, 200, 255)),
+                MarkerToolMode("pedestal", "arena.marker.pedestal", "modes.pedestal", "§d祭壇", Particle.END_ROD, Color.fromRGB(220, 160, 255))
             ),
             unavailableMessage = { null }
         ),
@@ -122,8 +123,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                 MarkerToolMode("lobby", "arena.marker.lobby", "modes.lobby", "§bロビー(帰還)", Particle.SOUL, Color.fromRGB(96, 224, 255)),
                 MarkerToolMode("lobby_main", "arena.marker.lobby_main", "modes.lobby_main", "§bロビー中央", Particle.SOUL_FIRE_FLAME, Color.fromRGB(96, 200, 255)),
                 MarkerToolMode("lobby_tutorial_start", "arena.marker.lobby_tutorial_start", "modes.lobby_tutorial_start", "§eチュートリアル開始", Particle.WAX_OFF, Color.fromRGB(255, 216, 96)),
-                MarkerToolMode("lobby_tutorial_step", "arena.marker.lobby_tutorial_step", "modes.lobby_tutorial_step", "§6チュートリアル途中", Particle.GLOW, Color.fromRGB(255, 176, 64)),
-                MarkerToolMode("pedestal", "arena.marker.pedestal", "modes.pedestal", "§d祭壇", Particle.END_ROD, Color.fromRGB(220, 160, 255))
+                MarkerToolMode("lobby_tutorial_step", "arena.marker.lobby_tutorial_step", "modes.lobby_tutorial_step", "§6チュートリアル途中", Particle.GLOW, Color.fromRGB(255, 176, 64))
             ),
             unavailableMessage = { null }
         ),

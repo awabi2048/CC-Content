@@ -65,7 +65,11 @@ data class ArenaStructureOrientation(
     val cornerExit: ArenaPathDirection,
     val straightEntry: ArenaPathDirection,
     val corridorEntry: ArenaPathDirection,
-    val goalEntry: ArenaPathDirection
+    val goalEntry: ArenaPathDirection,
+    val tjunctionEntry: ArenaPathDirection,
+    val tjunctionThrough: ArenaPathDirection,
+    val tjunctionBranch: ArenaPathDirection,
+    val pedestalEntry: ArenaPathDirection
 )
 
 data class ArenaStaticStructureVariant(
@@ -96,7 +100,9 @@ enum class ArenaStructureType(val keyword: String, val supportsAnimation: Boolea
     CORNER("corner", true),
     CORRIDOR("corridor", true),
     ENTRANCE("entrance", false),
-    GOAL("goal", false)
+    GOAL("goal", false),
+    TJUNCTION_ROOM("tjunction_room", false),
+    PEDESTAL_ROOM("pedestal_room", false)
 }
 
 class ArenaThemeLoader(private val plugin: JavaPlugin) {
@@ -106,6 +112,11 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             ArenaMissionType.CLEARING
         )
     }
+
+    private val optionalStructureTypes = setOf(
+        ArenaStructureType.TJUNCTION_ROOM,
+        ArenaStructureType.PEDESTAL_ROOM
+    )
 
     private data class ParsedThemeConfig(
         val iconMaterial: Material,
@@ -196,7 +207,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             val parsedThemeConfig = parseThemeConfig(themeConfig, themeId, warnings) ?: continue
             val loaded = loadStructures(folder, warnings)
             val missing = mutableListOf<String>()
-            ArenaStructureType.entries.forEach { type ->
+            ArenaStructureType.entries.filterNot { optionalStructureTypes.contains(it) }.forEach { type ->
                 if (type == ArenaStructureType.GOAL) {
                     val goalVariations = loaded.staticStructures[ArenaStructureType.GOAL].orEmpty()
                     REQUIRED_GOAL_MISSION_TYPES.forEach { missionType ->
@@ -399,6 +410,10 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
         val straightEntry = parseDirection(themeId, orientationSection, "straight_entry", warnings) ?: return null
         val corridorEntry = parseDirection(themeId, orientationSection, "corridor_entry", warnings) ?: return null
         val goalEntry = parseDirection(themeId, orientationSection, "goal_entry", warnings) ?: return null
+        val tjunctionEntry = parseOptionalDirection(orientationSection, "tjunction_entry") ?: straightEntry
+        val tjunctionThrough = parseOptionalDirection(orientationSection, "tjunction_through") ?: straightEntry.opposite()
+        val tjunctionBranch = parseOptionalDirection(orientationSection, "tjunction_branch") ?: straightEntry.right()
+        val pedestalEntry = parseOptionalDirection(orientationSection, "pedestal_entry") ?: tjunctionBranch.opposite()
 
         if (cornerEntry == cornerExit) {
             val warning = "[Arena] theme.yml の corner_entry/corner_exit が同じ方角のためスキップ: theme=$themeId value=${cornerEntry.token}"
@@ -409,6 +424,20 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
 
         if (!cornerEntry.isAdjacent(cornerExit)) {
             val warning = "[Arena] theme.yml の corner_entry/corner_exit は隣接方向のみ許可されています: theme=$themeId entry=${cornerEntry.token} exit=${cornerExit.token}"
+            plugin.logger.warning(warning)
+            warnings.add(warning)
+            return null
+        }
+
+        if (tjunctionEntry == tjunctionThrough || tjunctionEntry != tjunctionThrough.opposite()) {
+            val warning = "[Arena] theme.yml の tjunction_entry/tjunction_through は向かい合う必要があります: theme=$themeId entry=${tjunctionEntry.token} through=${tjunctionThrough.token}"
+            plugin.logger.warning(warning)
+            warnings.add(warning)
+            return null
+        }
+
+        if (!tjunctionBranch.isAdjacent(tjunctionEntry) || !tjunctionBranch.isAdjacent(tjunctionThrough)) {
+            val warning = "[Arena] theme.yml の tjunction_branch は entry/through の側面である必要があります: theme=$themeId entry=${tjunctionEntry.token} through=${tjunctionThrough.token} branch=${tjunctionBranch.token}"
             plugin.logger.warning(warning)
             warnings.add(warning)
             return null
@@ -435,7 +464,11 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 cornerExit = cornerExit,
                 straightEntry = straightEntry,
                 corridorEntry = corridorEntry,
-                goalEntry = goalEntry
+                goalEntry = goalEntry,
+                tjunctionEntry = tjunctionEntry,
+                tjunctionThrough = tjunctionThrough,
+                tjunctionBranch = tjunctionBranch,
+                pedestalEntry = pedestalEntry
             ),
             clearingBossMobId = clearingBossMobId
         )
@@ -462,6 +495,15 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             return null
         }
         return direction
+    }
+
+    private fun parseOptionalDirection(
+        section: org.bukkit.configuration.ConfigurationSection,
+        key: String
+    ): ArenaPathDirection? {
+        val raw = section.getString(key)?.trim().orEmpty()
+        if (raw.isEmpty()) return null
+        return ArenaPathDirection.fromToken(raw)
     }
 
     private fun parseWaveRange(text: String): ArenaThemeWaveRange? {

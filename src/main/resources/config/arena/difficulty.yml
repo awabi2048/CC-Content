@@ -3,6 +3,7 @@ star_1:
   mob_count_multiplier: 0.8
   wave_multiplier: 0.03
   wave: 5
+  pedestal_room_probability: 0.3
   revive_max_per_player: 1
   revive_time_limit_seconds: 30
   max_participants: 2
@@ -17,6 +18,7 @@ star_2:
   mob_count_multiplier: 1.0
   wave_multiplier: 0.04
   wave: 5
+  pedestal_room_probability: 0.3
   revive_max_per_player: 1
   revive_time_limit_seconds: 25
   max_participants: 3
@@ -31,6 +33,7 @@ star_3:
   mob_count_multiplier: 1.2
   wave_multiplier: 0.05
   wave: 5
+  pedestal_room_probability: 0.3
   revive_max_per_player: 1
   revive_time_limit_seconds: 20
   max_participants: 4
@@ -45,6 +48,7 @@ star_4:
   mob_count_multiplier: 1.5
   wave_multiplier: 0.06
   wave: 5
+  pedestal_room_probability: 0.3
   revive_max_per_player: 1
   revive_time_limit_seconds: 15
   max_participants: 6
