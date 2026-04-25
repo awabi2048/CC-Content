@@ -2814,11 +2814,7 @@ class ArenaManager(
             val anchor = downState.gameOverLocation
             if (anchor != null) {
                 val loc = player.location
-                if (loc.world?.uid != anchor.world?.uid ||
-                    loc.distanceSquared(anchor) > 0.01
-                ) {
-                    player.teleport(anchor)
-                }
+                player.teleport(Location(anchor.world, anchor.x, anchor.y, anchor.z, loc.yaw, loc.pitch))
             }
             player.velocity = Vector(0.0, 0.0, 0.0)
             return
