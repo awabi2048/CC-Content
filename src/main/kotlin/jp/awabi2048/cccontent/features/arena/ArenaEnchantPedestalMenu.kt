@@ -121,6 +121,7 @@ private data class PedestalEvaluation(
     val processable: Boolean,
     val expReady: Boolean,
     val executable: Boolean,
+    val powerInsufficient: Boolean = false,
     val requiredLevel: Int?,
     val missingLevel: Int?,
     val uiState: PedestalUiState,
@@ -176,7 +177,8 @@ private data class ViewerRuntime(
 class ArenaEnchantPedestalMenu(
     private val plugin: JavaPlugin,
     private val coreConfigProvider: () -> FileConfiguration,
-    private val missionServiceProvider: () -> ArenaMissionService?
+    private val missionServiceProvider: () -> ArenaMissionService?,
+    private val arenaManagerProvider: () -> ArenaManager? = { null }
 ) : Listener {
     private companion object {
         val PROTECTION_IDS: Set<String> = setOf("protection", "fire_protection", "blast_protection", "projectile_protection")
@@ -206,6 +208,7 @@ class ArenaEnchantPedestalMenu(
     private val overEnchantEntriesKey = NamespacedKey(plugin, "over_enchanter_entries")
     private val overEnchantLoreManagedKey = NamespacedKey(plugin, "over_enchanter_lore_managed")
     private val inputPlaceholderKey = NamespacedKey(plugin, "pedestal_input_placeholder")
+    private val auditLogger = ArenaAuditLogger(plugin)
 
     fun openMenu(player: Player) {
         val holder = ArenaEnchantPedestalHolder(player.uniqueId)
@@ -803,6 +806,8 @@ class ArenaEnchantPedestalMenu(
             return
         }
 
+        val baseItem = toolItem.clone()
+        val consumedCatalysts = prepared.sortedBy { it.slot }.map { it.item.clone() }
         val workingTool = toolItem.clone()
         var state = getOverEnchantState(workingTool)
         prepared.sortedBy { it.slot }.forEach { preparedCatalyst ->
@@ -828,6 +833,7 @@ class ArenaEnchantPedestalMenu(
 
         player.level = (player.level - requiredLevel).coerceAtLeast(0)
         missionServiceProvider()?.recordOverEnchantSuccess(player.uniqueId, prepared.size)
+        auditLogger.logPedestalTransform(player.uniqueId, player.name, baseItem, workingTool.clone(), consumedCatalysts)
         inventory.setItem(ArenaEnchantPedestalLayout.TOOL_SLOT, workingTool)
     }
 
@@ -1204,7 +1210,10 @@ class ArenaEnchantPedestalMenu(
     private fun buildExpInfoItem(player: Player, evaluation: PedestalEvaluation): ItemStack {
         val item = ItemStack(Material.BOOKSHELF)
         val meta = item.itemMeta ?: return item
-        if (!evaluation.processable) {
+        if (evaluation.powerInsufficient) {
+            meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.execute.insufficient_power", "§c祭壇の力が足りません"))
+            meta.lore = null
+        } else if (!evaluation.processable) {
             meta.setDisplayName("§c力を感じられません")
             meta.lore = null
         } else if (evaluation.missingLevel != null && evaluation.missingLevel > 0) {
@@ -1267,7 +1276,10 @@ class ArenaEnchantPedestalMenu(
         val item = ItemStack(Material.ENCHANTING_TABLE)
         val meta = item.itemMeta ?: return item
         val executable = evaluation.executable
-        if (!evaluation.processable) {
+        if (evaluation.powerInsufficient) {
+            meta.setDisplayName("§5オーバーエンチャント")
+            meta.lore = listOf(ArenaI18n.text(player, "arena.ui.pedestal.execute.insufficient_power", "§c祭壇の力が足りません"))
+        } else if (!evaluation.processable) {
             meta.setDisplayName("§5オーバーエンチャント")
             meta.lore = listOf(
                 ArenaI18n.text(
@@ -1489,6 +1501,22 @@ class ArenaEnchantPedestalMenu(
                     preparedCatalysts = emptyList()
                 )
 
+            if (!validateArenaPower(player, catalyst)) {
+                return PedestalEvaluation(
+                    catalystReady = true,
+                    processable = false,
+                    expReady = false,
+                    executable = false,
+                    powerInsufficient = true,
+                    requiredLevel = null,
+                    missingLevel = null,
+                    uiState = uiState,
+                    unlockedSlotCount = unlockProgress.unlockedSlotCount,
+                    usedSlotCount = usedSlotCount,
+                    preparedCatalysts = emptyList()
+                )
+            }
+
             if (!validateRouteCompatibility(workingState, catalyst, uiState, unlockProgress.unlockedSlotCount)) {
                 return PedestalEvaluation(
                     catalystReady = true,
@@ -1604,6 +1632,24 @@ class ArenaEnchantPedestalMenu(
                 }
                 validateExoticAttach(tool, catalyst.targetEnchantmentId)
             }
+        }
+    }
+
+    private fun validateArenaPower(player: Player, catalyst: ArenaEnchantShardData.Shard): Boolean {
+        val currentStar = currentArenaStar(player) ?: return true
+        return resolveShardLevel(catalyst) <= currentStar
+    }
+
+    private fun currentArenaStar(player: Player): Int? {
+        val session = arenaManagerProvider()?.getSession(player) ?: return null
+        return session.difficultyId.removePrefix("star_").toIntOrNull()?.coerceAtLeast(1)
+    }
+
+    private fun resolveShardLevel(catalyst: ArenaEnchantShardData.Shard): Int {
+        return when (catalyst.mode) {
+            ArenaOverEnchanterMode.LIMIT_BREAKING -> catalyst.overLevel ?: 1
+            ArenaOverEnchanterMode.OVER_STACKING,
+            ArenaOverEnchanterMode.EXOTIC_ATTACH -> 1
         }
     }
 

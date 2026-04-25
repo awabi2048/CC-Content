@@ -6,7 +6,7 @@ import org.bukkit.inventory.InventoryHolder
 import java.util.UUID
 import jp.awabi2048.cccontent.features.arena.ArenaI18n
 
-data class ArenaDailyMissionEntry(
+data class ArenaMissionEntry(
     val index: Int,
     val missionTypeId: String,
     val difficultyId: String,
@@ -14,10 +14,9 @@ data class ArenaDailyMissionEntry(
     val maxParticipants: Int = 6
 )
 
-data class ArenaDailyMissionSet(
-    val dateKey: String,
+data class ArenaMissionSet(
     val generatedAtMillis: Long,
-    val missions: List<ArenaDailyMissionEntry>
+    val missions: List<ArenaMissionEntry>
 )
 
 data class ArenaPlayerMissionData(
@@ -29,20 +28,23 @@ data class ArenaPlayerMissionData(
     var lobbyVisited: Boolean = false,
     var lobbyTutorialCompleted: Boolean = false,
     var licenseTier: ArenaLicenseTier = ArenaLicenseTier.PAPER,
-    val completedByDate: MutableMap<String, MutableSet<Int>> = mutableMapOf(),
+    val completedMissionIndices: MutableSet<Int> = mutableSetOf(),
     val enchantShardKillCounters: MutableMap<String, MutableMap<String, Int>> = mutableMapOf()
 ) {
-    fun isCompleted(dateKey: String, missionIndex: Int): Boolean {
-        return completedByDate[dateKey]?.contains(missionIndex) == true
+    fun isCompleted(missionIndex: Int): Boolean {
+        return completedMissionIndices.contains(missionIndex)
     }
 
-    fun markCompleted(dateKey: String, missionIndex: Int): Boolean {
-        val completed = completedByDate.getOrPut(dateKey) { mutableSetOf() }
-        if (!completed.add(missionIndex)) {
+    fun markCompleted(missionIndex: Int): Boolean {
+        if (!completedMissionIndices.add(missionIndex)) {
             return false
         }
         totalMissionClearCount += 1
         return true
+    }
+
+    fun clearCurrentMissionCompletions() {
+        completedMissionIndices.clear()
     }
 
     fun addMobKillCount(amount: Int = 1) {
@@ -153,8 +155,8 @@ data class ArenaLicenseRequirement(
 )
 
 data class ArenaStatusSnapshot(
-    val missionCacheDateKey: String?,
-    val generatedMissionSets: Int,
+    val currentMissionGeneratedAtMillis: Long?,
+    val hasCurrentMissionSet: Boolean,
     val loadedPlayerRecords: Int,
     val lobbyProgressCount: Int,
     val lobbyTutorialCompletedCount: Int,
@@ -235,9 +237,8 @@ data class ArenaMissionModifiers(
 }
 
 data class ArenaActiveMissionRecord(
-    val dateKey: String,
     val missionIndex: Int,
-    val mission: ArenaDailyMissionEntry
+    val mission: ArenaMissionEntry
 )
 
 object ArenaMissionLayout {
@@ -265,8 +266,7 @@ object ArenaMissionLayout {
 }
 
 class ArenaMissionMenuHolder(
-    val ownerId: UUID,
-    val dateKey: String
+    val ownerId: UUID
 ) : InventoryHolder {
     var backingInventory: Inventory? = null
 
@@ -277,7 +277,6 @@ class ArenaMissionMenuHolder(
 
 class ArenaMissionConfirmHolder(
     val ownerId: UUID,
-    val dateKey: String,
     val missionIndex: Int
 ) : InventoryHolder {
     var backingInventory: Inventory? = null

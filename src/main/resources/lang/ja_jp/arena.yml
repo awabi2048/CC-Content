@@ -263,6 +263,7 @@ arena:
         waiting: §cオーバーエンチャント実行
         ready_lore: §7クリックで実行
         waiting_lore: §7条件を満たすと実行できます
+        insufficient_power: §c祭壇の力が足りません
         missing_level: §8あと §a{value} レベル §8必要です
         consume_level: §8合成によって §a{value} レベル §8を消費します
     separator: §8§m――――――――――――――――――――

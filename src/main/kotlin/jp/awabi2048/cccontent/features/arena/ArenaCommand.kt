@@ -195,8 +195,8 @@ class ArenaCommand(
         sender.sendMessage("§7lobby flow: main=${if (report.lobbyMainReady) "§aYES" else "§cNO"}, tutorial=${if (report.lobbyTutorialReady) "§aYES" else "§cNO"}")
         sender.sendMessage("§7lobby progress: visited=${report.lobbyProgressVisitedCount}, tutorial_completed=${report.lobbyProgressTutorialCompletedCount}")
         if (mission != null) {
-            sender.sendMessage("§7missions: cache=${mission.generatedMissionSets}, active=${mission.activeMissionCount}, players=${mission.loadedPlayerRecords}, difficulty=${mission.difficultyCount}, generate_count=${mission.generateCount}, strong_enemy_types=${mission.strongEnemyMobTypeCount}, lobby_visited=${mission.lobbyProgressCount}, lobby_tutorial_done=${mission.lobbyTutorialCompletedCount}")
-            sender.sendMessage("§7mission date: ${mission.missionCacheDateKey ?: "none"}")
+            sender.sendMessage("§7missions: current=${if (mission.hasCurrentMissionSet) "§aYES" else "§cNO"}, active=${mission.activeMissionCount}, players=${mission.loadedPlayerRecords}, difficulty=${mission.difficultyCount}, generate_count=${mission.generateCount}, strong_enemy_types=${mission.strongEnemyMobTypeCount}, lobby_visited=${mission.lobbyProgressCount}, lobby_tutorial_done=${mission.lobbyTutorialCompletedCount}")
+            sender.sendMessage("§7mission generated_at: ${mission.currentMissionGeneratedAtMillis ?: "none"}")
         }
         return true
     }
