@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent.features.arena.mission
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.arena.ArenaAuditLogger
 import jp.awabi2048.cccontent.features.arena.ArenaI18n
+import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeVariant
 import jp.awabi2048.cccontent.features.arena.ArenaManager
 import jp.awabi2048.cccontent.features.arena.ArenaStartResult
 import jp.awabi2048.cccontent.features.arena.event.ArenaMissionGeneratedEvent
@@ -74,8 +75,6 @@ class ArenaMissionService(
     private var currentMissionSet: ArenaMissionSet? = null
     private val playerCache = mutableMapOf<UUID, ArenaPlayerMissionData>()
     private val activeMissions = mutableMapOf<UUID, ArenaActiveMissionRecord>()
-    private var difficultyDefinitions: List<ArenaDifficultyDefinition> = emptyList()
-    private var difficultyDisplayMap: Map<String, ArenaDifficultyDefinition> = emptyMap()
     private var strongEnemyMobTypeIds: Set<String> = DEFAULT_STRONG_ENEMY_MOB_TYPE_IDS
     private var generateCount: Int = MISSION_SLOT_LIMIT
 
@@ -127,7 +126,7 @@ class ArenaMissionService(
             activeMissionCount = activeMissions.size,
             strongEnemyMobTypeCount = strongEnemyMobTypeIds.size,
             generateCount = generateCount,
-            difficultyCount = difficultyDefinitions.size
+            themeCount = arenaManager.getThemeIds().size
         )
     }
 
@@ -245,7 +244,7 @@ class ArenaMissionService(
             return true
         }
 
-        if (!validateMissionLicense(player, mission.difficultyId)) {
+        if (!validateMissionLicense(player, mission.difficultyStar)) {
             return true
         }
 
@@ -334,7 +333,7 @@ class ArenaMissionService(
             return
         }
 
-        if (!validateMissionLicense(player, mission.difficultyId)) {
+        if (!validateMissionLicense(player, mission.difficultyStar)) {
             return
         }
 
@@ -364,8 +363,8 @@ class ArenaMissionService(
 
             when (val result = arenaManager.startSession(
                 player,
-                mission.difficultyId,
                 mission.themeId,
+                promoted = mission.promoted,
                 enableMultiplayerJoin = true,
                 inviteMissionTitle = inviteMissionTitle,
                 inviteMissionLore = inviteMissionLore,
@@ -459,7 +458,6 @@ class ArenaMissionService(
 
     private fun refreshDefinitions() {
         loadGenerationConfig()
-        loadDifficultyDefinitions()
         loadStrongEnemyDefinitions()
         validateArenaSources()
     }
@@ -477,50 +475,6 @@ class ArenaMissionService(
             throw IllegalStateException("arena.mission.generate_count がメニュー枠を超えています: $configured > $MISSION_SLOT_LIMIT")
         }
         generateCount = configured
-    }
-
-    private fun loadDifficultyDefinitions() {
-        val difficultyFile = ensureArenaConfig("config/arena/difficulty.yml")
-        val config = YamlConfiguration.loadConfiguration(difficultyFile)
-        data class ParsedDifficulty(
-            val id: String,
-            val display: String,
-            val explicitStar: Int,
-            val maxParticipants: Int
-        )
-
-        val parsed = mutableListOf<ParsedDifficulty>()
-
-        for (difficultyId in config.getKeys(false)) {
-            val section = config.getConfigurationSection(difficultyId) ?: continue
-            val display = section.getString("display", difficultyId) ?: difficultyId
-            val explicitStar = display.count { it == '★' }
-            val maxParticipants = section.getInt("max_participants", 6).coerceIn(1, 6)
-            parsed.add(
-                ParsedDifficulty(
-                    id = difficultyId,
-                    display = display,
-                    explicitStar = explicitStar,
-                    maxParticipants = maxParticipants
-                )
-            )
-        }
-
-        if (parsed.isEmpty()) {
-            throw IllegalStateException("difficulty.yml が空のためアリーナミッションを生成できません")
-        }
-
-        val sorted = parsed.sortedBy { it.id }
-        difficultyDefinitions = sorted.mapIndexed { index, definition ->
-            val fallbackStar = index + 1
-            ArenaDifficultyDefinition(
-                id = definition.id,
-                display = definition.display,
-                starLevel = if (definition.explicitStar > 0) definition.explicitStar else fallbackStar,
-                maxParticipants = definition.maxParticipants
-            )
-        }
-        difficultyDisplayMap = difficultyDefinitions.associateBy { it.id }
     }
 
     private fun loadStrongEnemyDefinitions() {
@@ -565,8 +519,8 @@ class ArenaMissionService(
             linkedMapOf(
                 "index" to mission.index,
                 "missionTypeId" to mission.missionTypeId,
-                "difficultyId" to mission.difficultyId,
                 "themeId" to mission.themeId,
+                "promoted" to mission.promoted,
                 "maxParticipants" to mission.maxParticipants
             )
         })
@@ -591,21 +545,17 @@ class ArenaMissionService(
             val theme = selectWeightedTheme(weightedThemes, random)
             val themeId = theme.id
             val missionType = ArenaMissionType.BARRIER_RESTART
-            val baseStar = theme.baseDifficultyStar
-            val promotedStar = if (random.nextDouble() < promotionProbability) baseStar + 1 else baseStar
-            val difficultyId = "star_$promotedStar"
-
-            if (!difficultyDisplayMap.containsKey(difficultyId)) {
-                throw IllegalStateException("上位難易度 $difficultyId が difficulty.yml に定義されていません")
-            }
-            val maxParticipants = difficultyMaxParticipants(difficultyId)
+            val promoted = theme.promotedVariant != null && random.nextDouble() < promotionProbability
+            val variant = theme.variant(promoted)
 
             ArenaMissionEntry(
                 index = index,
                 missionTypeId = missionType.id,
-                difficultyId = difficultyId,
                 themeId = themeId,
-                maxParticipants = maxParticipants
+                promoted = promoted,
+                difficultyStar = variant.difficultyStar,
+                difficultyDisplay = variant.display,
+                maxParticipants = variant.maxParticipants
             )
         }
 
@@ -634,8 +584,8 @@ class ArenaMissionService(
                 linkedMapOf(
                     "index" to mission.index,
                     "mission_type_id" to mission.missionTypeId,
-                    "difficulty_id" to mission.difficultyId,
                     "theme_id" to mission.themeId,
+                    "promoted" to mission.promoted,
                     "max_participants" to mission.maxParticipants
                 )
             }
@@ -662,17 +612,22 @@ class ArenaMissionService(
         val missions = missionMaps.mapNotNull { map ->
             val index = map["index"]?.toString()?.toIntOrNull() ?: return@mapNotNull null
             val missionTypeId = map["mission_type_id"]?.toString()?.trim().orEmpty()
-            val difficultyId = map["difficulty_id"]?.toString()?.trim().orEmpty()
+            if (map.containsKey("difficulty_id")) {
+                throw IllegalStateException("旧形式の difficulty_id を含むミッションデータは使用できません。ミッションを再生成してください")
+            }
             val themeId = map["theme_id"]?.toString()?.trim().orEmpty()
+            val promoted = map["promoted"]?.toString()?.toBooleanStrictOrNull() ?: false
             val maxParticipants = map["max_participants"]?.toString()?.toIntOrNull() ?: 6
 
-            validateStoredMission(index, missionTypeId, difficultyId, themeId, maxParticipants)
+            val variant = validateStoredMission(index, missionTypeId, themeId, promoted, maxParticipants)
 
             ArenaMissionEntry(
                 index = index,
                 missionTypeId = missionTypeId,
-                difficultyId = difficultyId,
                 themeId = themeId,
+                promoted = promoted,
+                difficultyStar = variant.difficultyStar,
+                difficultyDisplay = variant.display,
                 maxParticipants = maxParticipants
             )
         }.sortedBy { it.index }
@@ -693,10 +648,10 @@ class ArenaMissionService(
     private fun validateStoredMission(
         index: Int,
         missionTypeId: String,
-        difficultyId: String,
         themeId: String,
+        promoted: Boolean,
         maxParticipants: Int
-    ) {
+    ): ArenaThemeVariant {
         if (index < 0) {
             throw IllegalStateException("ミッションindexが不正です: $index")
         }
@@ -709,14 +664,16 @@ class ArenaMissionService(
             throw IllegalStateException("theme_id が不正です: $themeId")
         }
 
-        if (!difficultyDisplayMap.containsKey(difficultyId)) {
-            throw IllegalStateException("difficulty_id が不正です: $difficultyId")
+        val theme = arenaManager.getTheme(themeId)
+            ?: throw IllegalStateException("theme_id が不正です: $themeId")
+        if (promoted && theme.promotedVariant == null) {
+            throw IllegalStateException("promoted が指定されていますが promoted 設定がありません: theme=$themeId")
         }
-
-        val allowedMaxParticipants = difficultyMaxParticipants(difficultyId)
-        if (maxParticipants !in 1..allowedMaxParticipants) {
-            throw IllegalStateException("max_participants が不正です: $maxParticipants (difficulty=$difficultyId max=$allowedMaxParticipants)")
+        val variant = theme.variant(promoted)
+        if (maxParticipants !in 1..variant.maxParticipants) {
+            throw IllegalStateException("max_participants が不正です: $maxParticipants (theme=$themeId promoted=$promoted max=${variant.maxParticipants})")
         }
+        return variant
     }
 
     private fun selectWeightedTheme(themes: List<ArenaTheme>, random: Random): ArenaTheme {
@@ -859,7 +816,7 @@ class ArenaMissionService(
     }
 
     private fun createMissionItem(player: Player, mission: ArenaMissionEntry, isCompleted: Boolean): ItemStack {
-        val item = ItemStack(themeIconMaterial(mission.themeId))
+        val item = ItemStack(themeIconMaterial(mission.themeId, mission.promoted))
         val meta = item.itemMeta ?: return item
         val title = "${missionDisplayName(mission.missionTypeId)}＠${themeDisplayName(player, mission.themeId)}"
         meta.setDisplayName(
@@ -876,14 +833,14 @@ class ArenaMissionService(
 
     private fun createMissionSummaryItem(player: Player, mission: ArenaMissionEntry): ItemStack {
         return createActionItem(
-            themeIconMaterial(mission.themeId),
+            themeIconMaterial(mission.themeId, mission.promoted),
             ArenaI18n.text(player, "arena.ui.mission.item_name", "§a{mission}", "mission" to "${missionDisplayName(mission.missionTypeId)}＠${themeDisplayName(player, mission.themeId)}"),
             buildMissionConfirmLore(player, mission)
         )
     }
 
-    private fun themeIconMaterial(themeId: String): Material {
-        return arenaManager.getTheme(themeId)?.iconMaterial ?: Material.ROTTEN_FLESH
+    private fun themeIconMaterial(themeId: String, promoted: Boolean): Material {
+        return arenaManager.getTheme(themeId)?.config(promoted)?.iconMaterial ?: Material.ROTTEN_FLESH
     }
 
     private fun createPlayerHead(player: Player, playerData: ArenaPlayerMissionData): ItemStack {
@@ -955,7 +912,7 @@ class ArenaMissionService(
         lore += ArenaI18n.text(player, "arena.ui.mission.mission_title", "§f❙ §7ミッション内容")
         lore += missionGuideHints(missionType, player)
         lore += ""
-        lore += ArenaI18n.text(player, "arena.ui.mission.difficulty_inline", "§f❙ §7難易度 §f{difficulty}", "difficulty" to difficultyDisplay(mission.difficultyId))
+        lore += ArenaI18n.text(player, "arena.ui.mission.difficulty_inline", "§f❙ §7難易度 §f{difficulty}", "difficulty" to mission.difficultyDisplay)
         lore += ArenaI18n.text(player, "arena.ui.separator", "§8§m――――――――――――――――――――")
         return lore
     }
@@ -968,7 +925,7 @@ class ArenaMissionService(
         lore += ArenaI18n.text(player, "arena.ui.mission.mission_title", "§f❙ §7ミッション内容")
         lore += missionGuideHints(missionType, player)
         lore += ""
-        lore += ArenaI18n.text(player, "arena.ui.mission.difficulty_inline", "§f❙ §7難易度 §f{difficulty}", "difficulty" to difficultyDisplay(mission.difficultyId))
+        lore += ArenaI18n.text(player, "arena.ui.mission.difficulty_inline", "§f❙ §7難易度 §f{difficulty}", "difficulty" to mission.difficultyDisplay)
         lore += ArenaI18n.text(player, "arena.ui.mission.memo_inline", "§f❙ §7メモ §f{memo}", "memo" to memo)
         lore += ArenaI18n.text(player, "arena.ui.separator", "§8§m――――――――――――――――――――")
         return lore
@@ -1042,18 +999,6 @@ class ArenaMissionService(
         return ArenaI18n.text(player, tier.displayNameKey, tier.name.lowercase(Locale.ROOT))
     }
 
-    private fun difficultyDisplay(difficultyId: String): String {
-        return difficultyDisplayMap[difficultyId]?.display ?: difficultyId
-    }
-
-    private fun difficultyMaxParticipants(difficultyId: String): Int {
-        return difficultyDisplayMap[difficultyId]?.maxParticipants?.coerceIn(1, 6) ?: 6
-    }
-
-    private fun difficultyStar(difficultyId: String): Int {
-        return difficultyDisplayMap[difficultyId]?.starLevel ?: 1
-    }
-
     private fun missionDisplayName(missionTypeId: String): String {
         val mission = ArenaMissionType.fromId(missionTypeId) ?: return missionTypeId
         return ArenaI18n.text(null, mission.displayNameKey, mission.id)
@@ -1067,9 +1012,8 @@ class ArenaMissionService(
         return ArenaI18n.text(player, "arena.theme.$themeId.name", themeId)
     }
 
-    private fun validateMissionLicense(player: Player, difficultyId: String): Boolean {
+    private fun validateMissionLicense(player: Player, missionDifficultyStar: Int): Boolean {
         val playerData = getPlayerData(player.uniqueId)
-        val missionDifficultyStar = difficultyStar(difficultyId)
         if (missionDifficultyStar <= playerData.licenseTier.maxDifficultyStar) {
             return true
         }

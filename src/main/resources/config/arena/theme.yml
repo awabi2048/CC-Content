@@ -1,458 +1,2343 @@
-# テーマIDごとに向きを定義します。
-# theme_id:
-#   weight: 5
-#   icon: STONE
-#   max_summon_count: 10
-#   clear_mob_count: 20
-#   mobs: # config/mob_definition.yml の id を指定
-#     zombie_basic:
-#       weight: 10
-#       wave: 1..
-#     skeleton_basic:
-#       weight: 6
-#       wave: 2..5
-#   door_open_sound:
-#     key: minecraft:block.iron_door.open
-#     pitch: 1.0
-#   orientation:
-#     entrance_exit: north
-#     corner_entry: north
-#     corner_exit: east
-#     straight_entry: north
-#     corridor_entry: north
-#     goal_entry: north
-#     tjunction_entry: south
-#     tjunction_through: north
-#     tjunction_branch: east
-#     pedestal_entry: west
+# theme_id ごとにアリーナ構成を定義します。
+# normal は通常版、promoted は同じ theme_id の昇格版上書きです。
+# promoted 側で未指定の項目は normal から継承されます。waves は配列全体を置き換えます。
 
-ruins:
-  weight: 5
-  base_difficulty_star: 1
-  icon: STONE
-  max_summon_count: 10
-  clear_mob_count: 20
-  door_open_sound:
-    key: minecraft:block.wood.break
-    pitch: 0.5
-  mobs:
-    zombie_normal:
-      weight: 8
-      wave: 1..
-    zombie_light_leap:
-      weight: 9
-      wave: 1..
-    zombie_heavy_shield:
-      weight: 7
-      wave: 3..
-    zombie_archer:
-      weight: 7
-      wave: 2..
-    zombie_archer_swap:
-      weight: 8
-      wave: 3..
-    skeleton_normal:
-      weight: 7
-      wave: 1..
-    skeleton_plain:
-      weight: 7
-      wave: 1..
-    skeleton_rapid:
-      weight: 7
-      wave: 2..
-    skeleton_curve_backstep:
-      weight: 6
-      wave: 3..
-    skeleton_heavy_bow_shield:
-      weight: 6
-      wave: 3..
-    skeleton_throw_close:
-      weight: 7
-      wave: 2..
-    iron_golem_normal:
-      weight: 2
-      wave: 4..
-    iron_golem_magnet:
-      weight: 2
-      wave: 5..
-  orientation:
-    entrance_exit: north
-    corner_entry: south
-    corner_exit: east
-    straight_entry: south
-    corridor_entry: south
-    goal_entry: west
-    tjunction_entry: west
-    tjunction_through: east
-    tjunction_branch: south
-    pedestal_entry: south
+normal:
+  ruins:
+    weight: 5
+    icon: STONE
+    difficulty_star: 1
+    display: "§c★§7★★★"
+    max_participants: 2
+    pedestal_room_probability: 0.3
+    revive_max_per_player: 1
+    revive_time_limit_seconds: 30
+    waves:
+    - wave: 1
+      spawn_interval: 20
+      clear_mob_count: 17
+      max_alive: 9
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1
+        skeleton_normal:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1
+    - wave: 2
+      spawn_interval: 20
+      clear_mob_count: 17
+      max_alive: 9
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_normal:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1
+    - wave: 3
+      spawn_interval: 20
+      clear_mob_count: 18
+      max_alive: 9
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1
+        zombie_heavy_shield:
+          weight: 7
+          stat_multiplier: 1
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1
+        zombie_archer_swap:
+          weight: 8
+          stat_multiplier: 1
+        skeleton_normal:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_curve_backstep:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1
+    - wave: 4
+      spawn_interval: 20
+      clear_mob_count: 18
+      max_alive: 9
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1
+        zombie_heavy_shield:
+          weight: 7
+          stat_multiplier: 1
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1
+        zombie_archer_swap:
+          weight: 8
+          stat_multiplier: 1
+        skeleton_normal:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_curve_backstep:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1
+        iron_golem_normal:
+          weight: 2
+          stat_multiplier: 1
+    - wave: 5
+      spawn_interval: 20
+      clear_mob_count: 19
+      max_alive: 10
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1
+        zombie_heavy_shield:
+          weight: 7
+          stat_multiplier: 1
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1
+        zombie_archer_swap:
+          weight: 8
+          stat_multiplier: 1
+        skeleton_normal:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_curve_backstep:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1
+        iron_golem_normal:
+          weight: 2
+          stat_multiplier: 1
+        iron_golem_magnet:
+          weight: 2
+          stat_multiplier: 1
+    door_open_sound:
+      key: minecraft:block.wood.break
+      pitch: 0.5
+    orientation:
+      entrance_exit: north
+      corner_entry: south
+      corner_exit: east
+      straight_entry: south
+      corridor_entry: south
+      goal_entry: west
+      tjunction_entry: west
+      tjunction_through: east
+      tjunction_branch: south
+      pedestal_entry: south
+  desert_temple:
+    weight: 5
+    icon: CHISELED_SANDSTONE
+    difficulty_star: 1
+    display: "§c★§7★★★"
+    max_participants: 2
+    pedestal_room_probability: 0.3
+    revive_max_per_player: 1
+    revive_time_limit_seconds: 30
+    waves:
+    - wave: 1
+      spawn_interval: 20
+      clear_mob_count: 17
+      max_alive: 9
+      mobs:
+        husk_normal:
+          weight: 8
+          stat_multiplier: 1
+        husk_light_leap:
+          weight: 9
+          stat_multiplier: 1
+        skeleton_normal:
+          weight: 8
+          stat_multiplier: 1
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1
+    - wave: 2
+      spawn_interval: 20
+      clear_mob_count: 17
+      max_alive: 9
+      mobs:
+        husk_normal:
+          weight: 8
+          stat_multiplier: 1
+        husk_light_leap:
+          weight: 9
+          stat_multiplier: 1
+        husk_archer:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_normal:
+          weight: 8
+          stat_multiplier: 1
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1
+        silverfish_plain:
+          weight: 10
+          stat_multiplier: 1
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1
+    - wave: 3
+      spawn_interval: 20
+      clear_mob_count: 18
+      max_alive: 9
+      mobs:
+        husk_normal:
+          weight: 8
+          stat_multiplier: 1
+        husk_light_leap:
+          weight: 9
+          stat_multiplier: 1
+        husk_heavy_shield:
+          weight: 7
+          stat_multiplier: 1
+        husk_archer:
+          weight: 7
+          stat_multiplier: 1
+        husk_archer_swap:
+          weight: 8
+          stat_multiplier: 1
+        husk_weakening_aura:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_normal:
+          weight: 8
+          stat_multiplier: 1
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_curve_backstep:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1
+        silverfish_plain:
+          weight: 10
+          stat_multiplier: 1
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1
+        spider_ferocious:
+          weight: 6
+          stat_multiplier: 1
+    - wave: 4
+      spawn_interval: 20
+      clear_mob_count: 18
+      max_alive: 9
+      mobs:
+        husk_normal:
+          weight: 8
+          stat_multiplier: 1
+        husk_light_leap:
+          weight: 9
+          stat_multiplier: 1
+        husk_heavy_shield:
+          weight: 7
+          stat_multiplier: 1
+        husk_archer:
+          weight: 7
+          stat_multiplier: 1
+        husk_archer_swap:
+          weight: 8
+          stat_multiplier: 1
+        husk_weakening_aura:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_normal:
+          weight: 8
+          stat_multiplier: 1
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_curve_backstep:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1
+        silverfish_plain:
+          weight: 10
+          stat_multiplier: 1
+        silverfish_big_poison:
+          weight: 5
+          stat_multiplier: 1
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1
+        spider_ferocious:
+          weight: 6
+          stat_multiplier: 1
+        spider_venom_frenzy:
+          weight: 5
+          stat_multiplier: 1
+        silverfish_stealth_fang:
+          weight: 3
+          stat_multiplier: 1
+        desert_temple_sand_golem:
+          weight: 2
+          stat_multiplier: 1
+    - wave: 5
+      spawn_interval: 20
+      clear_mob_count: 19
+      max_alive: 10
+      mobs:
+        husk_normal:
+          weight: 8
+          stat_multiplier: 1
+        husk_light_leap:
+          weight: 9
+          stat_multiplier: 1
+        husk_heavy_shield:
+          weight: 7
+          stat_multiplier: 1
+        husk_archer:
+          weight: 7
+          stat_multiplier: 1
+        husk_archer_swap:
+          weight: 8
+          stat_multiplier: 1
+        husk_weakening_aura:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_normal:
+          weight: 8
+          stat_multiplier: 1
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1
+        skeleton_curve_backstep:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1
+        silverfish_plain:
+          weight: 10
+          stat_multiplier: 1
+        silverfish_big_poison:
+          weight: 5
+          stat_multiplier: 1
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1
+        spider_ferocious:
+          weight: 6
+          stat_multiplier: 1
+        spider_venom_frenzy:
+          weight: 5
+          stat_multiplier: 1
+        spider_broodmother:
+          weight: 3
+          stat_multiplier: 1
+        silverfish_stealth_fang:
+          weight: 3
+          stat_multiplier: 1
+        desert_temple_sand_golem:
+          weight: 2
+          stat_multiplier: 1
+    door_open_sound:
+      key: minecraft:block.sand.break
+      pitch: 0.5
+    orientation:
+      entrance_exit: south
+      corner_entry: north
+      corner_exit: west
+      straight_entry: east
+      corridor_entry: north
+      goal_entry: east
+      tjunction_entry: east
+      tjunction_through: west
+      tjunction_branch: north
+      pedestal_entry: south
+  ocean_monument:
+    weight: 4
+    icon: PRISMARINE_BRICKS
+    difficulty_star: 2
+    display: "§c★★§7★★"
+    max_participants: 3
+    pedestal_room_probability: 0.3
+    revive_max_per_player: 1
+    revive_time_limit_seconds: 25
+    waves:
+    - wave: 1
+      spawn_interval: 18
+      clear_mob_count: 21
+      max_alive: 11
+      mobs:
+        drowned_unarmed:
+          weight: 8
+          stat_multiplier: 1.35
+        guardian_small:
+          weight: 3
+          stat_multiplier: 1.35
+    - wave: 2
+      spawn_interval: 18
+      clear_mob_count: 22
+      max_alive: 11
+      mobs:
+        drowned_unarmed:
+          weight: 8
+          stat_multiplier: 1.35
+        drowned_trident_guard:
+          weight: 12
+          stat_multiplier: 1.35
+        water_spirit:
+          weight: 2
+          stat_multiplier: 1.35
+          max_alive: 2
+        guardian_normal:
+          weight: 4
+          stat_multiplier: 1.35
+        guardian_small:
+          weight: 3
+          stat_multiplier: 1.35
+    - wave: 3
+      spawn_interval: 18
+      clear_mob_count: 23
+      max_alive: 12
+      mobs:
+        drowned_unarmed:
+          weight: 8
+          stat_multiplier: 1.35
+        drowned_trident_guard:
+          weight: 12
+          stat_multiplier: 1.35
+        drowned_raider_axe:
+          weight: 6
+          stat_multiplier: 1.35
+        water_spirit:
+          weight: 2
+          stat_multiplier: 1.35
+          max_alive: 2
+        guardian_normal:
+          weight: 4
+          stat_multiplier: 1.35
+        guardian_small:
+          weight: 3
+          stat_multiplier: 1.35
+        guardian_drain:
+          weight: 3
+          stat_multiplier: 1.35
+    - wave: 4
+      spawn_interval: 18
+      clear_mob_count: 24
+      max_alive: 12
+      mobs:
+        drowned_unarmed:
+          weight: 8
+          stat_multiplier: 1.35
+        drowned_trident_guard:
+          weight: 12
+          stat_multiplier: 1.35
+        drowned_raider_axe:
+          weight: 6
+          stat_multiplier: 1.35
+        water_spirit_elite:
+          weight: 2
+          stat_multiplier: 1.35
+          max_alive: 2
+        guardian_normal:
+          weight: 4
+          stat_multiplier: 1.35
+        guardian_small:
+          weight: 3
+          stat_multiplier: 1.35
+        guardian_drain:
+          weight: 3
+          stat_multiplier: 1.35
+        guardian_beam_burst:
+          weight: 2
+          stat_multiplier: 1.35
+    - wave: 5
+      spawn_interval: 18
+      clear_mob_count: 24
+      max_alive: 12
+      mobs:
+        drowned_unarmed:
+          weight: 8
+          stat_multiplier: 1.35
+        drowned_trident_guard:
+          weight: 12
+          stat_multiplier: 1.35
+        drowned_raider_axe:
+          weight: 6
+          stat_multiplier: 1.35
+        water_spirit_elite:
+          weight: 2
+          stat_multiplier: 1.35
+          max_alive: 2
+        guardian_normal:
+          weight: 4
+          stat_multiplier: 1.35
+        guardian_small:
+          weight: 3
+          stat_multiplier: 1.35
+        guardian_drain:
+          weight: 3
+          stat_multiplier: 1.35
+        guardian_beam_burst:
+          weight: 2
+          stat_multiplier: 1.35
+    door_open_sound:
+      key: minecraft:item.bucket.empty
+      pitch: 0.5
+    orientation:
+      entrance_exit: north
+      corner_entry: south
+      corner_exit: east
+      straight_entry: south
+      corridor_entry: south
+      goal_entry: west
+      tjunction_entry: south
+      tjunction_through: north
+      tjunction_branch: east
+      pedestal_entry: west
+  natura:
+    weight: 4
+    icon: MOSSY_COBBLESTONE
+    difficulty_star: 2
+    display: "§c★★§7★★"
+    max_participants: 3
+    pedestal_room_probability: 0.3
+    revive_max_per_player: 1
+    revive_time_limit_seconds: 25
+    waves:
+    - wave: 1
+      spawn_interval: 18
+      clear_mob_count: 21
+      max_alive: 11
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        bogged_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.35
+        slime_merge_small:
+          weight: 10
+          stat_multiplier: 1.35
+    - wave: 2
+      spawn_interval: 18
+      clear_mob_count: 22
+      max_alive: 11
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        bogged_rapid:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_throw_close:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_boomerang:
+          weight: 6
+          stat_multiplier: 1.35
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.35
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1.35
+        slime_merge_small:
+          weight: 10
+          stat_multiplier: 1.35
+        slime_merge_medium:
+          weight: 7
+          stat_multiplier: 1.35
+        witch_normal:
+          weight: 6
+          stat_multiplier: 1.35
+    - wave: 3
+      spawn_interval: 18
+      clear_mob_count: 23
+      max_alive: 12
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        zombie_heavy_shield:
+          weight: 7
+          stat_multiplier: 1.35
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1.35
+        zombie_archer_swap:
+          weight: 8
+          stat_multiplier: 1.35
+        bogged_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        bogged_rapid:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_curve_backstep:
+          weight: 6
+          stat_multiplier: 1.35
+        bogged_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1.35
+        bogged_throw_close:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_boomerang:
+          weight: 6
+          stat_multiplier: 1.35
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.35
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_ferocious:
+          weight: 6
+          stat_multiplier: 1.35
+        frog_big:
+          weight: 4
+          stat_multiplier: 1.35
+        slime_merge_small:
+          weight: 10
+          stat_multiplier: 1.35
+        slime_merge_medium:
+          weight: 7
+          stat_multiplier: 1.35
+        slime_poison:
+          weight: 5
+          stat_multiplier: 1.35
+        witch_normal:
+          weight: 6
+          stat_multiplier: 1.35
+    - wave: 4
+      spawn_interval: 18
+      clear_mob_count: 24
+      max_alive: 12
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        zombie_heavy_shield:
+          weight: 7
+          stat_multiplier: 1.35
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1.35
+        zombie_archer_swap:
+          weight: 8
+          stat_multiplier: 1.35
+        bogged_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        bogged_rapid:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_curve_backstep:
+          weight: 6
+          stat_multiplier: 1.35
+        bogged_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1.35
+        bogged_throw_close:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_boomerang:
+          weight: 6
+          stat_multiplier: 1.35
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.35
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_ferocious:
+          weight: 6
+          stat_multiplier: 1.35
+        spider_venom_frenzy:
+          weight: 5
+          stat_multiplier: 1.35
+        frog_big:
+          weight: 4
+          stat_multiplier: 1.35
+        slime_merge_small:
+          weight: 10
+          stat_multiplier: 1.35
+        slime_merge_medium:
+          weight: 7
+          stat_multiplier: 1.35
+        slime_merge_large:
+          weight: 3
+          stat_multiplier: 1.35
+        slime_poison:
+          weight: 5
+          stat_multiplier: 1.35
+        slime_wither:
+          weight: 4
+          stat_multiplier: 1.35
+        witch_normal:
+          weight: 6
+          stat_multiplier: 1.35
+        witch_elite:
+          weight: 3
+          stat_multiplier: 1.35
+        bat_venom:
+          weight: 2
+          stat_multiplier: 1.35
+    - wave: 5
+      spawn_interval: 18
+      clear_mob_count: 24
+      max_alive: 12
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        zombie_heavy_shield:
+          weight: 7
+          stat_multiplier: 1.35
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1.35
+        zombie_archer_swap:
+          weight: 8
+          stat_multiplier: 1.35
+        bogged_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        bogged_rapid:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_curve_backstep:
+          weight: 6
+          stat_multiplier: 1.35
+        bogged_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1.35
+        bogged_throw_close:
+          weight: 7
+          stat_multiplier: 1.35
+        bogged_boomerang:
+          weight: 6
+          stat_multiplier: 1.35
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.35
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_ferocious:
+          weight: 6
+          stat_multiplier: 1.35
+        spider_venom_frenzy:
+          weight: 5
+          stat_multiplier: 1.35
+        spider_broodmother:
+          weight: 3
+          stat_multiplier: 1.35
+        frog_big:
+          weight: 4
+          stat_multiplier: 1.35
+        slime_merge_small:
+          weight: 10
+          stat_multiplier: 1.35
+        slime_merge_medium:
+          weight: 7
+          stat_multiplier: 1.35
+        slime_merge_large:
+          weight: 3
+          stat_multiplier: 1.35
+        slime_poison:
+          weight: 5
+          stat_multiplier: 1.35
+        slime_wither:
+          weight: 4
+          stat_multiplier: 1.35
+        witch_normal:
+          weight: 6
+          stat_multiplier: 1.35
+        witch_elite:
+          weight: 3
+          stat_multiplier: 1.35
+        bat_venom:
+          weight: 2
+          stat_multiplier: 1.35
+    door_open_sound:
+      key: minecraft:block.stone.break
+      pitch: 0.8
+    orientation:
+      entrance_exit: north
+      corner_entry: south
+      corner_exit: east
+      straight_entry: south
+      corridor_entry: south
+      goal_entry: west
+      tjunction_entry: south
+      tjunction_through: north
+      tjunction_branch: east
+      pedestal_entry: west
+  nether:
+    weight: 1
+    icon: NETHER_BRICKS
+    difficulty_star: 3
+    display: "§c★★★§7★"
+    max_participants: 4
+    pedestal_room_probability: 0.3
+    revive_max_per_player: 1
+    revive_time_limit_seconds: 20
+    waves:
+    - wave: 1
+      spawn_interval: 16
+      clear_mob_count: 26
+      max_alive: 13
+      mobs:
+        blaze_normal:
+          weight: 10
+          stat_multiplier: 1.9
+        wither_skeleton_swap:
+          weight: 6
+          stat_multiplier: 1.9
+    - wave: 2
+      spawn_interval: 16
+      clear_mob_count: 27
+      max_alive: 14
+      mobs:
+        blaze_normal:
+          weight: 10
+          stat_multiplier: 1.9
+        blaze_rapid:
+          weight: 8
+          stat_multiplier: 1.9
+        magma_cube_medium:
+          weight: 6
+          stat_multiplier: 1.9
+        wither_skeleton_swap:
+          weight: 6
+          stat_multiplier: 1.9
+    - wave: 3
+      spawn_interval: 16
+      clear_mob_count: 28
+      max_alive: 14
+      mobs:
+        blaze_normal:
+          weight: 10
+          stat_multiplier: 1.9
+        blaze_rapid:
+          weight: 8
+          stat_multiplier: 1.9
+        blaze_melee:
+          weight: 6
+          stat_multiplier: 1.9
+        magma_cube_medium:
+          weight: 6
+          stat_multiplier: 1.9
+        wither_skeleton_swap:
+          weight: 6
+          stat_multiplier: 1.9
+        wither_skeleton_bow_guard:
+          weight: 5
+          stat_multiplier: 1.9
+    - wave: 4
+      spawn_interval: 16
+      clear_mob_count: 29
+      max_alive: 15
+      mobs:
+        blaze_normal:
+          weight: 10
+          stat_multiplier: 1.9
+        blaze_rapid:
+          weight: 8
+          stat_multiplier: 1.9
+        blaze_melee:
+          weight: 6
+          stat_multiplier: 1.9
+        blaze_power:
+          weight: 4
+          stat_multiplier: 1.9
+        magma_cube_medium:
+          weight: 6
+          stat_multiplier: 1.9
+        magma_cube_large:
+          weight: 4
+          stat_multiplier: 1.9
+        wither_skeleton_swap:
+          weight: 6
+          stat_multiplier: 1.9
+        wither_skeleton_bow_guard:
+          weight: 5
+          stat_multiplier: 1.9
+        wither_skeleton_wither_boomerang:
+          weight: 4
+          stat_multiplier: 1.9
+    - wave: 5
+      spawn_interval: 16
+      clear_mob_count: 30
+      max_alive: 15
+      mobs:
+        blaze_normal:
+          weight: 10
+          stat_multiplier: 1.9
+        blaze_rapid:
+          weight: 8
+          stat_multiplier: 1.9
+        blaze_melee:
+          weight: 6
+          stat_multiplier: 1.9
+        blaze_power:
+          weight: 4
+          stat_multiplier: 1.9
+        blaze_beam:
+          weight: 3
+          stat_multiplier: 1.9
+        magma_cube_medium:
+          weight: 6
+          stat_multiplier: 1.9
+        magma_cube_large:
+          weight: 4
+          stat_multiplier: 1.9
+        wither_skeleton_swap:
+          weight: 6
+          stat_multiplier: 1.9
+        wither_skeleton_bow_guard:
+          weight: 5
+          stat_multiplier: 1.9
+        wither_skeleton_wither_boomerang:
+          weight: 4
+          stat_multiplier: 1.9
+        ashen_spirit:
+          weight: 2
+          stat_multiplier: 1.9
+    door_open_sound:
+      key: minecraft:block.nether_bricks.place
+      pitch: 0.9
+    orientation:
+      entrance_exit: north
+      corner_entry: south
+      corner_exit: east
+      straight_entry: south
+      corridor_entry: south
+      goal_entry: west
+      tjunction_entry: south
+      tjunction_through: north
+      tjunction_branch: east
+      pedestal_entry: west
+  end:
+    weight: 1
+    icon: PURPUR_PILLAR
+    difficulty_star: 3
+    display: "§c★★★§7★"
+    max_participants: 4
+    pedestal_room_probability: 0.3
+    revive_max_per_player: 1
+    revive_time_limit_seconds: 20
+    waves:
+    - wave: 1
+      spawn_interval: 16
+      clear_mob_count: 13
+      max_alive: 7
+      mobs:
+        wither_ghost:
+          weight: 4
+          stat_multiplier: 1.9
+        enderman_mist_delay:
+          weight: 1
+          stat_multiplier: 1.9
+        endermite_poison:
+          weight: 1
+          stat_multiplier: 1.9
+    - wave: 2
+      spawn_interval: 16
+      clear_mob_count: 14
+      max_alive: 7
+      mobs:
+        wither_ghost:
+          weight: 4
+          stat_multiplier: 1.9
+        endermite_poison:
+          weight: 1
+          stat_multiplier: 1.9
+        wither_knight:
+          weight: 4
+          stat_multiplier: 1.9
+        enderman_small_backstab:
+          weight: 1
+          stat_multiplier: 1.9
+        enderman_void_carrier:
+          weight: 1
+          stat_multiplier: 1.9
+        shulker_mimic:
+          weight: 1
+          stat_multiplier: 1.9
+    - wave: 3
+      spawn_interval: 16
+      clear_mob_count: 14
+      max_alive: 7
+      mobs:
+        wither_ghost:
+          weight: 4
+          stat_multiplier: 1.9
+        wither_knight:
+          weight: 4
+          stat_multiplier: 1.9
+        shulker_mimic:
+          weight: 1
+          stat_multiplier: 1.9
+        enderman_rift_carrier:
+          weight: 1
+          stat_multiplier: 1.9
+        enderman_grave_carrier:
+          weight: 1
+          stat_multiplier: 1.9
+        raiden_creeper:
+          weight: 1
+          stat_multiplier: 1.9
+    - wave: 4
+      spawn_interval: 16
+      clear_mob_count: 15
+      max_alive: 8
+      mobs:
+        wither_ghost:
+          weight: 4
+          stat_multiplier: 1.9
+        wither_knight:
+          weight: 4
+          stat_multiplier: 1.9
+        shulker_mimic:
+          weight: 1
+          stat_multiplier: 1.9
+        end_crystal_sentinel:
+          weight: 1
+          stat_multiplier: 1.9
+        enderman_phase:
+          weight: 1
+          stat_multiplier: 1.9
+        enderman_drain:
+          weight: 1
+          stat_multiplier: 1.9
+    - wave: 5
+      spawn_interval: 16
+      clear_mob_count: 15
+      max_alive: 8
+      mobs:
+        wither_ghost:
+          weight: 4
+          stat_multiplier: 1.9
+        wither_knight:
+          weight: 4
+          stat_multiplier: 1.9
+        end_wither_sentinel:
+          weight: 1
+          stat_multiplier: 1.9
+        ender_eye_beam:
+          weight: 1
+          stat_multiplier: 1.9
+        enderman_mirror:
+          weight: 1
+          stat_multiplier: 1.9
+        enderman_eye_summoner:
+          weight: 1
+          stat_multiplier: 1.9
 
-desert_temple:
-  weight: 5
-  base_difficulty_star: 1
-  icon: CHISELED_SANDSTONE
-  max_summon_count: 10
-  clear_mob_count: 20
-  door_open_sound:
-    key: minecraft:block.sand.break
-    pitch: 0.5
-  mobs:
-    husk_normal:
-      weight: 8
-      wave: 1..
-    husk_light_leap:
-      weight: 9
-      wave: 1..
-    husk_heavy_shield:
-      weight: 7
-      wave: 3..
-    husk_archer:
-      weight: 7
-      wave: 2..
-    husk_archer_swap:
-      weight: 8
-      wave: 3..
-    husk_weakening_aura:
-      weight: 6
-      wave: 3..
-    skeleton_normal:
-      weight: 8
-      wave: 1..
-    skeleton_plain:
-      weight: 7
-      wave: 1..
-    skeleton_rapid:
-      weight: 7
-      wave: 2..
-    skeleton_curve_backstep:
-      weight: 6
-      wave: 3..
-    skeleton_heavy_bow_shield:
-      weight: 6
-      wave: 3..
-    skeleton_throw_close:
-      weight: 7
-      wave: 2..
-    silverfish_plain:
-      weight: 10
-      wave: 2..
-    silverfish_big_poison:
-      weight: 5
-      wave: 4..
-    spider_plain:
-      weight: 8
-      wave: 1..
-    spider_stealth:
-      weight: 7
-      wave: 2..
-    spider_swift:
-      weight: 7
-      wave: 2..
-    spider_ferocious:
-      weight: 6
-      wave: 3..
-    spider_venom_frenzy:
-      weight: 5
-      wave: 4..
-    spider_broodmother:
-      weight: 3
-      wave: 5..
-    silverfish_stealth_fang:
-      weight: 3
-      wave: 4..
-    desert_temple_sand_golem:
-      weight: 2
-      wave: 4..
-  orientation:
-    entrance_exit: south
-    corner_entry: north
-    corner_exit: west
-    straight_entry: east
-    corridor_entry: north
-    goal_entry: east
-    tjunction_entry: east
-    tjunction_through: west
-    tjunction_branch: north
-    pedestal_entry: south
-
-ocean_monument:
-  weight: 4
-  base_difficulty_star: 2
-  icon: PRISMARINE_BRICKS
-  max_summon_count: 10
-  clear_mob_count: 20
-  door_open_sound:
-    key: minecraft:item.bucket.empty
-    pitch: 0.5
-  mobs:
-    drowned_unarmed:
-      weight: 8
-      wave: 1..
-    drowned_trident_guard:
-      weight: 12
-      wave: 2..
-    drowned_raider_axe:
-      weight: 6
-      wave: 3..
-    water_spirit:
-      weight: 2
-      wave: 2..3
-      max_alive: 2
-    water_spirit_elite:
-      weight: 2
-      wave: 4..5
-      max_alive: 2
-    guardian_normal:
-      weight: 4
-      wave: 2..
-    guardian_small:
-      weight: 3
-      wave: 1..
-    guardian_drain:
-      weight: 3
-      wave: 3..
-    guardian_beam_burst:
-      weight: 2
-      wave: 4..
-  orientation:
-    entrance_exit: north
-    corner_entry: south
-    corner_exit: east
-    straight_entry: south
-    corridor_entry: south
-    goal_entry: west
-    tjunction_entry: south
-    tjunction_through: north
-    tjunction_branch: east
-    pedestal_entry: west
-
-natura:
-  weight: 4
-  base_difficulty_star: 2
-  icon: MOSSY_COBBLESTONE
-  max_summon_count: 10
-  clear_mob_count: 20
-  door_open_sound:
-    key: minecraft:block.stone.break
-    pitch: 0.8
-  mobs:
-    zombie_normal:
-      weight: 8
-      wave: 1..
-    zombie_light_leap:
-      weight: 9
-      wave: 1..
-    zombie_heavy_shield:
-      weight: 7
-      wave: 3..
-    zombie_archer:
-      weight: 7
-      wave: 2..
-    zombie_archer_swap:
-      weight: 8
-      wave: 3..
-    bogged_plain:
-      weight: 7
-      wave: 1..
-    bogged_normal:
-      weight: 8
-      wave: 1..
-    bogged_rapid:
-      weight: 7
-      wave: 2..
-    bogged_curve_backstep:
-      weight: 6
-      wave: 3..
-    bogged_heavy_bow_shield:
-      weight: 6
-      wave: 3..
-    bogged_throw_close:
-      weight: 7
-      wave: 2..
-    bogged_boomerang:
-      weight: 6
-      wave: 2..
-    spider_plain:
-      weight: 8
-      wave: 1..
-    spider_stealth:
-      weight: 7
-      wave: 2..
-    spider_swift:
-      weight: 7
-      wave: 2..
-    spider_ferocious:
-      weight: 6
-      wave: 3..
-    spider_venom_frenzy:
-      weight: 5
-      wave: 4..
-    spider_broodmother:
-      weight: 3
-      wave: 5..
-    frog_big:
-      weight: 4
-      wave: 3..
-    slime_merge_small:
-      weight: 10
-      wave: 1..
-    slime_merge_medium:
-      weight: 7
-      wave: 2..
-    slime_merge_large:
-      weight: 3
-      wave: 4..
-    slime_poison:
-      weight: 5
-      wave: 3..
-    slime_wither:
-      weight: 4
-      wave: 4..
-    witch_normal:
-      weight: 6
-      wave: 2..
-    witch_elite:
-      weight: 3
-      wave: 4..
-    bat_venom:
-      weight: 2
-      wave: 4..
-  orientation:
-    entrance_exit: north
-    corner_entry: south
-    corner_exit: east
-    straight_entry: south
-    corridor_entry: south
-    goal_entry: west
-    tjunction_entry: south
-    tjunction_through: north
-    tjunction_branch: east
-    pedestal_entry: west
-
-nether:
-  weight: 1
-  base_difficulty_star: 3
-  icon: NETHER_BRICKS
-  max_summon_count: 10
-  clear_mob_count: 20
-  door_open_sound:
-    key: minecraft:block.nether_bricks.place
-    pitch: 0.9
-  mobs:
-    blaze_normal:
-      weight: 10
-      wave: 1..
-    blaze_rapid:
-      weight: 8
-      wave: 2..
-    blaze_melee:
-      weight: 6
-      wave: 3..
-    blaze_power:
-      weight: 4
-      wave: 4..
-    blaze_beam:
-      weight: 3
-      wave: 5..
-    magma_cube_medium:
-      weight: 6
-      wave: 2..
-    magma_cube_large:
-      weight: 4
-      wave: 4..
-    wither_skeleton_swap:
-      weight: 6
-      wave: 1..
-    wither_skeleton_bow_guard:
-      weight: 5
-      wave: 3..
-    wither_skeleton_wither_boomerang:
-      weight: 4
-      wave: 4..
-    ashen_spirit:
-      weight: 2
-      wave: 5..
-  orientation:
-    entrance_exit: north
-    corner_entry: south
-    corner_exit: east
-    straight_entry: south
-    corridor_entry: south
-    goal_entry: west
-    tjunction_entry: south
-    tjunction_through: north
-    tjunction_branch: east
-    pedestal_entry: west
-
-end:
-  weight: 1
-  base_difficulty_star: 3
-  icon: PURPUR_PILLAR
-  max_summon_count: 5
-  clear_mob_count: 10
-  door_open_sound:
-    key: minecraft:block.glass.break
-    pitch: 0.66
-  mobs:
-    wither_ghost:
-      weight: 4
-      wave: 1..5
-    enderman_mist_delay:
-      weight: 1
-      wave: 1..1
-    endermite_poison:
-      weight: 1
-      wave: 1..2
-    wither_knight:
-      weight: 4
-      wave: 2..5
-    enderman_small_backstab:
-      weight: 1
-      wave: 2..2
-    enderman_void_carrier:
-      weight: 1
-      wave: 2..2
-    shulker_mimic:
-      weight: 1
-      wave: 2..4
-    enderman_rift_carrier:
-      weight: 1
-      wave: 3..3
-    enderman_grave_carrier:
-      weight: 1
-      wave: 3..3
-    raiden_creeper:
-      weight: 1
-      wave: 3..3
-    end_crystal_sentinel:
-      weight: 1
-      wave: 4..4
-    end_wither_sentinel:
-      weight: 1
-      wave: 5..5
-    enderman_phase:
-      weight: 1
-      wave: 4..4
-    enderman_drain:
-      weight: 1
-      wave: 4..4
-    ender_eye_beam:
-      weight: 1
-      wave: 5..5
-    enderman_mirror:
-      weight: 1
-      wave: 5..5
-    enderman_eye_summoner:
-      weight: 1
-      wave: 5..5
-  orientation:
-    entrance_exit: north
-    corner_entry: south
-    corner_exit: east
-    straight_entry: south
-    corridor_entry: south
-    goal_entry: west
-    tjunction_entry: south
-    tjunction_through: north
-    tjunction_branch: east
-    pedestal_entry: west
+    door_open_sound:
+      key: minecraft:block.glass.break
+      pitch: 0.66
+    orientation:
+      entrance_exit: north
+      corner_entry: south
+      corner_exit: east
+      straight_entry: south
+      corridor_entry: south
+      goal_entry: west
+      tjunction_entry: south
+      tjunction_through: north
+      tjunction_branch: east
+      pedestal_entry: west
+promoted:
+  ruins:
+    difficulty_star: 2
+    display: "§c★★§7★★"
+    max_participants: 3
+    pedestal_room_probability: 0.3
+    revive_max_per_player: 1
+    revive_time_limit_seconds: 25
+    waves:
+    - wave: 1
+      spawn_interval: 18
+      clear_mob_count: 21
+      max_alive: 11
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        skeleton_normal:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1.35
+    - wave: 2
+      spawn_interval: 18
+      clear_mob_count: 22
+      max_alive: 11
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_normal:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1.35
+    - wave: 3
+      spawn_interval: 18
+      clear_mob_count: 23
+      max_alive: 12
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        zombie_heavy_shield:
+          weight: 7
+          stat_multiplier: 1.35
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1.35
+        zombie_archer_swap:
+          weight: 8
+          stat_multiplier: 1.35
+        skeleton_normal:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_curve_backstep:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1.35
+    - wave: 4
+      spawn_interval: 18
+      clear_mob_count: 24
+      max_alive: 12
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        zombie_heavy_shield:
+          weight: 7
+          stat_multiplier: 1.35
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1.35
+        zombie_archer_swap:
+          weight: 8
+          stat_multiplier: 1.35
+        skeleton_normal:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_curve_backstep:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1.35
+        iron_golem_normal:
+          weight: 2
+          stat_multiplier: 1.35
+    - wave: 5
+      spawn_interval: 18
+      clear_mob_count: 24
+      max_alive: 12
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        zombie_heavy_shield:
+          weight: 7
+          stat_multiplier: 1.35
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1.35
+        zombie_archer_swap:
+          weight: 8
+          stat_multiplier: 1.35
+        skeleton_normal:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_curve_backstep:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1.35
+        iron_golem_normal:
+          weight: 2
+          stat_multiplier: 1.35
+        iron_golem_magnet:
+          weight: 2
+          stat_multiplier: 1.35
+  desert_temple:
+    difficulty_star: 2
+    display: "§c★★§7★★"
+    max_participants: 3
+    pedestal_room_probability: 0.3
+    revive_max_per_player: 1
+    revive_time_limit_seconds: 25
+    waves:
+    - wave: 1
+      spawn_interval: 18
+      clear_mob_count: 21
+      max_alive: 11
+      mobs:
+        husk_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        husk_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        skeleton_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.35
+    - wave: 2
+      spawn_interval: 18
+      clear_mob_count: 22
+      max_alive: 11
+      mobs:
+        husk_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        husk_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        husk_archer:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1.35
+        silverfish_plain:
+          weight: 10
+          stat_multiplier: 1.35
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.35
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1.35
+    - wave: 3
+      spawn_interval: 18
+      clear_mob_count: 23
+      max_alive: 12
+      mobs:
+        husk_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        husk_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        husk_heavy_shield:
+          weight: 7
+          stat_multiplier: 1.35
+        husk_archer:
+          weight: 7
+          stat_multiplier: 1.35
+        husk_archer_swap:
+          weight: 8
+          stat_multiplier: 1.35
+        husk_weakening_aura:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_curve_backstep:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1.35
+        silverfish_plain:
+          weight: 10
+          stat_multiplier: 1.35
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.35
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_ferocious:
+          weight: 6
+          stat_multiplier: 1.35
+    - wave: 4
+      spawn_interval: 18
+      clear_mob_count: 24
+      max_alive: 12
+      mobs:
+        husk_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        husk_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        husk_heavy_shield:
+          weight: 7
+          stat_multiplier: 1.35
+        husk_archer:
+          weight: 7
+          stat_multiplier: 1.35
+        husk_archer_swap:
+          weight: 8
+          stat_multiplier: 1.35
+        husk_weakening_aura:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_curve_backstep:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1.35
+        silverfish_plain:
+          weight: 10
+          stat_multiplier: 1.35
+        silverfish_big_poison:
+          weight: 5
+          stat_multiplier: 1.35
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.35
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_ferocious:
+          weight: 6
+          stat_multiplier: 1.35
+        spider_venom_frenzy:
+          weight: 5
+          stat_multiplier: 1.35
+        silverfish_stealth_fang:
+          weight: 3
+          stat_multiplier: 1.35
+        desert_temple_sand_golem:
+          weight: 2
+          stat_multiplier: 1.35
+    - wave: 5
+      spawn_interval: 18
+      clear_mob_count: 24
+      max_alive: 12
+      mobs:
+        husk_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        husk_light_leap:
+          weight: 9
+          stat_multiplier: 1.35
+        husk_heavy_shield:
+          weight: 7
+          stat_multiplier: 1.35
+        husk_archer:
+          weight: 7
+          stat_multiplier: 1.35
+        husk_archer_swap:
+          weight: 8
+          stat_multiplier: 1.35
+        husk_weakening_aura:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_normal:
+          weight: 8
+          stat_multiplier: 1.35
+        skeleton_plain:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_rapid:
+          weight: 7
+          stat_multiplier: 1.35
+        skeleton_curve_backstep:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1.35
+        skeleton_throw_close:
+          weight: 7
+          stat_multiplier: 1.35
+        silverfish_plain:
+          weight: 10
+          stat_multiplier: 1.35
+        silverfish_big_poison:
+          weight: 5
+          stat_multiplier: 1.35
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.35
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1.35
+        spider_ferocious:
+          weight: 6
+          stat_multiplier: 1.35
+        spider_venom_frenzy:
+          weight: 5
+          stat_multiplier: 1.35
+        spider_broodmother:
+          weight: 3
+          stat_multiplier: 1.35
+        silverfish_stealth_fang:
+          weight: 3
+          stat_multiplier: 1.35
+        desert_temple_sand_golem:
+          weight: 2
+          stat_multiplier: 1.35
+  ocean_monument:
+    difficulty_star: 3
+    display: "§c★★★§7★"
+    max_participants: 4
+    pedestal_room_probability: 0.3
+    revive_max_per_player: 1
+    revive_time_limit_seconds: 20
+    waves:
+    - wave: 1
+      spawn_interval: 16
+      clear_mob_count: 26
+      max_alive: 13
+      mobs:
+        drowned_unarmed:
+          weight: 8
+          stat_multiplier: 1.9
+        guardian_small:
+          weight: 3
+          stat_multiplier: 1.9
+    - wave: 2
+      spawn_interval: 16
+      clear_mob_count: 27
+      max_alive: 14
+      mobs:
+        drowned_unarmed:
+          weight: 8
+          stat_multiplier: 1.9
+        drowned_trident_guard:
+          weight: 12
+          stat_multiplier: 1.9
+        water_spirit:
+          weight: 2
+          stat_multiplier: 1.9
+          max_alive: 2
+        guardian_normal:
+          weight: 4
+          stat_multiplier: 1.9
+        guardian_small:
+          weight: 3
+          stat_multiplier: 1.9
+    - wave: 3
+      spawn_interval: 16
+      clear_mob_count: 28
+      max_alive: 14
+      mobs:
+        drowned_unarmed:
+          weight: 8
+          stat_multiplier: 1.9
+        drowned_trident_guard:
+          weight: 12
+          stat_multiplier: 1.9
+        drowned_raider_axe:
+          weight: 6
+          stat_multiplier: 1.9
+        water_spirit:
+          weight: 2
+          stat_multiplier: 1.9
+          max_alive: 2
+        guardian_normal:
+          weight: 4
+          stat_multiplier: 1.9
+        guardian_small:
+          weight: 3
+          stat_multiplier: 1.9
+        guardian_drain:
+          weight: 3
+          stat_multiplier: 1.9
+    - wave: 4
+      spawn_interval: 16
+      clear_mob_count: 29
+      max_alive: 15
+      mobs:
+        drowned_unarmed:
+          weight: 8
+          stat_multiplier: 1.9
+        drowned_trident_guard:
+          weight: 12
+          stat_multiplier: 1.9
+        drowned_raider_axe:
+          weight: 6
+          stat_multiplier: 1.9
+        water_spirit_elite:
+          weight: 2
+          stat_multiplier: 1.9
+          max_alive: 2
+        guardian_normal:
+          weight: 4
+          stat_multiplier: 1.9
+        guardian_small:
+          weight: 3
+          stat_multiplier: 1.9
+        guardian_drain:
+          weight: 3
+          stat_multiplier: 1.9
+        guardian_beam_burst:
+          weight: 2
+          stat_multiplier: 1.9
+    - wave: 5
+      spawn_interval: 16
+      clear_mob_count: 30
+      max_alive: 15
+      mobs:
+        drowned_unarmed:
+          weight: 8
+          stat_multiplier: 1.9
+        drowned_trident_guard:
+          weight: 12
+          stat_multiplier: 1.9
+        drowned_raider_axe:
+          weight: 6
+          stat_multiplier: 1.9
+        water_spirit_elite:
+          weight: 2
+          stat_multiplier: 1.9
+          max_alive: 2
+        guardian_normal:
+          weight: 4
+          stat_multiplier: 1.9
+        guardian_small:
+          weight: 3
+          stat_multiplier: 1.9
+        guardian_drain:
+          weight: 3
+          stat_multiplier: 1.9
+        guardian_beam_burst:
+          weight: 2
+          stat_multiplier: 1.9
+  natura:
+    difficulty_star: 3
+    display: "§c★★★§7★"
+    max_participants: 4
+    pedestal_room_probability: 0.3
+    revive_max_per_player: 1
+    revive_time_limit_seconds: 20
+    waves:
+    - wave: 1
+      spawn_interval: 16
+      clear_mob_count: 26
+      max_alive: 13
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.9
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.9
+        bogged_plain:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_normal:
+          weight: 8
+          stat_multiplier: 1.9
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.9
+        slime_merge_small:
+          weight: 10
+          stat_multiplier: 1.9
+    - wave: 2
+      spawn_interval: 16
+      clear_mob_count: 27
+      max_alive: 14
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.9
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.9
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_plain:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_normal:
+          weight: 8
+          stat_multiplier: 1.9
+        bogged_rapid:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_throw_close:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_boomerang:
+          weight: 6
+          stat_multiplier: 1.9
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.9
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1.9
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1.9
+        slime_merge_small:
+          weight: 10
+          stat_multiplier: 1.9
+        slime_merge_medium:
+          weight: 7
+          stat_multiplier: 1.9
+        witch_normal:
+          weight: 6
+          stat_multiplier: 1.9
+    - wave: 3
+      spawn_interval: 16
+      clear_mob_count: 28
+      max_alive: 14
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.9
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.9
+        zombie_heavy_shield:
+          weight: 7
+          stat_multiplier: 1.9
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1.9
+        zombie_archer_swap:
+          weight: 8
+          stat_multiplier: 1.9
+        bogged_plain:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_normal:
+          weight: 8
+          stat_multiplier: 1.9
+        bogged_rapid:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_curve_backstep:
+          weight: 6
+          stat_multiplier: 1.9
+        bogged_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1.9
+        bogged_throw_close:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_boomerang:
+          weight: 6
+          stat_multiplier: 1.9
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.9
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1.9
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1.9
+        spider_ferocious:
+          weight: 6
+          stat_multiplier: 1.9
+        frog_big:
+          weight: 4
+          stat_multiplier: 1.9
+        slime_merge_small:
+          weight: 10
+          stat_multiplier: 1.9
+        slime_merge_medium:
+          weight: 7
+          stat_multiplier: 1.9
+        slime_poison:
+          weight: 5
+          stat_multiplier: 1.9
+        witch_normal:
+          weight: 6
+          stat_multiplier: 1.9
+    - wave: 4
+      spawn_interval: 16
+      clear_mob_count: 29
+      max_alive: 15
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.9
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.9
+        zombie_heavy_shield:
+          weight: 7
+          stat_multiplier: 1.9
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1.9
+        zombie_archer_swap:
+          weight: 8
+          stat_multiplier: 1.9
+        bogged_plain:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_normal:
+          weight: 8
+          stat_multiplier: 1.9
+        bogged_rapid:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_curve_backstep:
+          weight: 6
+          stat_multiplier: 1.9
+        bogged_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1.9
+        bogged_throw_close:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_boomerang:
+          weight: 6
+          stat_multiplier: 1.9
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.9
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1.9
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1.9
+        spider_ferocious:
+          weight: 6
+          stat_multiplier: 1.9
+        spider_venom_frenzy:
+          weight: 5
+          stat_multiplier: 1.9
+        frog_big:
+          weight: 4
+          stat_multiplier: 1.9
+        slime_merge_small:
+          weight: 10
+          stat_multiplier: 1.9
+        slime_merge_medium:
+          weight: 7
+          stat_multiplier: 1.9
+        slime_merge_large:
+          weight: 3
+          stat_multiplier: 1.9
+        slime_poison:
+          weight: 5
+          stat_multiplier: 1.9
+        slime_wither:
+          weight: 4
+          stat_multiplier: 1.9
+        witch_normal:
+          weight: 6
+          stat_multiplier: 1.9
+        witch_elite:
+          weight: 3
+          stat_multiplier: 1.9
+        bat_venom:
+          weight: 2
+          stat_multiplier: 1.9
+    - wave: 5
+      spawn_interval: 16
+      clear_mob_count: 30
+      max_alive: 15
+      mobs:
+        zombie_normal:
+          weight: 8
+          stat_multiplier: 1.9
+        zombie_light_leap:
+          weight: 9
+          stat_multiplier: 1.9
+        zombie_heavy_shield:
+          weight: 7
+          stat_multiplier: 1.9
+        zombie_archer:
+          weight: 7
+          stat_multiplier: 1.9
+        zombie_archer_swap:
+          weight: 8
+          stat_multiplier: 1.9
+        bogged_plain:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_normal:
+          weight: 8
+          stat_multiplier: 1.9
+        bogged_rapid:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_curve_backstep:
+          weight: 6
+          stat_multiplier: 1.9
+        bogged_heavy_bow_shield:
+          weight: 6
+          stat_multiplier: 1.9
+        bogged_throw_close:
+          weight: 7
+          stat_multiplier: 1.9
+        bogged_boomerang:
+          weight: 6
+          stat_multiplier: 1.9
+        spider_plain:
+          weight: 8
+          stat_multiplier: 1.9
+        spider_stealth:
+          weight: 7
+          stat_multiplier: 1.9
+        spider_swift:
+          weight: 7
+          stat_multiplier: 1.9
+        spider_ferocious:
+          weight: 6
+          stat_multiplier: 1.9
+        spider_venom_frenzy:
+          weight: 5
+          stat_multiplier: 1.9
+        spider_broodmother:
+          weight: 3
+          stat_multiplier: 1.9
+        frog_big:
+          weight: 4
+          stat_multiplier: 1.9
+        slime_merge_small:
+          weight: 10
+          stat_multiplier: 1.9
+        slime_merge_medium:
+          weight: 7
+          stat_multiplier: 1.9
+        slime_merge_large:
+          weight: 3
+          stat_multiplier: 1.9
+        slime_poison:
+          weight: 5
+          stat_multiplier: 1.9
+        slime_wither:
+          weight: 4
+          stat_multiplier: 1.9
+        witch_normal:
+          weight: 6
+          stat_multiplier: 1.9
+        witch_elite:
+          weight: 3
+          stat_multiplier: 1.9
+        bat_venom:
+          weight: 2
+          stat_multiplier: 1.9
+  nether:
+    difficulty_star: 4
+    display: "§c★★★★"
+    max_participants: 6
+    pedestal_room_probability: 0.3
+    revive_max_per_player: 1
+    revive_time_limit_seconds: 15
+    waves:
+    - wave: 1
+      spawn_interval: 14
+      clear_mob_count: 32
+      max_alive: 16
+      mobs:
+        blaze_normal:
+          weight: 10
+          stat_multiplier: 2.6
+        wither_skeleton_swap:
+          weight: 6
+          stat_multiplier: 2.6
+    - wave: 2
+      spawn_interval: 14
+      clear_mob_count: 34
+      max_alive: 17
+      mobs:
+        blaze_normal:
+          weight: 10
+          stat_multiplier: 2.6
+        blaze_rapid:
+          weight: 8
+          stat_multiplier: 2.6
+        magma_cube_medium:
+          weight: 6
+          stat_multiplier: 2.6
+        wither_skeleton_swap:
+          weight: 6
+          stat_multiplier: 2.6
+    - wave: 3
+      spawn_interval: 14
+      clear_mob_count: 36
+      max_alive: 18
+      mobs:
+        blaze_normal:
+          weight: 10
+          stat_multiplier: 2.6
+        blaze_rapid:
+          weight: 8
+          stat_multiplier: 2.6
+        blaze_melee:
+          weight: 6
+          stat_multiplier: 2.6
+        magma_cube_medium:
+          weight: 6
+          stat_multiplier: 2.6
+        wither_skeleton_swap:
+          weight: 6
+          stat_multiplier: 2.6
+        wither_skeleton_bow_guard:
+          weight: 5
+          stat_multiplier: 2.6
+    - wave: 4
+      spawn_interval: 14
+      clear_mob_count: 38
+      max_alive: 19
+      mobs:
+        blaze_normal:
+          weight: 10
+          stat_multiplier: 2.6
+        blaze_rapid:
+          weight: 8
+          stat_multiplier: 2.6
+        blaze_melee:
+          weight: 6
+          stat_multiplier: 2.6
+        blaze_power:
+          weight: 4
+          stat_multiplier: 2.6
+        magma_cube_medium:
+          weight: 6
+          stat_multiplier: 2.6
+        magma_cube_large:
+          weight: 4
+          stat_multiplier: 2.6
+        wither_skeleton_swap:
+          weight: 6
+          stat_multiplier: 2.6
+        wither_skeleton_bow_guard:
+          weight: 5
+          stat_multiplier: 2.6
+        wither_skeleton_wither_boomerang:
+          weight: 4
+          stat_multiplier: 2.6
+    - wave: 5
+      spawn_interval: 14
+      clear_mob_count: 39
+      max_alive: 20
+      mobs:
+        blaze_normal:
+          weight: 10
+          stat_multiplier: 2.6
+        blaze_rapid:
+          weight: 8
+          stat_multiplier: 2.6
+        blaze_melee:
+          weight: 6
+          stat_multiplier: 2.6
+        blaze_power:
+          weight: 4
+          stat_multiplier: 2.6
+        blaze_beam:
+          weight: 3
+          stat_multiplier: 2.6
+        magma_cube_medium:
+          weight: 6
+          stat_multiplier: 2.6
+        magma_cube_large:
+          weight: 4
+          stat_multiplier: 2.6
+        wither_skeleton_swap:
+          weight: 6
+          stat_multiplier: 2.6
+        wither_skeleton_bow_guard:
+          weight: 5
+          stat_multiplier: 2.6
+        wither_skeleton_wither_boomerang:
+          weight: 4
+          stat_multiplier: 2.6
+        ashen_spirit:
+          weight: 2
+          stat_multiplier: 2.6
+  end:
+    difficulty_star: 4
+    display: "§c★★★★"
+    max_participants: 6
+    pedestal_room_probability: 0.3
+    revive_max_per_player: 1
+    revive_time_limit_seconds: 15
+    waves:
+    - wave: 1
+      spawn_interval: 14
+      clear_mob_count: 16
+      max_alive: 8
+      mobs:
+        wither_ghost:
+          weight: 4
+          stat_multiplier: 2.6
+        enderman_mist_delay:
+          weight: 1
+          stat_multiplier: 2.6
+        endermite_poison:
+          weight: 1
+          stat_multiplier: 2.6
+    - wave: 2
+      spawn_interval: 14
+      clear_mob_count: 17
+      max_alive: 9
+      mobs:
+        wither_ghost:
+          weight: 4
+          stat_multiplier: 2.6
+        endermite_poison:
+          weight: 1
+          stat_multiplier: 2.6
+        wither_knight:
+          weight: 4
+          stat_multiplier: 2.6
+        enderman_small_backstab:
+          weight: 1
+          stat_multiplier: 2.6
+        enderman_void_carrier:
+          weight: 1
+          stat_multiplier: 2.6
+        shulker_mimic:
+          weight: 1
+          stat_multiplier: 2.6
+    - wave: 3
+      spawn_interval: 14
+      clear_mob_count: 18
+      max_alive: 9
+      mobs:
+        wither_ghost:
+          weight: 4
+          stat_multiplier: 2.6
+        wither_knight:
+          weight: 4
+          stat_multiplier: 2.6
+        shulker_mimic:
+          weight: 1
+          stat_multiplier: 2.6
+        enderman_rift_carrier:
+          weight: 1
+          stat_multiplier: 2.6
+        enderman_grave_carrier:
+          weight: 1
+          stat_multiplier: 2.6
+        raiden_creeper:
+          weight: 1
+          stat_multiplier: 2.6
+    - wave: 4
+      spawn_interval: 14
+      clear_mob_count: 19
+      max_alive: 10
+      mobs:
+        wither_ghost:
+          weight: 4
+          stat_multiplier: 2.6
+        wither_knight:
+          weight: 4
+          stat_multiplier: 2.6
+        shulker_mimic:
+          weight: 1
+          stat_multiplier: 2.6
+        end_crystal_sentinel:
+          weight: 1
+          stat_multiplier: 2.6
+        enderman_phase:
+          weight: 1
+          stat_multiplier: 2.6
+        enderman_drain:
+          weight: 1
+          stat_multiplier: 2.6
+    - wave: 5
+      spawn_interval: 14
+      clear_mob_count: 20
+      max_alive: 10
+      mobs:
+        wither_ghost:
+          weight: 4
+          stat_multiplier: 2.6
+        wither_knight:
+          weight: 4
+          stat_multiplier: 2.6
+        end_wither_sentinel:
+          weight: 1
+          stat_multiplier: 2.6
+        ender_eye_beam:
+          weight: 1
+          stat_multiplier: 2.6
+        enderman_mirror:
+          weight: 1
+          stat_multiplier: 2.6
+        enderman_eye_summoner:
+          weight: 1
+          stat_multiplier: 2.6

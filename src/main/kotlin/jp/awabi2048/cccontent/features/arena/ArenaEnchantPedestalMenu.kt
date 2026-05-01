@@ -1642,7 +1642,7 @@ class ArenaEnchantPedestalMenu(
 
     private fun currentArenaStar(player: Player): Int? {
         val session = arenaManagerProvider()?.getSession(player) ?: return null
-        return session.difficultyId.removePrefix("star_").toIntOrNull()?.coerceAtLeast(1)
+        return session.difficultyStar.coerceAtLeast(1)
     }
 
     private fun resolveShardLevel(catalyst: ArenaEnchantShardData.Shard): Int {

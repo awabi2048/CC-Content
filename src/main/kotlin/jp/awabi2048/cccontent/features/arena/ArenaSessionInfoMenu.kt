@@ -98,7 +98,7 @@ class ArenaSessionInfoMenu(
     }
 
     private fun buildSessionItem(session: ArenaSession): ItemStack {
-        val themeIcon = arenaManager.getTheme(session.themeId)?.iconMaterial ?: Material.ROTTEN_FLESH
+        val themeIcon = arenaManager.getTheme(session.themeId)?.config(session.promoted)?.iconMaterial ?: Material.ROTTEN_FLESH
         val item = ItemStack(themeIcon)
         val meta = item.itemMeta ?: return item
 

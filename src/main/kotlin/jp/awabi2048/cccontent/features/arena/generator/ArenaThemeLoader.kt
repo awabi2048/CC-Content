@@ -5,6 +5,7 @@ import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import org.bukkit.Bukkit
 import org.bukkit.Material
+import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.structure.Structure
@@ -15,16 +16,50 @@ import kotlin.random.Random
 data class ArenaTheme(
     val id: String,
     val path: String,
-    val iconMaterial: Material,
-    val weight: Int,
-    val baseDifficultyStar: Int,
-    val mobSpawnConfig: ArenaThemeMobSpawnConfig,
-    val doorOpenSound: ArenaThemeDoorOpenSound,
-    val orientation: ArenaStructureOrientation,
+    val normalConfig: ArenaThemeConfig,
+    val promotedConfig: ArenaThemeConfig?,
     val gridPitch: Int,
     val staticStructures: Map<ArenaStructureType, List<ArenaStaticStructureVariant>>,
     val animatedStructures: Map<ArenaStructureType, List<ArenaAnimatedStructureVariant>>,
+) {
+    val iconMaterial: Material get() = normalConfig.iconMaterial
+    val weight: Int get() = normalConfig.weight
+    val normalVariant: ArenaThemeVariant get() = normalConfig.variant
+    val promotedVariant: ArenaThemeVariant? get() = promotedConfig?.variant
+    val doorOpenSound: ArenaThemeDoorOpenSound get() = normalConfig.doorOpenSound
+    val orientation: ArenaStructureOrientation get() = normalConfig.orientation
+    val clearingBossMobId: String? get() = normalConfig.clearingBossMobId
+
+    fun config(promoted: Boolean): ArenaThemeConfig {
+        return if (promoted) promotedConfig ?: normalConfig else normalConfig
+    }
+
+    fun variant(promoted: Boolean): ArenaThemeVariant {
+        return config(promoted).variant
+    }
+
+    fun withActiveConfig(promoted: Boolean): ArenaTheme {
+        return if (!promoted) this else copy(normalConfig = config(promoted))
+    }
+}
+
+data class ArenaThemeConfig(
+    val iconMaterial: Material,
+    val weight: Int,
+    val variant: ArenaThemeVariant,
+    val doorOpenSound: ArenaThemeDoorOpenSound,
+    val orientation: ArenaStructureOrientation,
     val clearingBossMobId: String? = null
+)
+
+data class ArenaThemeVariant(
+    val difficultyStar: Int,
+    val display: String,
+    val maxParticipants: Int,
+    val pedestalRoomProbability: Double,
+    val reviveMaxPerPlayer: Int,
+    val reviveTimeLimitSeconds: Int,
+    val waves: List<ArenaWaveSpawnRule>
 )
 
 data class ArenaThemeDoorOpenSound(
@@ -45,19 +80,17 @@ data class ArenaThemeWaveRange(
 data class ArenaThemeWeightedMobEntry(
     val mobId: String,
     val weight: Int,
-    val waveRange: ArenaThemeWaveRange,
+    val statMultiplier: Double,
     val maxAlive: Int?
 )
 
-data class ArenaThemeMobSpawnConfig(
-    val maxSummonCount: Int,
+data class ArenaWaveSpawnRule(
+    val wave: Int,
+    val spawnIntervalTicks: Long,
+    val maxAlive: Int,
     val clearMobCount: Int,
     val weightedMobs: List<ArenaThemeWeightedMobEntry>
-) {
-    fun candidatesForWave(wave: Int): List<ArenaThemeWeightedMobEntry> {
-        return weightedMobs.filter { it.waveRange.contains(wave) }
-    }
-}
+)
 
 data class ArenaStructureOrientation(
     val entranceExit: ArenaPathDirection,
@@ -119,13 +152,8 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
     )
 
     private data class ParsedThemeConfig(
-        val iconMaterial: Material,
-        val weight: Int,
-        val baseDifficultyStar: Int,
-        val mobSpawnConfig: ArenaThemeMobSpawnConfig,
-        val doorOpenSound: ArenaThemeDoorOpenSound,
-        val orientation: ArenaStructureOrientation,
-        val clearingBossMobId: String? = null
+        val normalConfig: ArenaThemeConfig,
+        val promotedConfig: ArenaThemeConfig?
     )
 
     private sealed interface StructureState {
@@ -175,10 +203,21 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             plugin.saveResource("config/arena/theme.yml", false)
         }
         val themeConfig = YamlConfiguration.loadConfiguration(themeConfigFile)
-        val configuredThemeIds = themeConfig.getKeys(false)
+        val normalSection = themeConfig.getConfigurationSection("normal")
+            ?: throw IllegalStateException("[Arena] theme.yml requires normal section")
+        val promotedSection = themeConfig.getConfigurationSection("promoted")
+        val configuredThemeIds = normalSection.getKeys(false)
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .toSet()
+        val promotedOnlyThemeIds = promotedSection?.getKeys(false)
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() && !configuredThemeIds.contains(it) }
+            ?.sorted()
+            .orEmpty()
+        if (promotedOnlyThemeIds.isNotEmpty()) {
+            throw IllegalStateException("[Arena] theme.yml の promoted に normal 未定義のテーマがあります: ${promotedOnlyThemeIds.joinToString()}")
+        }
         val folderById = themeFolders.associateBy { it.name }
         val folderThemeIds = folderById.keys
 
@@ -204,7 +243,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
 
         for (themeId in validThemeIds) {
             val folder = folderById[themeId] ?: continue
-            val parsedThemeConfig = parseThemeConfig(themeConfig, themeId, warnings) ?: continue
+            val parsedThemeConfig = parseThemeConfig(normalSection, promotedSection, themeId, warnings) ?: continue
             val loaded = loadStructures(folder, warnings)
             val missing = mutableListOf<String>()
             ArenaStructureType.entries.filterNot { optionalStructureTypes.contains(it) }.forEach { type ->
@@ -250,23 +289,18 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             themes[themeId] = ArenaTheme(
                 id = themeId,
                 path = folder.name,
-                iconMaterial = parsedThemeConfig.iconMaterial,
-                weight = parsedThemeConfig.weight,
-                baseDifficultyStar = parsedThemeConfig.baseDifficultyStar,
-                mobSpawnConfig = parsedThemeConfig.mobSpawnConfig,
-                doorOpenSound = parsedThemeConfig.doorOpenSound,
-                orientation = parsedThemeConfig.orientation,
+                normalConfig = parsedThemeConfig.normalConfig,
+                promotedConfig = parsedThemeConfig.promotedConfig,
                 gridPitch = gridPitch,
                 staticStructures = loaded.staticStructures,
-                animatedStructures = loaded.animatedStructures,
-                clearingBossMobId = parsedThemeConfig.clearingBossMobId
+                animatedStructures = loaded.animatedStructures
             )
         }
 
         featureInitLogger?.apply {
             if (themes.isEmpty()) {
                 setStatus("Arena", FeatureInitializationLogger.Status.FAILURE)
-                addDetailMessage("Arena", "[Arena] テーマ読み込み失敗: 有効なテーマが0個です")
+                addDetailMessage("Arena", "[Arena] theme load failed: no valid themes")
             } else if (warnings.isNotEmpty()) {
                 setStatus("Arena", FeatureInitializationLogger.Status.WARNING)
                 addSummaryMessage("Arena", "テーマ${themes.size}種")
@@ -279,48 +313,57 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
     }
 
     private fun parseThemeConfig(
-        config: YamlConfiguration,
+        normalRoot: ConfigurationSection,
+        promotedRoot: ConfigurationSection?,
         themeId: String,
         warnings: MutableList<String>
     ): ParsedThemeConfig? {
-        val section = config.getConfigurationSection(themeId)
-        if (section == null) {
-            val warning = "[Arena] theme.yml のテーマ定義が不正なためスキップ: $themeId"
+        val normalSection = normalRoot.getConfigurationSection(themeId)
+        if (normalSection == null) {
+            val warning = "[Arena] theme.yml の normal.$themeId が不正なためスキップします"
             plugin.logger.warning(warning)
             warnings.add(warning)
             return null
         }
 
-        if (!section.contains("base_difficulty_star")) {
-            throw IllegalStateException("[Arena] theme.yml の base_difficulty_star が未設定です: theme=$themeId")
-        }
-        val baseDifficultyStar = section.getInt("base_difficulty_star", -1)
-        if (baseDifficultyStar < 1 || baseDifficultyStar > 4) {
-            throw IllegalStateException("[Arena] theme.yml の base_difficulty_star は1〜4である必要があります: theme=$themeId base_difficulty_star=$baseDifficultyStar")
-        }
+        val normalConfig = parseThemeConfigVariant(normalSection, themeId, "normal", warnings, null) ?: return null
+        val promotedConfig = promotedRoot
+            ?.getConfigurationSection(themeId)
+            ?.let { parseThemeConfigVariant(it, themeId, "promoted", warnings, normalConfig) }
 
-        val weight = if (section.contains("weight")) {
-            section.getInt("weight", 1)
-        } else {
-            1
-        }
+        return ParsedThemeConfig(
+            normalConfig = normalConfig,
+            promotedConfig = promotedConfig
+        )
+    }
+
+    private fun parseThemeConfigVariant(
+        section: ConfigurationSection,
+        themeId: String,
+        variantName: String,
+        warnings: MutableList<String>,
+        fallback: ArenaThemeConfig?
+    ): ArenaThemeConfig? {
+        val weight = section.getInt("weight", fallback?.weight ?: 1)
         if (weight <= 0) {
-            throw IllegalStateException("[Arena] theme.yml の weight は1以上である必要があります: theme=$themeId weight=$weight")
+            throw IllegalStateException("[Arena] theme.yml の weight は1以上である必要があります: theme=$themeId variant=$variantName weight=$weight")
         }
 
-        val iconName = (section.getString("icon") ?: Material.PAPER.name).trim()
-        val iconMaterial = try {
-            Material.valueOf(iconName.uppercase())
-        } catch (_: IllegalArgumentException) {
-            val warning = "[Arena] theme.yml の icon が不正なためスキップ: theme=$themeId icon=$iconName"
-            plugin.logger.warning(warning)
-            warnings.add(warning)
-            return null
+        val iconMaterial = if (section.contains("icon")) {
+            val iconName = (section.getString("icon") ?: Material.PAPER.name).trim()
+            try {
+                Material.valueOf(iconName.uppercase())
+            } catch (_: IllegalArgumentException) {
+                val warning = "[Arena] theme.yml の icon が不正なためスキップします: theme=$themeId variant=$variantName icon=$iconName"
+                plugin.logger.warning(warning)
+                warnings.add(warning)
+                return null
+            }
+        } else {
+            fallback?.iconMaterial ?: Material.PAPER
         }
 
         val coreConfig = CoreConfigManager.get(plugin)
-        val maxSummonCount = section.getInt("max_summon_count", 1).coerceAtLeast(1)
-        val clearMobCount = section.getInt("clear_mob_count", 1).coerceAtLeast(1)
         val defaultDoorSoundKey = coreConfig
             .getString("arena.door_animation.sound.key", "minecraft:block.iron_door.open")
             ?.trim()
@@ -331,79 +374,48 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             .toFloat()
             .coerceIn(0.5f, 2.0f)
         val doorSoundSection = section.getConfigurationSection("door_open_sound")
-        val doorSoundKey = doorSoundSection?.getString("key")?.trim().orEmpty().ifBlank { defaultDoorSoundKey }
-        val doorSoundPitch = (doorSoundSection?.getDouble("pitch", defaultDoorSoundPitch.toDouble())
+        val doorSoundKey = doorSoundSection?.getString("key")?.trim().orEmpty()
+            .ifBlank { fallback?.doorOpenSound?.key ?: defaultDoorSoundKey }
+        val doorSoundPitch = (doorSoundSection?.getDouble("pitch", fallback?.doorOpenSound?.pitch?.toDouble() ?: defaultDoorSoundPitch.toDouble())
+            ?: fallback?.doorOpenSound?.pitch?.toDouble()
             ?: defaultDoorSoundPitch.toDouble()).toFloat().coerceIn(0.5f, 2.0f)
-        val mobsSection = section.getConfigurationSection("mobs")
-        if (mobsSection == null) {
-            val warning = "[Arena] theme.yml の mobs セクションが見つからないためスキップ: theme=$themeId"
-            plugin.logger.warning(warning)
-            warnings.add(warning)
-            return null
-        }
-        val weightedMobs = mutableListOf<ArenaThemeWeightedMobEntry>()
-        for (mobId in mobsSection.getKeys(false)) {
-            val id = mobId.trim()
-            if (id.isEmpty()) {
-                val warning = "[Arena] theme.yml の mobs ID が空のためスキップ: theme=$themeId"
-                plugin.logger.warning(warning)
-                warnings.add(warning)
-                continue
-            }
-            val weight = mobsSection.getInt("$mobId.weight", 0)
-            if (weight <= 0) {
-                val warning = "[Arena] theme.yml の mobs.weight は1以上である必要があります: theme=$themeId mob=$id"
-                plugin.logger.warning(warning)
-                warnings.add(warning)
-                continue
-            }
-            val waveText = mobsSection.getString("$mobId.wave", "1..") ?: "1.."
-            val waveRange = parseWaveRange(waveText)
-            if (waveRange == null) {
-                val warning = "[Arena] theme.yml の mobs.wave が不正です: theme=$themeId mob=$id wave=$waveText"
-                plugin.logger.warning(warning)
-                warnings.add(warning)
-                continue
-            }
 
-            val maxAlivePath = "$mobId.max_alive"
-            val maxAlive = if (mobsSection.contains(maxAlivePath)) {
-                val value = mobsSection.getInt(maxAlivePath, 0)
-                if (value <= 0) {
-                    val warning = "[Arena] theme.yml の mobs.max_alive は1以上である必要があります: theme=$themeId mob=$id max_alive=$value"
-                    plugin.logger.warning(warning)
-                    warnings.add(warning)
-                    continue
-                }
-                value
-            } else {
-                null
-            }
-
-            weightedMobs.add(
-                ArenaThemeWeightedMobEntry(
-                    mobId = id,
-                    weight = weight,
-                    waveRange = waveRange,
-                    maxAlive = maxAlive
-                )
-            )
-        }
-        if (weightedMobs.isEmpty()) {
-            val warning = "[Arena] theme.yml の有効な mobs 定義が1件もないためスキップ: theme=$themeId"
-            plugin.logger.warning(warning)
-            warnings.add(warning)
-            return null
-        }
-
+        val variant = parseThemeVariant(section, themeId, variantName, warnings, fallback?.variant) ?: return null
         val orientationSection = section.getConfigurationSection("orientation")
-        if (orientationSection == null) {
-            val warning = "[Arena] theme.yml の orientation が見つからないためスキップ: theme=$themeId"
+        val orientation = if (orientationSection != null) {
+            parseOrientation(themeId, orientationSection, warnings) ?: return null
+        } else if (fallback != null) {
+            fallback.orientation
+        } else {
+            val warning = "[Arena] theme.yml の orientation が見つからないためスキップします: theme=$themeId variant=$variantName"
             plugin.logger.warning(warning)
             warnings.add(warning)
             return null
         }
+        val clearingBossMobId = if (section.contains("clearing_boss_mob_id")) {
+            section.getString("clearing_boss_mob_id")?.trim()?.takeIf { it.isNotBlank() }
+        } else {
+            fallback?.clearingBossMobId
+        }
 
+        return ArenaThemeConfig(
+            iconMaterial = iconMaterial,
+            weight = weight,
+            variant = variant,
+            doorOpenSound = ArenaThemeDoorOpenSound(
+                key = doorSoundKey,
+                pitch = doorSoundPitch
+            ),
+            orientation = orientation,
+            clearingBossMobId = clearingBossMobId
+        )
+    }
+
+    private fun parseOrientation(
+        themeId: String,
+        orientationSection: ConfigurationSection,
+        warnings: MutableList<String>
+    ): ArenaStructureOrientation? {
         val entranceExit = parseDirection(themeId, orientationSection, "entrance_exit", warnings) ?: return null
         val cornerEntry = parseDirection(themeId, orientationSection, "corner_entry", warnings) ?: return null
         val cornerExit = parseDirection(themeId, orientationSection, "corner_exit", warnings) ?: return null
@@ -416,7 +428,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
         val pedestalEntry = parseOptionalDirection(orientationSection, "pedestal_entry") ?: tjunctionBranch.opposite()
 
         if (cornerEntry == cornerExit) {
-            val warning = "[Arena] theme.yml の corner_entry/corner_exit が同じ方角のためスキップ: theme=$themeId value=${cornerEntry.token}"
+            val warning = "[Arena] theme.yml の corner_entry/corner_exit が同じ方向のためスキップします: theme=$themeId value=${cornerEntry.token}"
             plugin.logger.warning(warning)
             warnings.add(warning)
             return null
@@ -443,34 +455,111 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             return null
         }
 
-        val clearingBossMobId = section.getString("clearing_boss_mob_id")?.trim()?.takeIf { it.isNotBlank() }
+        return ArenaStructureOrientation(
+            entranceExit = entranceExit,
+            cornerEntry = cornerEntry,
+            cornerExit = cornerExit,
+            straightEntry = straightEntry,
+            corridorEntry = corridorEntry,
+            goalEntry = goalEntry,
+            tjunctionEntry = tjunctionEntry,
+            tjunctionThrough = tjunctionThrough,
+            tjunctionBranch = tjunctionBranch,
+            pedestalEntry = pedestalEntry
+        )
+    }
+    private fun parseThemeVariant(
+        section: ConfigurationSection,
+        themeId: String,
+        variantName: String,
+        warnings: MutableList<String>,
+        fallback: ArenaThemeVariant? = null
+    ): ArenaThemeVariant? {
+        val difficultyStar = section.getInt("difficulty_star", fallback?.difficultyStar ?: -1)
+        if (difficultyStar < 1 || difficultyStar > 4) {
+            throw IllegalStateException("[Arena] theme.yml の difficulty_star は1以上である必要があります: theme=$themeId variant=$variantName difficulty_star=$difficultyStar")
+        }
+        val display = section.getString("display", fallback?.display ?: themeId) ?: themeId
+        val maxParticipants = section.getInt("max_participants", fallback?.maxParticipants ?: 6).coerceIn(1, 6)
+        val pedestalRoomProbability = section.getDouble("pedestal_room_probability", fallback?.pedestalRoomProbability ?: 0.0).coerceIn(0.0, 1.0)
+        val reviveMaxPerPlayerRaw = section.getInt("revive_max_per_player", fallback?.reviveMaxPerPlayer ?: -1)
+        val reviveMaxPerPlayer = if (reviveMaxPerPlayerRaw <= 0) Int.MAX_VALUE else reviveMaxPerPlayerRaw
+        val reviveTimeLimitSeconds = section.getInt("revive_time_limit_seconds", fallback?.reviveTimeLimitSeconds ?: 0).coerceAtLeast(0)
+        val waveMaps = section.getMapList("waves")
+        val waves = if (waveMaps.isEmpty() && fallback != null) {
+            fallback.waves
+        } else if (waveMaps.isEmpty()) {
+            val warning = "[Arena] theme.yml の waves が空のためスキップ: theme=$themeId variant=$variantName"
+            plugin.logger.warning(warning)
+            warnings.add(warning)
+            return null
+        } else {
+            waveMaps.mapIndexed { index, raw ->
+            parseWaveSpawnRule(themeId, variantName, index, raw)
+            }.sortedBy { it.wave }
+        }
 
-        return ParsedThemeConfig(
-            iconMaterial = iconMaterial,
-            weight = weight,
-            baseDifficultyStar = baseDifficultyStar,
-            mobSpawnConfig = ArenaThemeMobSpawnConfig(
-                maxSummonCount = maxSummonCount,
-                clearMobCount = clearMobCount,
-                weightedMobs = weightedMobs
-            ),
-            doorOpenSound = ArenaThemeDoorOpenSound(
-                key = doorSoundKey,
-                pitch = doorSoundPitch
-            ),
-            orientation = ArenaStructureOrientation(
-                entranceExit = entranceExit,
-                cornerEntry = cornerEntry,
-                cornerExit = cornerExit,
-                straightEntry = straightEntry,
-                corridorEntry = corridorEntry,
-                goalEntry = goalEntry,
-                tjunctionEntry = tjunctionEntry,
-                tjunctionThrough = tjunctionThrough,
-                tjunctionBranch = tjunctionBranch,
-                pedestalEntry = pedestalEntry
-            ),
-            clearingBossMobId = clearingBossMobId
+        waves.forEachIndexed { index, rule ->
+            val expected = index + 1
+            if (rule.wave != expected) {
+                throw IllegalStateException("[Arena] theme.yml の waves.wave は1始まりの連番である必要があります: theme=$themeId variant=$variantName expected=$expected actual=${rule.wave}")
+            }
+        }
+
+        return ArenaThemeVariant(
+            difficultyStar = difficultyStar,
+            display = display,
+            maxParticipants = maxParticipants,
+            pedestalRoomProbability = pedestalRoomProbability,
+            reviveMaxPerPlayer = reviveMaxPerPlayer,
+            reviveTimeLimitSeconds = reviveTimeLimitSeconds,
+            waves = waves
+        )
+    }
+
+    private fun parseWaveSpawnRule(
+        themeId: String,
+        variantName: String,
+        index: Int,
+        raw: Map<*, *>
+    ): ArenaWaveSpawnRule {
+        val wave = raw["wave"]?.toString()?.toIntOrNull()
+            ?: throw IllegalStateException("[Arena] theme.yml の waves[$index].wave が不正です: theme=$themeId variant=$variantName")
+        val spawnInterval = raw["spawn_interval"]?.toString()?.toLongOrNull()?.coerceAtLeast(1L)
+            ?: throw IllegalStateException("[Arena] theme.yml の waves[$index].spawn_interval が不正です: theme=$themeId variant=$variantName")
+        val clearMobCount = raw["clear_mob_count"]?.toString()?.toIntOrNull()?.coerceAtLeast(1)
+            ?: throw IllegalStateException("[Arena] theme.yml の waves[$index].clear_mob_count が不正です: theme=$themeId variant=$variantName")
+        val maxAlive = raw["max_alive"]?.toString()?.toIntOrNull()?.coerceAtLeast(1)
+            ?: throw IllegalStateException("[Arena] theme.yml の waves[$index].max_alive が不正です: theme=$themeId variant=$variantName")
+        val mobs = raw["mobs"] as? Map<*, *>
+            ?: throw IllegalStateException("[Arena] theme.yml の waves[$index].mobs が不正です: theme=$themeId variant=$variantName")
+        val weightedMobs = mobs.map { (mobIdRaw, valueRaw) ->
+            val mobId = mobIdRaw?.toString()?.trim().orEmpty()
+            if (mobId.isBlank()) {
+                throw IllegalStateException("[Arena] theme.yml の mob ID が空です: theme=$themeId variant=$variantName wave=$wave")
+            }
+            val values = valueRaw as? Map<*, *>
+                ?: throw IllegalStateException("[Arena] theme.yml の mob定義が不正です: theme=$themeId variant=$variantName wave=$wave mob=$mobId")
+            val weight = values["weight"]?.toString()?.toIntOrNull()?.coerceAtLeast(1)
+                ?: throw IllegalStateException("[Arena] theme.yml の mob.weight が不正です: theme=$themeId variant=$variantName wave=$wave mob=$mobId")
+            val statMultiplier = values["stat_multiplier"]?.toString()?.toDoubleOrNull()?.coerceAtLeast(0.01) ?: 1.0
+            val maxAlive = values["max_alive"]?.toString()?.toIntOrNull()?.coerceAtLeast(1)
+            ArenaThemeWeightedMobEntry(
+                mobId = mobId,
+                weight = weight,
+                statMultiplier = statMultiplier,
+                maxAlive = maxAlive
+            )
+        }
+        if (weightedMobs.isEmpty()) {
+            throw IllegalStateException("[Arena] theme.yml の waves[$index].mobs が空です: theme=$themeId variant=$variantName")
+        }
+        return ArenaWaveSpawnRule(
+            wave = wave,
+            spawnIntervalTicks = spawnInterval,
+            maxAlive = maxAlive,
+            clearMobCount = clearMobCount,
+            weightedMobs = weightedMobs
         )
     }
 
@@ -482,14 +571,14 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
     ): ArenaPathDirection? {
         val raw = section.getString(key)?.trim().orEmpty()
         if (raw.isEmpty()) {
-            val warning = "[Arena] theme.yml の方角指定が未設定のためスキップ: theme=$themeId key=$key"
+            val warning = "[Arena] theme.yml の方向指定が未設定のためスキップ: theme=$themeId key=$key"
             plugin.logger.warning(warning)
             warnings.add(warning)
             return null
         }
         val direction = ArenaPathDirection.fromToken(raw)
         if (direction == null) {
-            val warning = "[Arena] theme.yml の方角指定が不正のためスキップ: theme=$themeId key=$key value=$raw"
+            val warning = "[Arena] theme.yml の方向指定が不正のためスキップ: theme=$themeId key=$key value=$raw"
             plugin.logger.warning(warning)
             warnings.add(warning)
             return null
@@ -545,7 +634,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
 
                 val type = ArenaStructureType.entries.firstOrNull { it.keyword == parts.first().lowercase() }
                 if (type == null) {
-                    val warning = "[Arena] 命名規約に合わないためスキップ: ${file.name}"
+                    val warning = "[Arena] 命名規則に合わないためスキップ: ${file.name}"
                     plugin.logger.warning(warning)
                     warnings.add(warning)
                     continue
@@ -554,7 +643,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 if (type.supportsAnimation) {
                     val parsed = parseAnimatedFile(type, parts, template)
                     if (parsed == null) {
-                        val warning = "[Arena] 命名規約に合わないためスキップ: ${file.name}"
+                        val warning = "[Arena] 命名規則に合わないためスキップ: ${file.name}"
                         plugin.logger.warning(warning)
                         warnings.add(warning)
                         continue
@@ -563,7 +652,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 } else {
                     val parsed = parseStaticFile(type, parts, template)
                     if (parsed == null) {
-                        val warning = "[Arena] 命名規約に合わないためスキップ: ${file.name}"
+                        val warning = "[Arena] 命名規則に合わないためスキップ: ${file.name}"
                         plugin.logger.warning(warning)
                         warnings.add(warning)
                         continue

@@ -9,8 +9,10 @@ import jp.awabi2048.cccontent.features.arena.ArenaI18n
 data class ArenaMissionEntry(
     val index: Int,
     val missionTypeId: String,
-    val difficultyId: String,
     val themeId: String,
+    val promoted: Boolean,
+    val difficultyStar: Int,
+    val difficultyDisplay: String,
     val maxParticipants: Int = 6
 )
 
@@ -94,13 +96,6 @@ data class ArenaPlayerMissionData(
     }
 }
 
-data class ArenaDifficultyDefinition(
-    val id: String,
-    val display: String,
-    val starLevel: Int,
-    val maxParticipants: Int
-)
-
 enum class ArenaLicenseTier(
     val id: String,
     val maxDifficultyStar: Int,
@@ -163,7 +158,7 @@ data class ArenaStatusSnapshot(
     val activeMissionCount: Int,
     val strongEnemyMobTypeCount: Int,
     val generateCount: Int,
-    val difficultyCount: Int
+    val themeCount: Int
 )
 
 enum class ArenaMissionType(

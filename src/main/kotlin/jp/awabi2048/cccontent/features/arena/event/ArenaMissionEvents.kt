@@ -49,7 +49,7 @@ class ArenaSessionEndedEvent(
     val ownerPlayerId: UUID,
     val worldName: String,
     val themeId: String,
-    val difficultyId: String,
+    val promoted: Boolean,
     val starCount: Int,
     val waves: Int,
     val success: Boolean

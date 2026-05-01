@@ -195,19 +195,19 @@ class ArenaCommand(
         sender.sendMessage("§7lobby flow: main=${if (report.lobbyMainReady) "§aYES" else "§cNO"}, tutorial=${if (report.lobbyTutorialReady) "§aYES" else "§cNO"}")
         sender.sendMessage("§7lobby progress: visited=${report.lobbyProgressVisitedCount}, tutorial_completed=${report.lobbyProgressTutorialCompletedCount}")
         if (mission != null) {
-            sender.sendMessage("§7missions: current=${if (mission.hasCurrentMissionSet) "§aYES" else "§cNO"}, active=${mission.activeMissionCount}, players=${mission.loadedPlayerRecords}, difficulty=${mission.difficultyCount}, generate_count=${mission.generateCount}, strong_enemy_types=${mission.strongEnemyMobTypeCount}, lobby_visited=${mission.lobbyProgressCount}, lobby_tutorial_done=${mission.lobbyTutorialCompletedCount}")
+            sender.sendMessage("§7missions: current=${if (mission.hasCurrentMissionSet) "§aYES" else "§cNO"}, active=${mission.activeMissionCount}, players=${mission.loadedPlayerRecords}, themes=${mission.themeCount}, generate_count=${mission.generateCount}, strong_enemy_types=${mission.strongEnemyMobTypeCount}, lobby_visited=${mission.lobbyProgressCount}, lobby_tutorial_done=${mission.lobbyTutorialCompletedCount}")
             sender.sendMessage("§7mission generated_at: ${mission.currentMissionGeneratedAtMillis ?: "none"}")
         }
         return true
     }
 
     private fun handleStart(sender: CommandSender, args: Array<out String>): Boolean {
-        if (args.size < 5) {
+        if (args.size !in 4..5) {
             sender.sendMessage(
                 ArenaI18n.text(
                     sender,
                     "arena.messages.command.usage.start",
-                    "&c使用法: /arenaa start <player|@s|@near> <star_count(1-4)> <theme> <mission_type>"
+                    "&c使用法: /arenaa start <player|@s|@near> <theme> <mission_type> [promoted]"
                 )
             )
             return true
@@ -250,18 +250,24 @@ class ArenaCommand(
             }
         }
 
-        val starCount = args[2].toIntOrNull()
-        if (starCount == null || starCount < 1 || starCount > 4) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.usage.start", "&c使用法: /arenaa start <player|@s|@near> <star_count(1-4)> <theme> <mission_type>"))
-            return true
-        }
-        val difficultyId = "star_$starCount"
-        val theme = args[3]
-        val missionType = ArenaMissionType.fromId(args[4].lowercase())
+        val theme = args[2]
+        val missionType = ArenaMissionType.fromId(args[3].lowercase())
         if (missionType == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.start_error.invalid_mission_type", "&c無効なミッションタイプです: {type}", "type" to args[4]))
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.start_error.invalid_mission_type", "&c無効なミッションタイプです: {type}", "type" to args[3]))
             return true
         }
+        val variantArg = args.getOrNull(4)
+        if (variantArg != null && !variantArg.equals("promoted", ignoreCase = true)) {
+            sender.sendMessage(
+                ArenaI18n.text(
+                    sender,
+                    "arena.messages.command.usage.start",
+                    "&c使用法: /arenaa start <player|@s|@near> <theme> <mission_type> [promoted]"
+                )
+            )
+            return true
+        }
+        val promoted = variantArg != null
 
         val startedAt = System.nanoTime()
         val missionModifiers = when (missionType) {
@@ -270,8 +276,8 @@ class ArenaCommand(
         }
         when (val result = manager.startSession(
             target,
-            difficultyId,
             theme,
+            promoted = promoted,
             initialParticipants = initialParticipants,
             missionModifiers = missionModifiers,
             missionTypeId = missionType
@@ -540,7 +546,7 @@ class ArenaCommand(
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.header", "&6=== Arena 管理コマンド ==="))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.menu", "&f/arenaa menu <mission|broadcast|pedestal> [player]"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.lobby", "&f/arenaa lobby <player> [tutorial|main]"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s|@near> <star_count> <theme> <mission_type>"))
+        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start", "&f/arenaa start <player|@s|@near> <theme> <mission_type> [promoted]"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop", "&f/arenaa stop <player>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.license", "&f/arenaa license set <player> <paper|bronze|silver|gold>"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.theme", "&f/arenaa theme list"))
@@ -572,7 +578,7 @@ class ArenaCommand(
             3 -> when (args[0].lowercase()) {
                 "menu" -> Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[2], ignoreCase = true) }
                 "lobby" -> listOf("tutorial", "main").filter { it.startsWith(args[2], ignoreCase = true) }
-                "start" -> listOf("1", "2", "3", "4").filter { it.startsWith(args[2], ignoreCase = true) }
+                "start" -> arenaManagerProvider()?.getThemeIds()?.filter { it.startsWith(args[2], ignoreCase = true) } ?: emptyList()
                 "license" -> if (args[1].equals("set", ignoreCase = true)) {
                     Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[2], ignoreCase = true) }
                 } else {
@@ -581,7 +587,7 @@ class ArenaCommand(
                 else -> emptyList()
             }
             4 -> when (args[0].lowercase()) {
-                "start" -> arenaManagerProvider()?.getThemeIds()?.filter { it.startsWith(args[3], ignoreCase = true) } ?: emptyList()
+                "start" -> ArenaMissionType.entries.map { it.id }.filter { it.startsWith(args[3], ignoreCase = true) }
                 "license" -> if (args[1].equals("set", ignoreCase = true)) {
                     ArenaLicenseTier.entries.map { it.id }.filter { it.startsWith(args[3], ignoreCase = true) }
                 } else {
@@ -590,7 +596,14 @@ class ArenaCommand(
                 else -> emptyList()
             }
             5 -> when (args[0].lowercase()) {
-                "start" -> ArenaMissionType.entries.map { it.id }.filter { it.startsWith(args[4], ignoreCase = true) }
+                "start" -> {
+                    val theme = arenaManagerProvider()?.getTheme(args[2])
+                    if (theme?.promotedVariant != null) {
+                        listOf("promoted").filter { it.startsWith(args[4], ignoreCase = true) }
+                    } else {
+                        emptyList()
+                    }
+                }
                 else -> emptyList()
             }
             else -> emptyList()
