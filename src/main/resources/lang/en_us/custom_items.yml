@@ -263,7 +263,7 @@ custom_items:
       theme_none: '&e利用可能なテーマがありません'
       theme_list: '&6[Arena] 利用可能テーマ: {themes}'
       usage:
-        start: '&c使用法: /arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
+        start: '&c使用法: /arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
         stop: '&c使用法: /arenaa stop <player>'
         license: '&c使用法: /arenaa license set <player> <paper|bronze|silver|gold>'
         theme: '&c使用法: /arenaa theme list'
@@ -274,7 +274,7 @@ custom_items:
         invalid_mission_type: '&c無効なミッションタイプです: {type}'
       help:
         header: '&6=== Arena 管理コマンド ==='
-        start: '&f/arenaa start <player|@s|@near> <star_count> <theme> <mission_type>'
+        start: '&f/arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
         stop: '&f/arenaa stop <player>'
         license: '&f/arenaa license set <player> <paper|bronze|silver|gold>'
         theme: '&f/arenaa theme list'
@@ -602,3 +602,4 @@ custom_items:
         command:
           help:
             broadcast: '&f/arenaa broadcast'
+
