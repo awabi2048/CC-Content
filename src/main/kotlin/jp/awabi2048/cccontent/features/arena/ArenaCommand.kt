@@ -10,6 +10,14 @@ import jp.awabi2048.cccontent.features.arena.mission.ArenaLicenseTier
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionModifiers
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.event.ClickEvent
+import net.kyori.adventure.text.event.HoverEvent
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 class ArenaCommand(
     private val arenaManagerProvider: () -> ArenaManager? = { null },
@@ -19,6 +27,9 @@ class ArenaCommand(
     private val featureEnabledProvider: () -> Boolean = { true },
     private val featureFailureReasonProvider: () -> String? = { null }
 ) : CommandExecutor, TabCompleter {
+    private val legacySerializer = LegacyComponentSerializer.legacySection()
+    private val statusTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.JAPAN)
+        .withZone(ZoneId.systemDefault())
 
     private enum class ArenaMenuType(
         val id: String,
@@ -57,11 +68,8 @@ class ArenaCommand(
             "start" -> handleStart(sender, args)
             "stop" -> handleStop(sender, args)
             "license" -> handleLicense(sender, args)
-            "theme" -> handleTheme(sender, args)
             "lobby" -> handleLobby(sender, args)
             "status" -> handleStatus(sender)
-            "broadcast" -> handleBroadcast(sender)
-            "pedestal" -> handlePedestal(sender)
             else -> {
                 showUsage(sender)
                 true
@@ -155,20 +163,125 @@ class ArenaCommand(
         }
 
         val report = manager.buildStatusReport()
-        val mission = report.missionProgress
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.menu.status.title"))
-        sender.sendMessage("§7sessions: §f${report.activeSessionCount}§7 / §f${report.maxConcurrentSessions}")
-        sender.sendMessage("§7arena worlds: §f${report.readyWorldCount} ready§7, §f${report.inUseWorldCount} in-use§7, §f${report.cleaningWorldCount} cleaning§7, §f${report.brokenWorldCount} broken")
-        sender.sendMessage("§7world pool: §f${report.arenaWorldReady}§7 / §f${report.arenaWorldTotal} ready")
-        sender.sendMessage("§7lift ready: ${if (report.liftReady) "§aYES" else "§cNO"}")
-        sender.sendMessage("§7lobby markers: main=${report.mainLobbyCount}, tutorial_start=${report.tutorialStartCount}, tutorial_step=${report.tutorialStepCount}, return=${report.returnLobbyCount}, pedestal=${report.pedestalCount}")
-        sender.sendMessage("§7lobby flow: main=${if (report.lobbyMainReady) "§aYES" else "§cNO"}, tutorial=${if (report.lobbyTutorialReady) "§aYES" else "§cNO"}")
-        sender.sendMessage("§7lobby progress: visited=${report.lobbyProgressVisitedCount}, tutorial_completed=${report.lobbyProgressTutorialCompletedCount}")
-        if (mission != null) {
-            sender.sendMessage("§7missions: current=${if (mission.hasCurrentMissionSet) "§aYES" else "§cNO"}, active=${mission.activeMissionCount}, players=${mission.loadedPlayerRecords}, themes=${mission.themeCount}, generate_count=${mission.generateCount}, strong_enemy_types=${mission.strongEnemyMobTypeCount}, lobby_visited=${mission.lobbyProgressCount}, lobby_tutorial_done=${mission.lobbyTutorialCompletedCount}")
-            sender.sendMessage("§7mission generated_at: ${mission.currentMissionGeneratedAtMillis ?: "none"}")
-        }
+        sender.sendMessage(component("§6=== Arena Status ==="))
+        sender.sendMessage(buildPoolStatusLine(report))
+        sender.sendMessage(buildLobbyStatusLine(report))
+        sender.sendMessage(buildMissionStatusLine(report))
+        sender.sendMessage(buildThemeStatusLine(report))
         return true
+    }
+
+    private fun buildPoolStatusLine(report: ArenaStatusReport): Component {
+        val detail = listOf(
+            "§f使用中: §e${report.inUseWorldCount}",
+            "§f待機中: §a${report.readyWorldCount}",
+            "§f清掃中: §b${report.cleaningWorldCount}",
+            "§fエラー: §c${report.brokenWorldCount}",
+            "§7同時セッション: §f${report.activeSessionCount}/${report.maxConcurrentSessions}"
+        ).joinToString("\n")
+        val worlds = report.poolWorlds.ifEmpty {
+            (1..report.arenaWorldTotal).map { ArenaPoolWorldStatus("pool.$it", "broken") }
+        }
+
+        var line = component("§7セッション状態: ")
+        worlds.forEachIndexed { index, pool ->
+            if (index > 0) {
+                line = line.append(component("§8, "))
+            }
+            val color = when (pool.state) {
+                "in_use" -> "§e"
+                "ready" -> "§a"
+                "broken" -> "§c"
+                "cleaning" -> "§b"
+                else -> "§7"
+            }
+            val label = pool.name.removePrefix("arena.")
+            line = line.append(component("$color$label").hoverEvent(HoverEvent.showText(component(detail))))
+        }
+        return line
+    }
+
+    private fun buildLobbyStatusLine(report: ArenaStatusReport): Component {
+        val ok = report.lobbyMainReady && report.lobbyTutorialReady && report.returnLobbyCount > 0
+        val missing = mutableListOf<String>()
+        if (!report.lobbyMainReady) missing += "main lobby marker"
+        if (!report.lobbyTutorialReady) missing += "tutorial_start marker"
+        if (report.returnLobbyCount <= 0) missing += "return marker"
+        val detail = buildString {
+            appendLine("§fmain: §b${report.mainLobbyCount}")
+            appendLine("§ftutorial_start: §b${report.tutorialStartCount}")
+            appendLine("§ftutorial_step: §b${report.tutorialStepCount}")
+            appendLine("§freturn: §b${report.returnLobbyCount}")
+            appendLine("§fpedestal: §b${report.pedestalCount}")
+            append("§flift: ")
+            append(if (report.liftReady) "§a利用可能" else "§e待機中")
+            if (missing.isNotEmpty()) {
+                appendLine()
+                append("§c不足: ${missing.joinToString(", ")}")
+            }
+        }
+        val status = if (ok) "§a利用可能" else "§cエラー"
+        return component("§7ロビー: ")
+            .append(component(status).hoverEvent(HoverEvent.showText(component(detail))))
+    }
+
+    private fun buildMissionStatusLine(report: ArenaStatusReport): Component {
+        val mission = report.missionProgress
+        val generated = mission?.hasCurrentMissionSet == true
+        val generatedAt = mission?.currentMissionGeneratedAtMillis
+            ?.let { statusTimeFormatter.format(Instant.ofEpochMilli(it)) }
+            ?: "なし"
+        val detail = if (mission == null) {
+            "§cMission service unavailable"
+        } else {
+            listOf(
+                "§f生成日時: §b$generatedAt",
+                "§f生成数: §b${mission.generateCount}",
+                "§f進行中: §b${mission.activeMissionCount}",
+                "§fテーマ数: §b${mission.themeCount}"
+            ).joinToString("\n")
+        }
+        val status = if (generated) "§a生成済み" else "§e生成まだ"
+        val click = if (generated) {
+            ClickEvent.runCommand("/arenaa menu mission")
+        } else {
+            ClickEvent.suggestCommand("/ccc debug update_day arena")
+        }
+        return component("§7ミッション: ")
+            .append(component(status).hoverEvent(HoverEvent.showText(component(detail))).clickEvent(click))
+    }
+
+    private fun buildThemeStatusLine(report: ArenaStatusReport): Component {
+        val loadStatus = report.themeLoadStatus
+        var line = component("§7テーマ読み込み状況: ")
+        val entries = mutableListOf<Component>()
+        loadStatus.availableThemeIds.sorted().forEach { themeId ->
+            entries += component("§a$themeId")
+                .hoverEvent(HoverEvent.showText(component("§a利用可能")))
+        }
+        loadStatus.unavailableThemes.forEach { issue ->
+            entries += component("§c${issue.themeId}")
+                .hoverEvent(HoverEvent.showText(component(issue.details.joinToString("\n"))))
+        }
+        if (entries.isEmpty()) {
+            entries += component("§cなし")
+                .hoverEvent(HoverEvent.showText(component(loadStatus.generalWarnings.joinToString("\n").ifBlank { "テーマが読み込まれていません" })))
+        }
+        entries.forEachIndexed { index, entry ->
+            if (index > 0) {
+                line = line.append(component("§8, "))
+            }
+            line = line.append(entry)
+        }
+        if (loadStatus.generalWarnings.isNotEmpty()) {
+            line = line.append(component(" §e(!)")
+                .hoverEvent(HoverEvent.showText(component(loadStatus.generalWarnings.joinToString("\n")))))
+        }
+        return line
+    }
+
+    private fun component(text: String): Component {
+        return legacySerializer.deserialize(text)
     }
 
     private fun handleStart(sender: CommandSender, args: Array<out String>): Boolean {
@@ -448,10 +561,7 @@ class ArenaCommand(
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.license"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.theme"))
         sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.status"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.broadcast"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.pedestal"))
     }
 
     override fun onTabComplete(
@@ -464,14 +574,13 @@ class ArenaCommand(
         if (!featureEnabledProvider()) return emptyList()
 
         return when (args.size) {
-            1 -> listOf("menu", "lobby", "start", "stop", "license", "theme", "status", "broadcast", "pedestal").filter { it.startsWith(args[0], ignoreCase = true) }
+            1 -> listOf("menu", "lobby", "start", "stop", "license", "status").filter { it.startsWith(args[0], ignoreCase = true) }
             2 -> when (args[0].lowercase()) {
                 "menu" -> ArenaMenuType.entries.map { it.id }.filter { it.startsWith(args[1], ignoreCase = true) }
                 "lobby" -> Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], ignoreCase = true) }
                 "start" -> listOf("@s", "@near") + Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], ignoreCase = true) }
                 "stop" -> arenaManagerProvider()?.getActiveSessionPlayerNames()?.filter { it.startsWith(args[1], ignoreCase = true) } ?: emptyList()
                 "license" -> listOf("set").filter { it.startsWith(args[1], ignoreCase = true) }
-                "theme" -> listOf("list").filter { it.startsWith(args[1], ignoreCase = true) }
                 else -> emptyList()
             }
             3 -> when (args[0].lowercase()) {

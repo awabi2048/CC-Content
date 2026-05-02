@@ -49,7 +49,6 @@ arena:
         start: '&cUsage: /arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
         stop: '&cUsage: /arenaa stop <player>'
         license: '&cUsage: /arenaa license set <player> <paper|bronze|silver|gold>'
-        theme: '&cUsage: /arenaa theme list'
       start_error:
         already_in_session: '&c{player} is already in an arena session'
         concurrent_limit_reached: '&cConcurrent session limit reached ({current}/{max})'
@@ -71,10 +70,7 @@ arena:
         start: '&f/arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
         stop: '&f/arenaa stop <player>'
         license: '&f/arenaa license set <player> <paper|bronze|silver|gold>'
-        theme: '&f/arenaa theme list'
         status: '&f/arenaa status'
-        broadcast: '&f/arenaa broadcast'
-        pedestal: '&f/arenaa pedestal'
     menu:
       open_failed: '&cFailed to open the arena mission'
       open_failed_detail: '&cFailed to open the arena menu: {message}'

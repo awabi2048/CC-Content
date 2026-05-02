@@ -5,6 +5,7 @@ import jp.awabi2048.cccontent.features.arena.generator.ArenaStageGenerator
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageBuildException
 import jp.awabi2048.cccontent.features.arena.generator.ArenaTheme
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeLoader
+import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeLoadStatus
 import jp.awabi2048.cccontent.features.arena.generator.ArenaDoorAnimationPlacement
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeWeightedMobEntry
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeVariant
@@ -207,6 +208,7 @@ private data class ArenaLobbyProgress(
 )
 
 data class ArenaStatusReport(
+    val poolWorlds: List<ArenaPoolWorldStatus>,
     val readyWorldCount: Int,
     val totalWorldCount: Int,
     val inUseWorldCount: Int,
@@ -227,7 +229,13 @@ data class ArenaStatusReport(
     val maxConcurrentSessions: Int,
     val missionProgress: ArenaStatusSnapshot?,
     val lobbyProgressVisitedCount: Int,
-    val lobbyProgressTutorialCompletedCount: Int
+    val lobbyProgressTutorialCompletedCount: Int,
+    val themeLoadStatus: ArenaThemeLoadStatus
+)
+
+data class ArenaPoolWorldStatus(
+    val name: String,
+    val state: String
 )
 
 private enum class ArenaLobbyTargetType {
@@ -7651,6 +7659,9 @@ class ArenaManager(
         val pedestalCount = lobbySnapshots.sumOf { it.pedestal.size }
         val missionSnapshot = arenaMissionService?.getStatusSnapshot()
         return ArenaStatusReport(
+            poolWorlds = arenaWorldStates
+                .map { (name, state) -> ArenaPoolWorldStatus(name, state.name.lowercase(Locale.US)) }
+                .sortedBy { it.name },
             readyWorldCount = worldStates[ArenaPoolWorldState.READY] ?: 0,
             totalWorldCount = arenaWorldStates.size,
             inUseWorldCount = worldStates[ArenaPoolWorldState.IN_USE] ?: 0,
@@ -7671,7 +7682,8 @@ class ArenaManager(
             maxConcurrentSessions = maxConcurrentSessions,
             missionProgress = missionSnapshot,
             lobbyProgressVisitedCount = missionSnapshot?.lobbyProgressCount ?: lobbyVisitedParticipants.size,
-            lobbyProgressTutorialCompletedCount = missionSnapshot?.lobbyTutorialCompletedCount ?: tutorialCompletedParticipants.size
+            lobbyProgressTutorialCompletedCount = missionSnapshot?.lobbyTutorialCompletedCount ?: tutorialCompletedParticipants.size,
+            themeLoadStatus = themeLoader.getLoadStatus()
         )
     }
 

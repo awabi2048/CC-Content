@@ -49,7 +49,6 @@ arena:
         start: '&c使用法: /arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
         stop: '&c使用法: /arenaa stop <player>'
         license: '&c使用法: /arenaa license set <player> <paper|bronze|silver|gold>'
-        theme: '&c使用法: /arenaa theme list'
       start_error:
         already_in_session: '&c{player} はすでにアリーナセッション中です'
         concurrent_limit_reached: '&c同時セッション上限に達しています ({current}/{max})'
@@ -71,10 +70,7 @@ arena:
         start: '&f/arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
         stop: '&f/arenaa stop <player>'
         license: '&f/arenaa license set <player> <paper|bronze|silver|gold>'
-        theme: '&f/arenaa theme list'
         status: '&f/arenaa status'
-        broadcast: '&f/arenaa broadcast'
-        pedestal: '&f/arenaa pedestal'
     menu:
       open_failed: '&cアリーナミッションを開けませんでした'
       open_failed_detail: '&cアリーナメニューを開けませんでした: {message}'

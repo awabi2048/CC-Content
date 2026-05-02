@@ -266,7 +266,6 @@ custom_items:
         start: '&c使用法: /arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
         stop: '&c使用法: /arenaa stop <player>'
         license: '&c使用法: /arenaa license set <player> <paper|bronze|silver|gold>'
-        theme: '&c使用法: /arenaa theme list'
       start_error:
         lift_not_ready: '&cリフトの準備ができていないため開始できません'
         lift_occupied: '&cリフトが使用中のため開始できません'
@@ -277,10 +276,7 @@ custom_items:
         start: '&f/arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
         stop: '&f/arenaa stop <player>'
         license: '&f/arenaa license set <player> <paper|bronze|silver|gold>'
-        theme: '&f/arenaa theme list'
-        broadcast: '&f/arenaa broadcast'
         menu: '&f/arenaa menu'
-        pedestal: '&f/arenaa pedestal'
     menu:
       open_failed: '&cアリーナミッションを開けませんでした'
       open_failed_detail: '&cアリーナメニューを開けませんでした: {message}'
@@ -601,5 +597,4 @@ custom_items:
       messages:
         command:
           help:
-            broadcast: '&f/arenaa broadcast'
 
