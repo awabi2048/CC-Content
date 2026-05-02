@@ -24,7 +24,7 @@ object ArenaSessionInfoLayout {
     const val INFO_SLOT = 40
 
     val MENU_TITLE: String
-        get() = ArenaI18n.text(null, "arena.ui.broadcast.title", "\u00a78\u30a2\u30ea\u30fc\u30ca\u5b9f\u6cc1")
+        get() = ArenaI18n.text(null, "arena.ui.broadcast.title")
 }
 
 class ArenaSessionInfoHolder(
@@ -103,34 +103,34 @@ class ArenaSessionInfoMenu(
         val meta = item.itemMeta ?: return item
 
         val title = session.inviteMissionTitle
-            ?: ArenaI18n.text(null, "arena.ui.broadcast.default_title", "\u00a7f\u30a2\u30ea\u30fc\u30ca\u30af\u30a8\u30b9\u30c8")
+            ?: ArenaI18n.text(null, "arena.ui.broadcast.default_title")
         meta.setDisplayName(title)
 
         val lore = mutableListOf<String>()
-        val separator = ArenaI18n.text(null, "arena.ui.separator", "\u00a78\u00a7m\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015")
+        val separator = ArenaI18n.text(null, "arena.ui.separator")
         lore.add(separator)
 
         val inGetReady = !session.stageStarted || session.startedWaves.isEmpty()
         val waveLine = if (inGetReady) {
-            ArenaI18n.text(null, "arena.ui.broadcast.wave.get_ready", "\u00a77\u00ab \u00a76Wave \u25ef (Last Wave) \u00a77\u00bb \u00a7e\u5230\u7740\uff01")
+            ArenaI18n.text(null, "arena.ui.broadcast.wave.get_ready")
         } else {
             val displayWave = session.startedWaves.maxOrNull() ?: session.currentWave.coerceAtLeast(1)
             val isLastWave = displayWave >= session.waves
             val waveBase = if (isLastWave) {
-                ArenaI18n.text(null, "arena.ui.broadcast.wave.last", "\u00a77\u00ab \u00a76Wave \u25ef (Last Wave) \u00a77\u00bb")
+                ArenaI18n.text(null, "arena.ui.broadcast.wave.last")
             } else {
-                ArenaI18n.text(null, "arena.ui.broadcast.wave.normal", "\u00a77\u00ab \u00a76Wave {wave} \u00a77\u00bb", "wave" to displayWave)
+                ArenaI18n.text(null, "arena.ui.broadcast.wave.normal", "wave" to displayWave)
             }
             val cleared = session.clearedWaves.contains(displayWave)
             if (cleared) {
-                "$waveBase ${ArenaI18n.text(null, "arena.ui.broadcast.wave.clear", "\u00a7dCLEAR")}"
+                "$waveBase ${ArenaI18n.text(null, "arena.ui.broadcast.wave.clear")}"
             } else {
                 waveBase
             }
         }
         lore.add(waveLine)
         lore.add(separator)
-        lore.add(ArenaI18n.text(null, "arena.ui.broadcast.players_header", "\u00a7f\u2759 \u00a77\u53c2\u52a0\u30d7\u30ec\u30a4\u30e4\u30fc"))
+        lore.add(ArenaI18n.text(null, "arena.ui.broadcast.players_header"))
 
         val participantOrder = if (session.sidebarParticipantOrder.isNotEmpty()) {
             session.sidebarParticipantOrder
@@ -150,14 +150,14 @@ class ArenaSessionInfoMenu(
                 val currentHealth = onlinePlayer.health.coerceIn(0.0, maxHealth)
                 val hearts = (currentHealth / (maxHealth / 10.0)).let { round(it).toInt() }.coerceIn(0, 10)
                 val healthBar = "\u00a7c" + "\u2764".repeat(hearts) + "\u00a78" + "\u2764".repeat(10 - hearts)
-                lore.add(ArenaI18n.text(null, "arena.ui.broadcast.player_line", "\u00a77\u30fb \u00a7b{name} {status}", "name" to name, "status" to healthBar))
+                lore.add(ArenaI18n.text(null, "arena.ui.broadcast.player_line", "name" to name, "status" to healthBar))
             } else {
-                lore.add(ArenaI18n.text(null, "arena.ui.broadcast.player_line", "\u00a77\u30fb \u00a7b{name} {status}", "name" to name, "status" to status))
+                lore.add(ArenaI18n.text(null, "arena.ui.broadcast.player_line", "name" to name, "status" to status))
             }
         }
 
         lore.add("")
-        lore.add(ArenaI18n.text(null, "arena.ui.broadcast.radio_header", "\u00a7f\u2759 \u00a77\u7121\u7dda"))
+        lore.add(ArenaI18n.text(null, "arena.ui.broadcast.radio_header"))
 
         val lastMsg = session.lastOageMessage
         if (lastMsg != null) {
@@ -177,7 +177,7 @@ class ArenaSessionInfoMenu(
         val item = ItemStack(Material.GRAY_STAINED_GLASS_PANE)
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(
-            ArenaI18n.text(null, "arena.ui.broadcast.empty_slot", "\u00a7e\u4f59\u88d5\u3042\u308a")
+            ArenaI18n.text(null, "arena.ui.broadcast.empty_slot")
         )
         meta.lore = emptyList()
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
@@ -192,22 +192,22 @@ class ArenaSessionInfoMenu(
 
         if (!hasAnySession) {
             item = ItemStack(Material.GRAY_STAINED_GLASS_PANE)
-            displayName = ArenaI18n.text(null, "arena.ui.broadcast.lift.no_session", "\u00a78-")
+            displayName = ArenaI18n.text(null, "arena.ui.broadcast.lift.no_session")
         } else {
             val anyReady = sessions.any { arenaManager.getLiftStatusForSession(it) == ArenaLiftStatus.READY }
             val anyOccupied = sessions.any { arenaManager.getLiftStatusForSession(it) == ArenaLiftStatus.OCCUPIED }
             when {
                 anyOccupied -> {
                     item = ItemStack(Material.RED_STAINED_GLASS_PANE)
-                    displayName = ArenaI18n.text(null, "arena.ui.broadcast.lift.occupied", "\u00a7c\u30ea\u30d5\u30c8\u4f7f\u7528\u4e2d")
+                    displayName = ArenaI18n.text(null, "arena.ui.broadcast.lift.occupied")
                 }
                 anyReady -> {
                     item = ItemStack(Material.GREEN_STAINED_GLASS_PANE)
-                    displayName = ArenaI18n.text(null, "arena.ui.broadcast.lift.ready", "\u00a7a\u30ea\u30d5\u30c8\u4f7f\u7528\u53ef")
+                    displayName = ArenaI18n.text(null, "arena.ui.broadcast.lift.ready")
                 }
                 else -> {
                     item = ItemStack(Material.YELLOW_STAINED_GLASS_PANE)
-                    displayName = ArenaI18n.text(null, "arena.ui.broadcast.lift.preparing", "\u00a7e\u30ea\u30d5\u30c8\u6e96\u5099\u4e2d")
+                    displayName = ArenaI18n.text(null, "arena.ui.broadcast.lift.preparing")
                 }
             }
         }
@@ -223,16 +223,9 @@ class ArenaSessionInfoMenu(
         val item = ItemStack(Material.BOOK)
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(
-            ArenaI18n.text(null, "arena.ui.broadcast.info.name", "\u00a7bInfo")
+            ArenaI18n.text(null, "arena.ui.broadcast.info.name")
         )
-        meta.lore = ArenaI18n.stringList(
-            null,
-            "arena.ui.broadcast.info.lore",
-            listOf(
-                "\u00a77\u304a\u3042\u3052\u3061\u3083\u3093\u304c\u57fa\u5730\u304b\u3089",
-                "\u00a77\u30b5\u30dd\u30fc\u30c8\u3092\u884c\u3063\u3066\u3044\u307e\u3059"
-            )
-        )
+        meta.lore = ArenaI18n.stringList(null, "arena.ui.broadcast.info.lore")
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
         item.itemMeta = meta
         return item

@@ -14,15 +14,15 @@ object ArenaI18n {
     fun clearCache() {
     }
 
-    fun text(sender: CommandSender?, key: String, fallback: String, vararg placeholders: Pair<String, Any?>): String {
-        return text(sender as? Player, key, fallback, *placeholders)
+    fun text(sender: CommandSender?, key: String, vararg placeholders: Pair<String, Any?>): String {
+        return text(sender as? Player, key, *placeholders)
     }
 
-    fun text(player: Player?, key: String, fallback: String, vararg placeholders: Pair<String, Any?>): String {
+    fun text(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): String {
         return CCSystem.getAPI().getI18nString(SOURCE_ID, player, key, placeholdersMap(*placeholders)).replace('&', '§')
     }
 
-    fun stringList(player: Player?, key: String, fallback: List<String>, vararg placeholders: Pair<String, Any?>): List<String> {
+    fun stringList(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): List<String> {
         return CCSystem.getAPI().getI18nStringList(SOURCE_ID, player, key, placeholdersMap(*placeholders)).map { it.replace('&', '§') }
     }
 

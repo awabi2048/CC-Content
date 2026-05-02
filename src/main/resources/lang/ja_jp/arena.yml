@@ -106,6 +106,7 @@ arena:
     lobby:
       tutorial:
         hold_hint: Shift長押しで進む
+        completed_title: §aロビーチュートリアル完了！
         steps:
         - §f「ここがアリーナロビーです！ミッションは掲示板から受注できますよ！」
         - §f「ロビー中央から各設備にアクセスできます。必要な準備を整えましょう！」
@@ -218,6 +219,7 @@ arena:
       ended_by_warp: '&cワープしたため死亡扱いでアリーナを終了しました'
       ended_by_shutdown: '&cサーバー停止によりアリーナを終了しました'
       stopped_by_admin: '&c管理コマンドによりアリーナを停止しました'
+      stage_title: §6{theme}
     stage:
       already_started: '&eステージはすでに開始しています'
       start_subtitle: '&6ステージ開始'

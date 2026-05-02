@@ -666,7 +666,7 @@ class MobService(private val plugin: JavaPlugin) {
         val activeMob = resolveActiveMobByDamager(damager) ?: return null
         val categoryId = activeMob.mobType.rewardCategoryId
         val key = "custom_items.arena.mob_token.token_names.$categoryId"
-        return ArenaI18n.text(viewer, key, categoryId)
+        return ArenaI18n.text(viewer, key)
     }
 
     private fun resolveActiveMobByDamager(damager: Entity): ActiveMob? {

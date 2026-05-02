@@ -134,7 +134,7 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
         arenaManager.clearLobbyTutorialState(event.player)
         arenaManager.stopSession(
             event.player,
-            ArenaI18n.text(event.player, "arena.messages.session.ended_by_logout", "&cログアウトしたためアリーナを終了しました")
+            ArenaI18n.text(event.player, "arena.messages.session.ended_by_logout")
         )
     }
 
@@ -151,7 +151,7 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
         arenaManager.handleInviteTargetUnavailable(event.player)
         arenaManager.stopSession(
             event.player,
-            ArenaI18n.text(event.player, "arena.messages.session.ended_by_death", "&c死亡したためアリーナを終了しました")
+            ArenaI18n.text(event.player, "arena.messages.session.ended_by_death")
         )
     }
 

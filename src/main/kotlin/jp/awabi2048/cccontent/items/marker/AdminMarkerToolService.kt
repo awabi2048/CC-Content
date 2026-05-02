@@ -296,7 +296,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
 
         return when (definition.toolId) {
             "arena.structure_marker_tool", "arena.other_marker_tool", "arena.lift_tool" ->
-                ArenaI18n.text(player, fullKey, fallback, *placeholders)
+                ArenaI18n.text(player, fullKey, *placeholders)
             "sukima_dungeon.marker_tool" -> MessageManager.getMessage(
                 player,
                 fullKey,

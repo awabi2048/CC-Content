@@ -106,6 +106,7 @@ arena:
     lobby:
       tutorial:
         hold_hint: Hold Shift to continue
+        completed_title: §aLobby tutorial complete!
         steps:
         - §f"This is the arena lobby! You can accept missions from the board."
         - §f"From the lobby center, you can access each facility. Prepare before departure!"
@@ -216,6 +217,7 @@ arena:
       ended_by_warp: '&cArena ended as death because you warped'
       ended_by_shutdown: '&cArena ended because the server is shutting down'
       stopped_by_admin: '&cArena stopped by admin command'
+      stage_title: §6{theme}
     stage:
       already_started: '&eThe stage has already started'
       start_subtitle: '&6Stage Start'

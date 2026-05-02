@@ -241,10 +241,10 @@ object ArenaMissionLayout {
     const val CONFIRM_SIZE = 45
 
     val MENU_TITLE: String
-        get() = ArenaI18n.text(null, "arena.ui.menu_title", "§8アリーナ掲示板")
+        get() = ArenaI18n.text(null, "arena.ui.menu_title")
 
     val CONFIRM_TITLE: String
-        get() = ArenaI18n.text(null, "arena.ui.confirm_title", "§8参加確認")
+        get() = ArenaI18n.text(null, "arena.ui.confirm_title")
 
     val MENU_MISSION_SLOTS = listOf(19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34)
     const val MENU_PLAYER_SLOT = 47

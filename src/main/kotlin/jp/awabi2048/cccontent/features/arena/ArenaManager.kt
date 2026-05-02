@@ -115,7 +115,6 @@ sealed class ArenaStartResult {
 
     data class Error(
         val messageKey: String,
-        val fallback: String,
         val placeholders: Array<out Pair<String, Any?>> = emptyArray()
     ) : ArenaStartResult()
 }
@@ -356,7 +355,7 @@ class ArenaManager(
     private val legacySerializer = LegacyComponentSerializer.legacySection()
     private val themeLoader = ArenaThemeLoader(plugin)
     private val stageGenerator = ArenaStageGenerator()
-    private val legacyColorPattern = Regex("(?i)ﾂｧ[0-9A-FK-ORX]")
+    private val legacyColorPattern = Regex("(?i)§[0-9A-FK-ORX]")
     private val sessionsByWorld = mutableMapOf<String, ArenaSession>()
     private val playerToSessionWorld = mutableMapOf<UUID, String>()
     private val mobToSessionWorld = mutableMapOf<UUID, String>()
@@ -621,7 +620,7 @@ class ArenaManager(
         validateMobTokenLanguageKeys(tokenTypeIds)
 
         if (mobDefinitions.isEmpty()) {
-            plugin.logger.severe("[Arena] config/mob_definition.yml 縺檎ｩｺ縺ｮ縺溘ａ繧｢繝ｪ繝ｼ繝翫ｒ髢句ｧ九〒縺阪∪縺帙ｓ")
+            plugin.logger.severe("[Arena] config/mob_definition.yml did not load any mob definitions.")
         }
     }
 
@@ -703,7 +702,6 @@ class ArenaManager(
         if (alreadyInSession != null) {
             return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.already_in_session",
-                "&c{player} 縺ｯ縺吶〒縺ｫ繧｢繝ｪ繝ｼ繝翫そ繝・す繝ｧ繝ｳ荳ｭ縺ｧ縺・",
                 arrayOf("player" to alreadyInSession.name)
             ))
         }
@@ -711,7 +709,6 @@ class ArenaManager(
         if (sessionsByWorld.size >= maxConcurrentSessions) {
             return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.concurrent_limit_reached",
-                "&c蜷梧凾繧ｻ繝・す繝ｧ繝ｳ荳企剞縺ｫ驕斐＠縺ｦ縺・∪縺・({current}/{max})",
                 arrayOf("current" to sessionsByWorld.size, "max" to maxConcurrentSessions)
             ))
         }
@@ -719,12 +716,11 @@ class ArenaManager(
         val theme = themeLoader.getTheme(requestedTheme)
             ?: return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.theme_not_found",
-                "&c譛牙柑縺ｪ繝・・繝槭′隕九▽縺九ｊ縺ｾ縺帙ｓ"
+                arrayOf("theme" to requestedTheme, "mob_type" to requestedTheme)
             ))
         if (promoted && theme.promotedVariant == null) {
             return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.promoted_not_configured",
-                "&ctheme '{theme}' には promoted 設定がありません",
                 arrayOf("theme" to theme.id, "mob_type" to theme.id)
             ))
         }
@@ -736,12 +732,11 @@ class ArenaManager(
         }
         if (undefinedWave != null) {
             plugin.logger.severe(
-                "[Arena] 繧ｻ繝・す繝ｧ繝ｳ髢句ｧ句､ｱ謨・ theme繧ｹ繝昴・繝ｳ譛ｪ螳夂ｾｩ繧ｦ繧ｧ繝ｼ繝悶′縺ゅｊ縺ｾ縺・" +
+                "[Arena] 驛｢・ｧ繝ｻ・ｻ驛｢譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬯ｮ・｢陷ｿ・･繝ｻ・ｧ陷ｿ・･繝ｻ・､繝ｻ・ｱ髫ｰ・ｨ郢晢ｽｻ theme驛｢・ｧ繝ｻ・ｹ驛｢譎・ｺ｢郢晢ｽｻ驛｢譎｢・ｽ・ｳ髫ｴ蟷｢・ｽ・ｪ髯橸ｽｳ陞溘ｑ・ｽ・ｾ繝ｻ・ｩ驛｢・ｧ繝ｻ・ｦ驛｢・ｧ繝ｻ・ｧ驛｢譎｢・ｽ・ｼ驛｢譎・§遯ｶ・ｲ驍ｵ・ｺ郢ｧ繝ｻ・ｽ鬘費ｽｸ・ｺ繝ｻ・ｾ驍ｵ・ｺ郢晢ｽｻ" +
                     "theme=${theme.id} promoted=$promoted wave=$undefinedWave"
             )
             return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.undefined_wave_spawn",
-                "&ctheme '{theme}' 縺ｯ wave {wave} 縺ｮ繧ｹ繝昴・繝ｳ縺梧悴螳夂ｾｩ縺ｧ縺・",
                 arrayOf("theme" to theme.id, "mob_type" to theme.id, "wave" to undefinedWave)
             ))
         }
@@ -751,7 +746,6 @@ class ArenaManager(
         if (participantPlayers.size > sanitizedMaxParticipants) {
             return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.too_many_participants",
-                "&c蜿ょ刈莠ｺ謨ｰ縺御ｸ企剞繧定ｶ・∴縺ｦ縺・∪縺・({count}/{max})",
                 arrayOf("count" to participantPlayers.size, "max" to sanitizedMaxParticipants)
             ))
         }
@@ -763,31 +757,23 @@ class ArenaManager(
         }
         if (enableMultiplayerJoin && !isEntranceLiftReady(liftMarkers)) {
             return completed(ArenaStartResult.Error(
-                "arena.messages.command.start_error.lift_not_ready",
-                "&c繝ｪ繝輔ヨ縺ｮ貅門ｙ縺後〒縺阪※縺・↑縺・◆繧・幕蟋九〒縺阪∪縺帙ｓ"
-            ))
+                "arena.messages.command.start_error.lift_not_ready"))
         }
 
         if (enableMultiplayerJoin && liftMarkers.any { liftOccupiedMarkerKeys.contains(liftMarkerKey(it)) }) {
             liftOccupiedWaiters.add(target.uniqueId)
             return completed(ArenaStartResult.Error(
-                "arena.messages.command.start_error.lift_occupied",
-                "&c繝ｪ繝輔ヨ縺御ｽｿ逕ｨ荳ｭ縺ｮ縺溘ａ髢句ｧ九〒縺阪∪縺帙ｓ"
-            ))
+                "arena.messages.command.start_error.lift_occupied"))
         }
 
         val lobbyMarkers = findLoadedLobbyMarkerSnapshot(target.world)
         if (lobbyMarkers.returnLobby.isEmpty()) {
             return completed(ArenaStartResult.Error(
-                "arena.messages.command.start_error.lobby_marker_not_found",
-                "&c繝ｭ繝薙・繝槭・繧ｫ繝ｼ縺瑚ｦ九▽縺九ｉ縺ｪ縺・◆繧・幕蟋九〒縺阪∪縺帙ｓ"
-            ))
+                "arena.messages.command.start_error.lobby_marker_not_found"))
         }
 
         val world = acquireArenaPoolWorld() ?: return completed(ArenaStartResult.Error(
-            "arena.messages.command.start_error.pool_world_unavailable",
-            "&c繧｢繝ｪ繝ｼ繝翫Ρ繝ｼ繝ｫ繝画ｺ門ｙ荳ｭ縺ｮ縺溘ａ髢句ｧ九〒縺阪∪縺帙ｓ"
-        ))
+            "arena.messages.command.start_error.pool_world_unavailable"))
 
         val returnLocations = participantPlayers.associate { it.uniqueId to it.location.clone() }.toMutableMap()
         val originalGameModes = participantPlayers.associate { it.uniqueId to it.gameMode }.toMutableMap()
@@ -855,24 +841,16 @@ class ArenaManager(
         if (enableMultiplayerJoin) {
             liftMarkers.forEach { liftOccupiedMarkerKeys.add(liftMarkerKey(it)) }
         }
-        logArenaPoolState("繧ｻ繝・す繝ｧ繝ｳ髢句ｧ・, world.name")
+        logArenaPoolState("驛｢・ｧ繝ｻ・ｻ驛｢譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬯ｮ・｢陷ｿ・･繝ｻ・ｧ郢晢ｽｻ, world.name")
 
         return try {
             if (enableMultiplayerJoin) {
                 target.showBossBar(getOrCreateJoinCountdownBossBar(session, target.uniqueId))
                 target.sendMessage(
-                    ArenaI18n.text(
-                        target,
-                        "arena.messages.multiplayer.invite_window_started",
-                        "ﾂｧ6繝溘ャ繧ｷ繝ｧ繝ｳ繧貞女豕ｨ縺励∪縺励◆・・ｧ7繝ｪ繝輔ヨ繧呈ｺ門ｙ荳ｭ縺ｧ縺・.."
-                    )
+                    ArenaI18n.text(target, "arena.messages.multiplayer.invite_window_started")
                 )
                 target.sendMessage(
-                    ArenaI18n.text(
-                        target,
-                        "arena.messages.multiplayer.invite_window_hint",
-                        "ﾂｧ7蟾ｦ繧ｯ繝ｪ繝・け縺ｧ縺ｻ縺九・繝励Ξ繧､繝､繝ｼ繧偵Α繝・す繝ｧ繝ｳ縺ｫ隱倥≧縺薙→縺後〒縺阪∪縺・"
-                    )
+                    ArenaI18n.text(target, "arena.messages.multiplayer.invite_window_hint")
                 )
 
                 session.stageBuildTask = stageGenerator.buildIncrementally(
@@ -905,14 +883,13 @@ class ArenaManager(
                         }
                         .onFailure { throwable ->
                             if (throwable is ArenaStageBuildException) {
-                                plugin.logger.severe("[Arena] 繧ｹ繝・・繧ｸ縺ｮ逕滓・縺ｫ螟ｱ謨励＠縺ｾ縺励◆: ${throwable.message}")
+                                plugin.logger.severe("[Arena] 驛｢・ｧ繝ｻ・ｹ驛｢譏ｴ繝ｻ郢晢ｽｻ驛｢・ｧ繝ｻ・ｸ驍ｵ・ｺ繝ｻ・ｮ鬨ｾ蠅難ｽｻ阮吶・驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ ${throwable.message}")
                                 throwable.printStackTrace()
                             }
                             terminateSession(
                                 session,
                                 false,
                                 messageKey = "arena.messages.command.start_error.stage_build_failed",
-                                fallbackMessage = "&c繧ｹ繝・・繧ｸ縺ｮ逕滓・縺ｫ螟ｱ謨励＠縺ｾ縺励◆"
                             )
                             onCompleted?.invoke(elapsedMillisSince(startedAtNanos))
                         }
@@ -951,21 +928,13 @@ class ArenaManager(
             }
             if (showSessionStartedMessage) {
                 target.sendMessage(
-                    ArenaI18n.text(
-                        target,
-                        "arena.messages.session.started",
-                        "&6[Arena] 繧ｻ繝・す繝ｧ繝ｳ髢句ｧ・ theme={theme}, difficulty={difficulty}, waves={waves}",
-                        "theme" to theme.id,
-                        "mob_type" to theme.id,
-                        "difficulty" to variant.display,
-                        "waves" to variant.waves.size
-                    )
+                    ArenaI18n.text(target, "arena.messages.session.started", "theme" to theme.id, "mob_type" to theme.id, "difficulty" to variant.display, "waves" to variant.waves.size)
                 )
             }
             ArenaStartResult.Success(theme.id, variant.waves.size, promoted, variant.display)
         } catch (e: Exception) {
             if (e is ArenaStageBuildException) {
-                plugin.logger.severe("[Arena] 繧ｹ繝・・繧ｸ縺ｮ逕滓・縺ｫ螟ｱ謨励＠縺ｾ縺励◆: ${e.message}")
+                plugin.logger.severe("[Arena] 驛｢・ｧ繝ｻ・ｹ驛｢譏ｴ繝ｻ郢晢ｽｻ驛｢・ｧ繝ｻ・ｸ驍ｵ・ｺ繝ｻ・ｮ鬨ｾ蠅難ｽｻ阮吶・驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ ${e.message}")
                 e.printStackTrace()
             }
             val failedSession = sessionsByWorld[world.name]
@@ -977,17 +946,16 @@ class ArenaManager(
             onCompleted?.invoke(elapsedMillisSince(startedAtNanos))
             ArenaStartResult.Error(
                 "arena.messages.command.start_error.stage_build_failed",
-                "&c{message}",
                 arrayOf("message" to (e.message ?: "unknown"))
             )
         }
     }
 
-    fun stopSession(player: Player, reason: String = ArenaI18n.text(player, "arena.messages.session.ended", "&c繧｢繝ｪ繝ｼ繝翫そ繝・す繝ｧ繝ｳ縺檎ｵゆｺ・＠縺ｾ縺励◆")): Boolean {
+    fun stopSession(player: Player, reason: String = ArenaI18n.text(player, "arena.messages.session.ended")): Boolean {
         return leavePlayerFromSession(player.uniqueId, reason)
     }
 
-    fun stopSessionToLobby(player: Player, reason: String = ArenaI18n.text(player, "arena.messages.session.ended", "&c繧｢繝ｪ繝ｼ繝翫そ繝・す繝ｧ繝ｳ縺檎ｵゆｺ・＠縺ｾ縺励◆")): Boolean {
+    fun stopSessionToLobby(player: Player, reason: String = ArenaI18n.text(player, "arena.messages.session.ended")): Boolean {
         val session = getSession(player)
         val destination = if (session != null) resolveSessionLobbyLocation(session) else null
         val stopped = leavePlayerFromSession(player.uniqueId, reason, destination)
@@ -1000,13 +968,13 @@ class ArenaManager(
 
     fun stopSessionById(playerId: UUID, reason: String? = null): Boolean {
         val player = Bukkit.getPlayer(playerId)
-        val localizedReason = reason ?: ArenaI18n.text(player, "arena.messages.session.ended", "&c繧｢繝ｪ繝ｼ繝翫そ繝・す繝ｧ繝ｳ縺檎ｵゆｺ・＠縺ｾ縺励◆")
+        val localizedReason = reason ?: ArenaI18n.text(player, "arena.messages.session.ended")
         return leavePlayerFromSession(playerId, localizedReason)
     }
 
     fun stopSessionToLobbyById(playerId: UUID, reason: String? = null): Boolean {
         val player = Bukkit.getPlayer(playerId)
-        val localizedReason = reason ?: ArenaI18n.text(player, "arena.messages.session.ended", "&c繧｢繝ｪ繝ｼ繝翫そ繝・す繝ｧ繝ｳ縺檎ｵゆｺ・＠縺ｾ縺励◆")
+        val localizedReason = reason ?: ArenaI18n.text(player, "arena.messages.session.ended")
         val worldName = playerToSessionWorld[playerId]
         val session = worldName?.let { sessionsByWorld[it] }
         val destination = if (session != null) resolveSessionLobbyLocation(session) else null
@@ -1207,7 +1175,7 @@ class ArenaManager(
     }
 
     private fun showLobbyTutorialCompletedEffect(player: Player) {
-        player.sendTitle("", "ﾂｧfﾂｫ ﾂｧ6ﾂｧlArena ﾂｧfﾂｻ", 10, 100, 10)
+        player.sendTitle("", ArenaI18n.text(player, "arena.messages.lobby.tutorial.completed_title"), 10, 100, 10)
         playLobbyBgm(player)
     }
 
@@ -1225,7 +1193,7 @@ class ArenaManager(
             .mapNotNull { Bukkit.getPlayer(it) }
             .filter { it.isOnline && it.world.name == session.worldName }
             .forEach { participant ->
-                participant.sendMessage(ArenaI18n.text(participant, "arena.messages.down.participant_died", "&4{player} is down.", "player" to player.name))
+                participant.sendMessage(ArenaI18n.text(participant, "arena.messages.down.participant_died", "player" to player.name))
                 if (!hasOtherAliveNonDownParticipant(session, participant.uniqueId)) {
                     return@forEach
                 }
@@ -1233,7 +1201,6 @@ class ArenaManager(
                     participant,
                     OAGE_FOLLOWUP_DELAY_TICKS,
                     "arena.messages.oage.participant_died_followup",
-                    "縺・∪蜉ｩ縺代↓陦後″縺ｾ縺吶・・・",
                     force = true
                 )
             }
@@ -1253,7 +1220,6 @@ class ArenaManager(
                 session,
                 false,
                 messageKey = "arena.messages.session.ended_by_shutdown",
-                fallbackMessage = "&c繧ｵ繝ｼ繝舌・蛛懈ｭ｢縺ｫ繧医ｊ繧｢繝ｪ繝ｼ繝翫ｒ邨ゆｺ・＠縺ｾ縺励◆",
                 duringShutdown = true
             )
         }
@@ -1355,7 +1321,7 @@ class ArenaManager(
         session.barrierPointLocations.clear()
         session.barrierPointLocations.addAll(stage.barrierPointLocations.map { it.clone() })
 
-        // 謗・ｨ弱Α繝・す繝ｧ繝ｳ逕ｨ: 繝懊せ繧ｹ繝昴・繝ｳ菴咲ｽｮ繧偵さ繝斐・
+        // 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ・朱・・ｹ譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬨ｾ蛹・ｽｽ・ｨ: 驛｢譎・鯵邵ｺ蟶ｷ・ｹ・ｧ繝ｻ・ｹ驛｢譎・ｺ｢郢晢ｽｻ驛｢譎｢・ｽ・ｳ髣厄ｽｴ陷･・ｲ繝ｻ・ｽ繝ｻ・ｮ驛｢・ｧ陋幢ｽｵ邵ｺ諷包ｽｹ譎・ｱ堤ｹ晢ｽｻ
         session.clearingBossLocations.clear()
         session.clearingBossLocations.addAll(stage.clearingBossLocations.map { it.clone() })
 
@@ -1414,21 +1380,12 @@ class ArenaManager(
     private fun declineInvitedParticipant(session: ArenaSession, invited: Player) {
         removeInvitedParticipant(session, invited.uniqueId)
         invited.sendMessage(
-            ArenaI18n.text(
-                invited,
-                "arena.messages.multiplayer.declined_self",
-                "&e諡帛ｾ・ｒ霎樣縺励∪縺励◆"
-            )
+            ArenaI18n.text(invited, "arena.messages.multiplayer.declined_self")
         )
         val owner = Bukkit.getPlayer(session.ownerPlayerId)
         if (owner != null && owner.isOnline) {
             owner.sendMessage(
-                ArenaI18n.text(
-                    owner,
-                    "arena.messages.multiplayer.declined_notify_owner",
-                    "&e{player} 縺梧魚蠕・ｒ霎樣縺励∪縺励◆",
-                    "player" to invited.name
-                )
+                ArenaI18n.text(owner, "arena.messages.multiplayer.declined_notify_owner", "player" to invited.name)
             )
         }
     }
@@ -1444,13 +1401,13 @@ class ArenaManager(
             }
             val world = Bukkit.getWorld(session.worldName) ?: continue
 
-            // 謗・ｨ弱Α繝・す繝ｧ繝ｳ: 譎る俣蛻・ｌ繝√ぉ繝・け
+            // 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ・朱・・ｹ譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ: 髫ｴ蠑ｱ・玖将・｣髯具ｽｻ郢晢ｽｻ繝ｻ讙趣ｽｹ譏ｶ繝ｻ邵ｺ閾･・ｹ譏ｴ繝ｻ邵ｺ繝ｻ
             if (isClearingMission(session) && isClearingBossTimeExpired(session)) {
                 onClearingBossTimeExpired(session)
                 continue
             }
 
-            // 謗・ｨ弱Α繝・す繝ｧ繝ｳ: 繝懊せ繝舌・譖ｴ譁ｰ・域凾髢楢｡ｨ遉ｺ縺ｮ縺溘ａ・・
+            // 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ・朱・・ｹ譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ: 驛｢譎・鯵邵ｺ蟶ｷ・ｹ譎√・郢晢ｽｻ髫ｴ蜴・ｽｽ・ｴ髫ｴ繝ｻ・ｽ・ｰ郢晢ｽｻ陜捺ｺｷ繝ｻ鬯ｮ・｢隶鯉ｽ｢繝ｻ・｡繝ｻ・ｨ鬩穂ｼ夲ｽｽ・ｺ驍ｵ・ｺ繝ｻ・ｮ驍ｵ・ｺ雋・∞・ｽ竏壹・郢晢ｽｻ
             if (isClearingMission(session) && session.clearingBossSpawned) {
                 updateSessionProgressBossBar(session)
             }
@@ -1605,7 +1562,7 @@ class ArenaManager(
         try {
             applyArenaMobDrop(event)
         } catch (exception: Exception) {
-            plugin.logger.log(Level.SEVERE, "[Arena] 繝｢繝悶ラ繝ｭ繝・・蜃ｦ逅・↓螟ｱ謨励＠縺ｾ縺励◆縺瑚ｨ惹ｼ宣ｲ陦後・邯咏ｶ壹＠縺ｾ縺・ entityId=$entityId", exception)
+            plugin.logger.log(Level.SEVERE, "[Arena] 驛｢譎｢・ｽ・｢驛｢譎・§郢晢ｽｩ驛｢譎｢・ｽ・ｭ驛｢譏ｴ繝ｻ郢晢ｽｻ髯ｷ繝ｻ・ｽ・ｦ鬨ｾ繝ｻ繝ｻ遶頑･｢譽斐・・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ・ｸ・ｺ霑ｹ螟ｲ・ｽ・ｨ隲・ｹ繝ｻ・ｼ陞ｳ・｣・つ繝ｻ・ｲ鬮ｯ・ｦ陟募ｾ後・鬩搾ｽｯ陷･謫ｾ・ｽ・ｶ陞｢・ｹ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ郢晢ｽｻ entityId=$entityId", exception)
         }
         val worldName = mobToSessionWorld.remove(entityId)
             ?: entityMobToSessionWorld.remove(entityId)
@@ -1872,22 +1829,14 @@ class ArenaManager(
             event.isCancelled = true
             if (!ArenaPermissions.hasPedestalMenuPermission(player)) {
                 player.sendMessage(
-                    ArenaI18n.text(
-                        player,
-                        "arena.messages.command.menu_permission_denied",
-                        "&c縺薙・繝｡繝九Η繝ｼ繧帝幕縺乗ｨｩ髯舌′縺ゅｊ縺ｾ縺帙ｓ"
-                    )
+                    ArenaI18n.text(player, "arena.messages.command.menu_permission_denied")
                 )
                 return
             }
             val menu = pedestalMenuProvider?.invoke()
             if (menu == null) {
                 player.sendMessage(
-                    ArenaI18n.text(
-                        player,
-                        "arena.messages.command.feature_unavailable",
-                        "ﾂｧcArena feature 縺ｯ蛻晄悄蛹悶↓螟ｱ謨励＠縺溘◆繧∝茜逕ｨ縺ｧ縺阪∪縺帙ｓ"
-                    )
+                    ArenaI18n.text(player, "arena.messages.command.feature_unavailable")
                 )
                 return
             }
@@ -1915,22 +1864,14 @@ class ArenaManager(
     private fun openPedestalMenu(player: Player) {
         if (!ArenaPermissions.hasPedestalMenuPermission(player)) {
             player.sendMessage(
-                ArenaI18n.text(
-                    player,
-                    "arena.messages.command.menu_permission_denied",
-                    "&c邵ｺ阮吶・郢晢ｽ｡郢昜ｹ斟礼ｹ晢ｽｼ郢ｧ蟶晏ｹ慕ｸｺ荵暦ｽｨ・ｩ鬮ｯ闊娯ｲ邵ｺ繧・ｽ顔ｸｺ・ｾ邵ｺ蟶呻ｽ・"
-                )
+                ArenaI18n.text(player, "arena.messages.command.menu_permission_denied")
             )
             return
         }
         val menu = pedestalMenuProvider?.invoke()
         if (menu == null) {
             player.sendMessage(
-                ArenaI18n.text(
-                    player,
-                    "arena.messages.command.feature_unavailable",
-                    "・ゑｽｧcArena feature 邵ｺ・ｯ陋ｻ譎・ｄ陋ｹ謔ｶ竊楢棔・ｱ隰ｨ蜉ｱ・邵ｺ貅倪螺郢ｧ竏晁懸騾包ｽｨ邵ｺ・ｧ邵ｺ髦ｪ竏ｪ邵ｺ蟶呻ｽ・"
-                )
+                ArenaI18n.text(player, "arena.messages.command.feature_unavailable")
             )
             return
         }
@@ -2035,11 +1976,7 @@ class ArenaManager(
         if (ownerSession != null && ownerSession.multiplayerJoinEnabled && ownerSession.ownerPlayerId == player.uniqueId) {
             if (System.currentTimeMillis() >= ownerSession.joinGraceEndMillis) {
                 player.sendMessage(
-                    ArenaI18n.text(
-                        player,
-                        "arena.messages.multiplayer.invite_window_closed",
-                        "&c蜍滄寔譎る俣縺ｯ邨ゆｺ・＠縺ｾ縺励◆"
-                    )
+                    ArenaI18n.text(player, "arena.messages.multiplayer.invite_window_closed")
                 )
                 return
             }
@@ -2144,34 +2081,21 @@ class ArenaManager(
         val reservedSeats = session.participants.size + session.invitedParticipants.size
         if (reservedSeats >= session.maxParticipants) {
             owner.sendMessage(
-                ArenaI18n.text(
-                    owner,
-                    "arena.messages.multiplayer.invite_failed_full",
-                    "&c縺薙・繝溘ャ繧ｷ繝ｧ繝ｳ縺ｮ譛螟ｧ蜿ょ刈莠ｺ謨ｰ縺ｫ驕斐＠縺ｦ縺・ｋ縺溘ａ諡帛ｾ・〒縺阪∪縺帙ｓ"
-                )
+                ArenaI18n.text(owner, "arena.messages.multiplayer.invite_failed_full")
             )
             return
         }
 
         if (playerToSessionWorld.containsKey(invited.uniqueId)) {
             owner.sendMessage(
-                ArenaI18n.text(
-                    owner,
-                    "arena.messages.multiplayer.invite_failed_in_session",
-                    "&c{player} 縺ｯ縺吶〒縺ｫ蛻･縺ｮ繧｢繝ｪ繝ｼ繝翫↓蜿ょ刈縺励※縺・∪縺・",
-                    "player" to invited.name
-                )
+                ArenaI18n.text(owner, "arena.messages.multiplayer.invite_failed_in_session", "player" to invited.name)
             )
             return
         }
 
         if (invited.world.uid != owner.world.uid) {
             owner.sendMessage(
-                ArenaI18n.text(
-                    owner,
-                    "arena.messages.multiplayer.invite_failed_world",
-                    "&c蜷後§繝ｯ繝ｼ繝ｫ繝牙・縺ｮ繝励Ξ繧､繝､繝ｼ縺ｮ縺ｿ諡帛ｾ・〒縺阪∪縺・"
-                )
+                ArenaI18n.text(owner, "arena.messages.multiplayer.invite_failed_world")
             )
             return
         }
@@ -2179,24 +2103,14 @@ class ArenaManager(
         val lockedWorld = invitedPlayerLocks[invited.uniqueId]
         if (lockedWorld != null && lockedWorld != session.worldName) {
             owner.sendMessage(
-                ArenaI18n.text(
-                    owner,
-                    "arena.messages.multiplayer.invite_failed_already_locked",
-                    "&c{player} 縺ｯ縺吶〒縺ｫ莉悶・諡帛ｾ・ｒ蜿励￠縺ｦ縺・∪縺・",
-                    "player" to invited.name
-                )
+                ArenaI18n.text(owner, "arena.messages.multiplayer.invite_failed_already_locked", "player" to invited.name)
             )
             return
         }
 
         if (!session.invitedParticipants.add(invited.uniqueId)) {
             owner.sendMessage(
-                ArenaI18n.text(
-                    owner,
-                    "arena.messages.multiplayer.already_invited",
-                    "&e{player} 縺ｯ縺吶〒縺ｫ諡帛ｾ・ｸ医∩縺ｧ縺・",
-                    "player" to invited.name
-                )
+                ArenaI18n.text(owner, "arena.messages.multiplayer.already_invited", "player" to invited.name)
             )
             return
         }
@@ -2207,20 +2121,11 @@ class ArenaManager(
         invited.isGlowing = true
         invited.showBossBar(getOrCreateJoinCountdownBossBar(session, invited.uniqueId))
         owner.sendMessage(
-            ArenaI18n.text(
-                owner,
-                "arena.messages.multiplayer.invite_sent",
-                "&a{player} 縺ｫ諡帛ｾ・ｒ騾∽ｿ｡縺励∪縺励◆",
-                "player" to invited.name
-            )
+            ArenaI18n.text(owner, "arena.messages.multiplayer.invite_sent", "player" to invited.name)
         )
         invited.sendMessage(buildInviteMessageComponent(owner.name, session))
         invited.sendMessage(
-            ArenaI18n.text(
-                invited,
-                "arena.messages.multiplayer.invited_decline_hint",
-                "&7霎樣縺吶ｋ蝣ｴ蜷医・縲∵魚蠕・・ｒ蟾ｦ繧ｯ繝ｪ繝・け縺励※縺上□縺輔＞"
-            )
+            ArenaI18n.text(invited, "arena.messages.multiplayer.invited_decline_hint")
         )
     }
 
@@ -2228,20 +2133,20 @@ class ArenaManager(
         val missionTitle = session.inviteMissionTitle
         if (missionTitle.isNullOrBlank()) {
             return legacySerializer.deserialize(
-                ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_simple", "&8[&cArena&8] &7{owner} invited you to Arena.", "owner" to ownerName)
+                ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_simple", "owner" to ownerName)
             )
         }
 
         val hoverText = if (session.inviteMissionLore.isEmpty()) {
-            ArenaI18n.text(null, "arena.messages.multiplayer.no_description", "ﾂｧ7隱ｬ譏弱・縺ゅｊ縺ｾ縺帙ｓ")
+            ArenaI18n.text(null, "arena.messages.multiplayer.no_description")
         } else {
             session.inviteMissionLore.joinToString("\n")
         }
 
-        val prefix = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_prefix", "ﾂｧ8ﾂｧlﾂｫﾂｧcﾂｧlArenaﾂｧ8ﾂｧlﾂｻ ﾂｧ7{owner}縺輔ｓ縺後≠縺ｪ縺溘ｒ繝溘ャ繧ｷ繝ｧ繝ｳﾂｧe", "owner" to ownerName))
-        val missionPart = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_mission", "&e[{mission}]", "mission" to missionTitle))
+        val prefix = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_prefix", "owner" to ownerName))
+        val missionPart = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_mission", "mission" to missionTitle))
             .hoverEvent(HoverEvent.showText(legacySerializer.deserialize(hoverText)))
-        val suffix = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_suffix", "&7 invited."))
+        val suffix = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_suffix"))
 
         return Component.empty()
             .append(prefix)
@@ -2456,11 +2361,7 @@ class ArenaManager(
 
         if (!reviveDisabled) {
             player.sendMessage(
-                ArenaI18n.text(
-                    player,
-                    "arena.messages.down.entered",
-                    "&c繝繧ｦ繝ｳ縺励∪縺励◆縲ら函蟄倩・・陂・函繧貞ｾ・▲縺ｦ縺上□縺輔＞"
-                )
+                ArenaI18n.text(player, "arena.messages.down.entered")
             )
 
             session.participants
@@ -2469,16 +2370,12 @@ class ArenaManager(
                 .mapNotNull { Bukkit.getPlayer(it) }
                 .filter { it.isOnline && it.world.name == session.worldName }
                 .forEach { participant ->
-                    participant.sendMessage(ArenaI18n.text(participant, "arena.messages.down.needs_revive", "&c{player} is down and needs revive.", "player" to player.name))
+                    participant.sendMessage(ArenaI18n.text(participant, "arena.messages.down.needs_revive", "player" to player.name))
                 }
         }
 
         if (reviveDisabled && hasOtherAliveNonDownParticipant(session, player.uniqueId)) {
-            val oageMessage = ArenaI18n.stringList(
-                player,
-                "arena.messages.oage.down_with_survivors",
-                listOf("縺顔夢繧後＆縺ｾ・∽ｻ悶・縺ｿ縺ｪ縺輔ｓ縺ｮ讒伜ｭ舌・縺薙％縺九ｉ縺ｧ繧ら｢ｺ隱阪〒縺阪∪縺吶ｈ・・")
-            ).randomOrNull() ?: "縺顔夢繧後＆縺ｾ・∽ｻ悶・縺ｿ縺ｪ縺輔ｓ縺ｮ讒伜ｭ舌・縺薙％縺九ｉ縺ｧ繧ら｢ｺ隱阪〒縺阪∪縺吶ｈ・・"
+            val oageMessage = ArenaI18n.stringList(player, "arena.messages.oage.down_with_survivors").randomOrNull() ?: return
             sendOageMessage(
                 player,
                 "arena.messages.oage.down_with_survivors",
@@ -2512,17 +2409,12 @@ class ArenaManager(
             downed.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, Int.MAX_VALUE, 0, false, false, false))
             downed.playSound(downed.location, Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0f, 0.75f)
             downed.sendMessage(
-                ArenaI18n.text(
-                    downed,
-                    "arena.messages.down.game_over",
-                    "&c逶ｮ縺ｮ蜑阪′縺ｾ縺｣縺上ｉ縺ｫ縺ｪ縺｣縺・..・―n&7縺翫≠縺偵■繧・ｓ縺梧舞蜃ｺ荳ｭ..."
-                )
+                ArenaI18n.text(downed, "arena.messages.down.game_over")
             )
             scheduleOageMessage(
                 downed,
                 OAGE_FOLLOWUP_DELAY_TICKS,
                 "arena.messages.oage.game_over_followup",
-                "縺・∪陦後″縺ｾ縺呻ｼ√■繧・▲縺ｨ蠕・▲縺ｦ縺ｭ",
                 force = true
             )
             clearReviveBindingForDowned(session, downedId, playInterruptedSound = false)
@@ -2541,23 +2433,14 @@ class ArenaManager(
         downed.noDamageTicks = 20
 
         downed.sendMessage(
-            ArenaI18n.text(
-                downed,
-                "arena.messages.down.recovered",
-                "&a陂・函縺輔ｌ縺ｾ縺励◆・・"
-            )
+            ArenaI18n.text(downed, "arena.messages.down.recovered")
         )
 
         if (revivedBy != null && revivedBy.uniqueId != downed.uniqueId) {
             downed.playSound(downed.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f)
             revivedBy.playSound(revivedBy.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f)
             revivedBy.sendMessage(
-                ArenaI18n.text(
-                    revivedBy,
-                    "arena.messages.down.revive_success",
-                    "&a{player} 繧定・逕溘＠縺ｾ縺励◆",
-                    "player" to downed.name
-                )
+                ArenaI18n.text(revivedBy, "arena.messages.down.revive_success", "player" to downed.name)
             )
         }
     }
@@ -2606,17 +2489,12 @@ class ArenaManager(
                         downed.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, blindnessTicks, 0, false, false, false))
                         if (downState.reviveDisabled) {
                             downed.sendMessage(
-                                ArenaI18n.text(
-                                    downed,
-                                    "arena.messages.down.game_over",
-                                    "&c逶ｮ縺ｮ蜑阪′縺ｾ縺｣縺上ｉ縺ｫ縺ｪ縺｣縺・..・―n&7縺翫≠縺偵■繧・ｓ縺梧舞蜃ｺ荳ｭ..."
-                                )
+                                ArenaI18n.text(downed, "arena.messages.down.game_over")
                             )
                             scheduleOageMessage(
                                 downed,
                                 OAGE_FOLLOWUP_DELAY_TICKS,
                                 "arena.messages.oage.game_over_followup",
-                                "縺・∪陦後″縺ｾ縺呻ｼ√■繧・▲縺ｨ蠕・▲縺ｦ縺ｭ",
                                 force = true
                             )
                         }
@@ -2634,14 +2512,13 @@ class ArenaManager(
                                 downed,
                                 40L,
                                 oageKey,
-                                if (otherAliveExists) "Please wait. You can watch the others from here." else "Please wait.",
                                 force = true
                             )
                             stopSessionToLobbyById(downedId, "")
                         } else {
                             stopSessionById(
                                 downedId,
-                                ArenaI18n.text(downed, "arena.messages.down.timeout", "&c繝繧ｦ繝ｳ譎る俣蛻・ｌ縺ｧ縺吶ゅΟ繝薙・縺ｸ霆｢騾√＆繧後∪縺・")
+                                ArenaI18n.text(downed, "arena.messages.down.timeout")
                             )
                         }
                     }
@@ -2807,8 +2684,8 @@ class ArenaManager(
                 reviverPlayerBar = BossBar.bossBar(Component.empty(), 0.0f, BossBar.Color.BLUE, BossBar.Overlay.PROGRESS)
             )
         }
-        bossBars.downedPlayerBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.revive.downed", "ﾂｧ7{reviver}縺輔ｓ縺瑚・逕滉ｸｭ...", "reviver" to reviver.name)))
-        bossBars.reviverPlayerBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.revive.reviver", "ﾂｧ7{downed}縺輔ｓ繧定・逕滉ｸｭ...", "downed" to downed.name)))
+        bossBars.downedPlayerBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.revive.downed", "reviver" to reviver.name)))
+        bossBars.reviverPlayerBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.revive.reviver", "downed" to downed.name)))
         bossBars.downedPlayerBar.progress(progress.coerceIn(0.0f, 1.0f))
         bossBars.reviverPlayerBar.progress(progress.coerceIn(0.0f, 1.0f))
 
@@ -3204,7 +3081,7 @@ class ArenaManager(
         locales.forEach { locale ->
             val config = loadLangConfig(locale)
             if (config == null) {
-                plugin.logger.warning("[Arena] mob_token險隱樊､懆ｨｼ: locale=$locale 縺ｮ險隱槭ヵ繧｡繧､繝ｫ繧定ｪｭ縺ｿ霎ｼ繧√∪縺帙ｓ")
+                plugin.logger.warning("[Arena] mob token language file could not be loaded: locale=$locale")
                 return@forEach
             }
 
@@ -3222,7 +3099,7 @@ class ArenaManager(
             }
 
             if (missingKeys.isNotEmpty()) {
-                plugin.logger.warning("[Arena] mob_token險隱樊､懆ｨｼ: locale=$locale 縺ｧ荳崎ｶｳ/蝙倶ｸ肴ｭ｣繧ｭ繝ｼ ${missingKeys.size}莉ｶ")
+                plugin.logger.warning("[Arena] mob token language file could not be loaded: locale=$locale")
                 missingKeys.forEach { key ->
                     plugin.logger.warning("[Arena]   - $key")
                 }
@@ -3375,7 +3252,6 @@ class ArenaManager(
         session: ArenaSession,
         success: Boolean,
         messageKey: String? = null,
-        fallbackMessage: String? = null,
         duringShutdown: Boolean = false,
         vararg messagePlaceholders: Pair<String, Any?>
     ) {
@@ -3438,15 +3314,11 @@ class ArenaManager(
                 if (destination != null) {
                     player.teleport(destination)
                 }
-                if (messageKey != null && fallbackMessage != null) {
-                    player.sendMessage(ArenaI18n.text(player, messageKey, fallbackMessage, *messagePlaceholders))
+                if (messageKey != null) {
+                    player.sendMessage(ArenaI18n.text(player, messageKey, *messagePlaceholders))
                     if (success) {
                         player.sendMessage(
-                            ArenaI18n.text(
-                                player,
-                                "arena.messages.session.retry_hint",
-                                "&7邂｡逅・さ繝槭Φ繝峨〒 difficulty / theme 繧呈欠螳壹＠縺ｦ蜀肴倦謌ｦ縺ｧ縺阪∪縺・"
-                            )
+                            ArenaI18n.text(player, "arena.messages.session.retry_hint")
                         )
                     }
                 }
@@ -3573,7 +3445,7 @@ class ArenaManager(
         val world = Bukkit.getWorld(worldName)
         if (world == null) {
             markArenaWorldBroken(worldName)
-            logArenaPoolState("繧ｻ繝・す繝ｧ繝ｳ邨ゆｺ・, worldName")
+            logArenaPoolState("驛｢・ｧ繝ｻ・ｻ驛｢譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬩搾ｽｨ郢ｧ繝ｻ・ｽ・ｺ郢晢ｽｻ, worldName")
             return
         }
 
@@ -3582,7 +3454,7 @@ class ArenaManager(
         val cleanupBounds = collectCleanupBounds(session)
         if (cleanupBounds.isEmpty()) {
             markArenaWorldReady(worldName)
-            logArenaPoolState("繧ｻ繝・す繝ｧ繝ｳ邨ゆｺ・, worldName")
+            logArenaPoolState("驛｢・ｧ繝ｻ・ｻ驛｢譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬩搾ｽｨ郢ｧ繝ｻ・ｽ・ｺ郢晢ｽｻ, worldName")
             return
         }
 
@@ -3600,10 +3472,10 @@ class ArenaManager(
             )
         )
         arenaWorldStates[worldName] = ArenaPoolWorldState.CLEANING
-        logArenaPoolState("繧ｻ繝・す繝ｧ繝ｳ邨ゆｺ・, worldName")
+        logArenaPoolState("驛｢・ｧ繝ｻ・ｻ驛｢譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬩搾ｽｨ郢ｧ繝ｻ・ｽ・ｺ郢晢ｽｻ, worldName")
         val estimatedSeconds = estimateCleanupSeconds(totalBlocks)
         plugin.logger.info(
-            "[Arena] 繧ｯ繝ｪ繝ｼ繝ｳ繧｢繝・・髢句ｧ・ world=$worldName blocks=$totalBlocks " +
+            "[Arena] 驛｢・ｧ繝ｻ・ｯ驛｢譎｢・ｽ・ｪ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｳ驛｢・ｧ繝ｻ・｢驛｢譏ｴ繝ｻ郢晢ｽｻ鬯ｮ・｢陷ｿ・･繝ｻ・ｧ郢晢ｽｻ world=$worldName blocks=$totalBlocks " +
                 "estimated=${formatSeconds(estimatedSeconds)}s budget=${cleanupBlocksPerTick}/tick"
         )
     }
@@ -3702,7 +3574,7 @@ class ArenaManager(
         val isFinalWaveBarrierObjective = wave == session.waves && hasBarrierActivationObjective(session)
         if (candidates.isEmpty()) {
             plugin.logger.severe(
-                "[Arena] 髢句ｧ倶ｸ崎・繧ｦ繧ｧ繝ｼ繝悶ｒ讀懷・: world=${session.worldName} theme=${theme.id} wave=$wave"
+                "[Arena] 鬯ｮ・｢陷ｿ・･繝ｻ・ｧ陋滂ｽｶ繝ｻ・ｸ陝蠑ｱ繝ｻ驛｢・ｧ繝ｻ・ｦ驛｢・ｧ繝ｻ・ｧ驛｢譎｢・ｽ・ｼ驛｢譎・§繝ｻ螳夲ｽｮﾂ隲幢ｽｷ郢晢ｽｻ: world=${session.worldName} theme=${theme.id} wave=$wave"
             )
             session.startedWaves.add(wave)
             if (isFinalWaveBarrierObjective) {
@@ -3715,8 +3587,8 @@ class ArenaManager(
 
         if (spawns.isEmpty()) {
             plugin.logger.severe(
-                "[Arena] wave=$wave 縺ｮ mob 繧ｹ繝昴・繝ｳ菴咲ｽｮ縺・莉ｶ縺ｮ縺溘ａ閾ｪ蜍輔け繝ｪ繧｢縺励∪縺吶・ " +
-                    " 蟇ｾ雎｡驛ｨ螻九↓ 'arena.marker.mob' 繧・蛟倶ｻ･荳企・鄂ｮ縺励※縺上□縺輔＞: world=${session.worldName}"
+                "[Arena] wave=$wave 驍ｵ・ｺ繝ｻ・ｮ mob 驛｢・ｧ繝ｻ・ｹ驛｢譎・ｺ｢郢晢ｽｻ驛｢譎｢・ｽ・ｳ髣厄ｽｴ陷･・ｲ繝ｻ・ｽ繝ｻ・ｮ驍ｵ・ｺ郢晢ｽｻ髣比ｼ夲ｽｽ・ｶ驍ｵ・ｺ繝ｻ・ｮ驍ｵ・ｺ雋・∞・ｽ繝ｻ譏弱・・ｪ髯ｷ蟠趣ｽｼ譁撰ｿ驛｢譎｢・ｽ・ｪ驛｢・ｧ繝ｻ・｢驍ｵ・ｺ陷会ｽｱ遶擾ｽｪ驍ｵ・ｺ陷ｷ・ｶ・つ郢晢ｽｻ " +
+                    " 髯昴・・ｽ・ｾ鬮ｮ雜｣・ｽ・｡鬯ｩ蟷｢・ｽ・ｨ髯橸ｽｻ闕ｵ譏ｶ繝ｻ 'arena.marker.mob' 驛｢・ｧ郢晢ｽｻ髯区ｺｷﾂ・ｶ繝ｻ・ｻ繝ｻ・･髣包ｽｳ闔ｨ竏壹・鬩励ｑ・ｽ・ｮ驍ｵ・ｺ陷会ｽｱ遯ｶ・ｻ驍ｵ・ｺ闕ｳ蟯ｩ蜻ｳ驍ｵ・ｺ髴郁ｲｻ・ｼ繝ｻ world=${session.worldName}"
             )
             session.startedWaves.add(wave)
             if (isFinalWaveBarrierObjective) {
@@ -3739,7 +3611,7 @@ class ArenaManager(
             )
         }
 
-        // 謗・ｨ弱Α繝・す繝ｧ繝ｳ: 譛邨ゅえ繧ｧ繝ｼ繝悶〒繝懊せ繧偵せ繝昴・繝ｳ
+        // 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ・朱・・ｹ譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ: 髫ｴ蟠｢ﾂ鬩搾ｽｨ郢ｧ繝ｻ竏ｴ驛｢・ｧ繝ｻ・ｧ驛｢譎｢・ｽ・ｼ驛｢譎・§邵ｲ蝣､・ｹ譎・鯵邵ｺ蟶ｷ・ｹ・ｧ陋幢ｽｵ邵ｺ蟶ｷ・ｹ譎・ｺ｢郢晢ｽｻ驛｢譎｢・ｽ・ｳ
         if (wave == session.waves && isClearingMission(session)) {
             spawnClearingBosses(session)
         }
@@ -4073,9 +3945,9 @@ class ArenaManager(
         if (!notified.add(wave)) return
 
         val title = if (wave >= session.waves) {
-            ArenaI18n.text(player, "arena.messages.wave.last_title", "ﾂｧ7- ﾂｧ6Last Wave ﾂｧ7-")
+            ArenaI18n.text(player, "arena.messages.wave.last_title")
         } else {
-            ArenaI18n.text(player, "arena.messages.wave.title", "ﾂｧ7- ﾂｧ6Wave {wave} ﾂｧ7-", "wave" to wave)
+            ArenaI18n.text(player, "arena.messages.wave.title", "wave" to wave)
         }
         player.sendTitle("", title, 10, 50, 10)
         if (playWitherSpawn) {
@@ -4445,7 +4317,7 @@ class ArenaManager(
 
         schedulePendingWaveClearedMessageIfReady(session)
 
-        // 謗・ｨ弱・繧ｹ豁ｻ莠｡繝√ぉ繝・け
+        // 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ郢晢ｽｻ驛｢・ｧ繝ｻ・ｹ髮弱・・ｽ・ｻ髣費｣ｰ繝ｻ・｡驛｢譏ｶ繝ｻ邵ｺ閾･・ｹ譏ｴ繝ｻ邵ｺ繝ｻ
         if (session.clearingBossEntityIds.contains(mobId)) {
             session.clearingBossEntityIds.remove(mobId)
             if (checkClearingBossesDefeated(session)) {
@@ -4582,7 +4454,7 @@ class ArenaManager(
         if (!isClearingMission(session)) return
         if (session.clearingBossSpawned) return
         if (session.clearingBossLocations.isEmpty()) {
-            plugin.logger.warning("[Arena] CLEARING 繝溘ャ繧ｷ繝ｧ繝ｳ縺ｧ縺吶′ clearingBossLocations 縺檎ｩｺ縺ｧ縺・ world=${session.worldName}")
+            plugin.logger.warning("[Arena] CLEARING 驛｢譎・ｽｺ蛟･ﾎ暮Δ・ｧ繝ｻ・ｷ驛｢譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ驍ｵ・ｺ繝ｻ・ｧ驍ｵ・ｺ陷ｷ・ｶ遯ｶ・ｲ clearingBossLocations 驍ｵ・ｺ隶呵ｶ｣・ｽ・ｩ繝ｻ・ｺ驍ｵ・ｺ繝ｻ・ｧ驍ｵ・ｺ郢晢ｽｻ world=${session.worldName}")
             return
         }
 
@@ -4590,23 +4462,23 @@ class ArenaManager(
         val bossMobId = if (!themeConfig?.clearingBossMobId.isNullOrBlank()) {
             themeConfig!!.clearingBossMobId!!
         } else {
-            plugin.logger.warning("[Arena] CLEARING 繝溘ャ繧ｷ繝ｧ繝ｳ: clearingBossMobId 縺梧悴螳夂ｾｩ縺ｮ縺溘ａ繝・ヵ繧ｩ繝ｫ繝・obId=zombie 繧剃ｽｿ逕ｨ: theme=${session.themeId}")
+            plugin.logger.warning("[Arena] CLEARING 驛｢譎・ｽｺ蛟･ﾎ暮Δ・ｧ繝ｻ・ｷ驛｢譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ: clearingBossMobId 驍ｵ・ｺ隴ｴ・ｧ隰費ｽｴ髯橸ｽｳ陞溘ｑ・ｽ・ｾ繝ｻ・ｩ驍ｵ・ｺ繝ｻ・ｮ驍ｵ・ｺ雋・∞・ｽ竏ｫ・ｹ譏ｴ繝ｻ郢晢ｽｵ驛｢・ｧ繝ｻ・ｩ驛｢譎｢・ｽ・ｫ驛｢譏ｴ繝ｻobId=zombie 驛｢・ｧ陷代・・ｽ・ｽ繝ｻ・ｿ鬨ｾ蛹・ｽｽ・ｨ: theme=${session.themeId}")
             "zombie"
         }
 
         val definition = mobDefinitions[bossMobId]
         if (definition == null) {
-            plugin.logger.severe("[Arena] clearingBossMobId=$bossMobId 縺ｮ繝｢繝門ｮ夂ｾｩ縺瑚ｦ九▽縺九ｊ縺ｾ縺帙ｓ")
+            plugin.logger.severe("[Arena] clearingBossMobId=$bossMobId is not defined in mob definitions.")
             return
         }
 
         val world = Bukkit.getWorld(session.worldName)
         if (world == null) {
-            plugin.logger.severe("[Arena] 謗・ｨ弱・繧ｹ繧ｹ繝昴・繝ｳ螟ｱ謨・ 繝ｯ繝ｼ繝ｫ繝峨′隕九▽縺九ｊ縺ｾ縺帙ｓ world=${session.worldName}")
+            plugin.logger.severe("[Arena] 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ郢晢ｽｻ驛｢・ｧ繝ｻ・ｹ驛｢・ｧ繝ｻ・ｹ驛｢譎・ｺ｢郢晢ｽｻ驛｢譎｢・ｽ・ｳ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ郢晢ｽｻ 驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ遯ｶ・ｲ鬮ｫ遨ゑｽｹ譏ｶ蜻ｽ驍ｵ・ｺ闕ｵ譎｢・ｽ鬘費ｽｸ・ｺ繝ｻ・ｾ驍ｵ・ｺ陝ｶ蜻ｻ・ｽ繝ｻworld=${session.worldName}")
             return
         }
 
-        // 謗・ｨ弱Α繝・す繝ｧ繝ｳ逕ｨ縺ｮ譎る俣蛻ｶ髯舌ｒ險ｭ螳・
+        // 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ・朱・・ｹ譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬨ｾ蛹・ｽｽ・ｨ驍ｵ・ｺ繝ｻ・ｮ髫ｴ蠑ｱ・玖将・｣髯具ｽｻ繝ｻ・ｶ鬯ｮ・ｯ髣企ｯ会ｽｽ蟶晏搦繝ｻ・ｭ髯橸ｽｳ郢晢ｽｻ
         session.clearingBossTimeLimitSeconds = calculateClearingBossTimeLimitSeconds(session.difficultyStar)
 
         session.clearingBossLocations.forEach { location ->
@@ -4635,7 +4507,7 @@ class ArenaManager(
                 enforceAdultMob(entity)
                 spawnMobAppearParticles(world, entity.location)
 
-                // 繝懊せ縺ｮ繧ｹ繝・・繧ｿ繧ｹ繧帝←逕ｨ・磯壼ｸｸ縺ｮ繝｢繝悶→縺ｯ逡ｰ縺ｪ繧芥P菫ｮ鬟ｾ蟄舌・驕ｩ逕ｨ縺励↑縺・ｼ・
+                // 驛｢譎・鯵邵ｺ蟶ｷ・ｸ・ｺ繝ｻ・ｮ驛｢・ｧ繝ｻ・ｹ驛｢譏ｴ繝ｻ郢晢ｽｻ驛｢・ｧ繝ｻ・ｿ驛｢・ｧ繝ｻ・ｹ驛｢・ｧ陝ｶ譏ｶ繝ｻ鬨ｾ蛹・ｽｽ・ｨ郢晢ｽｻ騾趣ｽｯ・つ陞｢・ｼ繝ｻ・ｸ繝ｻ・ｸ驍ｵ・ｺ繝ｻ・ｮ驛｢譎｢・ｽ・｢驛｢譎・§遶雁､・ｸ・ｺ繝ｻ・ｯ鬨ｾ・｡繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｪ驛｢・ｧ髣・ｽ･P髣厄ｽｫ繝ｻ・ｮ鬯ｯ貊ゑｽｽ・ｾ髯昴・繝ｻ郢晢ｽｻ鬯ｩ蛹・ｽｽ・ｩ鬨ｾ蛹・ｽｽ・ｨ驍ｵ・ｺ陷会ｽｱ遶企・・ｸ・ｺ郢晢ｽｻ繝ｻ・ｼ郢晢ｽｻ
                 applyMobStats(entity, definition, 1.0, session.sessionVariance, ArenaMissionModifiers.NONE)
 
                 if (entity is Mob) {
@@ -4648,9 +4520,9 @@ class ArenaManager(
                 entityMobToSessionWorld.remove(entity.uniqueId)
                 mobToDefinitionTypeId[entity.uniqueId] = definition.typeId.trim().lowercase(Locale.ROOT)
                 entityMobToDefinitionTypeId.remove(entity.uniqueId)
-                plugin.logger.info("[Arena] 謗・ｨ弱・繧ｹ繧偵せ繝昴・繝ｳ: mobId=$bossMobId location=${spawnLocation.blockX},${spawnLocation.blockY},${spawnLocation.blockZ}")
+                plugin.logger.info("[Arena] 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ郢晢ｽｻ驛｢・ｧ繝ｻ・ｹ驛｢・ｧ陋幢ｽｵ邵ｺ蟶ｷ・ｹ譎・ｺ｢郢晢ｽｻ驛｢譎｢・ｽ・ｳ: mobId=$bossMobId location=${spawnLocation.blockX},${spawnLocation.blockY},${spawnLocation.blockZ}")
             } else {
-                plugin.logger.warning("[Arena] 謗・ｨ弱・繧ｹ縺ｮ繧ｹ繝昴・繝ｳ縺ｫ螟ｱ謨・ mobId=$bossMobId")
+                plugin.logger.warning("[Arena] 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ郢晢ｽｻ驛｢・ｧ繝ｻ・ｹ驍ｵ・ｺ繝ｻ・ｮ驛｢・ｧ繝ｻ・ｹ驛｢譎・ｺ｢郢晢ｽｻ驛｢譎｢・ｽ・ｳ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ郢晢ｽｻ mobId=$bossMobId")
             }
         }
 
@@ -4666,11 +4538,7 @@ class ArenaManager(
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline && player.world.name == session.worldName) {
                 player.sendMessage(
-                    ArenaI18n.text(
-                        player,
-                        "arena.messages.clearing.boss_spawned",
-                        "ﾂｧcﾂｧl笞 謗・ｨ弱・繧ｹ縺悟・迴ｾ縺励∪縺励◆・・"
-                    )
+                    ArenaI18n.text(player, "arena.messages.clearing.boss_spawned")
                 )
                 player.playSound(player.location, Sound.ENTITY_WITHER_SPAWN, 0.7f, 1.2f)
             }
@@ -4693,7 +4561,7 @@ class ArenaManager(
     private fun onClearingBossDefeated(session: ArenaSession) {
         if (session.phase == ArenaPhase.TERMINATING) return
 
-        plugin.logger.info("[Arena] 謗・ｨ弱・繧ｹ蜈ｨ貊・ world=${session.worldName}")
+        plugin.logger.info("[Arena] 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ郢晢ｽｻ驛｢・ｧ繝ｻ・ｹ髯ｷ闌ｨ・ｽ・ｨ髮狗ｿｫ繝ｻ world=${session.worldName}")
 
         completeClearingMission(session)
     }
@@ -4719,11 +4587,7 @@ class ArenaManager(
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline && player.world.name == session.worldName) {
                 player.sendMessage(
-                    ArenaI18n.text(
-                        player,
-                        "arena.messages.clearing.success",
-                        "ﾂｧaﾂｧl謗・ｨ弱・繧ｹ繧貞・縺ｦ險惹ｼ舌＠縺ｾ縺励◆・√Α繝・す繝ｧ繝ｳ繧ｯ繝ｪ繧｢・・"
-                    )
+                    ArenaI18n.text(player, "arena.messages.clearing.success")
                 )
                 player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 2.0f)
                 player.playSound(player.location, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f)
@@ -4741,11 +4605,7 @@ class ArenaManager(
                 if (player != null && player.isOnline && player.world.name == activeSession.worldName) {
                     player.sendTitle(
                         "",
-                        ArenaI18n.text(
-                            player,
-                            "arena.messages.mission.return_hint",
-                            "ﾂｧ7Shift髟ｷ謚ｼ縺励〒繝ｭ繝薙・縺ｫ蟶ｰ驍・〒縺阪∪縺・"
-                        ),
+                        ArenaI18n.text(player, "arena.messages.mission.return_hint"),
                         0,
                         50,
                         10
@@ -4756,12 +4616,12 @@ class ArenaManager(
     }
 
     private fun calculateClearingBossTimeLimitSeconds(starLevel: Int): Int {
-        // 髮｣譏灘ｺｦID縺九ｉ笘・・謨ｰ繧貞叙蠕暦ｼ・tar_1, star_2, etc.・・
+        // 鬯ｮ・ｮ繝ｻ・｣髫ｴ蜀猟ｧ繝ｻ・ｺ繝ｻ・ｦID驍ｵ・ｺ闕ｵ譎｢・ｽ閾･・ｬ蛟･繝ｻ郢晢ｽｻ髫ｰ・ｨ繝ｻ・ｰ驛｢・ｧ髮区ｧｫ蠕宣辧蠅灘惧繝ｻ・ｼ郢晢ｽｻtar_1, star_2, etc.郢晢ｽｻ郢晢ｽｻ
         return when (starLevel) {
-            1 -> 600   // 笘・: 10蛻・
-            2 -> 480   // 笘・: 8蛻・
-            3 -> 300   // 笘・: 5蛻・
-            4 -> 240   // 笘・: 4蛻・
+            1 -> 600   // 髫ｨ蛟･繝ｻ: 10髯具ｽｻ郢晢ｽｻ
+            2 -> 480   // 髫ｨ蛟･繝ｻ: 8髯具ｽｻ郢晢ｽｻ
+            3 -> 300   // 髫ｨ蛟･繝ｻ: 5髯具ｽｻ郢晢ｽｻ
+            4 -> 240   // 髫ｨ蛟･繝ｻ: 4髯具ｽｻ郢晢ｽｻ
             else -> 600
         }
     }
@@ -4793,7 +4653,7 @@ class ArenaManager(
         if (session.phase == ArenaPhase.TERMINATING) return
         if (session.phase == ArenaPhase.GAME_OVER) return
 
-        plugin.logger.info("[Arena] 謗・ｨ弱Α繝・す繝ｧ繝ｳ譎る俣蛻・ｌ: world=${session.worldName}")
+        plugin.logger.info("[Arena] 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ・朱・・ｹ譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ髫ｴ蠑ｱ・玖将・｣髯具ｽｻ郢晢ｽｻ繝ｻ繝ｻ world=${session.worldName}")
 
         stopWaveSpawning(session, session.waves)
 
@@ -4801,11 +4661,7 @@ class ArenaManager(
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline && player.world.name == session.worldName) {
                 player.sendMessage(
-                    ArenaI18n.text(
-                        player,
-                        "arena.messages.clearing.time_expired",
-                        "ﾂｧcﾂｧl笞 譎る俣蛻・ｌ縺ｧ縺呻ｼ√Α繝・す繝ｧ繝ｳ螟ｱ謨・.."
-                    )
+                    ArenaI18n.text(player, "arena.messages.clearing.time_expired")
                 )
                 player.playSound(player.location, Sound.ENTITY_WITHER_DEATH, 0.7f, 0.5f)
             }
@@ -4862,7 +4718,7 @@ class ArenaManager(
                         applyDoorAnimationFrame(placement, targetFrame)
                     }.onFailure { throwable ->
                         plugin.logger.warning(
-                            "[Arena] 繝峨い繧｢繝九Γ繝輔Ξ繝ｼ繝驕ｩ逕ｨ縺ｫ螟ｱ謨・ world=${currentSession.worldName} wave=$targetWave frame=$targetFrame error=${throwable.message}"
+                            "[Arena] 驛｢譎擾ｽｳ・ｨ邵ｺ繝ｻ・ｹ・ｧ繝ｻ・｢驛｢譏懶ｽｹ譁滄豪・ｹ譎・ｽｼ驥・ｨ抵ｽｹ譎｢・ｽ・ｼ驛｢譎｢・｣・ｰ鬯ｩ蛹・ｽｽ・ｩ鬨ｾ蛹・ｽｽ・ｨ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ郢晢ｽｻ world=${currentSession.worldName} wave=$targetWave frame=$targetFrame error=${throwable.message}"
                         )
                     }.isSuccess
                     if (!applied) return@forEachIndexed
@@ -4879,7 +4735,7 @@ class ArenaManager(
                             applyDoorAnimationFrame(placement, lastFrame)
                         }.onFailure { throwable ->
                             plugin.logger.warning(
-                                "[Arena] 繝峨い繧｢繝九Γ譛邨ゅヵ繝ｬ繝ｼ繝驕ｩ逕ｨ縺ｫ螟ｱ謨・ world=${currentSession.worldName} wave=$targetWave error=${throwable.message}"
+                                "[Arena] 驛｢譎擾ｽｳ・ｨ邵ｺ繝ｻ・ｹ・ｧ繝ｻ・｢驛｢譏懶ｽｹ譁滓･｢・ｭ蟠｢ﾂ鬩搾ｽｨ郢ｧ繝ｻﾎｨ驛｢譎｢・ｽ・ｬ驛｢譎｢・ｽ・ｼ驛｢譎｢・｣・ｰ鬯ｩ蛹・ｽｽ・ｩ鬨ｾ蛹・ｽｽ・ｨ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ郢晢ｽｻ world=${currentSession.worldName} wave=$targetWave error=${throwable.message}"
                             )
                         }
                     }
@@ -5475,11 +5331,11 @@ class ArenaManager(
                 sendOageMessage(
                     player,
                     "arena.messages.barrier.restart_confirmed",
-                    ArenaI18n.text(player, "arena.messages.barrier.restart_confirmed", "邨千阜縺ｮ蜀崎ｵｷ蜍輔ｒ遒ｺ隱阪＠縺ｾ縺励◆・・")
+                    ArenaI18n.text(player, "arena.messages.barrier.restart_confirmed")
                 )
                 player.sendTitle(
                     "",
-                    ArenaI18n.text(player, "arena.messages.barrier.return_hint", "&7Hold shift to return to lobby."),
+                    ArenaI18n.text(player, "arena.messages.barrier.return_hint"),
                     0,
                     50,
                     10
@@ -5571,7 +5427,7 @@ class ArenaManager(
         }
 
         if (session.barrierRestarting) {
-            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.barrier_restart", "ﾂｧ7- ﾂｧ6Last Wave ﾂｧ7- ﾂｧd蜀崎ｵｷ蜍穂ｸｭ...")))
+            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.barrier_restart")))
             bossBar.color(BossBar.Color.PINK)
             bossBar.progress(barrierRestartProgress(session).toFloat().coerceIn(0.0f, 1.0f))
             return
@@ -5591,18 +5447,18 @@ class ArenaManager(
         if (clearedWave != null) {
             val nextWave = clearedWave + 1
             if (nextWave <= session.waves && !session.startedWaves.contains(nextWave)) {
-                bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.wave_clear", "ﾂｧ7- ﾂｧ6Wave {wave} ﾂｧ7- ﾂｧbCLEAR", "wave" to clearedWave)))
+                bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.wave_clear", "wave" to clearedWave)))
                 bossBar.color(BossBar.Color.BLUE)
                 bossBar.progress(1.0f)
                 return
             }
 
             val waveLabel = if (clearedWave >= session.waves) {
-                ArenaI18n.text(null, "arena.bossbar.last_wave_label", "Last Wave")
+                ArenaI18n.text(null, "arena.bossbar.last_wave_label")
             } else {
-                ArenaI18n.text(null, "arena.bossbar.wave_label", "Wave {wave}", "wave" to clearedWave)
+                ArenaI18n.text(null, "arena.bossbar.wave_label", "wave" to clearedWave)
             }
-            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.wave_clear_dynamic", "ﾂｧ7- ﾂｧ6{waveLabel} ﾂｧ7- ﾂｧbCLEAR", "waveLabel" to waveLabel)))
+            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.wave_clear_dynamic", "waveLabel" to waveLabel)))
             bossBar.color(BossBar.Color.BLUE)
             bossBar.progress(1.0f)
             return
@@ -5610,7 +5466,7 @@ class ArenaManager(
 
         val wave = session.currentWave.coerceIn(1, session.waves)
 
-        // 謗・ｨ弱Α繝・す繝ｧ繝ｳ: 譛邨ゅえ繧ｧ繝ｼ繝悶〒繝懊せ繝舌・縺ｫ谿九ｊ譎る俣繧定｡ｨ遉ｺ
+        // 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ・朱・・ｹ譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ: 髫ｴ蟠｢ﾂ鬩搾ｽｨ郢ｧ繝ｻ竏ｴ驛｢・ｧ繝ｻ・ｧ驛｢譎｢・ｽ・ｼ驛｢譎・§邵ｲ蝣､・ｹ譎・鯵邵ｺ蟶ｷ・ｹ譎√・郢晢ｽｻ驍ｵ・ｺ繝ｻ・ｫ髫ｹ・ｿ闕ｵ譎｢・ｽ鬘假ｽｭ蠑ｱ・玖将・｣驛｢・ｧ陞ｳ螟ｲ・ｽ・｡繝ｻ・ｨ鬩穂ｼ夲ｽｽ・ｺ
         if (wave == session.waves && isClearingMission(session) && session.clearingBossSpawned) {
             val remainingSeconds = getClearingBossTimeRemainingSeconds(session)
             val timeText = formatTimeRemaining(remainingSeconds)
@@ -5622,7 +5478,7 @@ class ArenaManager(
             val defeatedCount = bossCount - aliveBossCount
             val progress = (defeatedCount.toDouble() / bossCount.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
             val barColor = if (remainingSeconds <= 60) BossBar.Color.RED else BossBar.Color.PURPLE
-            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.clearing_boss", "ﾂｧ7- ﾂｧ5謗・ｨ弱・繧ｹ ﾂｧ7- ﾂｧc{time} ﾂｧ8(ﾂｧ7谿九ｊﾂｧb{alive}ﾂｧ8菴・", "time" to timeText, "alive" to aliveBossCount)))
+            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.clearing_boss", "time" to timeText, "alive" to aliveBossCount)))
             bossBar.color(barColor)
             bossBar.progress(progress)
             return
@@ -5634,7 +5490,7 @@ class ArenaManager(
                 it.type == ArenaActionMarkerType.BARRIER_ACTIVATE && it.state == ArenaActionMarkerState.RUNNING
             }
             val progress = (activated.toDouble() / total.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
-            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.last_wave_progress", "ﾂｧ7- ﾂｧ6Last Wave ﾂｧ7- ﾂｧ8(ﾂｧ7{activated}/ﾂｧb{total}ﾂｧ8)", "activated" to activated, "total" to total)))
+            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.last_wave_progress", "activated" to activated, "total" to total)))
             bossBar.color(BossBar.Color.BLUE)
             bossBar.progress(progress)
             return
@@ -5644,11 +5500,11 @@ class ArenaManager(
         val target = (session.waveClearTargets[wave] ?: 1).coerceAtLeast(1)
         val progress = (kills.toDouble() / target.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
         val waveLabel = if (wave >= session.waves) {
-            ArenaI18n.text(null, "arena.bossbar.last_wave_label", "Last Wave")
+            ArenaI18n.text(null, "arena.bossbar.last_wave_label")
         } else {
-            ArenaI18n.text(null, "arena.bossbar.wave_label", "Wave {wave}", "wave" to wave)
+            ArenaI18n.text(null, "arena.bossbar.wave_label", "wave" to wave)
         }
-        bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.wave_progress", "ﾂｧ7- ﾂｧ6{waveLabel} ﾂｧ7- ﾂｧ8(ﾂｧc{kills}ﾂｧ7/{target}ﾂｧ8)", "waveLabel" to waveLabel, "kills" to kills, "target" to target)))
+        bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.wave_progress", "waveLabel" to waveLabel, "kills" to kills, "target" to target)))
         bossBar.color(BossBar.Color.RED)
         bossBar.progress(progress)
     }
@@ -5775,19 +5631,17 @@ class ArenaManager(
     private fun broadcastMessage(
         session: ArenaSession,
         key: String,
-        fallback: String,
         vararg placeholders: Pair<String, Any?>
     ) {
         session.participants.forEach { participantId ->
             val player = Bukkit.getPlayer(participantId) ?: return@forEach
-            player.sendMessage(ArenaI18n.text(player, key, fallback, *placeholders))
+            player.sendMessage(ArenaI18n.text(player, key, *placeholders))
         }
     }
 
     private fun broadcastOageMessage(
         session: ArenaSession,
         key: String,
-        fallback: List<String>,
         vararg placeholders: Pair<String, Any?>
     ) {
         var lastMessage: String? = null
@@ -5795,7 +5649,7 @@ class ArenaManager(
             val player = Bukkit.getPlayer(participantId) ?: return@forEach
             if (!player.isOnline || player.world.name != session.worldName) return@forEach
 
-            val message = ArenaI18n.stringList(player, key, fallback, *placeholders).randomOrNull() ?: return@forEach
+            val message = ArenaI18n.stringList(player, key, *placeholders).randomOrNull() ?: return@forEach
             lastMessage = message
             sendOageMessage(player, key, message)
         }
@@ -5830,7 +5684,7 @@ class ArenaManager(
         if (!force && random.nextDouble() >= oageMessageChance(key)) return
         OageMessageSender.send(
             player,
-            "ﾂｧf縲・message縲・",
+            message,
             plugin,
             sound = Sound.ENTITY_ALLAY_AMBIENT_WITHOUT_ITEM,
             volume = 1.0f,
@@ -5842,14 +5696,13 @@ class ArenaManager(
         player: Player,
         delayTicks: Long,
         key: String,
-        fallback: String,
         vararg placeholders: Pair<String, Any?>,
         force: Boolean = false
     ) {
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             val activePlayer = Bukkit.getPlayer(player.uniqueId) ?: return@Runnable
             if (!activePlayer.isOnline) return@Runnable
-            val message = ArenaI18n.stringList(activePlayer, key, listOf(fallback), *placeholders).randomOrNull() ?: return@Runnable
+            val message = ArenaI18n.stringList(activePlayer, key, *placeholders).randomOrNull() ?: return@Runnable
             sendOageMessage(activePlayer, key, message, force = force)
         }, delayTicks)
     }
@@ -5872,14 +5725,10 @@ class ArenaManager(
             when {
                 allInCombat -> broadcastOageMessage(
                     session,
-                    "arena.messages.oage.combat_all_engaged",
-                    listOf("縺ｪ縺九↑縺区焔蠑ｷ縺・〒縺吶・窶ｦ・・")
-                )
+                    "arena.messages.oage.combat_all_engaged")
                 noneInCombat && session.startedWaves.contains(1) -> broadcastOageMessage(
                     session,
-                    "arena.messages.oage.combat_all_calm",
-                    listOf("縺・＞諢溘§縺ｧ縺呻ｼ√％縺ｮ隱ｿ蟄舌〒縺後ｓ縺ｰ繧翫∪縺励ｇ縺・ｼ・")
-                )
+                    "arena.messages.oage.combat_all_calm")
             }
         }
     }
@@ -5888,9 +5737,7 @@ class ArenaManager(
         if (!session.oageAnnouncements.add("stage_start")) return
         broadcastOageMessage(
             session,
-            "arena.messages.oage.stage_start",
-            listOf("迴ｾ蝨ｰ縺ｫ蛻ｰ逹縺励∪縺励◆・√♀縺ｭ縺後＞縺励∪縺吶・・・")
-        )
+            "arena.messages.oage.stage_start")
     }
 
     private fun scheduleWaveClearReminder(session: ArenaSession, wave: Int) {
@@ -5906,9 +5753,7 @@ class ArenaManager(
 
             broadcastOageMessage(
                 activeSession,
-                "arena.messages.oage.wave_clear_wait",
-                listOf("謇峨・蜑阪・繝槭・繧ｫ繝ｼ縺ｫ霑代▼縺上→縲∽ｽ輔°繧上°繧翫◎縺・〒縺呻ｼ・")
-            )
+                "arena.messages.oage.wave_clear_wait")
         }, 5L * 60L * 20L)
 
         session.waveClearReminderTasks[wave] = task
@@ -5920,17 +5765,13 @@ class ArenaManager(
         if (remaining <= (2.0 / 3.0) && session.oageAnnouncements.add("barrier_restart_remaining_2_3")) {
             broadcastOageMessage(
                 session,
-                "arena.messages.oage.barrier_restart_remaining_2_3",
-                listOf("蜀崎ｵｷ蜍輔・鬆・ｪｿ縺ｧ縺呻ｼ∵戟縺｡縺薙◆縺医※縺上□縺輔＞繝ｼ・・")
-            )
+                "arena.messages.oage.barrier_restart_remaining_2_3")
         }
 
         if (remaining <= (1.0 / 3.0) && session.oageAnnouncements.add("barrier_restart_remaining_1_3")) {
             broadcastOageMessage(
                 session,
-                "arena.messages.oage.barrier_restart_remaining_1_3",
-                listOf("縺ゅ→縺｡繧・▲縺ｨ縺ｧ縺・..・・")
-            )
+                "arena.messages.oage.barrier_restart_remaining_1_3")
         }
     }
 
@@ -5970,8 +5811,8 @@ class ArenaManager(
             activeSession.participants.forEach { participantId ->
                 val player = Bukkit.getPlayer(participantId) ?: return@forEach
                 if (!player.isOnline || player.world.name != activeSession.worldName) return@forEach
-                val themeName = ArenaI18n.text(player, "arena.theme.${activeSession.themeId}.name", activeSession.themeId)
-                player.sendTitle("", "ﾂｧ7ﾂｫ ﾂｧ6$themeName ﾂｧ7ﾂｻ", 10, 60, 10)
+                val themeName = ArenaI18n.text(player, "arena.theme.${activeSession.themeId}.name")
+                player.sendTitle("", ArenaI18n.text(player, "arena.messages.session.stage_title", "theme" to themeName), 10, 60, 10)
             }
             startArenaBgmMode(activeSession, ArenaBgmMode.NORMAL, currentTick)
         }, delayTicks.coerceAtLeast(0L))
@@ -6349,25 +6190,25 @@ class ArenaManager(
             }
         }
 
-        plugin.logger.info("[Arena] 繝ｯ繝ｼ繝ｫ繝峨・繝ｼ繝ｫ蛻晄悄蛹・ ready=${readyArenaWorldNames.size} / total=${names.size}")
+        plugin.logger.info("[Arena] 驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｻ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ髯具ｽｻ隴弱・・・刹・ｹ郢晢ｽｻ ready=${readyArenaWorldNames.size} / total=${names.size}")
     }
 
     private fun resetArenaPoolWorld(worldName: String): Boolean {
         val loadedWorld = Bukkit.getWorld(worldName)
         if (loadedWorld != null && !Bukkit.unloadWorld(loadedWorld, false)) {
-            plugin.logger.warning("[Arena] 繝励・繝ｫ繝ｯ繝ｼ繝ｫ繝峨・繧｢繝ｳ繝ｭ繝ｼ繝峨↓螟ｱ謨励＠縺ｾ縺励◆: $worldName")
+            plugin.logger.warning("[Arena] 驛｢譎丞ｹｲ郢晢ｽｻ驛｢譎｢・ｽ・ｫ驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｻ驛｢・ｧ繝ｻ・｢驛｢譎｢・ｽ・ｳ驛｢譎｢・ｽ・ｭ驛｢譎｢・ｽ・ｼ驛｢譎擾ｽｳ・ｨ遶頑･｢譽斐・・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ $worldName")
             return false
         }
 
         val worldFolder = worldFolder(worldName)
         if (worldFolder.exists() && !deleteDirectory(worldFolder)) {
-            plugin.logger.warning("[Arena] 繝励・繝ｫ繝ｯ繝ｼ繝ｫ繝峨ヵ繧ｩ繝ｫ繝蜑企勁縺ｫ螟ｱ謨励＠縺ｾ縺励◆: $worldName")
+            plugin.logger.warning("[Arena] 驛｢譎丞ｹｲ郢晢ｽｻ驛｢譎｢・ｽ・ｫ驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｵ驛｢・ｧ繝ｻ・ｩ驛｢譎｢・ｽ・ｫ驛｢謨鳴髯ｷ蜿ｰ・ｼ竏晄ｱるし・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ $worldName")
             return false
         }
 
         val created = createArenaWorld(worldName)
         if (created == null) {
-            plugin.logger.warning("[Arena] 繝励・繝ｫ繝ｯ繝ｼ繝ｫ繝臥函謌舌↓螟ｱ謨励＠縺ｾ縺励◆: $worldName")
+            plugin.logger.warning("[Arena] 驛｢譎丞ｹｲ郢晢ｽｻ驛｢譎｢・ｽ・ｫ驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎√・陷・ｽｽ髫ｰ迹壹・遶頑･｢譽斐・・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ $worldName")
             return false
         }
 
@@ -6414,7 +6255,7 @@ class ArenaManager(
     fun createDebugVoidWorld(): World? {
         val world = createArenaWorld() ?: return null
         if (!markDebugVoidWorld(world)) {
-            plugin.logger.warning("[Arena] 繝・ヰ繝・げ逕ｨ繝懊う繝峨Ρ繝ｼ繝ｫ繝峨・繝槭・繧ｫ繝ｼ菴懈・縺ｫ螟ｱ謨励＠縺ｾ縺励◆: ${world.name}")
+            plugin.logger.warning("[Arena] 驛｢譏ｴ繝ｻ郢晢ｽｰ驛｢譏ｴ繝ｻ邵ｺ蟶敖蛹・ｽｽ・ｨ驛｢譎・鯵邵ｺ繝ｻ・ｹ譎擾ｽｳ・ｨ・趣ｽ｡驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｻ驛｢譎・ｽｧ・ｭ郢晢ｽｻ驛｢・ｧ繝ｻ・ｫ驛｢譎｢・ｽ・ｼ髣厄ｽｴ隲帛現繝ｻ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ ${world.name}")
             tryDeleteWorld(world)
             return null
         }
@@ -6430,7 +6271,7 @@ class ArenaManager(
         }
 
         if (!templateFolder.copyRecursively(cloneFolder, overwrite = false)) {
-            plugin.logger.warning("[Arena] 繝・ヰ繝・げ逕ｨ繝懊う繝峨Ρ繝ｼ繝ｫ繝峨・隍・｣ｽ縺ｫ螟ｱ謨励＠縺ｾ縺励◆: ${templateFolder.name} -> $cloneWorldName")
+            plugin.logger.warning("[Arena] 驛｢譏ｴ繝ｻ郢晢ｽｰ驛｢譏ｴ繝ｻ邵ｺ蟶敖蛹・ｽｽ・ｨ驛｢譎・鯵邵ｺ繝ｻ・ｹ譎擾ｽｳ・ｨ・趣ｽ｡驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｻ鬮ｫ髦ｪ繝ｻ繝ｻ・｣繝ｻ・ｽ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ ${templateFolder.name} -> $cloneWorldName")
             return null
         }
 
@@ -6441,7 +6282,7 @@ class ArenaManager(
             return null
         }
         if (!markDebugVoidWorld(world)) {
-            plugin.logger.warning("[Arena] 隍・｣ｽ繝ｯ繝ｼ繝ｫ繝峨・繝槭・繧ｫ繝ｼ菴懈・縺ｫ螟ｱ謨励＠縺ｾ縺励◆: ${world.name}")
+            plugin.logger.warning("[Arena] 鬮ｫ髦ｪ繝ｻ繝ｻ・｣繝ｻ・ｽ驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｻ驛｢譎・ｽｧ・ｭ郢晢ｽｻ驛｢・ｧ繝ｻ・ｫ驛｢譎｢・ｽ・ｼ髣厄ｽｴ隲帛現繝ｻ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ ${world.name}")
             tryDeleteWorld(world)
             return null
         }
@@ -6454,7 +6295,7 @@ class ArenaManager(
             return
         }
 
-        createDebugVoidWorld() ?: plugin.logger.warning("[Arena] 襍ｷ蜍墓凾縺ｮ繝・ヰ繝・げ逕ｨ繝懊う繝峨Ρ繝ｼ繝ｫ繝臥函謌舌↓螟ｱ謨励＠縺ｾ縺励◆")
+        createDebugVoidWorld() ?: plugin.logger.warning("[Arena] Failed to create debug void world.")
     }
 
     fun isDebugVoidWorld(world: World): Boolean {
@@ -6478,7 +6319,7 @@ class ArenaManager(
 
         val created = createArenaWorld(DEBUG_VOID_WORLD_TEMPLATE_NAME) ?: return null
         if (!markTemplateMarker(created.worldFolder)) {
-            plugin.logger.warning("[Arena] 繝・ヰ繝・げ繝・Φ繝励Ξ繝ｼ繝医・繝槭・繧ｫ繝ｼ菴懈・縺ｫ螟ｱ謨励＠縺ｾ縺励◆: ${created.name}")
+            plugin.logger.warning("[Arena] 驛｢譏ｴ繝ｻ郢晢ｽｰ驛｢譏ｴ繝ｻ邵ｺ蝣､・ｹ譏ｴ繝ｻ・趣ｽｦ驛｢譎丞ｹｲ・取ｨ抵ｽｹ譎｢・ｽ・ｼ驛｢譎冗樟郢晢ｽｻ驛｢譎・ｽｧ・ｭ郢晢ｽｻ驛｢・ｧ繝ｻ・ｫ驛｢譎｢・ｽ・ｼ髣厄ｽｴ隲帛現繝ｻ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ ${created.name}")
         }
         Bukkit.unloadWorld(created, false)
         return templateFolder
@@ -6597,7 +6438,7 @@ class ArenaManager(
     private fun markQueuedWorldDeletionFailed(pending: PendingWorldDeletion, maxAttempts: Int) {
         pending.attempts += 1
         if (pending.attempts >= maxAttempts) {
-            plugin.logger.severe("[Arena] 繝ｯ繝ｼ繝ｫ繝牙炎髯､繧呈妙蠢ｵ: ${pending.worldName} path=${pending.folder.absolutePath}")
+            plugin.logger.severe("[Arena] 驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎臥櫨霓､譛ｱ・ｫ・ｯ繝ｻ・､驛｢・ｧ陷ｻ莠･・ｦ蜻ｵ・ｰ・｢繝ｻ・ｵ: ${pending.worldName} path=${pending.folder.absolutePath}")
             pendingWorldDeletions.remove(pending.worldName)
         }
     }
@@ -6609,7 +6450,7 @@ class ArenaManager(
     private fun initializeActionMarkers(session: ArenaSession) {
         val world = Bukkit.getWorld(session.worldName)
         if (world == null) {
-            plugin.logger.warning("[Arena] 繧｢繧ｯ繧ｷ繝ｧ繝ｳ繝槭・繧ｫ繝ｼ蛻晄悄蛹悶せ繧ｭ繝・・: 繝ｯ繝ｼ繝ｫ繝画悴蜿門ｾ・world=${session.worldName}")
+            plugin.logger.warning("[Arena] 驛｢・ｧ繝ｻ・｢驛｢・ｧ繝ｻ・ｯ驛｢・ｧ繝ｻ・ｷ驛｢譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ驛｢譎・ｽｧ・ｭ郢晢ｽｻ驛｢・ｧ繝ｻ・ｫ驛｢譎｢・ｽ・ｼ髯具ｽｻ隴弱・・・刹・ｹ隰費ｽｶ邵ｺ蟶ｷ・ｹ・ｧ繝ｻ・ｭ驛｢譏ｴ繝ｻ郢晢ｽｻ: 驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎牙愛隰費ｽｴ髯ｷ・ｿ鬮｢ﾂ繝ｻ・ｾ郢晢ｽｻworld=${session.worldName}")
             return
         }
         val markers = mutableMapOf<UUID, ArenaActionMarker>()
@@ -6641,7 +6482,7 @@ class ArenaManager(
         session.actionMarkers.clear()
         session.actionMarkers.putAll(markers)
         session.actionMarkerHoldStates.clear()
-        plugin.logger.info("[Arena] 繧｢繧ｯ繧ｷ繝ｧ繝ｳ繝槭・繧ｫ繝ｼ蛻晄悄蛹・ world=${session.worldName} total=${markers.size} barrier=${markers.values.count { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }}")
+        plugin.logger.info("[Arena] 驛｢・ｧ繝ｻ・｢驛｢・ｧ繝ｻ・ｯ驛｢・ｧ繝ｻ・ｷ驛｢譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ驛｢譎・ｽｧ・ｭ郢晢ｽｻ驛｢・ｧ繝ｻ・ｫ驛｢譎｢・ｽ・ｼ髯具ｽｻ隴弱・・・刹・ｹ郢晢ｽｻ world=${session.worldName} total=${markers.size} barrier=${markers.values.count { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }}")
     }
 
     private fun ensureDoorActionMarkersForTargetWave(session: ArenaSession, targetWave: Int) {
@@ -6681,7 +6522,6 @@ class ArenaManager(
                     session,
                     false,
                     messageKey = "arena.messages.multiplayer.cancelled_owner_offline",
-                    fallbackMessage = "&c繧ｪ繝ｼ繝翫・縺御ｸ榊惠縺ｮ縺溘ａ繝槭Ν繝∝盾蜉蜍滄寔繧堤ｵゆｺ・＠縺ｾ縺励◆"
                 )
                 return@forEach
             }
@@ -6705,7 +6545,7 @@ class ArenaManager(
                         .mapNotNull { Bukkit.getPlayer(it) }
                         .filter { it.isOnline }
                     waiters.forEach { waitingPlayer ->
-                    waitingPlayer.sendTitle(ArenaI18n.text(waitingPlayer, "arena.messages.multiplayer.stage_wait_title", "ﾂｧ7繧｢繝ｪ繝ｼ繝翫ｒ貅門ｙ荳ｭ..."), "", 0, 60, 0)
+                    waitingPlayer.sendTitle(ArenaI18n.text(waitingPlayer, "arena.messages.multiplayer.stage_wait_title"), "", 0, 60, 0)
                     }
                     session.stageGenerationWaitTitleShown = true
                 }
@@ -6725,30 +6565,17 @@ class ArenaManager(
             if (invited == null || !invited.isOnline) {
                 removeInvitedParticipant(session, invitedId)
                 owner.sendMessage(
-                    ArenaI18n.text(
-                        owner,
-                        "arena.messages.multiplayer.invite_cancelled_offline",
-                        "&e諡帛ｾ・＠縺ｦ縺・◆繝励Ξ繧､繝､繝ｼ縺後Ο繧ｰ繧｢繧ｦ繝医＠縺溘◆繧√∵魚蠕・ｒ閾ｪ蜍戊ｾ樣縺ｫ縺励∪縺励◆"
-                    )
+                    ArenaI18n.text(owner, "arena.messages.multiplayer.invite_cancelled_offline")
                 )
                 return@forEach
             }
             if (invited.world.uid != owner.world.uid) {
                 removeInvitedParticipant(session, invitedId)
                 invited.sendMessage(
-                    ArenaI18n.text(
-                        invited,
-                        "arena.messages.multiplayer.invite_auto_declined_far",
-                        "&e諡帛ｾ・・°繧蛾屬繧後◆縺溘ａ縲∵魚蠕・ｒ閾ｪ蜍戊ｾ樣縺励∪縺励◆"
-                    )
+                    ArenaI18n.text(invited, "arena.messages.multiplayer.invite_auto_declined_far")
                 )
                 owner.sendMessage(
-                    ArenaI18n.text(
-                        owner,
-                        "arena.messages.multiplayer.invite_auto_declined_far_owner",
-                        "&e{player} 縺碁屬繧後◆縺溘ａ縲∵魚蠕・ｒ閾ｪ蜍戊ｾ樣縺ｫ縺励∪縺励◆",
-                        "player" to invited.name
-                    )
+                    ArenaI18n.text(owner, "arena.messages.multiplayer.invite_auto_declined_far_owner", "player" to invited.name)
                 )
                 return@forEach
             }
@@ -6756,19 +6583,10 @@ class ArenaManager(
             if (invited.location.distanceSquared(owner.location) > maxDistanceSquared) {
                 removeInvitedParticipant(session, invitedId)
                 invited.sendMessage(
-                    ArenaI18n.text(
-                        invited,
-                        "arena.messages.multiplayer.invite_auto_declined_far",
-                        "&e諡帛ｾ・・°繧蛾屬繧後◆縺溘ａ縲∵魚蠕・ｒ閾ｪ蜍戊ｾ樣縺励∪縺励◆"
-                    )
+                    ArenaI18n.text(invited, "arena.messages.multiplayer.invite_auto_declined_far")
                 )
                 owner.sendMessage(
-                    ArenaI18n.text(
-                        owner,
-                        "arena.messages.multiplayer.invite_auto_declined_far_owner",
-                        "&e{player} 縺碁屬繧後◆縺溘ａ縲∵魚蠕・ｒ閾ｪ蜍戊ｾ樣縺ｫ縺励∪縺励◆",
-                        "player" to invited.name
-                    )
+                    ArenaI18n.text(owner, "arena.messages.multiplayer.invite_auto_declined_far_owner", "player" to invited.name)
                 )
             }
         }
@@ -6784,7 +6602,7 @@ class ArenaManager(
                 (ownerRemaining.toDouble() / session.joinGraceDurationMillis.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
             }
             val ownerBar = getOrCreateJoinCountdownBossBar(session, owner.uniqueId)
-            ownerBar.name(legacySerializer.deserialize(ArenaI18n.text(owner, "arena.bossbar.join_countdown", "&fStarting in &e{seconds}s", "seconds" to formatRemainingSeconds(ownerRemaining))))
+            ownerBar.name(legacySerializer.deserialize(ArenaI18n.text(owner, "arena.bossbar.join_countdown", "seconds" to formatRemainingSeconds(ownerRemaining))))
             ownerBar.progress(ownerProgress)
             owner.showBossBar(ownerBar)
         }
@@ -6800,7 +6618,7 @@ class ArenaManager(
                 (remaining.toDouble() / session.joinGraceDurationMillis.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
             }
             val bar = getOrCreateJoinCountdownBossBar(session, invitedId)
-            bar.name(legacySerializer.deserialize(ArenaI18n.text(invited, "arena.bossbar.join_countdown", "&fStarting in &e{seconds}s", "seconds" to formatRemainingSeconds(remaining))))
+            bar.name(legacySerializer.deserialize(ArenaI18n.text(invited, "arena.bossbar.join_countdown", "seconds" to formatRemainingSeconds(remaining))))
             bar.progress(progress)
             invited.showBossBar(bar)
         }
@@ -6808,7 +6626,7 @@ class ArenaManager(
 
     private fun getOrCreateJoinCountdownBossBar(session: ArenaSession, playerId: UUID): BossBar {
         return session.joinCountdownBossBars.getOrPut(playerId) {
-            BossBar.bossBar(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.join_countdown", "&fStarting in &e{seconds}s", "seconds" to "0")), 1.0f, BossBar.Color.WHITE, BossBar.Overlay.NOTCHED_12)
+            BossBar.bossBar(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.join_countdown", "seconds" to "0")), 1.0f, BossBar.Color.WHITE, BossBar.Overlay.NOTCHED_12)
         }
     }
 
@@ -6874,7 +6692,7 @@ class ArenaManager(
                 if (currentTick < nextTick) return@forEach
                 val player = Bukkit.getPlayer(playerId) ?: return@forEach
                 if (!player.isOnline) return@forEach
-                player.sendTitle("", ArenaI18n.text(player, "arena.messages.multiplayer.waiting_title", "ﾂｧ7蜿ょ刈蠕・ｩ滉ｸｭ"), 0, 25, 5)
+                player.sendTitle("", ArenaI18n.text(player, "arena.messages.multiplayer.waiting_title"), 0, 25, 5)
                 session.waitingSubtitleNextTickByPlayer[playerId] = currentTick + 20L
             }
         }
@@ -6885,11 +6703,7 @@ class ArenaManager(
             session.waitingOutsideTicksByPlayer.remove(playerId)
             val player = Bukkit.getPlayer(playerId) ?: return@forEach
             player.sendMessage(
-                ArenaI18n.text(
-                    player,
-                    "arena.messages.multiplayer.waiting_exited",
-                    "ﾂｧc繝ｪ繝輔ヨ縺九ｉ髯阪ｊ縺ｾ縺励◆縲ょ盾蜉縺吶ｋ蝣ｴ蜷医・荵励▲縺ｦ蠕・ｩ溘＠縺ｦ縺上□縺輔＞・・"
-                )
+                ArenaI18n.text(player, "arena.messages.multiplayer.waiting_exited")
             )
         }
     }
@@ -6901,7 +6715,6 @@ class ArenaManager(
                 session,
                 false,
                 messageKey = "arena.messages.multiplayer.cancelled_owner_offline",
-                fallbackMessage = "&c繧ｪ繝ｼ繝翫・縺御ｸ榊惠縺ｮ縺溘ａ繝槭Ν繝∝盾蜉蜍滄寔繧堤ｵゆｺ・＠縺ｾ縺励◆"
             )
             return
         }
@@ -6911,7 +6724,6 @@ class ArenaManager(
                 session,
                 false,
                 messageKey = "arena.messages.multiplayer.cancelled_owner_not_waiting",
-                fallbackMessage = "&c繧ｪ繝ｼ繝翫・縺碁幕蟋句ｾ・ｩ溘お繝ｪ繧｢縺ｫ縺・↑縺・◆繧・幕蟋九ｒ荳ｭ豁｢縺励∪縺励◆"
             )
             return
         }
@@ -6928,7 +6740,6 @@ class ArenaManager(
                 session,
                 false,
                 messageKey = "arena.messages.multiplayer.cancelled_owner_not_waiting",
-                fallbackMessage = "&c繧ｪ繝ｼ繝翫・縺碁幕蟋句ｾ・ｩ溘お繝ｪ繧｢縺ｫ縺・↑縺・◆繧・幕蟋九ｒ荳ｭ豁｢縺励∪縺励◆"
             )
             return
         }
@@ -6977,7 +6788,6 @@ class ArenaManager(
                 session,
                 false,
                 messageKey = "arena.messages.command.start_error.lift_not_ready",
-                fallbackMessage = "&c繝ｪ繝輔ヨ縺ｮ貅門ｙ縺後〒縺阪※縺・↑縺・◆繧・幕蟋九〒縺阪∪縺帙ｓ"
             )
             return
         }
@@ -6986,7 +6796,6 @@ class ArenaManager(
                 session,
                 false,
                 messageKey = "arena.messages.command.start_error.lift_not_ready",
-                fallbackMessage = "&c繝ｪ繝輔ヨ縺ｮ貅門ｙ縺後〒縺阪※縺・↑縺・◆繧・幕蟋九〒縺阪∪縺帙ｓ"
             )
             return
         }
@@ -7007,7 +6816,6 @@ class ArenaManager(
                 session,
                 false,
                 messageKey = "arena.messages.command.start_error.lift_not_ready",
-                fallbackMessage = "&c繝ｪ繝輔ヨ縺ｮ貅門ｙ縺後〒縺阪※縺・↑縺・◆繧・幕蟋九〒縺阪∪縺帙ｓ"
             )
             return
         }
@@ -7021,7 +6829,6 @@ class ArenaManager(
                     session,
                     false,
                     messageKey = "arena.messages.command.start_error.lift_not_ready",
-                    fallbackMessage = "&c繝ｪ繝輔ヨ縺ｮ貅門ｙ縺後〒縺阪※縺・↑縺・◆繧・幕蟋九〒縺阪∪縺帙ｓ"
                 )
                 return
             }
@@ -7445,11 +7252,7 @@ class ArenaManager(
             if (player != null && player.isOnline) {
                 OageMessageSender.send(
                     player,
-                    ArenaI18n.text(
-                        player,
-                        "arena.messages.oage.lift_occupied_done",
-                        "ﾂｧf縲後Μ繝輔ヨ縺ｮ貅門ｙ縺檎ｵゅｏ繧翫∪縺励◆・√・"
-                    ),
+                    ArenaI18n.text(player, "arena.messages.oage.lift_occupied_done"),
                     plugin,
                     sound = Sound.ENTITY_ALLAY_AMBIENT_WITHOUT_ITEM,
                     volume = 1.0f,
@@ -7574,7 +7377,7 @@ class ArenaManager(
             renderActionMarkerParticles(player, marker, color)
             if (isInsideActionMarkerRange(player.location, marker.center)) {
                 player.sendActionBar(
-                    Component.text(ArenaI18n.text(player, "arena.messages.lobby.tutorial.hold_hint", "Shift髟ｷ謚ｼ縺励〒騾ｲ繧"))
+                    Component.text(ArenaI18n.text(player, "arena.messages.lobby.tutorial.hold_hint"))
                 )
             }
             updateLobbyTutorialHoldState(player, marker, currentTick)
@@ -7619,7 +7422,7 @@ class ArenaManager(
 
         val tutorialState = lobbyTutorialStates[playerId]
         val stepIndex = tutorialState?.stepIndex ?: 0
-        val stepMessages = ArenaI18n.stringList(player, "arena.messages.lobby.tutorial.steps", emptyList())
+        val stepMessages = ArenaI18n.stringList(player, "arena.messages.lobby.tutorial.steps")
         stepMessages.getOrNull(stepIndex)
             ?.takeIf { it.isNotBlank() }
             ?.let { player.sendMessage(it) }
@@ -7673,15 +7476,9 @@ class ArenaManager(
                     val remainingSeconds = ((BARRIER_RETURN_HOLD_TICKS - holdTicks).coerceAtLeast(0)).toDouble() / 20.0
                     val formatted = String.format(Locale.US, "%.1f", remainingSeconds)
                     val countdownKey = if (session.missionCompleted) "arena.messages.mission.return_countdown" else "arena.messages.barrier.return_countdown"
-                    val countdownFallback = "ﾂｧ7蟶ｰ驍・ｸｭ ﾂｧe{seconds} 遘・"
                     player.sendTitle(
                         "",
-                        ArenaI18n.text(
-                            player,
-                            countdownKey,
-                            countdownFallback,
-                            "seconds" to formatted
-                        ),
+                        ArenaI18n.text(player, countdownKey, "seconds" to formatted),
                         0,
                         6,
                         0
@@ -7696,19 +7493,14 @@ class ArenaManager(
                 session.barrierReturnHoldTicksByParticipant.remove(participantId)
                 session.barrierReturnSubtitleNextTickByParticipant.remove(participantId)
                 val returnKey = if (session.missionCompleted) "arena.messages.mission.returned" else "arena.messages.barrier.returned"
-                val returnFallback = "&a繝ｭ繝薙・縺ｸ蟶ｰ驍・＠縺ｾ縺励◆"
                 val returnedToLobby = stopSessionToLobbyById(
                     participantId,
-                    ArenaI18n.text(player, returnKey, returnFallback)
+                    ArenaI18n.text(player, returnKey)
                 )
                 if (returnedToLobby && session.missionCompleted) {
                     val lobbyPlayer = Bukkit.getPlayer(participantId)
                     if (lobbyPlayer != null && lobbyPlayer.isOnline) {
-                        val followupMessage = ArenaI18n.stringList(
-                            lobbyPlayer,
-                            "arena.messages.oage.mission_returned_followup",
-                            listOf("縺翫°縺医ｊ縺ｪ縺輔＞・√ｆ縺｣縺上ｊ莨代ｓ縺ｧ縺上□縺輔＞縺ｭ")
-                        ).randomOrNull()
+                        val followupMessage = ArenaI18n.stringList(lobbyPlayer, "arena.messages.oage.mission_returned_followup").randomOrNull()
                         if (!followupMessage.isNullOrBlank()) {
                             sendOageMessage(
                                 lobbyPlayer,
@@ -7726,7 +7518,7 @@ class ArenaManager(
         val marker = findHoldableActionMarker(session, player.location)
         if (marker?.type == ArenaActionMarkerType.DOOR_TOGGLE) {
             player.sendActionBar(
-                Component.text(ArenaI18n.text(player, "arena.messages.door.open_hint", "Shift髟ｷ謚ｼ縺励〒謇峨ｒ髢九￥"))
+                Component.text(ArenaI18n.text(player, "arena.messages.door.open_hint"))
             )
         }
         if (!player.isSneaking || marker == null) {
@@ -8106,13 +7898,13 @@ class ArenaManager(
     private fun buildRecruitmentSidebarLines(session: ArenaSession): List<String> {
         val now = System.currentTimeMillis()
         val remainingSeconds = (session.joinGraceEndMillis - now).coerceAtLeast(0L) / 1000L
-        val missionTitle = session.inviteMissionTitle?.takeIf { it.isNotBlank() } ?: ArenaI18n.text(null, "arena.ui.recruitment.default_mission_title", "繧｢繝ｪ繝ｼ繝翫Α繝・す繝ｧ繝ｳ")
+        val missionTitle = session.inviteMissionTitle?.takeIf { it.isNotBlank() } ?: ArenaI18n.text(null, "arena.ui.recruitment.default_mission_title")
 
         val lines = mutableListOf<String>()
         lines += ""
-        lines += ArenaI18n.text(null, "arena.ui.recruitment.title", "&6[{missionTitle}]", "missionTitle" to missionTitle)
+        lines += ArenaI18n.text(null, "arena.ui.recruitment.title", "missionTitle" to missionTitle)
         lines += ""
-        lines += ArenaI18n.text(null, "arena.ui.recruitment.remaining", "&fStarting in &e{seconds}s", "seconds" to remainingSeconds)
+        lines += ArenaI18n.text(null, "arena.ui.recruitment.remaining", "seconds" to remainingSeconds)
         lines += ""
 
         val playerIds = linkedSetOf<UUID>()
@@ -8124,9 +7916,9 @@ class ArenaManager(
                 ?: "Unknown"
             val inWaitingArea = session.waitingParticipants.contains(playerId)
             lines += if (inWaitingArea) {
-                ArenaI18n.text(null, "arena.ui.recruitment.waiting_participant", "ﾂｧb笨ｦ {name}", "name" to name)
+                ArenaI18n.text(null, "arena.ui.recruitment.waiting_participant", "name" to name)
             } else {
-                ArenaI18n.text(null, "arena.ui.recruitment.normal_participant", "ﾂｧ7笨ｧ {name}", "name" to name)
+                ArenaI18n.text(null, "arena.ui.recruitment.normal_participant", "name" to name)
             }
         }
         lines += ""
@@ -8139,17 +7931,17 @@ class ArenaManager(
         val lines = mutableListOf<String>()
         lines += ""
         lines += when {
-            session.phase == ArenaPhase.GAME_OVER -> ArenaI18n.text(null, "arena.ui.sidebar.defeat", "ﾂｧcﾂｧlDEFEAT")
-            inGetReady -> ArenaI18n.text(null, "arena.ui.sidebar.get_ready", "ﾂｧ7ﾂｧlGet Ready!")
+            session.phase == ArenaPhase.GAME_OVER -> ArenaI18n.text(null, "arena.ui.sidebar.defeat")
+            inGetReady -> ArenaI18n.text(null, "arena.ui.sidebar.get_ready")
             else -> buildWaveSidebarHeader(session, sidebarWave ?: session.currentWave.coerceAtLeast(1))
         }
 
-        // 謗・ｨ弱Α繝・す繝ｧ繝ｳ: 邨碁℃譎る俣繧定｡ｨ遉ｺ
+        // 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ・朱・・ｹ譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ: 鬩搾ｽｨ驕停沖ﾑ・垓蠑ｱ・玖将・｣驛｢・ｧ陞ｳ螟ｲ・ｽ・｡繝ｻ・ｨ鬩穂ｼ夲ｽｽ・ｺ
         if (isClearingMission(session) && session.firstDoorOpenedAtMillis != null) {
             val elapsedMillis = System.currentTimeMillis() - session.firstDoorOpenedAtMillis!!
             val elapsedSeconds = (elapsedMillis / 1000).toInt().coerceAtLeast(0)
             val elapsedTimeText = formatTimeRemaining(elapsedSeconds)
-            lines += ArenaI18n.text(null, "arena.ui.sidebar.elapsed_time", "ﾂｧ7邨碁℃: ﾂｧf{time}", "time" to elapsedTimeText)
+            lines += ArenaI18n.text(null, "arena.ui.sidebar.elapsed_time", "time" to elapsedTimeText)
         }
 
         lines += ""
@@ -8165,7 +7957,7 @@ class ArenaManager(
                 ?: session.sidebarParticipantNames[playerId]
                 ?: "Unknown"
             val status = resolveSidebarParticipantStatus(session, playerId)
-            lines += ArenaI18n.text(null, "arena.ui.sidebar.participant_line", "ﾂｧ7笳ｯ ﾂｧb{name} {status}", "name" to name, "status" to status)
+            lines += ArenaI18n.text(null, "arena.ui.sidebar.participant_line", "name" to name, "status" to status)
         }
         lines += ""
         return lines
@@ -8178,12 +7970,12 @@ class ArenaManager(
 
     private fun buildWaveSidebarHeader(session: ArenaSession, wave: Int): String {
         val base = if (wave >= session.waves) {
-            ArenaI18n.text(null, "arena.ui.sidebar.last_wave", "ﾂｧ7ﾂｻ ﾂｧ6ﾂｧlLast Wave ﾂｧ7ﾂｫ")
+            ArenaI18n.text(null, "arena.ui.sidebar.last_wave")
         } else {
-            ArenaI18n.text(null, "arena.ui.sidebar.wave", "ﾂｧ7ﾂｻ ﾂｧ6ﾂｧlWave {wave} ﾂｧ7ﾂｫ", "wave" to wave)
+            ArenaI18n.text(null, "arena.ui.sidebar.wave", "wave" to wave)
         }
         return if (session.clearedWaves.contains(wave)) {
-            "$base ${ArenaI18n.text(null, "arena.ui.sidebar.clear", "ﾂｧdCLEAR")}" 
+            "$base ${ArenaI18n.text(null, "arena.ui.sidebar.clear")}" 
         } else {
             base
         }
@@ -8191,15 +7983,15 @@ class ArenaManager(
 
     private fun resolveSidebarParticipantStatus(session: ArenaSession, playerId: UUID): String {
         if (isSidebarPreparing(session, playerId)) {
-            return ArenaI18n.text(null, "arena.ui.sidebar.status_preparing", "ﾂｧdPREPARING")
+            return ArenaI18n.text(null, "arena.ui.sidebar.status_preparing")
         }
 
         val downState = session.downedPlayers[playerId]
         if (downState != null) {
             if (downState.reviveDisabled) {
-                return ArenaI18n.text(null, "arena.ui.sidebar.status_dead", "ﾂｧcDEAD")
+                return ArenaI18n.text(null, "arena.ui.sidebar.status_dead")
             }
-            return ArenaI18n.text(null, "arena.ui.sidebar.status_down", "ﾂｧeDOWN")
+            return ArenaI18n.text(null, "arena.ui.sidebar.status_down")
         }
 
         val online = Bukkit.getPlayer(playerId)
@@ -8210,9 +8002,9 @@ class ArenaManager(
             !online.isDead &&
             online.world.name == session.worldName
         ) {
-            return ArenaI18n.text(null, "arena.ui.sidebar.status_alive", "ﾂｧaALIVE")
+            return ArenaI18n.text(null, "arena.ui.sidebar.status_alive")
         }
-        return ArenaI18n.text(null, "arena.ui.sidebar.status_dead", "ﾂｧcDEAD")
+        return ArenaI18n.text(null, "arena.ui.sidebar.status_dead")
     }
 
     private fun isSidebarPreparing(session: ArenaSession, playerId: UUID): Boolean {
@@ -8259,7 +8051,7 @@ class ArenaManager(
         val objective = scoreboard.registerNewObjective(
             ARENA_SIDEBAR_OBJECTIVE_NAME,
             "dummy",
-            legacySerializer.deserialize(ArenaI18n.text(null, "arena.ui.sidebar.title", "ﾂｧ7ﾂｫ ﾂｧcARENA ﾂｧ7ﾂｻ"))
+            legacySerializer.deserialize(ArenaI18n.text(null, "arena.ui.sidebar.title"))
         )
         objective.displaySlot = DisplaySlot.SIDEBAR
         objective.numberFormat(NumberFormat.blank())
@@ -8317,24 +8109,23 @@ class ArenaManager(
 
     private fun arenaSidebarEntry(index: Int): String {
         return when (index.coerceIn(0, ARENA_SIDEBAR_MAX_LINES - 1)) {
-            0 -> "ﾂｧ0"
-            1 -> "ﾂｧ1"
-            2 -> "ﾂｧ2"
-            3 -> "ﾂｧ3"
-            4 -> "ﾂｧ4"
-            5 -> "ﾂｧ5"
-            6 -> "ﾂｧ6"
-            7 -> "ﾂｧ7"
-            8 -> "ﾂｧ8"
-            9 -> "ﾂｧ9"
-            10 -> "ﾂｧa"
-            11 -> "ﾂｧb"
-            12 -> "ﾂｧc"
-            13 -> "ﾂｧd"
-            else -> "ﾂｧe"
+            0 -> "§0"
+            1 -> "§1"
+            2 -> "§2"
+            3 -> "§3"
+            4 -> "§4"
+            5 -> "§5"
+            6 -> "§6"
+            7 -> "§7"
+            8 -> "§8"
+            9 -> "§9"
+            10 -> "§a"
+            11 -> "§b"
+            12 -> "§c"
+            13 -> "§d"
+            else -> "§e"
         }
     }
-
     private fun removeArenaSidebar(playerId: UUID) {
         arenaSidebarPlayers.remove(playerId)
         val previousScoreboard = arenaSidebarPreviousScoreboards.remove(playerId)
@@ -8401,10 +8192,10 @@ class ArenaManager(
                 cleanupWorldJobs.removeFirstOrNull()
                 val elapsedMillis = (now - job.startedAtMillis).coerceAtLeast(0L)
                 plugin.logger.info(
-                    "[Arena] 繧ｯ繝ｪ繝ｼ繝ｳ繧｢繝・・螳御ｺ・ world=${job.worldName} blocks=${job.processedBlocks}/${job.totalBlocks} elapsed=${elapsedMillis}ms"
+                    "[Arena] 驛｢・ｧ繝ｻ・ｯ驛｢譎｢・ｽ・ｪ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｳ驛｢・ｧ繝ｻ・｢驛｢譏ｴ繝ｻ郢晢ｽｻ髯橸ｽｳ陟包ｽ｡繝ｻ・ｺ郢晢ｽｻ world=${job.worldName} blocks=${job.processedBlocks}/${job.totalBlocks} elapsed=${elapsedMillis}ms"
                 )
                 markArenaWorldReady(job.worldName)
-                logArenaPoolState("繧ｯ繝ｪ繝ｼ繝ｳ繧｢繝・・螳御ｺ・, job.worldName")
+                logArenaPoolState("驛｢・ｧ繝ｻ・ｯ驛｢譎｢・ｽ・ｪ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｳ驛｢・ｧ繝ｻ・｢驛｢譏ｴ繝ｻ郢晢ｽｻ髯橸ｽｳ陟包ｽ｡繝ｻ・ｺ郢晢ｽｻ, job.worldName")
                 continue
             }
 
@@ -8426,7 +8217,7 @@ class ArenaManager(
                 val rate = if (elapsedSeconds <= 0.0) 0.0 else job.processedBlocks.toDouble() / elapsedSeconds
                 val remainingSeconds = if (rate <= 0.0) estimateCleanupSeconds(remainingBlocks) else remainingBlocks.toDouble() / rate
                 plugin.logger.info(
-                    "[Arena] 繧ｯ繝ｪ繝ｼ繝ｳ繧｢繝・・騾ｲ謐・ world=${job.worldName} progress=${formatPercent(progress)}% " +
+                    "[Arena] 驛｢・ｧ繝ｻ・ｯ驛｢譎｢・ｽ・ｪ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｳ驛｢・ｧ繝ｻ・｢驛｢譏ｴ繝ｻ郢晢ｽｻ鬯ｨ・ｾ繝ｻ・ｲ髫ｰ闊後・ world=${job.worldName} progress=${formatPercent(progress)}% " +
                         "processed=${job.processedBlocks}/${job.totalBlocks} elapsed=${formatSeconds(elapsedSeconds)}s " +
                         "remaining=${formatSeconds(remainingSeconds)}s"
                 )
@@ -8475,7 +8266,7 @@ class ArenaManager(
 
             if (deleteQueuedWorldFolder(pending)) {
                 pendingWorldDeletions.remove(pending.worldName)
-                plugin.logger.info("[Arena] 譛ｪ蜑企勁繝ｯ繝ｼ繝ｫ繝峨・蜑企勁縺ｫ謌仙粥: ${pending.worldName}")
+                plugin.logger.info("[Arena] 髫ｴ蟷｢・ｽ・ｪ髯ｷ蜿ｰ・ｼ竏晄ｱるΔ譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｻ髯ｷ蜿ｰ・ｼ竏晄ｱるし・ｺ繝ｻ・ｫ髫ｰ蠕｡・ｻ蜥擾ｽｲ・･: ${pending.worldName}")
                 return@forEach
             }
 
