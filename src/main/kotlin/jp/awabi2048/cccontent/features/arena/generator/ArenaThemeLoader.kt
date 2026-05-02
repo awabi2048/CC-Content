@@ -92,6 +92,17 @@ data class ArenaWaveSpawnRule(
     val weightedMobs: List<ArenaThemeWeightedMobEntry>
 )
 
+data class ArenaThemeLoadStatus(
+    val availableThemeIds: Set<String> = emptySet(),
+    val unavailableThemes: List<ArenaThemeLoadIssue> = emptyList(),
+    val generalWarnings: List<String> = emptyList()
+)
+
+data class ArenaThemeLoadIssue(
+    val themeId: String,
+    val details: List<String>
+)
+
 data class ArenaStructureOrientation(
     val entranceExit: ArenaPathDirection,
     val cornerEntry: ArenaPathDirection,
@@ -180,6 +191,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
     )
 
     private val themes = mutableMapOf<String, ArenaTheme>()
+    private var lastLoadStatus: ArenaThemeLoadStatus = ArenaThemeLoadStatus()
 
     fun load(featureInitLogger: FeatureInitializationLogger? = null) {
         themes.clear()
@@ -296,6 +308,8 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 animatedStructures = loaded.animatedStructures
             )
         }
+
+        lastLoadStatus = buildLoadStatus(configuredThemeIds + folderThemeIds, warnings)
 
         featureInitLogger?.apply {
             if (themes.isEmpty()) {
@@ -824,4 +838,30 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
     }
 
     fun getThemeIds(): Set<String> = themes.keys
+
+    fun getLoadStatus(): ArenaThemeLoadStatus = lastLoadStatus
+
+    private fun buildLoadStatus(candidateThemeIds: Set<String>, warnings: List<String>): ArenaThemeLoadStatus {
+        val availableThemeIds = themes.keys.toSortedSet()
+        val unavailableThemeIds = (candidateThemeIds - availableThemeIds)
+            .filter { it.isNotBlank() }
+            .sorted()
+        val unavailableThemes = unavailableThemeIds.map { themeId ->
+            val details = warnings.filter { warning ->
+                warning.contains(themeId) || warning.contains("structures/arena/$themeId")
+            }.ifEmpty { listOf("[Arena] theme was not loaded: $themeId") }
+            ArenaThemeLoadIssue(themeId, details)
+        }
+        val unavailableSet = unavailableThemeIds.toSet()
+        val generalWarnings = warnings.filterNot { warning ->
+            unavailableSet.any { themeId ->
+                warning.contains(themeId) || warning.contains("structures/arena/$themeId")
+            }
+        }
+        return ArenaThemeLoadStatus(
+            availableThemeIds = availableThemeIds,
+            unavailableThemes = unavailableThemes,
+            generalWarnings = generalWarnings
+        )
+    }
 }

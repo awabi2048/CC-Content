@@ -22,7 +22,7 @@ commands:
     permission: sukimadungeon.command.base
   arenaa:
     description: アリーナ管理コマンド
-    usage: /arenaa <menu|lobby|start|stop|license|theme|broadcast|pedestal>
+    usage: /arenaa <menu|lobby|start|stop|license|status>
     permission: cc-content.arena.admin
   rankmenu:
     description: 職業メインメニューを開く
