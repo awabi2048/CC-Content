@@ -1,16 +1,13 @@
 package jp.awabi2048.cccontent.command
 
 import org.bukkit.Location
-import org.bukkit.World
 import org.bukkit.command.Command
 import org.bukkit.command.BlockCommandSender
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Entity
-import org.bukkit.entity.Player
 import org.bukkit.util.Vector
-import kotlin.math.max
 
 /**
  * /cc-content メインコマンド
@@ -23,13 +20,7 @@ class CCCommand(
     private val onClearBlockPlacementData: (() -> Unit)? = null,
     private val mobDefinitionIdsProvider: (() -> Collection<String>)? = null,
     private val onSummonMob: ((String, Location) -> Entity?)? = null,
-    private val onBatchBreakDebug: ((Player, String, Int, Int, Boolean) -> Boolean)? = null,
-    private val onBlastMineDebug: ((Player, Double, Int, Boolean, Double) -> Boolean)? = null,
-    private val onUpdateDay: ((String?) -> Boolean)? = null,
-    private val onCreateVoidWorldDebug: ((Player) -> World?)? = null,
-    private val onCloneVoidWorldDebug: ((Player) -> World?)? = null,
-    private val onDeleteVoidWorldDebug: ((Player) -> Boolean)? = null,
-    private val isDebugVoidWorld: ((World) -> Boolean)? = null
+    private val onUpdateDay: ((String?) -> Boolean)? = null
 ) : CommandExecutor, TabCompleter {
     
     override fun onCommand(
@@ -56,17 +47,11 @@ class CCCommand(
             "restart" -> {
                 handleRestart(sender)
             }
-            "clear_block_placement_data" -> {
-                handleClearBlockPlacementData(sender)
-            }
             "summon" -> {
                 handleSummon(sender, args)
             }
             "debug" -> {
                 handleDebug(sender, args)
-            }
-            "update_day" -> {
-                handleUpdateDay(sender, args)
             }
             "help" -> {
                 showHelp(sender)
@@ -134,167 +119,21 @@ class CCCommand(
             return false
         }
 
-        val player = sender as? org.bukkit.entity.Player
-        if (player == null) {
-            sender.sendMessage("§cこのコマンドはプレイヤーのみ実行できます")
-            return false
-        }
-
         if (args.size < 2) {
-            sender.sendMessage("§c使用法: /ccc debug <mine_all|cut_all|blast_mine|create_void_world|clone_void_world|delete_void_world> ...")
+            sender.sendMessage("§c使用法: /ccc debug <clear_block_placement_data|update_day> ...")
             return false
         }
 
         val mode = args[1].lowercase()
 
         return when (mode) {
-            "mine_all", "cut_all" -> handleBatchBreakDebug(sender, player, args)
-            "blast_mine" -> handleBlastMineDebug(sender, player, args)
-            "create_void_world" -> handleCreateVoidWorldDebug(sender, player, args)
-            "clone_void_world" -> handleCloneVoidWorldDebug(sender, player, args)
-            "delete_void_world" -> handleDeleteVoidWorldDebug(sender, player, args)
+            "clear_block_placement_data" -> handleClearBlockPlacementData(sender, args)
+            "update_day" -> handleUpdateDay(sender, (listOf("update_day") + args.drop(2)).toTypedArray())
             else -> {
-                sender.sendMessage("§cmodeは mine_all, cut_all, blast_mine, create_void_world, clone_void_world, または delete_void_world を指定してください")
+                sender.sendMessage("§cmodeは clear_block_placement_data または update_day を指定してください")
                 false
             }
         }
-    }
-
-    private fun handleCreateVoidWorldDebug(sender: CommandSender, player: Player, args: Array<String>): Boolean {
-        if (onCreateVoidWorldDebug == null) {
-            sender.sendMessage("§cデバッグ機能が利用できません")
-            return false
-        }
-
-        if (args.size != 2) {
-            sender.sendMessage("§c使用法: /ccc debug create_void_world")
-            return false
-        }
-
-        val startedAt = System.nanoTime()
-        val world = onCreateVoidWorldDebug.invoke(player)
-        if (world == null) {
-            sender.sendMessage("§cボイドワールドの生成に失敗しました (${elapsedMs(startedAt)} ms)")
-            return false
-        }
-
-        player.teleport(world.spawnLocation)
-        sender.sendMessage("§aボイドワールドを生成しました: ${world.name} (${elapsedMs(startedAt)} ms)")
-        return true
-    }
-
-    private fun handleCloneVoidWorldDebug(sender: CommandSender, player: Player, args: Array<String>): Boolean {
-        if (onCloneVoidWorldDebug == null) {
-            sender.sendMessage("§cデバッグ機能が利用できません")
-            return false
-        }
-
-        if (args.size != 2) {
-            sender.sendMessage("§c使用法: /ccc debug clone_void_world")
-            return false
-        }
-
-        val startedAt = System.nanoTime()
-        val world = onCloneVoidWorldDebug.invoke(player)
-        if (world == null) {
-            sender.sendMessage("§cボイドワールドの複製に失敗しました (${elapsedMs(startedAt)} ms)")
-            return false
-        }
-
-        player.teleport(world.spawnLocation)
-        sender.sendMessage("§aボイドワールドを複製しました: ${world.name} (${elapsedMs(startedAt)} ms)")
-        return true
-    }
-
-    private fun handleDeleteVoidWorldDebug(sender: CommandSender, player: Player, args: Array<String>): Boolean {
-        if (onDeleteVoidWorldDebug == null || isDebugVoidWorld == null) {
-            sender.sendMessage("§cデバッグ機能が利用できません")
-            return false
-        }
-
-        if (args.size != 2) {
-            sender.sendMessage("§c使用法: /ccc debug delete_void_world")
-            return false
-        }
-
-        val world = player.world
-        if (!isDebugVoidWorld.invoke(world)) {
-            sender.sendMessage("§c現在のワールドはデバッグ用ボイドワールドではありません")
-            return false
-        }
-
-        val startedAt = System.nanoTime()
-        val result = onDeleteVoidWorldDebug.invoke(player)
-        if (!result) {
-            sender.sendMessage("§cボイドワールドの削除に失敗しました (${elapsedMs(startedAt)} ms)")
-            return false
-        }
-
-        sender.sendMessage("§aボイドワールドを削除しました: ${world.name} (${elapsedMs(startedAt)} ms)")
-        return true
-    }
-
-    private fun handleBatchBreakDebug(sender: CommandSender, player: Player, args: Array<String>): Boolean {
-        if (onBatchBreakDebug == null) {
-            sender.sendMessage("§cデバッグ機能が利用できません")
-            return false
-        }
-
-        if (args.size != 5) {
-            sender.sendMessage("§c使用法: /ccc debug <mine_all|cut_all> <delay> <max_chain> <auto_collect>")
-            return false
-        }
-
-        val mode = args[1].lowercase()
-        val delay = args[2].toIntOrNull()
-        val maxChain = args[3].toIntOrNull()
-        val autoCollect = args[4].toBooleanStrictOrNull()
-        if (delay == null || maxChain == null || autoCollect == null) {
-            sender.sendMessage("§cdelay/max_chain/auto_collect の指定が不正です")
-            sender.sendMessage("§7例: /ccc debug mine_all 0 32 true")
-            return false
-        }
-
-        val result = onBatchBreakDebug.invoke(player, mode, delay, maxChain, autoCollect)
-        if (!result) {
-            sender.sendMessage("§cデバッグ設定の反映に失敗しました")
-            return false
-        }
-
-        sender.sendMessage("§aデバッグ設定を反映しました: mode=$mode, delay=$delay, max_chain=$maxChain, auto_collect=$autoCollect")
-        return true
-    }
-
-    private fun handleBlastMineDebug(sender: CommandSender, player: Player, args: Array<String>): Boolean {
-        if (onBlastMineDebug == null) {
-            sender.sendMessage("§cデバッグ機能が利用できません")
-            return false
-        }
-
-        if (args.size != 6) {
-            sender.sendMessage("§c使用法: /ccc debug blast_mine <radius> <delay_ticks_per_layer> <auto_collect> <loss_rate>")
-            return false
-        }
-
-        val radius = args[2].toDoubleOrNull()
-        val delayTicksPerLayer = args[3].toIntOrNull()
-        val autoCollect = args[4].toBooleanStrictOrNull()
-        val lossRate = args[5].toDoubleOrNull()
-
-        if (radius == null || delayTicksPerLayer == null || autoCollect == null || lossRate == null) {
-            sender.sendMessage("§cradius/delay_ticks_per_layer/auto_collect/loss_rate の指定が不正です")
-            sender.sendMessage("§7例: /ccc debug blast_mine 3.0 2 true 0.1")
-            return false
-        }
-
-        val result = onBlastMineDebug.invoke(player, radius, delayTicksPerLayer, autoCollect, lossRate)
-        if (!result) {
-            sender.sendMessage("§cデバッグ設定の反映に失敗しました")
-            return false
-        }
-
-        sender.sendMessage("§aデバッグ設定を反映しました: radius=$radius, delay=$delayTicksPerLayer, auto_collect=$autoCollect, loss_rate=$lossRate")
-        return true
     }
 
     private fun handleUpdateDay(sender: CommandSender, args: Array<String>): Boolean {
@@ -309,7 +148,7 @@ class CCCommand(
         }
 
         if (args.size > 2) {
-            sender.sendMessage("§c使用法: /ccc update_day [arena]")
+            sender.sendMessage("§c使用法: /ccc debug update_day [arena]")
             return false
         }
 
@@ -336,9 +175,14 @@ class CCCommand(
         return true
     }
 
-    private fun handleClearBlockPlacementData(sender: CommandSender): Boolean {
+    private fun handleClearBlockPlacementData(sender: CommandSender, args: Array<String>): Boolean {
         if (!sender.hasPermission("cc-content.admin")) {
             sender.sendMessage("§c権限がありません")
+            return false
+        }
+
+        if (args.size != 2) {
+            sender.sendMessage("§c使用法: /ccc debug clear_block_placement_data")
             return false
         }
 
@@ -430,25 +274,10 @@ class CCCommand(
                §7  - 例: /ccc summon zombie_leap_only ~ ~ ~
                §7  - 例: /ccc summon zombie_leap_only
 
-               §f/ccc clear_block_placement_data
+               §f/ccc debug clear_block_placement_data
                §7  - プレイヤー設置ブロック判定データを削除します
 
-              §f/ccc debug <mine_all|cut_all> <delay> <max_chain> <auto_collect>
-              §7  - MineAll/CutAll のデバッグ設定を適用します
-
-                §f/ccc debug blast_mine <radius> <delay> <auto_collect> <loss_rate>
-                §7  - BlastMine のデバッグ設定を適用します
-
-                §f/ccc debug create_void_world
-                §7  - アリーナと同じボイドワールドを生成してそこへ移動します
-
-                §f/ccc debug clone_void_world
-                §7  - テンプレートからボイドワールドを複製してそこへ移動します
-
-                §f/ccc debug delete_void_world
-                §7  - 現在のデバッグ用ボイドワールドを削除します
-
-               §f/ccc update_day [arena]
+               §f/ccc debug update_day [arena]
                §7  - 日付更新処理を実行します
                
                §f/arenaa §7- アリーナ管理コマンド
@@ -472,9 +301,7 @@ class CCCommand(
                      candidates.add("reload")
                      candidates.add("restart")
                      candidates.add("summon")
-                     candidates.add("clear_block_placement_data")
                      candidates.add("debug")
-                    candidates.add("update_day")
                 }
                 return candidates.filter { it.startsWith(prefix) }
             }
@@ -487,50 +314,19 @@ class CCCommand(
               }
                "debug" -> {
                    when (args.size) {
-                      2 -> listOf("mine_all", "cut_all", "blast_mine", "create_void_world", "clone_void_world", "delete_void_world").filter { it.startsWith(args[1].lowercase()) }
+                      2 -> listOf("clear_block_placement_data", "update_day").filter { it.startsWith(args[1].lowercase()) }
                      3 -> {
                          when (args[1].lowercase()) {
-                             "mine_all", "cut_all" -> listOf("0", "1", "2", "3", "5").filter { it.startsWith(args[2]) }
-                             "blast_mine" -> listOf("2.0", "3.0", "4.0", "5.0").filter { it.startsWith(args[2]) }
-                             else -> emptyList()
-                         }
-                     }
-                     4 -> {
-                         when (args[1].lowercase()) {
-                             "mine_all", "cut_all" -> listOf("16", "24", "32", "64").filter { it.startsWith(args[3]) }
-                             "blast_mine" -> listOf("0", "1", "2", "3").filter { it.startsWith(args[3]) }
-                             else -> emptyList()
-                         }
-                     }
-                     5 -> {
-                         when (args[1].lowercase()) {
-                             "mine_all", "cut_all" -> listOf("true", "false").filter { it.startsWith(args[4].lowercase()) }
-                             "blast_mine" -> listOf("true", "false").filter { it.startsWith(args[4].lowercase()) }
-                             else -> emptyList()
-                         }
-                     }
-                     6 -> {
-                         when (args[1].lowercase()) {
-                             "blast_mine" -> listOf("0.0", "0.1", "0.2", "0.3").filter { it.startsWith(args[5]) }
+                             "update_day" -> listOf("arena").filter { it.startsWith(args[2], ignoreCase = true) }
                              else -> emptyList()
                          }
                      }
                       else -> emptyList()
                    }
                }
-               "update_day" -> {
-                   if (args.size == 2) {
-                       listOf("arena").filter { it.startsWith(args[1], ignoreCase = true) }
-                   } else {
-                       emptyList()
-                   }
-               }
                "summon" -> {
                    when (args.size) {
-                      2 -> {
-                          val ids = mobDefinitionIdsProvider?.invoke().orEmpty().sorted()
-                          ids.filter { it.startsWith(args[1], ignoreCase = true) }
-                      }
+                      2 -> mobDefinitionIdsProvider?.invoke().orEmpty().sorted().filter { it.startsWith(args[1], ignoreCase = true) }
                       3, 4, 5 -> listOf("~", "~1", "~-1").filter { it.startsWith(args[args.lastIndex]) }
                       else -> emptyList()
                   }
@@ -614,7 +410,4 @@ class CCCommand(
         return String.format(java.util.Locale.ROOT, "%.2f", value)
     }
 
-    private fun elapsedMs(startedAtNanos: Long): Long {
-        return max(0L, (System.nanoTime() - startedAtNanos) / 1_000_000L)
-    }
 }

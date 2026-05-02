@@ -264,48 +264,11 @@ class CCContent : JavaPlugin(), Listener {
             onClearBlockPlacementData = { clearBlockPlacementData() },
             mobDefinitionIdsProvider = { sharedMobService.getDefinitionIds() },
             onSummonMob = { definitionId, location -> summonConfiguredMob(definitionId, location) },
-            onBatchBreakDebug = { player, mode, delay, maxChain, autoCollect ->
-                val batchMode = UnlockBatchBreakHandler.BatchBreakMode.fromRaw(mode)
-                if (batchMode == null) {
-                    false
-                } else {
-                    UnlockBatchBreakHandler.setDebugOverride(player.uniqueId, batchMode, delay, maxChain, autoCollect)
-                    true
-                }
-            },
-            onBlastMineDebug = { player, radius, delayTicksPerLayer, autoCollect, lossRate ->
-                BlastMineHandler.setDebugOverride(player.uniqueId, radius, autoCollect, lossRate)
-                true
-            },
             onUpdateDay = { target ->
                 when (target) {
                     null, "arena" -> arenaMissionService?.updateToday() ?: false
                     else -> false
                 }
-            },
-            onCreateVoidWorldDebug = { _: Player ->
-                if (arenaFeatureReady && ::arenaManager.isInitialized) {
-                    arenaManager.createDebugVoidWorld()
-                } else {
-                    null
-                }
-            },
-            onCloneVoidWorldDebug = { _: Player ->
-                if (arenaFeatureReady && ::arenaManager.isInitialized) {
-                    arenaManager.cloneDebugVoidWorld()
-                } else {
-                    null
-                }
-            },
-            onDeleteVoidWorldDebug = { player ->
-                if (arenaFeatureReady && ::arenaManager.isInitialized) {
-                    arenaManager.deleteDebugVoidWorld(player.world)
-                } else {
-                    false
-                }
-            },
-            isDebugVoidWorld = { world ->
-                arenaFeatureReady && ::arenaManager.isInitialized && arenaManager.isDebugVoidWorld(world)
             }
         )
 
