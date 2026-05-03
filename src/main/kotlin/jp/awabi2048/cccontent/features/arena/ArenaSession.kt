@@ -204,6 +204,8 @@ data class ArenaSession(
     val waitingNotifiedParticipants: MutableSet<UUID> = mutableSetOf(),
     val waitingSubtitleNextTickByPlayer: MutableMap<UUID, Long> = mutableMapOf(),
     val waitingOutsideTicksByPlayer: MutableMap<UUID, Int> = mutableMapOf(),
+    var waitingAllSneakingSinceMillis: Long? = null,
+    var waitingFastStartHintCooldownUntilMillis: Long = 0L,
     val entranceLiftLockedParticipants: MutableSet<UUID> = mutableSetOf(),
     var entranceLiftChunkTicketWorldName: String? = null,
     val entranceLiftChunkTicketKeys: MutableSet<Long> = mutableSetOf(),

@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.api.event.PlayerLeftClickPlayerEvent
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.mob.ability.MobShootUtil
 import jp.awabi2048.cccontent.mob.event.CustomEntityMobSpawnEvent
@@ -18,13 +19,13 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
 import org.bukkit.event.entity.EntityPotionEffectEvent
 import org.bukkit.event.entity.ProjectileLaunchEvent
+import org.bukkit.event.entity.EntityToggleGlideEvent
 import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.entity.EntityMountEvent
 import org.bukkit.event.entity.EntityRemoveEvent
-import org.bukkit.event.player.PlayerAnimationEvent
 import org.bukkit.event.player.PlayerChangedWorldEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerInteractEntityEvent
@@ -102,13 +103,24 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    fun onEntityToggleGlide(event: EntityToggleGlideEvent) {
+        if (!event.isGliding) return
+        val player = event.entity as? Player ?: return
+        if (arenaManager.cancelArenaGlide(player)) {
+            event.isCancelled = true
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     fun onEntityPotionEffect(event: EntityPotionEffectEvent) {
         arenaManager.handleElderGuardianCurse(event)
     }
 
     @EventHandler(ignoreCancelled = true)
-    fun onPlayerAnimation(event: PlayerAnimationEvent) {
-        arenaManager.handleMultiplayerInviteSwing(event)
+    fun onPlayerLeftClickPlayer(event: PlayerLeftClickPlayerEvent) {
+        if (arenaManager.handlePlayerLeftClickPlayer(event.player, event.target)) {
+            event.isCancelled = true
+        }
     }
 
     @EventHandler(ignoreCancelled = true)

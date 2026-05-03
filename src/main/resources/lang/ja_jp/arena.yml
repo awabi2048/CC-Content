@@ -116,6 +116,7 @@ arena:
       wait_area_hint: '&7招待したプレイヤーと開始待機エリアに入ると待機状態になります'
       waiting_entered: '&a開始待機エリアに入りました。猶予終了まで待機してください'
       waiting_exited: §cリフトから降りました。参加する場合は乗って待機してください！
+      fast_start_hint: '&7全員がリフト上でスニークを3秒続けると、すぐに出発できます'
       lift_not_ready_oage: §f「リフトの準備が出来ていないみたいです！ちょっとまってね！」
       lift_occupied_oage: §f「リフトが空くまでちょっとまってね！」
       waiting_title: '&7参加待機中'
@@ -152,6 +153,7 @@ arena:
         &7おあげちゃんが救出中...'
       participant_died: §4{player}さんが倒れました... §7（おあげちゃんが救出に向かいます）
       needs_revive: '&c{player}さんがダウンしました！蘇生が必要です！'
+      revive_hint: '&7近くでスニークすると蘇生できます！'
     oage:
       stage_start:
       - §f現地に到着しました！
