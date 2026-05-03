@@ -12,7 +12,6 @@ data class ArenaMissionEntry(
     val themeId: String,
     val promoted: Boolean,
     val difficultyStar: Int,
-    val difficultyDisplay: String,
     val maxParticipants: Int = 6
 )
 

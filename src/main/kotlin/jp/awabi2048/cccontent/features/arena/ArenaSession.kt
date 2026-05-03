@@ -104,7 +104,6 @@ data class ArenaSession(
     val themeId: String,
     val promoted: Boolean,
     val difficultyStar: Int,
-    val difficultyDisplay: String,
     val sessionVariance: Double = Random.nextDouble(0.85, 1.15),
     val waves: Int,
     val missionModifiers: ArenaMissionModifiers = ArenaMissionModifiers.NONE,

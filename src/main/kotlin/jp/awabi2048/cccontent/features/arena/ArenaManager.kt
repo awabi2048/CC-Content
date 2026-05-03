@@ -790,13 +790,13 @@ class ArenaManager(
 
         val placeholderLocation = Location(world, 0.0, 64.0, 0.0)
         val placeholderBounds = ArenaBounds(0, 0, 0, 0, 0, 0)
+        val difficultyDisplay = ArenaMenuItems.difficultyStars(variant.difficultyStar)
         val session = ArenaSession(
             ownerPlayerId = target.uniqueId,
             worldName = world.name,
             themeId = theme.id,
             promoted = promoted,
             difficultyStar = variant.difficultyStar,
-            difficultyDisplay = variant.display,
             waves = variant.waves.size,
             missionModifiers = missionModifiers,
             missionTypeId = missionTypeId,
@@ -936,10 +936,10 @@ class ArenaManager(
             }
             if (showSessionStartedMessage) {
                 target.sendMessage(
-                    ArenaI18n.text(target, "arena.messages.session.started", "theme" to theme.id, "mob_type" to theme.id, "difficulty" to variant.display, "waves" to variant.waves.size)
+                    ArenaI18n.text(target, "arena.messages.session.started", "theme" to theme.id, "mob_type" to theme.id, "difficulty" to difficultyDisplay, "waves" to variant.waves.size)
                 )
             }
-            ArenaStartResult.Success(theme.id, variant.waves.size, promoted, variant.display)
+            ArenaStartResult.Success(theme.id, variant.waves.size, promoted, difficultyDisplay)
         } catch (e: Exception) {
             if (e is ArenaStageBuildException) {
                 plugin.logger.severe("[Arena] 驛｢・ｧ繝ｻ・ｹ驛｢譏ｴ繝ｻ郢晢ｽｻ驛｢・ｧ繝ｻ・ｸ驍ｵ・ｺ繝ｻ・ｮ鬨ｾ蠅難ｽｻ阮吶・驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ ${e.message}")

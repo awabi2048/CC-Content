@@ -7,7 +7,6 @@ normal:
     weight: 5
     icon: STONE
     difficulty_star: 1
-    display: "§c★§7★★★"
     max_participants: 2
     pedestal_room_probability: 0.3
     revive_max_per_player: 1
@@ -197,7 +196,6 @@ normal:
     weight: 5
     icon: CHISELED_SANDSTONE
     difficulty_star: 1
-    display: "§c★§7★★★"
     max_participants: 2
     pedestal_room_probability: 0.3
     revive_max_per_player: 1
@@ -474,7 +472,6 @@ normal:
     weight: 4
     icon: PRISMARINE_BRICKS
     difficulty_star: 2
-    display: "§c★★§7★★"
     max_participants: 3
     pedestal_room_probability: 0.3
     revive_max_per_player: 1
@@ -617,7 +614,6 @@ normal:
     weight: 4
     icon: MOSSY_COBBLESTONE
     difficulty_star: 2
-    display: "§c★★§7★★"
     max_participants: 3
     pedestal_room_probability: 0.3
     revive_max_per_player: 1
@@ -948,7 +944,6 @@ normal:
     weight: 1
     icon: NETHER_BRICKS
     difficulty_star: 3
-    display: "§c★★★§7★"
     max_participants: 4
     pedestal_room_probability: 0.3
     revive_max_per_player: 1
@@ -1093,7 +1088,6 @@ normal:
     weight: 1
     icon: PURPUR_PILLAR
     difficulty_star: 3
-    display: "§c★★★§7★"
     max_participants: 4
     pedestal_room_probability: 0.3
     revive_max_per_player: 1
@@ -1223,7 +1217,6 @@ normal:
 promoted:
   ruins:
     difficulty_star: 2
-    display: "§c★★§7★★"
     max_participants: 3
     pedestal_room_probability: 0.3
     revive_max_per_player: 1
@@ -1397,7 +1390,6 @@ promoted:
           stat_multiplier: 1.35
   desert_temple:
     difficulty_star: 2
-    display: "§c★★§7★★"
     max_participants: 3
     pedestal_room_probability: 0.3
     revive_max_per_player: 1
@@ -1658,7 +1650,6 @@ promoted:
           stat_multiplier: 1.35
   ocean_monument:
     difficulty_star: 3
-    display: "§c★★★§7★"
     max_participants: 4
     pedestal_room_probability: 0.3
     revive_max_per_player: 1
@@ -1785,7 +1776,6 @@ promoted:
           stat_multiplier: 1.9
   natura:
     difficulty_star: 3
-    display: "§c★★★§7★"
     max_participants: 4
     pedestal_room_probability: 0.3
     revive_max_per_player: 1
@@ -2100,7 +2090,6 @@ promoted:
           stat_multiplier: 1.9
   nether:
     difficulty_star: 4
-    display: "§c★★★★"
     max_participants: 6
     pedestal_room_probability: 0.3
     revive_max_per_player: 1
@@ -2229,7 +2218,6 @@ promoted:
           stat_multiplier: 2.6
   end:
     difficulty_star: 4
-    display: "§c★★★★"
     max_participants: 6
     pedestal_room_probability: 0.3
     revive_max_per_player: 1

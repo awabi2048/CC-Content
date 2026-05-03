@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent.features.arena.mission
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.arena.ArenaAuditLogger
 import jp.awabi2048.cccontent.features.arena.ArenaI18n
+import jp.awabi2048.cccontent.features.arena.ArenaMenuItems
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeVariant
 import jp.awabi2048.cccontent.features.arena.ArenaManager
 import jp.awabi2048.cccontent.features.arena.ArenaStartResult
@@ -537,7 +538,6 @@ class ArenaMissionService(
                 themeId = themeId,
                 promoted = promoted,
                 difficultyStar = variant.difficultyStar,
-                difficultyDisplay = variant.display,
                 maxParticipants = variant.maxParticipants
             )
         }
@@ -610,7 +610,6 @@ class ArenaMissionService(
                 themeId = themeId,
                 promoted = promoted,
                 difficultyStar = variant.difficultyStar,
-                difficultyDisplay = variant.display,
                 maxParticipants = maxParticipants
             )
         }.sortedBy { it.index }
@@ -779,12 +778,7 @@ class ArenaMissionService(
     }
 
     private fun createBackgroundPane(material: Material): ItemStack {
-        val item = ItemStack(material)
-        val meta = item.itemMeta ?: return item
-        meta.setDisplayName(" ")
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
-        item.itemMeta = meta
-        return item
+        return ArenaMenuItems.backgroundPane(material)
     }
 
     private fun createActionItem(material: Material, name: String, lore: List<String>): ItemStack {
@@ -857,7 +851,7 @@ class ArenaMissionService(
         val lore = mutableListOf<String>()
         lore += ArenaI18n.text(player, "arena.ui.separator")
         lore += ArenaI18n.text(player, "arena.ui.license_card.current_license", "tier" to licenseTierDisplayName(player, currentTier))
-        lore += ArenaI18n.text(player, "arena.ui.license_card.allowed_difficulty", "difficulty" to difficultyCapDisplay(currentTier.maxDifficultyStar))
+        lore += ArenaI18n.text(player, "arena.ui.license_card.allowed_difficulty", "difficulty" to difficultyDisplay(currentTier.maxDifficultyStar))
         lore += ArenaI18n.text(player, "arena.ui.separator")
         lore += ArenaI18n.text(player, "arena.ui.license_card.next_header")
 
@@ -885,7 +879,7 @@ class ArenaMissionService(
         lore += ArenaI18n.text(player, "arena.ui.mission.mission_title")
         lore += missionGuideHints(missionType, player)
         lore += ""
-        lore += ArenaI18n.text(player, "arena.ui.mission.difficulty_inline", "difficulty" to mission.difficultyDisplay)
+        lore += ArenaI18n.text(player, "arena.ui.mission.difficulty_inline", "difficulty" to difficultyDisplay(mission.difficultyStar))
         lore += ArenaI18n.text(player, "arena.ui.separator")
         return lore
     }
@@ -898,7 +892,7 @@ class ArenaMissionService(
         lore += ArenaI18n.text(player, "arena.ui.mission.mission_title")
         lore += missionGuideHints(missionType, player)
         lore += ""
-        lore += ArenaI18n.text(player, "arena.ui.mission.difficulty_inline", "difficulty" to mission.difficultyDisplay)
+        lore += ArenaI18n.text(player, "arena.ui.mission.difficulty_inline", "difficulty" to difficultyDisplay(mission.difficultyStar))
         lore += ArenaI18n.text(player, "arena.ui.mission.memo_inline", "memo" to memo)
         lore += ArenaI18n.text(player, "arena.ui.separator")
         return lore
@@ -948,9 +942,8 @@ class ArenaMissionService(
         return "$color$cappedCurrent§7/$required"
     }
 
-    private fun difficultyCapDisplay(starCount: Int): String {
-        val effective = starCount.coerceIn(1, 4)
-        return "★".repeat(effective).padEnd(3, '☆')
+    private fun difficultyDisplay(starCount: Int): String {
+        return ArenaMenuItems.difficultyStars(starCount)
     }
 
     private fun licenseTierDisplayName(player: Player?, tier: ArenaLicenseTier): String {

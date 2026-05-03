@@ -54,7 +54,6 @@ data class ArenaThemeConfig(
 
 data class ArenaThemeVariant(
     val difficultyStar: Int,
-    val display: String,
     val maxParticipants: Int,
     val pedestalRoomProbability: Double,
     val reviveMaxPerPlayer: Int,
@@ -490,10 +489,9 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
         fallback: ArenaThemeVariant? = null
     ): ArenaThemeVariant? {
         val difficultyStar = section.getInt("difficulty_star", fallback?.difficultyStar ?: -1)
-        if (difficultyStar < 1 || difficultyStar > 4) {
+        if (difficultyStar < 1) {
             throw IllegalStateException("[Arena] theme.yml の difficulty_star は1以上である必要があります: theme=$themeId variant=$variantName difficulty_star=$difficultyStar")
         }
-        val display = section.getString("display", fallback?.display ?: themeId) ?: themeId
         val maxParticipants = section.getInt("max_participants", fallback?.maxParticipants ?: 6).coerceIn(1, 6)
         val pedestalRoomProbability = section.getDouble("pedestal_room_probability", fallback?.pedestalRoomProbability ?: 0.0).coerceIn(0.0, 1.0)
         val reviveMaxPerPlayerRaw = section.getInt("revive_max_per_player", fallback?.reviveMaxPerPlayer ?: -1)
@@ -522,7 +520,6 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
 
         return ArenaThemeVariant(
             difficultyStar = difficultyStar,
-            display = display,
             maxParticipants = maxParticipants,
             pedestalRoomProbability = pedestalRoomProbability,
             reviveMaxPerPlayer = reviveMaxPerPlayer,

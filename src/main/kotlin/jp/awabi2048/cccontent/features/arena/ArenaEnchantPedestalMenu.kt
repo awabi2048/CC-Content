@@ -21,7 +21,6 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
-import org.bukkit.inventory.meta.ItemMeta
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
@@ -1318,9 +1317,8 @@ class ArenaEnchantPedestalMenu(
         meta.lore = null
         meta.persistentDataContainer.set(inputPlaceholderKey, PersistentDataType.BYTE, 1)
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        applyExplicitTooltipHide(meta)
         item.itemMeta = meta
-        return item
+        return ArenaMenuItems.hideTooltip(item)
     }
 
     private fun buildInputSlotPlaceholder(player: Player): ItemStack {
@@ -1329,9 +1327,8 @@ class ArenaEnchantPedestalMenu(
         meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
         meta.persistentDataContainer.set(inputPlaceholderKey, PersistentDataType.BYTE, 1)
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        applyExplicitTooltipHide(meta)
         item.itemMeta = meta
-        return item
+        return ArenaMenuItems.hideTooltip(item)
     }
 
     private fun buildHiddenAnimationPane(player: Player): ItemStack {
@@ -1340,9 +1337,8 @@ class ArenaEnchantPedestalMenu(
         meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
         meta.persistentDataContainer.set(inputPlaceholderKey, PersistentDataType.BYTE, 1)
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        applyExplicitTooltipHide(meta)
         item.itemMeta = meta
-        return item
+        return ArenaMenuItems.hideTooltip(item)
     }
 
     private fun buildSimplePane(player: Player, material: Material): ItemStack {
@@ -1350,9 +1346,8 @@ class ArenaEnchantPedestalMenu(
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        applyExplicitTooltipHide(meta)
         item.itemMeta = meta
-        return item
+        return ArenaMenuItems.hideTooltip(item)
     }
 
     private fun buildPathPane(player: Player, material: Material, glint: Boolean): ItemStack {
@@ -1362,9 +1357,8 @@ class ArenaEnchantPedestalMenu(
         meta.persistentDataContainer.set(inputPlaceholderKey, PersistentDataType.BYTE, 1)
         meta.setEnchantmentGlintOverride(glint)
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
-        applyExplicitTooltipHide(meta)
         item.itemMeta = meta
-        return item
+        return ArenaMenuItems.hideTooltip(item)
     }
 
     private fun buildForgeProgressItem(player: Player): ItemStack {
@@ -1372,9 +1366,8 @@ class ArenaEnchantPedestalMenu(
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        applyExplicitTooltipHide(meta)
         item.itemMeta = meta
-        return item
+        return ArenaMenuItems.hideTooltip(item)
     }
 
     private fun evaluate(player: Player, inventory: Inventory): PedestalEvaluation {
@@ -2006,16 +1999,4 @@ class ArenaEnchantPedestalMenu(
         player.playSound(player.location, key, SoundCategory.PLAYERS, 1.0f, pitch)
     }
 
-    private fun applyExplicitTooltipHide(meta: ItemMeta) {
-        runCatching {
-            meta.setHideTooltip(true)
-        }
-        meta.addItemFlags(ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
-        runCatching {
-            val method = meta.javaClass.methods.firstOrNull {
-                it.name == "setHideTooltip" && it.parameterTypes.size == 1 && it.parameterTypes[0] == Boolean::class.javaPrimitiveType
-            } ?: return
-            method.invoke(meta, true)
-        }
-    }
 }
