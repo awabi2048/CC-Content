@@ -78,11 +78,9 @@ import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.block.Action
 import org.bukkit.event.Event
-import org.bukkit.event.player.PlayerAnimationEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerInteractEntityEvent
 import org.bukkit.event.entity.EntityMountEvent
-import org.bukkit.event.player.PlayerAnimationType
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.PlayerInventory
 import org.bukkit.potion.PotionEffect
@@ -315,6 +313,8 @@ class ArenaManager(
         const val MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT = 45
         const val MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT = 16.0
         const val MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT = 6
+        const val MULTIPLAYER_FAST_START_SNEAK_MILLIS = 3000L
+        const val MULTIPLAYER_FAST_START_HINT_COOLDOWN_MILLIS = 10000L
         const val WAVE_START_COMBAT_BGM_DELAY_TICKS = 0L
         const val ENTRANCE_BGM_START_DELAY_TICKS = 30L
         const val MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS = 5L
@@ -1433,6 +1433,8 @@ class ArenaManager(
         session.waitingParticipants.clear()
         session.waitingSubtitleNextTickByPlayer.clear()
         session.waitingOutsideTicksByPlayer.clear()
+        session.waitingAllSneakingSinceMillis = null
+        session.waitingFastStartHintCooldownUntilMillis = 0L
         session.invitedParticipants.clear()
     }
 
@@ -1442,6 +1444,7 @@ class ArenaManager(
         session.waitingNotifiedParticipants.remove(invitedId)
         session.waitingSubtitleNextTickByPlayer.remove(invitedId)
         session.waitingOutsideTicksByPlayer.remove(invitedId)
+        session.waitingAllSneakingSinceMillis = null
         hideJoinCountdownBossBar(session, invitedId)
         releaseInvitedPlayerLock(invitedId)
         removeArenaSidebar(invitedId)
@@ -1827,6 +1830,15 @@ class ArenaManager(
         )
     }
 
+    fun cancelArenaGlide(player: Player): Boolean {
+        val session = getSession(player) ?: return false
+        if (!session.participants.contains(player.uniqueId)) return false
+        if (player.isGliding) {
+            player.isGliding = false
+        }
+        return true
+    }
+
     fun handleDownedPlayerAttack(event: EntityDamageByEntityEvent) {
         val target = event.entity as? LivingEntity ?: return
         if (target is Player) return
@@ -2072,21 +2084,16 @@ class ArenaManager(
             .add(attacker.uniqueId)
     }
 
-    fun handleMultiplayerInviteSwing(event: PlayerAnimationEvent) {
-        if (event.animationType != PlayerAnimationType.ARM_SWING) {
-            return
-        }
-
-        val player = event.player
+    fun handlePlayerLeftClickPlayer(player: Player, target: Player): Boolean {
         val session = getSession(player)
-        if (session != null && trySelectReviveTargetBySwing(session, player)) {
-            return
+        if (session != null && trySelectReviveTargetByLeftClick(session, player, target)) {
+            return true
         }
 
         val currentTick = Bukkit.getCurrentTick().toLong()
         val cooldownUntil = inviteSwingCooldownUntilTick[player.uniqueId] ?: Long.MIN_VALUE
         if (currentTick < cooldownUntil) {
-            return
+            return session?.multiplayerJoinEnabled == true || invitedPlayerLocks.containsKey(player.uniqueId)
         }
 
         val ownerSession = getSession(player)
@@ -2095,58 +2102,41 @@ class ArenaManager(
                 player.sendMessage(
                     ArenaI18n.text(player, "arena.messages.multiplayer.invite_window_closed")
                 )
-                return
+                return true
             }
 
-            val invited = rayTraceTargetPlayer(player) ?: return
             inviteSwingCooldownUntilTick[player.uniqueId] = currentTick + MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS
-            trySendMultiplayerInvite(player, invited, ownerSession)
-            return
+            trySendMultiplayerInvite(player, target, ownerSession)
+            return true
         }
 
-        val lockedWorld = invitedPlayerLocks[player.uniqueId] ?: return
+        val lockedWorld = invitedPlayerLocks[player.uniqueId] ?: return false
         val invitedSession = sessionsByWorld[lockedWorld] ?: run {
             invitedPlayerLocks.remove(player.uniqueId)
             player.isGlowing = false
-            return
+            return false
         }
         if (!invitedSession.multiplayerJoinEnabled) {
-            return
+            return false
         }
         if (!invitedSession.invitedParticipants.contains(player.uniqueId)) {
-            return
+            return false
         }
 
-        val owner = Bukkit.getPlayer(invitedSession.ownerPlayerId) ?: return
+        val owner = Bukkit.getPlayer(invitedSession.ownerPlayerId) ?: return false
         if (!owner.isOnline || owner.world.uid != player.world.uid) {
-            return
+            return false
         }
 
-        val target = rayTraceTargetPlayer(player) ?: return
         if (target.uniqueId != owner.uniqueId) {
-            return
+            return false
         }
         inviteSwingCooldownUntilTick[player.uniqueId] = currentTick + MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS
         declineInvitedParticipant(invitedSession, player)
+        return true
     }
 
-    private fun rayTraceTargetPlayer(source: Player): Player? {
-        val maxDistance = (source.getAttribute(Attribute.ENTITY_INTERACTION_RANGE)?.value ?: 3.0).coerceAtLeast(1.0)
-        val eyeLocation = source.eyeLocation
-        val hit = source.world.rayTrace(
-            eyeLocation,
-            eyeLocation.direction,
-            maxDistance,
-            FluidCollisionMode.NEVER,
-            true,
-            0.1
-        ) { candidate ->
-            candidate is Player && candidate.uniqueId != source.uniqueId
-        }
-        return hit?.hitEntity as? Player
-    }
-
-    private fun trySelectReviveTargetBySwing(session: ArenaSession, player: Player): Boolean {
+    private fun trySelectReviveTargetByLeftClick(session: ArenaSession, player: Player, target: Player): Boolean {
         if (!session.participants.contains(player.uniqueId)) {
             return false
         }
@@ -2154,44 +2144,15 @@ class ArenaManager(
             return false
         }
 
-        val target = resolveReviveTargetByRayTrace(session, player) ?: return false
+        if (!session.participants.contains(target.uniqueId)) {
+            return false
+        }
+        if (!isPlayerDowned(session, target.uniqueId)) {
+            return false
+        }
 
         handleReviveTargetSelection(session, player, target)
         return true
-    }
-
-    private fun resolveReviveTargetByRayTrace(session: ArenaSession, source: Player): Player? {
-        val maxDistance = (source.getAttribute(Attribute.ENTITY_INTERACTION_RANGE)?.value ?: 3.0).coerceAtLeast(1.0)
-        val eyeLocation = source.eyeLocation
-        val hit = source.world.rayTrace(
-            eyeLocation,
-            eyeLocation.direction,
-            maxDistance,
-            FluidCollisionMode.NEVER,
-            true,
-            0.2
-        ) { candidate ->
-            when (candidate) {
-                is Player -> candidate.uniqueId != source.uniqueId
-                is Shulker -> true
-                else -> false
-            }
-        }
-        val entity = hit?.hitEntity ?: return null
-        return when (entity) {
-            is Player -> {
-                if (!session.participants.contains(entity.uniqueId)) return null
-                if (!isPlayerDowned(session, entity.uniqueId)) return null
-                entity
-            }
-            is Shulker -> {
-                val downedId = findDownedPlayerIdByShulker(session, entity.uniqueId) ?: return null
-                val downed = Bukkit.getPlayer(downedId) ?: return null
-                if (!downed.isOnline) return null
-                downed
-            }
-            else -> null
-        }
     }
 
     private fun trySendMultiplayerInvite(owner: Player, invited: Player, session: ArenaSession) {
@@ -2488,6 +2449,7 @@ class ArenaManager(
                 .filter { it.isOnline && it.world.name == session.worldName }
                 .forEach { participant ->
                     participant.sendMessage(ArenaI18n.text(participant, "arena.messages.down.needs_revive", "player" to player.name))
+                    participant.sendMessage(ArenaI18n.text(participant, "arena.messages.down.revive_hint"))
                 }
         }
 
@@ -3488,6 +3450,8 @@ class ArenaManager(
         session.waitingNotifiedParticipants.clear()
         session.waitingSubtitleNextTickByPlayer.clear()
         session.waitingOutsideTicksByPlayer.clear()
+        session.waitingAllSneakingSinceMillis = null
+        session.waitingFastStartHintCooldownUntilMillis = 0L
         session.arenaPreparingUntilMillisByParticipant.clear()
         session.entranceLiftLockedParticipants.clear()
         session.joinCountdownBossBars.clear()
@@ -6667,6 +6631,7 @@ class ArenaManager(
 
             updateJoinCountdownBossBars(session, now)
             updateWaitingParticipants(session)
+            updateMultiplayerFastStart(session, now)
 
             if (!session.multiplayerJoinFinalizeStarted && now >= session.joinGraceEndMillis) {
                 session.multiplayerJoinFinalizeStarted = true
@@ -6842,6 +6807,52 @@ class ArenaManager(
             player.sendMessage(
                 ArenaI18n.text(player, "arena.messages.multiplayer.waiting_exited")
             )
+        }
+    }
+
+    private fun updateMultiplayerFastStart(session: ArenaSession, nowMillis: Long) {
+        if (session.multiplayerJoinFinalizeStarted || session.multiplayerJoinIntroStarted) {
+            session.waitingAllSneakingSinceMillis = null
+            return
+        }
+
+        val candidateIds = linkedSetOf<UUID>()
+        candidateIds += session.ownerPlayerId
+        candidateIds += session.invitedParticipants
+
+        val candidates = candidateIds.mapNotNull { Bukkit.getPlayer(it) }
+        val allWaiting = candidates.size == candidateIds.size &&
+            candidateIds.isNotEmpty() &&
+            candidateIds.all { it in session.waitingParticipants }
+
+        if (!allWaiting) {
+            session.waitingAllSneakingSinceMillis = null
+            return
+        }
+
+        if (nowMillis >= session.waitingFastStartHintCooldownUntilMillis) {
+            candidates
+                .filter { it.isOnline }
+                .forEach { player ->
+                    player.sendMessage(ArenaI18n.text(player, "arena.messages.multiplayer.fast_start_hint"))
+                }
+            session.waitingFastStartHintCooldownUntilMillis = nowMillis + MULTIPLAYER_FAST_START_HINT_COOLDOWN_MILLIS
+        }
+
+        val allSneaking = candidates.all { player ->
+            player.isOnline &&
+                player.isSneaking
+        }
+        if (!allSneaking) {
+            session.waitingAllSneakingSinceMillis = null
+            return
+        }
+
+        val since = session.waitingAllSneakingSinceMillis ?: nowMillis.also {
+            session.waitingAllSneakingSinceMillis = it
+        }
+        if (nowMillis - since >= MULTIPLAYER_FAST_START_SNEAK_MILLIS) {
+            session.multiplayerJoinFinalizeStarted = true
         }
     }
 
@@ -8143,7 +8154,7 @@ class ArenaManager(
             !online.isDead &&
             online.world.name == session.worldName
         ) {
-            return ArenaI18n.text(null, "arena.ui.sidebar.status_alive")
+            return "§c❤ ${online.health.roundToInt().coerceAtLeast(0)}"
         }
         return ArenaI18n.text(null, "arena.ui.sidebar.status_dead")
     }

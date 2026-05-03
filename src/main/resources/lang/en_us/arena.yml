@@ -116,6 +116,7 @@ arena:
       wait_area_hint: '&7Invited players enter waiting state by standing in the join area with the owner'
       waiting_entered: '&aYou entered the waiting area. Stay here until the grace time ends'
       waiting_exited: '&cYou stepped off the lift. Stay on it if you want to join!'
+      fast_start_hint: '&7If everyone sneaks on the lift for 3 seconds, departure starts immediately'
       lift_not_ready_oage: §f"Looks like the lift is not ready yet! Please wait a little!"
       lift_occupied_oage: §f"Please wait until the lift is free!"
       waiting_title: '&7Waiting to start'
@@ -150,6 +151,7 @@ arena:
       game_over: '&cEverything went dark...!\n&7Game over. Teleporting to lobby'
       participant_died: §4{player} has fallen... §7(Oage is heading to rescue)
       needs_revive: '&c{player} is downed! Revive them!'
+      revive_hint: '&7Sneak near them to revive!'
     oage:
       stage_start:
       - §fWe have arrived on site!
