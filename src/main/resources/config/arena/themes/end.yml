@@ -1,0 +1,248 @@
+﻿normal:
+  weight: 1
+  icon: PURPUR_PILLAR
+  difficulty_star: 3
+  difficulty_exp_bonus_rate: 0.3
+  wave_exp_bonus_rate_increment: 0.15
+  max_participants: 4
+  pedestal_room_probability: 0.3
+  revive_max_per_player: 1
+  revive_time_limit_seconds: 20
+  waves:
+  - wave: 1
+    spawn_interval: 16
+    clear_mob_count: 20
+    max_alive: 7
+    mobs:
+      wither_ghost:
+        weight: 4
+        stat_multiplier: 1.9
+      enderman_mist_delay:
+        weight: 1
+        stat_multiplier: 1.9
+      endermite_poison:
+        weight: 1
+        stat_multiplier: 1.9
+  - wave: 2
+    spawn_interval: 16
+    clear_mob_count: 21
+    max_alive: 7
+    mobs:
+      wither_ghost:
+        weight: 4
+        stat_multiplier: 1.9
+      endermite_poison:
+        weight: 1
+        stat_multiplier: 1.9
+      wither_knight:
+        weight: 4
+        stat_multiplier: 1.9
+      enderman_small_backstab:
+        weight: 1
+        stat_multiplier: 1.9
+      enderman_void_carrier:
+        weight: 1
+        stat_multiplier: 1.9
+      shulker_mimic:
+        weight: 1
+        stat_multiplier: 1.9
+  - wave: 3
+    spawn_interval: 16
+    clear_mob_count: 21
+    max_alive: 7
+    mobs:
+      wither_ghost:
+        weight: 4
+        stat_multiplier: 1.9
+      wither_knight:
+        weight: 4
+        stat_multiplier: 1.9
+      shulker_mimic:
+        weight: 1
+        stat_multiplier: 1.9
+      enderman_rift_carrier:
+        weight: 1
+        stat_multiplier: 1.9
+      enderman_grave_carrier:
+        weight: 1
+        stat_multiplier: 1.9
+      raiden_creeper:
+        weight: 1
+        stat_multiplier: 1.9
+  - wave: 4
+    spawn_interval: 16
+    clear_mob_count: 23
+    max_alive: 8
+    mobs:
+      wither_ghost:
+        weight: 4
+        stat_multiplier: 1.9
+      wither_knight:
+        weight: 4
+        stat_multiplier: 1.9
+      shulker_mimic:
+        weight: 1
+        stat_multiplier: 1.9
+      end_crystal_sentinel:
+        weight: 1
+        stat_multiplier: 1.9
+      enderman_phase:
+        weight: 1
+        stat_multiplier: 1.9
+      enderman_drain:
+        weight: 1
+        stat_multiplier: 1.9
+  - wave: 5
+    spawn_interval: 16
+    clear_mob_count: 23
+    max_alive: 8
+    mobs:
+      wither_ghost:
+        weight: 4
+        stat_multiplier: 1.9
+      wither_knight:
+        weight: 4
+        stat_multiplier: 1.9
+      end_wither_sentinel:
+        weight: 1
+        stat_multiplier: 1.9
+      ender_eye_beam:
+        weight: 1
+        stat_multiplier: 1.9
+      enderman_mirror:
+        weight: 1
+        stat_multiplier: 1.9
+      enderman_eye_summoner:
+        weight: 1
+        stat_multiplier: 1.9
+
+  door_open_sound:
+    key: minecraft:block.glass.break
+    pitch: 0.66
+  orientation:
+    entrance_exit: north
+    corner_entry: south
+    corner_exit: east
+    straight_entry: south
+    corridor_entry: south
+    goal_entry: west
+    tjunction_entry: south
+    tjunction_through: north
+    tjunction_branch: east
+    pedestal_entry: west
+
+promoted:
+  difficulty_star: 4
+  difficulty_exp_bonus_rate: 0.45
+  wave_exp_bonus_rate_increment: 0.2
+  max_participants: 6
+  pedestal_room_probability: 0.3
+  revive_max_per_player: 1
+  revive_time_limit_seconds: 15
+  waves:
+  - wave: 1
+    spawn_interval: 14
+    clear_mob_count: 24
+    max_alive: 8
+    mobs:
+      wither_ghost:
+        weight: 4
+        stat_multiplier: 2.6
+      enderman_mist_delay:
+        weight: 1
+        stat_multiplier: 2.6
+      endermite_poison:
+        weight: 1
+        stat_multiplier: 2.6
+  - wave: 2
+    spawn_interval: 14
+    clear_mob_count: 26
+    max_alive: 9
+    mobs:
+      wither_ghost:
+        weight: 4
+        stat_multiplier: 2.6
+      endermite_poison:
+        weight: 1
+        stat_multiplier: 2.6
+      wither_knight:
+        weight: 4
+        stat_multiplier: 2.6
+      enderman_small_backstab:
+        weight: 1
+        stat_multiplier: 2.6
+      enderman_void_carrier:
+        weight: 1
+        stat_multiplier: 2.6
+      shulker_mimic:
+        weight: 1
+        stat_multiplier: 2.6
+  - wave: 3
+    spawn_interval: 14
+    clear_mob_count: 27
+    max_alive: 9
+    mobs:
+      wither_ghost:
+        weight: 4
+        stat_multiplier: 2.6
+      wither_knight:
+        weight: 4
+        stat_multiplier: 2.6
+      shulker_mimic:
+        weight: 1
+        stat_multiplier: 2.6
+      enderman_rift_carrier:
+        weight: 1
+        stat_multiplier: 2.6
+      enderman_grave_carrier:
+        weight: 1
+        stat_multiplier: 2.6
+      raiden_creeper:
+        weight: 1
+        stat_multiplier: 2.6
+  - wave: 4
+    spawn_interval: 14
+    clear_mob_count: 29
+    max_alive: 10
+    mobs:
+      wither_ghost:
+        weight: 4
+        stat_multiplier: 2.6
+      wither_knight:
+        weight: 4
+        stat_multiplier: 2.6
+      shulker_mimic:
+        weight: 1
+        stat_multiplier: 2.6
+      end_crystal_sentinel:
+        weight: 1
+        stat_multiplier: 2.6
+      enderman_phase:
+        weight: 1
+        stat_multiplier: 2.6
+      enderman_drain:
+        weight: 1
+        stat_multiplier: 2.6
+  - wave: 5
+    spawn_interval: 14
+    clear_mob_count: 30
+    max_alive: 10
+    mobs:
+      wither_ghost:
+        weight: 4
+        stat_multiplier: 2.6
+      wither_knight:
+        weight: 4
+        stat_multiplier: 2.6
+      end_wither_sentinel:
+        weight: 1
+        stat_multiplier: 2.6
+      ender_eye_beam:
+        weight: 1
+        stat_multiplier: 2.6
+      enderman_mirror:
+        weight: 1
+        stat_multiplier: 2.6
+      enderman_eye_summoner:
+        weight: 1
+        stat_multiplier: 2.6

@@ -1,0 +1,541 @@
+﻿normal:
+  weight: 5
+  icon: CHISELED_SANDSTONE
+  difficulty_star: 1
+  difficulty_exp_bonus_rate: 0
+  wave_exp_bonus_rate_increment: 0.05
+  max_participants: 2
+  pedestal_room_probability: 0.3
+  revive_max_per_player: 1
+  revive_time_limit_seconds: 30
+  waves:
+  - wave: 1
+    spawn_interval: 20
+    clear_mob_count: 26
+    max_alive: 9
+    mobs:
+      husk_normal:
+        weight: 8
+        stat_multiplier: 1
+      husk_light_leap:
+        weight: 9
+        stat_multiplier: 1
+      skeleton_normal:
+        weight: 8
+        stat_multiplier: 1
+      skeleton_plain:
+        weight: 7
+        stat_multiplier: 1
+      spider_plain:
+        weight: 8
+        stat_multiplier: 1
+  - wave: 2
+    spawn_interval: 20
+    clear_mob_count: 26
+    max_alive: 9
+    mobs:
+      husk_normal:
+        weight: 8
+        stat_multiplier: 1
+      husk_light_leap:
+        weight: 9
+        stat_multiplier: 1
+      husk_archer:
+        weight: 7
+        stat_multiplier: 1
+      skeleton_normal:
+        weight: 8
+        stat_multiplier: 1
+      skeleton_plain:
+        weight: 7
+        stat_multiplier: 1
+      skeleton_rapid:
+        weight: 7
+        stat_multiplier: 1
+      skeleton_throw_close:
+        weight: 7
+        stat_multiplier: 1
+      silverfish_plain:
+        weight: 10
+        stat_multiplier: 1
+      spider_plain:
+        weight: 8
+        stat_multiplier: 1
+      spider_stealth:
+        weight: 7
+        stat_multiplier: 1
+      spider_swift:
+        weight: 7
+        stat_multiplier: 1
+  - wave: 3
+    spawn_interval: 20
+    clear_mob_count: 27
+    max_alive: 9
+    mobs:
+      husk_normal:
+        weight: 8
+        stat_multiplier: 1
+      husk_light_leap:
+        weight: 9
+        stat_multiplier: 1
+      husk_heavy_shield:
+        weight: 7
+        stat_multiplier: 1
+      husk_archer:
+        weight: 7
+        stat_multiplier: 1
+      husk_archer_swap:
+        weight: 8
+        stat_multiplier: 1
+      husk_weakening_aura:
+        weight: 6
+        stat_multiplier: 1
+      skeleton_normal:
+        weight: 8
+        stat_multiplier: 1
+      skeleton_plain:
+        weight: 7
+        stat_multiplier: 1
+      skeleton_rapid:
+        weight: 7
+        stat_multiplier: 1
+      skeleton_curve_backstep:
+        weight: 6
+        stat_multiplier: 1
+      skeleton_heavy_bow_shield:
+        weight: 6
+        stat_multiplier: 1
+      skeleton_throw_close:
+        weight: 7
+        stat_multiplier: 1
+      silverfish_plain:
+        weight: 10
+        stat_multiplier: 1
+      spider_plain:
+        weight: 8
+        stat_multiplier: 1
+      spider_stealth:
+        weight: 7
+        stat_multiplier: 1
+      spider_swift:
+        weight: 7
+        stat_multiplier: 1
+      spider_ferocious:
+        weight: 6
+        stat_multiplier: 1
+  - wave: 4
+    spawn_interval: 20
+    clear_mob_count: 27
+    max_alive: 9
+    mobs:
+      husk_normal:
+        weight: 8
+        stat_multiplier: 1
+      husk_light_leap:
+        weight: 9
+        stat_multiplier: 1
+      husk_heavy_shield:
+        weight: 7
+        stat_multiplier: 1
+      husk_archer:
+        weight: 7
+        stat_multiplier: 1
+      husk_archer_swap:
+        weight: 8
+        stat_multiplier: 1
+      husk_weakening_aura:
+        weight: 6
+        stat_multiplier: 1
+      skeleton_normal:
+        weight: 8
+        stat_multiplier: 1
+      skeleton_plain:
+        weight: 7
+        stat_multiplier: 1
+      skeleton_rapid:
+        weight: 7
+        stat_multiplier: 1
+      skeleton_curve_backstep:
+        weight: 6
+        stat_multiplier: 1
+      skeleton_heavy_bow_shield:
+        weight: 6
+        stat_multiplier: 1
+      skeleton_throw_close:
+        weight: 7
+        stat_multiplier: 1
+      silverfish_plain:
+        weight: 10
+        stat_multiplier: 1
+      silverfish_big_poison:
+        weight: 5
+        stat_multiplier: 1
+      spider_plain:
+        weight: 8
+        stat_multiplier: 1
+      spider_stealth:
+        weight: 7
+        stat_multiplier: 1
+      spider_swift:
+        weight: 7
+        stat_multiplier: 1
+      spider_ferocious:
+        weight: 6
+        stat_multiplier: 1
+      spider_venom_frenzy:
+        weight: 5
+        stat_multiplier: 1
+      silverfish_stealth_fang:
+        weight: 3
+        stat_multiplier: 1
+      desert_temple_sand_golem:
+        weight: 2
+        stat_multiplier: 1
+  - wave: 5
+    spawn_interval: 20
+    clear_mob_count: 29
+    max_alive: 10
+    mobs:
+      husk_normal:
+        weight: 8
+        stat_multiplier: 1
+      husk_light_leap:
+        weight: 9
+        stat_multiplier: 1
+      husk_heavy_shield:
+        weight: 7
+        stat_multiplier: 1
+      husk_archer:
+        weight: 7
+        stat_multiplier: 1
+      husk_archer_swap:
+        weight: 8
+        stat_multiplier: 1
+      husk_weakening_aura:
+        weight: 6
+        stat_multiplier: 1
+      skeleton_normal:
+        weight: 8
+        stat_multiplier: 1
+      skeleton_plain:
+        weight: 7
+        stat_multiplier: 1
+      skeleton_rapid:
+        weight: 7
+        stat_multiplier: 1
+      skeleton_curve_backstep:
+        weight: 6
+        stat_multiplier: 1
+      skeleton_heavy_bow_shield:
+        weight: 6
+        stat_multiplier: 1
+      skeleton_throw_close:
+        weight: 7
+        stat_multiplier: 1
+      silverfish_plain:
+        weight: 10
+        stat_multiplier: 1
+      silverfish_big_poison:
+        weight: 5
+        stat_multiplier: 1
+      spider_plain:
+        weight: 8
+        stat_multiplier: 1
+      spider_stealth:
+        weight: 7
+        stat_multiplier: 1
+      spider_swift:
+        weight: 7
+        stat_multiplier: 1
+      spider_ferocious:
+        weight: 6
+        stat_multiplier: 1
+      spider_venom_frenzy:
+        weight: 5
+        stat_multiplier: 1
+      spider_broodmother:
+        weight: 3
+        stat_multiplier: 1
+      silverfish_stealth_fang:
+        weight: 3
+        stat_multiplier: 1
+      desert_temple_sand_golem:
+        weight: 2
+        stat_multiplier: 1
+  door_open_sound:
+    key: minecraft:block.sand.break
+    pitch: 0.5
+  orientation:
+    entrance_exit: south
+    corner_entry: north
+    corner_exit: west
+    straight_entry: east
+    corridor_entry: north
+    goal_entry: east
+    tjunction_entry: east
+    tjunction_through: west
+    tjunction_branch: north
+    pedestal_entry: south
+
+promoted:
+  difficulty_star: 2
+  difficulty_exp_bonus_rate: 0.15
+  wave_exp_bonus_rate_increment: 0.1
+  max_participants: 3
+  pedestal_room_probability: 0.3
+  revive_max_per_player: 1
+  revive_time_limit_seconds: 25
+  waves:
+  - wave: 1
+    spawn_interval: 18
+    clear_mob_count: 32
+    max_alive: 11
+    mobs:
+      husk_normal:
+        weight: 8
+        stat_multiplier: 1.35
+      husk_light_leap:
+        weight: 9
+        stat_multiplier: 1.35
+      skeleton_normal:
+        weight: 8
+        stat_multiplier: 1.35
+      skeleton_plain:
+        weight: 7
+        stat_multiplier: 1.35
+      spider_plain:
+        weight: 8
+        stat_multiplier: 1.35
+  - wave: 2
+    spawn_interval: 18
+    clear_mob_count: 33
+    max_alive: 11
+    mobs:
+      husk_normal:
+        weight: 8
+        stat_multiplier: 1.35
+      husk_light_leap:
+        weight: 9
+        stat_multiplier: 1.35
+      husk_archer:
+        weight: 7
+        stat_multiplier: 1.35
+      skeleton_normal:
+        weight: 8
+        stat_multiplier: 1.35
+      skeleton_plain:
+        weight: 7
+        stat_multiplier: 1.35
+      skeleton_rapid:
+        weight: 7
+        stat_multiplier: 1.35
+      skeleton_throw_close:
+        weight: 7
+        stat_multiplier: 1.35
+      silverfish_plain:
+        weight: 10
+        stat_multiplier: 1.35
+      spider_plain:
+        weight: 8
+        stat_multiplier: 1.35
+      spider_stealth:
+        weight: 7
+        stat_multiplier: 1.35
+      spider_swift:
+        weight: 7
+        stat_multiplier: 1.35
+  - wave: 3
+    spawn_interval: 18
+    clear_mob_count: 35
+    max_alive: 12
+    mobs:
+      husk_normal:
+        weight: 8
+        stat_multiplier: 1.35
+      husk_light_leap:
+        weight: 9
+        stat_multiplier: 1.35
+      husk_heavy_shield:
+        weight: 7
+        stat_multiplier: 1.35
+      husk_archer:
+        weight: 7
+        stat_multiplier: 1.35
+      husk_archer_swap:
+        weight: 8
+        stat_multiplier: 1.35
+      husk_weakening_aura:
+        weight: 6
+        stat_multiplier: 1.35
+      skeleton_normal:
+        weight: 8
+        stat_multiplier: 1.35
+      skeleton_plain:
+        weight: 7
+        stat_multiplier: 1.35
+      skeleton_rapid:
+        weight: 7
+        stat_multiplier: 1.35
+      skeleton_curve_backstep:
+        weight: 6
+        stat_multiplier: 1.35
+      skeleton_heavy_bow_shield:
+        weight: 6
+        stat_multiplier: 1.35
+      skeleton_throw_close:
+        weight: 7
+        stat_multiplier: 1.35
+      silverfish_plain:
+        weight: 10
+        stat_multiplier: 1.35
+      spider_plain:
+        weight: 8
+        stat_multiplier: 1.35
+      spider_stealth:
+        weight: 7
+        stat_multiplier: 1.35
+      spider_swift:
+        weight: 7
+        stat_multiplier: 1.35
+      spider_ferocious:
+        weight: 6
+        stat_multiplier: 1.35
+  - wave: 4
+    spawn_interval: 18
+    clear_mob_count: 36
+    max_alive: 12
+    mobs:
+      husk_normal:
+        weight: 8
+        stat_multiplier: 1.35
+      husk_light_leap:
+        weight: 9
+        stat_multiplier: 1.35
+      husk_heavy_shield:
+        weight: 7
+        stat_multiplier: 1.35
+      husk_archer:
+        weight: 7
+        stat_multiplier: 1.35
+      husk_archer_swap:
+        weight: 8
+        stat_multiplier: 1.35
+      husk_weakening_aura:
+        weight: 6
+        stat_multiplier: 1.35
+      skeleton_normal:
+        weight: 8
+        stat_multiplier: 1.35
+      skeleton_plain:
+        weight: 7
+        stat_multiplier: 1.35
+      skeleton_rapid:
+        weight: 7
+        stat_multiplier: 1.35
+      skeleton_curve_backstep:
+        weight: 6
+        stat_multiplier: 1.35
+      skeleton_heavy_bow_shield:
+        weight: 6
+        stat_multiplier: 1.35
+      skeleton_throw_close:
+        weight: 7
+        stat_multiplier: 1.35
+      silverfish_plain:
+        weight: 10
+        stat_multiplier: 1.35
+      silverfish_big_poison:
+        weight: 5
+        stat_multiplier: 1.35
+      spider_plain:
+        weight: 8
+        stat_multiplier: 1.35
+      spider_stealth:
+        weight: 7
+        stat_multiplier: 1.35
+      spider_swift:
+        weight: 7
+        stat_multiplier: 1.35
+      spider_ferocious:
+        weight: 6
+        stat_multiplier: 1.35
+      spider_venom_frenzy:
+        weight: 5
+        stat_multiplier: 1.35
+      silverfish_stealth_fang:
+        weight: 3
+        stat_multiplier: 1.35
+      desert_temple_sand_golem:
+        weight: 2
+        stat_multiplier: 1.35
+  - wave: 5
+    spawn_interval: 18
+    clear_mob_count: 36
+    max_alive: 12
+    mobs:
+      husk_normal:
+        weight: 8
+        stat_multiplier: 1.35
+      husk_light_leap:
+        weight: 9
+        stat_multiplier: 1.35
+      husk_heavy_shield:
+        weight: 7
+        stat_multiplier: 1.35
+      husk_archer:
+        weight: 7
+        stat_multiplier: 1.35
+      husk_archer_swap:
+        weight: 8
+        stat_multiplier: 1.35
+      husk_weakening_aura:
+        weight: 6
+        stat_multiplier: 1.35
+      skeleton_normal:
+        weight: 8
+        stat_multiplier: 1.35
+      skeleton_plain:
+        weight: 7
+        stat_multiplier: 1.35
+      skeleton_rapid:
+        weight: 7
+        stat_multiplier: 1.35
+      skeleton_curve_backstep:
+        weight: 6
+        stat_multiplier: 1.35
+      skeleton_heavy_bow_shield:
+        weight: 6
+        stat_multiplier: 1.35
+      skeleton_throw_close:
+        weight: 7
+        stat_multiplier: 1.35
+      silverfish_plain:
+        weight: 10
+        stat_multiplier: 1.35
+      silverfish_big_poison:
+        weight: 5
+        stat_multiplier: 1.35
+      spider_plain:
+        weight: 8
+        stat_multiplier: 1.35
+      spider_stealth:
+        weight: 7
+        stat_multiplier: 1.35
+      spider_swift:
+        weight: 7
+        stat_multiplier: 1.35
+      spider_ferocious:
+        weight: 6
+        stat_multiplier: 1.35
+      spider_venom_frenzy:
+        weight: 5
+        stat_multiplier: 1.35
+      spider_broodmother:
+        weight: 3
+        stat_multiplier: 1.35
+      silverfish_stealth_fang:
+        weight: 3
+        stat_multiplier: 1.35
+      desert_temple_sand_golem:
+        weight: 2
+        stat_multiplier: 1.35

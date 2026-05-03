@@ -1,0 +1,273 @@
+﻿normal:
+  weight: 4
+  icon: PRISMARINE_BRICKS
+  difficulty_star: 2
+  difficulty_exp_bonus_rate: 0.15
+  wave_exp_bonus_rate_increment: 0.1
+  max_participants: 3
+  pedestal_room_probability: 0.3
+  revive_max_per_player: 1
+  revive_time_limit_seconds: 25
+  waves:
+  - wave: 1
+    spawn_interval: 18
+    clear_mob_count: 32
+    max_alive: 11
+    mobs:
+      drowned_unarmed:
+        weight: 8
+        stat_multiplier: 1.35
+      guardian_small:
+        weight: 3
+        stat_multiplier: 1.35
+  - wave: 2
+    spawn_interval: 18
+    clear_mob_count: 33
+    max_alive: 11
+    mobs:
+      drowned_unarmed:
+        weight: 8
+        stat_multiplier: 1.35
+      drowned_trident_guard:
+        weight: 12
+        stat_multiplier: 1.35
+      water_spirit:
+        weight: 2
+        stat_multiplier: 1.35
+        max_alive: 2
+      guardian_normal:
+        weight: 4
+        stat_multiplier: 1.35
+      guardian_small:
+        weight: 3
+        stat_multiplier: 1.35
+  - wave: 3
+    spawn_interval: 18
+    clear_mob_count: 35
+    max_alive: 12
+    mobs:
+      drowned_unarmed:
+        weight: 8
+        stat_multiplier: 1.35
+      drowned_trident_guard:
+        weight: 12
+        stat_multiplier: 1.35
+      drowned_raider_axe:
+        weight: 6
+        stat_multiplier: 1.35
+      water_spirit:
+        weight: 2
+        stat_multiplier: 1.35
+        max_alive: 2
+      guardian_normal:
+        weight: 4
+        stat_multiplier: 1.35
+      guardian_small:
+        weight: 3
+        stat_multiplier: 1.35
+      guardian_drain:
+        weight: 3
+        stat_multiplier: 1.35
+  - wave: 4
+    spawn_interval: 18
+    clear_mob_count: 36
+    max_alive: 12
+    mobs:
+      drowned_unarmed:
+        weight: 8
+        stat_multiplier: 1.35
+      drowned_trident_guard:
+        weight: 12
+        stat_multiplier: 1.35
+      drowned_raider_axe:
+        weight: 6
+        stat_multiplier: 1.35
+      water_spirit_elite:
+        weight: 2
+        stat_multiplier: 1.35
+        max_alive: 2
+      guardian_normal:
+        weight: 4
+        stat_multiplier: 1.35
+      guardian_small:
+        weight: 3
+        stat_multiplier: 1.35
+      guardian_drain:
+        weight: 3
+        stat_multiplier: 1.35
+      guardian_beam_burst:
+        weight: 2
+        stat_multiplier: 1.35
+  - wave: 5
+    spawn_interval: 18
+    clear_mob_count: 36
+    max_alive: 12
+    mobs:
+      drowned_unarmed:
+        weight: 8
+        stat_multiplier: 1.35
+      drowned_trident_guard:
+        weight: 12
+        stat_multiplier: 1.35
+      drowned_raider_axe:
+        weight: 6
+        stat_multiplier: 1.35
+      water_spirit_elite:
+        weight: 2
+        stat_multiplier: 1.35
+        max_alive: 2
+      guardian_normal:
+        weight: 4
+        stat_multiplier: 1.35
+      guardian_small:
+        weight: 3
+        stat_multiplier: 1.35
+      guardian_drain:
+        weight: 3
+        stat_multiplier: 1.35
+      guardian_beam_burst:
+        weight: 2
+        stat_multiplier: 1.35
+  door_open_sound:
+    key: minecraft:item.bucket.empty
+    pitch: 0.5
+  orientation:
+    entrance_exit: north
+    corner_entry: south
+    corner_exit: east
+    straight_entry: south
+    corridor_entry: south
+    goal_entry: west
+    tjunction_entry: south
+    tjunction_through: north
+    tjunction_branch: east
+    pedestal_entry: west
+
+promoted:
+  difficulty_star: 3
+  difficulty_exp_bonus_rate: 0.3
+  wave_exp_bonus_rate_increment: 0.15
+  max_participants: 4
+  pedestal_room_probability: 0.3
+  revive_max_per_player: 1
+  revive_time_limit_seconds: 20
+  waves:
+  - wave: 1
+    spawn_interval: 16
+    clear_mob_count: 39
+    max_alive: 13
+    mobs:
+      drowned_unarmed:
+        weight: 8
+        stat_multiplier: 1.9
+      guardian_small:
+        weight: 3
+        stat_multiplier: 1.9
+  - wave: 2
+    spawn_interval: 16
+    clear_mob_count: 41
+    max_alive: 14
+    mobs:
+      drowned_unarmed:
+        weight: 8
+        stat_multiplier: 1.9
+      drowned_trident_guard:
+        weight: 12
+        stat_multiplier: 1.9
+      water_spirit:
+        weight: 2
+        stat_multiplier: 1.9
+        max_alive: 2
+      guardian_normal:
+        weight: 4
+        stat_multiplier: 1.9
+      guardian_small:
+        weight: 3
+        stat_multiplier: 1.9
+  - wave: 3
+    spawn_interval: 16
+    clear_mob_count: 42
+    max_alive: 14
+    mobs:
+      drowned_unarmed:
+        weight: 8
+        stat_multiplier: 1.9
+      drowned_trident_guard:
+        weight: 12
+        stat_multiplier: 1.9
+      drowned_raider_axe:
+        weight: 6
+        stat_multiplier: 1.9
+      water_spirit:
+        weight: 2
+        stat_multiplier: 1.9
+        max_alive: 2
+      guardian_normal:
+        weight: 4
+        stat_multiplier: 1.9
+      guardian_small:
+        weight: 3
+        stat_multiplier: 1.9
+      guardian_drain:
+        weight: 3
+        stat_multiplier: 1.9
+  - wave: 4
+    spawn_interval: 16
+    clear_mob_count: 44
+    max_alive: 15
+    mobs:
+      drowned_unarmed:
+        weight: 8
+        stat_multiplier: 1.9
+      drowned_trident_guard:
+        weight: 12
+        stat_multiplier: 1.9
+      drowned_raider_axe:
+        weight: 6
+        stat_multiplier: 1.9
+      water_spirit_elite:
+        weight: 2
+        stat_multiplier: 1.9
+        max_alive: 2
+      guardian_normal:
+        weight: 4
+        stat_multiplier: 1.9
+      guardian_small:
+        weight: 3
+        stat_multiplier: 1.9
+      guardian_drain:
+        weight: 3
+        stat_multiplier: 1.9
+      guardian_beam_burst:
+        weight: 2
+        stat_multiplier: 1.9
+  - wave: 5
+    spawn_interval: 16
+    clear_mob_count: 45
+    max_alive: 15
+    mobs:
+      drowned_unarmed:
+        weight: 8
+        stat_multiplier: 1.9
+      drowned_trident_guard:
+        weight: 12
+        stat_multiplier: 1.9
+      drowned_raider_axe:
+        weight: 6
+        stat_multiplier: 1.9
+      water_spirit_elite:
+        weight: 2
+        stat_multiplier: 1.9
+        max_alive: 2
+      guardian_normal:
+        weight: 4
+        stat_multiplier: 1.9
+      guardian_small:
+        weight: 3
+        stat_multiplier: 1.9
+      guardian_drain:
+        weight: 3
+        stat_multiplier: 1.9
+      guardian_beam_burst:
+        weight: 2
+        stat_multiplier: 1.9
