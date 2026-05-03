@@ -1672,6 +1672,10 @@ class ArenaManager(
             return
         }
 
+        if (hasVanillaTotemAvailable(player.inventory)) {
+            return
+        }
+
         event.isCancelled = true
 
         if (!isWaveCombatActive(session)) {
@@ -1695,6 +1699,11 @@ class ArenaManager(
         }
 
         setPlayerDown(session, player)
+    }
+
+    private fun hasVanillaTotemAvailable(inventory: PlayerInventory): Boolean {
+        return inventory.itemInMainHand.type == Material.TOTEM_OF_UNDYING ||
+            inventory.itemInOffHand.type == Material.TOTEM_OF_UNDYING
     }
 
     private fun isWaveCombatActive(session: ArenaSession): Boolean {
