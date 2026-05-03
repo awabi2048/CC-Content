@@ -1,95 +1,624 @@
-difficulty_mock:
-  item_count_bonus: 0
-  exp_bonus_rate: 1.0
-  rarity: common
-
-additional_drops:
-  default: []
-  by_mob_type:
-    zombie:
-      - item: ROTTEN_FLESH
-        amount: 0-2
-      - item: IRON_INGOT
-        amount: 1
-        chance: 0.025
-    husk:
-      - item: ROTTEN_FLESH
-        amount: 0-2
-      - item: IRON_INGOT
-        amount: 1
-        chance: 0.025
-    drowned:
-      - item: ROTTEN_FLESH
-        amount: 0-2
-      - item: COPPER_INGOT
-        amount: 0-1
-        chance: 0.11
-    skeleton:
-      - item: BONE
-        amount: 0-2
-      - item: ARROW
-        amount: 0-2
-        chance: 0.8
-    spider:
-      - item: STRING
-        amount: 0-2
-      - item: SPIDER_EYE
-        amount: 0-1
-        chance: 0.33
-    silverfish:
-      - item: GUNPOWDER
-        amount: 0-1
-        chance: 0.3
-    iron_golem:
-      - item: IRON_INGOT
-        amount: 0-2
-      - item: POPPY
-        amount: 0-1
-    guardian:
-      - item: PRISMARINE_SHARD
-        amount: 0-2
-      - item: LIGHTNING_ROD
-        amount: 0-1
-        chance: 0.25
-      - item: PRISMARINE_CRYSTALS
-        amount: 0-1
-        chance: 0.33
-    bogged:
-      - item: BONE
-        amount: 0-2
-      - item: ARROW
-        amount: 0-2
-        chance: 0.8
-    slime:
-      - item: SLIME_BALL
-        amount: 0-2
-    blaze:
-      - item: BLAZE_ROD
-        amount: 0-1
-    magma_cube:
-      - item: MAGMA_CREAM
-        amount: 0-1
-    wither_skeleton:
-      - item: COAL
-        amount: 0-1
-      - item: BONE
-        amount: 0-1
-    witch:
-      - item: GLOWSTONE_DUST
-        amount: 0-2
-        chance: 0.125
-      - item: SUGAR
-        amount: 0-2
-        chance: 0.125
-      - item: REDSTONE
-        amount: 0-2
-        chance: 0.125
-      - item: SPIDER_EYE
-        amount: 0-2
-        chance: 0.125
-      - item: GLASS_BOTTLE
-        amount: 0-2
-        chance: 0.125
-      - item: GUNPOWDER
-        amount: 0-2
-        chance: 0.125
+zombie_normal:
+  base_exp: 3
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: IRON_INGOT
+    amount: 1
+    chance: 0.025
+skeleton_normal:
+  base_exp: 3
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+skeleton_rapid:
+  base_exp: 3
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+skeleton_curve_backstep:
+  base_exp: 3
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+skeleton_heavy_bow_shield:
+  base_exp: 4
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+skeleton_throw_close:
+  base_exp: 3
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+zombie_light_leap:
+  base_exp: 4
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: IRON_INGOT
+    amount: 1
+    chance: 0.025
+zombie_archer:
+  base_exp: 3
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: IRON_INGOT
+    amount: 1
+    chance: 0.025
+zombie_archer_swap:
+  base_exp: 4
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: IRON_INGOT
+    amount: 1
+    chance: 0.025
+zombie_heavy_shield:
+  base_exp: 5
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: IRON_INGOT
+    amount: 1
+    chance: 0.025
+husk_normal:
+  base_exp: 3
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: IRON_INGOT
+    amount: 1
+    chance: 0.025
+husk_light_leap:
+  base_exp: 4
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: IRON_INGOT
+    amount: 1
+    chance: 0.025
+husk_archer:
+  base_exp: 3
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: IRON_INGOT
+    amount: 1
+    chance: 0.025
+husk_archer_swap:
+  base_exp: 4
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: IRON_INGOT
+    amount: 1
+    chance: 0.025
+husk_heavy_shield:
+  base_exp: 5
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: IRON_INGOT
+    amount: 1
+    chance: 0.025
+husk_weakening_aura:
+  base_exp: 4
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: IRON_INGOT
+    amount: 1
+    chance: 0.025
+raiden_creeper:
+  base_exp: 5
+  items: []
+skeleton_plain:
+  base_exp: 2
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+spider_plain:
+  base_exp: 2
+  items:
+  - item: STRING
+    amount: 0-2
+  - item: SPIDER_EYE
+    amount: 0-1
+    chance: 0.33
+spider_stealth:
+  base_exp: 3
+  items:
+  - item: STRING
+    amount: 0-2
+  - item: SPIDER_EYE
+    amount: 0-1
+    chance: 0.33
+spider_broodmother:
+  base_exp: 6
+  items:
+  - item: STRING
+    amount: 0-2
+  - item: SPIDER_EYE
+    amount: 0-1
+    chance: 0.33
+spider_broodling:
+  base_exp: 1
+  items:
+  - item: STRING
+    amount: 0-2
+  - item: SPIDER_EYE
+    amount: 0-1
+    chance: 0.33
+spider_swift:
+  base_exp: 3
+  items:
+  - item: STRING
+    amount: 0-2
+  - item: SPIDER_EYE
+    amount: 0-1
+    chance: 0.33
+spider_venom_frenzy:
+  base_exp: 4
+  items:
+  - item: STRING
+    amount: 0-2
+  - item: SPIDER_EYE
+    amount: 0-1
+    chance: 0.33
+spider_ferocious:
+  base_exp: 4
+  items:
+  - item: STRING
+    amount: 0-2
+  - item: SPIDER_EYE
+    amount: 0-1
+    chance: 0.33
+silverfish_plain:
+  base_exp: 1
+  items:
+  - item: GUNPOWDER
+    amount: 0-1
+    chance: 0.3
+silverfish_big_poison:
+  base_exp: 2
+  items:
+  - item: GUNPOWDER
+    amount: 0-1
+    chance: 0.3
+silverfish_stealth_fang:
+  base_exp: 3
+  items:
+  - item: GUNPOWDER
+    amount: 0-1
+    chance: 0.3
+iron_golem_normal:
+  base_exp: 13
+  items:
+  - item: IRON_INGOT
+    amount: 0-2
+  - item: POPPY
+    amount: 0-1
+iron_golem_magnet:
+  base_exp: 12
+  items:
+  - item: IRON_INGOT
+    amount: 0-2
+  - item: POPPY
+    amount: 0-1
+desert_temple_sand_golem:
+  base_exp: 14
+  items:
+  - item: IRON_INGOT
+    amount: 0-2
+  - item: POPPY
+    amount: 0-1
+guardian_normal:
+  base_exp: 5
+  items:
+  - item: PRISMARINE_SHARD
+    amount: 0-2
+  - item: LIGHTNING_ROD
+    amount: 0-1
+    chance: 0.25
+  - item: PRISMARINE_CRYSTALS
+    amount: 0-1
+    chance: 0.33
+guardian_small:
+  base_exp: 2
+  items:
+  - item: PRISMARINE_SHARD
+    amount: 0-2
+  - item: LIGHTNING_ROD
+    amount: 0-1
+    chance: 0.25
+  - item: PRISMARINE_CRYSTALS
+    amount: 0-1
+    chance: 0.33
+guardian_beam_burst:
+  base_exp: 7
+  items:
+  - item: PRISMARINE_SHARD
+    amount: 0-2
+  - item: LIGHTNING_ROD
+    amount: 0-1
+    chance: 0.25
+  - item: PRISMARINE_CRYSTALS
+    amount: 0-1
+    chance: 0.33
+guardian_drain:
+  base_exp: 6
+  items:
+  - item: PRISMARINE_SHARD
+    amount: 0-2
+  - item: LIGHTNING_ROD
+    amount: 0-1
+    chance: 0.25
+  - item: PRISMARINE_CRYSTALS
+    amount: 0-1
+    chance: 0.33
+bogged_plain:
+  base_exp: 2
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+bogged_normal:
+  base_exp: 3
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+bogged_rapid:
+  base_exp: 3
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+bogged_curve_backstep:
+  base_exp: 3
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+bogged_heavy_bow_shield:
+  base_exp: 4
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+bogged_throw_close:
+  base_exp: 3
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+bogged_boomerang:
+  base_exp: 3
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+stray_plain:
+  base_exp: 2
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+stray_normal:
+  base_exp: 3
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+stray_rapid:
+  base_exp: 3
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+stray_curve_backstep:
+  base_exp: 3
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+stray_heavy_bow_shield:
+  base_exp: 4
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+stray_throw_close:
+  base_exp: 3
+  items:
+  - item: BONE
+    amount: 0-2
+  - item: ARROW
+    amount: 0-2
+    chance: 0.8
+slime_merge_small:
+  base_exp: 1
+  items:
+  - item: SLIME_BALL
+    amount: 0-2
+slime_merge_medium:
+  base_exp: 3
+  items:
+  - item: SLIME_BALL
+    amount: 0-2
+slime_merge_large:
+  base_exp: 6
+  items:
+  - item: SLIME_BALL
+    amount: 0-2
+slime_merge_mini:
+  base_exp: 1
+  items:
+  - item: SLIME_BALL
+    amount: 0-2
+slime_poison:
+  base_exp: 3
+  items:
+  - item: SLIME_BALL
+    amount: 0-2
+slime_wither:
+  base_exp: 4
+  items:
+  - item: SLIME_BALL
+    amount: 0-2
+drowned_unarmed:
+  base_exp: 3
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: COPPER_INGOT
+    amount: 0-1
+    chance: 0.11
+drowned_trident_guard:
+  base_exp: 5
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: COPPER_INGOT
+    amount: 0-1
+    chance: 0.11
+drowned_raider_axe:
+  base_exp: 4
+  items:
+  - item: ROTTEN_FLESH
+    amount: 0-2
+  - item: COPPER_INGOT
+    amount: 0-1
+    chance: 0.11
+water_spirit:
+  base_exp: 10
+  items: []
+water_spirit_elite:
+  base_exp: 15
+  items: []
+ashen_spirit:
+  base_exp: 6
+  items: []
+frog_big:
+  base_exp: 6
+  items: []
+blaze_normal:
+  base_exp: 3
+  items:
+  - item: BLAZE_ROD
+    amount: 0-1
+blaze_power:
+  base_exp: 4
+  items:
+  - item: BLAZE_ROD
+    amount: 0-1
+blaze_rapid:
+  base_exp: 3
+  items:
+  - item: BLAZE_ROD
+    amount: 0-1
+blaze_melee:
+  base_exp: 4
+  items:
+  - item: BLAZE_ROD
+    amount: 0-1
+blaze_beam:
+  base_exp: 4
+  items:
+  - item: BLAZE_ROD
+    amount: 0-1
+magma_cube_large:
+  base_exp: 4
+  items:
+  - item: MAGMA_CREAM
+    amount: 0-1
+magma_cube_medium:
+  base_exp: 3
+  items:
+  - item: MAGMA_CREAM
+    amount: 0-1
+magma_cube_small:
+  base_exp: 2
+  items:
+  - item: MAGMA_CREAM
+    amount: 0-1
+magma_cube_mini:
+  base_exp: 1
+  items:
+  - item: MAGMA_CREAM
+    amount: 0-1
+wither_skeleton_swap:
+  base_exp: 3
+  items:
+  - item: COAL
+    amount: 0-1
+  - item: BONE
+    amount: 0-1
+wither_skeleton_bow_guard:
+  base_exp: 3
+  items:
+  - item: COAL
+    amount: 0-1
+  - item: BONE
+    amount: 0-1
+wither_skeleton_wither_boomerang:
+  base_exp: 3
+  items:
+  - item: COAL
+    amount: 0-1
+  - item: BONE
+    amount: 0-1
+wither_knight:
+  base_exp: 4
+  items:
+  - item: COAL
+    amount: 0-1
+  - item: BONE
+    amount: 0-1
+wither_ghost:
+  base_exp: 4
+  items:
+  - item: COAL
+    amount: 0-1
+  - item: BONE
+    amount: 0-1
+witch_normal:
+  base_exp: 4
+  items:
+  - item: GLOWSTONE_DUST
+    amount: 0-2
+    chance: 0.125
+  - item: SUGAR
+    amount: 0-2
+    chance: 0.125
+  - item: REDSTONE
+    amount: 0-2
+    chance: 0.125
+  - item: SPIDER_EYE
+    amount: 0-2
+    chance: 0.125
+  - item: GLASS_BOTTLE
+    amount: 0-2
+    chance: 0.125
+  - item: GUNPOWDER
+    amount: 0-2
+    chance: 0.125
+witch_elite:
+  base_exp: 6
+  items:
+  - item: GLOWSTONE_DUST
+    amount: 0-2
+    chance: 0.125
+  - item: SUGAR
+    amount: 0-2
+    chance: 0.125
+  - item: REDSTONE
+    amount: 0-2
+    chance: 0.125
+  - item: SPIDER_EYE
+    amount: 0-2
+    chance: 0.125
+  - item: GLASS_BOTTLE
+    amount: 0-2
+    chance: 0.125
+  - item: GUNPOWDER
+    amount: 0-2
+    chance: 0.125
+bat_venom:
+  base_exp: 10
+  items: []
+enderman_mist_delay:
+  base_exp: 7
+  items: []
+enderman_small_backstab:
+  base_exp: 5
+  items: []
+enderman_void_carrier:
+  base_exp: 7
+  items: []
+enderman_rift_carrier:
+  base_exp: 8
+  items: []
+enderman_grave_carrier:
+  base_exp: 9
+  items: []
+end_crystal_sentinel:
+  base_exp: 16
+  items: []
+end_wither_sentinel:
+  base_exp: 20
+  items:
+  - item: COAL
+    amount: 0-1
+  - item: BONE
+    amount: 0-1
+endermite_poison:
+  base_exp: 4
+  items:
+  - item: GUNPOWDER
+    amount: 0-1
+    chance: 0.3
+shulker_mimic:
+  base_exp: 6
+  items: []
+ender_eye_beam:
+  base_exp: 4
+  items:
+  - item: PRISMARINE_SHARD
+    amount: 0-2
+  - item: LIGHTNING_ROD
+    amount: 0-1
+    chance: 0.25
+  - item: PRISMARINE_CRYSTALS
+    amount: 0-1
+    chance: 0.33
+ender_ghost:
+  base_exp: 3
+  items: []
+ender_shooter:
+  base_exp: 5
+  items: []

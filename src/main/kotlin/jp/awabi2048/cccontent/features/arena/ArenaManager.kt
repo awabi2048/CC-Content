@@ -164,12 +164,13 @@ private data class ArenaDropEntry(
     val chance: Double
 )
 
+private data class ArenaMobDefinitionDrop(
+    val baseExp: Int,
+    val items: List<ArenaDropEntry>
+)
+
 private data class ArenaDropConfig(
-    val additionalDefaultDrops: List<ArenaDropEntry>,
-    val additionalByMobType: Map<String, List<ArenaDropEntry>>,
-    val mockItemCountBonus: Int,
-    val mockExpBonusRate: Double,
-    val mockRarity: String
+    val byMobDefinition: Map<String, ArenaMobDefinitionDrop>
 )
 
 private data class BarrierRestartConfig(
@@ -440,11 +441,7 @@ class ArenaManager(
             )
     )
     private var dropConfig = ArenaDropConfig(
-        additionalDefaultDrops = emptyList(),
-        additionalByMobType = emptyMap(),
-        mockItemCountBonus = 0,
-        mockExpBonusRate = 1.0,
-        mockRarity = "common"
+        byMobDefinition = emptyMap()
     )
     private var pedestalMenuProvider: (() -> ArenaEnchantPedestalMenu?)? = null
 
@@ -634,25 +631,17 @@ class ArenaManager(
 
     private fun loadDropConfig(file: File) {
         val config = YamlConfiguration.loadConfiguration(file)
-        val mockItemCountBonus = config.getInt("difficulty_mock.item_count_bonus", 0)
-        val mockExpBonusRate = config.getDouble("difficulty_mock.exp_bonus_rate", 1.0)
-            .coerceAtLeast(0.0)
-        val mockRarity = config.getString("difficulty_mock.rarity", "common") ?: "common"
 
-        val additionalDefaultDrops = parseDropEntries(config, "additional_drops.default")
-        val additionalByMobType = mutableMapOf<String, List<ArenaDropEntry>>()
-        val byMobTypeSection = config.getConfigurationSection("additional_drops.by_mob_type")
-        byMobTypeSection?.getKeys(false)?.forEach { mobTypeId ->
-            val key = mobTypeId.trim().lowercase(Locale.ROOT)
-            additionalByMobType[key] = parseDropEntries(config, "additional_drops.by_mob_type.$mobTypeId")
+        val byMobDefinition = mutableMapOf<String, ArenaMobDefinitionDrop>()
+        config.getKeys(false).forEach { definitionId ->
+            val key = definitionId.trim().lowercase(Locale.ROOT)
+            val baseExp = config.getInt("$definitionId.base_exp", 0).coerceAtLeast(0)
+            val items = parseDropEntries(config, "$definitionId.items")
+            byMobDefinition[key] = ArenaMobDefinitionDrop(baseExp = baseExp, items = items)
         }
 
         dropConfig = ArenaDropConfig(
-            additionalDefaultDrops = additionalDefaultDrops,
-            additionalByMobType = additionalByMobType,
-            mockItemCountBonus = mockItemCountBonus,
-            mockExpBonusRate = mockExpBonusRate,
-            mockRarity = mockRarity
+            byMobDefinition = byMobDefinition
         )
     }
 
@@ -1669,6 +1658,10 @@ class ArenaManager(
         val session = getSession(player) ?: return
         if (!session.participants.contains(player.uniqueId)) return
 
+        if (!session.stageStarted || session.phase != ArenaPhase.IN_PROGRESS) {
+            return
+        }
+
         if (isPlayerDowned(session, player.uniqueId)) {
             event.isCancelled = true
             return
@@ -1680,6 +1673,12 @@ class ArenaManager(
         }
 
         event.isCancelled = true
+
+        if (!isWaveCombatActive(session)) {
+            player.health = 1.0
+            player.noDamageTicks = 10
+            return
+        }
 
         val otherAliveExists = hasOtherAliveNonDownParticipant(session, player.uniqueId)
         if (!isMultiplayerSession(session) ||
@@ -1696,6 +1695,19 @@ class ArenaManager(
         }
 
         setPlayerDown(session, player)
+    }
+
+    private fun isWaveCombatActive(session: ArenaSession): Boolean {
+        if (session.phase != ArenaPhase.IN_PROGRESS) return false
+        if (!session.stageStarted) return false
+        if (session.missionCompleted || session.barrierRestartCompleted || session.barrierRestarting) return false
+
+        val wave = session.currentWave
+        if (wave <= 0 || wave > session.waves) return false
+        if (!session.startedWaves.contains(wave)) return false
+        if (session.clearedWaves.contains(wave)) return false
+
+        return true
     }
 
     fun handleElderGuardianCurse(event: EntityPotionEffectEvent) {
@@ -2923,12 +2935,12 @@ class ArenaManager(
 
     private fun applyArenaMobDrop(event: EntityDeathEvent) {
         val entity = event.entity
-        if (!mobToSessionWorld.containsKey(entity.uniqueId) && !entityMobToSessionWorld.containsKey(entity.uniqueId)) {
-            return
-        }
+        val worldName = mobToSessionWorld[entity.uniqueId]
+            ?: entityMobToSessionWorld[entity.uniqueId]
+            ?: return
+        val session = sessionsByWorld[worldName]
 
         val killer = entity.killer
-        val baseExp = event.droppedExp
         event.drops.clear()
 
         if (killer == null) {
@@ -2957,23 +2969,36 @@ class ArenaManager(
             if (stack.type.isAir || stack.amount <= 0) return@forEach
             entity.world.dropItemNaturally(entity.location.add(0.0, 0.5, 0.0), stack)
         }
-        event.droppedExp = floor(baseExp * dropConfig.mockExpBonusRate).toInt().coerceAtLeast(0)
+        event.droppedExp = if (session != null) {
+            calculateArenaDroppedExp(session, entity.uniqueId, normalizedTypeId)
+        } else {
+            0
+        }
     }
 
     private fun buildConfiguredAdditionalDrops(killer: Player, mobTypeId: String, lootingLevel: Int): List<ItemStack> {
-        val entries = mutableListOf<ArenaDropEntry>()
-        entries += dropConfig.additionalDefaultDrops
-        entries += dropConfig.additionalByMobType[mobTypeId].orEmpty()
-        val categoryTypeId = resolveMobTokenCategoryTypeId(mobTypeId)
-        if (categoryTypeId != mobTypeId) {
-            entries += dropConfig.additionalByMobType[categoryTypeId].orEmpty()
-        }
+        val entries = dropConfig.byMobDefinition[mobTypeId]?.items.orEmpty()
 
         return entries.mapNotNull { entry ->
             if (random.nextDouble() >= entry.chance) return@mapNotNull null
             val amount = applyAmountModifiers(entry.minAmount, entry.maxAmount, lootingLevel)
             resolveConfiguredDrop(entry.itemId, killer, amount)
         }
+    }
+
+    private fun calculateArenaDroppedExp(session: ArenaSession, entityId: UUID, mobDefinitionId: String): Int {
+        val baseExp = dropConfig.byMobDefinition[mobDefinitionId]?.baseExp ?: 0
+        if (baseExp <= 0) {
+            return 0
+        }
+        val variant = themeLoader.getTheme(session.themeId)?.variant(session.promoted) ?: return baseExp
+        val wave = session.mobWaveMap[entityId]
+            ?: session.currentWave.takeIf { it > 0 }
+            ?: 1
+        val multiplier = 1.0 +
+            variant.difficultyExpBonusRate +
+            ((wave.coerceAtLeast(1) - 1) * variant.waveExpBonusRateIncrement)
+        return floor(baseExp * multiplier.coerceAtLeast(0.0)).toInt().coerceAtLeast(0)
     }
 
     private fun resolveConfiguredDrop(itemId: String, killer: Player, amount: Int): ItemStack? {
@@ -2990,9 +3015,8 @@ class ArenaManager(
         } else {
             random.nextInt(minAmount, maxAmount + 1)
         }
-        val mockBonus = dropConfig.mockItemCountBonus
         val lootingBonus = if (lootingLevel > 0) random.nextInt(lootingLevel + 1) else 0
-        return (base + mockBonus + lootingBonus).coerceAtLeast(1)
+        return (base + lootingBonus).coerceAtLeast(1)
     }
 
     private fun resolveLootingLevel(inventory: PlayerInventory): Int {
