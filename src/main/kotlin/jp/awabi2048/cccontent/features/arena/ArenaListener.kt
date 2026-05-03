@@ -7,6 +7,7 @@ import jp.awabi2048.cccontent.mob.event.CustomMobSpawnEvent
 import org.bukkit.NamespacedKey
 import org.bukkit.Sound
 import org.bukkit.entity.AbstractArrow
+import org.bukkit.entity.EnderPearl
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
@@ -16,6 +17,7 @@ import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
 import org.bukkit.event.entity.EntityPotionEffectEvent
+import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPlaceEvent
@@ -26,7 +28,9 @@ import org.bukkit.event.player.PlayerAnimationEvent
 import org.bukkit.event.player.PlayerChangedWorldEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerInteractEntityEvent
+import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
+import org.bukkit.event.player.PlayerTeleportEvent
 import org.bukkit.persistence.PersistentDataType
 import kotlin.random.Random
 
@@ -89,6 +93,15 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    fun onProjectileLaunch(event: ProjectileLaunchEvent) {
+        val pearl = event.entity as? EnderPearl ?: return
+        val player = pearl.shooter as? Player ?: return
+        if (arenaManager.getSession(player) != null) {
+            event.isCancelled = true
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     fun onEntityPotionEffect(event: EntityPotionEffectEvent) {
         arenaManager.handleElderGuardianCurse(event)
     }
@@ -119,6 +132,16 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    fun onPlayerTeleport(event: PlayerTeleportEvent) {
+        if (event.cause != PlayerTeleportEvent.TeleportCause.CHORUS_FRUIT) {
+            return
+        }
+        if (arenaManager.getSession(event.player) != null) {
+            event.isCancelled = true
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     fun onPlayerInteractEntity(event: PlayerInteractEntityEvent) {
         arenaManager.handleArenaInteractEntity(event)
     }
@@ -130,12 +153,12 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
 
     @EventHandler
     fun onPlayerQuit(event: PlayerQuitEvent) {
-        arenaManager.handleInviteTargetUnavailable(event.player)
-        arenaManager.clearLobbyTutorialState(event.player)
-        arenaManager.stopSession(
-            event.player,
-            ArenaI18n.text(event.player, "arena.messages.session.ended_by_logout")
-        )
+        arenaManager.handleParticipantQuit(event.player)
+    }
+
+    @EventHandler
+    fun onPlayerJoin(event: PlayerJoinEvent) {
+        arenaManager.handleParticipantJoin(event.player)
     }
 
     @EventHandler

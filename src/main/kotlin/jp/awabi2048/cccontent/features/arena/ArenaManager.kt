@@ -375,6 +375,7 @@ class ArenaManager(
     private val cleanupWorldJobs = ArrayDeque<ArenaWorldCleanupJob>()
     private val invitedPlayerLocks = mutableMapOf<UUID, String>()
     private val inviteSwingCooldownUntilTick = mutableMapOf<UUID, Long>()
+    private val pendingLobbyReturnPlayers = mutableSetOf<UUID>()
     private val arenaSidebarPlayers = mutableSetOf<UUID>()
     private val arenaSidebarPreviousScoreboards = mutableMapOf<UUID, org.bukkit.scoreboard.Scoreboard>()
     private val mobDefinitions = mutableMapOf<String, MobDefinition>()
@@ -1056,6 +1057,15 @@ class ArenaManager(
         BGMManager.playPrecise(player, track.soundKey, track.loopTicks, track.pitch)
     }
 
+    private fun sendPlayerToLobbyOrSpawn(player: Player) {
+        if (sendPlayerToLobby(player, "main")) {
+            return
+        }
+        Bukkit.getWorlds().firstOrNull()?.spawnLocation?.let { spawn ->
+            player.teleport(spawn)
+        }
+    }
+
     private fun clearLobbyTutorialState(playerId: UUID) {
         lobbyTutorialStates.remove(playerId)
         lobbyTutorialMarkers.remove(playerId)
@@ -1287,6 +1297,69 @@ class ArenaManager(
         }
 
         removeInvitedParticipant(session, player.uniqueId)
+    }
+
+    fun handleParticipantQuit(player: Player) {
+        handleInviteTargetUnavailable(player)
+        clearLobbyTutorialState(player)
+
+        val session = getSession(player) ?: return
+        if (!session.participants.contains(player.uniqueId)) return
+
+        stopArenaBgmForPlayer(player)
+        session.progressBossBar?.let { player.hideBossBar(it) }
+        hideJoinCountdownBossBar(session, player.uniqueId)
+        clearReviveBindingByReviver(session, player.uniqueId)
+        removeArenaSidebar(player.uniqueId)
+        updateArenaSidebars()
+        scheduleTerminateIfAllParticipantsLoggedOut(session.worldName)
+    }
+
+    private fun scheduleTerminateIfAllParticipantsLoggedOut(worldName: String) {
+        Bukkit.getScheduler().runTask(plugin, Runnable {
+            val session = sessionsByWorld[worldName] ?: return@Runnable
+            if (session.participants.any { participantId ->
+                    val participant = Bukkit.getPlayer(participantId)
+                    participant != null && participant.isOnline
+                }
+            ) {
+                return@Runnable
+            }
+            terminateSession(session, false)
+        })
+    }
+
+    fun handleParticipantJoin(player: Player) {
+        val session = getSession(player)
+        if (session == null || !session.participants.contains(player.uniqueId)) {
+            if (pendingLobbyReturnPlayers.remove(player.uniqueId)) {
+                sendPlayerToLobbyOrSpawn(player)
+            }
+            return
+        }
+
+        val world = Bukkit.getWorld(session.worldName)
+        if (world == null) {
+            pendingLobbyReturnPlayers.add(player.uniqueId)
+            sendPlayerToLobbyOrSpawn(player)
+            return
+        }
+
+        val destination = resolveLatestRoomCheckpoint(session, world)
+            ?: session.entranceCheckpoint.clone().apply { this.world = world }
+        destination.yaw = player.location.yaw
+        destination.pitch = player.location.pitch
+        player.teleport(destination)
+        applySessionGameMode(session, player)
+        player.removePotionEffect(PotionEffectType.BLINDNESS)
+        val now = System.currentTimeMillis()
+        session.participantLocationHistory[player.uniqueId] = ArrayDeque<TimedPlayerLocation>().apply {
+            addLast(TimedPlayerLocation(now, destination.clone()))
+        }
+        session.participantLastSampleMillis[player.uniqueId] = now
+        session.progressBossBar?.let { player.showBossBar(it) }
+        resumeArenaBgmForPlayer(session, player)
+        updateArenaSidebars()
     }
 
     private fun applyStageBuildResult(session: ArenaSession, stage: jp.awabi2048.cccontent.features.arena.generator.ArenaStageBuildResult) {
@@ -1820,6 +1893,13 @@ class ArenaManager(
     }
 
     fun handleArenaInteract(event: PlayerInteractEvent) {
+        if (isArenaEnderPearlUse(event)) {
+            event.isCancelled = true
+            event.setUseInteractedBlock(Event.Result.DENY)
+            event.setUseItemInHand(Event.Result.DENY)
+            return
+        }
+
         val clicked = event.clickedBlock ?: return
         val worldName = clicked.world.name
         val session = sessionsByWorld[worldName] ?: return
@@ -1848,6 +1928,14 @@ class ArenaManager(
         event.isCancelled = true
         event.setUseInteractedBlock(Event.Result.DENY)
         event.setUseItemInHand(Event.Result.DEFAULT)
+    }
+
+    private fun isArenaEnderPearlUse(event: PlayerInteractEvent): Boolean {
+        val player = event.player
+        val session = getSession(player) ?: return false
+        if (!session.participants.contains(player.uniqueId)) return false
+        if (player.world.name != session.worldName) return false
+        return event.item?.type == Material.ENDER_PEARL
     }
 
     fun handleArenaInteractEntity(event: PlayerInteractEntityEvent) {
@@ -3339,29 +3427,31 @@ class ArenaManager(
             playerToSessionWorld.remove(participantId)
             inviteSwingCooldownUntilTick.remove(participantId)
             val player = Bukkit.getPlayer(participantId)
-            if (player != null && player.isOnline) {
-                if (duringShutdown || shuttingDown) {
-                    stopArenaBgmForPlayer(player)
-                } else {
-                    scheduleBoundaryStopArenaBgmForPlayer(session, player)
-                }
-                restoreSessionGameMode(session, player)
-                val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
-                val destination = if (session.returnLocations[participantId]?.world != null) {
-                    session.returnLocations[participantId]
-                } else {
-                    fallback
-                }
-                if (destination != null) {
-                    player.teleport(destination)
-                }
-                if (messageKey != null) {
-                    player.sendMessage(ArenaI18n.text(player, messageKey, *messagePlaceholders))
-                    if (success) {
-                        player.sendMessage(
-                            ArenaI18n.text(player, "arena.messages.session.retry_hint")
-                        )
-                    }
+            if (player == null || !player.isOnline) {
+                pendingLobbyReturnPlayers.add(participantId)
+                return@forEach
+            }
+            if (duringShutdown || shuttingDown) {
+                stopArenaBgmForPlayer(player)
+            } else {
+                scheduleBoundaryStopArenaBgmForPlayer(session, player)
+            }
+            restoreSessionGameMode(session, player)
+            val fallback = Bukkit.getWorlds().firstOrNull()?.spawnLocation
+            val destination = if (session.returnLocations[participantId]?.world != null) {
+                session.returnLocations[participantId]
+            } else {
+                fallback
+            }
+            if (destination != null) {
+                player.teleport(destination)
+            }
+            if (messageKey != null) {
+                player.sendMessage(ArenaI18n.text(player, messageKey, *messagePlaceholders))
+                if (success) {
+                    player.sendMessage(
+                        ArenaI18n.text(player, "arena.messages.session.retry_hint")
+                    )
                 }
             }
         }
@@ -6149,6 +6239,12 @@ class ArenaManager(
         if (mode == ArenaBgmMode.NORMAL) {
             tryBroadcastPendingWaveClearedMessageOnNormalBgm(session)
         }
+    }
+
+    private fun resumeArenaBgmForPlayer(session: ArenaSession, player: Player) {
+        val track = arenaBgmTrackForMode(session.arenaBgmMode) ?: return
+        stopAllArenaBgmForPlayer(player)
+        BGMManager.playPrecise(player, track.soundKey, track.loopTicks, track.pitch)
     }
 
     private fun stopArenaBgm(session: ArenaSession) {
