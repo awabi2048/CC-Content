@@ -45,6 +45,48 @@ class ArenaAuditLogger(private val plugin: JavaPlugin) {
         )
     }
 
+    fun logPedestalExpConsume(
+        playerId: UUID,
+        playerName: String,
+        amount: Int,
+        levelBefore: Int,
+        levelAfter: Int
+    ) {
+        append(
+            linkedMapOf(
+                "ts" to timestamp(),
+                "type" to "pedestal_exp_consume",
+                "playerId" to playerId.toString(),
+                "playerName" to playerName,
+                "amount" to amount,
+                "levelBefore" to levelBefore,
+                "levelAfter" to levelAfter
+            )
+        )
+    }
+
+    fun logPedestalExpRefund(
+        playerId: UUID,
+        playerName: String,
+        amount: Int,
+        levelBefore: Int,
+        levelAfter: Int,
+        reason: String
+    ) {
+        append(
+            linkedMapOf(
+                "ts" to timestamp(),
+                "type" to "pedestal_exp_refund",
+                "playerId" to playerId.toString(),
+                "playerName" to playerName,
+                "amount" to amount,
+                "levelBefore" to levelBefore,
+                "levelAfter" to levelAfter,
+                "reason" to reason
+            )
+        )
+    }
+
     private fun append(payload: Map<String, Any?>) {
         runCatching {
             logFile.parentFile.mkdirs()

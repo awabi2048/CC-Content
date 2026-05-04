@@ -6,6 +6,7 @@ import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
+import org.bukkit.Particle
 import org.bukkit.SoundCategory
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.enchantments.Enchantment
@@ -163,13 +164,14 @@ private data class ViewerRuntime(
     var activeAnimationKind: PanelAnimationKind? = null,
     var activeAnimationProgress: Int = 0,
     var activeAnimationDirection: Int = 1,
+    var prepaidLevel: Int = 0,
     var leftRightStartLeft: Int = 0,
     var leftRightStartRight: Int = 0,
     var leftPathLevel: Int = 0,
     var rightPathLevel: Int = 0,
     var glintPathLevel: Int = 0,
     var frozenRemovalDisplayState: Map<Int, ItemStack>? = null,
-    var returnCatalystsBeforeFullCollapse: Boolean = false,
+    val pendingCatalystReturns: MutableMap<Int, ItemStack> = mutableMapOf(),
     val pendingPathAnimations: MutableList<PathAnimationRequest> = mutableListOf()
 )
 
@@ -333,8 +335,9 @@ class ArenaEnchantPedestalMenu(
         runtime?.panelAnimationTask?.cancel()
         runtime?.forgeAnimationTask?.cancel()
         runtime?.isForging = false
+        runtime?.let { refundPrepaidExp(player, it, "inventory_closed") }
+        runtime?.let { flushPendingCatalystReturns(player, it) }
         runtime?.frozenRemovalDisplayState = null
-        runtime?.returnCatalystsBeforeFullCollapse = false
 
         playSound(player, "minecraft:block.ender_chest.close", 0.5f)
         playSound(player, "minecraft:entity.allay.item_thrown", 0.5f)
@@ -695,7 +698,7 @@ class ArenaEnchantPedestalMenu(
         runtime.activeAnimationProgress = 0
         runtime.activeAnimationDirection = 1
         runtime.pendingPathAnimations.clear()
-        runtime.returnCatalystsBeforeFullCollapse = true
+        preparePendingCatalystReturns(inventory, runtime)
 
         if (runtime.glintPathLevel > 0) {
             playSound(player, "minecraft:block.beacon.deactivate", 0.8f)
@@ -741,10 +744,6 @@ class ArenaEnchantPedestalMenu(
         }
 
         runtime.pendingPathAnimations += PathAnimationRequest(kind = PanelAnimationKind.FULL, reveal = false)
-        if (runtime.pendingPathAnimations.first().kind == PanelAnimationKind.FULL && runtime.returnCatalystsBeforeFullCollapse) {
-            returnAllCatalystsToPlayer(player, inventory)
-            runtime.returnCatalystsBeforeFullCollapse = false
-        }
         val first = runtime.pendingPathAnimations.removeAt(0)
         startAnimation(player, inventory, runtime, first.kind, first.reveal, first.startProgress)
     }
@@ -755,8 +754,11 @@ class ArenaEnchantPedestalMenu(
             renderStatic(player, inventory)
             return
         }
+        if (!consumeExpUpfront(player, runtime, evaluation.requiredLevel)) {
+            renderStatic(player, inventory)
+            return
+        }
 
-        // TODO: executeForge() の成否を返す形にして、失敗時は成功SE/演出を分岐させる。
         runtime.panelAnimationTask?.cancel()
         runtime.isForging = true
         playSound(player, "minecraft:block.end_portal_frame.fill", 2.0f)
@@ -769,6 +771,7 @@ class ArenaEnchantPedestalMenu(
                 runtime.forgeAnimationTask?.cancel()
                 runtime.forgeAnimationTask = null
                 runtime.isForging = false
+                refundPrepaidExp(player, runtime, "forge_interrupted")
                 return@Runnable
             }
 
@@ -782,27 +785,32 @@ class ArenaEnchantPedestalMenu(
 
             runtime.forgeAnimationTask?.cancel()
             runtime.forgeAnimationTask = null
-            runCatching {
+            val succeeded = runCatching {
                 executeForge(player, inventory)
+            }.getOrDefault(false)
+            runtime.isForging = false
+            if (!succeeded) {
+                handleForgeFailure(player, inventory)
+                return@Runnable
             }
+            runtime.prepaidLevel = 0
             playSound(player, "minecraft:entity.lightning_bolt.thunder", 2.0f)
             playSound(player, "minecraft:entity.breeze.hurt", 0.5f)
-            runtime.isForging = false
             renderStatic(player, inventory)
         }, 0L, FORGE_ANIMATION_PERIOD_TICKS)
     }
 
-    private fun executeForge(player: Player, inventory: Inventory) {
-        val toolItem = getInputItem(inventory, ArenaEnchantPedestalLayout.TOOL_SLOT) ?: return
+    private fun executeForge(player: Player, inventory: Inventory): Boolean {
+        val toolItem = getInputItem(inventory, ArenaEnchantPedestalLayout.TOOL_SLOT) ?: return false
 
         val eval = evaluate(player, inventory)
-        val requiredLevel = eval.requiredLevel ?: return
+        val requiredLevel = eval.requiredLevel ?: return false
         val prepared = eval.preparedCatalysts
         if (!eval.executable || prepared.isEmpty()) {
-            return
+            return false
         }
-        if (player.level < requiredLevel) {
-            return
+        if (runtimeFor(player.uniqueId)?.prepaidLevel != requiredLevel) {
+            return false
         }
 
         val baseItem = toolItem.clone()
@@ -830,10 +838,63 @@ class ArenaEnchantPedestalMenu(
         setOverEnchantState(workingTool, state)
         applyOverEnchantLore(workingTool, state)
 
-        player.level = (player.level - requiredLevel).coerceAtLeast(0)
         missionServiceProvider()?.recordOverEnchantSuccess(player.uniqueId, prepared.size)
         auditLogger.logPedestalTransform(player.uniqueId, player.name, baseItem, workingTool.clone(), consumedCatalysts)
         inventory.setItem(ArenaEnchantPedestalLayout.TOOL_SLOT, workingTool)
+        return true
+    }
+
+    private fun handleForgeFailure(player: Player, inventory: Inventory) {
+        runtimeFor(player.uniqueId)?.let { refundPrepaidExp(player, it, "forge_failed") }
+        val center = player.location.clone().add(0.0, 1.0, 0.0)
+        player.world.spawnParticle(Particle.EXPLOSION_EMITTER, center, 1, 0.0, 0.0, 0.0, 0.0)
+        player.world.spawnParticle(Particle.SMOKE, center, 24, 0.25, 0.2, 0.25, 0.01)
+        playSound(player, "minecraft:entity.generic.explode", 0.8f)
+        playSound(player, "minecraft:block.beacon.deactivate", 0.6f)
+        player.closeInventory()
+    }
+
+    private fun consumeExpUpfront(player: Player, runtime: ViewerRuntime, requiredLevel: Int): Boolean {
+        if (requiredLevel <= 0) {
+            runtime.prepaidLevel = 0
+            return true
+        }
+        if (player.level < requiredLevel) {
+            return false
+        }
+        val before = player.level
+        player.level = (before - requiredLevel).coerceAtLeast(0)
+        runtime.prepaidLevel = requiredLevel
+        auditLogger.logPedestalExpConsume(
+            playerId = player.uniqueId,
+            playerName = player.name,
+            amount = requiredLevel,
+            levelBefore = before,
+            levelAfter = player.level
+        )
+        return true
+    }
+
+    private fun refundPrepaidExp(player: Player, runtime: ViewerRuntime, reason: String) {
+        val amount = runtime.prepaidLevel
+        if (amount <= 0) {
+            return
+        }
+        val before = player.level
+        player.level = before + amount
+        runtime.prepaidLevel = 0
+        auditLogger.logPedestalExpRefund(
+            playerId = player.uniqueId,
+            playerName = player.name,
+            amount = amount,
+            levelBefore = before,
+            levelAfter = player.level,
+            reason = reason
+        )
+    }
+
+    private fun runtimeFor(playerId: UUID): ViewerRuntime? {
+        return runtimes[playerId]
     }
 
     private fun startAnimation(
@@ -868,9 +929,13 @@ class ArenaEnchantPedestalMenu(
             val evaluation = evaluate(player, inventory)
             val displayState = buildDisplayState(player, inventory, evaluation, runtime)
 
+            val previousProgress = runtime.activeAnimationProgress
             val nextProgress = (runtime.activeAnimationProgress + runtime.activeAnimationDirection).coerceIn(0, max)
             runtime.activeAnimationProgress = nextProgress
             applyAnimationView(player, inventory, runtime, displayState, kind, nextProgress)
+            if (kind == PanelAnimationKind.FULL && runtime.activeAnimationDirection < 0) {
+                returnPendingCatalystsForHiddenSteps(player, inventory, runtime, previousProgress, nextProgress)
+            }
 
             val complete = nextProgress == if (runtime.activeAnimationDirection > 0) max else 0
             if (!complete) {
@@ -890,7 +955,6 @@ class ArenaEnchantPedestalMenu(
 
             if (kind == PanelAnimationKind.FULL && evaluation.uiState == PedestalUiState.NO_TOOL) {
                 resetPathState(runtime)
-                runtime.returnCatalystsBeforeFullCollapse = false
                 runtime.frozenRemovalDisplayState = null
             }
 
@@ -928,10 +992,6 @@ class ArenaEnchantPedestalMenu(
     private fun runNextPendingPathAnimation(player: Player, inventory: Inventory, runtime: ViewerRuntime) {
         if (runtime.pendingPathAnimations.isEmpty()) {
             return
-        }
-        if (runtime.returnCatalystsBeforeFullCollapse && runtime.pendingPathAnimations.first().kind == PanelAnimationKind.FULL) {
-            returnAllCatalystsToPlayer(player, inventory)
-            runtime.returnCatalystsBeforeFullCollapse = false
         }
         val next = runtime.pendingPathAnimations.removeAt(0)
         startAnimation(player, inventory, runtime, next.kind, next.reveal, next.startProgress)
@@ -1158,7 +1218,7 @@ class ArenaEnchantPedestalMenu(
             activeAnimationDirection = 1,
             glintPathLevel = 0,
             frozenRemovalDisplayState = null,
-            returnCatalystsBeforeFullCollapse = false,
+            pendingCatalystReturns = mutableMapOf(),
             pendingPathAnimations = mutableListOf()
         )
         return buildDisplayState(player, inventory, evaluate(player, inventory), frozenRuntime)
@@ -1178,6 +1238,7 @@ class ArenaEnchantPedestalMenu(
         runtime.rightPathLevel = 0
         runtime.glintPathLevel = 0
         runtime.frozenRemovalDisplayState = null
+        runtime.pendingCatalystReturns.clear()
     }
 
     private fun captureSnapshot(player: Player, inventory: Inventory): InputSnapshot {
@@ -1904,6 +1965,57 @@ class ArenaEnchantPedestalMenu(
     private fun returnAllCatalystsToPlayer(player: Player, inventory: Inventory) {
         ArenaEnchantPedestalLayout.CATALYST_SLOTS.forEach { slot ->
             returnItemToPlayer(player, inventory, slot)
+        }
+    }
+
+    private fun preparePendingCatalystReturns(inventory: Inventory, runtime: ViewerRuntime) {
+        ArenaEnchantPedestalLayout.CATALYST_SLOTS.forEach { slot ->
+            val item = getInputItem(inventory, slot) ?: return@forEach
+            runtime.pendingCatalystReturns[slot] = item.clone()
+        }
+    }
+
+    private fun returnPendingCatalystsForHiddenSteps(
+        player: Player,
+        inventory: Inventory,
+        runtime: ViewerRuntime,
+        previousProgress: Int,
+        nextProgress: Int
+    ) {
+        if (previousProgress <= nextProgress) {
+            return
+        }
+        val steps = ArenaEnchantPedestalLayout.REVEAL_STEPS
+        val from = nextProgress.coerceAtLeast(0)
+        val until = previousProgress.coerceAtMost(steps.size)
+        for (index in from until until) {
+            steps[index].forEach { slot ->
+                if (slot !in ArenaEnchantPedestalLayout.CATALYST_SLOTS) {
+                    return@forEach
+                }
+                returnPendingCatalystForSlot(player, inventory, runtime, slot)
+            }
+        }
+    }
+
+    private fun returnPendingCatalystForSlot(player: Player, inventory: Inventory, runtime: ViewerRuntime, slot: Int) {
+        val pending = runtime.pendingCatalystReturns.remove(slot) ?: return
+        inventory.setItem(slot, null)
+        val leftovers = player.inventory.addItem(pending)
+        leftovers.values.forEach { leftover ->
+            player.world.dropItemNaturally(player.location, leftover)
+        }
+    }
+
+    private fun flushPendingCatalystReturns(player: Player, runtime: ViewerRuntime) {
+        if (runtime.pendingCatalystReturns.isEmpty()) {
+            return
+        }
+        val pending = runtime.pendingCatalystReturns.values.map { it.clone() }
+        runtime.pendingCatalystReturns.clear()
+        val leftovers = player.inventory.addItem(*pending.toTypedArray())
+        leftovers.values.forEach { leftover ->
+            player.world.dropItemNaturally(player.location, leftover)
         }
     }
 
