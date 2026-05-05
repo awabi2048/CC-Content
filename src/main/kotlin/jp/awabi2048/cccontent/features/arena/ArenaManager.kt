@@ -82,6 +82,7 @@ import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerInteractEntityEvent
 import org.bukkit.event.entity.EntityMountEvent
 import org.bukkit.event.entity.PlayerDeathEvent
+import org.bukkit.event.entity.EntityRegainHealthEvent
 import org.bukkit.event.player.PlayerRespawnEvent
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.PlayerInventory
@@ -1882,6 +1883,14 @@ class ArenaManager(
         }
 
         setPlayerDown(session, player)
+    }
+
+    fun handleParticipantRegainHealth(event: EntityRegainHealthEvent) {
+        val player = event.entity as? Player ?: return
+        val session = getSession(player) ?: return
+        if (!session.participants.contains(player.uniqueId)) return
+        if (!isPlayerDowned(session, player.uniqueId)) return
+        event.isCancelled = true
     }
 
     private fun hasVanillaTotemAvailable(inventory: PlayerInventory): Boolean {
@@ -5071,8 +5080,14 @@ class ArenaManager(
     private fun findNearestParticipant(session: ArenaSession, location: Location): Player? {
         return session.participants
             .mapNotNull { participantId -> Bukkit.getPlayer(participantId) }
-            .filter { it.isOnline && it.world.name == session.worldName }
-            .minByOrNull { it.location.distanceSquared(location) }
+            .filter { player ->
+                player.isOnline &&
+                    player.world.name == session.worldName &&
+                    !player.isDead &&
+                    player.gameMode != org.bukkit.GameMode.SPECTATOR &&
+                    !isPlayerDowned(session, player.uniqueId)
+            }
+            .minByOrNull { player -> player.location.distanceSquared(location) }
     }
 
     private fun removeWaveMobs(session: ArenaSession, wave: Int) {
@@ -6196,7 +6211,11 @@ class ArenaManager(
                 return@any false
             }
             val target = mob.target as? Player ?: return@any false
-            target.uniqueId == participantId && target.isOnline && !target.isDead && target.world.name == session.worldName
+            target.uniqueId == participantId &&
+                target.isOnline &&
+                !target.isDead &&
+                target.world.name == session.worldName &&
+                !isPlayerDowned(session, target.uniqueId)
         }
     }
 

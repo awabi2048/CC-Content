@@ -18,6 +18,7 @@ import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
 import org.bukkit.event.entity.EntityPotionEffectEvent
+import org.bukkit.event.entity.EntityRegainHealthEvent
 import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.event.entity.EntityToggleGlideEvent
 import org.bukkit.event.entity.EntityShootBowEvent
@@ -68,6 +69,11 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
             return
         }
         arenaManager.handleMobFallDamage(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityRegainHealth(event: EntityRegainHealthEvent) {
+        arenaManager.handleParticipantRegainHealth(event)
     }
 
     @EventHandler(ignoreCancelled = true)
