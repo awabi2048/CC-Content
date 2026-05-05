@@ -81,6 +81,8 @@ import org.bukkit.event.Event
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerInteractEntityEvent
 import org.bukkit.event.entity.EntityMountEvent
+import org.bukkit.event.entity.PlayerDeathEvent
+import org.bukkit.event.player.PlayerRespawnEvent
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.PlayerInventory
 import org.bukkit.potion.PotionEffect
@@ -122,6 +124,13 @@ private data class PendingWorldDeletion(
     val worldName: String,
     val folder: File,
     var attempts: Int = 0
+)
+
+private data class PendingArenaDeathRespawn(
+    val worldName: String,
+    val respawnLocation: Location,
+    val reviveDisabled: Boolean,
+    val convertAllDownedToGameOver: Boolean
 )
 
 private enum class ArenaPoolWorldState {
@@ -376,6 +385,7 @@ class ArenaManager(
     private val invitedPlayerLocks = mutableMapOf<UUID, String>()
     private val inviteSwingCooldownUntilTick = mutableMapOf<UUID, Long>()
     private val pendingLobbyReturnPlayers = mutableSetOf<UUID>()
+    private val pendingDeathRespawns = mutableMapOf<UUID, PendingArenaDeathRespawn>()
     private val arenaSidebarPlayers = mutableSetOf<UUID>()
     private val arenaSidebarPreviousScoreboards = mutableMapOf<UUID, org.bukkit.scoreboard.Scoreboard>()
     private val mobDefinitions = mutableMapOf<String, MobDefinition>()
@@ -1236,6 +1246,7 @@ class ArenaManager(
         entityMobToSessionWorld.clear()
         mobToDefinitionTypeId.clear()
         entityMobToDefinitionTypeId.clear()
+        pendingDeathRespawns.clear()
         cleanupWorldJobs.clear()
         readyArenaWorldNames.clear()
         confusionManager.clearAll()
@@ -1256,6 +1267,20 @@ class ArenaManager(
     fun getSession(player: Player): ArenaSession? {
         val worldName = playerToSessionWorld[player.uniqueId] ?: return null
         return sessionsByWorld[worldName]
+    }
+
+    fun canEnterSessionWorld(player: Player, worldName: String): Boolean {
+        val session = sessionsByWorld[worldName] ?: return true
+        return ArenaPermissions.hasAdminAccess(player) || session.participants.contains(player.uniqueId)
+    }
+
+    fun handleUnauthorizedSessionWorldPresence(player: Player): Boolean {
+        val worldName = player.world.name
+        if (canEnterSessionWorld(player, worldName)) {
+            return false
+        }
+        sendPlayerToLobbyOrSpawn(player)
+        return true
     }
 
     fun getThemeIds(): Set<String> = themeLoader.getThemeIds()
@@ -1360,6 +1385,88 @@ class ArenaManager(
         session.progressBossBar?.let { player.showBossBar(it) }
         resumeArenaBgmForPlayer(session, player)
         updateArenaSidebars()
+    }
+
+    fun handleParticipantDeath(event: PlayerDeathEvent) {
+        val player = event.player
+        val session = getSession(player) ?: return
+        if (!session.participants.contains(player.uniqueId)) return
+
+        event.deathMessage = null
+        event.drops.clear()
+        event.droppedExp = 0
+        event.keepInventory = true
+        event.keepLevel = true
+
+        val otherAliveExists = hasOtherAliveNonDownParticipant(session, player.uniqueId)
+        val reviveDisabled = isPlayerDowned(session, player.uniqueId) ||
+            !isWaveCombatActive(session) ||
+            !isMultiplayerSession(session) ||
+            !otherAliveExists ||
+            !canBeRevived(session, player.uniqueId)
+        val respawnLocation = resolveParticipantRespawnLocation(session, player) ?: return
+        pendingDeathRespawns[player.uniqueId] = PendingArenaDeathRespawn(
+            worldName = session.worldName,
+            respawnLocation = respawnLocation,
+            reviveDisabled = reviveDisabled,
+            convertAllDownedToGameOver = isMultiplayerSession(session) && !otherAliveExists
+        )
+
+        notifyParticipantDeath(player)
+        handleInviteTargetUnavailable(player)
+    }
+
+    fun handleParticipantRespawn(event: PlayerRespawnEvent) {
+        val pending = pendingDeathRespawns.remove(event.player.uniqueId) ?: return
+        event.respawnLocation = pending.respawnLocation
+
+        Bukkit.getScheduler().runTask(plugin, Runnable {
+            val player = event.player
+            val session = sessionsByWorld[pending.worldName] ?: run {
+                sendPlayerToLobbyOrSpawn(player)
+                return@Runnable
+            }
+            if (!session.participants.contains(player.uniqueId)) {
+                sendPlayerToLobbyOrSpawn(player)
+                return@Runnable
+            }
+
+            applySessionGameMode(session, player)
+            player.removePotionEffect(PotionEffectType.BLINDNESS)
+            if (isPlayerDowned(session, player.uniqueId)) {
+                player.health = 1.0
+                player.fireTicks = 0
+                player.fallDistance = 0.0f
+                player.velocity = Vector(0.0, 0.0, 0.0)
+                syncDownedShulker(session, player, forceTeleport = true)
+                retargetMobsFromDownedPlayers(session)
+            } else {
+                setPlayerDown(session, player, reviveDisabled = pending.reviveDisabled)
+            }
+            if (pending.convertAllDownedToGameOver) {
+                convertDownedPlayersToGameOver(session)
+            }
+            updateArenaSidebars()
+        })
+    }
+
+    private fun resolveParticipantRespawnLocation(session: ArenaSession, player: Player): Location? {
+        val world = Bukkit.getWorld(session.worldName)
+        if (world == null) {
+            return session.returnLocations[player.uniqueId]?.takeIf { it.world != null }?.clone()
+                ?: Bukkit.getWorlds().firstOrNull()?.spawnLocation
+        }
+
+        val downedLocation = session.downedPlayers[player.uniqueId]?.gameOverLocation
+        val destination = if (downedLocation?.world?.name == session.worldName) {
+            downedLocation.clone()
+        } else {
+            resolveLatestRoomCheckpoint(session, world)
+                ?: session.entranceCheckpoint.clone().apply { this.world = world }
+        }
+        destination.yaw = player.location.yaw
+        destination.pitch = player.location.pitch
+        return destination
     }
 
     private fun applyStageBuildResult(session: ArenaSession, stage: jp.awabi2048.cccontent.features.arena.generator.ArenaStageBuildResult) {
@@ -2999,10 +3106,19 @@ class ArenaManager(
             ?: return
         val session = sessionsByWorld[worldName]
 
-        val killer = entity.killer
+        val killer = entity.killer?.takeIf { player ->
+            session == null || session.participants.contains(player.uniqueId)
+        }
+        val trackedParticipantDamagers = session?.mobDamagedParticipants?.get(entity.uniqueId)
+            .orEmpty()
+            .filter { session?.participants?.contains(it) == true }
+        val rewardPlayer = killer ?: trackedParticipantDamagers
+            .asSequence()
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .firstOrNull { it.isOnline && it.world.name == worldName }
         event.drops.clear()
 
-        if (killer == null) {
+        if (rewardPlayer == null) {
             event.droppedExp = 0
             return
         }
@@ -3011,16 +3127,16 @@ class ArenaManager(
             ?: entityMobToDefinitionTypeId[entity.uniqueId]
             ?: entity.type.name
         val normalizedTypeId = definitionTypeId.trim().lowercase(Locale.ROOT)
-        val lootingLevel = resolveLootingLevel(killer.inventory)
+        val lootingLevel = resolveLootingLevel(rewardPlayer.inventory)
 
         val rebuiltDrops = mutableListOf<ItemStack>()
-        rebuiltDrops += buildConfiguredAdditionalDrops(killer, normalizedTypeId, lootingLevel)
+        rebuiltDrops += buildConfiguredAdditionalDrops(rewardPlayer, normalizedTypeId, lootingLevel)
 
-        createMobTokenDrop(killer, normalizedTypeId, lootingLevel)?.let { token ->
+        createMobTokenDrop(rewardPlayer, normalizedTypeId, lootingLevel)?.let { token ->
             rebuiltDrops += token
         }
 
-        createEnchantShardDrop(killer, normalizedTypeId)?.let { shard ->
+        createEnchantShardDrop(rewardPlayer, normalizedTypeId)?.let { shard ->
             rebuiltDrops += shard
         }
 
@@ -3136,6 +3252,12 @@ class ArenaManager(
 
     private fun resolveMobTokenCategoryTypeId(mobTypeId: String): String {
         val normalized = sanitizeMobTypeId(mobTypeId)
+        mobDefinitions[normalized]?.typeId?.let { definitionTypeId ->
+            mobService.resolveRewardCategoryId(definitionTypeId)?.let { return it }
+            mobService.resolveMobType(definitionTypeId)?.baseEntityType?.let { baseEntityType ->
+                return ArenaMobTokenItem.resolveTokenCategoryTypeId(baseEntityType.name)
+            }
+        }
         mobService.resolveRewardCategoryId(normalized)?.let { return it }
 
         val baseEntityType = mobService.resolveMobType(normalized)?.baseEntityType
@@ -3291,6 +3413,7 @@ class ArenaManager(
         }
 
         playerToSessionWorld.remove(playerId)
+        pendingDeathRespawns.remove(playerId)
         inviteSwingCooldownUntilTick.remove(playerId)
         session.participants.remove(playerId)
         val returnLocation = session.returnLocations.remove(playerId)
@@ -3383,6 +3506,9 @@ class ArenaManager(
         sidebarCleanupTargets.addAll(session.sidebarParticipantOrder)
         sidebarCleanupTargets.forEach { playerId ->
             removeArenaSidebar(playerId)
+        }
+        sidebarCleanupTargets.forEach { playerId ->
+            pendingDeathRespawns.remove(playerId)
         }
 
         session.participants.toList().forEach { participantId ->

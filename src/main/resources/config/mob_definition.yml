@@ -619,6 +619,13 @@ shulker_mimic:
   movement_speed: 0.01
   armor: 7.0
 
+shulker_warp_sniper:
+  type: shulker_warp_sniper
+  health: 40.0
+  attack: 6.2
+  movement_speed: 0.01
+  armor: 7.0
+
 ender_eye_beam:
   type: ender_eye_beam
   health: 28.0

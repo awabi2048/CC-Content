@@ -93,6 +93,7 @@ import jp.awabi2048.cccontent.mob.type.ShulkerRhythmMobType
 import jp.awabi2048.cccontent.mob.type.ShulkerLaserMobType
 import jp.awabi2048.cccontent.mob.type.ShulkerDisruptorMobType
 import jp.awabi2048.cccontent.mob.type.ShulkerMimicMobType
+import jp.awabi2048.cccontent.mob.type.ShulkerWarpSniperMobType
 import jp.awabi2048.cccontent.mob.type.EnderEyeHunterMobType
 import jp.awabi2048.cccontent.mob.type.EnderEyeOrbitMobType
 import jp.awabi2048.cccontent.mob.type.EnderEyeBeamMobType
@@ -107,6 +108,7 @@ import jp.awabi2048.cccontent.mob.type.ZombieNormalMobType
 import jp.awabi2048.cccontent.mob.type.ZombieShieldOnlyMobType
 import jp.awabi2048.cccontent.mob.ability.BoomerangService
 import jp.awabi2048.cccontent.mob.ability.HomingArrowService
+import jp.awabi2048.cccontent.mob.ability.ShulkerWarpSniperAbility
 import jp.awabi2048.cccontent.mob.ability.ThrownWeaponService
 import org.bukkit.Bukkit
 import org.bukkit.Color
@@ -145,6 +147,7 @@ import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.entity.ProjectileHitEvent
 import org.bukkit.event.entity.EntityTransformEvent
 import org.bukkit.event.entity.EntityTeleportEvent
+import org.bukkit.event.player.PlayerInteractEntityEvent
 import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.PotionMeta
@@ -175,6 +178,7 @@ class MobService(private val plugin: JavaPlugin) {
     companion object {
         private val instances = WeakHashMap<JavaPlugin, MobService>()
         private const val VISUAL_SHULKER_BULLET_TAG = "cc.mob.visual_shulker_bullet"
+        private const val ALLOW_SHULKER_WARP_SNIPER_TELEPORT_TAG = "cc.mob.allow_shulker_warp_sniper_teleport"
         private const val STEALTH_FANG_KNOCKUP = 0.55
 
         fun getInstance(plugin: JavaPlugin): MobService? {
@@ -360,6 +364,7 @@ class MobService(private val plugin: JavaPlugin) {
         registerMobType(ShulkerDisruptorMobType())
         registerMobType(WitherGhostMobType())
         registerMobType(ShulkerMimicMobType())
+        registerMobType(ShulkerWarpSniperMobType())
         registerMobType(EnderEyeHunterMobType())
         registerMobType(EnderEyeOrbitMobType())
         registerMobType(EnderEyeBeamMobType())
@@ -829,6 +834,13 @@ class MobService(private val plugin: JavaPlugin) {
     fun handleEntityTeleport(event: EntityTeleportEvent) {
         val living = event.entity as? LivingEntity ?: return
         val activeMob = activeMobs[living.uniqueId] ?: return
+        if (activeMob.mobType.id == "shulker_warp_sniper") {
+            if (living.scoreboardTags.contains(ALLOW_SHULKER_WARP_SNIPER_TELEPORT_TAG)) {
+                return
+            }
+            event.isCancelled = true
+            return
+        }
         if (!activeMob.mobType.id.startsWith("enderman_")) return
     }
 
@@ -847,6 +859,11 @@ class MobService(private val plugin: JavaPlugin) {
         }
         val shooter = projectile.shooter as? LivingEntity ?: return
         val activeMob = activeMobs[shooter.uniqueId] ?: return
+        if (activeMob.mobType.id == "shulker_warp_sniper" && projectile is ShulkerBullet) {
+            event.isCancelled = true
+            projectile.remove()
+            return
+        }
 
         if (activeMob.mobType.id == "witch_elite" && projectile is ThrownPotion) {
             handleEliteWitchPotionLaunch(event, shooter, activeMob, projectile)
@@ -864,6 +881,13 @@ class MobService(private val plugin: JavaPlugin) {
         if (!consumeManagedProjectilePermit(shooter.uniqueId)) {
             event.isCancelled = true
             projectile.remove()
+        }
+    }
+
+    fun handlePlayerInteractEntity(event: PlayerInteractEntityEvent) {
+        val interaction = event.rightClicked as? org.bukkit.entity.Interaction ?: return
+        if (ShulkerWarpSniperAbility.handleProjectileInteraction(interaction)) {
+            event.isCancelled = true
         }
     }
 
