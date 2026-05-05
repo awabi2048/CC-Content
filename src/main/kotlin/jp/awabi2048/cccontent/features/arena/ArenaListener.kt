@@ -18,6 +18,7 @@ import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
 import org.bukkit.event.entity.EntityPotionEffectEvent
+import org.bukkit.event.entity.EntityRegainHealthEvent
 import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.event.entity.EntityToggleGlideEvent
 import org.bukkit.event.entity.EntityShootBowEvent
@@ -31,6 +32,7 @@ import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerInteractEntityEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
+import org.bukkit.event.player.PlayerRespawnEvent
 import org.bukkit.event.player.PlayerTeleportEvent
 import org.bukkit.persistence.PersistentDataType
 import kotlin.random.Random
@@ -67,6 +69,11 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
             return
         }
         arenaManager.handleMobFallDamage(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityRegainHealth(event: EntityRegainHealthEvent) {
+        arenaManager.handleParticipantRegainHealth(event)
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -145,10 +152,15 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
 
     @EventHandler(ignoreCancelled = true)
     fun onPlayerTeleport(event: PlayerTeleportEvent) {
-        if (event.cause != PlayerTeleportEvent.TeleportCause.CHORUS_FRUIT) {
+        if (event.cause == PlayerTeleportEvent.TeleportCause.CHORUS_FRUIT &&
+            arenaManager.getSession(event.player) != null
+        ) {
+            event.isCancelled = true
             return
         }
-        if (arenaManager.getSession(event.player) != null) {
+
+        val destinationWorld = event.to.world ?: return
+        if (!arenaManager.canEnterSessionWorld(event.player, destinationWorld.name)) {
             event.isCancelled = true
         }
     }
@@ -176,18 +188,18 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     @EventHandler
     fun onPlayerChangedWorld(event: PlayerChangedWorldEvent) {
         arenaManager.clearLobbyTutorialState(event.player)
+        arenaManager.handleUnauthorizedSessionWorldPresence(event.player)
     }
 
     @EventHandler
     fun onPlayerDeath(event: PlayerDeathEvent) {
         if (arenaManager.getSession(event.player) == null) return
-        event.deathMessage = null
-        arenaManager.notifyParticipantDeath(event.player)
-        arenaManager.handleInviteTargetUnavailable(event.player)
-        arenaManager.stopSession(
-            event.player,
-            ArenaI18n.text(event.player, "arena.messages.session.ended_by_death")
-        )
+        arenaManager.handleParticipantDeath(event)
+    }
+
+    @EventHandler
+    fun onPlayerRespawn(event: PlayerRespawnEvent) {
+        arenaManager.handleParticipantRespawn(event)
     }
 
     private fun handleConfusionMeleeMiss(event: EntityDamageByEntityEvent) {

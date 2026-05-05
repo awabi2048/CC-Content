@@ -69,6 +69,7 @@ import jp.awabi2048.cccontent.mob.ability.ShulkerProximitySparkZoneAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerEndRodLaserAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerSniperShotAbility
 import jp.awabi2048.cccontent.mob.ability.ShulkerMimicBoltAbility
+import jp.awabi2048.cccontent.mob.ability.ShulkerWarpSniperAbility
 import jp.awabi2048.cccontent.mob.ability.ConeAttackAbility
 import jp.awabi2048.cccontent.mob.ability.AttackBackstepAbility
 import jp.awabi2048.cccontent.mob.ability.EndWitherSentinelAbility
@@ -79,6 +80,7 @@ import jp.awabi2048.cccontent.mob.ability.FloatingHeadVisualAbility
 import jp.awabi2048.cccontent.mob.ability.StationaryTurretVisualAbility
 import org.bukkit.Bukkit
 import org.bukkit.Color
+import org.bukkit.DyeColor
 import org.bukkit.Particle
 import org.bukkit.Sound
 import org.bukkit.enchantments.Enchantment
@@ -1268,7 +1270,11 @@ class WitherGhostMobType : EquipmentMobType(
     }
 
     override fun onDamaged(context: MobDamagedContext, runtime: CustomMobRuntime?) {
-        if (context.event.isCancelled) return
+        if (context.event.isCancelled) {
+            val loc = context.entity.location.clone().add(0.0, 0.5, 0.0)
+            context.entity.world.playSound(loc, Sound.ITEM_SHIELD_BLOCK, 1.0f, 1.0f)
+            return
+        }
         if (context.event.finalDamage <= 0.0) return
         val loc = context.entity.location.clone().add(0.0, 0.5, 0.0)
         context.entity.world.playSound(loc, Sound.BLOCK_CREAKING_HEART_BREAK, 0.9f, 0.8f)
@@ -1942,6 +1948,32 @@ class ShulkerMimicMobType : AbilityMobType(
     )
 ) {
     override val rewardCategoryId: String = "shulker"
+}
+
+class ShulkerWarpSniperMobType : EquipmentMobType(
+    id = "shulker_warp_sniper",
+    baseEntityType = EntityType.SHULKER,
+    abilities = listOf(
+        ShulkerWarpSniperAbility(id = "shulker_warp_sniper_ai")
+    )
+) {
+    override val rewardCategoryId: String = "shulker"
+
+    override fun onDamaged(context: MobDamagedContext, runtime: CustomMobRuntime?) {
+        val shulker = context.entity as? org.bukkit.entity.Shulker
+        if (shulker != null && shulker.peek < 0.5f && kotlin.random.Random.nextDouble() < 0.5) {
+            context.event.isCancelled = true
+            return
+        }
+        super.onDamaged(context, runtime)
+    }
+
+    override fun onSpawn(context: MobSpawnContext, runtime: CustomMobRuntime?) {
+        super.onSpawn(context, runtime)
+        val shulker = context.entity as? org.bukkit.entity.Shulker ?: return
+        shulker.getAttribute(org.bukkit.attribute.Attribute.SCALE)?.baseValue = 1.25
+        shulker.color = DyeColor.PURPLE
+    }
 }
 
 class EnderEyeBeamMobType : EquipmentMobType(

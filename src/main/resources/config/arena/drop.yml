@@ -605,6 +605,9 @@ endermite_poison:
 shulker_mimic:
   base_exp: 6
   items: []
+shulker_warp_sniper:
+  base_exp: 6
+  items: []
 ender_eye_beam:
   base_exp: 4
   items:

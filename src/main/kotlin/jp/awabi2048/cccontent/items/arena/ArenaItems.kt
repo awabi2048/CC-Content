@@ -131,6 +131,7 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
             return when (normalized) {
                 "cave_spider" -> "spider"
                 "ashen_spirit", "water_spirit", "vex" -> "spirit"
+                "shulker_mimic", "shulker_warp_sniper" -> "shulker"
                 else -> normalized
             }
         }

@@ -43,7 +43,7 @@
       enderman_void_carrier:
         weight: 1
         stat_multiplier: 1.9
-      shulker_mimic:
+      shulker_warp_sniper:
         weight: 1
         stat_multiplier: 1.9
   - wave: 3
@@ -57,7 +57,7 @@
       wither_knight:
         weight: 4
         stat_multiplier: 1.9
-      shulker_mimic:
+      shulker_warp_sniper:
         weight: 1
         stat_multiplier: 1.9
       enderman_rift_carrier:
@@ -80,7 +80,7 @@
       wither_knight:
         weight: 4
         stat_multiplier: 1.9
-      shulker_mimic:
+      shulker_warp_sniper:
         weight: 1
         stat_multiplier: 1.9
       end_crystal_sentinel:
@@ -174,7 +174,7 @@ promoted:
       enderman_void_carrier:
         weight: 1
         stat_multiplier: 2.6
-      shulker_mimic:
+      shulker_warp_sniper:
         weight: 1
         stat_multiplier: 2.6
   - wave: 3
@@ -188,7 +188,7 @@ promoted:
       wither_knight:
         weight: 4
         stat_multiplier: 2.6
-      shulker_mimic:
+      shulker_warp_sniper:
         weight: 1
         stat_multiplier: 2.6
       enderman_rift_carrier:
@@ -211,7 +211,7 @@ promoted:
       wither_knight:
         weight: 4
         stat_multiplier: 2.6
-      shulker_mimic:
+      shulker_warp_sniper:
         weight: 1
         stat_multiplier: 2.6
       end_crystal_sentinel:
