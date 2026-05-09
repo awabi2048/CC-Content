@@ -4,6 +4,108 @@ gui:
     next_page: §7次のページに進みます
     previous_page: §7前のページに戻ります
     confirm: §7このオプションで確定します
+  npc:
+    oage_jinja_offering:
+      title:
+        main: §8おあげ神社 - 授与所
+        daily: §8授与所 - 日替わり
+        shop: §8授与所 - ショップ
+        talk: §8授与所 - おしゃべり
+        request: §8授与所 - お願い
+      messages:
+        preparing: §7この機能はまだ準備中です。
+      back:
+        name: §c戻る
+        lore:
+        - §7授与所に戻ります
+      main:
+        daily:
+          name: §e日替わり
+          lore:
+          - §7今日できることを見ます
+        shop:
+          name: §aショップ
+          lore:
+          - §7授与品や特別な品を見ます
+        talk:
+          name: §bおしゃべり
+          lore:
+          - §7おあげちゃんと話します
+        request:
+          name: §dおあげちゃんにお願い
+          lore:
+          - §7特別なお願いをします
+      daily:
+        header:
+          name: §e日替わり
+          lore:
+          - §7今日の依頼とアルバイト
+        delivery:
+          name: §a職業別納品
+          lore:
+          - §7職業ごとの納品依頼です
+          - §8現在は見た目のみです
+        part_time:
+          name: §6おあげちゃんのアルバイト
+          lore:
+          - §7短いお手伝いを受けます
+          - §8現在は見た目のみです
+      shop:
+        header:
+          name: §aショップ
+          lore:
+          - §7授与所の品を見ます
+        placeholder:
+          name: §7準備中の品 #{index}
+          lore:
+          - §8現在は見た目のみです
+        tab:
+          other:
+            name: §aその他
+            lore:
+            - §7その他の品を表示します
+            active:
+              name: §a§lその他
+              lore:
+              - §7表示中のタブです
+          head:
+            name: §d装飾品
+            lore:
+            - §7ヘッド等の装飾品を表示します
+            active:
+              name: §d§l装飾品
+              lore:
+              - §7表示中のタブです
+      talk:
+        header:
+          name: §bおしゃべり
+          lore:
+          - §7話題を選びます
+        topic:
+          arena:
+            name: §cアリーナ
+            lore:
+            - §7アリーナについて話します
+            - §8現在は見た目のみです
+          locked:
+            name: §8未解放のトピック
+            lore:
+            - §7まだ話せません
+      request:
+        header:
+          name: §dおあげちゃんにお願い
+          lore:
+          - §7お願いの内容を選びます
+        restore:
+          name: §a失具還術
+          lore:
+          - §7失ったものを戻す術です
+          - §8現在は見た目のみです
+        ritual:
+          name: §d儀式
+          lore:
+          - §7特別な儀式を行います
+          - §8現在は見た目のみです
   profession:
     selection:
       title: §8職業を選択してください

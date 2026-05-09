@@ -1,12 +1,14 @@
 package jp.awabi2048.cccontent.command
 
 import org.bukkit.Location
+import org.bukkit.Bukkit
 import org.bukkit.command.Command
 import org.bukkit.command.BlockCommandSender
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Entity
+import org.bukkit.entity.Player
 import org.bukkit.util.Vector
 
 /**
@@ -20,7 +22,9 @@ class CCCommand(
     private val onClearBlockPlacementData: (() -> Unit)? = null,
     private val mobDefinitionIdsProvider: (() -> Collection<String>)? = null,
     private val onSummonMob: ((String, Location) -> Entity?)? = null,
-    private val onUpdateDay: ((String?) -> Boolean)? = null
+    private val onUpdateDay: ((String?) -> Boolean)? = null,
+    private val npcMenuIdsProvider: (() -> Collection<String>)? = null,
+    private val onOpenNpcMenu: ((String, Player) -> Boolean)? = null
 ) : CommandExecutor, TabCompleter {
     
     override fun onCommand(
@@ -52,6 +56,9 @@ class CCCommand(
             }
             "debug" -> {
                 handleDebug(sender, args)
+            }
+            "npc-menu" -> {
+                handleNpcMenu(sender, args)
             }
             "help" -> {
                 showHelp(sender)
@@ -134,6 +141,38 @@ class CCCommand(
                 false
             }
         }
+    }
+
+    private fun handleNpcMenu(sender: CommandSender, args: Array<String>): Boolean {
+        if (!sender.hasPermission("cc-content.npc.menu.open")) {
+            sender.sendMessage("§c権限がありません")
+            return false
+        }
+
+        if (onOpenNpcMenu == null) {
+            sender.sendMessage("§cNPCメニュー機能が利用できません")
+            return false
+        }
+
+        if (args.size !in 2..3) {
+            sender.sendMessage("§c使用法: /ccc npc-menu <menu_id> [player]")
+            return false
+        }
+
+        val menuId = args[1]
+        val target = if (args.size == 3) {
+            Bukkit.getPlayerExact(args[2]) ?: run {
+                sender.sendMessage("§cプレイヤーが見つかりません: ${args[2]}")
+                return false
+            }
+        } else {
+            sender as? Player ?: run {
+                sender.sendMessage("§cプレイヤー名を指定してください")
+                return false
+            }
+        }
+
+        return onOpenNpcMenu.invoke(menuId, target)
     }
 
     private fun handleUpdateDay(sender: CommandSender, args: Array<String>): Boolean {
@@ -277,8 +316,11 @@ class CCCommand(
                §f/ccc debug clear_block_placement_data
                §7  - プレイヤー設置ブロック判定データを削除します
 
-               §f/ccc debug update_day [arena]
-               §7  - 日付更新処理を実行します
+              §f/ccc debug update_day [arena]
+              §7  - 日付更新処理を実行します
+
+              §f/ccc npc-menu <menu_id> [player]
+              §7  - NPCメニューを開きます
                
                §f/arenaa §7- アリーナ管理コマンド
                §f/sukima_dungeon §7- スキマダンジョンコマンド
@@ -302,6 +344,9 @@ class CCCommand(
                      candidates.add("restart")
                      candidates.add("summon")
                      candidates.add("debug")
+                }
+                if (sender.hasPermission("cc-content.npc.menu.open")) {
+                    candidates.add("npc-menu")
                 }
                 return candidates.filter { it.startsWith(prefix) }
             }
@@ -328,6 +373,13 @@ class CCCommand(
                    when (args.size) {
                       2 -> mobDefinitionIdsProvider?.invoke().orEmpty().sorted().filter { it.startsWith(args[1], ignoreCase = true) }
                       3, 4, 5 -> listOf("~", "~1", "~-1").filter { it.startsWith(args[args.lastIndex]) }
+                      else -> emptyList()
+                  }
+              }
+              "npc-menu" -> {
+                  when (args.size) {
+                      2 -> npcMenuIdsProvider?.invoke().orEmpty().sorted().filter { it.startsWith(args[1], ignoreCase = true) }
+                      3 -> Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[2], ignoreCase = true) }
                       else -> emptyList()
                   }
               }

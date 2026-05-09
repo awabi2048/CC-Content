@@ -1,0 +1,4 @@
+menus:
+  oage_jinja_offering:
+    display_name: "おあげ神社 - 授与所"
+    open_command: "cc-content npc-menu oage_jinja_offering {player}"

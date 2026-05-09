@@ -51,6 +51,9 @@ permissions:
   cc-content.arena.menu.pedestal:
     description: アリーナ祭壇メニューを開ける
     default: true
+  cc-content.npc.menu.open:
+    description: NPCメニューを開ける
+    default: op
   cc-content.arena.license.paper:
     description: アリーナ ライセンス paper 段階
     default: false

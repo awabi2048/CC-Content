@@ -48,6 +48,7 @@ import jp.awabi2048.cccontent.features.arena.ArenaEnchantPedestalMenu
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import jp.awabi2048.cccontent.features.brewery.BreweryFeature
 import jp.awabi2048.cccontent.features.cooking.CookingFeature
+import jp.awabi2048.cccontent.features.npc.menu.NpcMenuService
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.impl.RankManagerImpl
 import jp.awabi2048.cccontent.features.rank.impl.YamlRankStorage
@@ -125,6 +126,7 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var sharedMobService: MobService
     private lateinit var breweryFeature: BreweryFeature
     private lateinit var cookingFeature: CookingFeature
+    private lateinit var npcMenuService: NpcMenuService
     private var rankManagerInstance: RankManagerImpl? = null
     private var ignoreBlockStoreInstance: IgnoreBlockStore? = null
     private lateinit var contentEnabledAtStartup: ContentEnabledSettings
@@ -175,6 +177,8 @@ class CCContent : JavaPlugin(), Listener {
         CustomHeadConfigRegistry.initialize(this)
         RadioCassetteConfig.initialize(this)
         RadioCassettePlaybackManager.initialize(this)
+        npcMenuService = NpcMenuService(this)
+        npcMenuService.initialize()
 
         sharedMobService = MobService(this)
         sharedMobService.reloadDefinitions()
@@ -269,6 +273,14 @@ class CCContent : JavaPlugin(), Listener {
                     null, "arena" -> arenaMissionService?.updateToday() ?: false
                     else -> false
                 }
+            },
+            npcMenuIdsProvider = { if (::npcMenuService.isInitialized) npcMenuService.getMenuIds() else emptyList() },
+            onOpenNpcMenu = { menuId, player ->
+                if (::npcMenuService.isInitialized) {
+                    npcMenuService.open(menuId, player)
+                } else {
+                    false
+                }
             }
         )
 
@@ -320,6 +332,9 @@ class CCContent : JavaPlugin(), Listener {
         server.pluginManager.registerEvents(CustomHeadGuiListener(this), this)
         server.pluginManager.registerEvents(CustomItemInteractionListener(), this)
         server.pluginManager.registerEvents(RadioCassetteGuiListener(), this)
+        if (::npcMenuService.isInitialized) {
+            server.pluginManager.registerEvents(npcMenuService, this)
+        }
         server.pluginManager.registerEvents(StorageBoxGuiListener(this), this)
         server.pluginManager.registerEvents(TransparentItemFrameListener(this), this)
 
@@ -847,6 +862,9 @@ class CCContent : JavaPlugin(), Listener {
         AirCannonConfig.reload()
         CustomHeadConfigRegistry.reload(this)
         RadioCassetteConfig.reload()
+        if (::npcMenuService.isInitialized) {
+            npcMenuService.reload()
+        }
         registerCustomHeadItems()
         registerRadioCassetteItems()
 

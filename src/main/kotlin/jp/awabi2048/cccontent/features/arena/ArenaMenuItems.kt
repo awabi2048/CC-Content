@@ -1,9 +1,7 @@
 package jp.awabi2048.cccontent.features.arena
 
-import io.papermc.paper.datacomponent.DataComponentTypes
-import io.papermc.paper.datacomponent.item.TooltipDisplay
+import jp.awabi2048.cccontent.gui.GuiMenuItems
 import org.bukkit.Material
-import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 
 object ArenaMenuItems {
@@ -17,16 +15,10 @@ object ArenaMenuItems {
     }
 
     fun backgroundPane(material: Material, name: String = " "): ItemStack {
-        val item = ItemStack(material)
-        val meta = item.itemMeta ?: return hideTooltip(item)
-        meta.setDisplayName(name)
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
-        item.itemMeta = meta
-        return hideTooltip(item)
+        return GuiMenuItems.backgroundPane(material, name)
     }
 
     fun hideTooltip(item: ItemStack): ItemStack {
-        item.setData(DataComponentTypes.TOOLTIP_DISPLAY, TooltipDisplay.tooltipDisplay().hideTooltip(true).build())
-        return item
+        return GuiMenuItems.hideTooltip(item)
     }
 }
