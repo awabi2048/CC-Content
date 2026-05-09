@@ -1,3 +1,5 @@
+@file:Suppress("REDUNDANT_ELSE_IN_WHEN")
+
 package jp.awabi2048.cccontent.features.arena.generator
 
 import jp.awabi2048.cccontent.features.arena.ArenaBounds

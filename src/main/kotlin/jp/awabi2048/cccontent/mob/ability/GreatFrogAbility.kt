@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.mob.ability
 
 import com.destroystokyo.paper.entity.ai.Goal

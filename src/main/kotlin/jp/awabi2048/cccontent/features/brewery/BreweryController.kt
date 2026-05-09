@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION", "SENSELESS_COMPARISON", "UNNECESSARY_SAFE_CALL", "USELESS_ELVIS")
+
 package jp.awabi2048.cccontent.features.brewery
 
 import jp.awabi2048.cccontent.CCContent

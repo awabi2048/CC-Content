@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.features.rank.prestige
 
 import jp.awabi2048.cccontent.features.rank.profession.ProfessionManager

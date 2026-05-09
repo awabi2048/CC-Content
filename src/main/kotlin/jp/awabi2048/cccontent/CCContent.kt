@@ -1272,6 +1272,6 @@ class CCContent : JavaPlugin(), Listener {
     
     override fun onDisable() {
         stopPlugin()
-        logger.info("CC-Content v${description.version} が無効化されました")
+        logger.info("CC-Content v${pluginMeta.version} が無効化されました")
     }
 }

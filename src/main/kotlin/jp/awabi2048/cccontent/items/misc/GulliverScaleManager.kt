@@ -29,7 +29,7 @@ class GulliverScaleManager : Runnable {
             val meta = item.itemMeta ?: continue
             val container = meta.persistentDataContainer
 
-            val scaleAttribute = player.getAttribute(Attribute.valueOf("GENERIC_SCALE")) ?: continue
+            val scaleAttribute = player.getAttribute(Attribute.SCALE) ?: continue
             val currentScale = scaleAttribute.baseValue
 
             if (container.has(GulliverItems.BIG_LIGHT_KEY, PersistentDataType.BYTE)) {

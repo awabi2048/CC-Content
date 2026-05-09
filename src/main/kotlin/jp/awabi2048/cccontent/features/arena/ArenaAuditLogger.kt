@@ -1,5 +1,8 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.features.arena
 
+import jp.awabi2048.cccontent.util.ItemMetaCompat
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.util.io.BukkitObjectOutputStream
@@ -108,7 +111,7 @@ class ArenaAuditLogger(private val plugin: JavaPlugin) {
             "displayName" to meta?.displayName,
             "lore" to meta?.lore,
             "enchants" to item.enchantments.mapKeys { it.key.key.toString() },
-            "customModelData" to meta?.takeIf { it.hasCustomModelData() }?.customModelData,
+            "customModelData" to meta?.let { ItemMetaCompat.getLegacyCustomModelData(it) },
             "persistentDataKeys" to meta?.persistentDataContainer?.keys?.map { it.toString() }?.sorted(),
             "bukkitSerialized" to item.serialize(),
             "rawBase64" to runCatching { serializeItem(item) }.getOrNull()

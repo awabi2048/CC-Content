@@ -1,3 +1,5 @@
+@file:Suppress("USELESS_CAST")
+
 package jp.awabi2048.cccontent.mob.ability
 
 import org.bukkit.entity.LivingEntity

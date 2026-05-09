@@ -25,7 +25,7 @@ object GuiMenuItems {
         val item = ItemStack(material)
         val meta = item.itemMeta ?: return hideTooltip(item)
         meta.displayName(legacy(name))
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return hideTooltip(item)
     }
@@ -37,7 +37,7 @@ object GuiMenuItems {
         if (lore.isNotEmpty()) {
             meta.lore(lore.map { legacy(it) })
         }
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return item
     }

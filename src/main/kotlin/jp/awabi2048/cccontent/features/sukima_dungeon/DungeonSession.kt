@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
 import org.bukkit.Bukkit

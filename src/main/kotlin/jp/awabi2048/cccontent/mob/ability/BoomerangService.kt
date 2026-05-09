@@ -1,3 +1,5 @@
+@file:Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
+
 package jp.awabi2048.cccontent.mob.ability
 
 import org.bukkit.Bukkit

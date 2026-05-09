@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.items.misc
 
 import jp.awabi2048.cccontent.items.CustomItem
+import jp.awabi2048.cccontent.util.ItemMetaCompat
 import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -30,7 +31,7 @@ class CustomHeadItem(
         val meta = item.itemMeta ?: return item
         meta.displayName(Component.text(variant.itemDisplayName))
         meta.lore(variant.itemLore.map { Component.text(it) })
-        variant.itemCustomModelData?.let { meta.setCustomModelData(it) }
+        variant.itemCustomModelData?.let { ItemMetaCompat.setLegacyCustomModelData(meta, it) }
         meta.persistentDataContainer.set(variantKey, PersistentDataType.STRING, variant.variantId)
         item.itemMeta = meta
         return item

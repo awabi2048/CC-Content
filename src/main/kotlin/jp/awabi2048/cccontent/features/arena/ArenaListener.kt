@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.features.arena
 
 import com.awabi2048.ccsystem.api.event.PlayerLeftClickPlayerEvent

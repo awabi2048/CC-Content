@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.mob.type
 
 import com.destroystokyo.paper.profile.ProfileProperty

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.features.sukima_dungeon.generator
 
 import org.bukkit.Bukkit

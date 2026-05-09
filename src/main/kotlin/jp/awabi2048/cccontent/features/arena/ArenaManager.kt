@@ -1,3 +1,12 @@
+@file:Suppress(
+    "DEPRECATION",
+    "REDUNDANT_ELSE_IN_WHEN",
+    "UNNECESSARY_NOT_NULL_ASSERTION",
+    "UNNECESSARY_SAFE_CALL",
+    "USELESS_CAST",
+    "USELESS_ELVIS",
+)
+
 package jp.awabi2048.cccontent.features.arena
 
 import jp.awabi2048.cccontent.config.CoreConfigManager

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.items.misc
 
 import jp.awabi2048.cccontent.items.CustomItemManager

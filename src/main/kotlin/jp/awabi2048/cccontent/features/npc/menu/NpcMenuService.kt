@@ -1,4 +1,6 @@
-﻿package jp.awabi2048.cccontent.features.npc.menu
+@file:Suppress("DEPRECATION")
+
+package jp.awabi2048.cccontent.features.npc.menu
 
 import com.awabi2048.ccsystem.CCSystem
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent

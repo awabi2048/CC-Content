@@ -1,3 +1,5 @@
+@file:Suppress("USELESS_ELVIS")
+
 package jp.awabi2048.cccontent.mob.ability
 
 import jp.awabi2048.cccontent.mob.MobDeathContext

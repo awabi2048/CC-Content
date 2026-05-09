@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION", "USELESS_CAST")
+
 package jp.awabi2048.cccontent.mob
 
 import jp.awabi2048.cccontent.features.arena.ArenaI18n

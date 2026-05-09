@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
 import jp.awabi2048.cccontent.CCContent
@@ -147,7 +149,7 @@ object CustomItemManager {
         meta.setMaxStackSize(1)
         meta.setDisplayName(MessageManager.getMessage(player, "item_bookmark_name", mapOf("tier" to tierDisplayName)))
         meta.lore = MessageManager.getList(player, "item_bookmark_lore")
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         meta.persistentDataContainer.set(TIER_KEY, PersistentDataType.STRING, tier.internalName)
         meta.persistentDataContainer.set(ITEM_TYPE_KEY, PersistentDataType.STRING, "bookmark")
         item.itemMeta = meta
@@ -159,7 +161,7 @@ object CustomItemManager {
         meta.setMaxStackSize(1)
         meta.setDisplayName(MessageManager.getMessage(player, "item_talisman_name"))
         meta.lore = MessageManager.getList(player, "item_talisman_lore")
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         meta.persistentDataContainer.set(ITEM_TYPE_KEY, PersistentDataType.STRING, "talisman")
         item.itemMeta = meta
     }
@@ -216,7 +218,7 @@ object CustomItemManager {
             "§7クールタイム: §b${cooldown} 秒",
             bar
         )
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         meta.persistentDataContainer.set(ITEM_TYPE_KEY, PersistentDataType.STRING, "compass")
         meta.persistentDataContainer.set(COMPASS_RADIUS_KEY, PersistentDataType.DOUBLE, radius)
         meta.persistentDataContainer.set(COMPASS_TIME_KEY, PersistentDataType.INTEGER, time)

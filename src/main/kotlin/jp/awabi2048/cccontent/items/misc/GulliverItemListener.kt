@@ -35,7 +35,7 @@ class GulliverItemListener(private val plugin: JavaPlugin) : Listener {
 
         if (player.isSneaking) {
             // Reset Scale
-            val scaleAttribute = player.getAttribute(Attribute.valueOf("GENERIC_SCALE"))
+            val scaleAttribute = player.getAttribute(Attribute.SCALE)
             if (scaleAttribute != null) {
                 scaleAttribute.baseValue = 1.0
                 
@@ -56,7 +56,7 @@ class GulliverItemListener(private val plugin: JavaPlugin) : Listener {
             if (player.isHandRaised) return
 
             // Check if limit is reached
-            val scaleAttribute = player.getAttribute(Attribute.valueOf("GENERIC_SCALE"))
+            val scaleAttribute = player.getAttribute(Attribute.SCALE)
             val currentScale = scaleAttribute?.baseValue ?: 1.0
             val maxScale = config.getBigLightMaxScale()
             val minScale = config.getSmallLightMinScale()

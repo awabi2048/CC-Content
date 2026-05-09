@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.mob
 
 import org.bukkit.entity.LivingEntity

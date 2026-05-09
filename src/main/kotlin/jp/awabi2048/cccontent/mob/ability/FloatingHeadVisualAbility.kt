@@ -1,3 +1,5 @@
+@file:Suppress("REDUNDANT_CALL_OF_CONVERSION_METHOD")
+
 package jp.awabi2048.cccontent.mob.ability
 
 import com.destroystokyo.paper.profile.ProfileProperty

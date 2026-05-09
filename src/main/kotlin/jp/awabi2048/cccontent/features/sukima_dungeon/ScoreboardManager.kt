@@ -1,4 +1,6 @@
-﻿package jp.awabi2048.cccontent.features.sukima_dungeon
+@file:Suppress("DEPRECATION", "USELESS_ELVIS")
+
+package jp.awabi2048.cccontent.features.sukima_dungeon
 
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player

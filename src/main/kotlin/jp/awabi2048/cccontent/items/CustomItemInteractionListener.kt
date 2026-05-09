@@ -1,3 +1,5 @@
+@file:Suppress("UNNECESSARY_SAFE_CALL")
+
 package jp.awabi2048.cccontent.items
 
 import org.bukkit.entity.Player

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.features.sukima_dungeon.listeners
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.DungeonManager

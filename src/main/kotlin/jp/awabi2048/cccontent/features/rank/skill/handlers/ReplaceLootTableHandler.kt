@@ -1,3 +1,5 @@
+@file:Suppress("USELESS_ELVIS")
+
 package jp.awabi2048.cccontent.features.rank.skill.handlers
 
 import jp.awabi2048.cccontent.features.rank.skill.EffectContext

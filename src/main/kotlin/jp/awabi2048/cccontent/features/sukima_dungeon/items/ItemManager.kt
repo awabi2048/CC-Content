@@ -1,5 +1,8 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.features.sukima_dungeon.items
 
+import jp.awabi2048.cccontent.util.ItemMetaCompat
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -157,7 +160,7 @@ class ItemManager(private val plugin: JavaPlugin) {
             
             // Apply models if provided
             item.itemModel?.let { meta.setItemModel(NamespacedKey.fromString(it)) }
-            item.customModelData?.let { meta.setCustomModelData(it) }
+            item.customModelData?.let { ItemMetaCompat.setLegacyCustomModelData(meta, it) }
             
             itemStack.itemMeta = meta
         }
@@ -247,8 +250,8 @@ class ItemManager(private val plugin: JavaPlugin) {
             if (meta.hasItemModel()) {
                 config.set("$itemPath.item_model", meta.itemModel?.toString())
             }
-            if (meta.hasCustomModelData()) {
-                config.set("$itemPath.custom_model_data", meta.customModelData)
+            if (ItemMetaCompat.hasLegacyCustomModelData(meta)) {
+                config.set("$itemPath.custom_model_data", ItemMetaCompat.getLegacyCustomModelData(meta))
             }
         }
         

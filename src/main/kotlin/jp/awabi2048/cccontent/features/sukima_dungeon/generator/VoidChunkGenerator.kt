@@ -1,4 +1,6 @@
-﻿package jp.awabi2048.cccontent.features.sukima_dungeon.generator
+@file:Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+
+package jp.awabi2048.cccontent.features.sukima_dungeon.generator
 
 import org.bukkit.World
 import org.bukkit.generator.ChunkGenerator

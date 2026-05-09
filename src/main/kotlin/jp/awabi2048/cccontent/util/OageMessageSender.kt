@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.util
 
 import jp.awabi2048.cccontent.CCContent

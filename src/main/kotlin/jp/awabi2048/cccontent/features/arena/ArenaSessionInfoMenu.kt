@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.features.arena
 
 import org.bukkit.Bukkit
@@ -168,7 +170,7 @@ class ArenaSessionInfoMenu(
 
         lore.add(separator)
         meta.lore = lore
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return item
     }
@@ -180,7 +182,7 @@ class ArenaSessionInfoMenu(
             ArenaI18n.text(null, "arena.ui.broadcast.empty_slot")
         )
         meta.lore = emptyList()
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return item
     }
@@ -214,7 +216,7 @@ class ArenaSessionInfoMenu(
 
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(displayName)
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return item
     }
@@ -226,7 +228,7 @@ class ArenaSessionInfoMenu(
             ArenaI18n.text(null, "arena.ui.broadcast.info.name")
         )
         meta.lore = ArenaI18n.stringList(null, "arena.ui.broadcast.info.lore")
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return item
     }

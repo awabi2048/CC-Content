@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.features.rank.command
 
 import jp.awabi2048.cccontent.features.rank.RankManager
@@ -727,7 +729,7 @@ class RankCommand(
                     withoutItalic(toComponent(BAR))
                 )
             )
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
             item.itemMeta = meta
         }
         return item
@@ -995,7 +997,7 @@ class RankCommand(
             skullMeta.owningPlayer = viewer
             skullMeta.displayName(withoutItalic(toComponent("§e${viewer.name}")))
             skullMeta.lore((listOf(toComponent(BAR)) + settingsLore.map { toComponent(it) } + listOf(toComponent(BAR))).map { withoutItalic(it) })
-            skullMeta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+            skullMeta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
             playerHead.itemMeta = skullMeta
         }
         inventory.setItem(MAIN_MENU_PLAYER_INFO_SLOT, playerHead)
@@ -2017,7 +2019,6 @@ class RankCommand(
         meta.lore(null)
         meta.itemName(withoutItalic(toComponent(messageProvider.getMessage(guideKey))))
         meta.setHideTooltip(false)
-        meta.removeItemFlags(ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
         routeItem.itemMeta = meta
         return routeItem
     }
@@ -2355,7 +2356,7 @@ class RankCommand(
         if (meta != null) {
             meta.displayName(withoutItalic(Component.text(" ")))
             meta.lore(emptyList())
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
             meta.setHideTooltip(true)
             item.itemMeta = meta
         }
@@ -2368,7 +2369,7 @@ class RankCommand(
         if (meta != null) {
             meta.displayName(withoutItalic(displayName))
             meta.lore(lore.map { withoutItalic(it) })
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ADDITIONAL_TOOLTIP)
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
             item.itemMeta = meta
         }
         return item

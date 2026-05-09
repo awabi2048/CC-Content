@@ -1,8 +1,11 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.items.arena
 
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.util.ItemMetaCompat
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.enchantments.Enchantment
@@ -38,7 +41,7 @@ abstract class ArenaSimpleItem(
         val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
         meta.displayName(Component.text(name))
         meta.lore(localizedLore.map { Component.text(it) })
-        modelData?.let { meta.setCustomModelData(it) }
+        modelData?.let { ItemMetaCompat.setLegacyCustomModelData(meta, it) }
         meta.persistentDataContainer.set(arenaItemKey, PersistentDataType.STRING, id)
         item.itemMeta = meta
         return item

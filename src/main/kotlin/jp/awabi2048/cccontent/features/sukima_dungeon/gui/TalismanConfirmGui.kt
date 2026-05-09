@@ -1,4 +1,6 @@
-﻿package jp.awabi2048.cccontent.features.sukima_dungeon.gui
+@file:Suppress("DEPRECATION")
+
+package jp.awabi2048.cccontent.features.sukima_dungeon.gui
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import org.bukkit.Bukkit

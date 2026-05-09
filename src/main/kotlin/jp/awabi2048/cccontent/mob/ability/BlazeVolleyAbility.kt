@@ -1,3 +1,5 @@
+@file:Suppress("USELESS_IS_CHECK")
+
 package jp.awabi2048.cccontent.mob.ability
 
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
