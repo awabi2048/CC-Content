@@ -49,6 +49,11 @@ custom_items:
       - §7最大3種類のアイテムを大量に格納できます。
       - §7手に持って§eShiftを2回§7でメニューを開きます。
       - §7§eShift+スクロール§7で使用対象を切り替えます。
+    boxed_daiginjo:
+      name: §f箱入り大吟醸
+      lore:
+      - §7ラベリングされた★5の大吟醸が入った箱
+      - §eおあげ神社に奉納できます
   arena:
     structure_marker_tool:
       name: §6アリーナ構造マーカーツール

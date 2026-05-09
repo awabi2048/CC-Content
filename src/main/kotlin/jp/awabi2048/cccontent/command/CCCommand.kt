@@ -24,7 +24,8 @@ class CCCommand(
     private val onSummonMob: ((String, Location) -> Entity?)? = null,
     private val onUpdateDay: ((String?) -> Boolean)? = null,
     private val npcMenuIdsProvider: (() -> Collection<String>)? = null,
-    private val onOpenNpcMenu: ((String, Player) -> Boolean)? = null
+    private val onOpenNpcMenu: ((String, Player) -> Boolean)? = null,
+    private val onNpcMenuMaintenance: ((String, String) -> Boolean)? = null
 ) : CommandExecutor, TabCompleter {
     
     override fun onCommand(
@@ -160,6 +161,16 @@ class CCCommand(
         }
 
         val menuId = args[1]
+        val maintenanceAction = args.getOrNull(2)?.lowercase()
+        if (maintenanceAction == "reset-delivery" || maintenanceAction == "reset-part-time") {
+            if (onNpcMenuMaintenance == null || !onNpcMenuMaintenance.invoke(menuId, maintenanceAction)) {
+                sender.sendMessage("§cNPCメニューのリセットに失敗しました: $maintenanceAction")
+                return false
+            }
+            sender.sendMessage("§aNPCメニューの状態をリセットしました: $maintenanceAction")
+            return true
+        }
+
         val target = if (args.size == 3) {
             Bukkit.getPlayerExact(args[2]) ?: run {
                 sender.sendMessage("§cプレイヤーが見つかりません: ${args[2]}")
@@ -379,7 +390,7 @@ class CCCommand(
               "npc-menu" -> {
                   when (args.size) {
                       2 -> npcMenuIdsProvider?.invoke().orEmpty().sorted().filter { it.startsWith(args[1], ignoreCase = true) }
-                      3 -> Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[2], ignoreCase = true) }
+                      3 -> (listOf("reset-delivery", "reset-part-time") + Bukkit.getOnlinePlayers().map { it.name }).filter { it.startsWith(args[2], ignoreCase = true) }
                       else -> emptyList()
                   }
               }

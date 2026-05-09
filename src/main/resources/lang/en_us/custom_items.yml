@@ -49,6 +49,11 @@ custom_items:
       - §7Stores up to 3 item types in large quantities.
       - §7Hold it and press §eShift twice§7 to open the menu.
       - §7Use §eShift + scroll§7 to change selected item.
+    boxed_daiginjo:
+      name: §f箱入り大吟醸
+      lore:
+      - §7ラベリングされた★5の大吟醸が入った箱
+      - §eおあげ神社に奉納できます
   arena:
     structure_marker_tool:
       name: §6Arena Structure Marker Tool

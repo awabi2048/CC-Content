@@ -112,6 +112,9 @@ object CustomItemManager {
         val meta = item.itemMeta ?: return
         val model = customItem.itemModel ?: meta.itemModel ?: NamespacedKey.minecraft(item.type.key.key)
         meta.setItemModel(model)
+        if (!customItem.canStack) {
+            meta.setMaxStackSize(1)
+        }
         item.itemMeta = meta
 
         if (item.type == Material.POISONOUS_POTATO && !customItem.keepConsumableComponent) {

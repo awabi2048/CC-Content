@@ -2,3 +2,36 @@ menus:
   oage_jinja_offering:
     display_name: "おあげ神社 - 授与所"
     open_command: "cc-content npc-menu oage_jinja_offering {player}"
+
+garbage_box:
+  rewards:
+    - material: BREAD
+      amount: 3
+      weight: 30
+      name: "§fおさがりのパン"
+      lore:
+        - "§7おあげちゃんのがらくた箱から出てきたもの"
+    - material: GOLD_NUGGET
+      amount: 8
+      weight: 20
+      name: "§6小さなどんぐり袋"
+      lore:
+        - "§7少しだけ得をした気分になります"
+    - material: EXPERIENCE_BOTTLE
+      amount: 4
+      weight: 15
+      name: "§a古い経験瓶"
+      lore:
+        - "§7神社の倉庫に眠っていました"
+    - material: AMETHYST_SHARD
+      amount: 2
+      weight: 10
+      name: "§dきらきらした欠片"
+      lore:
+        - "§7用途はあとで考えましょう"
+    - material: COOKIE
+      amount: 6
+      weight: 25
+      name: "§eおやつ"
+      lore:
+        - "§7休憩用です"

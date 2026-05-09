@@ -33,6 +33,7 @@ import jp.awabi2048.cccontent.items.misc.TransparentGlowItemFrameItem
 import jp.awabi2048.cccontent.items.misc.TransparentItemFrameItem
 import jp.awabi2048.cccontent.items.misc.TransparentItemFrameListener
 import jp.awabi2048.cccontent.items.marker.AdminMarkerToolService
+import jp.awabi2048.cccontent.items.misc.BoxedDaiginjoItem
 import jp.awabi2048.cccontent.items.sukima.*
 import jp.awabi2048.cccontent.items.brewery.BreweryMockClockItem
 import jp.awabi2048.cccontent.items.brewery.BreweryMockYeastItem
@@ -91,6 +92,8 @@ import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.scheduler.BukkitTask
 import java.io.File
+import java.io.InputStreamReader
+import java.nio.charset.StandardCharsets
 import java.util.jar.JarFile
 
 class CCContent : JavaPlugin(), Listener {
@@ -177,7 +180,10 @@ class CCContent : JavaPlugin(), Listener {
         CustomHeadConfigRegistry.initialize(this)
         RadioCassetteConfig.initialize(this)
         RadioCassettePlaybackManager.initialize(this)
-        npcMenuService = NpcMenuService(this)
+        npcMenuService = NpcMenuService(
+            plugin = this,
+            professionProvider = { playerId -> rankManagerInstance?.getPlayerProfession(playerId)?.profession }
+        )
         npcMenuService.initialize()
 
         sharedMobService = MobService(this)
@@ -280,6 +286,17 @@ class CCContent : JavaPlugin(), Listener {
                     npcMenuService.open(menuId, player)
                 } else {
                     false
+                }
+            },
+            onNpcMenuMaintenance = { menuId, action ->
+                if (!::npcMenuService.isInitialized || menuId != "oage_jinja_offering") {
+                    false
+                } else {
+                    when (action) {
+                        "reset-delivery" -> npcMenuService.resetDelivery()
+                        "reset-part-time" -> npcMenuService.resetPartTime()
+                        else -> false
+                    }
                 }
             }
         )
@@ -766,6 +783,7 @@ class CCContent : JavaPlugin(), Listener {
         CustomItemManager.register(StorageBoxTripleItem())
         CustomItemManager.register(TransparentItemFrameItem())
         CustomItemManager.register(TransparentGlowItemFrameItem())
+        CustomItemManager.register(BoxedDaiginjoItem)
         registerRadioCassetteItems()
         registerCustomHeadItems()
 
@@ -824,6 +842,8 @@ class CCContent : JavaPlugin(), Listener {
      * config 配下の設定を再読込
      */
     private fun reloadConfigFiles() {
+        saveSplitLanguageResources()
+        mergeMissingLanguageKeys()
         coreConfig = CoreConfigManager.load(this)
         validateAndRegisterLanguageSources()
         if (hasLanguageErrorsFor("arena")) {
@@ -957,6 +977,43 @@ class CCContent : JavaPlugin(), Listener {
                         target.parentFile?.mkdirs()
                         saveResource(entry.name, false)
                     }
+                }
+        }
+    }
+
+    private fun mergeMissingLanguageKeys() {
+        val codeSource = runCatching {
+            File(javaClass.protectionDomain.codeSource.location.toURI())
+        }.getOrNull() ?: return
+        if (!codeSource.isFile) {
+            return
+        }
+
+        JarFile(codeSource).use { jar ->
+            jar.entries().asSequence()
+                .filter { !it.isDirectory && it.name.startsWith("lang/") && it.name.endsWith(".yml") }
+                .forEach { entry ->
+                    val target = File(dataFolder, entry.name)
+                    if (!target.exists()) {
+                        return@forEach
+                    }
+
+                    val defaults = jar.getInputStream(entry).use { input ->
+                        YamlConfiguration.loadConfiguration(InputStreamReader(input, StandardCharsets.UTF_8))
+                    }
+                    val current = YamlConfiguration.loadConfiguration(target)
+                    val missingKeys = defaults.getKeys(true)
+                        .filter { key -> !defaults.isConfigurationSection(key) && !current.contains(key) }
+
+                    if (missingKeys.isEmpty()) {
+                        return@forEach
+                    }
+
+                    missingKeys.forEach { key ->
+                        current.set(key, defaults.get(key))
+                    }
+                    current.save(target)
+                    logger.info("[CCContent][Lang] 欠けている言語キーを補完しました: ${entry.name} (${missingKeys.size} keys)")
                 }
         }
     }

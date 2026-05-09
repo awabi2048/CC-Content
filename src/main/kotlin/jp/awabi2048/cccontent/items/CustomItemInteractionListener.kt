@@ -4,11 +4,20 @@ import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
+import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.inventory.ClickType
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.player.PlayerInteractEvent
 
 class CustomItemInteractionListener : Listener {
+
+    @EventHandler
+    fun onBlockPlace(event: BlockPlaceEvent) {
+        val customItem = CustomItemManager.identify(event.itemInHand) ?: return
+        if (!customItem.canPlace) {
+            event.isCancelled = true
+        }
+    }
 
     @EventHandler
     fun onPlayerInteract(event: PlayerInteractEvent) {

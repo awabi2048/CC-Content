@@ -38,6 +38,13 @@ interface CustomItem {
     /** 共通仕様の item_model（null の場合は素材に応じた既定モデルを使用） */
     val itemModel: NamespacedKey?
         get() = null
+
+    /** false の場合、このカスタムアイテムをブロックとして設置できない */
+    val canPlace: Boolean
+        get() = true
+
+    val canStack: Boolean
+        get() = true
     
     /**
      * アイテムを生成
