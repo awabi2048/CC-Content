@@ -162,7 +162,7 @@ class CCCommand(
 
         val menuId = args[1]
         val maintenanceAction = args.getOrNull(2)?.lowercase()
-        if (maintenanceAction == "reset-delivery" || maintenanceAction == "reset-part-time") {
+        if (maintenanceAction == "reset-delivery" || maintenanceAction == "reset-part-time" || maintenanceAction == "reset-shop-daily" || maintenanceAction == "reset-shop-weekly") {
             if (onNpcMenuMaintenance == null || !onNpcMenuMaintenance.invoke(menuId, maintenanceAction)) {
                 sender.sendMessage("§cNPCメニューのリセットに失敗しました: $maintenanceAction")
                 return false
@@ -387,13 +387,13 @@ class CCCommand(
                       else -> emptyList()
                   }
               }
-              "npc-menu" -> {
-                  when (args.size) {
-                      2 -> npcMenuIdsProvider?.invoke().orEmpty().sorted().filter { it.startsWith(args[1], ignoreCase = true) }
-                      3 -> (listOf("reset-delivery", "reset-part-time") + Bukkit.getOnlinePlayers().map { it.name }).filter { it.startsWith(args[2], ignoreCase = true) }
-                      else -> emptyList()
-                  }
-              }
+               "npc-menu" -> {
+                   when (args.size) {
+                       2 -> npcMenuIdsProvider?.invoke().orEmpty().sorted().filter { it.startsWith(args[1], ignoreCase = true) }
+                       3 -> (listOf("reset-delivery", "reset-part-time", "reset-shop-daily", "reset-shop-weekly") + Bukkit.getOnlinePlayers().map { it.name }).filter { it.startsWith(args[2], ignoreCase = true) }
+                       else -> emptyList()
+                   }
+               }
               else -> emptyList()
           }
       }

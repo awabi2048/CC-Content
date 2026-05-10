@@ -1,0 +1,60 @@
+tabs:
+  seasonal_head:
+    purchase_limit_daily: 1
+    items:
+    "1":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=64386
+    "2":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=121396
+    "3":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=109997
+    "4":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=109996
+    "5":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=58135
+    "6":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=40158
+    "7":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=27
+    "8":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=82
+    "9":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=50705
+    "10":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=83
+    "11":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=97550
+    "12":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=50701
+    "13":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=978
+    "14":
+      price: 20.0
+      purchase_limit_daily: 1
+      item_id: hdb=38764

@@ -289,12 +289,14 @@ class CCContent : JavaPlugin(), Listener {
                 }
             },
             onNpcMenuMaintenance = { menuId, action ->
-                if (!::npcMenuService.isInitialized || menuId != "oage_jinja_offering") {
+                if (!::npcMenuService.isInitialized || menuId != "oage_shrine") {
                     false
                 } else {
                     when (action) {
                         "reset-delivery" -> npcMenuService.resetDelivery()
                         "reset-part-time" -> npcMenuService.resetPartTime()
+                        "reset-shop-daily" -> npcMenuService.resetShopDaily()
+                        "reset-shop-weekly" -> npcMenuService.resetShopWeekly()
                         else -> false
                     }
                 }

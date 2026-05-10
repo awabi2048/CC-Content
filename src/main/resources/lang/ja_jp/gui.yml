@@ -5,15 +5,21 @@ gui:
     previous_page: §7前のページに戻ります
     confirm: §7このオプションで確定します
   npc:
-    oage_jinja_offering:
+    oage_shrine:
       title:
         main: §8おあげ神社 - 授与所
         daily: §8授与所 - 日替わり
         shop: §8授与所 - ショップ
         talk: §8授与所 - おしゃべり
         request: §8授与所 - お願い
+        garbage_box: §8おあげ神社 - がらくた箱
       messages:
         preparing: §7この機能はまだ準備中です。
+        no_economy: §cVault経済が利用できません。
+        insufficient_funds: §cどんぐりが足りません。
+        inventory_full: §cインベントリに空きがありません。
+        limit_reached: §cこの商品の交換可能回数を使い切っています。
+        purchase_complete: §a{name}§7を§6{price}どんぐり§7で交換しました。
       back:
         name: §c戻る
         lore:
@@ -52,30 +58,35 @@ gui:
           - §8現在は見た目のみです
       shop:
         header:
-          name: §aショップ
+          name: §a季節のヘッド
           lore:
-          - §7授与所の品を見ます
-        placeholder:
-          name: §7準備中の品 #{index}
+          - §7季節ごとのヘッドを見ます
+        empty:
+          name: §8空き枠
           lore:
-          - §8現在は見た目のみです
+          - §7商品はありません
         tab:
-          other:
-            name: §aその他
+          seasonal_head:
+            name: §d季節のヘッド
             lore:
-            - §7その他の品を表示します
+            - §7季節のヘッドを表示します
             active:
-              name: §a§lその他
+              name: §d§l季節のヘッド
               lore:
               - §7表示中のタブです
-          head:
-            name: §d装飾品
+        item:
+          head_lore:
+          - §bおあげ神社で交換してもらったヘッド
+        confirm:
+          title: §8交換確認
+          confirm_button:
+            name: §a交換する
             lore:
-            - §7ヘッド等の装飾品を表示します
-            active:
-              name: §d§l装飾品
-              lore:
-              - §7表示中のタブです
+            - §7この内容で交換します
+          cancel_button:
+            name: §cキャンセル
+            lore:
+            - §7交換をやめます
       talk:
         header:
           name: §bおしゃべり
