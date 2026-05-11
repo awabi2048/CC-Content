@@ -46,6 +46,7 @@ arena:
       usage:
         menu: '&cUsage: /arenaa menu <mission|broadcast|pedestal> [player]'
         lobby: '&cUsage: /arenaa lobby <player> [tutorial|main]'
+        theme: '&cUsage: /arenaa theme'
         start: '&cUsage: /arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
         stop: '&cUsage: /arenaa stop <player>'
         license: '&cUsage: /arenaa license set <player> <paper|bronze|silver|gold>'

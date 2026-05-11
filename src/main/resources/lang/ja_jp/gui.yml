@@ -28,19 +28,20 @@ gui:
         daily:
           name: §e日替わり
           lore:
-          - §7今日できることを見ます
+          - §7おあげちゃんからの依頼をこなして、§eご褒美§7を貰いましょう
         shop:
-          name: §aショップ
+          name: §a授与品
           lore:
-          - §7授与品や特別な品を見ます
+          - §7どんぐりを初穂料に、特別なアイテムを交換してもらえます
         talk:
           name: §bおしゃべり
           lore:
-          - §7おあげちゃんと話します
+          - §7おあげちゃんとお話ができます
+          - §7知らないことを教えてもらえるかも
         request:
-          name: §dおあげちゃんにお願い
+          name: §dご奉仕
           lore:
-          - §7特別なお願いをします
+          - §7どんぐりを初穂料に、お祓いなどをしてもらいます
       daily:
         header:
           name: §e日替わり
@@ -161,36 +162,6 @@ gui:
       cancel_button: §c§lキャンセル
     error:
       already_has_profession: §c既に職業を選択しています
-  skill:
-    tree_button: §aスキルツリー
-    tree_button_lore:
-    - §7スキルツリーを開きます
-    - §e§nクリックで開く
-    settings_button: §7設定
-    settings_button_lore:
-    - §7各種オプションを変更します
-    - §e§nクリックで開く
-    settings_title: §8職業設定
-    settings:
-      back: §c§l戻る
-      back_lore: §7職業メインメニューに戻ります
-      bossbar:
-        title: §6経験値獲得時のボスバー表示
-        current: §f§l| §7現在 {value}
-        action: §f§l| §7クリックで切り替え
-        mode:
-          short: 表示する（短め）
-          long: 表示する（長め）
-          hidden: 表示しない
-      level_up:
-        title: §bレベルアップ通知
-        current: §f§l| §7現在 {value}
-        action: §f§l| §7クリックで切り替え
-        enabled: 送信する
-        disabled: 送信しない
-    hint_button: §7職業のヒント
-    hint_button_lore:
-    - §c現在準備中です
 gui_buttons:
   cancel: §cキャンセル
   confirm: §a確認

@@ -5,6 +5,7 @@ import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
+import java.nio.file.Path
 import java.util.Locale
 
 object OageShrineShopConfig {
@@ -25,6 +26,10 @@ object OageShrineShopConfig {
     fun load(plugin: JavaPlugin): ConfigData {
         ensureDefaultFile(plugin)
         val yaml = YamlConfiguration.loadConfiguration(getConfigFile(plugin))
+        val errors = validate(yaml)
+        if (errors.isNotEmpty()) {
+            throw IllegalStateException("おあげ神社ショップ設定に不備があります:\n" + errors.joinToString("\n") { "- $it" })
+        }
         val tabsSection = yaml.getConfigurationSection("tabs")
             ?: throw IllegalStateException("tabs 設定が見つかりません")
 
@@ -38,6 +43,68 @@ object OageShrineShopConfig {
         }
 
         return ConfigData(tabs)
+    }
+
+    @JvmStatic
+    fun validateConfigFile(path: Path): List<String> {
+        return validate(YamlConfiguration.loadConfiguration(path.toFile()))
+    }
+
+    fun validate(yaml: YamlConfiguration): List<String> {
+        val errors = mutableListOf<String>()
+        val tabsSection = yaml.getConfigurationSection("tabs")
+        if (tabsSection == null) {
+            return listOf("tabs 設定が見つかりません")
+        }
+        if (tabsSection.getKeys(false).isEmpty()) {
+            return listOf("ショップタブが1件も定義されていません")
+        }
+
+        var validTabs = 0
+        tabsSection.getKeys(false).sorted().forEach { tabKey ->
+            val tabPath = "tabs.$tabKey"
+            val section = tabsSection.getConfigurationSection(tabKey)
+            if (section == null) {
+                errors += "$tabPath はセクションである必要があります"
+                return@forEach
+            }
+
+            val itemsSection = section.getConfigurationSection("items")
+            if (itemsSection == null || itemsSection.getKeys(false).isEmpty()) {
+                errors += "$tabPath.items に商品が1件も定義されていません"
+                return@forEach
+            }
+
+            var validItems = 0
+            itemsSection.getKeys(false).sorted().forEach { itemKey ->
+                val itemPath = "$tabPath.items.$itemKey"
+                val itemSection = itemsSection.getConfigurationSection(itemKey)
+                if (itemSection == null) {
+                    errors += "$itemPath はセクションである必要があります"
+                    return@forEach
+                }
+                val itemId = itemSection.getString("item_id")?.trim().orEmpty()
+                if (itemId.isBlank()) {
+                    errors += "$itemPath.item_id が空です"
+                }
+                val price = itemSection.getDoubleOrNull("price")
+                if (price == null || price <= 0.0) {
+                    errors += "$itemPath.price は正の数値である必要があります"
+                }
+                if (itemId.isNotBlank() && price != null && price > 0.0) {
+                    validItems++
+                }
+            }
+
+            if (validItems > 0) {
+                validTabs++
+            }
+        }
+
+        if (validTabs == 0) {
+            errors += "ショップタブが1件も有効な商品を持っていません"
+        }
+        return errors
     }
 
     private fun loadTab(tabId: String, section: ConfigurationSection): OageShrineShopTabDefinition? {

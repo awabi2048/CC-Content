@@ -1,4 +1,74 @@
 rank:
+  gui:
+    tree_button: '&aSkill Tree'
+    tree_button_lore:
+    - '&7Open the skill tree'
+    - '&eClick to open'
+    settings_button: '&7Settings'
+    settings_button_lore:
+    - '&7Change profession options'
+    - '&eClick to open'
+    settings_title: '&8Profession Settings'
+    settings:
+      back: '&cBack'
+      back_lore: '&7Return to profession main menu'
+      bossbar:
+        title: '&6Boss bar on EXP gain'
+        current: '&f| &7Current {value}'
+        action: '&f| &7Click to switch'
+        mode:
+          short: Show short
+          long: Show long
+          hidden: Hidden
+      level_up:
+        title: '&bLevel-up notification'
+        current: '&f| &7Current {value}'
+        action: '&f| &7Click to switch'
+        enabled: Enabled
+        disabled: Disabled
+    hint_button: '&7Profession hint'
+    hint_button_lore:
+    - '&cCurrently in preparation'
+  skill:
+    usage: '&cUsage: /rank skill'
+    player_only: '&cThis command can only be executed by a player'
+    gui:
+      title: '&8{profession} Skill Tree'
+      no_profession: '&cYou have not selected a profession'
+      tree_not_found: '&cSkill tree for {profession} was not found'
+      start_not_found: '&cStart skill was not found'
+      status:
+        prestige_unlocked: '&dPrestige'
+        acquired: '&aAcquired'
+        available: '&eAvailable'
+        locked: '&cLocked'
+      lore:
+        required_level: '&7Required Lv: &e{level}'
+        current_level: '&7Current Lv: &e{level}'
+        status: '&7Status: {status}'
+        prestige_available: '&dPrestige skill available'
+      route:
+        prev: Go Back
+        next: Go Forward
+      dialog:
+        title: '&6Confirm Skill Unlock'
+        body: '&fUnlock {skill}? &7You cannot proceed to the other branch after this choice.'
+        confirm: '&aUnlock'
+        cancel: '&cCancel'
+      unlock:
+        success: '&aUnlocked skill: {skill}'
+        already: '&eAlready unlocked: {skill}'
+        missing_prerequisite: '&cMissing prerequisite skills: {skills}'
+        level_shortage: '&cLevel requirement not met (required: {required}, current: {current})'
+        branch_locked: '&cThis branch is locked because the other branch was already chosen'
+        failed: '&cFailed to unlock skill'
+      prestige:
+        dialog:
+          title: '&dConfirm Prestige Skill'
+          body: '&fUnlock prestige skill {skill}?'
+        unlock:
+          success: '&dUnlocked prestige skill: {skill}'
+          failed: '&cFailed to unlock prestige skill'
   tutorial_task_info:
     usage: '§cUsage: /rank task-info <player>'
     player_not_found: §cPlayer not found
