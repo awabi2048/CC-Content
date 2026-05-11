@@ -215,10 +215,11 @@ class NpcMenuService(
     }
 
     private fun renderMain(player: Player, inventory: Inventory) {
-        inventory.setItem(19, icon(player, "main.daily", Material.CHEST))
-        inventory.setItem(21, icon(player, "main.shop", Material.CRAFTING_TABLE))
+        inventory.setItem(19, icon(player, "main.daily", Material.BAMBOO_HANGING_SIGN))
+        inventory.setItem(21, icon(player, "main.shop", Material.CHEST))
         inventory.setItem(23, icon(player, "main.talk", Material.WRITABLE_BOOK))
-        inventory.setItem(25, icon(player, "main.request", Material.CLOCK))
+        inventory.setItem(25, icon(player, "main.request", Material.FLOWER_BANNER_PATTERN))
+        inventory.setItem(40, oageChanHead())
     }
 
     private fun renderDaily(player: Player, inventory: Inventory) {
@@ -398,6 +399,14 @@ class NpcMenuService(
     }
 
     private fun icon(player: Player, key: String, material: Material): ItemStack = GuiMenuItems.icon(material, text(player, "$key.name"), list(player, "$key.lore"))
+
+    private fun oageChanHead(): ItemStack {
+        val item = GuiMenuItems.icon(Material.PLAYER_HEAD, "§aおあげ神社の授与所")
+        val meta = item.itemMeta as? SkullMeta ?: return item
+        meta.owningPlayer = Bukkit.getOfflinePlayer("OageChan_")
+        item.itemMeta = meta
+        return item
+    }
 
     private fun backButton(player: Player): ItemStack = GuiMenuItems.backButton(text(player, "back.name"), list(player, "back.lore"))
 

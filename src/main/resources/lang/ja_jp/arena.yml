@@ -49,6 +49,7 @@ arena:
         start: '&c使用法: /arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
         stop: '&c使用法: /arenaa stop <player>'
         license: '&c使用法: /arenaa license set <player> <paper|bronze|silver|gold>'
+        theme: '&cUsage: /arenaa theme'
       start_error:
         already_in_session: '&c{player} はすでにアリーナセッション中です'
         concurrent_limit_reached: '&c同時セッション上限に達しています ({current}/{max})'

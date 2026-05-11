@@ -942,10 +942,10 @@ class RankCommand(
             inventory.setItem(slot, headerFooterPane)
         }
 
-        val skillTreeLore = messageProvider.getMessageList("gui.skill.tree_button_lore")
+        val skillTreeLore = messageProvider.getMessageList("rank.gui.tree_button_lore")
         val skillTreeItem = createGuiItem(
             Material.OAK_SAPLING,
-            toComponent(messageProvider.getMessage("gui.skill.tree_button")),
+            toComponent(messageProvider.getMessage("rank.gui.tree_button")),
             listOf(toComponent(BAR)) + skillTreeLore.map { toComponent(it) } + listOf(toComponent(BAR))
         )
         inventory.setItem(MAIN_MENU_SKILL_TREE_SLOT, skillTreeItem)
@@ -982,10 +982,10 @@ class RankCommand(
         )
         inventory.setItem(MAIN_MENU_PROFESSION_OVERVIEW_SLOT, professionOverviewItem)
 
-        val settingsLore = messageProvider.getMessageList("gui.skill.settings_button_lore")
+        val settingsLore = messageProvider.getMessageList("rank.gui.settings_button_lore")
         val settingsItem = createGuiItem(
             Material.COMPARATOR,
-            toComponent(messageProvider.getMessage("gui.skill.settings_button")),
+            toComponent(messageProvider.getMessage("rank.gui.settings_button")),
             listOf(toComponent(BAR)) + settingsLore.map { toComponent(it) } + listOf(toComponent(BAR))
         )
         inventory.setItem(MAIN_MENU_SETTINGS_SLOT, settingsItem)
@@ -1003,10 +1003,10 @@ class RankCommand(
         inventory.setItem(MAIN_MENU_PLAYER_INFO_SLOT, playerHead)
 
         // 職業のヒントアイコン (スロット42) - モック実装
-        val hintLoreMain = messageProvider.getMessageList("gui.skill.hint_button_lore")
+        val hintLoreMain = messageProvider.getMessageList("rank.gui.hint_button_lore")
         val hintItem = createGuiItem(
             Material.COMPASS,
-            toComponent(messageProvider.getMessage("gui.skill.hint_button")),
+            toComponent(messageProvider.getMessage("rank.gui.hint_button")),
             listOf(toComponent(BAR)) + hintLoreMain.map { toComponent(it) } + listOf(toComponent(BAR))
         )
         inventory.setItem(MAIN_MENU_HINT_SLOT, hintItem)
@@ -1120,7 +1120,7 @@ class RankCommand(
         val inventory = Bukkit.createInventory(
             holder,
             27,
-            messageProvider.getMessage("gui.skill.settings_title")
+            messageProvider.getMessage("rank.gui.settings_title")
         )
         holder.backingInventory = inventory
         renderProfessionSettingsMenu(inventory, playerProfession)
@@ -1154,11 +1154,11 @@ class RankCommand(
         }
         val bossBarItem = createGuiItem(
             Material.CLOCK,
-            toComponent(messageProvider.getMessage("gui.skill.settings.bossbar.title")),
+            toComponent(messageProvider.getMessage("rank.gui.settings.bossbar.title")),
             listOf(
                 toComponent(BAR),
                 toComponent("§f§l| §7現在 $bossBarValueColor${bossBarMode.displayName}"),
-                toComponent(messageProvider.getMessage("gui.skill.settings.bossbar.action")),
+                toComponent(messageProvider.getMessage("rank.gui.settings.bossbar.action")),
                 toComponent(BAR)
             )
         )
@@ -1166,17 +1166,17 @@ class RankCommand(
 
         val levelUpEnabled = rankManager.isLevelUpNotificationEnabled(playerProfession.playerUuid)
         val levelUpValue = if (levelUpEnabled) {
-            "§a${messageProvider.getMessage("gui.skill.settings.level_up.enabled")}"
+            "§a${messageProvider.getMessage("rank.gui.settings.level_up.enabled")}"
         } else {
-            "§c${messageProvider.getMessage("gui.skill.settings.level_up.disabled")}"
+            "§c${messageProvider.getMessage("rank.gui.settings.level_up.disabled")}"
         }
         val levelUpItem = createGuiItem(
             Material.BELL,
-            toComponent(messageProvider.getMessage("gui.skill.settings.level_up.title")),
+            toComponent(messageProvider.getMessage("rank.gui.settings.level_up.title")),
             listOf(
                 toComponent(BAR),
                 toComponent("§f§l| §7現在 $levelUpValue"),
-                toComponent(messageProvider.getMessage("gui.skill.settings.level_up.action")),
+                toComponent(messageProvider.getMessage("rank.gui.settings.level_up.action")),
                 toComponent(BAR)
             )
         )

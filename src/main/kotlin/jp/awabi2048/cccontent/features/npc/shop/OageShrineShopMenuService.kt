@@ -39,7 +39,7 @@ class OageShrineShopMenuService(
     fun openShop(player: Player, tabId: String) {
         val tab = tabs.firstOrNull { it.tabId == tabId } ?: tabs.firstOrNull() ?: return
         val holder = ShopHolder(player.uniqueId, tab)
-        val inventory = Bukkit.createInventory(holder, SIZE, text(player, "title.shop"))
+        val inventory = Bukkit.createInventory(holder, SIZE, legacy(text(player, "title.shop")))
         holder.backingInventory = inventory
         render(player, holder, inventory)
         player.openInventory(inventory)
@@ -51,7 +51,7 @@ class OageShrineShopMenuService(
 
     fun openPurchaseConfirm(player: Player, resolved: OageShrineShopResolvedItem) {
         val holder = ConfirmHolder(player.uniqueId, resolved)
-        val inventory = Bukkit.createInventory(holder, CONFIRM_SIZE, text(player, "confirm.title"))
+        val inventory = Bukkit.createInventory(holder, CONFIRM_SIZE, legacy(text(player, "confirm.title")))
         holder.backingInventory = inventory
         applyConfirmFrame(inventory)
         inventory.setItem(CONFIRM_PREVIEW_SLOT, resolved.previewItem)
