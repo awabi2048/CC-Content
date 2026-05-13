@@ -46,6 +46,18 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
+            <groupId>me.crylonz.deadchest</groupId>
+            <artifactId>dead-chest</artifactId>
+            <version>4.30.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>net.milkbowl.vault</groupId>
+            <artifactId>VaultAPI</artifactId>
+            <version>1.7.3-b131</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib</artifactId>
             <version>${kotlin.version}</version>

@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.npc.shop
 
 import com.awabi2048.ccsystem.CCSystem
+import jp.awabi2048.cccontent.economy.ContentEconomyBridge
 import jp.awabi2048.cccontent.gui.GuiMenuItems
 import jp.awabi2048.cccontent.gui.OwnedMenuHolder
 import jp.awabi2048.cccontent.util.ContentLocaleResolver
@@ -61,7 +62,7 @@ class OageShrineShopMenuService(
     }
 
     fun confirmPurchase(player: Player, resolved: OageShrineShopResolvedItem) {
-        if (OageShrineEconomyBridge.get(plugin) == null) {
+        if (ContentEconomyBridge.get(plugin) == null) {
             playError(player)
             player.sendMessage(text(player, "messages.no_economy"))
             return
@@ -73,7 +74,7 @@ class OageShrineShopMenuService(
             return
         }
 
-        if (!OageShrineEconomyBridge.has(plugin, player, resolved.item.price)) {
+        if (!ContentEconomyBridge.has(plugin, player, resolved.item.price)) {
             playError(player)
             player.sendMessage(text(player, "messages.insufficient_funds"))
             return
@@ -85,7 +86,7 @@ class OageShrineShopMenuService(
             return
         }
 
-        if (!OageShrineEconomyBridge.withdraw(plugin, player, resolved.item.price)) {
+        if (!ContentEconomyBridge.withdraw(plugin, player, resolved.item.price)) {
             playError(player)
             player.sendMessage(text(player, "messages.no_economy"))
             return
@@ -93,7 +94,7 @@ class OageShrineShopMenuService(
 
         val leftovers = player.inventory.addItem(resolved.purchaseItem.clone())
         if (leftovers.isNotEmpty()) {
-            OageShrineEconomyBridge.deposit(plugin, player, resolved.item.price)
+            ContentEconomyBridge.deposit(plugin, player, resolved.item.price)
             playError(player)
             player.sendMessage(text(player, "messages.inventory_full"))
             return
@@ -102,7 +103,7 @@ class OageShrineShopMenuService(
         state.recordPurchase(player.uniqueId, resolved.tab, resolved.item)
         playClick(player)
         player.closeInventory()
-        player.sendMessage(text(player, "messages.purchase_complete", "name" to resolved.displayName, "price" to OageShrineEconomyBridge.formatPrice(resolved.item.price)))
+        player.sendMessage(text(player, "messages.purchase_complete", "name" to resolved.displayName, "price" to ContentEconomyBridge.formatPrice(resolved.item.price)))
     }
 
     @EventHandler
@@ -198,7 +199,7 @@ class OageShrineShopMenuService(
         lines += separator()
         headLore.forEach { lines += legacy(it) }
         lines += separator()
-        lines += legacy("§f❙ §7初穂料 §6${OageShrineEconomyBridge.formatPrice(price)}")
+        lines += legacy("§f❙ §7初穂料 §6${ContentEconomyBridge.formatPrice(price)}")
         val limit = item.purchaseLimitDaily ?: tab.purchaseLimitDaily ?: item.purchaseLimitWeekly ?: tab.purchaseLimitWeekly
         if (limit != null) {
             lines += legacy("§f❙ §7交換可能個数 §b${limit}個")
@@ -213,7 +214,7 @@ class OageShrineShopMenuService(
             text(player, "confirm.confirm_button.name"),
             list(player, "confirm.confirm_button.lore") + listOf(
                 "§7${resolved.displayName}",
-                "§7§f❙ §7初穂料 §6${OageShrineEconomyBridge.formatPrice(resolved.item.price)}"
+                "§7§f❙ §7初穂料 §6${ContentEconomyBridge.formatPrice(resolved.item.price)}"
             )
         )
     }

@@ -3,7 +3,10 @@
 package jp.awabi2048.cccontent.features.npc.menu
 
 import com.awabi2048.ccsystem.CCSystem
+import jp.awabi2048.cccontent.economy.ContentEconomyBridge
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
+import jp.awabi2048.cccontent.features.npc.request.DeadChestRecoveryService
+import jp.awabi2048.cccontent.features.npc.request.DeadChestSnapshot
 import jp.awabi2048.cccontent.features.npc.shop.OageShrineShopMenuService
 import jp.awabi2048.cccontent.features.npc.shop.OageShrineShopState
 import jp.awabi2048.cccontent.features.rank.profession.Profession
@@ -50,9 +53,15 @@ class NpcMenuService(
         const val PART_TIME_SLOT = 24
         const val DAILY_HEADER_SLOT = 4
         const val GARBAGE_BOX_HEADER_SLOT = 4
+        const val DEAD_CHEST_RECOVERY_COST = 300.0
+        const val DEAD_CHEST_LIST_HEADER_SLOT = 4
+        const val DEAD_CHEST_CONFIRM_PREVIEW_SLOT = 22
+        const val DEAD_CHEST_CONFIRM_SLOT = 20
+        const val DEAD_CHEST_CANCEL_SLOT = 24
         const val PART_TIME_TASK_ARENA = "arena_mission_clear"
         const val DELIVERY_WORLD_POINT_REWARD = 100
         val GARBAGE_BOX_REWARD_SLOTS = listOf(20, 21, 22, 23, 24, 29, 30, 31, 32, 33)
+        val DEAD_CHEST_LIST_SLOTS = listOf(19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34)
     }
 
     private val configFile = File(plugin.dataFolder, CONFIG_PATH)
@@ -61,6 +70,7 @@ class NpcMenuService(
     private var rewardDefinitions: List<GarbageBoxRewardDefinition> = emptyList()
     private var state = YamlConfiguration()
     private lateinit var shopMenuService: OageShrineShopMenuService
+    private val deadChestRecoveryService = DeadChestRecoveryService(plugin)
 
     fun initialize() {
         ensureConfig()
@@ -165,6 +175,30 @@ class NpcMenuService(
             NpcMenuView.REQUEST -> if (slot == BACK_SLOT) {
                 playClick(player)
                 openView(player, NpcMenuView.MAIN)
+            } else if (slot == 20) {
+                playClick(player)
+                openDeadChestList(player)
+            } else if (slot == 24) {
+                playError(player)
+                player.sendMessage("§7このお願いはまだ準備中です。")
+            }
+            NpcMenuView.DEAD_CHEST_LIST -> {
+                if (slot == BACK_SLOT) {
+                    playClick(player)
+                    openView(player, NpcMenuView.REQUEST)
+                } else {
+                    holder.deadChestSnapshots[slot]?.let {
+                        playClick(player)
+                        openDeadChestConfirm(player, it)
+                    }
+                }
+            }
+            NpcMenuView.DEAD_CHEST_CONFIRM -> when (slot) {
+                DEAD_CHEST_CONFIRM_SLOT -> holder.selectedDeadChest?.let { confirmDeadChestRecovery(player, it) }
+                DEAD_CHEST_CANCEL_SLOT -> {
+                    playClick(player)
+                    openDeadChestList(player)
+                }
             }
             NpcMenuView.GARBAGE_BOX -> {
                 if (slot == GARBAGE_BOX_BACK_SLOT) {
@@ -210,6 +244,8 @@ class NpcMenuService(
             NpcMenuView.DAILY -> renderDaily(player, inventory)
             NpcMenuView.TALK -> renderTalk(player, inventory)
             NpcMenuView.REQUEST -> renderRequest(player, inventory)
+            NpcMenuView.DEAD_CHEST_LIST -> renderDeadChestList(player, holder, inventory)
+            NpcMenuView.DEAD_CHEST_CONFIRM -> renderDeadChestConfirm(player, holder, inventory)
             NpcMenuView.GARBAGE_BOX -> renderGarbageBox(player, holder, inventory)
         }
     }
@@ -227,6 +263,135 @@ class NpcMenuService(
         inventory.setItem(DELIVERY_SLOT, deliveryIcon(player))
         inventory.setItem(PART_TIME_SLOT, partTimeIcon(player))
         inventory.setItem(BACK_SLOT, backButton(player))
+    }
+
+    private fun openDeadChestList(player: Player) {
+        val holder = NpcMenuHolder(player.uniqueId, NpcMenuView.DEAD_CHEST_LIST)
+        val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8失具還術 - 遺失物一覧")
+        holder.backingInventory = inventory
+        render(player, holder, inventory)
+        player.openInventory(inventory)
+    }
+
+    private fun openDeadChestConfirm(player: Player, snapshot: DeadChestSnapshot) {
+        val holder = NpcMenuHolder(player.uniqueId, NpcMenuView.DEAD_CHEST_CONFIRM)
+        holder.selectedDeadChest = snapshot
+        val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8失具還術 - 確認")
+        holder.backingInventory = inventory
+        render(player, holder, inventory)
+        player.openInventory(inventory)
+    }
+
+    private fun renderDeadChestList(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
+        inventory.setItem(DEAD_CHEST_LIST_HEADER_SLOT, GuiMenuItems.icon(
+            Material.ENDER_EYE,
+            "§a失具還術",
+            listOf(
+                "§7回収したい遺失物を選びます。",
+                "§7初穂料: §6300 Value",
+                "§8回収物は足元に戻ります。"
+            )
+        ))
+        inventory.setItem(BACK_SLOT, backButton(player))
+
+        val snapshots = deadChestRecoveryService.getActiveChests(player)
+        holder.deadChestSnapshots = DEAD_CHEST_LIST_SLOTS.zip(snapshots).toMap()
+        if (snapshots.isEmpty()) {
+            inventory.setItem(22, GuiMenuItems.icon(Material.GRAY_DYE, "§7回収できる遺失物はありません", listOf("§7現在アクティブなデスチェストはありません。")))
+            return
+        }
+
+        DEAD_CHEST_LIST_SLOTS.forEach { slot ->
+            val snapshot = holder.deadChestSnapshots[slot]
+            inventory.setItem(slot, if (snapshot != null) deadChestIcon(snapshot) else GuiMenuItems.backgroundPane(Material.GRAY_STAINED_GLASS_PANE))
+        }
+    }
+
+    private fun renderDeadChestConfirm(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
+        val snapshot = holder.selectedDeadChest ?: run {
+            inventory.setItem(22, GuiMenuItems.icon(Material.BARRIER, "§c対象が見つかりません"))
+            inventory.setItem(DEAD_CHEST_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§c戻る", listOf("§7一覧に戻ります。")))
+            return
+        }
+        inventory.setItem(DEAD_CHEST_CONFIRM_PREVIEW_SLOT, deadChestIcon(snapshot))
+        inventory.setItem(DEAD_CHEST_CONFIRM_SLOT, GuiMenuItems.icon(
+            Material.LIME_CONCRETE,
+            "§a回収する",
+            listOf(
+                "§7この遺失物を回収します。",
+                "§7初穂料: §6300 Value"
+            )
+        ))
+        inventory.setItem(DEAD_CHEST_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§cキャンセル", listOf("§7一覧に戻ります。")))
+    }
+
+    private fun deadChestIcon(snapshot: DeadChestSnapshot): ItemStack {
+        val description = snapshot.description
+        return GuiMenuItems.icon(
+            Material.CHEST,
+            "§a遺失物 ${snapshot.index + 1}",
+            listOf(
+                "§7発生: §f${description.createdAt}",
+                "§7場所: §f${description.worldName} ${description.x}, ${description.y}, ${description.z}",
+                "§7中身: §f${description.itemKinds}種 / ${description.itemCount}個",
+                "§8${description.summary}",
+                "§7初穂料: §6300 Value"
+            )
+        )
+    }
+
+    private fun confirmDeadChestRecovery(player: Player, snapshot: DeadChestSnapshot) {
+        if (!deadChestRecoveryService.isAvailable()) {
+            playError(player)
+            player.closeInventory()
+            player.sendMessage("§cDeadChestが利用できないため、失具還術を行えません。")
+            return
+        }
+        if (ContentEconomyBridge.get(plugin) == null) {
+            playError(player)
+            player.sendMessage("§c経済機能が利用できません。")
+            return
+        }
+        val activeChests = deadChestRecoveryService.getActiveChests(player)
+        val current = activeChests.firstOrNull { sameDeadChest(it, snapshot) } ?: run {
+            playError(player)
+            player.closeInventory()
+            player.sendMessage("§cその遺失物はすでに回収済みです。")
+            return
+        }
+        if (!ContentEconomyBridge.has(plugin, player, DEAD_CHEST_RECOVERY_COST)) {
+            playError(player)
+            player.sendMessage("§c初穂料が足りません。")
+            return
+        }
+        if (!ContentEconomyBridge.withdraw(plugin, player, DEAD_CHEST_RECOVERY_COST)) {
+            playError(player)
+            player.sendMessage("§c初穂料を納められませんでした。")
+            return
+        }
+
+        val recovered = deadChestRecoveryService.recover(player, current.chest)
+        if (!recovered) {
+            ContentEconomyBridge.deposit(plugin, player, DEAD_CHEST_RECOVERY_COST)
+            playError(player)
+            player.closeInventory()
+            player.sendMessage("§c回収に失敗したため、初穂料を返しました。")
+            return
+        }
+
+        playClick(player)
+        player.closeInventory()
+        player.sendMessage("§a失具還術により遺失物を回収しました。§7足元を確認してください。")
+    }
+
+    private fun sameDeadChest(left: DeadChestSnapshot, right: DeadChestSnapshot): Boolean {
+        val leftLocation = deadChestRecoveryService.chestLocation(left.chest)
+        val rightLocation = deadChestRecoveryService.chestLocation(right.chest)
+        return leftLocation.world?.name == rightLocation.world?.name &&
+            leftLocation.blockX == rightLocation.blockX &&
+            leftLocation.blockY == rightLocation.blockY &&
+            leftLocation.blockZ == rightLocation.blockZ &&
+            deadChestRecoveryService.chestOwnerId(left.chest) == deadChestRecoveryService.chestOwnerId(right.chest)
     }
 
     private fun renderTalk(player: Player, inventory: Inventory) {
@@ -541,7 +706,13 @@ class NpcMenuService(
     private data class DeliveryItemMatch(val slot: Int, val displayName: String)
 
     private enum class NpcMenuView(val key: String) {
-        MAIN("main"), DAILY("daily"), TALK("talk"), REQUEST("request"), GARBAGE_BOX("garbage_box")
+        MAIN("main"),
+        DAILY("daily"),
+        TALK("talk"),
+        REQUEST("request"),
+        DEAD_CHEST_LIST("dead_chest_list"),
+        DEAD_CHEST_CONFIRM("dead_chest_confirm"),
+        GARBAGE_BOX("garbage_box")
     }
 
     private class NpcMenuHolder(
@@ -549,5 +720,7 @@ class NpcMenuService(
         val view: NpcMenuView
     ) : OwnedMenuHolder(ownerId) {
         var garbageBoxRewards: Map<Int, GarbageBoxReward> = emptyMap()
+        var deadChestSnapshots: Map<Int, DeadChestSnapshot> = emptyMap()
+        var selectedDeadChest: DeadChestSnapshot? = null
     }
 }
