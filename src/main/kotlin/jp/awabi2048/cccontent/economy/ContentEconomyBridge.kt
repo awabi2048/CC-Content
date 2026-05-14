@@ -39,6 +39,8 @@ object ContentEconomyBridge {
 
     fun formatPrice(price: Double): String = formatter.format(price)
 
+    fun formatAcorn(price: Double, amountColor: String = "§e"): String = "§6🐿️ $amountColor${formatPrice(price)}"
+
     private fun ensure(plugin: JavaPlugin) {
         if (provider != null) {
             return

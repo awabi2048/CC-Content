@@ -6,7 +6,6 @@ import jp.awabi2048.cccontent.gui.GuiMenuItems
 import jp.awabi2048.cccontent.gui.OwnedMenuHolder
 import jp.awabi2048.cccontent.util.ContentLocaleResolver
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
@@ -195,16 +194,17 @@ class OageShrineShopMenuService(
     }
 
     private fun buildShopLore(headLore: List<String>, price: Double, tab: OageShrineShopTabDefinition, item: OageShrineShopItemDefinition): List<Component> {
+        val costLine = "§f❙ §7初穂料 ${ContentEconomyBridge.formatAcorn(price)}"
         val lines = mutableListOf<Component>()
-        lines += separator()
-        headLore.forEach { lines += legacy(it) }
-        lines += separator()
-        lines += legacy("§f❙ §7初穂料 §6${ContentEconomyBridge.formatPrice(price)}")
         val limit = item.purchaseLimitDaily ?: tab.purchaseLimitDaily ?: item.purchaseLimitWeekly ?: tab.purchaseLimitWeekly
-        if (limit != null) {
-            lines += legacy("§f❙ §7交換可能個数 §b${limit}個")
-        }
-        lines += separator()
+        val limitLine = limit?.let { "§f❙ §7交換可能個数 §b${it}個" }
+        val separator = separator(headLore + listOfNotNull(costLine, limitLine))
+        lines += separator
+        headLore.forEach { lines += legacy(it) }
+        lines += separator
+        lines += legacy(costLine)
+        if (limitLine != null) lines += legacy(limitLine)
+        lines += separator
         return lines
     }
 
@@ -214,7 +214,7 @@ class OageShrineShopMenuService(
             text(player, "confirm.confirm_button.name"),
             list(player, "confirm.confirm_button.lore") + listOf(
                 "§7${resolved.displayName}",
-                "§7§f❙ §7初穂料 §6${ContentEconomyBridge.formatPrice(resolved.item.price)}"
+                "§7§f❙ §7初穂料 ${ContentEconomyBridge.formatAcorn(resolved.item.price)}"
             )
         )
     }
@@ -268,7 +268,22 @@ class OageShrineShopMenuService(
         return player.inventory.storageContents.filterNotNull().any { existing -> existing.isSimilar(item) && existing.amount + item.amount <= existing.maxStackSize }
     }
 
-    private fun separator(): Component = Component.text("────────").color(NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false)
+    private fun separator(lines: Collection<String>): Component {
+        val maxWidth = lines.maxOfOrNull { displayWidth(stripColor(it)) } ?: 0
+        val separatorWidth = displayWidth("―").coerceAtLeast(1)
+        val count = ((maxWidth + separatorWidth - 1) / separatorWidth).coerceAtLeast(1)
+        return legacy("§8§m" + "―".repeat(count))
+    }
+
+    private fun stripColor(text: String): String = text.replace(Regex("[§&][0-9A-FK-ORa-fk-or]"), "")
+
+    private fun displayWidth(text: String): Int = text.sumOf { char ->
+        when {
+            char.code in 0x20..0x7E -> 6
+            char.code in 0xFF61..0xFF9F -> 6
+            else -> 12
+        }
+    }
 
     private fun legacy(text: String): Component = LegacyComponentSerializer.legacySection().deserialize(text).decoration(TextDecoration.ITALIC, false)
 
