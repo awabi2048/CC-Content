@@ -46,27 +46,30 @@ class NpcMenuService(
         const val MENU_ID = "oage_shrine"
         const val MENU_SIZE = 45
         const val TALK_MENU_SIZE = 54
-        const val GARBAGE_BOX_SIZE = 54
+        const val OAGE_BOX_SIZE = 54
         const val BACK_SLOT = 40
         const val TALK_BACK_SLOT = 49
-        const val GARBAGE_BOX_BACK_SLOT = 49
+        const val OAGE_BOX_BACK_SLOT = 49
         const val DELIVERY_SLOT = 20
         const val PART_TIME_SLOT = 24
         const val DAILY_HEADER_SLOT = 4
-        const val GARBAGE_BOX_HEADER_SLOT = 4
+        const val OAGE_BOX_HEADER_SLOT = 4
+        const val OAGE_BOX_CONFIRM_PREVIEW_SLOT = 22
+        const val OAGE_BOX_CONFIRM_SLOT = 20
+        const val OAGE_BOX_CANCEL_SLOT = 24
         const val DEAD_CHEST_RECOVERY_COST = 300.0
         const val DEAD_CHEST_CONFIRM_PREVIEW_SLOT = 22
         const val DEAD_CHEST_CONFIRM_SLOT = 20
         const val DEAD_CHEST_CANCEL_SLOT = 24
         const val PART_TIME_TASK_ARENA = "arena_mission_clear"
         const val DELIVERY_WORLD_POINT_REWARD = 100
-        val GARBAGE_BOX_REWARD_SLOTS = listOf(20, 21, 22, 23, 24, 29, 30, 31, 32, 33)
+        val OAGE_BOX_REWARD_SLOTS = listOf(20, 21, 22, 23, 24, 29, 30, 31, 32, 33)
     }
 
     private val configFile = File(plugin.dataFolder, CONFIG_PATH)
     private val stateFile = File(plugin.dataFolder, "data/npc/oage_shrine.yml")
     private val shopState = OageShrineShopState(File(plugin.dataFolder, "data/npc/oage_shrine_shop.yml"))
-    private var rewardDefinitions: List<GarbageBoxRewardDefinition> = emptyList()
+    private var oageBoxRewards = OageBoxRewardDefinitions(emptyList(), emptyList(), emptyList())
     private var state = YamlConfiguration()
     private lateinit var shopMenuService: OageShrineShopMenuService
     private val deadChestRecoveryService = DeadChestRecoveryService(plugin)
@@ -75,16 +78,15 @@ class NpcMenuService(
         ensureConfig()
         ensureState()
         shopMenuService = OageShrineShopMenuService(plugin, shopState)
-        shopMenuService.reload()
-        plugin.server.pluginManager.registerEvents(shopMenuService, plugin)
         reload()
+        plugin.server.pluginManager.registerEvents(shopMenuService, plugin)
     }
 
     fun reload() {
         ensureConfig()
         ensureState()
-        val config = YamlConfiguration.loadConfiguration(configFile)
-        rewardDefinitions = loadRewardDefinitions(config)
+        val config = loadMenuConfig()
+        oageBoxRewards = loadOageBoxRewardDefinitions(config)
         state = YamlConfiguration.loadConfiguration(stateFile)
         shopState.reload()
         if (::shopMenuService.isInitialized) {
@@ -104,6 +106,11 @@ class NpcMenuService(
         state.set("part_time.completed_tasks", null)
         state.set("part_time.opened", null)
         saveState()
+        return true
+    }
+
+    fun completeOageDaily(playerId: UUID): Boolean {
+        markPartTimeCompleted(playerId, PART_TIME_TASK_ARENA)
         return true
     }
 
@@ -187,20 +194,27 @@ class NpcMenuService(
                     openView(player, NpcMenuView.REQUEST)
                 }
             }
-            NpcMenuView.GARBAGE_BOX -> {
-                if (slot == GARBAGE_BOX_BACK_SLOT) {
+            NpcMenuView.OAGE_BOX -> {
+                if (slot == OAGE_BOX_BACK_SLOT) {
                     playClick(player)
                     openView(player, NpcMenuView.DAILY)
-                } else if (slot in GARBAGE_BOX_REWARD_SLOTS) {
-                    handleGarbageBoxRewardClick(player, holder, slot)
+                } else if (slot in OAGE_BOX_REWARD_SLOTS) {
+                    handleOageBoxRewardClick(player, holder, slot)
+                }
+            }
+            NpcMenuView.OAGE_BOX_CONFIRM -> when (slot) {
+                OAGE_BOX_CONFIRM_SLOT -> holder.selectedOageBoxReward?.let { confirmOageBoxReward(player, it) }
+                OAGE_BOX_CANCEL_SLOT -> {
+                    playClick(player)
+                    openOageBox(player)
                 }
             }
         }
     }
 
     private fun openView(player: Player, view: NpcMenuView) {
-        if (view == NpcMenuView.GARBAGE_BOX) {
-            openGarbageBox(player)
+        if (view == NpcMenuView.OAGE_BOX) {
+            openOageBox(player)
             return
         }
 
@@ -216,9 +230,18 @@ class NpcMenuService(
         shopMenuService.open(player)
     }
 
-    private fun openGarbageBox(player: Player) {
-        val holder = NpcMenuHolder(player.uniqueId, NpcMenuView.GARBAGE_BOX)
-        val inventory = Bukkit.createInventory(holder, GARBAGE_BOX_SIZE, title(player, NpcMenuView.GARBAGE_BOX))
+    private fun openOageBox(player: Player) {
+        val holder = NpcMenuHolder(player.uniqueId, NpcMenuView.OAGE_BOX)
+        val inventory = Bukkit.createInventory(holder, OAGE_BOX_SIZE, title(player, NpcMenuView.OAGE_BOX))
+        holder.backingInventory = inventory
+        render(player, holder, inventory)
+        player.openInventory(inventory)
+    }
+
+    private fun openOageBoxConfirm(player: Player, reward: OageBoxReward) {
+        val holder = NpcMenuHolder(player.uniqueId, NpcMenuView.OAGE_BOX_CONFIRM)
+        holder.selectedOageBoxReward = reward
+        val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8おあげBOX - 確認")
         holder.backingInventory = inventory
         render(player, holder, inventory)
         player.openInventory(inventory)
@@ -232,7 +255,8 @@ class NpcMenuService(
             NpcMenuView.TALK -> renderTalk(player, inventory)
             NpcMenuView.REQUEST -> renderRequest(player, inventory)
             NpcMenuView.DEAD_CHEST_CONFIRM -> renderDeadChestConfirm(player, holder, inventory)
-            NpcMenuView.GARBAGE_BOX -> renderGarbageBox(player, holder, inventory)
+            NpcMenuView.OAGE_BOX -> renderOageBox(player, holder, inventory)
+            NpcMenuView.OAGE_BOX_CONFIRM -> renderOageBoxConfirm(player, holder, inventory)
         }
     }
 
@@ -453,14 +477,25 @@ class NpcMenuService(
         return DeadChestRecoveryCheck(snapshot, balance, true, null)
     }
 
-    private fun renderGarbageBox(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
-        inventory.setItem(GARBAGE_BOX_HEADER_SLOT, GuiMenuItems.icon(Material.BRICKS, "§6がらくた箱", listOf("§7今日は何が出るでしょうか")))
-        inventory.setItem(GARBAGE_BOX_BACK_SLOT, backButton(player))
-        val rewards = drawGarbageBoxRewards()
-        holder.garbageBoxRewards = GARBAGE_BOX_REWARD_SLOTS.zip(rewards).toMap()
-        GARBAGE_BOX_REWARD_SLOTS.forEach { slot ->
-            inventory.setItem(slot, holder.garbageBoxRewards[slot]?.item ?: GuiMenuItems.icon(Material.GRAY_DYE, "§7空き"))
+    private fun renderOageBox(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
+        inventory.setItem(OAGE_BOX_HEADER_SLOT, GuiMenuItems.icon(Material.BRICKS, "§6おあげBOX", listOf("§7ご褒美を1つ選んでください")))
+        inventory.setItem(OAGE_BOX_BACK_SLOT, backButton(player))
+        val rewards = drawOageBoxRewards()
+        holder.oageBoxRewards = OAGE_BOX_REWARD_SLOTS.zip(rewards).toMap()
+        OAGE_BOX_REWARD_SLOTS.forEach { slot ->
+            inventory.setItem(slot, holder.oageBoxRewards[slot]?.icon(player) ?: GuiMenuItems.icon(Material.GRAY_DYE, "§7空き"))
         }
+    }
+
+    private fun renderOageBoxConfirm(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
+        val reward = holder.selectedOageBoxReward ?: run {
+            inventory.setItem(OAGE_BOX_CONFIRM_PREVIEW_SLOT, GuiMenuItems.icon(Material.BARRIER, "§c報酬が見つかりません"))
+            inventory.setItem(OAGE_BOX_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§c戻る", listOf("§7おあげBOXに戻ります。")))
+            return
+        }
+        inventory.setItem(OAGE_BOX_CONFIRM_PREVIEW_SLOT, reward.icon(player))
+        inventory.setItem(OAGE_BOX_CONFIRM_SLOT, GuiMenuItems.icon(Material.LIME_CONCRETE, "§a受け取る", listOf("§7このご褒美を受け取ります。")))
+        inventory.setItem(OAGE_BOX_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§cキャンセル", listOf("§7おあげBOXに戻ります。")))
     }
 
     private fun deliveryIcon(player: Player): ItemStack {
@@ -584,35 +619,73 @@ class NpcMenuService(
         }.getOrNull()
     }
 
+    private fun isWorldPointAvailable(): Boolean {
+        return runCatching {
+            val myWorldManager = Bukkit.getPluginManager().getPlugin("MyWorldManager") ?: return false
+            val apiClass = Class.forName("me.awabi2048.myworldmanager.api.MyWorldManagerApi", true, myWorldManager.javaClass.classLoader)
+            apiClass.getMethod("isWorldPointServiceAvailable").invoke(null) as? Boolean ?: false
+        }.getOrDefault(false)
+    }
+
     private fun handlePartTimeClick(player: Player) {
         if (isPartTimeOpened(player.uniqueId) || !isPartTimeTaskCompleted(player.uniqueId, PART_TIME_TASK_ARENA)) return
         playClick(player)
-        openGarbageBox(player)
+        openOageBox(player)
     }
 
-    private fun handleGarbageBoxRewardClick(player: Player, holder: NpcMenuHolder, slot: Int) {
+    private fun handleOageBoxRewardClick(player: Player, holder: NpcMenuHolder, slot: Int) {
         if (isPartTimeOpened(player.uniqueId)) {
             playError(player)
             player.closeInventory()
             player.sendMessage("§7今日のご褒美は受け取り済みです。")
             return
         }
-        val reward = holder.garbageBoxRewards[slot] ?: return
-        if (!canAcceptReward(player, reward.item)) {
+        val reward = holder.oageBoxRewards[slot] ?: return
+        playClick(player)
+        openOageBoxConfirm(player, reward)
+    }
+
+    private fun confirmOageBoxReward(player: Player, reward: OageBoxReward) {
+        if (isPartTimeOpened(player.uniqueId)) {
             playError(player)
-            player.sendMessage("§cインベントリに空きがありません。")
+            player.closeInventory()
+            player.sendMessage("§7今日のご褒美は受け取り済みです。")
             return
         }
-        val leftovers = player.inventory.addItem(reward.item.clone())
-        if (leftovers.isNotEmpty()) {
+        val failure = validateOageBoxRewardGrant(player, reward)
+        if (failure != null) {
             playError(player)
-            player.sendMessage("§cインベントリに空きがありません。")
+            player.sendMessage(failure)
+            return
+        }
+        if (!grantOageBoxReward(player, reward)) {
+            playError(player)
+            player.sendMessage("§cご褒美を受け取れませんでした。")
             return
         }
         markPartTimeOpened(player.uniqueId)
         playClick(player)
-        player.sendMessage("§aおあげちゃんのがらくた箱からご褒美を受け取りました。")
+        player.sendMessage("§aおあげBOXからご褒美を受け取りました。")
         player.closeInventory()
+    }
+
+    private fun validateOageBoxRewardGrant(player: Player, reward: OageBoxReward): String? = when (reward) {
+        is OageBoxReward.CustomItem -> {
+            val item = CustomItemManager.createItemForPlayer(reward.itemId, player, reward.amount)
+                ?: return "§c未登録のカスタムアイテムです: ${reward.itemId}"
+            if (canAcceptReward(player, item)) null else "§cインベントリに空きがありません。"
+        }
+        is OageBoxReward.Acorn -> if (ContentEconomyBridge.get(plugin) != null) null else "§c経済機能が利用できません。"
+        is OageBoxReward.WorldPoint -> if (isWorldPointAvailable()) null else "§cワールドポイント機能が利用できません。"
+    }
+
+    private fun grantOageBoxReward(player: Player, reward: OageBoxReward): Boolean = when (reward) {
+        is OageBoxReward.CustomItem -> {
+            val item = CustomItemManager.createItemForPlayer(reward.itemId, player, reward.amount) ?: return false
+            player.inventory.addItem(item).isEmpty()
+        }
+        is OageBoxReward.Acorn -> ContentEconomyBridge.deposit(plugin, player, reward.amount.toDouble())
+        is OageBoxReward.WorldPoint -> grantWorldPoint(player.uniqueId, reward.amount) != null
     }
 
     private fun canAcceptReward(player: Player, item: ItemStack): Boolean {
@@ -634,7 +707,7 @@ class NpcMenuService(
 
     private fun menuSize(view: NpcMenuView): Int = when (view) {
         NpcMenuView.TALK -> TALK_MENU_SIZE
-        NpcMenuView.GARBAGE_BOX -> GARBAGE_BOX_SIZE
+        NpcMenuView.OAGE_BOX -> OAGE_BOX_SIZE
         else -> MENU_SIZE
     }
 
@@ -721,17 +794,6 @@ class NpcMenuService(
             configFile.parentFile?.mkdirs()
             plugin.saveResource(CONFIG_PATH, false)
         }
-        val config = YamlConfiguration.loadConfiguration(configFile)
-        if (!config.isList("garbage_box.rewards")) {
-            config.set("garbage_box.rewards", listOf(
-                mapOf("material" to "BREAD", "amount" to 3, "weight" to 30, "name" to "§fおさがりのパン", "lore" to listOf("§7おあげちゃんのがらくた箱から出てきたもの")),
-                mapOf("material" to "GOLD_NUGGET", "amount" to 8, "weight" to 20, "name" to "§6小さなどんぐり袋", "lore" to listOf("§7少しだけ得をした気分になります")),
-                mapOf("material" to "EXPERIENCE_BOTTLE", "amount" to 4, "weight" to 15, "name" to "§a古い経験瓶", "lore" to listOf("§7神社の倉庫に眠っていました")),
-                mapOf("material" to "AMETHYST_SHARD", "amount" to 2, "weight" to 10, "name" to "§dきらきらした欠片", "lore" to listOf("§7用途はあとで考えましょう")),
-                mapOf("material" to "COOKIE", "amount" to 6, "weight" to 25, "name" to "§eおやつ", "lore" to listOf("§7休憩用です"))
-            ))
-            config.save(configFile)
-        }
     }
 
     private fun ensureState() {
@@ -741,40 +803,113 @@ class NpcMenuService(
         }
     }
 
-    private fun loadRewardDefinitions(config: YamlConfiguration): List<GarbageBoxRewardDefinition> {
-        return config.getMapList("garbage_box.rewards").mapNotNull { raw ->
-            val material = Material.matchMaterial(raw["material"]?.toString()?.uppercase() ?: return@mapNotNull null) ?: return@mapNotNull null
-            val amount = (raw["amount"] as? Number)?.toInt() ?: raw["amount"]?.toString()?.toIntOrNull() ?: 1
-            val weight = (raw["weight"] as? Number)?.toInt() ?: raw["weight"]?.toString()?.toIntOrNull() ?: 1
-            val name = raw["name"]?.toString()?.replace('&', '§')
-            val lore = (raw["lore"] as? List<*>)?.map { it.toString().replace('&', '§') }.orEmpty()
-            GarbageBoxRewardDefinition(material, amount.coerceIn(1, material.maxStackSize), weight.coerceAtLeast(1), name, lore)
-        }.ifEmpty { listOf(GarbageBoxRewardDefinition(Material.BREAD, 1, 1, "§fおさがりのパン", listOf("§7おあげちゃんのがらくた箱から出てきたもの"))) }
+    private fun loadMenuConfig(): YamlConfiguration {
+        return YamlConfiguration().also { config ->
+            config.options().pathSeparator('/')
+            config.load(configFile)
+        }
     }
 
-    private fun drawGarbageBoxRewards(): List<GarbageBoxReward> = List(GARBAGE_BOX_REWARD_SLOTS.size) { GarbageBoxReward(weightedRewardDefinition().toItem()) }
+    private fun loadOageBoxRewardDefinitions(config: YamlConfiguration): OageBoxRewardDefinitions {
+        val itemSection = config.getConfigurationSection("oage_box/rewards/item")
+            ?: throw IllegalStateException("config/npc/menu.yml: oage_box.rewards.item がありません")
+        val itemRewards = itemSection.getKeys(false).map { itemId ->
+            val amount = itemSection.getInt("$itemId/amount", 1).coerceAtLeast(1)
+            val weight = itemSection.getInt("$itemId/weight", 1).coerceAtLeast(1)
+            if (CustomItemManager.getItem(itemId) == null) {
+                throw IllegalStateException("config/npc/menu.yml: 未登録のカスタムアイテムIDです: $itemId")
+            }
+            OageBoxItemRewardDefinition(itemId, amount, weight)
+        }
+        val acornRewards = loadWeightedAmountDefinitions(config, "oage_box/rewards/dg")
+        val worldPointRewards = loadWeightedAmountDefinitions(config, "oage_box/rewards/world_point")
+        require(itemRewards.isNotEmpty()) { "config/npc/menu.yml: oage_box.rewards.item は1件以上必要です" }
+        require(acornRewards.isNotEmpty()) { "config/npc/menu.yml: oage_box.rewards.dg は1件以上必要です" }
+        require(worldPointRewards.isNotEmpty()) { "config/npc/menu.yml: oage_box.rewards.world_point は1件以上必要です" }
+        return OageBoxRewardDefinitions(itemRewards, acornRewards, worldPointRewards)
+    }
 
-    private fun weightedRewardDefinition(): GarbageBoxRewardDefinition {
-        val total = rewardDefinitions.sumOf { it.weight }.coerceAtLeast(1)
+    private fun loadWeightedAmountDefinitions(config: YamlConfiguration, path: String): List<WeightedAmountRewardDefinition> {
+        return config.getMapList(path).mapIndexed { index, raw ->
+            val amount = (raw["amount"] as? Number)?.toInt() ?: raw["amount"]?.toString()?.toIntOrNull()
+                ?: throw IllegalStateException("config/npc/menu.yml: $path[$index].amount が不正です")
+            val weight = (raw["weight"] as? Number)?.toInt() ?: raw["weight"]?.toString()?.toIntOrNull()
+                ?: throw IllegalStateException("config/npc/menu.yml: $path[$index].weight が不正です")
+            WeightedAmountRewardDefinition(amount.coerceAtLeast(1), weight.coerceAtLeast(1))
+        }
+    }
+
+    private fun drawOageBoxRewards(): List<OageBoxReward> {
+        val rewards = mutableListOf<OageBoxReward>()
+        val acorn = weightedAmountDefinition(oageBoxRewards.acornRewards)
+        val worldPoint = weightedAmountDefinition(oageBoxRewards.worldPointRewards)
+        rewards.add(OageBoxReward.Acorn(acorn.amount))
+        rewards.add(OageBoxReward.WorldPoint(worldPoint.amount))
+        rewards.addAll(drawOageBoxItemRewards())
+        return rewards.shuffled(Random)
+    }
+
+    private fun drawOageBoxItemRewards(): List<OageBoxReward.CustomItem> {
+        val rewards = mutableListOf<OageBoxReward.CustomItem>()
+        var pool = oageBoxRewards.itemRewards.toMutableList()
+        repeat(OAGE_BOX_REWARD_SLOTS.size - 2) {
+            if (pool.isEmpty()) {
+                pool = oageBoxRewards.itemRewards.toMutableList()
+            }
+            val selected = weightedItemDefinition(pool)
+            rewards.add(OageBoxReward.CustomItem(selected.itemId, selected.amount))
+            pool.remove(selected)
+        }
+        return rewards
+    }
+
+    private fun weightedItemDefinition(definitions: List<OageBoxItemRewardDefinition>): OageBoxItemRewardDefinition {
+        val total = definitions.sumOf { it.weight }.coerceAtLeast(1)
         var cursor = Random.nextInt(total)
-        for (definition in rewardDefinitions) {
+        for (definition in definitions) {
             cursor -= definition.weight
             if (cursor < 0) return definition
         }
-        return rewardDefinitions.first()
+        return definitions.first()
     }
 
-    private fun GarbageBoxRewardDefinition.toItem(): ItemStack {
-        val item = ItemStack(material, amount)
-        val meta = item.itemMeta ?: return item
-        if (!name.isNullOrBlank()) meta.displayName(legacy(name))
-        if (lore.isNotEmpty()) meta.lore(lore.map { legacy(it) })
-        item.itemMeta = meta
-        return item
+    private fun weightedAmountDefinition(definitions: List<WeightedAmountRewardDefinition>): WeightedAmountRewardDefinition {
+        val total = definitions.sumOf { it.weight }.coerceAtLeast(1)
+        var cursor = Random.nextInt(total)
+        for (definition in definitions) {
+            cursor -= definition.weight
+            if (cursor < 0) return definition
+        }
+        return definitions.first()
     }
 
-    private data class GarbageBoxRewardDefinition(val material: Material, val amount: Int, val weight: Int, val name: String?, val lore: List<String>)
-    private data class GarbageBoxReward(val item: ItemStack)
+    private fun OageBoxReward.icon(player: Player): ItemStack = when (this) {
+        is OageBoxReward.CustomItem -> CustomItemManager.createItemForPlayer(itemId, player, amount)
+            ?: GuiMenuItems.icon(Material.BARRIER, "§c未登録アイテム", listOf("§7$itemId"))
+        is OageBoxReward.Acorn -> GuiMenuItems.icon(
+            Material.SUNFLOWER,
+            "§6どんぐり",
+            listOf("§7${formatAcorn(amount.toDouble())}§7を受け取ります")
+        )
+        is OageBoxReward.WorldPoint -> GuiMenuItems.icon(
+            Material.EMERALD,
+            "§6ワールドポイント",
+            listOf("§7§e$amount§7 ワールドポイントを受け取ります")
+        )
+    }
+
+    private data class OageBoxRewardDefinitions(
+        val itemRewards: List<OageBoxItemRewardDefinition>,
+        val acornRewards: List<WeightedAmountRewardDefinition>,
+        val worldPointRewards: List<WeightedAmountRewardDefinition>
+    )
+    private data class OageBoxItemRewardDefinition(val itemId: String, val amount: Int, val weight: Int)
+    private data class WeightedAmountRewardDefinition(val amount: Int, val weight: Int)
+    private sealed class OageBoxReward {
+        data class CustomItem(val itemId: String, val amount: Int) : OageBoxReward()
+        data class Acorn(val amount: Int) : OageBoxReward()
+        data class WorldPoint(val amount: Int) : OageBoxReward()
+    }
     private data class DeliveryItemMatch(val slot: Int, val displayName: String)
     private data class DeadChestRecoveryCheck(
         val snapshot: DeadChestSnapshot?,
@@ -789,14 +924,16 @@ class NpcMenuService(
         TALK("talk"),
         REQUEST("request"),
         DEAD_CHEST_CONFIRM("dead_chest_confirm"),
-        GARBAGE_BOX("garbage_box")
+        OAGE_BOX("oage_box"),
+        OAGE_BOX_CONFIRM("oage_box_confirm")
     }
 
     private class NpcMenuHolder(
         ownerId: UUID,
         val view: NpcMenuView
     ) : OwnedMenuHolder(ownerId) {
-        var garbageBoxRewards: Map<Int, GarbageBoxReward> = emptyMap()
+        var oageBoxRewards: Map<Int, OageBoxReward> = emptyMap()
+        var selectedOageBoxReward: OageBoxReward? = null
         var selectedDeadChest: DeadChestSnapshot? = null
     }
 }

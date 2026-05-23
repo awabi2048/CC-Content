@@ -169,6 +169,7 @@ class CCContent : JavaPlugin(), Listener {
         featureInitLogger.registerFeature("Cooking")
         featureInitLogger.registerFeature("Arena")
         featureInitLogger.registerFeature("SukimaDungeon")
+        featureInitLogger.registerFeature("Oage Shrine")
 
         CustomItemManager.clear()
         CustomItemManager.setLogger(logger)
@@ -180,12 +181,6 @@ class CCContent : JavaPlugin(), Listener {
         CustomHeadConfigRegistry.initialize(this)
         RadioCassetteConfig.initialize(this)
         RadioCassettePlaybackManager.initialize(this)
-        npcMenuService = NpcMenuService(
-            plugin = this,
-            professionProvider = { playerId -> rankManagerInstance?.getPlayerProfession(playerId)?.profession }
-        )
-        npcMenuService.initialize()
-
         sharedMobService = MobService(this)
         sharedMobService.reloadDefinitions()
         sharedMobService.startTickTask()
@@ -199,6 +194,21 @@ class CCContent : JavaPlugin(), Listener {
         } else {
             logger.warning("[CustomItems] 言語ファイル検証エラーによりカスタムアイテム登録をスキップします")
             languageErrorsFor("custom_items").forEach { error -> logger.warning("[CustomItems][Lang] $error") }
+        }
+
+        try {
+            val menuService = NpcMenuService(
+                plugin = this,
+                professionProvider = { playerId -> rankManagerInstance?.getPlayerProfession(playerId)?.profession }
+            )
+            menuService.initialize()
+            npcMenuService = menuService
+            featureInitLogger.setStatus("Oage Shrine", FeatureInitializationLogger.Status.SUCCESS)
+            featureInitLogger.addSummaryMessage("Oage Shrine", "NPCメニュー登録")
+        } catch (e: Exception) {
+            featureInitLogger.setStatus("Oage Shrine", FeatureInitializationLogger.Status.FAILURE)
+            featureInitLogger.addDetailMessage("Oage Shrine", "[Oage Shrine] 初期化失敗: ${e.message}")
+            logger.warning("[Oage Shrine] 初期化に失敗しました: ${e.message}")
         }
 
         initializeFeatureIfEnabled("Rank System", "rank") {
@@ -276,8 +286,20 @@ class CCContent : JavaPlugin(), Listener {
             onSummonMob = { definitionId, location -> summonConfiguredMob(definitionId, location) },
             onUpdateDay = { target ->
                 when (target) {
-                    null, "arena" -> arenaMissionService?.updateToday() ?: false
+                    null -> {
+                        val arenaUpdated = arenaMissionService?.updateToday() ?: true
+                        val oageUpdated = if (::npcMenuService.isInitialized) npcMenuService.resetPartTime() else false
+                        arenaUpdated && oageUpdated
+                    }
+                    "arena" -> arenaMissionService?.updateToday() ?: false
                     else -> false
+                }
+            },
+            onCompleteOageDaily = { player ->
+                if (::npcMenuService.isInitialized) {
+                    npcMenuService.completeOageDaily(player.uniqueId)
+                } else {
+                    false
                 }
             },
             npcMenuIdsProvider = { if (::npcMenuService.isInitialized) npcMenuService.getMenuIds() else emptyList() },
@@ -886,6 +908,19 @@ class CCContent : JavaPlugin(), Listener {
         RadioCassetteConfig.reload()
         if (::npcMenuService.isInitialized) {
             npcMenuService.reload()
+        } else {
+            try {
+                val menuService = NpcMenuService(
+                    plugin = this,
+                    professionProvider = { playerId -> rankManagerInstance?.getPlayerProfession(playerId)?.profession }
+                )
+                menuService.initialize()
+                npcMenuService = menuService
+                server.pluginManager.registerEvents(npcMenuService, this)
+                logger.info("[Oage Shrine] NPCメニューを再初期化しました")
+            } catch (e: Exception) {
+                logger.warning("[Oage Shrine] NPCメニューの再初期化に失敗しました: ${e.message}")
+            }
         }
         registerCustomHeadItems()
         registerRadioCassetteItems()

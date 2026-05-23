@@ -9,7 +9,7 @@ softdepend: [HeadDatabase, Vault, CC-System, MyWorldManager, DeadChest]
 commands:
   cc-content:
     description: CC-Contentメインコマンド
-    usage: /ccc <reload|restart>
+    usage: /ccc <give|reload|restart|summon|debug|update_day|npc-menu|help>
     aliases: [ccc]
   rank:
     description: ランクシステムコマンド（デバッグ用）
@@ -30,6 +30,11 @@ commands:
     permission: cc-content.rank
 
 permissions:
+  cc-content.admin:
+    description: CC-Contentの管理コマンドを実行できる
+    default: op
+    children:
+      cc-content.npc.menu.open: true
   cc-content.rank:
     description: 職業メインメニューを開ける
     default: true

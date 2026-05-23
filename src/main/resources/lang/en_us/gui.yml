@@ -12,7 +12,7 @@ gui:
         shop: §8授与所 - ショップ
         talk: §8授与所 - おしゃべり
         request: §8授与所 - ご奉仕
-        garbage_box: §8おあげ神社 - がらくた箱
+        oage_box: §8おあげ神社 - おあげBOX
       messages:
         preparing: §7この機能はまだ準備中です。
         no_economy: §cVault経済が利用できません。

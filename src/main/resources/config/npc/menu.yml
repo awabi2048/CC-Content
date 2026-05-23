@@ -1,32 +1,41 @@
-garbage_box:
+oage_box:
   rewards:
-    - material: BREAD
-      amount: 3
-      weight: 30
-      name: "§fおさがりのパン"
-      lore:
-        - "§7おあげちゃんのがらくた箱から出てきたもの"
-    - material: GOLD_NUGGET
-      amount: 8
-      weight: 20
-      name: "§6小さなどんぐり袋"
-      lore:
-        - "§7少しだけ得をした気分になります"
-    - material: EXPERIENCE_BOTTLE
-      amount: 4
-      weight: 15
-      name: "§a古い経験瓶"
-      lore:
-        - "§7神社の倉庫に眠っていました"
-    - material: AMETHYST_SHARD
-      amount: 2
-      weight: 10
-      name: "§dきらきらした欠片"
-      lore:
-        - "§7用途はあとで考えましょう"
-    - material: COOKIE
-      amount: 6
-      weight: 25
-      name: "§eおやつ"
-      lore:
-        - "§7休憩用です"
+    item:
+      misc.boxed_daiginjo:
+        amount: 1
+        weight: 4
+      misc.storage_box_single:
+        amount: 1
+        weight: 2
+      misc.big_light:
+        amount: 1
+        weight: 3
+      misc.small_light:
+        amount: 1
+        weight: 3
+      misc.invisible_item_frame:
+        amount: 2
+        weight: 3
+      misc.invisible_glow_item_frame:
+        amount: 1
+        weight: 2
+      misc.air_cannon:
+        amount: 1
+        weight: 1
+      misc.auto_ignition_booster:
+        amount: 1
+        weight: 1
+    dg:
+      - amount: 10
+        weight: 4
+      - amount: 30
+        weight: 2
+      - amount: 50
+        weight: 1
+    world_point:
+      - amount: 5
+        weight: 4
+      - amount: 10
+        weight: 2
+      - amount: 20
+        weight: 1
