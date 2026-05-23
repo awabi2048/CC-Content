@@ -407,21 +407,23 @@ class NpcMenuService(
             "§c【注意】最新のデスチェストのみが回収対象になります！",
             "§cデスチェストが複数ある場合、それ以外のものは取り戻せません"
         )
-        val sep = separator(baseLore)
-        val lore = buildList {
-            add(sep)
+        val body = buildList {
             addAll(baseLore.take(3))
             add("")
             add(baseLore[3])
             add(baseLore[4])
+        }
+        val costOrStatusLine = when {
+            check.executable -> "§f❙ §7初穂料 ${formatAcorn(DEAD_CHEST_RECOVERY_COST)}"
+            check.snapshot == null -> "§7デスチェストが見つかりませんでした"
+            else -> check.failureMessage ?: "§c失具還術を行えません"
+        }
+        val sep = separator(body + costOrStatusLine)
+        val lore = buildList {
             add(sep)
-            add(
-                when {
-                    check.executable -> "§f❙ §7初穂料 ${formatAcorn(DEAD_CHEST_RECOVERY_COST)}"
-                    check.snapshot == null -> "§7デスチェストが見つかりませんでした"
-                    else -> check.failureMessage ?: "§c失具還術を行えません"
-                }
-            )
+            addAll(body)
+            add(sep)
+            add(costOrStatusLine)
             add(sep)
         }
         return GuiMenuItems.icon(Material.RECOVERY_COMPASS, "§a失具還術", lore).apply {
@@ -471,7 +473,14 @@ class NpcMenuService(
         val offeringName = legacyDisplayName(offering).ifBlank { "§f箱入り大吟醸" }
         val offeringLore = legacyLore(offering)
         val statusLine = deliveryStatusLine(player.uniqueId)
-        val sep = separator(listOf("§e奉納品", offeringName, statusLine) + offeringLore)
+        val body = buildList {
+            addAll(offeringLore)
+            add("§7おあげ神社に${offeringName}§7を奉納することで、")
+            add("§7お礼として§6ワールドポイント§7と§6🐿️ §eどんぐり§7を貰えます")
+            add("§c※ 奉納は1週間に1回まで行えます")
+            add(statusLine)
+        }
+        val sep = separator(body)
         val icon = GuiMenuItems.icon(
             Material.PLAYER_HEAD,
             "§e奉納品",
@@ -479,9 +488,9 @@ class NpcMenuService(
                 add(sep)
                 addAll(offeringLore)
                 add(sep)
-                add("§7おあげ神社に${offeringName}§7を奉納することで、")
-                add("§7お礼として§6ワールドポイント§7と§6🐿️ §eどんぐり§7を貰えます")
-                add("§c※ 奉納は1週間に1回まで行えます")
+                add(body[offeringLore.size])
+                add(body[offeringLore.size + 1])
+                add(body[offeringLore.size + 2])
                 add(sep)
                 add(statusLine)
                 add(sep)
@@ -505,14 +514,21 @@ class NpcMenuService(
             opened -> "§7今日のご褒美は受け取り済みです"
             else -> null
         }
-        val sep = separator(listOfNotNull("§6おあげちゃんアルバイト", "§f❙ §a今日のお仕事", taskLine, "§7おあげちゃんからの依頼をこなして、", "§6ご褒美§7を貰いましょう！", extraLine))
-        return GuiMenuItems.icon(Material.BARREL, "§6おあげちゃんアルバイト", buildList {
-            add(sep)
+        val body = buildList {
             add("§f❙ §a今日のお仕事")
             add(taskLine)
-            add(sep)
             add("§7おあげちゃんからの依頼をこなして、")
             add("§6ご褒美§7を貰いましょう！")
+            if (extraLine != null) add(extraLine)
+        }
+        val sep = separator(body)
+        return GuiMenuItems.icon(Material.BARREL, "§6おあげちゃんアルバイト", buildList {
+            add(sep)
+            add(body[0])
+            add(body[1])
+            add(sep)
+            add(body[2])
+            add(body[3])
             add(sep)
             if (extraLine != null) add(extraLine)
         })

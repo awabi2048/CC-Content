@@ -195,10 +195,11 @@ class OageShrineShopMenuService(
 
     private fun buildShopLore(headLore: List<String>, price: Double, tab: OageShrineShopTabDefinition, item: OageShrineShopItemDefinition): List<Component> {
         val costLine = "§f❙ §7初穂料 ${ContentEconomyBridge.formatAcorn(price)}"
-        val lines = mutableListOf<Component>()
         val limit = item.purchaseLimitDaily ?: tab.purchaseLimitDaily ?: item.purchaseLimitWeekly ?: tab.purchaseLimitWeekly
         val limitLine = limit?.let { "§f❙ §7交換可能個数 §b${it}個" }
-        val separator = separator(headLore + listOfNotNull(costLine, limitLine))
+        val body = headLore + listOfNotNull(costLine, limitLine)
+        val separator = separator(body)
+        val lines = mutableListOf<Component>()
         lines += separator
         headLore.forEach { lines += legacy(it) }
         lines += separator
