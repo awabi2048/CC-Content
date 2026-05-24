@@ -162,7 +162,7 @@ class OageShrineShopMenuService(
         val resolvedItems = holder.tab.items.mapNotNull { resolveItem(player, holder.tab, it) }.take(CONTENT_SLOTS.size)
         holder.items = CONTENT_SLOTS.zip(resolvedItems).associate { (slot, item) -> slot to item }
         CONTENT_SLOTS.forEach { slot ->
-            inventory.setItem(slot, holder.items[slot]?.previewItem ?: emptyShopItem(player))
+            inventory.setItem(slot, holder.items[slot]?.previewItem ?: emptyShopItem())
         }
     }
 
@@ -234,7 +234,7 @@ class OageShrineShopMenuService(
         for (slot in inventory.size - 9 until inventory.size) inventory.setItem(slot, black)
     }
 
-    private fun emptyShopItem(player: Player): ItemStack = icon(player, "shop.empty", Material.GRAY_DYE)
+    private fun emptyShopItem(): ItemStack = GuiMenuItems.backgroundPane(Material.WHITE_STAINED_GLASS_PANE)
 
     private fun icon(player: Player, key: String, material: Material): ItemStack =
         GuiMenuItems.icon(material, text(player, "$key.name"), list(player, "$key.lore"))
@@ -310,13 +310,6 @@ class OageShrineShopMenuService(
         const val CONFIRM_CONFIRM_SLOT = 20
         const val CONFIRM_CANCEL_SLOT = 24
         val TAB_SLOTS = listOf(47, 48)
-        val CONTENT_SLOTS = buildList {
-            for (row in 0 until 3) {
-                val base = 18 + row * 9
-                for (col in 1..7) {
-                    add(base + col)
-                }
-            }
-        }
+        val CONTENT_SLOTS = listOf(12, 14, 21, 23, 30, 32, 39, 41)
     }
 }

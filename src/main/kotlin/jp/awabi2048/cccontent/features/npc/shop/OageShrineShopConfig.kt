@@ -113,7 +113,7 @@ object OageShrineShopConfig {
         val items = itemsSection.getKeys(false).sorted().mapNotNull { goodsId ->
             val itemSection = itemsSection.getConfigurationSection(goodsId) ?: return@mapNotNull null
             loadItem(goodsId, itemSection)
-        }.take(14)
+        }.take(8)
 
         if (items.isEmpty()) {
             return null

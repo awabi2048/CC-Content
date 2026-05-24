@@ -34,6 +34,8 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.SkullMeta
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.UUID
 import kotlin.random.Random
 
@@ -61,6 +63,9 @@ class NpcMenuService(
         const val DEAD_CHEST_CONFIRM_PREVIEW_SLOT = 22
         const val DEAD_CHEST_CONFIRM_SLOT = 20
         const val DEAD_CHEST_CANCEL_SLOT = 24
+        const val DELIVERY_CONFIRM_PREVIEW_SLOT = 22
+        const val DELIVERY_CONFIRM_SLOT = 20
+        const val DELIVERY_CANCEL_SLOT = 24
         const val PART_TIME_TASK_ARENA = "arena_mission_clear"
         const val DELIVERY_WORLD_POINT_REWARD = 100
         val OAGE_BOX_REWARD_SLOTS = listOf(20, 21, 22, 23, 24, 29, 30, 31, 32, 33)
@@ -166,7 +171,6 @@ class NpcMenuService(
             NpcMenuView.MAIN -> when (slot) {
                 19 -> { playClick(player); openView(player, NpcMenuView.DAILY) }
                 21 -> { playClick(player); openShopMenu(player) }
-                23 -> { playClick(player); openView(player, NpcMenuView.TALK) }
                 25 -> { playClick(player); openView(player, NpcMenuView.REQUEST) }
             }
             NpcMenuView.DAILY -> when (slot) {
@@ -183,15 +187,19 @@ class NpcMenuService(
                 openView(player, NpcMenuView.MAIN)
             } else if (slot == 20) {
                 handleDeadChestRecoveryRequest(player)
-            } else if (slot == 24) {
-                playError(player)
-                player.sendMessage("§7このご奉仕はまだ準備中です。")
             }
             NpcMenuView.DEAD_CHEST_CONFIRM -> when (slot) {
                 DEAD_CHEST_CONFIRM_SLOT -> holder.selectedDeadChest?.let { confirmDeadChestRecovery(player, it) }
                 DEAD_CHEST_CANCEL_SLOT -> {
                     playClick(player)
                     openView(player, NpcMenuView.REQUEST)
+                }
+            }
+            NpcMenuView.DELIVERY_CONFIRM -> when (slot) {
+                DELIVERY_CONFIRM_SLOT -> holder.selectedDeliveryItem?.let { confirmDelivery(player, it) }
+                DELIVERY_CANCEL_SLOT -> {
+                    playClick(player)
+                    openView(player, NpcMenuView.DAILY)
                 }
             }
             NpcMenuView.OAGE_BOX -> {
@@ -255,6 +263,7 @@ class NpcMenuService(
             NpcMenuView.TALK -> renderTalk(player, inventory)
             NpcMenuView.REQUEST -> renderRequest(player, inventory)
             NpcMenuView.DEAD_CHEST_CONFIRM -> renderDeadChestConfirm(player, holder, inventory)
+            NpcMenuView.DELIVERY_CONFIRM -> renderDeliveryConfirm(player, holder, inventory)
             NpcMenuView.OAGE_BOX -> renderOageBox(player, holder, inventory)
             NpcMenuView.OAGE_BOX_CONFIRM -> renderOageBoxConfirm(player, holder, inventory)
         }
@@ -263,7 +272,7 @@ class NpcMenuService(
     private fun renderMain(player: Player, inventory: Inventory) {
         inventory.setItem(19, icon(player, "main.daily", Material.BAMBOO_HANGING_SIGN))
         inventory.setItem(21, icon(player, "main.shop", Material.CHEST))
-        inventory.setItem(23, icon(player, "main.talk", Material.WRITABLE_BOOK))
+        inventory.setItem(23, comingSoonIcon())
         inventory.setItem(25, icon(player, "main.request", Material.FLOWER_BANNER_PATTERN))
         inventory.setItem(40, oageChanHead())
     }
@@ -279,6 +288,15 @@ class NpcMenuService(
         val holder = NpcMenuHolder(player.uniqueId, NpcMenuView.DEAD_CHEST_CONFIRM)
         holder.selectedDeadChest = snapshot
         val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8失具還術 - 確認")
+        holder.backingInventory = inventory
+        render(player, holder, inventory)
+        player.openInventory(inventory)
+    }
+
+    private fun openDeliveryConfirm(player: Player, item: DeliveryItemMatch) {
+        val holder = NpcMenuHolder(player.uniqueId, NpcMenuView.DELIVERY_CONFIRM)
+        holder.selectedDeliveryItem = item
+        val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8奉納品 - 確認")
         holder.backingInventory = inventory
         render(player, holder, inventory)
         player.openInventory(inventory)
@@ -411,7 +429,7 @@ class NpcMenuService(
     private fun renderRequest(player: Player, inventory: Inventory) {
         inventory.setItem(4, icon(player, "request.header", Material.CLOCK))
         inventory.setItem(20, deadChestRecoveryIcon(player))
-        inventory.setItem(24, icon(player, "request.ritual", Material.NETHER_STAR))
+        inventory.setItem(24, comingSoonIcon())
         inventory.setItem(BACK_SLOT, backButton(player))
     }
 
@@ -498,6 +516,23 @@ class NpcMenuService(
         inventory.setItem(OAGE_BOX_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§cキャンセル", listOf("§7おあげBOXに戻ります。")))
     }
 
+    private fun renderDeliveryConfirm(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
+        val selected = holder.selectedDeliveryItem
+        inventory.setItem(DELIVERY_CONFIRM_PREVIEW_SLOT, boxedDaiginjoItem())
+        inventory.setItem(
+            DELIVERY_CONFIRM_SLOT,
+            GuiMenuItems.icon(
+                Material.LIME_CONCRETE,
+                "§a奉納する",
+                listOf(
+                    "§7${selected?.displayName ?: "奉納品"}§7を奉納します。",
+                    "§7報酬として§e$DELIVERY_WORLD_POINT_REWARD ワールドポイント§7を受け取ります。"
+                )
+            )
+        )
+        inventory.setItem(DELIVERY_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§cキャンセル", listOf("§7日課メニューに戻ります。")))
+    }
+
     private fun deliveryIcon(player: Player): ItemStack {
         val profession = professionProvider(player.uniqueId)
         if (profession != Profession.BREWER) {
@@ -545,7 +580,7 @@ class NpcMenuService(
         val opened = isPartTimeOpened(player.uniqueId)
         val taskLine = if (completed) "§7・ §aアリーナミッションを1回完了する" else "§7・ §fアリーナミッションを1回完了する"
         val extraLine = when {
-            completed && !opened -> "§eお仕事が全て終わったので、おあげちゃんがご褒美を用意してくれています (クリック)"
+            completed && !opened -> "§a今日のタスクがすべて完了しました！\n§e§nクリックで報酬を受け取る"
             opened -> "§7今日のご褒美は受け取り済みです"
             else -> null
         }
@@ -554,7 +589,7 @@ class NpcMenuService(
             add(taskLine)
             add("§7おあげちゃんからの依頼をこなして、")
             add("§6ご褒美§7を貰いましょう！")
-            if (extraLine != null) add(extraLine)
+            if (extraLine != null) addAll(extraLine.lines())
         }
         val sep = separator(body)
         return GuiMenuItems.icon(Material.BARREL, "§6おあげちゃんアルバイト", buildList {
@@ -565,9 +600,11 @@ class NpcMenuService(
             add(body[2])
             add(body[3])
             add(sep)
-            if (extraLine != null) add(extraLine)
+            if (extraLine != null) addAll(extraLine.lines())
         })
     }
+
+    private fun comingSoonIcon(): ItemStack = GuiMenuItems.hideTooltip(GuiMenuItems.icon(Material.BEDROCK, "§7Coming Soon"))
 
     private fun boxedDaiginjoItem(amount: Int = 1): ItemStack = requireNotNull(CustomItemManager.createItem(BoxedDaiginjoItem.fullId, amount))
 
@@ -580,6 +617,27 @@ class NpcMenuService(
             player.sendMessage("§cインベントリ内に箱入り大吟醸がありません。")
             return
         }
+
+        playClick(player)
+        openDeliveryConfirm(player, target)
+    }
+
+    private fun confirmDelivery(player: Player, selected: DeliveryItemMatch) {
+        if (professionProvider(player.uniqueId) != Profession.BREWER || isDeliveryCompleted(player.uniqueId)) {
+            player.closeInventory()
+            return
+        }
+
+        val target = player.inventory.getItem(selected.slot)
+            ?.takeIf { it.amount > 0 && isDeliveryItem(it) }
+            ?.let { DeliveryItemMatch(selected.slot, legacyDisplayName(it).ifBlank { selected.displayName }) }
+            ?: findDeliveryItem(player)
+            ?: run {
+                playError(player)
+                player.sendMessage("§cインベントリ内に箱入り大吟醸がありません。")
+                openView(player, NpcMenuView.DAILY)
+                return
+            }
 
         grantWorldPoint(player.uniqueId, DELIVERY_WORLD_POINT_REWARD) ?: return
         consumeOneDeliveryItem(player, target.slot)
@@ -630,7 +688,13 @@ class NpcMenuService(
     private fun handlePartTimeClick(player: Player) {
         if (isPartTimeOpened(player.uniqueId) || !isPartTimeTaskCompleted(player.uniqueId, PART_TIME_TASK_ARENA)) return
         playClick(player)
-        openOageBox(player)
+        player.closeInventory()
+        OageMessageSender.send(player, "§f今日もありがとうございます！好きなものを持っていってね", plugin, sound = null, volume = 1f, pitch = 1.5f)
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            if (player.isOnline && !isPartTimeOpened(player.uniqueId)) {
+                openOageBox(player)
+            }
+        }, 30L)
     }
 
     private fun handleOageBoxRewardClick(player: Player, holder: NpcMenuHolder, slot: Int) {
@@ -840,32 +904,33 @@ class NpcMenuService(
     }
 
     private fun drawOageBoxRewards(): List<OageBoxReward> {
+        val random = Random(oageBoxDailySeed())
         val rewards = mutableListOf<OageBoxReward>()
-        val acorn = weightedAmountDefinition(oageBoxRewards.acornRewards)
-        val worldPoint = weightedAmountDefinition(oageBoxRewards.worldPointRewards)
+        val acorn = weightedAmountDefinition(oageBoxRewards.acornRewards, random)
+        val worldPoint = weightedAmountDefinition(oageBoxRewards.worldPointRewards, random)
         rewards.add(OageBoxReward.Acorn(acorn.amount))
         rewards.add(OageBoxReward.WorldPoint(worldPoint.amount))
-        rewards.addAll(drawOageBoxItemRewards())
-        return rewards.shuffled(Random)
+        rewards.addAll(drawOageBoxItemRewards(random))
+        return rewards.shuffled(random)
     }
 
-    private fun drawOageBoxItemRewards(): List<OageBoxReward.CustomItem> {
+    private fun drawOageBoxItemRewards(random: Random): List<OageBoxReward.CustomItem> {
         val rewards = mutableListOf<OageBoxReward.CustomItem>()
         var pool = oageBoxRewards.itemRewards.toMutableList()
         repeat(OAGE_BOX_REWARD_SLOTS.size - 2) {
             if (pool.isEmpty()) {
                 pool = oageBoxRewards.itemRewards.toMutableList()
             }
-            val selected = weightedItemDefinition(pool)
+            val selected = weightedItemDefinition(pool, random)
             rewards.add(OageBoxReward.CustomItem(selected.itemId, selected.amount))
             pool.remove(selected)
         }
         return rewards
     }
 
-    private fun weightedItemDefinition(definitions: List<OageBoxItemRewardDefinition>): OageBoxItemRewardDefinition {
+    private fun weightedItemDefinition(definitions: List<OageBoxItemRewardDefinition>, random: Random): OageBoxItemRewardDefinition {
         val total = definitions.sumOf { it.weight }.coerceAtLeast(1)
-        var cursor = Random.nextInt(total)
+        var cursor = random.nextInt(total)
         for (definition in definitions) {
             cursor -= definition.weight
             if (cursor < 0) return definition
@@ -873,15 +938,17 @@ class NpcMenuService(
         return definitions.first()
     }
 
-    private fun weightedAmountDefinition(definitions: List<WeightedAmountRewardDefinition>): WeightedAmountRewardDefinition {
+    private fun weightedAmountDefinition(definitions: List<WeightedAmountRewardDefinition>, random: Random): WeightedAmountRewardDefinition {
         val total = definitions.sumOf { it.weight }.coerceAtLeast(1)
-        var cursor = Random.nextInt(total)
+        var cursor = random.nextInt(total)
         for (definition in definitions) {
             cursor -= definition.weight
             if (cursor < 0) return definition
         }
         return definitions.first()
     }
+
+    private fun oageBoxDailySeed(): Long = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
 
     private fun OageBoxReward.icon(player: Player): ItemStack = when (this) {
         is OageBoxReward.CustomItem -> CustomItemManager.createItemForPlayer(itemId, player, amount)
@@ -924,6 +991,7 @@ class NpcMenuService(
         TALK("talk"),
         REQUEST("request"),
         DEAD_CHEST_CONFIRM("dead_chest_confirm"),
+        DELIVERY_CONFIRM("delivery_confirm"),
         OAGE_BOX("oage_box"),
         OAGE_BOX_CONFIRM("oage_box_confirm")
     }
@@ -935,5 +1003,6 @@ class NpcMenuService(
         var oageBoxRewards: Map<Int, OageBoxReward> = emptyMap()
         var selectedOageBoxReward: OageBoxReward? = null
         var selectedDeadChest: DeadChestSnapshot? = null
+        var selectedDeliveryItem: DeliveryItemMatch? = null
     }
 }
