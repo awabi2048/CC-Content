@@ -191,6 +191,12 @@ class ArenaMissionService(
         savePlayerData(playerId)
     }
 
+    fun completeActiveMission(ownerPlayerId: UUID, participantIds: Collection<UUID>): Boolean {
+        val activeRecord = activeMissions.remove(ownerPlayerId) ?: return false
+        recordCompletedMission(activeRecord, participantIds + ownerPlayerId)
+        return true
+    }
+
     fun getOverEnchantSuccessCount(playerId: UUID): Int {
         return getPlayerData(playerId).totalOverEnchantSuccessCount.coerceAtLeast(0)
     }
@@ -286,14 +292,20 @@ class ArenaMissionService(
             return
         }
 
-        val playerData = getPlayerData(event.ownerPlayerId)
-        if (playerData.markCompleted(activeRecord.missionIndex)) {
-            evaluateLicensePromotion(event.ownerPlayerId, playerData)
-            savePlayerData(event.ownerPlayerId)
-            Bukkit.getPlayer(event.ownerPlayerId)?.let { player ->
-                player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.completed"))
+        recordCompletedMission(activeRecord, event.participantIds + event.ownerPlayerId)
+    }
+
+    private fun recordCompletedMission(activeRecord: ArenaActiveMissionRecord, participantIds: Collection<UUID>) {
+        participantIds.forEach { participantId ->
+            val playerData = getPlayerData(participantId)
+            if (playerData.markCompleted(activeRecord.missionIndex)) {
+                evaluateLicensePromotion(participantId, playerData)
+                savePlayerData(participantId)
+                Bukkit.getPlayer(participantId)?.let { player ->
+                    player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.completed"))
+                }
+                plugin.logger.info("[Arena] mission completion recorded: player=$participantId, mission=${activeRecord.missionIndex}")
             }
-            plugin.logger.info("[Arena] ミッション完了を記録しました: player=${event.ownerPlayerId}, mission=${activeRecord.missionIndex}")
         }
     }
 

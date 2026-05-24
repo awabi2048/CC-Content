@@ -3519,7 +3519,7 @@ class ArenaManager(
         }
 
         if (session.participants.isEmpty()) {
-            terminateSession(session, session.missionCompleted)
+            terminateSession(session, session.missionCompleted || session.barrierRestartCompleted)
         }
         return true
     }
@@ -3535,6 +3535,7 @@ class ArenaManager(
         Bukkit.getPluginManager().callEvent(
             ArenaSessionEndedEvent(
                 ownerPlayerId = session.ownerPlayerId,
+                participantIds = session.missionClearParticipantIds.toSet(),
                 worldName = session.worldName,
                 themeId = session.themeId,
                 promoted = session.promoted,
@@ -3607,6 +3608,7 @@ class ArenaManager(
         }
 
         session.participants.clear()
+        session.missionClearParticipantIds.clear()
         if (session.lobbyVisitedParticipants.isNotEmpty()) {
             lobbyVisitedParticipants.addAll(session.lobbyVisitedParticipants)
         }
@@ -4855,6 +4857,8 @@ class ArenaManager(
         requestArenaBgmMode(session, ArenaBgmMode.STOPPED, strictNextBoundary = true)
 
         session.missionCompleted = true
+        session.missionClearParticipantIds.addAll(session.participants)
+        arenaMissionService?.completeActiveMission(session.ownerPlayerId, session.missionClearParticipantIds)
         session.finalWaveStartedAtMillis = 0L
         stopWaveSpawning(session, session.waves)
 
@@ -5589,6 +5593,8 @@ class ArenaManager(
 
         session.barrierRestarting = false
         session.barrierRestartCompleted = true
+        session.missionClearParticipantIds.addAll(session.participants)
+        arenaMissionService?.completeActiveMission(session.ownerPlayerId, session.missionClearParticipantIds)
         session.finalWaveStartedAtMillis = 0L
         stopWaveSpawning(session, session.waves)
 

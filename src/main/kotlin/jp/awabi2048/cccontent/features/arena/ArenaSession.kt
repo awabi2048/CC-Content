@@ -249,5 +249,6 @@ data class ArenaSession(
     var firstDoorOpenedAtMillis: Long? = null,
     var clearingBossTimeLimitSeconds: Int = 180,
     var clearingBossTotalCount: Int = 0,
+    val missionClearParticipantIds: MutableSet<UUID> = mutableSetOf(),
     var missionCompleted: Boolean = false
 )

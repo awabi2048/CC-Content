@@ -47,6 +47,7 @@ class ArenaMissionStartRequestEvent(
 
 class ArenaSessionEndedEvent(
     val ownerPlayerId: UUID,
+    val participantIds: Set<UUID>,
     val worldName: String,
     val themeId: String,
     val promoted: Boolean,
