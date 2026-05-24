@@ -206,7 +206,7 @@ private data class ArenaBgmTrackConfig(
     val pitch: Float
 ) {
     val beatTicks: Double
-        get() = 1200.0 / bpm
+        get() = 1200.0 / (bpm * pitch.coerceIn(0.1f, 2.0f).toDouble())
 
     val loopTicks: Long
         get() = (beatTicks * loopBeats.toDouble()).roundToLong().coerceAtLeast(1L)
