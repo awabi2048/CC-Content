@@ -16,10 +16,10 @@ gui:
       messages:
         preparing: §7この機能はまだ準備中です。
         no_economy: §cVault経済が利用できません。
-        insufficient_funds: §6🐿️ §cどんぐりが足りません。
+        insufficient_funds: §6🐿 §cどんぐりが足りません。
         inventory_full: §cインベントリに空きがありません。
         limit_reached: §cこの商品の交換可能回数を使い切っています。
-        purchase_complete: §a{name}§7を§6🐿️ §e{price}§7で交換しました。
+        purchase_complete: §a{name}§7を§6🐿 §e{price}§7で交換しました。
       back:
         name: §c戻る
         lore:
@@ -32,7 +32,7 @@ gui:
         shop:
           name: §a授与品
           lore:
-          - §6🐿️ §eどんぐり§7を初穂料に、特別なアイテムを交換してもらえます
+          - §6🐿 §eどんぐり§7を初穂料に、特別なアイテムを交換してもらえます
         talk:
           name: §bおしゃべり
           lore:
@@ -41,7 +41,7 @@ gui:
         request:
           name: §dご奉仕
           lore:
-          - §6🐿️ §eどんぐり§7を初穂料に、お祓いなどをしてもらいます
+          - §6🐿 §eどんぐり§7を初穂料に、お祓いなどをしてもらいます
       daily:
         header:
           name: §e日替わり
@@ -112,7 +112,7 @@ gui:
           name: §a失具還術
           lore:
           - §7デスチェストからアイテムを取り戻します
-          - §7初穂料は§6🐿️ §e300§7です
+          - §7初穂料は§6🐿 §e300§7です
         ritual:
           name: §d儀式
           lore:

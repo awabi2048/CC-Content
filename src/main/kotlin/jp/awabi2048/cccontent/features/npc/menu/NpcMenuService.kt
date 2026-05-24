@@ -16,6 +16,7 @@ import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.misc.BoxedDaiginjoItem
 import jp.awabi2048.cccontent.util.ContentLocaleResolver
 import jp.awabi2048.cccontent.util.OageMessageSender
+import com.destroystokyo.paper.profile.PlayerProfile
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
@@ -76,13 +77,17 @@ class NpcMenuService(
     private val shopState = OageShrineShopState(File(plugin.dataFolder, "data/npc/oage_shrine_shop.yml"))
     private var oageBoxRewards = OageBoxRewardDefinitions(emptyList(), emptyList(), emptyList())
     private var state = YamlConfiguration()
+    private var oageChanProfile: PlayerProfile? = null
     private lateinit var shopMenuService: OageShrineShopMenuService
     private val deadChestRecoveryService = DeadChestRecoveryService(plugin)
 
     fun initialize() {
         ensureConfig()
         ensureState()
-        shopMenuService = OageShrineShopMenuService(plugin, shopState)
+        shopMenuService = OageShrineShopMenuService(plugin, shopState) { player ->
+            openView(player, NpcMenuView.MAIN)
+        }
+        loadOageChanProfile()
         reload()
         plugin.server.pluginManager.registerEvents(shopMenuService, plugin)
     }
@@ -278,7 +283,7 @@ class NpcMenuService(
     }
 
     private fun renderDaily(player: Player, inventory: Inventory) {
-        inventory.setItem(DAILY_HEADER_SLOT, icon(player, "daily.header", Material.WRITABLE_BOOK))
+        inventory.setItem(DAILY_HEADER_SLOT, icon(player, "main.daily", Material.BAMBOO_HANGING_SIGN))
         inventory.setItem(DELIVERY_SLOT, deliveryIcon(player))
         inventory.setItem(PART_TIME_SLOT, partTimeIcon(player))
         inventory.setItem(BACK_SLOT, backButton(player))
@@ -418,7 +423,7 @@ class NpcMenuService(
     }
 
     private fun renderTalk(player: Player, inventory: Inventory) {
-        inventory.setItem(4, icon(player, "talk.header", Material.WRITABLE_BOOK))
+        inventory.setItem(4, comingSoonIcon())
         inventory.setItem(20, icon(player, "talk.topic.arena", Material.DIAMOND_SWORD))
         listOf(21, 22, 23, 24, 29, 30, 31, 32, 33).forEach {
             inventory.setItem(it, icon(player, "talk.topic.locked", Material.GRAY_DYE))
@@ -427,7 +432,7 @@ class NpcMenuService(
     }
 
     private fun renderRequest(player: Player, inventory: Inventory) {
-        inventory.setItem(4, icon(player, "request.header", Material.CLOCK))
+        inventory.setItem(4, icon(player, "main.request", Material.FLOWER_BANNER_PATTERN))
         inventory.setItem(20, deadChestRecoveryIcon(player))
         inventory.setItem(24, comingSoonIcon())
         inventory.setItem(BACK_SLOT, backButton(player))
@@ -496,7 +501,7 @@ class NpcMenuService(
     }
 
     private fun renderOageBox(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
-        inventory.setItem(OAGE_BOX_HEADER_SLOT, GuiMenuItems.icon(Material.BRICKS, "§6おあげBOX", listOf("§7ご褒美を1つ選んでください")))
+        inventory.setItem(OAGE_BOX_HEADER_SLOT, partTimeIcon(player))
         inventory.setItem(OAGE_BOX_BACK_SLOT, backButton(player))
         val rewards = drawOageBoxRewards()
         holder.oageBoxRewards = OAGE_BOX_REWARD_SLOTS.zip(rewards).toMap()
@@ -546,7 +551,7 @@ class NpcMenuService(
         val body = buildList {
             addAll(offeringLore)
             add("§7おあげ神社に${offeringName}§7を奉納することで、")
-            add("§7お礼として§6ワールドポイント§7と§6🐿️ §eどんぐり§7を貰えます")
+            add("§7お礼として§6ワールドポイント§7と§6🐿 §eどんぐり§7を貰えます")
             add("§c※ 奉納は1週間に1回まで行えます")
             add(statusLine)
         }
@@ -581,7 +586,6 @@ class NpcMenuService(
         val taskLine = if (completed) "§7・ §aアリーナミッションを1回完了する" else "§7・ §fアリーナミッションを1回完了する"
         val extraLine = when {
             completed && !opened -> "§a今日のタスクがすべて完了しました！\n§e§nクリックで報酬を受け取る"
-            opened -> "§7今日のご褒美は受け取り済みです"
             else -> null
         }
         val body = buildList {
@@ -589,6 +593,7 @@ class NpcMenuService(
             add(taskLine)
             add("§7おあげちゃんからの依頼をこなして、")
             add("§6ご褒美§7を貰いましょう！")
+            if (opened) add("§c今日の分は既に受け取っています")
             if (extraLine != null) addAll(extraLine.lines())
         }
         val sep = separator(body)
@@ -599,12 +604,13 @@ class NpcMenuService(
             add(sep)
             add(body[2])
             add(body[3])
+            if (opened) add("§c今日の分は既に受け取っています")
             add(sep)
             if (extraLine != null) addAll(extraLine.lines())
         })
     }
 
-    private fun comingSoonIcon(): ItemStack = GuiMenuItems.hideTooltip(GuiMenuItems.icon(Material.BEDROCK, "§7Coming Soon"))
+    private fun comingSoonIcon(): ItemStack = GuiMenuItems.icon(Material.BEDROCK, "§7Coming Soon")
 
     private fun boxedDaiginjoItem(amount: Int = 1): ItemStack = requireNotNull(CustomItemManager.createItem(BoxedDaiginjoItem.fullId, amount))
 
@@ -762,9 +768,25 @@ class NpcMenuService(
     private fun oageChanHead(): ItemStack {
         val item = GuiMenuItems.icon(Material.PLAYER_HEAD, "§aおあげ神社の授与所")
         val meta = item.itemMeta as? SkullMeta ?: return item
-        meta.owningPlayer = Bukkit.getOfflinePlayer("OageChan_")
+        val profile = oageChanProfile
+        if (profile != null) {
+            meta.playerProfile = profile
+        } else {
+            meta.owningPlayer = Bukkit.getOfflinePlayer("OageChan_")
+        }
         item.itemMeta = meta
         return item
+    }
+
+    private fun loadOageChanProfile() {
+        Bukkit.createProfile("OageChan_").update().thenAccept { profile ->
+            Bukkit.getScheduler().runTask(plugin, Runnable {
+                oageChanProfile = profile
+            })
+        }.exceptionally { error ->
+            plugin.logger.warning("[Oage Shrine] OageChan_ のヘッドプロフィール取得に失敗しました: ${error.message}")
+            null
+        }
     }
 
     private fun backButton(player: Player): ItemStack = GuiMenuItems.backButton(text(player, "back.name"), list(player, "back.lore"))
@@ -800,14 +822,14 @@ class NpcMenuService(
     private fun separator(lines: Collection<String>): String {
         val maxWidth = lines.maxOfOrNull { displayWidth(stripColor(it)) } ?: 0
         val separatorWidth = displayWidth("―").coerceAtLeast(1)
-        val count = ((maxWidth + separatorWidth - 1) / separatorWidth).coerceAtLeast(1)
+        val count = ((((maxWidth + separatorWidth - 1) / separatorWidth) * 3 + 1) / 2).coerceAtLeast(1)
         return "§8§m" + "―".repeat(count)
     }
 
     private fun formatAcorn(amount: Double, color: String = "§e"): String = ContentEconomyBridge.formatAcorn(amount, color)
 
     private fun insufficientAcornLine(required: Double, balance: Double): String =
-        "§6🐿️ §c§n${ContentEconomyBridge.formatPrice(required)}§r §cどんぐりが足りません §7(手持ちの個数 ${formatAcorn(balance)}§7)"
+        "§6🐿 §c§n${ContentEconomyBridge.formatPrice(required)}§r §cどんぐりが足りません §7(手持ちの個数 ${formatAcorn(balance)}§7)"
 
     private fun stripColor(text: String): String = text.replace(Regex("[§&][0-9A-FK-ORa-fk-or]"), "")
 
