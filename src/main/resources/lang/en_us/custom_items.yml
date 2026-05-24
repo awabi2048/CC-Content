@@ -54,6 +54,27 @@ custom_items:
       lore:
       - §7ラベリングされた★5の大吟醸が入った箱
       - §eおあげ神社に奉納できます
+    delicious_sweet_berry:
+      name: §dExquisite Sweet Berry
+      lore:
+      - Very sweet and delicious.
+    old_pickaxe:
+      name: §7Worn Pickaxe
+      lore:
+      - §7A literal treasure dug up from the garden by Oage-chan.
+      - §d§oGaia Breaker §7is engraved on it.
+      - §7It is so old it looks ready to break at any moment.
+    worn_boots:
+      name: §7Worn Boots
+      lore:
+      - §7A literal treasure dug up from the garden by Oage-chan.
+      - §2§o7 League Boots §7is engraved on it.
+      - §7It is so old it does not look fit to wear.
+    large_experience_bottle:
+      name: §aLarge Experience Bottle
+      lore:
+      - §7A high-concentration experience bottle containing more power than normal.
+      - §7Use with right click.
   arena:
     structure_marker_tool:
       name: §6Arena Structure Marker Tool
@@ -110,6 +131,7 @@ custom_items:
         spirit: Spirit Tear
         frog: Great Frog Liver
         endermite: エンダーマイトの甲殻
+        boomerang: Boomerang
     theme:
       ruins:
         name: Ruins

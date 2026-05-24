@@ -32,7 +32,6 @@ import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardDefinition
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardItem
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardRegistry
 import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
-import jp.awabi2048.cccontent.items.arena.BoomerangTokenItem
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.mob.EntityMobSpawnOptions
 import jp.awabi2048.cccontent.mob.MobDefinition
@@ -3343,9 +3342,9 @@ class ArenaManager(
     private fun registerMobTypeTokenItems(): Set<String> {
         val tokenTypeIds = buildSet {
             knownMobTypeIds.forEach { add(resolveMobTokenCategoryTypeId(it)) }
+            add("boomerang")
         }
         CustomItemManager.register(ArenaMobTokenItem())
-        CustomItemManager.register(BoomerangTokenItem())
         return tokenTypeIds
     }
 

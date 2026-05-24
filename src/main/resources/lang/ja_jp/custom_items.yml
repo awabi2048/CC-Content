@@ -54,6 +54,27 @@ custom_items:
       lore:
       - §7ラベリングされた★5の大吟醸が入った箱
       - §eおあげ神社に奉納できます
+    delicious_sweet_berry:
+      name: §d絶品スイートベリー
+      lore:
+      - とっても甘くておいしい
+    old_pickaxe:
+      name: §7古びたつるはし
+      lore:
+      - §7おあげちゃんが庭で掘り出した、文字通りの掘り出しもの
+      - §d§oガイアブレーカー §7という銘が刻まれている
+      - §7ずいぶん古びていて、今にも折れてしまいそうだ
+    worn_boots:
+      name: §7くたくたになったブーツ
+      lore:
+      - §7おあげちゃんが庭で掘り出した、文字通りの掘り出しもの
+      - §2§o7 League Boots (7 リーグブーツ) §7という銘が刻まれている
+      - §7ずいぶん古びていて、とても履けそうにない
+    large_experience_bottle:
+      name: §a大きなエンチャント瓶
+      lore:
+      - §7通常のエンチャント瓶よりも多くの力を秘めた、高濃度のエンチャント瓶
+      - §7右クリックで使用可能
   arena:
     structure_marker_tool:
       name: §6アリーナ構造マーカーツール
@@ -110,6 +131,7 @@ custom_items:
         shulker: シュルカーの殻
         spirit: 精霊の涙
         frog: 大カエルの肝
+        boomerang: ブーメラン
     theme:
       ruins:
         name: 遺跡

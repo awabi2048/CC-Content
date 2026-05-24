@@ -32,6 +32,10 @@ import jp.awabi2048.cccontent.items.misc.StorageBoxTripleItem
 import jp.awabi2048.cccontent.items.misc.TransparentGlowItemFrameItem
 import jp.awabi2048.cccontent.items.misc.TransparentItemFrameItem
 import jp.awabi2048.cccontent.items.misc.TransparentItemFrameListener
+import jp.awabi2048.cccontent.items.misc.ExquisiteSweetBerryItem
+import jp.awabi2048.cccontent.items.misc.LargeExperienceBottleItem
+import jp.awabi2048.cccontent.items.misc.OldPickaxeItem
+import jp.awabi2048.cccontent.items.misc.WornBootsItem
 import jp.awabi2048.cccontent.items.marker.AdminMarkerToolService
 import jp.awabi2048.cccontent.items.misc.BoxedDaiginjoItem
 import jp.awabi2048.cccontent.items.sukima.*
@@ -809,6 +813,10 @@ class CCContent : JavaPlugin(), Listener {
         CustomItemManager.register(TransparentItemFrameItem())
         CustomItemManager.register(TransparentGlowItemFrameItem())
         CustomItemManager.register(BoxedDaiginjoItem)
+        CustomItemManager.register(ExquisiteSweetBerryItem())
+        CustomItemManager.register(OldPickaxeItem())
+        CustomItemManager.register(WornBootsItem())
+        CustomItemManager.register(LargeExperienceBottleItem())
         registerRadioCassetteItems()
         registerCustomHeadItems()
 

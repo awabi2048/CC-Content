@@ -17,6 +17,8 @@ import java.util.UUID
 import java.util.WeakHashMap
 import kotlin.random.Random
 
+import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
+
 class BoomerangService private constructor(private val plugin: JavaPlugin) {
     data class LaunchSpec(
         val ownerId: UUID,
@@ -243,9 +245,7 @@ class BoomerangService private constructor(private val plugin: JavaPlugin) {
     }
 
     private fun createBoomerangToken(): ItemStack {
-        return requireNotNull(jp.awabi2048.cccontent.items.CustomItemManager.createItem("arena.boomerang_token", 1)) {
-            "arena.boomerang_token is not registered"
-        }
+        return jp.awabi2048.cccontent.items.CustomItemManager.createItemForPlayer(ArenaMobTokenItem("boomerang"), null, 1)
     }
 
     private fun tickOutbound(

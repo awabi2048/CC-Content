@@ -113,6 +113,7 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
                 "cave_spider" -> "spider"
                 "ashen_spirit", "water_spirit", "vex" -> "spirit"
                 "shulker_mimic", "shulker_warp_sniper" -> "shulker"
+                "boomerang" -> "boomerang"
                 else -> normalized
             }
         }
@@ -179,18 +180,11 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
             "enderman",
             "shulker",
             "spirit",
-            "frog"
+            "frog",
+            "boomerang"
         )
     }
 }
-
-class BoomerangTokenItem : ArenaSimpleItem(
-    material = Material.POISONOUS_POTATO,
-    modelData = null,
-    id = "boomerang_token",
-    displayName = "§6ボーンメラン",
-    lore = listOf("§7アリーナに出現するモンスターが落としたアイテム", "§7アリーナロビーで報酬と交換しよう！")
-)
 
 enum class ArenaEnchantShardEffectType(val id: String) {
     LIMIT_BREAKING("limit_breaking"),
