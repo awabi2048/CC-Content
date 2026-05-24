@@ -976,15 +976,33 @@ class NpcMenuService(
         is OageBoxReward.CustomItem -> CustomItemManager.createItemForPlayer(itemId, player, amount)
             ?: GuiMenuItems.icon(Material.BARRIER, "§c未登録アイテム", listOf("§7$itemId"))
         is OageBoxReward.Acorn -> GuiMenuItems.icon(
-            Material.SUNFLOWER,
-            "§6どんぐり",
-            listOf("§7${formatAcorn(amount.toDouble())}§7を受け取ります")
-        )
+            Material.PLAYER_HEAD,
+            "§6収穫したてのどんぐり",
+            listOf("§7${stripDisplayIcon(formatAcorn(amount.toDouble()), "🐿")}§7が詰まっています")
+        ).apply { applyAcornTexture() }
         is OageBoxReward.WorldPoint -> GuiMenuItems.icon(
-            Material.EMERALD,
-            "§6ワールドポイント",
-            listOf("§7§e$amount§7 ワールドポイントを受け取ります")
+            Material.HONEY_BOTTLE,
+            "§6世界樹の樹液",
+            listOf("§7${stripDisplayIcon("§6🛖 §e$amount", "🛖")}§7に相当する量の樹液です")
         )
+    }
+
+    private fun ItemStack.applyAcornTexture(): ItemStack {
+        val meta = itemMeta as? SkullMeta ?: return this
+        val profile = Bukkit.createProfile(UUID.randomUUID(), "oage_box_acorn")
+        profile.setProperty(com.destroystokyo.paper.profile.ProfileProperty("textures", "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZDNhOWEwNzFiNDI4M2M3NTYyNjg3NWM3YmFmZDBlZWYxM2IzZGZmNThhZDk2ODBhMTY1Mjg4YTcxNzFjNTYzNSJ9fX0="))
+        meta.playerProfile = profile
+        itemMeta = meta
+        return this
+    }
+
+    private fun stripDisplayIcon(text: String, icon: String): String {
+        val withoutIcon = text
+            .removePrefix("§6$icon ")
+            .removePrefix("§6$icon")
+            .removePrefix("$icon ")
+            .removePrefix(icon)
+        return withoutIcon.trimStart()
     }
 
     private data class OageBoxRewardDefinitions(
