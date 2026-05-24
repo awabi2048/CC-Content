@@ -735,7 +735,8 @@ class NpcMenuService(
         }
         markPartTimeOpened(player.uniqueId)
         playClick(player)
-        player.sendMessage("§aおあげBOXからご褒美を受け取りました。")
+        player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 2.0f)
+        player.sendMessage("§aおあげBOXから ${reward.receivedDisplayName(player)} を入手しました！")
         player.closeInventory()
     }
 
@@ -978,12 +979,12 @@ class NpcMenuService(
         is OageBoxReward.Acorn -> GuiMenuItems.icon(
             Material.PLAYER_HEAD,
             "§6収穫したてのどんぐり",
-            listOf("§7${stripDisplayIcon(formatAcorn(amount.toDouble()), "🐿")}§7が詰まっています")
+            listOf("§7${acornDisplay(amount)}")
         ).apply { applyAcornTexture() }
         is OageBoxReward.WorldPoint -> GuiMenuItems.icon(
             Material.HONEY_BOTTLE,
             "§6世界樹の樹液",
-            listOf("§7${stripDisplayIcon("§6🛖 §e$amount", "🛖")}§7に相当する量の樹液です")
+            listOf("§7${worldPointDisplay(amount)}")
         )
     }
 
@@ -996,14 +997,18 @@ class NpcMenuService(
         return this
     }
 
-    private fun stripDisplayIcon(text: String, icon: String): String {
-        val withoutIcon = text
-            .removePrefix("§6$icon ")
-            .removePrefix("§6$icon")
-            .removePrefix("$icon ")
-            .removePrefix(icon)
-        return withoutIcon.trimStart()
+    private fun OageBoxReward.receivedDisplayName(player: Player): String = when (this) {
+        is OageBoxReward.CustomItem -> CustomItemManager.createItemForPlayer(itemId, player, amount)
+            ?.let { legacyDisplayName(it) }
+            ?.ifBlank { "§f$itemId" }
+            ?: "§f$itemId"
+        is OageBoxReward.Acorn -> acornDisplay(amount)
+        is OageBoxReward.WorldPoint -> worldPointDisplay(amount)
     }
+
+    private fun acornDisplay(amount: Int): String = "🐿 ${ContentEconomyBridge.formatPrice(amount.toDouble())}"
+
+    private fun worldPointDisplay(amount: Int): String = "🛖 $amount"
 
     private data class OageBoxRewardDefinitions(
         val itemRewards: List<OageBoxItemRewardDefinition>,
