@@ -245,7 +245,7 @@ class ArenaCommand(
         val click = if (generated) {
             ClickEvent.runCommand("/arenaa menu mission")
         } else {
-            ClickEvent.suggestCommand("/ccc debug update_day arena")
+            ClickEvent.suggestCommand("/ccc update_day arena")
         }
         return component("§7ミッション: ")
             .append(component(status).hoverEvent(HoverEvent.showText(component(detail))).clickEvent(click))

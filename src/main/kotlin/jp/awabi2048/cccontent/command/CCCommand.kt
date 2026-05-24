@@ -23,6 +23,7 @@ class CCCommand(
     private val mobDefinitionIdsProvider: (() -> Collection<String>)? = null,
     private val onSummonMob: ((String, Location) -> Entity?)? = null,
     private val onUpdateDay: ((String?) -> Boolean)? = null,
+    private val onCompleteOageDaily: ((Player) -> Boolean)? = null,
     private val npcMenuIdsProvider: (() -> Collection<String>)? = null,
     private val onOpenNpcMenu: ((String, Player) -> Boolean)? = null,
     private val onNpcMenuMaintenance: ((String, String) -> Boolean)? = null
@@ -57,6 +58,9 @@ class CCCommand(
             }
             "debug" -> {
                 handleDebug(sender, args)
+            }
+            "update_day" -> {
+                handleUpdateDay(sender, args)
             }
             "npc-menu" -> {
                 handleNpcMenu(sender, args)
@@ -128,7 +132,7 @@ class CCCommand(
         }
 
         if (args.size < 2) {
-            sender.sendMessage("§c使用法: /ccc debug <clear_block_placement_data|update_day> ...")
+            sender.sendMessage("§c使用法: /ccc debug <clear_block_placement_data|complete_oage_daily> ...")
             return false
         }
 
@@ -136,41 +140,27 @@ class CCCommand(
 
         return when (mode) {
             "clear_block_placement_data" -> handleClearBlockPlacementData(sender, args)
-            "update_day" -> handleUpdateDay(sender, (listOf("update_day") + args.drop(2)).toTypedArray())
+            "complete_oage_daily" -> handleCompleteOageDaily(sender, args)
             else -> {
-                sender.sendMessage("§cmodeは clear_block_placement_data または update_day を指定してください")
+                sender.sendMessage("§cmodeは clear_block_placement_data または complete_oage_daily を指定してください")
                 false
             }
         }
     }
 
-    private fun handleNpcMenu(sender: CommandSender, args: Array<String>): Boolean {
-        if (!sender.hasPermission("cc-content.npc.menu.open")) {
+    private fun handleCompleteOageDaily(sender: CommandSender, args: Array<String>): Boolean {
+        if (!sender.hasPermission("cc-content.admin")) {
             sender.sendMessage("§c権限がありません")
             return false
         }
-
-        if (onOpenNpcMenu == null) {
-            sender.sendMessage("§cNPCメニュー機能が利用できません")
+        if (onCompleteOageDaily == null) {
+            sender.sendMessage("§cおあげちゃんアルバイトのデバッグ機能が利用できません")
             return false
         }
-
         if (args.size !in 2..3) {
-            sender.sendMessage("§c使用法: /ccc npc-menu <menu_id> [player]")
+            sender.sendMessage("§c使用法: /ccc debug complete_oage_daily [player]")
             return false
         }
-
-        val menuId = args[1]
-        val maintenanceAction = args.getOrNull(2)?.lowercase()
-        if (maintenanceAction == "reset-delivery" || maintenanceAction == "reset-part-time" || maintenanceAction == "reset-shop-daily" || maintenanceAction == "reset-shop-weekly") {
-            if (onNpcMenuMaintenance == null || !onNpcMenuMaintenance.invoke(menuId, maintenanceAction)) {
-                sender.sendMessage("§cNPCメニューのリセットに失敗しました: $maintenanceAction")
-                return false
-            }
-            sender.sendMessage("§aNPCメニューの状態をリセットしました: $maintenanceAction")
-            return true
-        }
-
         val target = if (args.size == 3) {
             Bukkit.getPlayerExact(args[2]) ?: run {
                 sender.sendMessage("§cプレイヤーが見つかりません: ${args[2]}")
@@ -182,8 +172,57 @@ class CCCommand(
                 return false
             }
         }
+        if (!onCompleteOageDaily.invoke(target)) {
+            sender.sendMessage("§cおあげちゃんアルバイトを完了扱いにできませんでした")
+            return false
+        }
+        sender.sendMessage("§aおあげちゃんアルバイトを完了扱いにしました: ${target.name}")
+        return true
+    }
 
-        return onOpenNpcMenu.invoke(menuId, target)
+    private fun handleNpcMenu(sender: CommandSender, args: Array<String>): Boolean {
+        if (!sender.hasPermission("cc-content.npc.menu.open")) {
+            sender.sendMessage("§c権限がありません")
+            return true
+        }
+
+        if (onOpenNpcMenu == null) {
+            sender.sendMessage("§cNPCメニュー機能が利用できません")
+            return true
+        }
+
+        if (args.size !in 2..3) {
+            sender.sendMessage("§c使用法: /ccc npc-menu <menu_id> [player]")
+            return true
+        }
+
+        val menuId = args[1]
+        val maintenanceAction = args.getOrNull(2)?.lowercase()
+        if (maintenanceAction == "reset-delivery" || maintenanceAction == "reset-part-time" || maintenanceAction == "reset-shop-daily" || maintenanceAction == "reset-shop-weekly") {
+            if (onNpcMenuMaintenance == null || !onNpcMenuMaintenance.invoke(menuId, maintenanceAction)) {
+                sender.sendMessage("§cNPCメニューのリセットに失敗しました: $maintenanceAction")
+                return true
+            }
+            sender.sendMessage("§aNPCメニューの状態をリセットしました: $maintenanceAction")
+            return true
+        }
+
+        val target = if (args.size == 3) {
+            Bukkit.getPlayerExact(args[2]) ?: run {
+                sender.sendMessage("§cプレイヤーが見つかりません: ${args[2]}")
+                return true
+            }
+        } else {
+            sender as? Player ?: run {
+                sender.sendMessage("§cプレイヤー名を指定してください")
+                return true
+            }
+        }
+
+        if (!onOpenNpcMenu.invoke(menuId, target)) {
+            sender.sendMessage("§cNPCメニューを開けませんでした: $menuId")
+        }
+        return true
     }
 
     private fun handleUpdateDay(sender: CommandSender, args: Array<String>): Boolean {
@@ -198,7 +237,7 @@ class CCCommand(
         }
 
         if (args.size > 2) {
-            sender.sendMessage("§c使用法: /ccc debug update_day [arena]")
+            sender.sendMessage("§c使用法: /ccc update_day [arena]")
             return false
         }
 
@@ -327,7 +366,10 @@ class CCCommand(
                §f/ccc debug clear_block_placement_data
                §7  - プレイヤー設置ブロック判定データを削除します
 
-              §f/ccc debug update_day [arena]
+              §f/ccc debug complete_oage_daily [player]
+              §7  - おあげちゃんアルバイトを完了扱いにします
+
+              §f/ccc update_day [arena]
               §7  - 日付更新処理を実行します
 
               §f/ccc npc-menu <menu_id> [player]
@@ -355,6 +397,7 @@ class CCCommand(
                      candidates.add("restart")
                      candidates.add("summon")
                      candidates.add("debug")
+                     candidates.add("update_day")
                 }
                 if (sender.hasPermission("cc-content.npc.menu.open")) {
                     candidates.add("npc-menu")
@@ -370,14 +413,20 @@ class CCCommand(
               }
                "debug" -> {
                    when (args.size) {
-                      2 -> listOf("clear_block_placement_data", "update_day").filter { it.startsWith(args[1].lowercase()) }
+                      2 -> listOf("clear_block_placement_data", "complete_oage_daily").filter { it.startsWith(args[1].lowercase()) }
                      3 -> {
                          when (args[1].lowercase()) {
-                             "update_day" -> listOf("arena").filter { it.startsWith(args[2], ignoreCase = true) }
+                             "complete_oage_daily" -> Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[2], ignoreCase = true) }
                              else -> emptyList()
                          }
                      }
                       else -> emptyList()
+                   }
+               }
+               "update_day" -> {
+                   when (args.size) {
+                       2 -> listOf("arena").filter { it.startsWith(args[1], ignoreCase = true) }
+                       else -> emptyList()
                    }
                }
                "summon" -> {

@@ -24,7 +24,8 @@ import java.util.UUID
 
 class OageShrineShopMenuService(
     private val plugin: JavaPlugin,
-    private val state: OageShrineShopState
+    private val state: OageShrineShopState,
+    private val backToParent: (Player) -> Unit = { it.closeInventory() }
 ) : Listener {
     private var tabs: List<OageShrineShopTabDefinition> = emptyList()
 
@@ -117,7 +118,7 @@ class OageShrineShopMenuService(
                 when (event.rawSlot) {
                     SHOP_BACK_SLOT -> {
                         playClick(player)
-                        player.closeInventory()
+                        backToParent(player)
                     }
                     in TAB_SLOTS -> {
                         val index = TAB_SLOTS.indexOf(event.rawSlot)
@@ -155,14 +156,14 @@ class OageShrineShopMenuService(
 
     private fun render(player: Player, holder: ShopHolder, inventory: Inventory) {
         GuiMenuItems.fillFramed(inventory)
-        inventory.setItem(4, icon(player, "shop.header", Material.PLAYER_HEAD))
+        inventory.setItem(4, icon(player, "main.shop", Material.CHEST))
         inventory.setItem(SHOP_BACK_SLOT, backButton(player))
         renderTabs(player, holder.tab, inventory)
 
         val resolvedItems = holder.tab.items.mapNotNull { resolveItem(player, holder.tab, it) }.take(CONTENT_SLOTS.size)
         holder.items = CONTENT_SLOTS.zip(resolvedItems).associate { (slot, item) -> slot to item }
         CONTENT_SLOTS.forEach { slot ->
-            inventory.setItem(slot, holder.items[slot]?.previewItem ?: emptyShopItem(player))
+            inventory.setItem(slot, holder.items[slot]?.previewItem ?: emptyShopItem())
         }
     }
 
@@ -234,7 +235,7 @@ class OageShrineShopMenuService(
         for (slot in inventory.size - 9 until inventory.size) inventory.setItem(slot, black)
     }
 
-    private fun emptyShopItem(player: Player): ItemStack = icon(player, "shop.empty", Material.GRAY_DYE)
+    private fun emptyShopItem(): ItemStack = GuiMenuItems.backgroundPane(Material.WHITE_STAINED_GLASS_PANE)
 
     private fun icon(player: Player, key: String, material: Material): ItemStack =
         GuiMenuItems.icon(material, text(player, "$key.name"), list(player, "$key.lore"))
@@ -272,7 +273,7 @@ class OageShrineShopMenuService(
     private fun separator(lines: Collection<String>): Component {
         val maxWidth = lines.maxOfOrNull { displayWidth(stripColor(it)) } ?: 0
         val separatorWidth = displayWidth("―").coerceAtLeast(1)
-        val count = ((maxWidth + separatorWidth - 1) / separatorWidth).coerceAtLeast(1)
+        val count = ((((maxWidth + separatorWidth - 1) / separatorWidth) * 3 + 1) / 2).coerceAtLeast(1)
         return legacy("§8§m" + "―".repeat(count))
     }
 
@@ -310,13 +311,6 @@ class OageShrineShopMenuService(
         const val CONFIRM_CONFIRM_SLOT = 20
         const val CONFIRM_CANCEL_SLOT = 24
         val TAB_SLOTS = listOf(47, 48)
-        val CONTENT_SLOTS = buildList {
-            for (row in 0 until 3) {
-                val base = 18 + row * 9
-                for (col in 1..7) {
-                    add(base + col)
-                }
-            }
-        }
+        val CONTENT_SLOTS = (19..25).toList() + (28..34).toList()
     }
 }

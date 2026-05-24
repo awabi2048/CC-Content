@@ -373,25 +373,50 @@ public final class ResourceConfigurationValidator {
         if (root == null) {
             return;
         }
-        Map<String, Object> garbageBox = requireMap(root, "garbage_box", file, errors);
-        if (garbageBox == null) {
+        Map<String, Object> oageBox = requireMap(root, "oage_box", file, errors);
+        if (oageBox == null) {
             return;
         }
-        Object rewardsValue = garbageBox.get("rewards");
-        if (!(rewardsValue instanceof List<?> rewards) || rewards.isEmpty()) {
-            errors.add(format("missing garbage box rewards", file, "garbage_box.rewards", "at least one reward is required"));
+        Map<String, Object> rewards = requireMap(oageBox, "rewards", file, errors, "oage_box.rewards");
+        if (rewards == null) {
             return;
         }
-        for (int i = 0; i < rewards.size(); i++) {
-            Map<String, Object> reward = asMap(rewards.get(i));
-            String path = "garbage_box.rewards[" + i + "]";
+        Map<String, Object> itemRewards = requireMap(rewards, "item", file, errors, "oage_box.rewards.item");
+        if (itemRewards != null) {
+            requireNonEmpty(itemRewards, file, "oage_box.rewards.item", errors);
+            for (Map.Entry<String, Object> entry : itemRewards.entrySet()) {
+                String path = "oage_box.rewards.item." + entry.getKey();
+                if (!isCustomItemId(entry.getKey())) {
+                    errors.add(format("invalid custom item id", file, path, "custom item id must use the /ccc give feature.id format"));
+                }
+                Map<String, Object> reward = asMap(entry.getValue());
+                if (reward == null) {
+                    errors.add(format("invalid oage box item reward", file, path, "reward must be a section"));
+                    continue;
+                }
+                requirePositiveNumber(reward, "amount", file, path + ".amount", errors);
+                requirePositiveNumber(reward, "weight", file, path + ".weight", errors);
+            }
+        }
+        validateWeightedAmountRewards(rewards, "dg", file, "oage_box.rewards.dg", errors);
+        validateWeightedAmountRewards(rewards, "world_point", file, "oage_box.rewards.world_point", errors);
+    }
+
+    private static void validateWeightedAmountRewards(Map<String, Object> rewards, String key, Path file, String path, List<String> errors) {
+        Object rewardsValue = rewards.get(key);
+        if (!(rewardsValue instanceof List<?> rewardList) || rewardList.isEmpty()) {
+            errors.add(format("missing oage box reward", file, path, "at least one reward is required"));
+            return;
+        }
+        for (int i = 0; i < rewardList.size(); i++) {
+            Map<String, Object> reward = asMap(rewardList.get(i));
+            String rewardPath = path + "[" + i + "]";
             if (reward == null) {
-                errors.add(format("invalid garbage box reward", file, path, "reward must be a section"));
+                errors.add(format("invalid oage box reward", file, rewardPath, "reward must be a section"));
                 continue;
             }
-            requireMaterial(reward.get("material"), file, path + ".material", errors);
-            requirePositiveNumber(reward, "amount", file, path + ".amount", errors);
-            requirePositiveNumber(reward, "weight", file, path + ".weight", errors);
+            requirePositiveNumber(reward, "amount", file, rewardPath + ".amount", errors);
+            requirePositiveNumber(reward, "weight", file, rewardPath + ".weight", errors);
         }
     }
 
@@ -620,6 +645,10 @@ public final class ResourceConfigurationValidator {
 
     private static boolean isNonBlankString(Object value) {
         return value instanceof String text && !text.isBlank();
+    }
+
+    private static boolean isCustomItemId(String value) {
+        return value != null && value.matches("[a-z0-9_]+(\\.[a-z0-9_]+)+");
     }
 
     private static boolean isYaml(Path path) {

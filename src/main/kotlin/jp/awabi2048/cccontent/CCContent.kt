@@ -81,6 +81,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.tasks.SpecialTileTask
 import jp.awabi2048.cccontent.mob.MobEventListener
 import jp.awabi2048.cccontent.mob.MobService
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
+import net.luckperms.api.LuckPerms
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
@@ -169,6 +170,7 @@ class CCContent : JavaPlugin(), Listener {
         featureInitLogger.registerFeature("Cooking")
         featureInitLogger.registerFeature("Arena")
         featureInitLogger.registerFeature("SukimaDungeon")
+        featureInitLogger.registerFeature("Oage Shrine")
 
         CustomItemManager.clear()
         CustomItemManager.setLogger(logger)
@@ -180,12 +182,6 @@ class CCContent : JavaPlugin(), Listener {
         CustomHeadConfigRegistry.initialize(this)
         RadioCassetteConfig.initialize(this)
         RadioCassettePlaybackManager.initialize(this)
-        npcMenuService = NpcMenuService(
-            plugin = this,
-            professionProvider = { playerId -> rankManagerInstance?.getPlayerProfession(playerId)?.profession }
-        )
-        npcMenuService.initialize()
-
         sharedMobService = MobService(this)
         sharedMobService.reloadDefinitions()
         sharedMobService.startTickTask()
@@ -199,6 +195,21 @@ class CCContent : JavaPlugin(), Listener {
         } else {
             logger.warning("[CustomItems] 言語ファイル検証エラーによりカスタムアイテム登録をスキップします")
             languageErrorsFor("custom_items").forEach { error -> logger.warning("[CustomItems][Lang] $error") }
+        }
+
+        try {
+            val menuService = NpcMenuService(
+                plugin = this,
+                professionProvider = { playerId -> temporaryBrewerProfessionByLuckPerms(playerId) }
+            )
+            menuService.initialize()
+            npcMenuService = menuService
+            featureInitLogger.setStatus("Oage Shrine", FeatureInitializationLogger.Status.SUCCESS)
+            featureInitLogger.addSummaryMessage("Oage Shrine", "NPCメニュー登録")
+        } catch (e: Exception) {
+            featureInitLogger.setStatus("Oage Shrine", FeatureInitializationLogger.Status.FAILURE)
+            featureInitLogger.addDetailMessage("Oage Shrine", "[Oage Shrine] 初期化失敗: ${e.message}")
+            logger.warning("[Oage Shrine] 初期化に失敗しました: ${e.message}")
         }
 
         initializeFeatureIfEnabled("Rank System", "rank") {
@@ -276,8 +287,20 @@ class CCContent : JavaPlugin(), Listener {
             onSummonMob = { definitionId, location -> summonConfiguredMob(definitionId, location) },
             onUpdateDay = { target ->
                 when (target) {
-                    null, "arena" -> arenaMissionService?.updateToday() ?: false
+                    null -> {
+                        val arenaUpdated = arenaMissionService?.updateToday() ?: true
+                        val oageUpdated = if (::npcMenuService.isInitialized) npcMenuService.resetPartTime() else false
+                        arenaUpdated && oageUpdated
+                    }
+                    "arena" -> arenaMissionService?.updateToday() ?: false
                     else -> false
+                }
+            },
+            onCompleteOageDaily = { player ->
+                if (::npcMenuService.isInitialized) {
+                    npcMenuService.completeOageDaily(player.uniqueId)
+                } else {
+                    false
                 }
             },
             npcMenuIdsProvider = { if (::npcMenuService.isInitialized) npcMenuService.getMenuIds() else emptyList() },
@@ -828,6 +851,13 @@ class CCContent : JavaPlugin(), Listener {
         logger.info("[CustomHead] カスタムヘッド券を登録しました: ${variants.size}件")
     }
 
+    private fun temporaryBrewerProfessionByLuckPerms(playerId: java.util.UUID): Profession? {
+        // 一時措置: Rank側の職業判定が安定するまで、奉納品の日課だけ LuckPerms の brewer グループで醸造家判定を代替する。
+        val luckPerms = server.servicesManager.getRegistration(LuckPerms::class.java)?.provider ?: return null
+        val user = luckPerms.userManager.getUser(playerId) ?: luckPerms.userManager.loadUser(playerId).getNow(null) ?: return null
+        return if (user.primaryGroup.equals("brewer", ignoreCase = true)) Profession.BREWER else null
+    }
+
     private fun registerRadioCassetteItems() {
         CustomItemManager.unregisterByPrefix("misc.cassette_")
         CustomItemManager.register(RadioCassettePlayerItem())
@@ -886,6 +916,19 @@ class CCContent : JavaPlugin(), Listener {
         RadioCassetteConfig.reload()
         if (::npcMenuService.isInitialized) {
             npcMenuService.reload()
+        } else {
+            try {
+                val menuService = NpcMenuService(
+                    plugin = this,
+                    professionProvider = { playerId -> temporaryBrewerProfessionByLuckPerms(playerId) }
+                )
+                menuService.initialize()
+                npcMenuService = menuService
+                server.pluginManager.registerEvents(npcMenuService, this)
+                logger.info("[Oage Shrine] NPCメニューを再初期化しました")
+            } catch (e: Exception) {
+                logger.warning("[Oage Shrine] NPCメニューの再初期化に失敗しました: ${e.message}")
+            }
         }
         registerCustomHeadItems()
         registerRadioCassetteItems()
