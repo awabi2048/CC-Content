@@ -117,6 +117,7 @@ object CustomItemManager {
         }
         item.itemMeta = meta
 
+        // Project custom items should normally be non-consumable POISONOUS_POTATO items with itemModel visuals.
         if (item.type == Material.POISONOUS_POTATO && !customItem.keepConsumableComponent) {
             PoisonousPotatoComponentPack.applyNonConsumable(item)
         } else if (item.type == Material.POISONOUS_POTATO) {

@@ -67,18 +67,6 @@ custom_items:
       name: §6アリーナリフト設置ツール
       lore:
       - §7リフトマーカー専用ツール
-    ticket:
-      name: §6アリーナチケット
-      lore:
-      - §7アリーナへの参加チケット
-    medal:
-      name: §6アリーナメダル
-      lore:
-      - §7アリーナでの戦いの証
-    prize:
-      name: §6アリーナ報酬箱
-      lore:
-      - §7アリーナでの勝利報酬
     limit_breaking_sharpness_t1:
       name: '§d限界突破触媒: ダメージ増加 T1'
       lore:

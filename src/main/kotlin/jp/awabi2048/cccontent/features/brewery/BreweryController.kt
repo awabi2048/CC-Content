@@ -31,6 +31,7 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.ShapedRecipe
+import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import java.io.File
@@ -42,6 +43,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
     private val codec = BreweryItemCodec(plugin)
     private val stateFile = File(plugin.dataFolder, "data/brewery/state.yml")
     private val filterRecipeKey = NamespacedKey(plugin, "brewery_sample_filter")
+    private val mockClockKey = NamespacedKey(plugin, "brewery_mock_clock")
     private val rankManager = (plugin as? CCContent)?.getRankManager()
 
     private var settings: BrewerySettings = settingsLoader.loadSettings()
@@ -331,8 +333,8 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         val inputSlots = if (state.size == BarrelSize.BIG) BIG_AGING_INPUT_SLOTS else SMALL_AGING_INPUT_SLOTS
         val clockSlot = if (state.size == BarrelSize.BIG) BIG_AGING_CLOCK_SLOT else SMALL_AGING_CLOCK_SLOT
 
-        if (item.type == Material.CLOCK) {
-            moveToSingleSlot(item, state.inventory, clockSlot) { it.type == Material.CLOCK }
+        if (isClockAcceleratorItem(item)) {
+            moveToSingleSlot(item, state.inventory, clockSlot) { isClockAcceleratorItem(it) }
         }
 
         if (item.amount > 0) {
@@ -340,6 +342,17 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         }
 
         return (before - item.amount).coerceAtLeast(0)
+    }
+
+    private fun isClockAcceleratorItem(item: ItemStack): Boolean {
+        if (item.type == Material.CLOCK) {
+            return true
+        }
+        if (item.type != Material.POISONOUS_POTATO) {
+            return false
+        }
+        val meta = item.itemMeta ?: return false
+        return meta.persistentDataContainer.has(mockClockKey, PersistentDataType.BYTE)
     }
 
     private fun moveToSingleSlot(
@@ -471,7 +484,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         }
 
         if (slot == FERMENT_CLOCK_SLOT) {
-            val moved = handleSingleSlotMove(event, setOf(FERMENT_CLOCK_SLOT)) { placing -> placing.type == Material.CLOCK }
+            val moved = handleSingleSlotMove(event, setOf(FERMENT_CLOCK_SLOT)) { placing -> isClockAcceleratorItem(placing) }
             if (moved) playUiSuccessSound(player)
             refreshFermentationDecor(state)
             return
@@ -585,7 +598,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         }
 
         if (slot == DISTILL_CLOCK_SLOT) {
-            val moved = handleSingleSlotMove(event, setOf(DISTILL_CLOCK_SLOT)) { placing -> placing.type == Material.CLOCK }
+            val moved = handleSingleSlotMove(event, setOf(DISTILL_CLOCK_SLOT)) { placing -> isClockAcceleratorItem(placing) }
             if (moved) playUiSuccessSound(player)
             refreshDistillationDecor(state)
             return
@@ -613,7 +626,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         val clockSlot = if (state.size == BarrelSize.BIG) BIG_AGING_CLOCK_SLOT else SMALL_AGING_CLOCK_SLOT
 
         if (slot == clockSlot) {
-            val moved = handleSingleSlotMove(event, setOf(clockSlot)) { placing -> placing.type == Material.CLOCK }
+            val moved = handleSingleSlotMove(event, setOf(clockSlot)) { placing -> isClockAcceleratorItem(placing) }
             if (moved) playUiSuccessSound(player)
             refreshAgingDecor(state)
             return

@@ -29,8 +29,8 @@ interface CustomItem {
         get() = emptyList()
 
     /**
-     * 共通仕様で付与する `!consumable` を保持するか
-     * false の場合、POISONOUS_POTATO の consumable コンポーネントを除去する
+     * カスタムアイテムは、原則として POISONOUS_POTATO を土台にして itemModel で見た目を指定する。
+     * false の場合、POISONOUS_POTATO の consumable コンポーネントを除去し、食料として使えない中間素材にする。
      */
     val keepConsumableComponent: Boolean
         get() = false

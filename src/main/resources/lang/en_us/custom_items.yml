@@ -67,18 +67,6 @@ custom_items:
       name: §6Arena Lift Placement Tool
       lore:
       - §7Tool dedicated to lift markers
-    ticket:
-      name: §6Arena Ticket
-      lore:
-      - §7Entry ticket for the arena
-    medal:
-      name: §6Arena Medal
-      lore:
-      - §7Proof of arena battles
-    prize:
-      name: §6Arena Prize Box
-      lore:
-      - §7Victory reward from the arena
     limit_breaking_sharpness_t1:
       name: '§dLimit Break Catalyst: Sharpness T1'
       lore:

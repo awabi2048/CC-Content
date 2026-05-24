@@ -3,7 +3,7 @@
 package jp.awabi2048.cccontent.features.arena
 
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardData
-import jp.awabi2048.cccontent.items.arena.ArenaOverEnchanterMode
+import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardEffectType
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -821,18 +821,11 @@ class ArenaEnchantPedestalMenu(
         var state = getOverEnchantState(workingTool)
         prepared.sortedBy { it.slot }.forEach { preparedCatalyst ->
             val catalyst = preparedCatalyst.catalyst
-            val targetEnchant = resolveEnchantment(catalyst.targetEnchantmentId) ?: return@forEach
-            val resultingLevel = when (catalyst.mode) {
-                ArenaOverEnchanterMode.LIMIT_BREAKING -> {
-                    val overLevel = catalyst.overLevel ?: return@forEach
-                    targetEnchant.maxLevel + overLevel
-                }
-
-                ArenaOverEnchanterMode.SPECIAL_ATTACH -> targetEnchant.maxLevel
+            resolveAppliedEnchantments(catalyst).forEach { (enchantmentId, enchantment, resultingLevel) ->
+                workingTool.addUnsafeEnchantment(enchantment, resultingLevel)
+                val appliedOverLevel = resolveAppliedOverLevel(catalyst, enchantmentId)
+                state = applyOverEnchantEntry(state, enchantmentId, appliedOverLevel)
             }
-            workingTool.addUnsafeEnchantment(targetEnchant, resultingLevel)
-            val appliedOverLevel = resolveAppliedOverLevel(catalyst)
-            state = applyOverEnchantEntry(state, catalyst.targetEnchantmentId, appliedOverLevel)
             consumeOneCatalyst(inventory, preparedCatalyst.slot)
         }
 
@@ -1495,7 +1488,7 @@ class ArenaEnchantPedestalMenu(
                     usedSlotCount = usedSlotCount,
                     preparedCatalysts = emptyList()
                 )
-            val normalizedId = catalyst.targetEnchantmentId.trim().lowercase(Locale.ROOT)
+            val normalizedId = catalystIdentityKey(catalyst)
             if (!seenIds.add(normalizedId)) {
                 return PedestalEvaluation(
                     catalystReady = true,
@@ -1593,21 +1586,24 @@ class ArenaEnchantPedestalMenu(
         )
     }
 
+    private data class AppliedShardEnchantment(
+        val enchantmentId: String,
+        val enchantment: Enchantment,
+        val level: Int
+    )
+
     private fun validateRouteCompatibility(
         state: OverEnchantState,
         catalyst: ArenaEnchantShardData.Shard,
         uiState: PedestalUiState,
         unlockedSlotCount: Int
     ): Boolean {
-        val targetId = catalyst.targetEnchantmentId.trim().lowercase(Locale.ROOT)
+        val targetIds = catalyst.enchantmentIds.map { it.trim().lowercase(Locale.ROOT) }.filter { it.isNotBlank() }
+        val targetAlreadyExists = targetIds.any { state.entries.containsKey(it) }
         return when (uiState) {
             PedestalUiState.NO_TOOL -> false
-            PedestalUiState.TOOL_NO_OVER -> {
-                val targetAlreadyExists = state.entries.containsKey(targetId)
-                targetAlreadyExists || state.entries.size < unlockedSlotCount
-            }
-
-            PedestalUiState.TOOL_HAS_OVER -> state.entries.containsKey(targetId)
+            PedestalUiState.TOOL_NO_OVER -> targetAlreadyExists || state.entries.size < unlockedSlotCount
+            PedestalUiState.TOOL_HAS_OVER -> targetAlreadyExists
         }
     }
 
@@ -1617,13 +1613,15 @@ class ArenaEnchantPedestalMenu(
         catalyst: ArenaEnchantShardData.Shard,
         uiState: PedestalUiState
     ): Boolean {
-        val targetEnchant = resolveEnchantment(catalyst.targetEnchantmentId) ?: return false
-        val currentTargetLevel = tool.getEnchantmentLevel(targetEnchant)
-        val targetId = catalyst.targetEnchantmentId.trim().lowercase(Locale.ROOT)
-        val currentOverLevel = state.entries[targetId] ?: 0
+        val enchantments = catalyst.enchantmentIds.mapNotNull { id -> resolveEnchantment(id)?.let { id to it } }
+        if (enchantments.size != catalyst.enchantmentIds.size) {
+            return false
+        }
 
-        return when (catalyst.mode) {
-            ArenaOverEnchanterMode.LIMIT_BREAKING -> {
+        return when (catalyst.effectType) {
+            ArenaEnchantShardEffectType.LIMIT_BREAKING -> {
+                val targetId = catalyst.primaryEnchantmentId.trim().lowercase(Locale.ROOT)
+                val targetEnchant = enchantments.firstOrNull()?.second ?: return false
                 val overLevel = catalyst.overLevel ?: return false
                 if (!targetEnchant.canEnchantItem(tool)) {
                     return false
@@ -1631,6 +1629,8 @@ class ArenaEnchantPedestalMenu(
                 if (uiState == PedestalUiState.TOOL_HAS_OVER && !state.entries.containsKey(targetId)) {
                     return false
                 }
+                val currentTargetLevel = tool.getEnchantmentLevel(targetEnchant)
+                val currentOverLevel = state.entries[targetId] ?: 0
                 val expectedCurrentOver = overLevel - 1
                 if (expectedCurrentOver > 0 && currentOverLevel != expectedCurrentOver) {
                     return false
@@ -1642,12 +1642,15 @@ class ArenaEnchantPedestalMenu(
                 currentTargetLevel == requiredCurrent
             }
 
-            ArenaOverEnchanterMode.SPECIAL_ATTACH -> {
-                if (currentTargetLevel > 0) {
-                    return false
-                }
-                validateSpecialAttach(tool, catalyst.targetEnchantmentId)
+            ArenaEnchantShardEffectType.INCOMPATIBLE_COMBINATION -> validateIncompatibleCombination(tool, catalyst.enchantmentIds)
+
+            ArenaEnchantShardEffectType.INVALID_TARGET_ATTACH -> {
+                val targetId = catalyst.primaryEnchantmentId.trim().lowercase(Locale.ROOT)
+                val targetEnchant = enchantments.firstOrNull()?.second ?: return false
+                tool.getEnchantmentLevel(targetEnchant) <= 0 && validateInvalidTargetAttach(tool, targetId)
             }
+
+            ArenaEnchantShardEffectType.CUSTOM_ENCHANT_ATTACH -> false
         }
     }
 
@@ -1662,9 +1665,11 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun resolveShardLevel(catalyst: ArenaEnchantShardData.Shard): Int {
-        return when (catalyst.mode) {
-            ArenaOverEnchanterMode.LIMIT_BREAKING -> catalyst.overLevel ?: 1
-            ArenaOverEnchanterMode.SPECIAL_ATTACH -> 1
+        return when (catalyst.effectType) {
+            ArenaEnchantShardEffectType.LIMIT_BREAKING -> catalyst.overLevel ?: 1
+            ArenaEnchantShardEffectType.INCOMPATIBLE_COMBINATION,
+            ArenaEnchantShardEffectType.INVALID_TARGET_ATTACH,
+            ArenaEnchantShardEffectType.CUSTOM_ENCHANT_ATTACH -> 1
         }
     }
 
@@ -1673,45 +1678,44 @@ class ArenaEnchantPedestalMenu(
         state: OverEnchantState,
         catalyst: ArenaEnchantShardData.Shard
     ): Pair<ItemStack, OverEnchantState> {
-        val targetEnchant = resolveEnchantment(catalyst.targetEnchantmentId) ?: return tool to state
-        val resultingLevel = when (catalyst.mode) {
-            ArenaOverEnchanterMode.LIMIT_BREAKING -> {
-                val overLevel = catalyst.overLevel ?: return tool to state
-                targetEnchant.maxLevel + overLevel
-            }
-
-            ArenaOverEnchanterMode.SPECIAL_ATTACH -> targetEnchant.maxLevel
-        }
         val cloned = tool.clone()
-        cloned.addUnsafeEnchantment(targetEnchant, resultingLevel)
-        val appliedOverLevel = resolveAppliedOverLevel(catalyst)
-        val nextState = applyOverEnchantEntry(state, catalyst.targetEnchantmentId, appliedOverLevel)
+        var nextState = state
+        resolveAppliedEnchantments(catalyst).forEach { applied ->
+            cloned.addUnsafeEnchantment(applied.enchantment, applied.level)
+            nextState = applyOverEnchantEntry(nextState, applied.enchantmentId, resolveAppliedOverLevel(catalyst, applied.enchantmentId))
+        }
         return cloned to nextState
     }
 
-    private fun validateSpecialAttach(tool: ItemStack, targetEnchantmentId: String): Boolean {
-        return validateOverStackingBase(tool, targetEnchantmentId) || validateExoticAttach(tool, targetEnchantmentId)
+    private fun resolveAppliedEnchantments(catalyst: ArenaEnchantShardData.Shard): List<AppliedShardEnchantment> {
+        return catalyst.enchantmentIds.mapNotNull { rawId ->
+            val enchantmentId = rawId.trim().lowercase(Locale.ROOT)
+            val enchantment = resolveEnchantment(enchantmentId) ?: return@mapNotNull null
+            val level = when (catalyst.effectType) {
+                ArenaEnchantShardEffectType.LIMIT_BREAKING -> enchantment.maxLevel + (catalyst.overLevel ?: return@mapNotNull null)
+                ArenaEnchantShardEffectType.INCOMPATIBLE_COMBINATION,
+                ArenaEnchantShardEffectType.INVALID_TARGET_ATTACH -> enchantment.maxLevel
+                ArenaEnchantShardEffectType.CUSTOM_ENCHANT_ATTACH -> return@mapNotNull null
+            }
+            AppliedShardEnchantment(enchantmentId, enchantment, level)
+        }
     }
 
-    private fun validateOverStackingBase(tool: ItemStack, targetEnchantmentId: String): Boolean {
-        return when (targetEnchantmentId) {
-            "infinity" -> isBow(tool.type) && hasEnchantment(tool, "mending")
-            "mending" -> isBow(tool.type) && hasEnchantment(tool, "infinity")
-            "multishot" -> isCrossbow(tool.type) && hasEnchantment(tool, "piercing")
-            "piercing" -> isCrossbow(tool.type) && hasEnchantment(tool, "multishot")
-            "sharpness", "smite", "bane_of_arthropods" -> {
-                isSwordOrAxe(tool.type) && DAMAGE_IDS.any { it != targetEnchantmentId && hasEnchantment(tool, it) }
-            }
-
-            "protection", "fire_protection", "blast_protection", "projectile_protection" -> {
-                isArmor(tool.type) && PROTECTION_IDS.any { it != targetEnchantmentId && hasEnchantment(tool, it) }
-            }
-
+    private fun validateIncompatibleCombination(tool: ItemStack, enchantmentIds: List<String>): Boolean {
+        val normalized = enchantmentIds.map { it.trim().lowercase(Locale.ROOT) }.toSet()
+        return when (normalized) {
+            setOf("infinity", "mending") -> isBow(tool.type)
+            setOf("multishot", "piercing") -> isCrossbow(tool.type)
+            setOf("sharpness", "smite"),
+            setOf("sharpness", "bane_of_arthropods") -> isSwordOrAxe(tool.type)
+            setOf("protection", "fire_protection"),
+            setOf("protection", "blast_protection"),
+            setOf("protection", "projectile_protection") -> isArmor(tool.type)
             else -> false
         }
     }
 
-    private fun validateExoticAttach(tool: ItemStack, targetEnchantmentId: String): Boolean {
+    private fun validateInvalidTargetAttach(tool: ItemStack, targetEnchantmentId: String): Boolean {
         return when (targetEnchantmentId) {
             "infinity", "power" -> isCrossbow(tool.type)
             "breach" -> isSwordOrAxe(tool.type)
@@ -1720,13 +1724,15 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun resolveRequiredLevel(catalyst: ArenaEnchantShardData.Shard): Int? {
-        val path = when (catalyst.mode) {
-            ArenaOverEnchanterMode.LIMIT_BREAKING -> {
+        val path = when (catalyst.effectType) {
+            ArenaEnchantShardEffectType.LIMIT_BREAKING -> {
                 val level = catalyst.overLevel ?: return null
-                "arena.over_enchanter.limit_breaking.${catalyst.targetEnchantmentId}.$level"
+                "arena.over_enchanter.limit_breaking.${catalyst.primaryEnchantmentId}.$level"
             }
 
-            ArenaOverEnchanterMode.SPECIAL_ATTACH -> "arena.over_enchanter.special_attach.${catalyst.targetEnchantmentId}"
+            ArenaEnchantShardEffectType.INCOMPATIBLE_COMBINATION -> "arena.over_enchanter.incompatible_combination.${catalyst.setKey}"
+            ArenaEnchantShardEffectType.INVALID_TARGET_ATTACH -> "arena.over_enchanter.invalid_target_attach.${catalyst.primaryEnchantmentId}"
+            ArenaEnchantShardEffectType.CUSTOM_ENCHANT_ATTACH -> return null
         }
         val value = coreConfigProvider().getInt(path, -1)
         return value.takeIf { it > 0 }
@@ -1740,6 +1746,10 @@ class ArenaEnchantPedestalMenu(
     private fun hasEnchantment(item: ItemStack, enchantmentId: String): Boolean {
         val enchantment = resolveEnchantment(enchantmentId) ?: return false
         return item.getEnchantmentLevel(enchantment) > 0
+    }
+
+    private fun catalystIdentityKey(catalyst: ArenaEnchantShardData.Shard): String {
+        return "${catalyst.effectType.id}:${catalyst.enchantmentIds.joinToString("+")}:${catalyst.overLevel ?: 0}"
     }
 
     private fun isCatalystItem(item: ItemStack): Boolean {
@@ -1764,10 +1774,12 @@ class ArenaEnchantPedestalMenu(
         return name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE") || name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS")
     }
 
-    private fun resolveAppliedOverLevel(catalyst: ArenaEnchantShardData.Shard): Int {
-        return when (catalyst.mode) {
-            ArenaOverEnchanterMode.LIMIT_BREAKING -> catalyst.overLevel ?: 0
-            ArenaOverEnchanterMode.SPECIAL_ATTACH -> 1
+    private fun resolveAppliedOverLevel(catalyst: ArenaEnchantShardData.Shard, enchantmentId: String): Int {
+        return when (catalyst.effectType) {
+            ArenaEnchantShardEffectType.LIMIT_BREAKING -> catalyst.overLevel ?: 0
+            ArenaEnchantShardEffectType.INCOMPATIBLE_COMBINATION,
+            ArenaEnchantShardEffectType.INVALID_TARGET_ATTACH -> if (enchantmentId.isBlank()) 0 else 1
+            ArenaEnchantShardEffectType.CUSTOM_ENCHANT_ATTACH -> 0
         }
     }
 
@@ -2036,7 +2048,7 @@ class ArenaEnchantPedestalMenu(
 
     private fun canInsertCatalystIntoSlot(item: ItemStack, inventory: Inventory, slot: Int): Boolean {
         val incoming = ArenaEnchantShardData.read(item) ?: return false
-        val incomingId = incoming.targetEnchantmentId.trim().lowercase(Locale.ROOT)
+        val incomingId = catalystIdentityKey(incoming)
         val player = inventory.viewers.firstOrNull() as? Player
         val evaluation = player?.let { evaluate(it, inventory) }
         if (evaluation != null && slot !in resolveActiveCatalystSlots(evaluation)) {
@@ -2045,7 +2057,7 @@ class ArenaEnchantPedestalMenu(
         if (evaluation?.uiState == PedestalUiState.TOOL_HAS_OVER) {
             val tool = getInputItem(inventory, ArenaEnchantPedestalLayout.TOOL_SLOT) ?: return false
             val state = getOverEnchantState(tool)
-            if (!state.entries.containsKey(incomingId)) {
+            if (incoming.enchantmentIds.none { state.entries.containsKey(it.trim().lowercase(Locale.ROOT)) }) {
                 return false
             }
         }
@@ -2056,7 +2068,7 @@ class ArenaEnchantPedestalMenu(
             }
             val existing = getInputItem(inventory, s) ?: return@filter true
             val existingCatalyst = ArenaEnchantShardData.read(existing) ?: return@filter true
-            existingCatalyst.targetEnchantmentId.trim().lowercase(Locale.ROOT) != incomingId
+            catalystIdentityKey(existingCatalyst) != incomingId
         }
         return activeSlots.size == (evaluation?.let { resolveActiveCatalystSlots(it).size } ?: ArenaEnchantPedestalLayout.CATALYST_SLOTS.size)
     }
