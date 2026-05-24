@@ -166,7 +166,6 @@ arena:
       sharpness:
         1: 50
         2: 70
-        3: 95
       smite:
         1: 50
         2: 70
@@ -214,10 +213,11 @@ arena:
       blast_protection:
         1: 55
         2: 75
-    over_stacking:
+    special_attach:
       infinity: 55
       mending: 55
       sharpness: 60
+      power: 60
       smite: 60
       bane_of_arthropods: 60
       protection: 65
@@ -226,9 +226,6 @@ arena:
       projectile_protection: 65
       multishot: 58
       piercing: 58
-    exotic_attach:
-      infinity: 75
-      sharpness: 75
       breach: 80
   barrier_restart:
     default_duration_seconds: 30

@@ -7,6 +7,7 @@ import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.util.ItemMetaCompat
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Bukkit
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.inventory.ItemFlag
@@ -216,8 +217,7 @@ class BoomerangTokenItem : ArenaSimpleItem(
 
 enum class ArenaOverEnchanterMode(val id: String) {
     LIMIT_BREAKING("limit_breaking"),
-    OVER_STACKING("over_stacking"),
-    EXOTIC_ATTACH("exotic_attach");
+    SPECIAL_ATTACH("special_attach");
 
     companion object {
         fun fromId(id: String): ArenaOverEnchanterMode? {
@@ -390,26 +390,17 @@ object ArenaEnchantShardRegistry {
             baseDropChance = chance
         )
 
-    private fun overStacking(enchantId: String, label: String) = ArenaEnchantShardDefinition(
-        key = "over_stacking_$enchantId",
-        spec = "over_stacking:$enchantId",
+    private fun specialAttach(enchantId: String, label: String, mobIds: Set<String>, chance: Double) = ArenaEnchantShardDefinition(
+        key = "special_attach_$enchantId",
+        spec = "special_attach:$enchantId",
         enchantLabel = label,
         shard = ArenaEnchantShardData.Shard(
-            mode = ArenaOverEnchanterMode.OVER_STACKING,
+            mode = ArenaOverEnchanterMode.SPECIAL_ATTACH,
             targetEnchantmentId = enchantId,
             overLevel = null
-        )
-    )
-
-    private fun exoticAttach(enchantId: String, label: String) = ArenaEnchantShardDefinition(
-        key = "exotic_attach_$enchantId",
-        spec = "exotic_attach:$enchantId",
-        enchantLabel = label,
-        shard = ArenaEnchantShardData.Shard(
-            mode = ArenaOverEnchanterMode.EXOTIC_ATTACH,
-            targetEnchantmentId = enchantId,
-            overLevel = null
-        )
+        ),
+        dropMobDefinitionIds = mobIds,
+        baseDropChance = chance
     )
 
     val definitions: List<ArenaEnchantShardDefinition> = buildList {
@@ -448,21 +439,19 @@ object ArenaEnchantShardRegistry {
         add(lb("blast_protection_1", "blast_protection", "爆発耐性", 1, CREEPER_MOB_DEFINITION_IDS, 0.01))
         add(lb("blast_protection_2", "blast_protection", "爆発耐性", 2, CREEPER_MOB_DEFINITION_IDS, 0.004))
 
-        add(overStacking("infinity", "無限"))
-        add(overStacking("mending", "修繕"))
-        add(overStacking("sharpness", "ダメージ増加"))
-        add(overStacking("smite", "アンデッド特攻"))
-        add(overStacking("bane_of_arthropods", "虫特攻"))
-        add(overStacking("protection", "防護"))
-        add(overStacking("fire_protection", "火炎耐性"))
-        add(overStacking("blast_protection", "爆発耐性"))
-        add(overStacking("projectile_protection", "飛び道具耐性"))
-        add(overStacking("multishot", "拡散"))
-        add(overStacking("piercing", "貫通"))
-
-        add(exoticAttach("infinity", "無限"))
-        add(exoticAttach("sharpness", "ダメージ増加"))
-        add(exoticAttach("breach", "防具貫通"))
+        add(specialAttach("infinity", "無限", BOW_MOB_DEFINITION_IDS, 0.002))
+        add(specialAttach("mending", "修繕", BOW_MOB_DEFINITION_IDS, 0.002))
+        add(specialAttach("multishot", "拡散", BOW_MOB_DEFINITION_IDS, 0.002))
+        add(specialAttach("piercing", "貫通", BOW_MOB_DEFINITION_IDS, 0.002))
+        add(specialAttach("sharpness", "ダメージ増加", UNDEAD_MOB_DEFINITION_IDS + ARTHROPOD_MOB_DEFINITION_IDS, 0.002))
+        add(specialAttach("power", "射撃ダメージ", BOW_MOB_DEFINITION_IDS, 0.002))
+        add(specialAttach("smite", "アンデッド特攻", UNDEAD_MOB_DEFINITION_IDS, 0.002))
+        add(specialAttach("bane_of_arthropods", "虫特攻", ARTHROPOD_MOB_DEFINITION_IDS, 0.002))
+        add(specialAttach("protection", "防護", NETHER_EQUIPPED_MOB_DEFINITION_IDS + EQUIPPED_BOW_MOB_DEFINITION_IDS + CREEPER_MOB_DEFINITION_IDS, 0.002))
+        add(specialAttach("fire_protection", "火炎耐性", NETHER_EQUIPPED_MOB_DEFINITION_IDS, 0.002))
+        add(specialAttach("blast_protection", "爆発耐性", CREEPER_MOB_DEFINITION_IDS, 0.002))
+        add(specialAttach("projectile_protection", "飛び道具耐性", EQUIPPED_BOW_MOB_DEFINITION_IDS, 0.002))
+        add(specialAttach("breach", "防具貫通", EQUIPPED_MOB_DEFINITION_IDS, 0.002))
     }
 
     private val bySpec: Map<String, ArenaEnchantShardDefinition> = definitions.associateBy { it.spec }
@@ -543,8 +532,13 @@ class ArenaEnchantShardItem : ArenaSimpleItem(
         }
 
         private fun applyShardPresentation(meta: ItemMeta, definition: ArenaEnchantShardDefinition) {
-            meta.displayName(Component.text("§bエンチャントシャード§8【§d${definition.enchantLabel}§8】"))
-            meta.lore(buildLore(definition).map { Component.text(it) })
+            meta.displayName(
+                Component.text("エンチャントシャード", NamedTextColor.AQUA)
+                    .append(Component.text("【", NamedTextColor.DARK_GRAY))
+                    .append(enchantmentName(definition.shard.targetEnchantmentId).color(NamedTextColor.LIGHT_PURPLE))
+                    .append(Component.text("】", NamedTextColor.DARK_GRAY))
+            )
+            meta.lore(buildLore(definition))
             meta.setMaxStackSize(1)
             meta.addEnchant(Enchantment.UNBREAKING, 1, true)
             meta.addItemFlags(ItemFlag.HIDE_ENCHANTS)
@@ -555,21 +549,23 @@ class ArenaEnchantShardItem : ArenaSimpleItem(
             ArenaEnchantShardData.apply(meta, definition)
         }
 
-        private fun buildLore(definition: ArenaEnchantShardDefinition): List<String> {
+        private fun buildLore(definition: ArenaEnchantShardDefinition): List<Component> {
             val tier = when (definition.shard.mode) {
                 ArenaOverEnchanterMode.LIMIT_BREAKING -> roman(definition.shard.overLevel ?: 1)
-                ArenaOverEnchanterMode.OVER_STACKING,
-                ArenaOverEnchanterMode.EXOTIC_ATTACH -> "I"
+                ArenaOverEnchanterMode.SPECIAL_ATTACH -> "I"
             }
             val modeLabel = when (definition.shard.mode) {
-                ArenaOverEnchanterMode.LIMIT_BREAKING -> "§7限界突破用"
-                ArenaOverEnchanterMode.OVER_STACKING -> "§7競合付与用"
-                ArenaOverEnchanterMode.EXOTIC_ATTACH -> "§7強制付与用"
+                ArenaOverEnchanterMode.LIMIT_BREAKING -> "限界突破用"
+                ArenaOverEnchanterMode.SPECIAL_ATTACH -> "特殊付与用"
             }
             return listOf(
-                "§7Tier $tier",
-                modeLabel
+                Component.text("Tier $tier", NamedTextColor.GRAY),
+                Component.text(modeLabel, NamedTextColor.GRAY),
             )
+        }
+
+        private fun enchantmentName(enchantmentId: String): Component {
+            return Component.translatable("enchantment.minecraft.${enchantmentId.trim().lowercase(Locale.ROOT)}")
         }
 
         private fun roman(value: Int): String {
@@ -590,8 +586,7 @@ class ArenaEnchantShardItem : ArenaSimpleItem(
                     2 -> Material.AMETHYST_SHARD
                     else -> Material.ECHO_SHARD
                 }
-                ArenaOverEnchanterMode.OVER_STACKING -> Material.FERMENTED_SPIDER_EYE
-                ArenaOverEnchanterMode.EXOTIC_ATTACH -> Material.NETHER_STAR
+                ArenaOverEnchanterMode.SPECIAL_ATTACH -> Material.NETHER_STAR
             }
         }
     }

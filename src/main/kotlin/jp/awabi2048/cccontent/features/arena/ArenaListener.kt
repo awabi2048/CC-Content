@@ -24,6 +24,7 @@ import org.bukkit.event.entity.EntityRegainHealthEvent
 import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.event.entity.EntityToggleGlideEvent
 import org.bukkit.event.entity.EntityShootBowEvent
+import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.PlayerDeathEvent
@@ -44,6 +45,11 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     @EventHandler
     fun onEntityDeath(event: EntityDeathEvent) {
         arenaManager.handleMobDeath(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityPickupItem(event: EntityPickupItemEvent) {
+        arenaManager.handleEnchantShardPickup(event)
     }
 
     @EventHandler(ignoreCancelled = true)

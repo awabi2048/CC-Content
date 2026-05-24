@@ -828,8 +828,7 @@ class ArenaEnchantPedestalMenu(
                     targetEnchant.maxLevel + overLevel
                 }
 
-                ArenaOverEnchanterMode.OVER_STACKING,
-                ArenaOverEnchanterMode.EXOTIC_ATTACH -> targetEnchant.maxLevel
+                ArenaOverEnchanterMode.SPECIAL_ATTACH -> targetEnchant.maxLevel
             }
             workingTool.addUnsafeEnchantment(targetEnchant, resultingLevel)
             val appliedOverLevel = resolveAppliedOverLevel(catalyst)
@@ -1643,18 +1642,11 @@ class ArenaEnchantPedestalMenu(
                 currentTargetLevel == requiredCurrent
             }
 
-            ArenaOverEnchanterMode.OVER_STACKING -> {
+            ArenaOverEnchanterMode.SPECIAL_ATTACH -> {
                 if (currentTargetLevel > 0) {
                     return false
                 }
-                validateOverStackingBase(tool, catalyst.targetEnchantmentId)
-            }
-
-            ArenaOverEnchanterMode.EXOTIC_ATTACH -> {
-                if (currentTargetLevel > 0) {
-                    return false
-                }
-                validateExoticAttach(tool, catalyst.targetEnchantmentId)
+                validateSpecialAttach(tool, catalyst.targetEnchantmentId)
             }
         }
     }
@@ -1672,8 +1664,7 @@ class ArenaEnchantPedestalMenu(
     private fun resolveShardLevel(catalyst: ArenaEnchantShardData.Shard): Int {
         return when (catalyst.mode) {
             ArenaOverEnchanterMode.LIMIT_BREAKING -> catalyst.overLevel ?: 1
-            ArenaOverEnchanterMode.OVER_STACKING,
-            ArenaOverEnchanterMode.EXOTIC_ATTACH -> 1
+            ArenaOverEnchanterMode.SPECIAL_ATTACH -> 1
         }
     }
 
@@ -1689,14 +1680,17 @@ class ArenaEnchantPedestalMenu(
                 targetEnchant.maxLevel + overLevel
             }
 
-            ArenaOverEnchanterMode.OVER_STACKING,
-            ArenaOverEnchanterMode.EXOTIC_ATTACH -> targetEnchant.maxLevel
+            ArenaOverEnchanterMode.SPECIAL_ATTACH -> targetEnchant.maxLevel
         }
         val cloned = tool.clone()
         cloned.addUnsafeEnchantment(targetEnchant, resultingLevel)
         val appliedOverLevel = resolveAppliedOverLevel(catalyst)
         val nextState = applyOverEnchantEntry(state, catalyst.targetEnchantmentId, appliedOverLevel)
         return cloned to nextState
+    }
+
+    private fun validateSpecialAttach(tool: ItemStack, targetEnchantmentId: String): Boolean {
+        return validateOverStackingBase(tool, targetEnchantmentId) || validateExoticAttach(tool, targetEnchantmentId)
     }
 
     private fun validateOverStackingBase(tool: ItemStack, targetEnchantmentId: String): Boolean {
@@ -1719,7 +1713,7 @@ class ArenaEnchantPedestalMenu(
 
     private fun validateExoticAttach(tool: ItemStack, targetEnchantmentId: String): Boolean {
         return when (targetEnchantmentId) {
-            "infinity", "sharpness" -> isCrossbow(tool.type)
+            "infinity", "power" -> isCrossbow(tool.type)
             "breach" -> isSwordOrAxe(tool.type)
             else -> false
         }
@@ -1732,8 +1726,7 @@ class ArenaEnchantPedestalMenu(
                 "arena.over_enchanter.limit_breaking.${catalyst.targetEnchantmentId}.$level"
             }
 
-            ArenaOverEnchanterMode.OVER_STACKING -> "arena.over_enchanter.over_stacking.${catalyst.targetEnchantmentId}"
-            ArenaOverEnchanterMode.EXOTIC_ATTACH -> "arena.over_enchanter.exotic_attach.${catalyst.targetEnchantmentId}"
+            ArenaOverEnchanterMode.SPECIAL_ATTACH -> "arena.over_enchanter.special_attach.${catalyst.targetEnchantmentId}"
         }
         val value = coreConfigProvider().getInt(path, -1)
         return value.takeIf { it > 0 }
@@ -1774,8 +1767,7 @@ class ArenaEnchantPedestalMenu(
     private fun resolveAppliedOverLevel(catalyst: ArenaEnchantShardData.Shard): Int {
         return when (catalyst.mode) {
             ArenaOverEnchanterMode.LIMIT_BREAKING -> catalyst.overLevel ?: 0
-            ArenaOverEnchanterMode.OVER_STACKING,
-            ArenaOverEnchanterMode.EXOTIC_ATTACH -> 1
+            ArenaOverEnchanterMode.SPECIAL_ATTACH -> 1
         }
     }
 
