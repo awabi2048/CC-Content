@@ -735,7 +735,8 @@ class NpcMenuService(
         }
         markPartTimeOpened(player.uniqueId)
         playClick(player)
-        player.sendMessage("§aおあげBOXからご褒美を受け取りました。")
+        player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 2.0f)
+        player.sendMessage("§aおあげBOXから ${reward.receivedDisplayName(player)} を入手しました！")
         player.closeInventory()
     }
 
@@ -976,16 +977,38 @@ class NpcMenuService(
         is OageBoxReward.CustomItem -> CustomItemManager.createItemForPlayer(itemId, player, amount)
             ?: GuiMenuItems.icon(Material.BARRIER, "§c未登録アイテム", listOf("§7$itemId"))
         is OageBoxReward.Acorn -> GuiMenuItems.icon(
-            Material.SUNFLOWER,
-            "§6どんぐり",
-            listOf("§7${formatAcorn(amount.toDouble())}§7を受け取ります")
-        )
+            Material.PLAYER_HEAD,
+            "§6収穫したてのどんぐり",
+            listOf("§7${acornDisplay(amount)}")
+        ).apply { applyAcornTexture() }
         is OageBoxReward.WorldPoint -> GuiMenuItems.icon(
-            Material.EMERALD,
-            "§6ワールドポイント",
-            listOf("§7§e$amount§7 ワールドポイントを受け取ります")
+            Material.HONEY_BOTTLE,
+            "§6世界樹の樹液",
+            listOf("§7${worldPointDisplay(amount)}")
         )
     }
+
+    private fun ItemStack.applyAcornTexture(): ItemStack {
+        val meta = itemMeta as? SkullMeta ?: return this
+        val profile = Bukkit.createProfile(UUID.randomUUID(), "oage_box_acorn")
+        profile.setProperty(com.destroystokyo.paper.profile.ProfileProperty("textures", "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZDNhOWEwNzFiNDI4M2M3NTYyNjg3NWM3YmFmZDBlZWYxM2IzZGZmNThhZDk2ODBhMTY1Mjg4YTcxNzFjNTYzNSJ9fX0="))
+        meta.playerProfile = profile
+        itemMeta = meta
+        return this
+    }
+
+    private fun OageBoxReward.receivedDisplayName(player: Player): String = when (this) {
+        is OageBoxReward.CustomItem -> CustomItemManager.createItemForPlayer(itemId, player, amount)
+            ?.let { legacyDisplayName(it) }
+            ?.ifBlank { "§f$itemId" }
+            ?: "§f$itemId"
+        is OageBoxReward.Acorn -> acornDisplay(amount)
+        is OageBoxReward.WorldPoint -> worldPointDisplay(amount)
+    }
+
+    private fun acornDisplay(amount: Int): String = "🐿 ${ContentEconomyBridge.formatPrice(amount.toDouble())}"
+
+    private fun worldPointDisplay(amount: Int): String = "🛖 $amount"
 
     private data class OageBoxRewardDefinitions(
         val itemRewards: List<OageBoxItemRewardDefinition>,
