@@ -22,12 +22,7 @@ class ArenaItemListener : Listener {
         val customItem = CustomItemManager.identify(item) ?: return
         if (customItem.feature != "arena") return
         
-        // アイテムの種類による処理（スタブ）
-        when (customItem.id) {
-            "ticket" -> handleTicket(player, event)
-            "medal" -> handleMedal(player, event)
-            "prize" -> handlePrize(player, event)
-        }
+        customItem.onRightClick(player, event)
     }
     
     @EventHandler
@@ -40,18 +35,4 @@ class ArenaItemListener : Listener {
         }
     }
     
-    private fun handleTicket(player: Player, event: PlayerInteractEvent) {
-        // TODO: チケットのハンドリング
-        // アリーナへの参加処理
-    }
-    
-    private fun handleMedal(player: Player, event: PlayerInteractEvent) {
-        // TODO: メダルのハンドリング
-        // メダル情報の確認
-    }
-    
-    private fun handlePrize(player: Player, event: PlayerInteractEvent) {
-        // TODO: 報酬箱のハンドリング
-        // 報酬内容の確認
-    }
 }

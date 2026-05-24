@@ -18,13 +18,14 @@ class BrewerySampleFilterItem(private val plugin: JavaPlugin) : CustomItem {
         "§7蒸留時間 -15%",
         "§71蒸留ごとに耐久を1消費"
     )
+    override val itemModel: NamespacedKey = NamespacedKey.minecraft("shears")
 
     private val key = NamespacedKey(plugin, "brewery_filter_sample")
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        val item = ItemStack(Material.SHEARS, amount)
+        val item = ItemStack(Material.POISONOUS_POTATO, amount)
         val meta = item.itemMeta ?: return item
         val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
         val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
@@ -36,7 +37,7 @@ class BrewerySampleFilterItem(private val plugin: JavaPlugin) : CustomItem {
     }
 
     override fun matches(item: ItemStack): Boolean {
-        if (item.type != Material.SHEARS) return false
+        if (item.type != Material.POISONOUS_POTATO) return false
         val meta = item.itemMeta ?: return false
         return meta.persistentDataContainer.has(key, PersistentDataType.BYTE)
     }
@@ -47,13 +48,14 @@ class BreweryMockClockItem(private val plugin: JavaPlugin) : CustomItem {
     override val id: String = "mock_clock"
     override val displayName: String = "§bふしぎな時計（モック）"
     override val lore: List<String> = listOf("§7熟成GUIの時計スロット用（効果なし）")
+    override val itemModel: NamespacedKey = NamespacedKey.minecraft("clock")
 
     private val key = NamespacedKey(plugin, "brewery_mock_clock")
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        val item = ItemStack(Material.CLOCK, amount)
+        val item = ItemStack(Material.POISONOUS_POTATO, amount)
         val meta = item.itemMeta ?: return item
         val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
         val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
@@ -65,7 +67,7 @@ class BreweryMockClockItem(private val plugin: JavaPlugin) : CustomItem {
     }
 
     override fun matches(item: ItemStack): Boolean {
-        if (item.type != Material.CLOCK) return false
+        if (item.type != Material.POISONOUS_POTATO) return false
         val meta = item.itemMeta ?: return false
         return meta.persistentDataContainer.has(key, PersistentDataType.BYTE)
     }
@@ -76,13 +78,14 @@ class BreweryMockYeastItem(private val plugin: JavaPlugin) : CustomItem {
     override val id: String = "mock_yeast"
     override val displayName: String = "§a培養済み酵母（モック）"
     override val lore: List<String> = listOf("§7発酵GUIの酵母スロット用（効果なし）")
+    override val itemModel: NamespacedKey = NamespacedKey.minecraft("honey_bottle")
 
     private val key = NamespacedKey(plugin, "brewery_mock_yeast")
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        val item = ItemStack(Material.HONEY_BOTTLE, amount)
+        val item = ItemStack(Material.POISONOUS_POTATO, amount)
         val meta = item.itemMeta ?: return item
         val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
         val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
@@ -94,7 +97,7 @@ class BreweryMockYeastItem(private val plugin: JavaPlugin) : CustomItem {
     }
 
     override fun matches(item: ItemStack): Boolean {
-        if (item.type != Material.HONEY_BOTTLE) return false
+        if (item.type != Material.POISONOUS_POTATO) return false
         val meta = item.itemMeta ?: return false
         return meta.persistentDataContainer.has(key, PersistentDataType.BYTE)
     }

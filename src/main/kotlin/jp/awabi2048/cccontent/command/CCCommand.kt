@@ -348,7 +348,7 @@ class CCCommand(
               §f/cc-content give <player> <feature.id> [amount]
               §7  - カスタムアイテムを配布します
               §7  - 例: /cc-content give @s misc.big_light
-              §7  - 例: /cc-content give @a arena.prize 10
+              §7  - 例: /cc-content give @a arena.mob_token#zombie 10
               §7  - 例: /cc-content give @s sukima_dungeon.talisman
               
                  §f/ccc reload

@@ -27,6 +27,7 @@ import jp.awabi2048.cccontent.features.arena.mission.ArenaStatusSnapshot
 import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardData
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardDefinition
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardItem
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardRegistry
@@ -54,6 +55,7 @@ import org.bukkit.GameMode
 import org.bukkit.GameRule
 import org.bukkit.Location
 import org.bukkit.Material
+import org.bukkit.NamespacedKey
 import org.bukkit.Particle
 import org.bukkit.Sound
 import org.bukkit.World
@@ -92,12 +94,14 @@ import org.bukkit.event.player.PlayerInteractEntityEvent
 import org.bukkit.event.entity.EntityMountEvent
 import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.event.entity.EntityRegainHealthEvent
+import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.player.PlayerRespawnEvent
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.PlayerInventory
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.persistence.PersistentDataType
 import org.bukkit.scheduler.BukkitTask
 import org.bukkit.scoreboard.DisplaySlot
 import org.bukkit.util.Vector
@@ -413,6 +417,8 @@ class ArenaManager(
     private var maintenanceTask: BukkitTask? = null
     private var playerMonitorTask: BukkitTask? = null
     private var actionMarkerTask: BukkitTask? = null
+    private val enchantShardDropMarkerKey = NamespacedKey(plugin, "arena_enchant_shard_drop")
+    private val enchantShardDropEffectTasks = mutableMapOf<UUID, BukkitTask>()
     private var shuttingDown: Boolean = false
     private var barrierRestartConfig = BarrierRestartConfig(30, 0.05)
     private var multiplayerJoinGraceSeconds = MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT
@@ -1241,6 +1247,8 @@ class ArenaManager(
         playerMonitorTask = null
         actionMarkerTask?.cancel()
         actionMarkerTask = null
+        enchantShardDropEffectTasks.values.forEach { it.cancel() }
+        enchantShardDropEffectTasks.clear()
 
         sessionsByWorld.values.toList().forEach { session ->
             terminateSession(
@@ -3160,7 +3168,10 @@ class ArenaManager(
 
         rebuiltDrops.forEach { stack ->
             if (stack.type.isAir || stack.amount <= 0) return@forEach
-            entity.world.dropItemNaturally(entity.location.add(0.0, 0.5, 0.0), stack)
+            val dropped = entity.world.dropItemNaturally(entity.location.clone().add(0.0, 0.5, 0.0), stack)
+            if (ArenaEnchantShardData.read(stack) != null) {
+                markEnchantShardDrop(dropped)
+            }
         }
         event.droppedExp = if (session != null) {
             calculateArenaDroppedExp(session, entity.uniqueId, normalizedTypeId)
@@ -3260,6 +3271,39 @@ class ArenaManager(
         )
 
         return selected?.let { ArenaEnchantShardItem.createShard(killer, it.definition, 1) }
+    }
+
+    private fun markEnchantShardDrop(item: org.bukkit.entity.Item) {
+        item.persistentDataContainer.set(enchantShardDropMarkerKey, PersistentDataType.BYTE, 1)
+        item.world.playSound(item.location, "minecraft:block.trial_spawner.detect_player", 1.0f, 0.5f)
+        item.world.playSound(item.location, "minecraft:item.trident.thunder", 1.0f, 1.5f)
+        enchantShardDropEffectTasks.remove(item.uniqueId)?.cancel()
+        enchantShardDropEffectTasks[item.uniqueId] = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+            if (!item.isValid || item.isDead || item.itemStack.amount <= 0) {
+                enchantShardDropEffectTasks.remove(item.uniqueId)?.cancel()
+                return@Runnable
+            }
+            item.world.spawnParticle(
+                Particle.TRIAL_SPAWNER_DETECTION_OMINOUS,
+                item.location.clone().add(0.0, 0.25, 0.0),
+                4,
+                0.1,
+                0.1,
+                0.1,
+                0.0
+            )
+        }, 0L, 20L)
+    }
+
+    fun handleEnchantShardPickup(event: EntityPickupItemEvent) {
+        val player = event.entity as? Player ?: return
+        val item = event.item
+        val marked = item.persistentDataContainer.get(enchantShardDropMarkerKey, PersistentDataType.BYTE)?.toInt() == 1
+        if (!marked) {
+            return
+        }
+        enchantShardDropEffectTasks.remove(item.uniqueId)?.cancel()
+        player.playSound(player.location, "minecraft:entity.lightning_bolt.thunder", 1.0f, 2.0f)
     }
 
     private data class EvaluatedEnchantShardCandidate(

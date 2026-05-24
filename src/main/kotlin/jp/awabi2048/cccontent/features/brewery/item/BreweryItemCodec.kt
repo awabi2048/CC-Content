@@ -25,6 +25,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     private val agingStartKey = NamespacedKey(plugin, "brewery_aging_started_at")
     private val finalStarsKey = NamespacedKey(plugin, "brewery_final_stars")
     private val filterKey = NamespacedKey(plugin, "brewery_filter_sample")
+    private val filterRemainingUsesKey = NamespacedKey(plugin, "brewery_filter_remaining_uses")
 
     data class BreweryItemState(
         val stage: BrewStage,
@@ -259,13 +260,15 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
 
     fun isSampleFilter(item: ItemStack?): Boolean {
         if (item == null || item.type.isAir) return false
+        if (item.type != Material.POISONOUS_POTATO) return false
         val meta = item.itemMeta ?: return false
         return meta.persistentDataContainer.has(filterKey, PersistentDataType.BYTE)
     }
 
     fun buildSampleFilterItem(): ItemStack {
-        val item = ItemStack(Material.SHEARS)
+        val item = ItemStack(Material.POISONOUS_POTATO)
         val meta = item.itemMeta ?: return item
+        meta.setItemModel(NamespacedKey.minecraft("shears"))
         meta.setDisplayName("§e蒸留フィルター（試作）")
         meta.lore(
             listOf(
@@ -274,6 +277,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
             )
         )
         meta.persistentDataContainer.set(filterKey, PersistentDataType.BYTE, 1)
+        meta.persistentDataContainer.set(filterRemainingUsesKey, PersistentDataType.INTEGER, FILTER_MAX_USES)
         item.itemMeta = meta
         return item
     }
@@ -284,6 +288,17 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
 
     fun damageFilter(item: ItemStack, amount: Int): Boolean {
         val meta = item.itemMeta ?: return true
+        if (item.type == Material.POISONOUS_POTATO) {
+            val remaining = meta.persistentDataContainer.get(filterRemainingUsesKey, PersistentDataType.INTEGER)
+                ?: FILTER_MAX_USES
+            val nextRemaining = remaining - amount.coerceAtLeast(1)
+            if (nextRemaining <= 0) {
+                return true
+            }
+            meta.persistentDataContainer.set(filterRemainingUsesKey, PersistentDataType.INTEGER, nextRemaining)
+            item.itemMeta = meta
+            return false
+        }
         val damageable = meta as? org.bukkit.inventory.meta.Damageable ?: return true
         damageable.damage = damageable.damage + amount
         if (damageable.damage >= item.type.maxDurability) {
@@ -307,5 +322,9 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
 
     fun getHistory(container: PersistentDataContainer): String {
         return container.get(historyKey, PersistentDataType.STRING) ?: ""
+    }
+
+    companion object {
+        private const val FILTER_MAX_USES = 238
     }
 }

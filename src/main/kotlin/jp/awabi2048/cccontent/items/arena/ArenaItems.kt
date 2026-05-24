@@ -7,6 +7,8 @@ import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.util.ItemMetaCompat
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.Bukkit
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.inventory.ItemFlag
@@ -53,30 +55,6 @@ abstract class ArenaSimpleItem(
         return raw == id
     }
 }
-
-class ArenaTicketItem : ArenaSimpleItem(
-    material = Material.PAPER,
-    modelData = 4001,
-    id = "ticket",
-    displayName = "§6アリーナチケット",
-    lore = listOf("§7アリーナへの参加チケット")
-)
-
-class ArenaMedalItem : ArenaSimpleItem(
-    material = Material.SUNFLOWER,
-    modelData = 4002,
-    id = "medal",
-    displayName = "§6アリーナメダル",
-    lore = listOf("§7アリーナでの戦いの証")
-)
-
-class ArenaPrizeItem : ArenaSimpleItem(
-    material = Material.CHEST,
-    modelData = 4003,
-    id = "prize",
-    displayName = "§6アリーナ報酬箱",
-    lore = listOf("§7アリーナでの勝利報酬")
-)
 
 class ArenaDecayedEquipmentItem(
     private val kindId: String,
@@ -214,13 +192,14 @@ class BoomerangTokenItem : ArenaSimpleItem(
     lore = listOf("§7アリーナに出現するモンスターが落としたアイテム", "§7アリーナロビーで報酬と交換しよう！")
 )
 
-enum class ArenaOverEnchanterMode(val id: String) {
+enum class ArenaEnchantShardEffectType(val id: String) {
     LIMIT_BREAKING("limit_breaking"),
-    OVER_STACKING("over_stacking"),
-    EXOTIC_ATTACH("exotic_attach");
+    INCOMPATIBLE_COMBINATION("incompatible_combination"),
+    INVALID_TARGET_ATTACH("invalid_target_attach"),
+    CUSTOM_ENCHANT_ATTACH("custom_enchant_attach");
 
     companion object {
-        fun fromId(id: String): ArenaOverEnchanterMode? {
+        fun fromId(id: String): ArenaEnchantShardEffectType? {
             return entries.firstOrNull { it.id == id }
         }
     }
@@ -228,10 +207,16 @@ enum class ArenaOverEnchanterMode(val id: String) {
 
 object ArenaEnchantShardData {
     data class Shard(
-        val mode: ArenaOverEnchanterMode,
-        val targetEnchantmentId: String,
+        val effectType: ArenaEnchantShardEffectType,
+        val enchantmentIds: List<String>,
         val overLevel: Int?
-    )
+    ) {
+        val primaryEnchantmentId: String
+            get() = enchantmentIds.firstOrNull().orEmpty()
+
+        val setKey: String
+            get() = enchantmentIds.joinToString("+")
+    }
 
     private val shardMarkerKey by lazy {
         NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "enchant_shard_marker")
@@ -241,12 +226,12 @@ object ArenaEnchantShardData {
         NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "enchant_shard_spec")
     }
 
-    private val modeKey by lazy {
-        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "enchant_shard_mode")
+    private val effectTypeKey by lazy {
+        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "enchant_shard_effect_type")
     }
 
-    private val targetEnchantmentKey by lazy {
-        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "enchant_shard_target_enchantment")
+    private val enchantmentIdsKey by lazy {
+        NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "enchant_shard_enchantment_ids")
     }
 
     private val overLevelKey by lazy {
@@ -256,8 +241,8 @@ object ArenaEnchantShardData {
     fun apply(meta: ItemMeta, definition: ArenaEnchantShardDefinition) {
         meta.persistentDataContainer.set(shardMarkerKey, PersistentDataType.BYTE, 1)
         meta.persistentDataContainer.set(specKey, PersistentDataType.STRING, definition.spec)
-        meta.persistentDataContainer.set(modeKey, PersistentDataType.STRING, definition.shard.mode.id)
-        meta.persistentDataContainer.set(targetEnchantmentKey, PersistentDataType.STRING, definition.shard.targetEnchantmentId)
+        meta.persistentDataContainer.set(effectTypeKey, PersistentDataType.STRING, definition.shard.effectType.id)
+        meta.persistentDataContainer.set(enchantmentIdsKey, PersistentDataType.STRING, definition.shard.enchantmentIds.joinToString(","))
         if (definition.shard.overLevel != null) {
             meta.persistentDataContainer.set(overLevelKey, PersistentDataType.INTEGER, definition.shard.overLevel)
         } else {
@@ -270,11 +255,19 @@ object ArenaEnchantShardData {
         if (meta.persistentDataContainer.get(shardMarkerKey, PersistentDataType.BYTE)?.toInt() != 1) {
             return null
         }
-        val modeId = meta.persistentDataContainer.get(modeKey, PersistentDataType.STRING) ?: return null
-        val targetEnchantment = meta.persistentDataContainer.get(targetEnchantmentKey, PersistentDataType.STRING) ?: return null
-        val mode = ArenaOverEnchanterMode.fromId(modeId) ?: return null
+        val effectTypeId = meta.persistentDataContainer.get(effectTypeKey, PersistentDataType.STRING) ?: return null
+        val enchantmentIds = meta.persistentDataContainer.get(enchantmentIdsKey, PersistentDataType.STRING)
+            ?.split(',')
+            ?.map { it.trim().lowercase(Locale.ROOT) }
+            ?.filter { it.isNotBlank() }
+            ?.distinct()
+            .orEmpty()
+        if (enchantmentIds.isEmpty()) {
+            return null
+        }
+        val effectType = ArenaEnchantShardEffectType.fromId(effectTypeId) ?: return null
         val overLevel = meta.persistentDataContainer.get(overLevelKey, PersistentDataType.INTEGER)
-        return Shard(mode = mode, targetEnchantmentId = targetEnchantment, overLevel = overLevel)
+        return Shard(effectType = effectType, enchantmentIds = enchantmentIds, overLevel = overLevel)
     }
 
     fun readSpec(item: ItemStack): String? {
@@ -289,7 +282,7 @@ object ArenaEnchantShardData {
 data class ArenaEnchantShardDefinition(
     val key: String,
     val spec: String,
-    val enchantLabel: String,
+    val displayEnchantmentIds: List<String>,
     val shard: ArenaEnchantShardData.Shard,
     val dropMobDefinitionIds: Set<String> = emptySet(),
     val baseDropChance: Double? = null
@@ -380,36 +373,45 @@ object ArenaEnchantShardRegistry {
         ArenaEnchantShardDefinition(
             key = key,
             spec = "limit_breaking:$enchantId:$overLevel",
-            enchantLabel = label,
+            displayEnchantmentIds = listOf(enchantId),
             shard = ArenaEnchantShardData.Shard(
-                mode = ArenaOverEnchanterMode.LIMIT_BREAKING,
-                targetEnchantmentId = enchantId,
+                effectType = ArenaEnchantShardEffectType.LIMIT_BREAKING,
+                enchantmentIds = listOf(enchantId),
                 overLevel = overLevel
             ),
             dropMobDefinitionIds = mobIds,
             baseDropChance = chance
         )
 
-    private fun overStacking(enchantId: String, label: String) = ArenaEnchantShardDefinition(
-        key = "over_stacking_$enchantId",
-        spec = "over_stacking:$enchantId",
-        enchantLabel = label,
+    private fun incompatibleCombination(
+        setId: String,
+        enchantmentIds: List<String>,
+        mobIds: Set<String>,
+        chance: Double
+    ) = ArenaEnchantShardDefinition(
+        key = "incompatible_combination_$setId",
+        spec = "incompatible_combination:$setId",
+        displayEnchantmentIds = enchantmentIds,
         shard = ArenaEnchantShardData.Shard(
-            mode = ArenaOverEnchanterMode.OVER_STACKING,
-            targetEnchantmentId = enchantId,
+            effectType = ArenaEnchantShardEffectType.INCOMPATIBLE_COMBINATION,
+            enchantmentIds = enchantmentIds,
             overLevel = null
-        )
+        ),
+        dropMobDefinitionIds = mobIds,
+        baseDropChance = chance
     )
 
-    private fun exoticAttach(enchantId: String, label: String) = ArenaEnchantShardDefinition(
-        key = "exotic_attach_$enchantId",
-        spec = "exotic_attach:$enchantId",
-        enchantLabel = label,
+    private fun invalidTargetAttach(enchantId: String, mobIds: Set<String>, chance: Double) = ArenaEnchantShardDefinition(
+        key = "invalid_target_attach_$enchantId",
+        spec = "invalid_target_attach:$enchantId",
+        displayEnchantmentIds = listOf(enchantId),
         shard = ArenaEnchantShardData.Shard(
-            mode = ArenaOverEnchanterMode.EXOTIC_ATTACH,
-            targetEnchantmentId = enchantId,
+            effectType = ArenaEnchantShardEffectType.INVALID_TARGET_ATTACH,
+            enchantmentIds = listOf(enchantId),
             overLevel = null
-        )
+        ),
+        dropMobDefinitionIds = mobIds,
+        baseDropChance = chance
     )
 
     val definitions: List<ArenaEnchantShardDefinition> = buildList {
@@ -448,21 +450,16 @@ object ArenaEnchantShardRegistry {
         add(lb("blast_protection_1", "blast_protection", "爆発耐性", 1, CREEPER_MOB_DEFINITION_IDS, 0.01))
         add(lb("blast_protection_2", "blast_protection", "爆発耐性", 2, CREEPER_MOB_DEFINITION_IDS, 0.004))
 
-        add(overStacking("infinity", "無限"))
-        add(overStacking("mending", "修繕"))
-        add(overStacking("sharpness", "ダメージ増加"))
-        add(overStacking("smite", "アンデッド特攻"))
-        add(overStacking("bane_of_arthropods", "虫特攻"))
-        add(overStacking("protection", "防護"))
-        add(overStacking("fire_protection", "火炎耐性"))
-        add(overStacking("blast_protection", "爆発耐性"))
-        add(overStacking("projectile_protection", "飛び道具耐性"))
-        add(overStacking("multishot", "拡散"))
-        add(overStacking("piercing", "貫通"))
-
-        add(exoticAttach("infinity", "無限"))
-        add(exoticAttach("sharpness", "ダメージ増加"))
-        add(exoticAttach("breach", "防具貫通"))
+        add(incompatibleCombination("infinity_mending", listOf("infinity", "mending"), BOW_MOB_DEFINITION_IDS, 0.002))
+        add(incompatibleCombination("multishot_piercing", listOf("multishot", "piercing"), BOW_MOB_DEFINITION_IDS, 0.002))
+        add(incompatibleCombination("damage_smite", listOf("sharpness", "smite"), UNDEAD_MOB_DEFINITION_IDS, 0.002))
+        add(incompatibleCombination("damage_bane_of_arthropods", listOf("sharpness", "bane_of_arthropods"), ARTHROPOD_MOB_DEFINITION_IDS, 0.002))
+        add(incompatibleCombination("protection_fire_protection", listOf("protection", "fire_protection"), NETHER_EQUIPPED_MOB_DEFINITION_IDS, 0.002))
+        add(incompatibleCombination("protection_blast_protection", listOf("protection", "blast_protection"), CREEPER_MOB_DEFINITION_IDS, 0.002))
+        add(incompatibleCombination("protection_projectile_protection", listOf("protection", "projectile_protection"), EQUIPPED_BOW_MOB_DEFINITION_IDS, 0.002))
+        add(invalidTargetAttach("infinity", BOW_MOB_DEFINITION_IDS, 0.002))
+        add(invalidTargetAttach("power", BOW_MOB_DEFINITION_IDS, 0.002))
+        add(invalidTargetAttach("breach", EQUIPPED_MOB_DEFINITION_IDS, 0.002))
     }
 
     private val bySpec: Map<String, ArenaEnchantShardDefinition> = definitions.associateBy { it.spec }
@@ -480,8 +477,8 @@ object ArenaEnchantShardRegistry {
 
     fun findByShard(shard: ArenaEnchantShardData.Shard): ArenaEnchantShardDefinition? {
         return definitions.firstOrNull {
-            it.shard.mode == shard.mode &&
-                it.shard.targetEnchantmentId == shard.targetEnchantmentId &&
+            it.shard.effectType == shard.effectType &&
+                it.shard.enchantmentIds == shard.enchantmentIds &&
                 it.shard.overLevel == shard.overLevel
         }
     }
@@ -513,7 +510,7 @@ object ArenaEnchantShardRegistry {
 }
 
 class ArenaEnchantShardItem : ArenaSimpleItem(
-    material = Material.RESIN_CLUMP,
+    material = Material.POISONOUS_POTATO,
     modelData = null,
     id = "enchant_shard",
     displayName = "§bエンチャントシャード",
@@ -534,7 +531,6 @@ class ArenaEnchantShardItem : ArenaSimpleItem(
     companion object {
         fun createShard(player: Player?, definition: ArenaEnchantShardDefinition, amount: Int = 1): ItemStack {
             val item = CustomItemManager.createItemForPlayer(ArenaEnchantShardItem(), player, amount.coerceAtLeast(1))
-            item.type = materialForShard(definition)
             val meta = item.itemMeta ?: return item
             applyShardPresentation(meta, definition)
             applyShardData(meta, definition)
@@ -543,8 +539,15 @@ class ArenaEnchantShardItem : ArenaSimpleItem(
         }
 
         private fun applyShardPresentation(meta: ItemMeta, definition: ArenaEnchantShardDefinition) {
-            meta.displayName(Component.text("§bエンチャントシャード§8【§d${definition.enchantLabel}§8】"))
-            meta.lore(buildLore(definition).map { Component.text(it) })
+            meta.displayName(
+                Component.text("エンチャントシャード", NamedTextColor.AQUA)
+                    .decoration(TextDecoration.ITALIC, false)
+                    .append(Component.text("【", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false))
+                    .append(displayEnchantmentSet(definition).color(NamedTextColor.LIGHT_PURPLE).decoration(TextDecoration.ITALIC, false))
+                    .append(Component.text("】", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false))
+            )
+            meta.lore(buildLore(definition))
+            meta.setItemModel(itemModelForShard(definition))
             meta.setMaxStackSize(1)
             meta.addEnchant(Enchantment.UNBREAKING, 1, true)
             meta.addItemFlags(ItemFlag.HIDE_ENCHANTS)
@@ -555,21 +558,37 @@ class ArenaEnchantShardItem : ArenaSimpleItem(
             ArenaEnchantShardData.apply(meta, definition)
         }
 
-        private fun buildLore(definition: ArenaEnchantShardDefinition): List<String> {
-            val tier = when (definition.shard.mode) {
-                ArenaOverEnchanterMode.LIMIT_BREAKING -> roman(definition.shard.overLevel ?: 1)
-                ArenaOverEnchanterMode.OVER_STACKING,
-                ArenaOverEnchanterMode.EXOTIC_ATTACH -> "I"
+        private fun buildLore(definition: ArenaEnchantShardDefinition): List<Component> {
+            val tier = when (definition.shard.effectType) {
+                ArenaEnchantShardEffectType.LIMIT_BREAKING -> roman(definition.shard.overLevel ?: 1)
+                ArenaEnchantShardEffectType.INCOMPATIBLE_COMBINATION,
+                ArenaEnchantShardEffectType.INVALID_TARGET_ATTACH,
+                ArenaEnchantShardEffectType.CUSTOM_ENCHANT_ATTACH -> "I"
             }
-            val modeLabel = when (definition.shard.mode) {
-                ArenaOverEnchanterMode.LIMIT_BREAKING -> "§7限界突破用"
-                ArenaOverEnchanterMode.OVER_STACKING -> "§7競合付与用"
-                ArenaOverEnchanterMode.EXOTIC_ATTACH -> "§7強制付与用"
+            val description = when (definition.shard.effectType) {
+                ArenaEnchantShardEffectType.LIMIT_BREAKING -> "§f§o限界を超える力を秘めている"
+                ArenaEnchantShardEffectType.INCOMPATIBLE_COMBINATION,
+                ArenaEnchantShardEffectType.INVALID_TARGET_ATTACH,
+                ArenaEnchantShardEffectType.CUSTOM_ENCHANT_ATTACH -> "§f§o調和をもたらす力を秘めている"
             }
             return listOf(
-                "§7Tier $tier",
-                modeLabel
+                Component.text("Tier $tier", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
+                Component.text(description).decoration(TextDecoration.ITALIC, false),
             )
+        }
+
+        private fun displayEnchantmentSet(definition: ArenaEnchantShardDefinition): Component {
+            return definition.displayEnchantmentIds
+                .map { enchantmentName(it) }
+                .reduceOrNull { acc, component ->
+                    acc.append(Component.text(" ┃ ", NamedTextColor.DARK_GRAY).decoration(TextDecoration.ITALIC, false))
+                        .append(component)
+                }
+                ?: Component.text(definition.key)
+        }
+
+        private fun enchantmentName(enchantmentId: String): Component {
+            return Component.translatable("enchantment.minecraft.${enchantmentId.trim().lowercase(Locale.ROOT)}")
         }
 
         private fun roman(value: Int): String {
@@ -583,15 +602,16 @@ class ArenaEnchantShardItem : ArenaSimpleItem(
             }
         }
 
-        private fun materialForShard(definition: ArenaEnchantShardDefinition): Material {
-            return when (definition.shard.mode) {
-                ArenaOverEnchanterMode.LIMIT_BREAKING -> when ((definition.shard.overLevel ?: 1).coerceAtLeast(1)) {
-                    1 -> Material.RESIN_CLUMP
-                    2 -> Material.AMETHYST_SHARD
-                    else -> Material.ECHO_SHARD
+        private fun itemModelForShard(definition: ArenaEnchantShardDefinition): NamespacedKey {
+            return when (definition.shard.effectType) {
+                ArenaEnchantShardEffectType.LIMIT_BREAKING -> when ((definition.shard.overLevel ?: 1).coerceAtLeast(1)) {
+                    1 -> NamespacedKey.minecraft("resin_clump")
+                    2 -> NamespacedKey.minecraft("amethyst_shard")
+                    else -> NamespacedKey.minecraft("echo_shard")
                 }
-                ArenaOverEnchanterMode.OVER_STACKING -> Material.FERMENTED_SPIDER_EYE
-                ArenaOverEnchanterMode.EXOTIC_ATTACH -> Material.NETHER_STAR
+                ArenaEnchantShardEffectType.INCOMPATIBLE_COMBINATION,
+                ArenaEnchantShardEffectType.INVALID_TARGET_ATTACH,
+                ArenaEnchantShardEffectType.CUSTOM_ENCHANT_ATTACH -> NamespacedKey.minecraft("nether_star")
             }
         }
     }
