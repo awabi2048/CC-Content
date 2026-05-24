@@ -81,6 +81,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.tasks.SpecialTileTask
 import jp.awabi2048.cccontent.mob.MobEventListener
 import jp.awabi2048.cccontent.mob.MobService
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
+import net.luckperms.api.LuckPerms
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
@@ -199,7 +200,7 @@ class CCContent : JavaPlugin(), Listener {
         try {
             val menuService = NpcMenuService(
                 plugin = this,
-                professionProvider = { playerId -> rankManagerInstance?.getPlayerProfession(playerId)?.profession }
+                professionProvider = { playerId -> temporaryBrewerProfessionByLuckPerms(playerId) }
             )
             menuService.initialize()
             npcMenuService = menuService
@@ -850,6 +851,13 @@ class CCContent : JavaPlugin(), Listener {
         logger.info("[CustomHead] カスタムヘッド券を登録しました: ${variants.size}件")
     }
 
+    private fun temporaryBrewerProfessionByLuckPerms(playerId: java.util.UUID): Profession? {
+        // 一時措置: Rank側の職業判定が安定するまで、奉納品の日課だけ LuckPerms の brewer グループで醸造家判定を代替する。
+        val luckPerms = server.servicesManager.getRegistration(LuckPerms::class.java)?.provider ?: return null
+        val user = luckPerms.userManager.getUser(playerId) ?: luckPerms.userManager.loadUser(playerId).getNow(null) ?: return null
+        return if (user.primaryGroup.equals("brewer", ignoreCase = true)) Profession.BREWER else null
+    }
+
     private fun registerRadioCassetteItems() {
         CustomItemManager.unregisterByPrefix("misc.cassette_")
         CustomItemManager.register(RadioCassettePlayerItem())
@@ -912,7 +920,7 @@ class CCContent : JavaPlugin(), Listener {
             try {
                 val menuService = NpcMenuService(
                     plugin = this,
-                    professionProvider = { playerId -> rankManagerInstance?.getPlayerProfession(playerId)?.profession }
+                    professionProvider = { playerId -> temporaryBrewerProfessionByLuckPerms(playerId) }
                 )
                 menuService.initialize()
                 npcMenuService = menuService
