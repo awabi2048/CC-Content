@@ -48,6 +48,30 @@ class ArenaAuditLogger(private val plugin: JavaPlugin) {
         )
     }
 
+    fun logPedestalInputChange(
+        playerId: UUID,
+        playerName: String,
+        action: String,
+        slot: Int,
+        slotType: String,
+        item: ItemStack,
+        reason: String
+    ) {
+        append(
+            linkedMapOf(
+                "ts" to timestamp(),
+                "type" to "pedestal_input_change",
+                "playerId" to playerId.toString(),
+                "playerName" to playerName,
+                "action" to action,
+                "slot" to slot,
+                "slotType" to slotType,
+                "reason" to reason,
+                "item" to itemToMap(item)
+            )
+        )
+    }
+
     fun logPedestalExpConsume(
         playerId: UUID,
         playerName: String,

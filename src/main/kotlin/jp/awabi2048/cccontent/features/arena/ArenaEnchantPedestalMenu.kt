@@ -2,6 +2,7 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import io.papermc.paper.datacomponent.DataComponentTypes
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardData
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardEffectType
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
@@ -148,7 +149,8 @@ private data class InputSnapshot(
     val hasAnyInput: Boolean,
     val shardCount: Int,
     val expReady: Boolean,
-    val executable: Boolean
+    val executable: Boolean,
+    val items: Map<Int, ItemStack>
 )
 
 private data class PathAnimationRequest(
@@ -433,8 +435,6 @@ class ArenaEnchantPedestalMenu(
             moving.amount -= 1
             source.setItem(event.slot, moving)
         }
-        playSound(player, "minecraft:block.enchantment_table.use", 1.7f)
-        playSound(player, "minecraft:block.end_portal_frame.fill", 0.75f)
         Bukkit.getScheduler().runTask(plugin, Runnable {
             val after = captureSnapshot(player, top)
             processInputStateChange(player, top, before, after)
@@ -508,10 +508,14 @@ class ArenaEnchantPedestalMenu(
             return true
         }
 
+        val removedItem = getInputItem(top, ArenaEnchantPedestalLayout.TOOL_SLOT)?.clone()
         event.isCancelled = false
         Bukkit.getScheduler().runTask(plugin, Runnable {
             if (getInputItem(top, ArenaEnchantPedestalLayout.TOOL_SLOT) != null) {
                 return@Runnable
+            }
+            removedItem?.let { item ->
+                logPedestalInputChange(player, "remove", ArenaEnchantPedestalLayout.TOOL_SLOT, item, "animation_tool_removal")
             }
             startToolRemovalSequence(player, top, runtime)
         })
@@ -589,6 +593,7 @@ class ArenaEnchantPedestalMenu(
     ) {
         val holder = inventory.holder as? ArenaEnchantPedestalHolder ?: return
         val runtime = runtimes.getOrPut(holder.ownerId) { ViewerRuntime() }
+        logInputItemChanges(player, before, after, "inventory_click")
 
         if (before.hasTool && !after.hasTool) {
             playSound(player, "minecraft:block.enchantment_table.use", 0.85f)
@@ -973,6 +978,34 @@ class ArenaEnchantPedestalMenu(
         }
     }
 
+    private fun logInputItemChanges(
+        player: Player,
+        before: InputSnapshot,
+        after: InputSnapshot,
+        reason: String
+    ) {
+        inputSlots().forEach { slot ->
+            val previous = before.items[slot]
+            val current = after.items[slot]
+            when {
+                previous == null && current != null -> {
+                    logPedestalInputChange(player, "insert", slot, current, reason)
+                }
+                previous != null && current == null -> {
+                    logPedestalInputChange(player, "remove", slot, previous, reason)
+                }
+                previous != null && current != null && !previous.isSameInputStack(current) -> {
+                    logPedestalInputChange(player, "remove", slot, previous, reason)
+                    logPedestalInputChange(player, "insert", slot, current, reason)
+                }
+            }
+        }
+    }
+
+    private fun ItemStack.isSameInputStack(other: ItemStack): Boolean {
+        return amount == other.amount && isSimilar(other)
+    }
+
     private fun resolveAnimationMax(kind: PanelAnimationKind, runtime: ViewerRuntime): Int {
         return when (kind) {
             PanelAnimationKind.FULL -> ArenaEnchantPedestalLayout.REVEAL_STEPS.size
@@ -1239,12 +1272,16 @@ class ArenaEnchantPedestalMenu(
         val tool = getInputItem(inventory, ArenaEnchantPedestalLayout.TOOL_SLOT)
         val shardCount = ArenaEnchantPedestalLayout.CATALYST_SLOTS.count { slot -> getInputItem(inventory, slot) != null }
         val evaluation = evaluate(player, inventory)
+        val items = inputSlots().mapNotNull { slot ->
+            getInputItem(inventory, slot)?.clone()?.let { item -> slot to item }
+        }.toMap()
         return InputSnapshot(
             hasTool = tool != null,
             hasAnyInput = tool != null || shardCount > 0,
             shardCount = shardCount,
             expReady = evaluation.expReady,
-            executable = evaluation.executable
+            executable = evaluation.executable,
+            items = items
         )
     }
 
@@ -1288,14 +1325,20 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun buildProgressGaugeItem(player: Player, progress: SlotUnlockProgress): ItemStack {
-        val item = ItemStack(Material.END_CRYSTAL)
+        val item = ItemStack(Material.END_CRYSTAL, progress.remainingUntilNextUnlockDisplayAmount())
+        item.setData(DataComponentTypes.MAX_STACK_SIZE, 99)
         val meta = item.itemMeta ?: return item
-        val gaugeLine = buildGaugeLine(progress)
         meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
-        meta.lore = listOf(gaugeLine)
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
-        return item
+        return ArenaMenuItems.hideTooltip(item)
+    }
+
+    private fun SlotUnlockProgress.remainingUntilNextUnlockDisplayAmount(): Int {
+        val remaining = nextThreshold?.let { next ->
+            (next - successCount).coerceAtLeast(1)
+        } ?: unlockedSlotCount
+        return remaining.coerceIn(1, 99)
     }
 
     private fun buildInfoItem(player: Player): ItemStack {
@@ -1305,33 +1348,15 @@ class ArenaEnchantPedestalMenu(
         meta.lore = ArenaI18n.stringList(player, "arena.ui.pedestal.info.dummy")
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
-        return item
+        return ArenaMenuItems.hideTooltip(item)
     }
 
     private fun buildExecuteItem(player: Player, evaluation: PedestalEvaluation): ItemStack {
         val item = ItemStack(Material.ENCHANTING_TABLE)
         val meta = item.itemMeta ?: return item
         val executable = evaluation.executable
-        if (evaluation.powerInsufficient) {
-            meta.setDisplayName("§5オーバーエンチャント")
-            meta.lore = listOf(ArenaI18n.text(player, "arena.ui.pedestal.execute.insufficient_power"))
-        } else if (!evaluation.processable) {
-            meta.setDisplayName("§5オーバーエンチャント")
-            meta.lore = listOf(
-                ArenaI18n.text(player, "arena.ui.pedestal.execute.waiting_lore")
-            )
-        } else if (evaluation.missingLevel != null && evaluation.missingLevel > 0) {
-            meta.setDisplayName("§5オーバーエンチャント")
-            meta.lore = listOf(
-                ArenaI18n.text(player, "arena.ui.pedestal.execute.missing_level", "value" to evaluation.missingLevel)
-            )
-        } else {
-            meta.setDisplayName("§d力を解放する")
-            val consume = evaluation.requiredLevel ?: 0
-            meta.lore = listOf(
-                ArenaI18n.text(player, "arena.ui.pedestal.execute.consume_level", "value" to consume)
-            )
-        }
+        meta.setDisplayName(if (executable) "§5§k__________" else "§c§k__________")
+        meta.lore = null
         meta.setEnchantmentGlintOverride(executable)
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         item.itemMeta = meta
@@ -1962,6 +1987,7 @@ class ArenaEnchantPedestalMenu(
     private fun returnItemToPlayer(player: Player, inventory: Inventory, slot: Int) {
         val item = getInputItem(inventory, slot) ?: return
         inventory.setItem(slot, null)
+        logPedestalInputChange(player, "remove", slot, item, "return_to_player")
         val leftovers = player.inventory.addItem(item)
         leftovers.values.forEach { leftover ->
             player.world.dropItemNaturally(player.location, leftover)
@@ -2007,9 +2033,40 @@ class ArenaEnchantPedestalMenu(
     private fun returnPendingCatalystForSlot(player: Player, inventory: Inventory, runtime: ViewerRuntime, slot: Int) {
         val pending = runtime.pendingCatalystReturns.remove(slot) ?: return
         inventory.setItem(slot, null)
+        logPedestalInputChange(player, "remove", slot, pending, "pending_catalyst_return")
         val leftovers = player.inventory.addItem(pending)
         leftovers.values.forEach { leftover ->
             player.world.dropItemNaturally(player.location, leftover)
+        }
+    }
+
+    private fun logPedestalInputChange(
+        player: Player,
+        action: String,
+        slot: Int,
+        item: ItemStack,
+        reason: String
+    ) {
+        auditLogger.logPedestalInputChange(
+            playerId = player.uniqueId,
+            playerName = player.name,
+            action = action,
+            slot = slot,
+            slotType = inputSlotType(slot),
+            item = item.clone(),
+            reason = reason
+        )
+    }
+
+    private fun inputSlots(): List<Int> {
+        return listOf(ArenaEnchantPedestalLayout.TOOL_SLOT) + ArenaEnchantPedestalLayout.CATALYST_SLOTS
+    }
+
+    private fun inputSlotType(slot: Int): String {
+        return when (slot) {
+            ArenaEnchantPedestalLayout.TOOL_SLOT -> "tool"
+            in ArenaEnchantPedestalLayout.CATALYST_SLOTS -> "catalyst"
+            else -> "unknown"
         }
     }
 
