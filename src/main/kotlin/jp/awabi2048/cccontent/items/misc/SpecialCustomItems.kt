@@ -12,6 +12,7 @@ import net.kyori.adventure.text.Component
 import org.bukkit.GameMode
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
+import org.bukkit.Sound
 import org.bukkit.attribute.Attribute
 import org.bukkit.attribute.AttributeModifier
 import org.bukkit.entity.Player
@@ -243,6 +244,7 @@ class LargeExperienceBottleItem : CustomItem {
         if (CustomItemManager.identify(item) != this) return
 
         event.isCancelled = true
+        player.playSound(player.location, Sound.ENTITY_EXPERIENCE_BOTTLE_THROW, 0.9f, 1.0f)
         val bottle = player.launchProjectile(ThrownExpBottle::class.java)
         bottle.velocity = player.eyeLocation.direction.clone().normalize().multiply(0.7).add(Vector(0.0, 0.1, 0.0))
         bottle.persistentDataContainer.set(SpecialCustomItemKeys.EXPERIENCE_BOTTLE, PersistentDataType.BYTE, 1)
