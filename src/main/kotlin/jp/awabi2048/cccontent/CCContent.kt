@@ -16,6 +16,7 @@ import jp.awabi2048.cccontent.items.misc.AirCannonItem
 import jp.awabi2048.cccontent.items.misc.CustomHeadConfigRegistry
 import jp.awabi2048.cccontent.items.misc.CustomHeadGuiListener
 import jp.awabi2048.cccontent.items.misc.CustomHeadItem
+import jp.awabi2048.cccontent.items.misc.LargeExperienceBottleListener
 import jp.awabi2048.cccontent.items.misc.SparklingStoneItem
 import jp.awabi2048.cccontent.items.misc.SmallLight
 import jp.awabi2048.cccontent.items.misc.GulliverItemListener
@@ -371,6 +372,7 @@ class CCContent : JavaPlugin(), Listener {
         }
         server.pluginManager.registerEvents(CustomHeadGuiListener(this), this)
         server.pluginManager.registerEvents(CustomItemInteractionListener(), this)
+        server.pluginManager.registerEvents(LargeExperienceBottleListener(), this)
         if (::npcMenuService.isInitialized) {
             server.pluginManager.registerEvents(npcMenuService, this)
         }

@@ -15,6 +15,7 @@ import org.bukkit.NamespacedKey
 import org.bukkit.attribute.Attribute
 import org.bukkit.attribute.AttributeModifier
 import org.bukkit.entity.Player
+import org.bukkit.entity.ThrownExpBottle
 import org.bukkit.event.block.Action
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.inventory.EquipmentSlot
@@ -23,6 +24,7 @@ import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.ItemMeta
 import org.bukkit.persistence.PersistentDataType
+import org.bukkit.util.Vector
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
 
@@ -241,7 +243,9 @@ class LargeExperienceBottleItem : CustomItem {
         if (CustomItemManager.identify(item) != this) return
 
         event.isCancelled = true
-        player.giveExp(1500)
+        val bottle = player.launchProjectile(ThrownExpBottle::class.java)
+        bottle.velocity = player.eyeLocation.direction.clone().normalize().multiply(0.7).add(Vector(0.0, 0.1, 0.0))
+        bottle.persistentDataContainer.set(SpecialCustomItemKeys.EXPERIENCE_BOTTLE, PersistentDataType.BYTE, 1)
         if (player.gameMode == GameMode.CREATIVE) return
 
         when (event.hand) {
