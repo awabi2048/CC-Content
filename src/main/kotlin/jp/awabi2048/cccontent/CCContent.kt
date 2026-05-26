@@ -13,19 +13,15 @@ import jp.awabi2048.cccontent.items.misc.AutoIgnitionBoosterItem
 import jp.awabi2048.cccontent.items.misc.AutoIgnitionBoosterListener
 import jp.awabi2048.cccontent.items.misc.AirCannonConfig
 import jp.awabi2048.cccontent.items.misc.AirCannonItem
-import jp.awabi2048.cccontent.items.misc.CassetteTapeItem
 import jp.awabi2048.cccontent.items.misc.CustomHeadConfigRegistry
 import jp.awabi2048.cccontent.items.misc.CustomHeadGuiListener
 import jp.awabi2048.cccontent.items.misc.CustomHeadItem
+import jp.awabi2048.cccontent.items.misc.SparklingStoneItem
 import jp.awabi2048.cccontent.items.misc.SmallLight
 import jp.awabi2048.cccontent.items.misc.GulliverItemListener
 import jp.awabi2048.cccontent.items.misc.GulliverConfig
 import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
 import jp.awabi2048.cccontent.items.misc.HeadDatabaseBridge
-import jp.awabi2048.cccontent.items.misc.RadioCassetteConfig
-import jp.awabi2048.cccontent.items.misc.RadioCassetteGuiListener
-import jp.awabi2048.cccontent.items.misc.RadioCassettePlaybackManager
-import jp.awabi2048.cccontent.items.misc.RadioCassettePlayerItem
 import jp.awabi2048.cccontent.items.misc.StorageBoxGuiListener
 import jp.awabi2048.cccontent.items.misc.StorageBoxSingleItem
 import jp.awabi2048.cccontent.items.misc.StorageBoxTripleItem
@@ -184,8 +180,6 @@ class CCContent : JavaPlugin(), Listener {
         AutoIgnitionBoosterConfig.initialize(this)
         AirCannonConfig.initialize(this)
         CustomHeadConfigRegistry.initialize(this)
-        RadioCassetteConfig.initialize(this)
-        RadioCassettePlaybackManager.initialize(this)
         sharedMobService = MobService(this)
         sharedMobService.reloadDefinitions()
         sharedMobService.startTickTask()
@@ -377,7 +371,6 @@ class CCContent : JavaPlugin(), Listener {
         }
         server.pluginManager.registerEvents(CustomHeadGuiListener(this), this)
         server.pluginManager.registerEvents(CustomItemInteractionListener(), this)
-        server.pluginManager.registerEvents(RadioCassetteGuiListener(), this)
         if (::npcMenuService.isInitialized) {
             server.pluginManager.registerEvents(npcMenuService, this)
         }
@@ -426,7 +419,6 @@ class CCContent : JavaPlugin(), Listener {
             }
 
             PortalManager.shutdown()
-            RadioCassettePlaybackManager.shutdown()
             BGMManager.stopAll()
             DungeonSessionManager.saveSessions(this)
 
@@ -813,11 +805,11 @@ class CCContent : JavaPlugin(), Listener {
         CustomItemManager.register(TransparentItemFrameItem())
         CustomItemManager.register(TransparentGlowItemFrameItem())
         CustomItemManager.register(BoxedDaiginjoItem)
+        CustomItemManager.register(SparklingStoneItem())
         CustomItemManager.register(ExquisiteSweetBerryItem())
         CustomItemManager.register(OldPickaxeItem())
         CustomItemManager.register(WornBootsItem())
         CustomItemManager.register(LargeExperienceBottleItem())
-        registerRadioCassetteItems()
         registerCustomHeadItems()
 
         if (isContentEnabledAtStartup("brewery")) {
@@ -863,18 +855,6 @@ class CCContent : JavaPlugin(), Listener {
         return if (user.primaryGroup.equals("brewer", ignoreCase = true)) Profession.BREWER else null
     }
 
-    private fun registerRadioCassetteItems() {
-        CustomItemManager.unregisterByPrefix("misc.cassette_")
-        CustomItemManager.register(RadioCassettePlayerItem())
-
-        val cassetteDefinitions = RadioCassetteConfig.getAll()
-        cassetteDefinitions.forEach { definition ->
-            CustomItemManager.register(CassetteTapeItem(definition))
-        }
-
-        logger.info("[RadioCassette] カセットテープを登録しました: ${cassetteDefinitions.size}件")
-    }
-    
     /**
      * config 配下の設定を再読込
      */
@@ -918,7 +898,6 @@ class CCContent : JavaPlugin(), Listener {
         AutoIgnitionBoosterConfig.reload()
         AirCannonConfig.reload()
         CustomHeadConfigRegistry.reload(this)
-        RadioCassetteConfig.reload()
         if (::npcMenuService.isInitialized) {
             npcMenuService.reload()
         } else {
@@ -936,7 +915,6 @@ class CCContent : JavaPlugin(), Listener {
             }
         }
         registerCustomHeadItems()
-        registerRadioCassetteItems()
 
         if (::breweryFeature.isInitialized) {
             breweryFeature.reload()

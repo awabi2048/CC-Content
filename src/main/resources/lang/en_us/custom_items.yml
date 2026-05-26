@@ -32,12 +32,6 @@ custom_items:
       lore:
       - §7Turns invisible after placement.
       - §7Hold it and §eSneak§7 to temporarily reveal nearby transparent frames.
-    radio_cassette_player:
-      name: §6Radio Cassette
-      lore:
-      - §7Right click to open the radio menu.
-      - §7Insert a cassette and start playback
-      - §7to loop until you stop it from the menu.
     storage_box_single:
       name: §6Storage Box (1)
       lore:
@@ -54,10 +48,16 @@ custom_items:
       lore:
       - §7ラベリングされた★5の大吟醸が入った箱
       - §eおあげ神社に奉納できます
+    sparkling_stone:
+      name: §bキラキラの石
+      lore:
+      - §7おあげちゃんが拾ったきれいな石
+      - §7ダイヤモンドに負けず劣らずの輝き
     delicious_sweet_berry:
       name: §dExquisite Sweet Berry
       lore:
-      - Very sweet and delicious.
+      - §7おあげちゃんがおやつにとっておいたスイートベリー
+      - §7とっても甘くておいしい
     old_pickaxe:
       name: §7Worn Pickaxe
       lore:

@@ -423,7 +423,6 @@ public final class ResourceConfigurationValidator {
     private static void validateCustomItemConfigs(Path configRoot, Map<Path, Object> configs, List<String> errors) {
         requirePositiveNumber(rootMap(configs, configRoot.resolve("custom_item/air_cannon.yml"), errors), "cooldown_ticks", configRoot.resolve("custom_item/air_cannon.yml"), "cooldown_ticks", errors);
         validateCustomHead(configRoot, configs, errors);
-        validateRadioCassette(configRoot, configs, errors);
     }
 
     private static void validateCustomHead(Path configRoot, Map<Path, Object> configs, List<String> errors) {
@@ -453,28 +452,6 @@ public final class ResourceConfigurationValidator {
             if (!(headsValue instanceof List<?> heads) || heads.isEmpty()) {
                 errors.add(format("missing custom heads", file, path + ".heads", "at least one head is required"));
             }
-        }
-    }
-
-    private static void validateRadioCassette(Path configRoot, Map<Path, Object> configs, List<String> errors) {
-        Path file = configRoot.resolve("custom_item/radio_cassette.yml");
-        Map<String, Object> root = rootMap(configs, file, errors);
-        if (root == null) {
-            return;
-        }
-        Map<String, Object> cassettes = requireMap(root, "cassettes", file, errors);
-        if (cassettes == null) {
-            return;
-        }
-        requireNonEmpty(cassettes, file, "cassettes", errors);
-        for (Map.Entry<String, Object> entry : cassettes.entrySet()) {
-            Map<String, Object> cassette = asMap(entry.getValue());
-            String path = "cassettes." + entry.getKey();
-            if (cassette == null) {
-                errors.add(format("invalid cassette", file, path, "cassette must be a section"));
-                continue;
-            }
-            requireString(cassette, "sound", file, path + ".sound", errors);
         }
     }
 

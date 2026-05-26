@@ -27,6 +27,7 @@ import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
 
 object SpecialCustomItemKeys {
+    val SPARKLING_STONE = NamespacedKey("cccontent", "sparkling_stone")
     val SWEET_BERRY = NamespacedKey("cccontent", "delicious_sweet_berry")
     val PICKAXE = NamespacedKey("cccontent", "old_pickaxe")
     val BOOTS = NamespacedKey("cccontent", "worn_boots")
@@ -47,11 +48,43 @@ private fun applyLocalizedMeta(
     meta.lore(localizedLore.map { Component.text(it) })
 }
 
+class SparklingStoneItem : CustomItem {
+    override val feature: String = "misc"
+    override val id: String = "sparkling_stone"
+    override val displayName: String = "§bキラキラの石"
+    override val lore: List<String> = listOf(
+        "§7おあげちゃんが拾ったきれいな石",
+        "§7ダイヤモンドに負けず劣らずの輝き"
+    )
+    override val itemModel: NamespacedKey = NamespacedKey.minecraft("resin_clump")
+
+    override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
+
+    override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
+        val item = ItemStack(Material.POISONOUS_POTATO, amount.coerceAtLeast(1))
+        val meta = item.itemMeta ?: return item
+        applyLocalizedMeta(meta, player, feature, id, displayName, lore)
+        meta.setItemModel(itemModel)
+        meta.persistentDataContainer.set(SpecialCustomItemKeys.SPARKLING_STONE, PersistentDataType.BYTE, 1)
+        item.itemMeta = meta
+        return item
+    }
+
+    override fun matches(item: ItemStack): Boolean {
+        if (item.type != Material.POISONOUS_POTATO) return false
+        val meta = item.itemMeta ?: return false
+        return meta.persistentDataContainer.has(SpecialCustomItemKeys.SPARKLING_STONE, PersistentDataType.BYTE)
+    }
+}
+
 class ExquisiteSweetBerryItem : CustomItem {
     override val feature: String = "misc"
     override val id: String = "delicious_sweet_berry"
     override val displayName: String = "§d絶品スイートベリー"
-    override val lore: List<String> = listOf("とっても甘くておいしい")
+    override val lore: List<String> = listOf(
+        "§7おあげちゃんがおやつにとっておいたスイートベリー",
+        "§7とっても甘くておいしい"
+    )
     override val keepConsumableComponent: Boolean = true
     override val itemModel: NamespacedKey = NamespacedKey.minecraft("sweet_berries")
 
@@ -68,18 +101,18 @@ class ExquisiteSweetBerryItem : CustomItem {
             DataComponentTypes.FOOD,
             FoodProperties.food()
                 .nutrition(6)
-                .saturation(4.0f)
+                .saturation(6.0f)
                 .build()
         )
         item.setData(
             DataComponentTypes.CONSUMABLE,
             Consumable.consumable()
-                .consumeSeconds(1.6f)
+                .consumeSeconds(5.0f)
                 .animation(ItemUseAnimation.EAT)
                 .hasConsumeParticles(false)
                 .addEffect(
                     ConsumeEffect.applyStatusEffects(
-                        listOf(PotionEffect(PotionEffectType.REGENERATION, 200, 0, false, false, false)),
+                        listOf(PotionEffect(PotionEffectType.REGENERATION, 100, 0, false, false, false)),
                         1.0f
                     )
                 )
