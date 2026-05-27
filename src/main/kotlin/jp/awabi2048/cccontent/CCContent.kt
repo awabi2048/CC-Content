@@ -396,6 +396,7 @@ class CCContent : JavaPlugin(), Listener {
 
     private fun stopPlugin() {
         try {
+            arenaTokenExchangeMenu?.shutdown()
             HandlerList.unregisterAll(this as org.bukkit.plugin.Plugin)
             server.scheduler.cancelTasks(this)
 
@@ -419,6 +420,7 @@ class CCContent : JavaPlugin(), Listener {
             arenaMissionService?.shutdown()
             arenaSessionInfoMenu = null
             arenaEnchantPedestalMenu = null
+            arenaTokenExchangeMenu = null
             if (::arenaManager.isInitialized) {
                 arenaManager.setPedestalMenuProvider(null)
                 arenaManager.setMissionService(null)
@@ -878,6 +880,7 @@ class CCContent : JavaPlugin(), Listener {
                 arenaMissionService?.shutdown()
                 arenaSessionInfoMenu = null
                 arenaEnchantPedestalMenu = null
+                arenaTokenExchangeMenu?.shutdown()
                 arenaTokenExchangeMenu = null
                 if (::arenaManager.isInitialized) {
                     arenaManager.setMissionService(null)

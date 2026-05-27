@@ -114,6 +114,71 @@ class ArenaAuditLogger(private val plugin: JavaPlugin) {
         )
     }
 
+    fun logTokenExchangeInputChange(
+        playerId: UUID,
+        playerName: String,
+        action: String,
+        slot: Int,
+        item: ItemStack,
+        reason: String,
+        escrowId: String?
+    ) {
+        append(
+            linkedMapOf(
+                "ts" to timestamp(),
+                "type" to "token_exchange_input_change",
+                "playerId" to playerId.toString(),
+                "playerName" to playerName,
+                "action" to action,
+                "slot" to slot,
+                "reason" to reason,
+                "escrowId" to escrowId,
+                "item" to itemToMap(item)
+            )
+        )
+    }
+
+    fun logTokenExchangeConfirmation(
+        playerId: UUID,
+        playerName: String,
+        eventType: String,
+        mode: String,
+        amount: Double,
+        items: List<ItemStack>,
+        reason: String? = null
+    ) {
+        append(
+            linkedMapOf(
+                "ts" to timestamp(),
+                "type" to eventType,
+                "playerId" to playerId.toString(),
+                "playerName" to playerName,
+                "mode" to mode,
+                "amount" to amount,
+                "reason" to reason,
+                "items" to items.map { itemToMap(it) }
+            )
+        )
+    }
+
+    fun logTokenExchangeCleanup(
+        playerId: UUID,
+        playerName: String,
+        item: ItemStack,
+        reason: String
+    ) {
+        append(
+            linkedMapOf(
+                "ts" to timestamp(),
+                "type" to "token_exchange_temporary_lore_cleanup",
+                "playerId" to playerId.toString(),
+                "playerName" to playerName,
+                "reason" to reason,
+                "item" to itemToMap(item)
+            )
+        )
+    }
+
     private fun append(payload: Map<String, Any?>) {
         runCatching {
             logFile.parentFile.mkdirs()

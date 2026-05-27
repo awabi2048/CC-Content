@@ -273,7 +273,13 @@ arena:
     token_exchange:
       title: §8Mob Drop Exchange
       empty_name: §bArena mob drops can be exchanged for §6🐿 §eacorns
-      exchange_name: §6Have Mob Drops Exchanged for Acorns
+      exchange_name: §6Exchange for Acorns
+      bulk_exchange_name: §6Exchange All
+      info_name: §bInfo
+      info_lore: §7You can exchange drops from arena monsters for §6🐿 §eacorns§7.
+      confirm_title: §8Mob Drop Exchange - Confirm
+      confirm_ok: §aExchange
+      confirm_cancel: §cCancel
     separator: §8§m――――――――――――――――――――
     coming_soon: §7Coming Soon!
     license_card:

@@ -275,7 +275,13 @@ arena:
     token_exchange:
       title: §8モブドロップ交換
       empty_name: §bアリーナモブのドロップアイテムを、§6🐿 §eどんぐり§bと交換してもらえます
-      exchange_name: §6どんぐりと交換してもらう
+      exchange_name: §6どんぐりと交換する
+      bulk_exchange_name: §6一括交換する
+      info_name: §bInfo
+      info_lore: §7アリーナで倒したモンスターのドロップを、§6🐿 §eどんぐり §7と交換することができます
+      confirm_title: §8モブドロップ交換 - 確認
+      confirm_ok: §a交換する
+      confirm_cancel: §cキャンセル
     separator: §8§m――――――――――――――――――――
     coming_soon: §7Coming Soon!
     license_card:
