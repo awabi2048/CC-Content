@@ -42,6 +42,7 @@ public final class ResourceConfigurationValidator {
         validateIngredientDefinitions(configRoot, configs, errors);
         validateMobDefinitions(configRoot, configs, errors);
         validateArenaDropConfig(configRoot, configs, errors);
+        validateArenaRewardConfig(configRoot, configs, errors);
         validateArenaTokenExchangeConfig(configRoot, configs, errors);
         validateArenaThemes(configRoot, configs, errors);
         validateRankJobExp(configRoot, configs, errors);
@@ -235,6 +236,25 @@ public final class ResourceConfigurationValidator {
                     requireRatio(item.get("chance"), file, path + ".chance", errors);
                 }
             }
+        }
+    }
+
+    private static void validateArenaRewardConfig(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path file = configRoot.resolve("arena/reward.yml");
+        Map<String, Object> root = rootMap(configs, file, errors);
+        if (root == null) {
+            errors.add(format("missing arena reward config", file, "<root>", "reward config is required"));
+            return;
+        }
+        Map<String, Object> mobToken = requireMap(root, "mob_token", file, errors);
+        if (mobToken != null) {
+            requireRatio(mobToken.get("drop_chance"), file, "mob_token.drop_chance", errors);
+            requireNonNegativeNumber(mobToken, "looting_bonus_per_level", file, "mob_token.looting_bonus_per_level", errors);
+        }
+        Map<String, Object> enchantShard = requireMap(root, "enchant_shard", file, errors);
+        if (enchantShard != null) {
+            requireNonNegativeNumber(enchantShard, "drop_rate_multiplier", file, "enchant_shard.drop_rate_multiplier", errors);
+            requireNonNegativeNumber(enchantShard, "looting_multiplier_per_level", file, "enchant_shard.looting_multiplier_per_level", errors);
         }
     }
 

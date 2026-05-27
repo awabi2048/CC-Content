@@ -155,8 +155,6 @@ arena:
     sound:
       key: "minecraft:block.iron_door.open"
       pitch: 1.0
-  mob_token_drop_chance: 0.30
-  mob_token_looting_bonus_per_level: 0.033
   over_enchanter:
     slot_unlocks:
       1: 0

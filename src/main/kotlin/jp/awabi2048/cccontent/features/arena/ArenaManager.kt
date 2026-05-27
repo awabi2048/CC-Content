@@ -328,8 +328,10 @@ class ArenaManager(
         const val ACTION_MARKER_CENTER_Y_OFFSET = -0.25
         const val BARRIER_MARKER_HOLD_TICKS = 60
         const val MIDDLE_RING_MAX_ANGULAR_VELOCITY = 0.14
-        const val MOB_TOKEN_DROP_CHANCE = 0.30
+        const val MOB_TOKEN_DROP_CHANCE_DEFAULT = 0.30
         const val MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT = 0.033
+        const val ENCHANT_SHARD_DROP_RATE_MULTIPLIER_DEFAULT = 1.0
+        const val ENCHANT_SHARD_LOOTING_MULTIPLIER_PER_LEVEL_DEFAULT = 0.10
         const val STAGE_TRANSFER_BLINDNESS_TICKS = 60
         const val BARRIER_RETURN_HOLD_TICKS = 60
         const val MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT = 45
@@ -439,8 +441,10 @@ class ArenaManager(
     private var actionMarkerColorTransitionTicks = 16
     private var doorAnimationTotalTicks = DOOR_ANIMATION_TOTAL_TICKS_DEFAULT
     private var sharedWaveMaxAlive = SHARED_WAVE_MAX_ALIVE_DEFAULT
-    private var mobTokenDropChance = MOB_TOKEN_DROP_CHANCE
+    private var mobTokenDropChance = MOB_TOKEN_DROP_CHANCE_DEFAULT
     private var mobTokenLootingBonusPerLevel = MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT
+    private var enchantShardDropRateMultiplier = ENCHANT_SHARD_DROP_RATE_MULTIPLIER_DEFAULT
+    private var enchantShardLootingMultiplierPerLevel = ENCHANT_SHARD_LOOTING_MULTIPLIER_PER_LEVEL_DEFAULT
     private var arenaDoorAnimationSoundKey = "minecraft:block.iron_door.open"
     private var arenaDoorAnimationSoundPitch = 1.0f
     private var arenaMissionService: ArenaMissionService? = null
@@ -487,10 +491,12 @@ class ArenaManager(
 
     private fun loadBattleConfigs() {
         val dropFile = ensureArenaConfig("config/arena/drop.yml")
+        val rewardFile = ensureArenaConfig("config/arena/reward.yml")
         cachedEntranceLiftTemplate = null
 
         loadBarrierRestartConfig()
         loadArenaBgmConfig()
+        loadRewardConfig(rewardFile)
         loadMobDefinitions()
         loadDropConfig(dropFile)
     }
@@ -547,12 +553,6 @@ class ArenaManager(
             .coerceIn(0.5f, 2.0f)
         sharedWaveMaxAlive = config.getInt("arena.mob_spawn.system_max_alive", SHARED_WAVE_MAX_ALIVE_DEFAULT)
             .coerceAtLeast(1)
-        mobTokenDropChance = config
-            .getDouble("arena.mob_token_drop_chance", MOB_TOKEN_DROP_CHANCE)
-            .coerceIn(0.0, 1.0)
-        mobTokenLootingBonusPerLevel = config
-            .getDouble("arena.mob_token_looting_bonus_per_level", MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT)
-            .coerceAtLeast(0.0)
         maxConcurrentSessions = config
             .getInt("arena.session.max_concurrent", ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT)
             .coerceAtLeast(1)
@@ -562,6 +562,22 @@ class ArenaManager(
         cleanupBlocksPerTick = config
             .getInt("arena.world_pool.cleanup_blocks_per_tick", ARENA_CLEANUP_BLOCKS_PER_TICK_DEFAULT)
             .coerceAtLeast(1)
+    }
+
+    private fun loadRewardConfig(file: File) {
+        val config = YamlConfiguration.loadConfiguration(file)
+        mobTokenDropChance = config
+            .getDouble("mob_token.drop_chance", MOB_TOKEN_DROP_CHANCE_DEFAULT)
+            .coerceIn(0.0, 1.0)
+        mobTokenLootingBonusPerLevel = config
+            .getDouble("mob_token.looting_bonus_per_level", MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT)
+            .coerceAtLeast(0.0)
+        enchantShardDropRateMultiplier = config
+            .getDouble("enchant_shard.drop_rate_multiplier", ENCHANT_SHARD_DROP_RATE_MULTIPLIER_DEFAULT)
+            .coerceAtLeast(0.0)
+        enchantShardLootingMultiplierPerLevel = config
+            .getDouble("enchant_shard.looting_multiplier_per_level", ENCHANT_SHARD_LOOTING_MULTIPLIER_PER_LEVEL_DEFAULT)
+            .coerceAtLeast(0.0)
     }
 
     private fun loadArenaBgmConfig() {
@@ -3174,7 +3190,7 @@ class ArenaManager(
             rebuiltDrops += token
         }
 
-        createEnchantShardDrop(rewardPlayer, normalizedTypeId)?.let { shard ->
+        createEnchantShardDrop(rewardPlayer, normalizedTypeId, lootingLevel)?.let { shard ->
             rebuiltDrops += shard
         }
 
@@ -3255,7 +3271,7 @@ class ArenaManager(
         return CustomItemManager.createItemForPlayer(ArenaMobTokenItem(categoryTypeId), killer, 1)
     }
 
-    private fun createEnchantShardDrop(killer: Player, mobDefinitionId: String): ItemStack? {
+    private fun createEnchantShardDrop(killer: Player, mobDefinitionId: String, lootingLevel: Int): ItemStack? {
         val missionService = arenaMissionService ?: return null
         val candidateDefinitions = ArenaEnchantShardRegistry.getDropDefinitionsForMob(mobDefinitionId)
         if (candidateDefinitions.isEmpty()) {
@@ -3264,9 +3280,12 @@ class ArenaManager(
 
         val evaluated = candidateDefinitions.mapNotNull { definition ->
             val baseChance = definition.baseDropChance ?: return@mapNotNull null
+            val adjustedBaseChance = (baseChance * enchantShardDropRateMultiplier).coerceIn(0.0, 1.0)
             val previousCount = missionService.getEnchantShardKillCount(killer.uniqueId, definition.key, mobDefinitionId)
             val attemptCount = previousCount + 1
-            val finalChance = ArenaEnchantShardRegistry.calculateDropChance(baseChance, attemptCount)
+            val pityAdjustedChance = ArenaEnchantShardRegistry.calculateDropChance(adjustedBaseChance, attemptCount)
+            val lootingMultiplier = 1.0 + lootingLevel.coerceAtLeast(0).toDouble() * enchantShardLootingMultiplierPerLevel
+            val finalChance = (pityAdjustedChance * lootingMultiplier).coerceIn(0.0, 1.0)
             EvaluatedEnchantShardCandidate(definition, attemptCount, random.nextDouble() < finalChance)
         }
         if (evaluated.isEmpty()) {
