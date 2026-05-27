@@ -1,0 +1,24 @@
+rates:
+  skeleton: 0.09
+  zombie: 0.10
+  drowned: 0.11
+  spider: 0.17
+  husk: 0.22
+  bogged: 0.24
+  guardian: 0.28
+  wither_skeleton: 0.36
+  blaze: 0.42
+  slime: 0.43
+  silverfish: 0.81
+  spirit: 1.58
+  magma_cube: 1.66
+  witch: 1.76
+  iron_golem: 3.55
+  elder_guardian: 3.56
+  frog: 4.74
+  enderman: 4.95
+  shulker: 8.79
+  endermite: 10.15
+  bat: 14.65
+  creeper: 28.98
+  boomerang: 0.05

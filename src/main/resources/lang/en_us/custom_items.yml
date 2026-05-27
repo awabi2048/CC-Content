@@ -105,7 +105,7 @@ custom_items:
     mob_token:
       lore:
       - §7An item dropped by a monster that appears in the arena
-      - §7Exchange it for rewards in the arena lobby!
+      - §6🐿 §eacorns§7 can be exchanged for this!
       token_names:
         zombie: Zombie Head
         creeper: Creeper Gunpowder Pouch

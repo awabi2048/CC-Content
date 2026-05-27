@@ -86,12 +86,6 @@
       end_crystal_sentinel:
         weight: 1
         stat_multiplier: 1.9
-      enderman_phase:
-        weight: 1
-        stat_multiplier: 1.9
-      enderman_drain:
-        weight: 1
-        stat_multiplier: 1.9
   - wave: 5
     spawn_interval: 16
     clear_mob_count: 23
@@ -107,12 +101,6 @@
         weight: 1
         stat_multiplier: 1.9
       ender_eye_beam:
-        weight: 1
-        stat_multiplier: 1.9
-      enderman_mirror:
-        weight: 1
-        stat_multiplier: 1.9
-      enderman_eye_summoner:
         weight: 1
         stat_multiplier: 1.9
 
@@ -217,12 +205,6 @@ promoted:
       end_crystal_sentinel:
         weight: 1
         stat_multiplier: 2.6
-      enderman_phase:
-        weight: 1
-        stat_multiplier: 2.6
-      enderman_drain:
-        weight: 1
-        stat_multiplier: 2.6
   - wave: 5
     spawn_interval: 14
     clear_mob_count: 30
@@ -238,11 +220,5 @@ promoted:
         weight: 1
         stat_multiplier: 2.6
       ender_eye_beam:
-        weight: 1
-        stat_multiplier: 2.6
-      enderman_mirror:
-        weight: 1
-        stat_multiplier: 2.6
-      enderman_eye_summoner:
         weight: 1
         stat_multiplier: 2.6

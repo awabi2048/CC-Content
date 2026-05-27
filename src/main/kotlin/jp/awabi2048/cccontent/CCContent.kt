@@ -47,6 +47,7 @@ import jp.awabi2048.cccontent.features.arena.ArenaListener
 import jp.awabi2048.cccontent.features.arena.ArenaManager
 import jp.awabi2048.cccontent.features.arena.ArenaSessionInfoMenu
 import jp.awabi2048.cccontent.features.arena.ArenaEnchantPedestalMenu
+import jp.awabi2048.cccontent.features.arena.ArenaTokenExchangeMenu
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import jp.awabi2048.cccontent.features.brewery.BreweryFeature
 import jp.awabi2048.cccontent.features.cooking.CookingFeature
@@ -128,6 +129,7 @@ class CCContent : JavaPlugin(), Listener {
     private var arenaMissionService: ArenaMissionService? = null
     private var arenaSessionInfoMenu: ArenaSessionInfoMenu? = null
     private var arenaEnchantPedestalMenu: ArenaEnchantPedestalMenu? = null
+    private var arenaTokenExchangeMenu: ArenaTokenExchangeMenu? = null
     private lateinit var sharedMobService: MobService
     private lateinit var breweryFeature: BreweryFeature
     private lateinit var cookingFeature: CookingFeature
@@ -247,6 +249,7 @@ class CCContent : JavaPlugin(), Listener {
                     missionServiceProvider = { arenaMissionService },
                     arenaManagerProvider = { arenaManager }
                 )
+                arenaTokenExchangeMenu = ArenaTokenExchangeMenu(this).apply { initialize() }
                 arenaManager.setPedestalMenuProvider { arenaEnchantPedestalMenu }
                 arenaFeatureReady = true
             } catch (e: Exception) {
@@ -261,6 +264,7 @@ class CCContent : JavaPlugin(), Listener {
                 arenaMissionService = null
                 arenaSessionInfoMenu = null
                 arenaEnchantPedestalMenu = null
+                arenaTokenExchangeMenu = null
                 arenaFeatureReady = false
                 arenaFeatureFailureReason = e.message?.takeIf { it.isNotBlank() }
                     ?: "Arena feature の初期化に失敗しました"
@@ -337,6 +341,7 @@ class CCContent : JavaPlugin(), Listener {
                 missionService = arenaMissionService,
                 sessionInfoMenu = arenaSessionInfoMenu,
                 pedestalMenu = arenaEnchantPedestalMenu,
+                tokenExchangeMenu = arenaTokenExchangeMenu,
                 featureEnabledProvider = { arenaFeatureReady },
                 featureFailureReasonProvider = { arenaFeatureFailureReason }
             )
@@ -367,6 +372,9 @@ class CCContent : JavaPlugin(), Listener {
                 server.pluginManager.registerEvents(it, this)
             }
             arenaEnchantPedestalMenu?.let {
+                server.pluginManager.registerEvents(it, this)
+            }
+            arenaTokenExchangeMenu?.let {
                 server.pluginManager.registerEvents(it, this)
             }
         }
@@ -870,6 +878,7 @@ class CCContent : JavaPlugin(), Listener {
                 arenaMissionService?.shutdown()
                 arenaSessionInfoMenu = null
                 arenaEnchantPedestalMenu = null
+                arenaTokenExchangeMenu = null
                 if (::arenaManager.isInitialized) {
                     arenaManager.setMissionService(null)
                     arenaManager.shutdown()
@@ -926,6 +935,7 @@ class CCContent : JavaPlugin(), Listener {
         }
         if (arenaFeatureReady && ::arenaManager.isInitialized && isContentEnabledAtStartup("arena")) {
             arenaManager.reloadThemes()
+            arenaTokenExchangeMenu?.reload()
         }
 
         logger.info("[CCContent] config 配下の再読込を完了しました")

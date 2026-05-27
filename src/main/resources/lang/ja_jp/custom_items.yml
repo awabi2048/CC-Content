@@ -105,7 +105,7 @@ custom_items:
     mob_token:
       lore:
       - §7アリーナに出現するモンスターが落としたアイテム
-      - §7アリーナロビーで報酬と交換しよう！
+      - §6🐿 §eどんぐり§7と交換してもらおう！
       token_names:
         zombie: ゾンビの頭
         creeper: クリーパーの火薬袋

@@ -19,6 +19,11 @@ public final class ResourceConfigurationValidator {
     private static final Set<String> ALLOWED_EMPTY_CONFIGS = Set.of(
         "config/arena/mob_type.yml"
     );
+    private static final Set<String> REQUIRED_ARENA_TOKEN_EXCHANGE_RATES = Set.of(
+        "skeleton", "zombie", "drowned", "spider", "husk", "bogged", "guardian", "wither_skeleton",
+        "blaze", "slime", "silverfish", "spirit", "magma_cube", "witch", "iron_golem",
+        "elder_guardian", "frog", "enderman", "shulker", "endermite", "bat", "creeper", "boomerang"
+    );
 
     private ResourceConfigurationValidator() {
     }
@@ -37,6 +42,7 @@ public final class ResourceConfigurationValidator {
         validateIngredientDefinitions(configRoot, configs, errors);
         validateMobDefinitions(configRoot, configs, errors);
         validateArenaDropConfig(configRoot, configs, errors);
+        validateArenaTokenExchangeConfig(configRoot, configs, errors);
         validateArenaThemes(configRoot, configs, errors);
         validateRankJobExp(configRoot, configs, errors);
         validateRankJobs(configRoot, configs, errors);
@@ -228,6 +234,28 @@ public final class ResourceConfigurationValidator {
                 if (item.containsKey("chance")) {
                     requireRatio(item.get("chance"), file, path + ".chance", errors);
                 }
+            }
+        }
+    }
+
+    private static void validateArenaTokenExchangeConfig(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path file = configRoot.resolve("arena/token_exchange.yml");
+        Map<String, Object> root = rootMap(configs, file, errors);
+        if (root == null) {
+            errors.add(format("missing arena token exchange config", file, "<root>", "token exchange config is required"));
+            return;
+        }
+        Map<String, Object> rates = requireMap(root, "rates", file, errors, "rates");
+        if (rates == null) {
+            return;
+        }
+        requireNonEmpty(rates, file, "rates", errors);
+        for (Map.Entry<String, Object> entry : rates.entrySet()) {
+            requirePositiveNumber(entry.getValue(), file, "rates." + entry.getKey(), errors);
+        }
+        for (String categoryId : REQUIRED_ARENA_TOKEN_EXCHANGE_RATES) {
+            if (!rates.containsKey(categoryId)) {
+                errors.add(format("missing arena token exchange rate", file, "rates." + categoryId, "rate is required for generated token category"));
             }
         }
     }

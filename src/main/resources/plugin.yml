@@ -56,6 +56,9 @@ permissions:
   cc-content.arena.menu.pedestal:
     description: アリーナ祭壇メニューを開ける
     default: true
+  cc-content.arena.menu.token_exchange:
+    description: アリーナのモブドロップ交換メニューを開ける
+    default: true
   cc-content.npc.menu.open:
     description: NPCメニューを開ける
     default: op

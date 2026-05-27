@@ -44,7 +44,7 @@ arena:
       theme_none: '&e利用可能なテーマがありません'
       theme_list: '&6[Arena] 利用可能テーマ: {themes}'
       usage:
-        menu: '&c使用法: /arenaa menu <mission|broadcast|pedestal> [player]'
+        menu: '&c使用法: /arenaa menu <mission|broadcast|pedestal|token_exchange> [player]'
         lobby: '&c使用法: /arenaa lobby <player> [tutorial|main]'
         start: '&c使用法: /arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
         stop: '&c使用法: /arenaa stop <player>'
@@ -66,7 +66,7 @@ arena:
         invalid_mission_type: '&c無効なミッションタイプです: {type}'
       help:
         header: '&6=== Arena 管理コマンド ==='
-        menu: '&f/arenaa menu <mission|broadcast|pedestal> [player]'
+        menu: '&f/arenaa menu <mission|broadcast|pedestal|token_exchange> [player]'
         lobby: '&f/arenaa lobby <player> [tutorial|main]'
         start: '&f/arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
         stop: '&f/arenaa stop <player>'
@@ -237,6 +237,9 @@ arena:
       boss_defeated: §a掃討ボスを討伐しました！ミッションクリア！
       time_expired: §c時間切れ！掃討ボスを倒せませんでした...
       success: §a§l掃討ボスを全て討伐しました！ミッションクリア！
+    token_exchange:
+      completed: '§aモブドロップを {amount} §aと交換しました！'
+      failed: '&cどんぐりの付与に失敗したため、交換を中止しました。'
     mock:
       door_animation_start: '&7{message}'
       corridor_door_reinstall: '&7{message}'
@@ -269,6 +272,10 @@ arena:
         insufficient_power: §c祭壇の力が足りません
         missing_level: §8あと §a{value} レベル §8必要です
         consume_level: §8合成によって §a{value} レベル §8を消費します
+    token_exchange:
+      title: §8モブドロップ交換
+      empty_name: §bアリーナモブのドロップアイテムを、§6🐿 §eどんぐり§bと交換してもらえます
+      exchange_name: §6どんぐりと交換してもらう
     separator: §8§m――――――――――――――――――――
     coming_soon: §7Coming Soon!
     license_card:

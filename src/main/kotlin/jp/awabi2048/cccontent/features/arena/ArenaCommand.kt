@@ -24,6 +24,7 @@ class ArenaCommand(
     private val missionService: ArenaMissionService? = null,
     private val sessionInfoMenu: ArenaSessionInfoMenu? = null,
     private val pedestalMenu: ArenaEnchantPedestalMenu? = null,
+    private val tokenExchangeMenu: ArenaTokenExchangeMenu? = null,
     private val featureEnabledProvider: () -> Boolean = { true },
     private val featureFailureReasonProvider: () -> String? = { null }
 ) : CommandExecutor, TabCompleter {
@@ -37,7 +38,8 @@ class ArenaCommand(
     ) {
         MISSION("mission", { player -> ArenaPermissions.hasMissionMenuPermission(player) }),
         BROADCAST("broadcast", { player -> ArenaPermissions.hasBroadcastMenuPermission(player) }),
-        PEDESTAL("pedestal", { player -> ArenaPermissions.hasPedestalMenuPermission(player) });
+        PEDESTAL("pedestal", { player -> ArenaPermissions.hasPedestalMenuPermission(player) }),
+        TOKEN_EXCHANGE("token_exchange", { player -> ArenaPermissions.hasTokenExchangeMenuPermission(player) });
 
         companion object {
             fun fromId(id: String): ArenaMenuType? {
@@ -544,6 +546,16 @@ class ArenaCommand(
 
             ArenaMenuType.PEDESTAL -> {
                 val menu = pedestalMenu
+                if (menu == null) {
+                    sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable"))
+                    return true
+                }
+                menu.openMenu(target)
+                true
+            }
+
+            ArenaMenuType.TOKEN_EXCHANGE -> {
+                val menu = tokenExchangeMenu
                 if (menu == null) {
                     sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable"))
                     return true

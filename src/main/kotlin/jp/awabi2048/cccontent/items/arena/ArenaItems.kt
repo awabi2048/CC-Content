@@ -25,6 +25,10 @@ private val arenaItemKey by lazy {
     NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "arena_item")
 }
 
+private val arenaMobTokenCategoryKey by lazy {
+    NamespacedKey(Bukkit.getPluginManager().getPlugin("CC-Content")!!, "arena_mob_token_category")
+}
+
 abstract class ArenaSimpleItem(
     private val material: Material,
     private val modelData: Int?,
@@ -98,8 +102,15 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
         meta.lore(localizedLore.map { Component.text(it) })
         meta.setItemModel(itemModel)
         meta.persistentDataContainer.set(arenaItemKey, PersistentDataType.STRING, id)
+        meta.persistentDataContainer.set(arenaMobTokenCategoryKey, PersistentDataType.STRING, normalizedTypeId)
         item.itemMeta = meta
         return item
+    }
+
+    override fun updateLocalization(item: ItemStack, player: Player?) {
+        val categoryId = readCategoryId(item) ?: return
+        val localizedMeta = ArenaMobTokenItem(categoryId).createItemForPlayer(player, item.amount.coerceAtLeast(1)).itemMeta ?: return
+        item.itemMeta = localizedMeta
     }
 
     companion object {
@@ -111,7 +122,7 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
             val normalized = sanitizeMobTypeId(typeId)
             return when (normalized) {
                 "cave_spider" -> "spider"
-                "ashen_spirit", "water_spirit", "vex" -> "spirit"
+                "allay", "ashen_spirit", "water_spirit", "vex" -> "spirit"
                 "shulker_mimic", "shulker_warp_sniper" -> "shulker"
                 "boomerang" -> "boomerang"
                 else -> normalized
@@ -123,6 +134,15 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
         }
 
         fun supportedTokenCategoryTypeIds(): Set<String> = SUPPORTED_TOKEN_CATEGORY_TYPE_IDS
+
+        fun readCategoryId(item: ItemStack): String? {
+            val meta = item.itemMeta ?: return null
+            if (meta.persistentDataContainer.get(arenaItemKey, PersistentDataType.STRING) != "mob_token") {
+                return null
+            }
+            val categoryId = meta.persistentDataContainer.get(arenaMobTokenCategoryKey, PersistentDataType.STRING) ?: return null
+            return resolveTokenCategoryTypeId(categoryId).takeIf(::supportsTokenCategoryTypeId)
+        }
 
         private fun resolveItemModel(typeId: String): NamespacedKey {
             val normalized = resolveTokenCategoryTypeId(typeId)
@@ -176,8 +196,8 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
             "bogged",
             "stray",
             "bat",
-            "allay",
             "enderman",
+            "endermite",
             "shulker",
             "spirit",
             "frog",

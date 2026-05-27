@@ -9,6 +9,7 @@ object ArenaPermissions {
     const val MENU_MISSION = "cc-content.arena.menu.mission"
     const val MENU_BROADCAST = "cc-content.arena.menu.broadcast"
     const val MENU_PEDESTAL = "cc-content.arena.menu.pedestal"
+    const val MENU_TOKEN_EXCHANGE = "cc-content.arena.menu.token_exchange"
 
     const val LICENSE_PAPER = "cc-content.arena.license.paper"
     const val LICENSE_BRONZE = "cc-content.arena.license.bronze"
@@ -24,6 +25,8 @@ object ArenaPermissions {
     fun hasBroadcastMenuPermission(player: Player): Boolean = player.hasPermission(MENU_BROADCAST)
 
     fun hasPedestalMenuPermission(player: Player): Boolean = player.hasPermission(MENU_PEDESTAL)
+
+    fun hasTokenExchangeMenuPermission(player: Player): Boolean = player.hasPermission(MENU_TOKEN_EXCHANGE)
 
     fun hasAnyLicensePermission(player: Player): Boolean {
         return player.hasPermission(LICENSE_PAPER) ||

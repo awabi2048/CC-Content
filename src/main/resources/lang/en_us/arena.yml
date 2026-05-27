@@ -44,7 +44,7 @@ arena:
       theme_none: '&eNo themes are available'
       theme_list: '&6[Arena] Available themes: {themes}'
       usage:
-        menu: '&cUsage: /arenaa menu <mission|broadcast|pedestal> [player]'
+        menu: '&cUsage: /arenaa menu <mission|broadcast|pedestal|token_exchange> [player]'
         lobby: '&cUsage: /arenaa lobby <player> [tutorial|main]'
         theme: '&cUsage: /arenaa theme'
         start: '&cUsage: /arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
@@ -66,7 +66,7 @@ arena:
         invalid_mission_type: '&cInvalid mission type: {type}'
       help:
         header: '&6=== Arena Admin Commands ==='
-        menu: '&f/arenaa menu <mission|broadcast|pedestal> [player]'
+        menu: '&f/arenaa menu <mission|broadcast|pedestal|token_exchange> [player]'
         lobby: '&f/arenaa lobby <player> [tutorial|main]'
         start: '&f/arenaa start <player|@s|@near> <theme> <mission_type> [promoted]'
         stop: '&f/arenaa stop <player>'
@@ -235,6 +235,9 @@ arena:
       boss_defeated: §aSweep boss defeated! Mission clear!
       time_expired: §cTime ran out! Could not defeat the sweep boss...
       success: §a§lAll sweep bosses defeated! Mission clear!
+    token_exchange:
+      completed: '&aExchanged mob drops for {amount}&a!'
+      failed: '&cMob drop exchange was cancelled because payment failed.'
     mock:
       door_animation_start: '&7{message}'
       corridor_door_reinstall: '&7{message}'
@@ -267,6 +270,10 @@ arena:
         insufficient_power: §cThe altar lacks power
         missing_level: §8Need §a{value} levels §8more
         consume_level: §8Consumes §a{value} levels §8on forging
+    token_exchange:
+      title: §8Mob Drop Exchange
+      empty_name: §bArena mob drops can be exchanged for §6🐿 §eacorns
+      exchange_name: §6Have Mob Drops Exchanged for Acorns
     separator: §8§m――――――――――――――――――――
     coming_soon: §7Coming Soon!
     license_card:

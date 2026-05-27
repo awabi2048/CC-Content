@@ -1640,7 +1640,9 @@ class WaterSpiritMobType : EquipmentMobType(
             sharedCooldownTicks = 120L
         )
     )
-)
+) {
+    override val rewardCategoryId: String = "spirit"
+}
 
 class WaterSpiritEliteMobType : EquipmentMobType(
     id = "water_spirit_elite",
@@ -1657,7 +1659,9 @@ class WaterSpiritEliteMobType : EquipmentMobType(
             enhancedAmbientOrbit = true
         )
     )
-)
+) {
+    override val rewardCategoryId: String = "spirit"
+}
 
 class AshenSpiritMobType : EquipmentMobType(
     id = "ashen_spirit",
