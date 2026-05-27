@@ -360,12 +360,12 @@ arena:
         returning: §eリフト帰還中
         unavailable: §cリフト使用不可
       players_header: §f❙ §7参加プレイヤー
-      player_line: §7・ §b{name} {status}
+      player_line: §7・§b{name} {status}
       radio_header: §f❙ §7無線
       wave:
-        get_ready: §7« §6Wave ◯ (Last Wave) §7» §e到着！
+        get_ready: §e到着！
         normal: §7« §6Wave {wave} §7»
-        last: §7« §6Wave ◯ (Last Wave) §7»
+        last: §7« §6Last Wave §7»
         clear: §dCLEAR
   bossbar:
     join_countdown: §f開始まで §e{seconds} 秒

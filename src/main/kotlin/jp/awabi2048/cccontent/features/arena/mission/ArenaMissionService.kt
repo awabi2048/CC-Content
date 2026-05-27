@@ -366,7 +366,7 @@ class ArenaMissionService(
                 return@Runnable
             }
 
-            val inviteMissionTitle = "${missionDisplayName(mission.missionTypeId)}＠${themeDisplayName(player, mission.themeId)}"
+            val inviteMissionTitle = "${missionDisplayName(mission.missionTypeId)} @ ${themeDisplayName(player, mission.themeId)}"
             val inviteMissionLore = buildMissionConfirmLore(player, mission)
 
             // ミッションタイプに基づいてミッション修飾子を決定

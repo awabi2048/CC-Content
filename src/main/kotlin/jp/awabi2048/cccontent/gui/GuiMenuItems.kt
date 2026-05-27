@@ -61,6 +61,23 @@ object GuiMenuItems {
         }
     }
 
+    fun separator(lines: Collection<String>): String {
+        val maxWidth = lines.maxOfOrNull { displayWidth(stripColor(it)) } ?: 0
+        val separatorWidth = displayWidth("―").coerceAtLeast(1)
+        val count = ((((maxWidth + separatorWidth - 1) / separatorWidth) * 3 + 1) / 2).coerceAtLeast(1)
+        return "§8§m" + "―".repeat(count)
+    }
+
+    private fun stripColor(text: String): String = text.replace(Regex("[§&][0-9A-FK-ORa-fk-or]"), "")
+
+    private fun displayWidth(text: String): Int = text.sumOf { char ->
+        when {
+            char.code in 0x20..0x7E -> 6
+            char.code in 0xFF61..0xFF9F -> 6
+            else -> 12
+        }
+    }
+
     private fun legacy(text: String): Component {
         return LegacyComponentSerializer.legacySection().deserialize(text).decoration(TextDecoration.ITALIC, false)
     }

@@ -18,7 +18,6 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import java.util.UUID
-import kotlin.math.round
 
 object ArenaSessionInfoLayout {
     const val MENU_SIZE = 45
@@ -108,15 +107,17 @@ class ArenaSessionInfoMenu(
 
         val title = session.inviteMissionTitle
             ?: ArenaI18n.text(null, "arena.ui.broadcast.default_title")
-        meta.setDisplayName(title)
+        meta.setDisplayName(ArenaI18n.text(null, "arena.ui.mission.item_name", "mission" to title))
 
-        val lore = mutableListOf<String>()
-        val separator = ArenaI18n.text(null, "arena.ui.separator")
-        lore.add(separator)
-
-        val inGetReady = !session.stageStarted || session.startedWaves.isEmpty()
-        val waveLine = if (inGetReady) {
-            ArenaI18n.text(null, "arena.ui.broadcast.wave.get_ready")
+        val hasArrived = session.participants.any { playerId ->
+            Bukkit.getPlayer(playerId)?.world?.name == session.worldName
+        }
+        val waveLine = if (session.startedWaves.isEmpty()) {
+            if (hasArrived) {
+                ArenaI18n.text(null, "arena.ui.broadcast.wave.get_ready")
+            } else {
+                null
+            }
         } else {
             val displayWave = session.startedWaves.maxOrNull() ?: session.currentWave.coerceAtLeast(1)
             val isLastWave = displayWave >= session.waves
@@ -132,9 +133,6 @@ class ArenaSessionInfoMenu(
                 waveBase
             }
         }
-        lore.add(waveLine)
-        lore.add(separator)
-        lore.add(ArenaI18n.text(null, "arena.ui.broadcast.players_header"))
 
         val participantOrder = if (session.sidebarParticipantOrder.isNotEmpty()) {
             session.sidebarParticipantOrder
@@ -142,34 +140,38 @@ class ArenaSessionInfoMenu(
             session.participants.toList()
         }
 
-        for (playerId in participantOrder) {
+        val participantLines = participantOrder.map { playerId ->
             val name = Bukkit.getPlayer(playerId)?.name
                 ?: session.sidebarParticipantNames[playerId]
                 ?: "Unknown"
             val status = arenaManager.resolveParticipantStatus(session, playerId)
-            val statusStripped = status.replace("\u00a7.".toRegex(), "")
-            val onlinePlayer = Bukkit.getPlayer(playerId)
-            if (statusStripped == "ALIVE" && onlinePlayer != null && onlinePlayer.isOnline) {
-                val maxHealth = onlinePlayer.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH)?.value ?: 20.0
-                val currentHealth = onlinePlayer.health.coerceIn(0.0, maxHealth)
-                val hearts = (currentHealth / (maxHealth / 10.0)).let { round(it).toInt() }.coerceIn(0, 10)
-                val healthBar = "\u00a7c" + "\u2764".repeat(hearts) + "\u00a78" + "\u2764".repeat(10 - hearts)
-                lore.add(ArenaI18n.text(null, "arena.ui.broadcast.player_line", "name" to name, "status" to healthBar))
-            } else {
-                lore.add(ArenaI18n.text(null, "arena.ui.broadcast.player_line", "name" to name, "status" to status))
-            }
+            ArenaI18n.text(null, "arena.ui.broadcast.player_line", "name" to name, "status" to status)
         }
-
-        lore.add("")
-        lore.add(ArenaI18n.text(null, "arena.ui.broadcast.radio_header"))
 
         val lastMsg = session.lastOageMessage
-        if (lastMsg != null) {
-            lore.add("\u00a7a$lastMsg")
+        val radioLine = if (lastMsg != null) {
+            "\u00a7a$lastMsg"
         } else {
-            lore.add("\u00a77...")
+            "\u00a77..."
         }
 
+        val bodyLines = buildList {
+            waveLine?.let { add(it) }
+            add(ArenaI18n.text(null, "arena.ui.broadcast.players_header"))
+            addAll(participantLines)
+            add(ArenaI18n.text(null, "arena.ui.broadcast.radio_header"))
+            add(radioLine)
+        }
+        val separator = GuiMenuItems.separator(bodyLines)
+        val lore = mutableListOf<String>()
+        lore.add(separator)
+        waveLine?.let { lore.add(it) }
+        lore.add(separator)
+        lore.add(ArenaI18n.text(null, "arena.ui.broadcast.players_header"))
+        lore.addAll(participantLines)
+        lore.add("")
+        lore.add(ArenaI18n.text(null, "arena.ui.broadcast.radio_header"))
+        lore.add(radioLine)
         lore.add(separator)
         meta.lore = lore
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)

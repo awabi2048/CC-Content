@@ -821,26 +821,13 @@ class NpcMenuService(
     }
 
     private fun separator(lines: Collection<String>): String {
-        val maxWidth = lines.maxOfOrNull { displayWidth(stripColor(it)) } ?: 0
-        val separatorWidth = displayWidth("―").coerceAtLeast(1)
-        val count = ((((maxWidth + separatorWidth - 1) / separatorWidth) * 3 + 1) / 2).coerceAtLeast(1)
-        return "§8§m" + "―".repeat(count)
+        return GuiMenuItems.separator(lines)
     }
 
     private fun formatAcorn(amount: Double, color: String = "§e"): String = ContentEconomyBridge.formatAcorn(amount, color)
 
     private fun insufficientAcornLine(required: Double, balance: Double): String =
         "§6🐿 §c§n${ContentEconomyBridge.formatPrice(required)}§r §cどんぐりが足りません §7(手持ちの個数 ${formatAcorn(balance)}§7)"
-
-    private fun stripColor(text: String): String = text.replace(Regex("[§&][0-9A-FK-ORa-fk-or]"), "")
-
-    private fun displayWidth(text: String): Int = text.sumOf { char ->
-        when {
-            char.code in 0x20..0x7E -> 6
-            char.code in 0xFF61..0xFF9F -> 6
-            else -> 12
-        }
-    }
 
     private fun legacy(text: String): Component = LegacyComponentSerializer.legacySection().deserialize(text).decoration(TextDecoration.ITALIC, false)
 
