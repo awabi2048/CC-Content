@@ -8346,16 +8346,13 @@ class ArenaManager(
     }
 
     private fun buildWaveSidebarHeader(session: ArenaSession, wave: Int): String {
-        val base = if (wave >= session.waves) {
-            ArenaI18n.text(null, "arena.ui.sidebar.last_wave")
-        } else {
-            ArenaI18n.text(null, "arena.ui.sidebar.wave", "wave" to wave)
-        }
-        return if (session.clearedWaves.contains(wave)) {
-            "$base ${ArenaI18n.text(null, "arena.ui.sidebar.clear")}" 
-        } else {
-            base
-        }
+        return ArenaI18n.text(
+            null,
+            "arena.ui.sidebar.wave_progress",
+            "wave" to wave,
+            "current" to wave,
+            "total" to session.waves
+        )
     }
 
     private fun resolveSidebarParticipantStatus(session: ArenaSession, playerId: UUID): String {
@@ -8379,7 +8376,13 @@ class ArenaManager(
             !online.isDead &&
             online.world.name == session.worldName
         ) {
-            return "§c❤ ${online.health.roundToInt().coerceAtLeast(0)}"
+            val health = online.health.roundToInt().coerceAtLeast(0)
+            val absorption = online.absorptionAmount.roundToInt().coerceAtLeast(0)
+            return if (absorption > 0) {
+                "§c❤ $health §e+ $absorption"
+            } else {
+                "§c❤ $health"
+            }
         }
         return ArenaI18n.text(null, "arena.ui.sidebar.status_dead")
     }
