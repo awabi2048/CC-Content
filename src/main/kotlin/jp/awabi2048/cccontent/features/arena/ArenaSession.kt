@@ -48,6 +48,7 @@ enum class ArenaBgmMode {
 enum class ArenaLiftStatus {
     READY,
     OCCUPIED,
+    RETURNING,
     UNAVAILABLE
 }
 

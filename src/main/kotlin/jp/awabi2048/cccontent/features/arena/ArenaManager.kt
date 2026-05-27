@@ -412,6 +412,7 @@ class ArenaManager(
     private val lobbyTutorialMarkers = mutableMapOf<UUID, ArenaActionMarker>()
     private val lobbyTutorialHoldStates = mutableMapOf<UUID, ArenaActionMarkerHoldState>()
     private val liftOccupiedMarkerKeys = mutableSetOf<String>()
+    private val liftReturningMarkerKeys = mutableSetOf<String>()
     private val liftOccupiedWaiters = mutableSetOf<UUID>()
     private var maintenanceTask: BukkitTask? = null
     private var playerMonitorTask: BukkitTask? = null
@@ -774,11 +775,19 @@ class ArenaManager(
         }
 
         val liftMarkers = if (enableMultiplayerJoin) {
-            findNearbyLiftMarkers(target.location, multiplayerJoinMarkerSearchRadius)
+            findLoadedEntranceLiftMarkers()
         } else {
             emptyList()
         }
+        if (enableMultiplayerJoin && liftMarkers.size > 1) {
+            return completed(ArenaStartResult.Error(
+                "arena.messages.command.start_error.multiple_lifts"))
+        }
         if (enableMultiplayerJoin && !isEntranceLiftReady(liftMarkers)) {
+            return completed(ArenaStartResult.Error(
+                "arena.messages.command.start_error.lift_not_ready"))
+        }
+        if (enableMultiplayerJoin && !isNearEntranceLift(target.location, liftMarkers.single())) {
             return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.lift_not_ready"))
         }
@@ -1272,6 +1281,7 @@ class ArenaManager(
         invitedPlayerLocks.clear()
         inviteSwingCooldownUntilTick.clear()
         liftOccupiedMarkerKeys.clear()
+        liftReturningMarkerKeys.clear()
         liftOccupiedWaiters.clear()
         lobbyVisitedParticipants.clear()
         tutorialCompletedParticipants.clear()
@@ -1316,12 +1326,15 @@ class ArenaManager(
         return resolveSidebarParticipantStatus(session, playerId)
     }
 
-    fun getLiftStatusForSession(session: ArenaSession): ArenaLiftStatus {
-        val hasLiftMarkers = session.liftMarkerLocations.isNotEmpty()
-        val anyOccupied = session.liftMarkerLocations.any { loc -> liftOccupiedMarkerKeys.contains(liftMarkerKey(loc)) }
+    fun getEntranceLiftStatus(): ArenaLiftStatus {
+        val liftMarkers = findLoadedEntranceLiftMarkers()
+        if (liftMarkers.size != 1 || !isEntranceLiftReady(liftMarkers)) {
+            return ArenaLiftStatus.UNAVAILABLE
+        }
+        val markerKey = liftMarkerKey(liftMarkers.single())
         return when {
-            !hasLiftMarkers || !isEntranceLiftReady(session.liftMarkerLocations) -> ArenaLiftStatus.UNAVAILABLE
-            anyOccupied -> ArenaLiftStatus.OCCUPIED
+            liftReturningMarkerKeys.contains(markerKey) -> ArenaLiftStatus.RETURNING
+            liftOccupiedMarkerKeys.contains(markerKey) -> ArenaLiftStatus.OCCUPIED
             else -> ArenaLiftStatus.READY
         }
     }
@@ -7257,6 +7270,9 @@ class ArenaManager(
 
             if (!transferred && currentRise >= transferRise) {
                 transferred = true
+                session.liftMarkerLocations.forEach { loc ->
+                    liftReturningMarkerKeys.add(liftMarkerKey(loc))
+                }
                 teleportLiftParticipantsToStage(session, participants, stageWorld)
                 participants.forEach { player ->
                     session.arenaPreparingUntilMillisByParticipant.remove(player.uniqueId)
@@ -7573,14 +7589,18 @@ class ArenaManager(
         }
     }
 
-    private fun findNearbyLiftMarkers(origin: Location, radius: Double): List<Location> {
-        val world = origin.world ?: return emptyList()
-        return world.getNearbyEntities(origin, radius, radius, radius)
+    private fun findLoadedEntranceLiftMarkers(): List<Location> {
+        return Bukkit.getWorlds()
             .asSequence()
-            .filterIsInstance<Marker>()
+            .flatMap { world -> world.getEntitiesByClass(Marker::class.java).asSequence() }
             .filter { marker -> marker.scoreboardTags.contains("arena.marker.lift") }
-            .map { it.location.clone() }
+            .map { marker -> marker.location.clone() }
             .toList()
+    }
+
+    private fun isNearEntranceLift(origin: Location, marker: Location): Boolean {
+        if (origin.world?.uid != marker.world?.uid) return false
+        return origin.distanceSquared(marker) <= multiplayerJoinMarkerSearchRadius * multiplayerJoinMarkerSearchRadius
     }
 
     private fun liftMarkerKey(location: Location): String {
@@ -7590,7 +7610,9 @@ class ArenaManager(
 
     private fun releaseOccupiedLiftMarkers(session: ArenaSession) {
         session.liftMarkerLocations.forEach { loc ->
-            liftOccupiedMarkerKeys.remove(liftMarkerKey(loc))
+            val markerKey = liftMarkerKey(loc)
+            liftOccupiedMarkerKeys.remove(markerKey)
+            liftReturningMarkerKeys.remove(markerKey)
         }
     }
 
@@ -8012,7 +8034,7 @@ class ArenaManager(
             brokenWorldCount = worldStates[ArenaPoolWorldState.BROKEN] ?: 0,
             arenaWorldReady = readyArenaWorldNames.size,
             arenaWorldTotal = arenaPoolSize,
-            liftReady = sessionsByWorld.values.any { getLiftStatusForSession(it) == ArenaLiftStatus.READY },
+            liftReady = getEntranceLiftStatus() == ArenaLiftStatus.READY,
             lobbyReady = mainLobbyCount > 0 && tutorialStartCount > 0,
             lobbyMainReady = mainLobbyCount > 0,
             lobbyTutorialReady = tutorialStartCount > 0,

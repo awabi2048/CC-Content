@@ -2,6 +2,7 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import jp.awabi2048.cccontent.gui.GuiMenuItems
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -83,6 +84,7 @@ class ArenaSessionInfoMenu(
     }
 
     private fun render(inventory: Inventory) {
+        GuiMenuItems.fillFramed(inventory)
         val sessions = arenaManager.getActiveSessions()
         val maxSlots = ArenaSessionInfoLayout.SESSION_SLOTS.size
 
@@ -95,7 +97,7 @@ class ArenaSessionInfoMenu(
             }
         }
 
-        inventory.setItem(ArenaSessionInfoLayout.LIFT_SLOT, buildLiftItem(sessions))
+        inventory.setItem(ArenaSessionInfoLayout.LIFT_SLOT, buildLiftItem())
         inventory.setItem(ArenaSessionInfoLayout.INFO_SLOT, buildInfoItem())
     }
 
@@ -176,7 +178,7 @@ class ArenaSessionInfoMenu(
     }
 
     private fun buildEmptySlotItem(): ItemStack {
-        val item = ItemStack(Material.GRAY_STAINED_GLASS_PANE)
+        val item = ItemStack(Material.GLASS)
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(
             ArenaI18n.text(null, "arena.ui.broadcast.empty_slot")
@@ -187,32 +189,14 @@ class ArenaSessionInfoMenu(
         return item
     }
 
-    private fun buildLiftItem(sessions: List<ArenaSession>): ItemStack {
-        val hasAnySession = sessions.isNotEmpty()
-        val item: ItemStack
-        val displayName: String
-
-        if (!hasAnySession) {
-            item = ItemStack(Material.GRAY_STAINED_GLASS_PANE)
-            displayName = ArenaI18n.text(null, "arena.ui.broadcast.lift.no_session")
-        } else {
-            val anyReady = sessions.any { arenaManager.getLiftStatusForSession(it) == ArenaLiftStatus.READY }
-            val anyOccupied = sessions.any { arenaManager.getLiftStatusForSession(it) == ArenaLiftStatus.OCCUPIED }
-            when {
-                anyOccupied -> {
-                    item = ItemStack(Material.RED_STAINED_GLASS_PANE)
-                    displayName = ArenaI18n.text(null, "arena.ui.broadcast.lift.occupied")
-                }
-                anyReady -> {
-                    item = ItemStack(Material.GREEN_STAINED_GLASS_PANE)
-                    displayName = ArenaI18n.text(null, "arena.ui.broadcast.lift.ready")
-                }
-                else -> {
-                    item = ItemStack(Material.YELLOW_STAINED_GLASS_PANE)
-                    displayName = ArenaI18n.text(null, "arena.ui.broadcast.lift.preparing")
-                }
-            }
+    private fun buildLiftItem(): ItemStack {
+        val (material, displayName) = when (arenaManager.getEntranceLiftStatus()) {
+            ArenaLiftStatus.OCCUPIED -> Material.CHEST_MINECART to ArenaI18n.text(null, "arena.ui.broadcast.lift.occupied")
+            ArenaLiftStatus.READY -> Material.MINECART to ArenaI18n.text(null, "arena.ui.broadcast.lift.ready")
+            ArenaLiftStatus.RETURNING -> Material.FURNACE_MINECART to ArenaI18n.text(null, "arena.ui.broadcast.lift.returning")
+            ArenaLiftStatus.UNAVAILABLE -> Material.BARRIER to ArenaI18n.text(null, "arena.ui.broadcast.lift.unavailable")
         }
+        val item = ItemStack(material)
 
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(displayName)

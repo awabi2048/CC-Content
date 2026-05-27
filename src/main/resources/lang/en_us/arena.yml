@@ -58,6 +58,7 @@ arena:
         promoted_not_configured: '&ctheme ''{theme}'' has no promoted configuration'
         undefined_wave_spawn: '&ctheme ''{theme}'' has no spawn definition for wave {wave}'
         too_many_participants: '&cToo many participants ({count}/{max})'
+        multiple_lifts: '&cCannot start because multiple lift markers exist'
         lift_not_ready: '&cCannot start because the lift is not ready'
         lift_occupied: '&cCannot start because the lift is in use'
         lobby_marker_not_found: '&cCannot start because no lobby marker exists in loaded chunks'
@@ -342,19 +343,20 @@ arena:
         silver: Silver
         gold: Gold
     broadcast:
-      title: §8Arena Broadcast
+      title: §8⚡ Arena Radio ⚡
       default_title: §fArena Mission
       empty_slot: §eAvailable
       info:
         name: §bInfo
         lore:
-        - §7Oage-chan is supporting
-        - §7from the base
+        - §7The gatekeeper supports everyone
+        - §7inside the arena from the base,
+        - §7but cannot multitask for 4 or more parties.
       lift:
-        no_session: §8-
         occupied: §cLift in use
         ready: §aLift ready
-        preparing: §eLift preparing
+        returning: §eLift returning
+        unavailable: §cLift unavailable
       players_header: §f❙ §7Players
       player_line: §7・ §b{name} {status}
       radio_header: §f❙ §7Radio

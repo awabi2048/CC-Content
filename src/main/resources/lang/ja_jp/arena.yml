@@ -58,6 +58,7 @@ arena:
         promoted_not_configured: '&ctheme ''{theme}'' には promoted 設定がありません'
         undefined_wave_spawn: '&ctheme ''{theme}'' は wave {wave} のスポーンが未定義です'
         too_many_participants: '&c参加人数が上限を超えています ({count}/{max})'
+        multiple_lifts: '&cリフトマーカーが複数存在するため開始できません'
         lift_not_ready: '&cリフトの準備ができていないため開始できません'
         lift_occupied: '&cリフトが使用中のため開始できません'
         lobby_marker_not_found: '&cロビーマーカーが見つからないため開始できません'
@@ -344,19 +345,20 @@ arena:
         silver: シルバー
         gold: ゴールド
     broadcast:
-      title: §8アリーナ実況
+      title: §8⚡ アリーナ無線 ⚡
       default_title: §fアリーナミッション
       empty_slot: §e余裕あり
       info:
         name: §bInfo
         lore:
-        - §7おあげちゃんが基地から
-        - §7サポートを行っています
+        - §7門番さんは基地から、見えないところで
+        - §7アリーナ内の皆さんの支援をしています
+        - §74パーティー以上のマルチタスクは難しいとのことです
       lift:
-        no_session: §8-
         occupied: §cリフト使用中
         ready: §aリフト使用可
-        preparing: §eリフト準備中
+        returning: §eリフト帰還中
+        unavailable: §cリフト使用不可
       players_header: §f❙ §7参加プレイヤー
       player_line: §7・ §b{name} {status}
       radio_header: §f❙ §7無線
