@@ -4,6 +4,7 @@ import com.awabi2048.ccsystem.CCSystem
 import jp.awabi2048.cccontent.command.CCCommand
 import jp.awabi2048.cccontent.command.GiveCommand
 import jp.awabi2048.cccontent.config.CoreConfigManager
+import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemInteractionListener
 import jp.awabi2048.cccontent.items.CustomItemManager
@@ -245,7 +246,9 @@ class CCContent : JavaPlugin(), Listener {
                 arenaSessionInfoMenu = ArenaSessionInfoMenu(this, arenaManager)
                 arenaEnchantPedestalMenu = ArenaEnchantPedestalMenu(
                     plugin = this,
-                    coreConfigProvider = { coreConfig },
+                    overEnchanterConfigProvider = {
+                        FeatureConfigManager.load(this, FeatureConfigManager.ARENA_OVER_ENCHANTER_PATH)
+                    },
                     missionServiceProvider = { arenaMissionService },
                     arenaManagerProvider = { arenaManager }
                 )
@@ -585,7 +588,10 @@ class CCContent : JavaPlugin(), Listener {
 
             // 追加のランク系リスナー登録
             val minerListener = ProfessionMinerExpListener(this, rankManager, ignoreBlockStore)
-            val combatExpListener = ProfessionCombatExpListener(rankManager, coreConfig)
+            val combatExpListener = ProfessionCombatExpListener(
+                rankManager,
+                FeatureConfigManager.load(this, FeatureConfigManager.RANK_SETTINGS_PATH)
+            )
             server.pluginManager.registerEvents(minerListener, this)
             server.pluginManager.registerEvents(combatExpListener, this)
             

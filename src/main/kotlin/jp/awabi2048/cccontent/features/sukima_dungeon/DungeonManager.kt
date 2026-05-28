@@ -47,7 +47,12 @@ object DungeonManager {
             it.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, false)
             it.setGameRule(org.bukkit.GameRule.DO_WEATHER_CYCLE, false)
             it.time = 6000
-            WorldSettingsHelper.applyDistanceSettings(CCContent.instance, it, "sukima_dungeon.world_settings")
+            WorldSettingsHelper.applyDistanceSettings(
+                CCContent.instance,
+                it,
+                SukimaConfigHelper.getConfig(CCContent.instance),
+                "world_settings"
+            )
         }
         
         return world

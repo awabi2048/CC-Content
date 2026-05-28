@@ -9,7 +9,7 @@
 
 package jp.awabi2048.cccontent.features.arena
 
-import jp.awabi2048.cccontent.config.CoreConfigManager
+import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageGenerator
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageBuildException
 import jp.awabi2048.cccontent.features.arena.generator.ArenaTheme
@@ -328,8 +328,10 @@ class ArenaManager(
         const val ACTION_MARKER_CENTER_Y_OFFSET = -0.25
         const val BARRIER_MARKER_HOLD_TICKS = 60
         const val MIDDLE_RING_MAX_ANGULAR_VELOCITY = 0.14
-        const val MOB_TOKEN_DROP_CHANCE = 0.30
+        const val MOB_TOKEN_DROP_CHANCE_DEFAULT = 0.30
         const val MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT = 0.033
+        const val ENCHANT_SHARD_DROP_RATE_MULTIPLIER_DEFAULT = 1.0
+        const val ENCHANT_SHARD_LOOTING_MULTIPLIER_PER_LEVEL_DEFAULT = 0.10
         const val STAGE_TRANSFER_BLINDNESS_TICKS = 60
         const val BARRIER_RETURN_HOLD_TICKS = 60
         const val MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT = 45
@@ -439,8 +441,10 @@ class ArenaManager(
     private var actionMarkerColorTransitionTicks = 16
     private var doorAnimationTotalTicks = DOOR_ANIMATION_TOTAL_TICKS_DEFAULT
     private var sharedWaveMaxAlive = SHARED_WAVE_MAX_ALIVE_DEFAULT
-    private var mobTokenDropChance = MOB_TOKEN_DROP_CHANCE
+    private var mobTokenDropChance = MOB_TOKEN_DROP_CHANCE_DEFAULT
     private var mobTokenLootingBonusPerLevel = MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT
+    private var enchantShardDropRateMultiplier = ENCHANT_SHARD_DROP_RATE_MULTIPLIER_DEFAULT
+    private var enchantShardLootingMultiplierPerLevel = ENCHANT_SHARD_LOOTING_MULTIPLIER_PER_LEVEL_DEFAULT
     private var arenaDoorAnimationSoundKey = "minecraft:block.iron_door.open"
     private var arenaDoorAnimationSoundPitch = 1.0f
     private var arenaMissionService: ArenaMissionService? = null
@@ -487,89 +491,102 @@ class ArenaManager(
 
     private fun loadBattleConfigs() {
         val dropFile = ensureArenaConfig("config/arena/drop.yml")
+        val rewardFile = ensureArenaConfig(FeatureConfigManager.ARENA_REWARD_PATH)
         cachedEntranceLiftTemplate = null
 
         loadBarrierRestartConfig()
         loadArenaBgmConfig()
+        loadRewardConfig(rewardFile)
         loadMobDefinitions()
         loadDropConfig(dropFile)
     }
 
     private fun loadBarrierRestartConfig() {
-        val config = CoreConfigManager.get(plugin)
+        val config = FeatureConfigManager.load(plugin, FeatureConfigManager.ARENA_SETTINGS_PATH)
+        val missionConfig = FeatureConfigManager.load(plugin, FeatureConfigManager.ARENA_MISSION_PATH)
         barrierRestartConfig = BarrierRestartConfig(
-            defaultDurationSeconds = config.getInt("arena.barrier_restart.default_duration_seconds", 30).coerceAtLeast(1),
-            corruptionRatioBase = config.getDouble("arena.barrier_restart.corruption_ratio_base", 0.05).coerceAtLeast(0.0)
+            defaultDurationSeconds = missionConfig.getInt("barrier_restart.default_duration_seconds", 30).coerceAtLeast(1),
+            corruptionRatioBase = missionConfig.getDouble("barrier_restart.corruption_ratio_base", 0.05).coerceAtLeast(0.0)
         )
         multiplayerJoinGraceSeconds = config.getInt(
-            "arena.multiplayer.join_grace_seconds",
+            "multiplayer.join_grace_seconds",
             MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT
         ).coerceAtLeast(1)
         multiplayerJoinMarkerSearchRadius = config.getDouble(
-            "arena.multiplayer.join_marker_search_radius",
+            "multiplayer.join_marker_search_radius",
             MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
         ).coerceAtLeast(1.0)
         multiplayerInviteAutoDeclineDistance = config.getDouble(
-            "arena.multiplayer.invite_auto_decline_distance",
+            "multiplayer.invite_auto_decline_distance",
             multiplayerJoinMarkerSearchRadius
         ).coerceAtLeast(1.0)
         multiplayerStageBuildStepsPerTick = config
-            .getInt("arena.multiplayer.stage_build_steps_per_tick", 1)
+            .getInt("multiplayer.stage_build_steps_per_tick", 1)
             .coerceAtLeast(1)
         entranceLiftIntervalTicks = config
-            .getLong("arena.entrance_lift.interval_ticks", ENTRANCE_LIFT_INTERVAL_TICKS_DEFAULT)
+            .getLong("entrance_lift.interval_ticks", ENTRANCE_LIFT_INTERVAL_TICKS_DEFAULT)
             .coerceAtLeast(1L)
         entranceLiftMaxRiseBlocks = config
-            .getInt("arena.entrance_lift.max_rise_blocks", ENTRANCE_LIFT_MAX_RISE_BLOCKS_DEFAULT)
+            .getInt("entrance_lift.max_rise_blocks", ENTRANCE_LIFT_MAX_RISE_BLOCKS_DEFAULT)
             .coerceAtLeast(1)
         entranceLiftTransferRiseBlocks = config
-            .getInt("arena.entrance_lift.transfer_rise_blocks", ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT)
+            .getInt("entrance_lift.transfer_rise_blocks", ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT)
             .coerceIn(0, entranceLiftMaxRiseBlocks)
         downReviveHoldSeconds = config
-            .getInt("arena.down.revive_hold_seconds", DOWN_REVIVE_HOLD_SECONDS_DEFAULT)
+            .getInt("down.revive_hold_seconds", DOWN_REVIVE_HOLD_SECONDS_DEFAULT)
             .coerceAtLeast(1)
         downReviveRadius = config
-            .getDouble("arena.down.revive_radius", DOWN_REVIVE_RADIUS_DEFAULT)
+            .getDouble("down.revive_radius", DOWN_REVIVE_RADIUS_DEFAULT)
             .coerceAtLeast(1.0)
         downShulkerFollowIntervalTicks = config
-            .getLong("arena.down.shulker_follow_interval_ticks", DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT)
+            .getLong("down.shulker_follow_interval_ticks", DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT)
             .coerceAtLeast(1L)
-        doorAnimationTotalTicks = config.getInt("arena.door_animation.total_ticks", DOOR_ANIMATION_TOTAL_TICKS_DEFAULT)
+        doorAnimationTotalTicks = config.getInt("door_animation.total_ticks", DOOR_ANIMATION_TOTAL_TICKS_DEFAULT)
             .coerceAtLeast(1)
         arenaDoorAnimationSoundKey = config
-            .getString("arena.door_animation.sound.key", "minecraft:block.iron_door.open")
+            .getString("door_animation.sound.key", "minecraft:block.iron_door.open")
             ?.trim()
             .orEmpty()
             .ifBlank { "minecraft:block.iron_door.open" }
         arenaDoorAnimationSoundPitch = config
-            .getDouble("arena.door_animation.sound.pitch", 1.0)
+            .getDouble("door_animation.sound.pitch", 1.0)
             .toFloat()
             .coerceIn(0.5f, 2.0f)
-        sharedWaveMaxAlive = config.getInt("arena.mob_spawn.system_max_alive", SHARED_WAVE_MAX_ALIVE_DEFAULT)
+        sharedWaveMaxAlive = config.getInt("mob_spawn.system_max_alive", SHARED_WAVE_MAX_ALIVE_DEFAULT)
             .coerceAtLeast(1)
-        mobTokenDropChance = config
-            .getDouble("arena.mob_token_drop_chance", MOB_TOKEN_DROP_CHANCE)
-            .coerceIn(0.0, 1.0)
-        mobTokenLootingBonusPerLevel = config
-            .getDouble("arena.mob_token_looting_bonus_per_level", MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT)
-            .coerceAtLeast(0.0)
         maxConcurrentSessions = config
-            .getInt("arena.session.max_concurrent", ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT)
+            .getInt("session.max_concurrent", ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT)
             .coerceAtLeast(1)
         arenaPoolSize = config
-            .getInt("arena.world_pool.size", ARENA_POOL_SIZE_DEFAULT)
+            .getInt("world_pool.size", ARENA_POOL_SIZE_DEFAULT)
             .coerceAtLeast(maxConcurrentSessions)
         cleanupBlocksPerTick = config
-            .getInt("arena.world_pool.cleanup_blocks_per_tick", ARENA_CLEANUP_BLOCKS_PER_TICK_DEFAULT)
+            .getInt("world_pool.cleanup_blocks_per_tick", ARENA_CLEANUP_BLOCKS_PER_TICK_DEFAULT)
             .coerceAtLeast(1)
     }
 
+    private fun loadRewardConfig(file: File) {
+        val config = YamlConfiguration.loadConfiguration(file)
+        mobTokenDropChance = config
+            .getDouble("mob_token.drop_chance", MOB_TOKEN_DROP_CHANCE_DEFAULT)
+            .coerceIn(0.0, 1.0)
+        mobTokenLootingBonusPerLevel = config
+            .getDouble("mob_token.looting_bonus_per_level", MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT)
+            .coerceAtLeast(0.0)
+        enchantShardDropRateMultiplier = config
+            .getDouble("enchant_shard.drop_rate_multiplier", ENCHANT_SHARD_DROP_RATE_MULTIPLIER_DEFAULT)
+            .coerceAtLeast(0.0)
+        enchantShardLootingMultiplierPerLevel = config
+            .getDouble("enchant_shard.looting_multiplier_per_level", ENCHANT_SHARD_LOOTING_MULTIPLIER_PER_LEVEL_DEFAULT)
+            .coerceAtLeast(0.0)
+    }
+
     private fun loadArenaBgmConfig() {
-        val config = CoreConfigManager.get(plugin)
+        val config = FeatureConfigManager.load(plugin, FeatureConfigManager.ARENA_SETTINGS_PATH)
         arenaBgmConfig = ArenaBgmConfig(
             normal = parseArenaBgmTrackConfig(
                 config,
-                "arena.bgm.normal",
+                "bgm.normal",
                 ARENA_BGM_NORMAL_KEY_DEFAULT,
                 ARENA_BGM_NORMAL_BPM_DEFAULT,
                 ARENA_BGM_LOOP_BEATS_DEFAULT,
@@ -577,7 +594,7 @@ class ArenaManager(
             ),
             combat = parseArenaBgmTrackConfig(
                 config,
-                "arena.bgm.combat",
+                "bgm.combat",
                 ARENA_BGM_COMBAT_KEY_DEFAULT,
                 ARENA_BGM_COMBAT_BPM_DEFAULT,
                 ARENA_BGM_LOOP_BEATS_DEFAULT,
@@ -585,7 +602,7 @@ class ArenaManager(
             ),
             lobby = parseArenaBgmTrackConfig(
                 config,
-                "arena.bgm.lobby",
+                "bgm.lobby",
                 ARENA_BGM_LOBBY_KEY_DEFAULT,
                 ARENA_BGM_LOBBY_BPM_DEFAULT,
                 ARENA_BGM_LOOP_BEATS_DEFAULT,
@@ -3174,7 +3191,7 @@ class ArenaManager(
             rebuiltDrops += token
         }
 
-        createEnchantShardDrop(rewardPlayer, normalizedTypeId)?.let { shard ->
+        createEnchantShardDrop(rewardPlayer, normalizedTypeId, lootingLevel)?.let { shard ->
             rebuiltDrops += shard
         }
 
@@ -3255,7 +3272,7 @@ class ArenaManager(
         return CustomItemManager.createItemForPlayer(ArenaMobTokenItem(categoryTypeId), killer, 1)
     }
 
-    private fun createEnchantShardDrop(killer: Player, mobDefinitionId: String): ItemStack? {
+    private fun createEnchantShardDrop(killer: Player, mobDefinitionId: String, lootingLevel: Int): ItemStack? {
         val missionService = arenaMissionService ?: return null
         val candidateDefinitions = ArenaEnchantShardRegistry.getDropDefinitionsForMob(mobDefinitionId)
         if (candidateDefinitions.isEmpty()) {
@@ -3264,9 +3281,12 @@ class ArenaManager(
 
         val evaluated = candidateDefinitions.mapNotNull { definition ->
             val baseChance = definition.baseDropChance ?: return@mapNotNull null
+            val adjustedBaseChance = (baseChance * enchantShardDropRateMultiplier).coerceIn(0.0, 1.0)
             val previousCount = missionService.getEnchantShardKillCount(killer.uniqueId, definition.key, mobDefinitionId)
             val attemptCount = previousCount + 1
-            val finalChance = ArenaEnchantShardRegistry.calculateDropChance(baseChance, attemptCount)
+            val pityAdjustedChance = ArenaEnchantShardRegistry.calculateDropChance(adjustedBaseChance, attemptCount)
+            val lootingMultiplier = 1.0 + lootingLevel.coerceAtLeast(0).toDouble() * enchantShardLootingMultiplierPerLevel
+            val finalChance = (pityAdjustedChance * lootingMultiplier).coerceIn(0.0, 1.0)
             EvaluatedEnchantShardCandidate(definition, attemptCount, random.nextDouble() < finalChance)
         }
         if (evaluated.isEmpty()) {
@@ -6696,7 +6716,12 @@ class ArenaManager(
             setGameRule(GameRule.DO_WEATHER_CYCLE, false)
             setGameRule(GameRule.KEEP_INVENTORY, true)
             time = 18000
-            WorldSettingsHelper.applyDistanceSettings(plugin, this, "arena.world_settings")
+            WorldSettingsHelper.applyDistanceSettings(
+                plugin,
+                this,
+                FeatureConfigManager.load(plugin, FeatureConfigManager.ARENA_SETTINGS_PATH),
+                "world_settings"
+            )
         }
     }
 

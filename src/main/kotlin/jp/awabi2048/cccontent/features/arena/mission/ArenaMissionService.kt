@@ -2,7 +2,7 @@
 
 package jp.awabi2048.cccontent.features.arena.mission
 
-import jp.awabi2048.cccontent.CCContent
+import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.features.arena.ArenaAuditLogger
 import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.arena.ArenaMenuItems
@@ -461,23 +461,23 @@ class ArenaMissionService(
     }
 
     private fun loadGenerationConfig() {
-        val coreConfig = currentCoreConfig()
-        if (!coreConfig.contains("arena.mission.generate_count")) {
-            throw IllegalStateException("arena.mission.generate_count が見つかりません")
+        val missionConfig = currentMissionConfig()
+        if (!missionConfig.contains("mission.generate_count")) {
+            throw IllegalStateException("mission.generate_count が見つかりません")
         }
-        val configured = coreConfig.getInt("arena.mission.generate_count", MISSION_SLOT_LIMIT)
+        val configured = missionConfig.getInt("mission.generate_count", MISSION_SLOT_LIMIT)
         if (configured <= 0) {
-            throw IllegalStateException("arena.mission.generate_count が不正です: $configured")
+            throw IllegalStateException("mission.generate_count が不正です: $configured")
         }
         if (configured > MISSION_SLOT_LIMIT) {
-            throw IllegalStateException("arena.mission.generate_count がメニュー枠を超えています: $configured > $MISSION_SLOT_LIMIT")
+            throw IllegalStateException("mission.generate_count がメニュー枠を超えています: $configured > $MISSION_SLOT_LIMIT")
         }
         generateCount = configured
     }
 
     private fun loadStrongEnemyDefinitions() {
-        val coreConfig = currentCoreConfig()
-        val configured = coreConfig.getStringList("arena.license.strong_enemy_mob_type_ids")
+        val missionConfig = currentMissionConfig()
+        val configured = missionConfig.getStringList("license.strong_enemy_mob_type_ids")
             .map { it.trim().lowercase(Locale.ROOT) }
             .filter { it.isNotBlank() }
             .toSet()
@@ -505,9 +505,8 @@ class ArenaMissionService(
         return file
     }
 
-    private fun currentCoreConfig(): FileConfiguration {
-        return (plugin as? CCContent)?.getCoreConfig()
-            ?: throw IllegalStateException("CCContent core config が利用できません")
+    private fun currentMissionConfig(): FileConfiguration {
+        return FeatureConfigManager.load(plugin, FeatureConfigManager.ARENA_MISSION_PATH)
     }
 
     private fun generateAndSave(): ArenaMissionSet {
@@ -563,10 +562,10 @@ class ArenaMissionService(
     }
 
     private fun loadPromotionProbability(): Double {
-        val coreConfig = currentCoreConfig()
-        val value = coreConfig.getDouble("arena.mission.promotion_probability", -1.0)
+        val missionConfig = currentMissionConfig()
+        val value = missionConfig.getDouble("mission.promotion_probability", -1.0)
         if (value < 0.0 || value > 1.0) {
-            throw IllegalStateException("arena.mission.promotion_probability は0.0〜1.0である必要があります: $value")
+            throw IllegalStateException("mission.promotion_probability は0.0〜1.0である必要があります: $value")
         }
         return value
     }

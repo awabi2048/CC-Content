@@ -21,7 +21,7 @@ class ProfessionCombatExpListener(
     private val config: FileConfiguration,
 ) : Listener {
     companion object {
-        private const val EXP_MULTIPLIER_PATH = "rank.combat_exp.health_multiplier"
+        private const val EXP_MULTIPLIER_PATH = "combat_exp.health_multiplier"
     }
 
     @EventHandler(ignoreCancelled = true)
