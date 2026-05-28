@@ -9,18 +9,21 @@ import jp.awabi2048.cccontent.mob.event.CustomEntityMobSpawnEvent
 import jp.awabi2048.cccontent.mob.event.CustomMobSpawnEvent
 import org.bukkit.NamespacedKey
 import org.bukkit.Sound
+import org.bukkit.entity.AbstractWindCharge
 import org.bukkit.entity.AbstractArrow
 import org.bukkit.entity.EnderPearl
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
+import org.bukkit.event.block.BlockIgniteEvent
 import org.bukkit.event.entity.EntityDeathEvent
 import org.bukkit.event.entity.EntityDamageEvent
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent
 import org.bukkit.event.entity.EntityPotionEffectEvent
 import org.bukkit.event.entity.EntityRegainHealthEvent
+import org.bukkit.event.entity.ExplosionPrimeEvent
 import org.bukkit.event.entity.ProjectileLaunchEvent
 import org.bukkit.event.entity.EntityToggleGlideEvent
 import org.bukkit.event.entity.EntityShootBowEvent
@@ -151,6 +154,22 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     @EventHandler(ignoreCancelled = true)
     fun onBlockPlace(event: BlockPlaceEvent) {
         arenaManager.handleArenaBlockPlace(event)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onBlockIgnite(event: BlockIgniteEvent) {
+        if (event.cause != BlockIgniteEvent.IgniteCause.ARROW) return
+        if (arenaManager.isActiveSessionWorld(event.block.world.name)) {
+            event.isCancelled = true
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onExplosionPrime(event: ExplosionPrimeEvent) {
+        if (event.entity !is AbstractWindCharge) return
+        if (arenaManager.isActiveSessionWorld(event.entity.world.name)) {
+            event.isCancelled = true
+        }
     }
 
     @EventHandler

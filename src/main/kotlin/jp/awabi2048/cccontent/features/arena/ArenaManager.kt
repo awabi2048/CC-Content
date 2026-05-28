@@ -1339,6 +1339,10 @@ class ArenaManager(
         return sessionsByWorld.values.toList()
     }
 
+    fun isActiveSessionWorld(worldName: String): Boolean {
+        return sessionsByWorld.containsKey(worldName)
+    }
+
     fun resolveParticipantStatus(session: ArenaSession, playerId: UUID): String {
         return resolveSidebarParticipantStatus(session, playerId)
     }
