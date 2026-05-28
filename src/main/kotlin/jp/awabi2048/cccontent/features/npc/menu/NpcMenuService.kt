@@ -802,9 +802,7 @@ class NpcMenuService(
 
     private fun text(player: Player, key: String): String {
         val locale = ContentLocaleResolver.resolve(player)
-        return jp.awabi2048.cccontent.CCContent.languageManager.let { _ ->
-            com.awabi2048.ccsystem.CCSystem.getAPI().getI18nString("CC-Content:rank", locale, "gui.npc.oage_shrine.$key", emptyMap()).replace('&', '§')
-        }
+        return com.awabi2048.ccsystem.CCSystem.getAPI().getI18nString("CC-Content:rank", locale, "gui.npc.oage_shrine.$key", emptyMap()).replace('&', '§')
     }
 
     private fun list(player: Player, key: String): List<String> {

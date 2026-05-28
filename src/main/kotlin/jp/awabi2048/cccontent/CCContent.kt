@@ -168,6 +168,8 @@ class CCContent : JavaPlugin(), Listener {
         validateAndRegisterLanguageSources()
         contentEnabledAtStartup = loadContentEnabledSettings()
 
+        languageManager = LanguageLoader(this, "ja_jp")
+
         featureInitLogger = FeatureInitializationLogger(logger)
         featureInitLogger.registerFeature("Rank System")
         featureInitLogger.registerFeature("Brewery")
@@ -544,9 +546,7 @@ class CCContent : JavaPlugin(), Listener {
             rankManagerInstance = rankManager
 
             // 言語ファイルを読み込み
-            val languageLoader = LanguageLoader(this, "ja_jp")
-            languageManager = languageLoader
-            val messageProvider = MessageProviderImpl(languageLoader)
+            val messageProvider = MessageProviderImpl(languageManager)
             rankManager.setMessageProvider(messageProvider)
             rankManager.initBossBarManager(this)
 
