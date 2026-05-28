@@ -1,0 +1,42 @@
+mission:
+  generate_count: 14
+  promotion_probability: 0.25
+
+license:
+  strong_enemy_mob_type_ids:
+    - "witch_elite"
+    - "water_spirit"
+    - "ashen_spirit"
+    - "frog_big"
+    - "spider_broodmother"
+    - "guardian_beam_burst"
+
+barrier_restart:
+  default_duration_seconds: 30
+  corruption_ratio_base: 0.05
+
+mission_charactor_config:
+  none:
+    weight: 70
+    spawn_interval_multiplier: 1.0
+    max_summon_count_multiplier: 1.0
+    clear_mob_count_multiplier: 1.0
+    mob_stats_multiplier:
+      health: 1.0
+      attack: 1.0
+  legion:
+    weight: 15
+    spawn_interval_multiplier: 0.5
+    max_summon_count_multiplier: 1.5
+    clear_mob_count_multiplier: 1.5
+    mob_stats_multiplier:
+      health: 0.75
+      attack: 0.75
+  elite:
+    weight: 15
+    spawn_interval_multiplier: 0.5
+    max_summon_count_multiplier: 0.75
+    clear_mob_count_multiplier: 0.75
+    mob_stats_multiplier:
+      health: 1.5
+      attack: 1.5

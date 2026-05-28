@@ -1,13 +1,11 @@
 package jp.awabi2048.cccontent.world
 
-import jp.awabi2048.cccontent.config.CoreConfigManager
 import org.bukkit.World
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 
 object WorldSettingsHelper {
-    fun applyDistanceSettings(plugin: JavaPlugin, world: World, pathPrefix: String) {
-        val config = CoreConfigManager.get(plugin)
+    fun applyDistanceSettings(plugin: JavaPlugin, world: World, config: FileConfiguration, pathPrefix: String) {
         applyDistance(plugin, world, config, "$pathPrefix.view_distance") { value ->
             world.viewDistance = value
         }

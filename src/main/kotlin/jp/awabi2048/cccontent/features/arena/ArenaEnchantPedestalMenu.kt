@@ -181,7 +181,7 @@ private data class ViewerRuntime(
 
 class ArenaEnchantPedestalMenu(
     private val plugin: JavaPlugin,
-    private val coreConfigProvider: () -> FileConfiguration,
+    private val overEnchanterConfigProvider: () -> FileConfiguration,
     private val missionServiceProvider: () -> ArenaMissionService?,
     private val arenaManagerProvider: () -> ArenaManager? = { null }
 ) : Listener {
@@ -1752,14 +1752,14 @@ class ArenaEnchantPedestalMenu(
         val path = when (catalyst.effectType) {
             ArenaEnchantShardEffectType.LIMIT_BREAKING -> {
                 val level = catalyst.overLevel ?: return null
-                "arena.over_enchanter.limit_breaking.${catalyst.primaryEnchantmentId}.$level"
+                "limit_breaking.${catalyst.primaryEnchantmentId}.$level"
             }
 
-            ArenaEnchantShardEffectType.INCOMPATIBLE_COMBINATION -> "arena.over_enchanter.incompatible_combination.${catalyst.setKey}"
-            ArenaEnchantShardEffectType.INVALID_TARGET_ATTACH -> "arena.over_enchanter.invalid_target_attach.${catalyst.primaryEnchantmentId}"
+            ArenaEnchantShardEffectType.INCOMPATIBLE_COMBINATION -> "incompatible_combination.${catalyst.setKey}"
+            ArenaEnchantShardEffectType.INVALID_TARGET_ATTACH -> "invalid_target_attach.${catalyst.primaryEnchantmentId}"
             ArenaEnchantShardEffectType.CUSTOM_ENCHANT_ATTACH -> return null
         }
-        val value = coreConfigProvider().getInt(path, -1)
+        val value = overEnchanterConfigProvider().getInt(path, -1)
         return value.takeIf { it > 0 }
     }
 
@@ -1942,7 +1942,7 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun resolveSlotUnlockThresholds(): Map<Int, Int> {
-        val section = coreConfigProvider().getConfigurationSection("arena.over_enchanter.slot_unlocks")
+        val section = overEnchanterConfigProvider().getConfigurationSection("slot_unlocks")
         if (section == null) {
             return DEFAULT_SLOT_UNLOCKS
         }

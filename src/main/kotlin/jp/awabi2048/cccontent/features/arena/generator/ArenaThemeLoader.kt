@@ -1,6 +1,6 @@
 package jp.awabi2048.cccontent.features.arena.generator
 
-import jp.awabi2048.cccontent.config.CoreConfigManager
+import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import org.bukkit.Bukkit
@@ -394,14 +394,14 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             fallback?.iconMaterial ?: Material.PAPER
         }
 
-        val coreConfig = CoreConfigManager.get(plugin)
-        val defaultDoorSoundKey = coreConfig
-            .getString("arena.door_animation.sound.key", "minecraft:block.iron_door.open")
+        val settingsConfig = FeatureConfigManager.load(plugin, FeatureConfigManager.ARENA_SETTINGS_PATH)
+        val defaultDoorSoundKey = settingsConfig
+            .getString("door_animation.sound.key", "minecraft:block.iron_door.open")
             ?.trim()
             .orEmpty()
             .ifBlank { "minecraft:block.iron_door.open" }
-        val defaultDoorSoundPitch = coreConfig
-            .getDouble("arena.door_animation.sound.pitch", 1.0)
+        val defaultDoorSoundPitch = settingsConfig
+            .getDouble("door_animation.sound.pitch", 1.0)
             .toFloat()
             .coerceIn(0.5f, 2.0f)
         val doorSoundSection = section.getConfigurationSection("door_open_sound")

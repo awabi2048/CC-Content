@@ -9,7 +9,7 @@
 
 package jp.awabi2048.cccontent.features.arena
 
-import jp.awabi2048.cccontent.config.CoreConfigManager
+import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageGenerator
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageBuildException
 import jp.awabi2048.cccontent.features.arena.generator.ArenaTheme
@@ -491,7 +491,7 @@ class ArenaManager(
 
     private fun loadBattleConfigs() {
         val dropFile = ensureArenaConfig("config/arena/drop.yml")
-        val rewardFile = ensureArenaConfig("config/arena/reward.yml")
+        val rewardFile = ensureArenaConfig(FeatureConfigManager.ARENA_REWARD_PATH)
         cachedEntranceLiftTemplate = null
 
         loadBarrierRestartConfig()
@@ -502,65 +502,66 @@ class ArenaManager(
     }
 
     private fun loadBarrierRestartConfig() {
-        val config = CoreConfigManager.get(plugin)
+        val config = FeatureConfigManager.load(plugin, FeatureConfigManager.ARENA_SETTINGS_PATH)
+        val missionConfig = FeatureConfigManager.load(plugin, FeatureConfigManager.ARENA_MISSION_PATH)
         barrierRestartConfig = BarrierRestartConfig(
-            defaultDurationSeconds = config.getInt("arena.barrier_restart.default_duration_seconds", 30).coerceAtLeast(1),
-            corruptionRatioBase = config.getDouble("arena.barrier_restart.corruption_ratio_base", 0.05).coerceAtLeast(0.0)
+            defaultDurationSeconds = missionConfig.getInt("barrier_restart.default_duration_seconds", 30).coerceAtLeast(1),
+            corruptionRatioBase = missionConfig.getDouble("barrier_restart.corruption_ratio_base", 0.05).coerceAtLeast(0.0)
         )
         multiplayerJoinGraceSeconds = config.getInt(
-            "arena.multiplayer.join_grace_seconds",
+            "multiplayer.join_grace_seconds",
             MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT
         ).coerceAtLeast(1)
         multiplayerJoinMarkerSearchRadius = config.getDouble(
-            "arena.multiplayer.join_marker_search_radius",
+            "multiplayer.join_marker_search_radius",
             MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
         ).coerceAtLeast(1.0)
         multiplayerInviteAutoDeclineDistance = config.getDouble(
-            "arena.multiplayer.invite_auto_decline_distance",
+            "multiplayer.invite_auto_decline_distance",
             multiplayerJoinMarkerSearchRadius
         ).coerceAtLeast(1.0)
         multiplayerStageBuildStepsPerTick = config
-            .getInt("arena.multiplayer.stage_build_steps_per_tick", 1)
+            .getInt("multiplayer.stage_build_steps_per_tick", 1)
             .coerceAtLeast(1)
         entranceLiftIntervalTicks = config
-            .getLong("arena.entrance_lift.interval_ticks", ENTRANCE_LIFT_INTERVAL_TICKS_DEFAULT)
+            .getLong("entrance_lift.interval_ticks", ENTRANCE_LIFT_INTERVAL_TICKS_DEFAULT)
             .coerceAtLeast(1L)
         entranceLiftMaxRiseBlocks = config
-            .getInt("arena.entrance_lift.max_rise_blocks", ENTRANCE_LIFT_MAX_RISE_BLOCKS_DEFAULT)
+            .getInt("entrance_lift.max_rise_blocks", ENTRANCE_LIFT_MAX_RISE_BLOCKS_DEFAULT)
             .coerceAtLeast(1)
         entranceLiftTransferRiseBlocks = config
-            .getInt("arena.entrance_lift.transfer_rise_blocks", ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT)
+            .getInt("entrance_lift.transfer_rise_blocks", ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT)
             .coerceIn(0, entranceLiftMaxRiseBlocks)
         downReviveHoldSeconds = config
-            .getInt("arena.down.revive_hold_seconds", DOWN_REVIVE_HOLD_SECONDS_DEFAULT)
+            .getInt("down.revive_hold_seconds", DOWN_REVIVE_HOLD_SECONDS_DEFAULT)
             .coerceAtLeast(1)
         downReviveRadius = config
-            .getDouble("arena.down.revive_radius", DOWN_REVIVE_RADIUS_DEFAULT)
+            .getDouble("down.revive_radius", DOWN_REVIVE_RADIUS_DEFAULT)
             .coerceAtLeast(1.0)
         downShulkerFollowIntervalTicks = config
-            .getLong("arena.down.shulker_follow_interval_ticks", DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT)
+            .getLong("down.shulker_follow_interval_ticks", DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT)
             .coerceAtLeast(1L)
-        doorAnimationTotalTicks = config.getInt("arena.door_animation.total_ticks", DOOR_ANIMATION_TOTAL_TICKS_DEFAULT)
+        doorAnimationTotalTicks = config.getInt("door_animation.total_ticks", DOOR_ANIMATION_TOTAL_TICKS_DEFAULT)
             .coerceAtLeast(1)
         arenaDoorAnimationSoundKey = config
-            .getString("arena.door_animation.sound.key", "minecraft:block.iron_door.open")
+            .getString("door_animation.sound.key", "minecraft:block.iron_door.open")
             ?.trim()
             .orEmpty()
             .ifBlank { "minecraft:block.iron_door.open" }
         arenaDoorAnimationSoundPitch = config
-            .getDouble("arena.door_animation.sound.pitch", 1.0)
+            .getDouble("door_animation.sound.pitch", 1.0)
             .toFloat()
             .coerceIn(0.5f, 2.0f)
-        sharedWaveMaxAlive = config.getInt("arena.mob_spawn.system_max_alive", SHARED_WAVE_MAX_ALIVE_DEFAULT)
+        sharedWaveMaxAlive = config.getInt("mob_spawn.system_max_alive", SHARED_WAVE_MAX_ALIVE_DEFAULT)
             .coerceAtLeast(1)
         maxConcurrentSessions = config
-            .getInt("arena.session.max_concurrent", ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT)
+            .getInt("session.max_concurrent", ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT)
             .coerceAtLeast(1)
         arenaPoolSize = config
-            .getInt("arena.world_pool.size", ARENA_POOL_SIZE_DEFAULT)
+            .getInt("world_pool.size", ARENA_POOL_SIZE_DEFAULT)
             .coerceAtLeast(maxConcurrentSessions)
         cleanupBlocksPerTick = config
-            .getInt("arena.world_pool.cleanup_blocks_per_tick", ARENA_CLEANUP_BLOCKS_PER_TICK_DEFAULT)
+            .getInt("world_pool.cleanup_blocks_per_tick", ARENA_CLEANUP_BLOCKS_PER_TICK_DEFAULT)
             .coerceAtLeast(1)
     }
 
@@ -581,11 +582,11 @@ class ArenaManager(
     }
 
     private fun loadArenaBgmConfig() {
-        val config = CoreConfigManager.get(plugin)
+        val config = FeatureConfigManager.load(plugin, FeatureConfigManager.ARENA_SETTINGS_PATH)
         arenaBgmConfig = ArenaBgmConfig(
             normal = parseArenaBgmTrackConfig(
                 config,
-                "arena.bgm.normal",
+                "bgm.normal",
                 ARENA_BGM_NORMAL_KEY_DEFAULT,
                 ARENA_BGM_NORMAL_BPM_DEFAULT,
                 ARENA_BGM_LOOP_BEATS_DEFAULT,
@@ -593,7 +594,7 @@ class ArenaManager(
             ),
             combat = parseArenaBgmTrackConfig(
                 config,
-                "arena.bgm.combat",
+                "bgm.combat",
                 ARENA_BGM_COMBAT_KEY_DEFAULT,
                 ARENA_BGM_COMBAT_BPM_DEFAULT,
                 ARENA_BGM_LOOP_BEATS_DEFAULT,
@@ -601,7 +602,7 @@ class ArenaManager(
             ),
             lobby = parseArenaBgmTrackConfig(
                 config,
-                "arena.bgm.lobby",
+                "bgm.lobby",
                 ARENA_BGM_LOBBY_KEY_DEFAULT,
                 ARENA_BGM_LOBBY_BPM_DEFAULT,
                 ARENA_BGM_LOOP_BEATS_DEFAULT,
@@ -6715,7 +6716,12 @@ class ArenaManager(
             setGameRule(GameRule.DO_WEATHER_CYCLE, false)
             setGameRule(GameRule.KEEP_INVENTORY, true)
             time = 18000
-            WorldSettingsHelper.applyDistanceSettings(plugin, this, "arena.world_settings")
+            WorldSettingsHelper.applyDistanceSettings(
+                plugin,
+                this,
+                FeatureConfigManager.load(plugin, FeatureConfigManager.ARENA_SETTINGS_PATH),
+                "world_settings"
+            )
         }
     }
 

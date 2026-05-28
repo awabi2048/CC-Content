@@ -1,6 +1,5 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
-import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureBuilder
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureLoader
@@ -154,7 +153,7 @@ class SukimaDungeon : JavaPlugin(), Listener {
     }
 
     fun reloadPlugin() {
-        CoreConfigManager.load(this)
+        SukimaConfigHelper.reload(this)
         
         // Load messages
         MessageManager.load(this)

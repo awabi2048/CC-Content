@@ -1,0 +1,57 @@
+bgm:
+  target_state_switch_threshold_seconds: 10
+  normal:
+    key: "kota_server:ost_3.sukima_dungeon"
+    bpm: 120
+    loop_beats: 384
+    switch_interval_beats: 8
+    pitch: 1.0
+  combat:
+    key: "kota_server:ost_4.arena"
+    bpm: 140
+    loop_beats: 384
+    switch_interval_beats: 8
+    pitch: 1.0
+  lobby:
+    key: "kota_server:ost_3.sukima_dungeon"
+    bpm: 120
+    loop_beats: 384
+    switch_interval_beats: 8
+    pitch: 0.8409
+
+multiplayer:
+  join_grace_seconds: 45
+  join_marker_search_radius: 16.0
+  invite_auto_decline_distance: 16.0
+  stage_build_steps_per_tick: 1
+
+entrance_lift:
+  interval_ticks: 10
+  transfer_rise_blocks: 10
+  max_rise_blocks: 17
+
+session:
+  max_concurrent: 3
+
+world_pool:
+  size: 3
+  cleanup_blocks_per_tick: 300
+
+down:
+  revive_hold_seconds: 3
+  revive_radius: 2.5
+  shulker_follow_interval_ticks: 2
+
+mob_spawn:
+  system_max_alive: 128
+
+door_animation:
+  total_ticks: 40
+  sound:
+    key: "minecraft:block.iron_door.open"
+    pitch: 1.0
+
+world_settings:
+  view_distance: 6
+  simulation_distance: 4
+  send_view_distance: -1

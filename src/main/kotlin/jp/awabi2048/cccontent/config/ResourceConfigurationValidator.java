@@ -39,12 +39,16 @@ public final class ResourceConfigurationValidator {
         List<String> errors = new ArrayList<>();
         validateNonEmptyConfigs(configRoot, configs, errors);
         validateCoreConfig(configRoot, configs, errors);
+        validateArenaSettingsConfig(configRoot, configs, errors);
+        validateArenaMissionConfig(configRoot, configs, errors);
+        validateArenaOverEnchanterConfig(configRoot, configs, errors);
         validateIngredientDefinitions(configRoot, configs, errors);
         validateMobDefinitions(configRoot, configs, errors);
         validateArenaDropConfig(configRoot, configs, errors);
         validateArenaRewardConfig(configRoot, configs, errors);
         validateArenaTokenExchangeConfig(configRoot, configs, errors);
         validateArenaThemes(configRoot, configs, errors);
+        validateRankSettingsConfig(configRoot, configs, errors);
         validateRankJobExp(configRoot, configs, errors);
         validateRankJobs(configRoot, configs, errors);
         validateTutorialTasks(configRoot, configs, errors);
@@ -110,42 +114,77 @@ public final class ResourceConfigurationValidator {
         if (persistence != null) {
             requirePositiveNumber(persistence, "flush_interval_minutes", file, "persistence.flush_interval_minutes", errors);
         }
-        Map<String, Object> sukima = requireMap(root, "sukima_dungeon", file, errors);
-        if (sukima != null) {
-            Map<String, Object> sizes = requireMap(sukima, "sizes", file, errors);
-            if (sizes != null) {
-                requireNonEmpty(sizes, file, "sukima_dungeon.sizes", errors);
-                for (Map.Entry<String, Object> entry : sizes.entrySet()) {
-                    Map<String, Object> size = asMap(entry.getValue());
-                    if (size == null) {
-                        errors.add(format("invalid config value", file, "sukima_dungeon.sizes." + entry.getKey(), "size entry must be a section"));
-                        continue;
-                    }
-                    String path = "sukima_dungeon.sizes." + entry.getKey();
-                    requirePositiveNumber(size, "tiles", file, path + ".tiles", errors);
-                    requirePositiveNumber(size, "duration", file, path + ".duration", errors);
-                    requireNonNegativeNumber(size, "npc_base_count", file, path + ".npc_base_count", errors);
-                    requireNonNegativeNumber(size, "sprout_base_count", file, path + ".sprout_base_count", errors);
-                }
-            }
+    }
+
+    private static void validateArenaSettingsConfig(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path file = configRoot.resolve("arena/settings.yml");
+        Map<String, Object> root = rootMap(configs, file, errors);
+        if (root == null) {
+            errors.add(format("missing arena settings config", file, "<root>", "settings config is required"));
+            return;
         }
-        Map<String, Object> arena = requireMap(root, "arena", file, errors);
-        if (arena != null) {
-            requireMap(arena, "bgm", file, errors);
-            requireMap(arena, "mission", file, errors);
-            Map<String, Object> session = requireMap(arena, "session", file, errors);
-            if (session != null) {
-                requirePositiveNumber(session, "max_concurrent", file, "arena.session.max_concurrent", errors);
-            }
-            Map<String, Object> worldPool = requireMap(arena, "world_pool", file, errors);
-            if (worldPool != null) {
-                requirePositiveNumber(worldPool, "size", file, "arena.world_pool.size", errors);
-                requirePositiveNumber(worldPool, "cleanup_blocks_per_tick", file, "arena.world_pool.cleanup_blocks_per_tick", errors);
-            }
+        requireMap(root, "bgm", file, errors);
+        requireMap(root, "multiplayer", file, errors);
+        requireMap(root, "entrance_lift", file, errors);
+        requireMap(root, "down", file, errors);
+        requireMap(root, "mob_spawn", file, errors);
+        requireMap(root, "door_animation", file, errors);
+        requireMap(root, "world_settings", file, errors);
+        Map<String, Object> session = requireMap(root, "session", file, errors);
+        if (session != null) {
+            requirePositiveNumber(session, "max_concurrent", file, "session.max_concurrent", errors);
         }
-        Map<String, Object> rank = requireMap(root, "rank", file, errors);
-        if (rank != null) {
-            requireMap(rank, "combat_exp", file, errors);
+        Map<String, Object> worldPool = requireMap(root, "world_pool", file, errors);
+        if (worldPool != null) {
+            requirePositiveNumber(worldPool, "size", file, "world_pool.size", errors);
+            requirePositiveNumber(worldPool, "cleanup_blocks_per_tick", file, "world_pool.cleanup_blocks_per_tick", errors);
+        }
+    }
+
+    private static void validateArenaMissionConfig(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path file = configRoot.resolve("arena/mission.yml");
+        Map<String, Object> root = rootMap(configs, file, errors);
+        if (root == null) {
+            errors.add(format("missing arena mission config", file, "<root>", "mission config is required"));
+            return;
+        }
+        Map<String, Object> mission = requireMap(root, "mission", file, errors);
+        if (mission != null) {
+            requirePositiveNumber(mission, "generate_count", file, "mission.generate_count", errors);
+            requireRatio(mission.get("promotion_probability"), file, "mission.promotion_probability", errors);
+        }
+        requireMap(root, "license", file, errors);
+        Map<String, Object> barrierRestart = requireMap(root, "barrier_restart", file, errors);
+        if (barrierRestart != null) {
+            requirePositiveNumber(barrierRestart, "default_duration_seconds", file, "barrier_restart.default_duration_seconds", errors);
+            requireNonNegativeNumber(barrierRestart, "corruption_ratio_base", file, "barrier_restart.corruption_ratio_base", errors);
+        }
+        requireMap(root, "mission_charactor_config", file, errors);
+    }
+
+    private static void validateArenaOverEnchanterConfig(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path file = configRoot.resolve("arena/over_enchanter.yml");
+        Map<String, Object> root = rootMap(configs, file, errors);
+        if (root == null) {
+            errors.add(format("missing arena over enchanter config", file, "<root>", "over enchanter config is required"));
+            return;
+        }
+        requireMap(root, "slot_unlocks", file, errors);
+        requireMap(root, "limit_breaking", file, errors);
+        requireMap(root, "incompatible_combination", file, errors);
+        requireMap(root, "invalid_target_attach", file, errors);
+    }
+
+    private static void validateRankSettingsConfig(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path file = configRoot.resolve("rank/settings.yml");
+        Map<String, Object> root = rootMap(configs, file, errors);
+        if (root == null) {
+            errors.add(format("missing rank settings config", file, "<root>", "rank settings config is required"));
+            return;
+        }
+        Map<String, Object> combatExp = requireMap(root, "combat_exp", file, errors);
+        if (combatExp != null) {
+            requireNonNegativeNumber(combatExp, "health_multiplier", file, "combat_exp.health_multiplier", errors);
         }
     }
 
@@ -544,6 +583,28 @@ public final class ResourceConfigurationValidator {
     }
 
     private static void validateSukimaDungeonConfigs(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path settingsFile = configRoot.resolve("sukima_dungeon/settings.yml");
+        Map<String, Object> settingsRoot = rootMap(configs, settingsFile, errors);
+        if (settingsRoot == null) {
+            errors.add(format("missing sukima dungeon settings config", settingsFile, "<root>", "settings config is required"));
+        } else {
+            Map<String, Object> sizes = requireMap(settingsRoot, "sizes", settingsFile, errors);
+            if (sizes != null) {
+                requireNonEmpty(sizes, settingsFile, "sizes", errors);
+                for (Map.Entry<String, Object> entry : sizes.entrySet()) {
+                    Map<String, Object> size = asMap(entry.getValue());
+                    if (size == null) {
+                        errors.add(format("invalid config value", settingsFile, "sizes." + entry.getKey(), "size entry must be a section"));
+                        continue;
+                    }
+                    String path = "sizes." + entry.getKey();
+                    requirePositiveNumber(size, "tiles", settingsFile, path + ".tiles", errors);
+                    requirePositiveNumber(size, "duration", settingsFile, path + ".duration", errors);
+                    requireNonNegativeNumber(size, "npc_base_count", settingsFile, path + ".npc_base_count", errors);
+                    requireNonNegativeNumber(size, "sprout_base_count", settingsFile, path + ".sprout_base_count", errors);
+                }
+            }
+        }
         Path themeFile = configRoot.resolve("sukima_dungeon/theme.yml");
         Map<String, Object> themeRoot = rootMap(configs, themeFile, errors);
         if (themeRoot != null) {
