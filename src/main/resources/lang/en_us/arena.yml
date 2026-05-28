@@ -99,7 +99,7 @@ arena:
       stage_build_failed_internal: '&cStage generation failed. Please report to staff. (STRUCTURE_ERROR)'
       return_hint: §7Hold Shift to return to lobby
       return_countdown: §7Returning in §e{seconds} sec
-      returned: '&aReturned to lobby'
+      returned: '§7Returned to the arena lobby!'
       completed: '&aミッションクリア！'
     lobby:
       tutorial:
@@ -205,7 +205,7 @@ arena:
       restart_confirmed: Barrier restart confirmed!
       return_hint: §7Hold Shift to return to lobby
       return_countdown: §7Returning in §e{seconds} sec
-      returned: '&aReturned to lobby'
+      returned: '§7Returned to the arena lobby!'
     session:
       starting: '&6[Arena] Starting arena...'
       started: '&6[Arena] Session started: theme={theme}, mob_type={mob_type}, difficulty={difficulty}, waves={waves}'
@@ -333,6 +333,7 @@ arena:
       status_down: §eDOWN
       status_alive: §aALIVE
       status_preparing: §dPREPARING
+      status_returned: §8RETURNED
       status_dead: §cDEAD
     license:
       tier:

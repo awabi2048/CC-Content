@@ -7875,12 +7875,10 @@ class ArenaManager(
 
                 val nextSubtitleTick = session.barrierReturnSubtitleNextTickByParticipant[participantId] ?: 0L
                 if (currentTick >= nextSubtitleTick) {
-                    val remainingSeconds = ((BARRIER_RETURN_HOLD_TICKS - holdTicks).coerceAtLeast(0)).toDouble() / 20.0
-                    val formatted = String.format(Locale.US, "%.1f", remainingSeconds)
-                    val countdownKey = if (session.missionCompleted) "arena.messages.mission.return_countdown" else "arena.messages.barrier.return_countdown"
+                    val remainingSeconds = ceil(((BARRIER_RETURN_HOLD_TICKS - holdTicks).coerceAtLeast(0)).toDouble() / 20.0).toInt()
                     player.sendTitle(
-                        "",
-                        ArenaI18n.text(player, countdownKey, "seconds" to formatted),
+                        "§b帰還中",
+                        "§7残り ${remainingSeconds}秒",
                         0,
                         6,
                         0
@@ -8398,6 +8396,16 @@ class ArenaManager(
         }
 
         val online = Bukkit.getPlayer(playerId)
+        if (
+            session.participants.contains(playerId) &&
+            online != null &&
+            online.isOnline &&
+            !online.isDead &&
+            online.world.name != session.worldName
+        ) {
+            return ArenaI18n.text(null, "arena.ui.sidebar.status_returned")
+        }
+
         if (
             session.participants.contains(playerId) &&
             online != null &&
