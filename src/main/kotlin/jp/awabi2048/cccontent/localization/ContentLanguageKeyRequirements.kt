@@ -26,7 +26,7 @@ object ContentLanguageKeyRequirements {
                 .sorted()
                 .map { id ->
                     LanguageKeyRequirement(
-                        sourceId = "CC-Content:arena",
+                        sourceId = "CC-System",
                         key = "arena.theme.$id.name",
                         reason = "config/arena/themes defines arena theme id=$id"
                     )

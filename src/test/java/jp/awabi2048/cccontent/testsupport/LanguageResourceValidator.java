@@ -91,10 +91,15 @@ public final class LanguageResourceValidator {
         try (var localeDirs = Files.list(langRoot)) {
             for (Path localeDir : localeDirs.filter(Files::isDirectory).sorted().toList()) {
                 Map<String, Map<String, Object>> files = new LinkedHashMap<>();
-                try (var ymlFiles = Files.list(localeDir)) {
-                    for (Path file : ymlFiles.filter(Files::isRegularFile).filter(LanguageResourceValidator::isYaml).sorted().toList()) {
-                        files.put(file.getFileName().toString(), readYaml(file));
-                    }
+                try (var ymlFiles = Files.walk(localeDir)) {
+                    ymlFiles.filter(Files::isRegularFile).filter(LanguageResourceValidator::isYaml).sorted().forEach(file -> {
+                        try {
+                            String relativePath = localeDir.relativize(file).toString().replace('\\', '/');
+                            files.put(relativePath, readYaml(file));
+                        } catch (IOException e) {
+                            throw new RuntimeException("Failed to read YAML: " + file, e);
+                        }
+                    });
                 }
                 locales.put(localeDir.getFileName().toString().toLowerCase(), files);
             }

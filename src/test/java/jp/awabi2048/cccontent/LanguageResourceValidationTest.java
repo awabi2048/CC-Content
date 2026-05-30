@@ -1,6 +1,5 @@
 package jp.awabi2048.cccontent;
 
-import jp.awabi2048.cccontent.localization.ContentLanguageKeyRequirements;
 import jp.awabi2048.cccontent.testsupport.LanguageResourceValidator;
 import org.junit.jupiter.api.Test;
 
