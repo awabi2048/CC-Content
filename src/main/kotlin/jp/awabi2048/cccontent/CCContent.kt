@@ -962,14 +962,6 @@ class CCContent : JavaPlugin(), Listener {
         val validationResult = api.validateI18nSource(this, contentLanguageFeatureByFile())
         languageErrorsByFeature = validationResult.errorsByFeature
         customItemsLanguageAvailable = !hasLanguageErrorsFor("custom_items")
-
-        unregisterLanguageSources(api)
-
-        contentLanguageSources().forEach { (feature, fileNames) ->
-            if (!hasLanguageErrorsFor(feature)) {
-                api.registerI18nSource("CC-Content:$feature", this, fileNames)
-            }
-        }
     }
 
     private fun unregisterLanguageSources(api: com.awabi2048.ccsystem.api.CCSystemAPI = CCSystem.getAPI()) {
