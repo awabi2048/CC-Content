@@ -456,7 +456,6 @@ class CCContent : JavaPlugin(), Listener {
             MenuCooldownManager.clearAll()
             CustomItemManager.clear()
             HeadDatabaseBridge.reset()
-            runCatching { unregisterLanguageSources() }
             rankManagerInstance = null
             ignoreBlockStoreInstance = null
             playTimeTrackerTaskId = -1
@@ -962,20 +961,6 @@ class CCContent : JavaPlugin(), Listener {
         val validationResult = api.validateI18nSource(this, contentLanguageFeatureByFile())
         languageErrorsByFeature = validationResult.errorsByFeature
         customItemsLanguageAvailable = !hasLanguageErrorsFor("custom_items")
-
-        unregisterLanguageSources(api)
-
-        contentLanguageSources().forEach { (feature, fileNames) ->
-            if (!hasLanguageErrorsFor(feature)) {
-                api.registerI18nSource("CC-Content:$feature", this, fileNames)
-            }
-        }
-    }
-
-    private fun unregisterLanguageSources(api: com.awabi2048.ccsystem.api.CCSystemAPI = CCSystem.getAPI()) {
-        contentLanguageSources().keys.forEach { feature ->
-            api.unregisterI18nSource("CC-Content:$feature")
-        }
     }
 
     private fun hasLanguageErrorsFor(feature: String): Boolean {
@@ -998,15 +983,6 @@ class CCContent : JavaPlugin(), Listener {
             put("mission.yml", "rank")
             put("gui.yml", "rank")
         }
-    }
-
-    private fun contentLanguageSources(): Map<String, Set<String>> {
-        return mapOf(
-            "arena" to setOf("arena.yml"),
-            "custom_items" to setOf("custom_items.yml"),
-            "sukima_dungeon" to setOf("sukima_dungeon.yml"),
-            "rank" to setOf("rank.yml", "profession.yml", "skill.yml", "tutorial_rank.yml", "mission.yml", "gui.yml")
-        )
     }
 
     private fun saveSplitLanguageResources() {
