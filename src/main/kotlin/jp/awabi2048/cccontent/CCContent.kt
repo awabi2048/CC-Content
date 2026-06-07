@@ -36,6 +36,22 @@ import jp.awabi2048.cccontent.items.misc.OldPickaxeItem
 import jp.awabi2048.cccontent.items.misc.WornBootsItem
 import jp.awabi2048.cccontent.items.marker.AdminMarkerToolService
 import jp.awabi2048.cccontent.items.misc.BoxedDaiginjoItem
+import jp.awabi2048.cccontent.items.misc.HalfDrunkDaiginjoItem
+import jp.awabi2048.cccontent.items.misc.AcornCookieItem
+import jp.awabi2048.cccontent.items.misc.TaroSnackItem
+import jp.awabi2048.cccontent.items.misc.DecentArmorItem
+import jp.awabi2048.cccontent.items.misc.IgnitionLogicItem
+import jp.awabi2048.cccontent.items.misc.FireproofLeggingsItem
+import jp.awabi2048.cccontent.items.misc.FireproofListener
+import jp.awabi2048.cccontent.items.misc.FireworkLoaderItem
+import jp.awabi2048.cccontent.items.misc.LampDeviceItem
+import jp.awabi2048.cccontent.items.misc.ExpGeneratorItem
+import jp.awabi2048.cccontent.items.misc.DenseWindChargeItem
+import jp.awabi2048.cccontent.items.misc.MagicConcaveLensItem
+import jp.awabi2048.cccontent.items.misc.MagicConvexLensItem
+import jp.awabi2048.cccontent.items.misc.BronzeNozzleItem
+import jp.awabi2048.cccontent.items.misc.AirTriggerItem
+import jp.awabi2048.cccontent.items.misc.DecentBowItem
 import jp.awabi2048.cccontent.items.sukima.*
 import jp.awabi2048.cccontent.items.brewery.BreweryMockClockItem
 import jp.awabi2048.cccontent.items.brewery.BreweryMockYeastItem
@@ -386,6 +402,7 @@ class CCContent : JavaPlugin(), Listener {
         server.pluginManager.registerEvents(CustomHeadGuiListener(this), this)
         server.pluginManager.registerEvents(CustomItemInteractionListener(), this)
         server.pluginManager.registerEvents(LargeExperienceBottleListener(), this)
+        server.pluginManager.registerEvents(FireproofListener(), this)
         if (::npcMenuService.isInitialized) {
             server.pluginManager.registerEvents(npcMenuService, this)
         }
@@ -827,6 +844,24 @@ class CCContent : JavaPlugin(), Listener {
         CustomItemManager.register(OldPickaxeItem())
         CustomItemManager.register(WornBootsItem())
         CustomItemManager.register(LargeExperienceBottleItem())
+        
+        // 新規カスタムアイテム (misc)
+        CustomItemManager.register(HalfDrunkDaiginjoItem())
+        CustomItemManager.register(AcornCookieItem())
+        CustomItemManager.register(TaroSnackItem())
+        DecentArmorItem.createAll().forEach { CustomItemManager.register(it) }
+        CustomItemManager.register(IgnitionLogicItem())
+        CustomItemManager.register(FireproofLeggingsItem())
+        CustomItemManager.register(FireworkLoaderItem())
+        CustomItemManager.register(LampDeviceItem())
+        CustomItemManager.register(ExpGeneratorItem())
+        CustomItemManager.register(DenseWindChargeItem())
+        CustomItemManager.register(MagicConcaveLensItem())
+        CustomItemManager.register(MagicConvexLensItem())
+        CustomItemManager.register(BronzeNozzleItem())
+        CustomItemManager.register(AirTriggerItem())
+        CustomItemManager.register(DecentBowItem())
+        
         registerCustomHeadItems()
 
         if (isContentEnabledAtStartup("brewery")) {
