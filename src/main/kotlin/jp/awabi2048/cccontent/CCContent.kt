@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent
 import com.awabi2048.ccsystem.CCSystem
 import jp.awabi2048.cccontent.command.CCCommand
 import jp.awabi2048.cccontent.command.GiveCommand
+import jp.awabi2048.cccontent.command.StructureCommand
 import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.items.CustomItemI18n
@@ -99,6 +100,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.listeners.*
 import jp.awabi2048.cccontent.features.sukima_dungeon.tasks.SpecialTileTask
 import jp.awabi2048.cccontent.mob.MobEventListener
 import jp.awabi2048.cccontent.mob.MobService
+import jp.awabi2048.cccontent.structure.SchemStructureService
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import net.luckperms.api.LuckPerms
 import org.bukkit.configuration.file.FileConfiguration
@@ -302,8 +304,22 @@ class CCContent : JavaPlugin(), Listener {
         }
 
         val giveCommand = GiveCommand()
+        val structureCommand = StructureCommand(
+            structureService = SchemStructureService(this),
+            onArenaStructureSaved = {
+                if (::arenaManager.isInitialized) {
+                    arenaManager.reloadThemes()
+                }
+            },
+            onSukimaStructureSaved = {
+                if (::structureLoader.isInitialized) {
+                    structureLoader.loadThemes()
+                }
+            }
+        )
         val ccCommand = CCCommand(
             giveCommand = giveCommand,
+            structureCommand = structureCommand,
             onReload = { reloadConfigFiles() },
             onRestart = { restartPlugin() },
             onClearBlockPlacementData = { clearBlockPlacementData() },
@@ -993,7 +1009,7 @@ class CCContent : JavaPlugin(), Listener {
 
     private fun validateAndRegisterLanguageSources() {
         val api = CCSystem.getAPI()
-        val validationResult = api.validateI18nSource(this, contentLanguageFeatureByFile())
+        val validationResult = api.validateI18nSource(CCSystem.instance, contentLanguageFeatureByFile())
         languageErrorsByFeature = validationResult.errorsByFeature
         customItemsLanguageAvailable = !hasLanguageErrorsFor("custom_items")
     }
@@ -1008,15 +1024,15 @@ class CCContent : JavaPlugin(), Listener {
 
     private fun contentLanguageFeatureByFile(): Map<String, String> {
         return buildMap {
-            put("arena.yml", "arena")
-            put("custom_items.yml", "custom_items")
-            put("sukima_dungeon.yml", "sukima_dungeon")
-            put("rank.yml", "rank")
-            put("profession.yml", "rank")
-            put("skill.yml", "rank")
-            put("tutorial_rank.yml", "rank")
-            put("mission.yml", "rank")
-            put("gui.yml", "rank")
+            put("content/arena.yml", "arena")
+            put("content/custom_items.yml", "custom_items")
+            put("content/sukima_dungeon.yml", "sukima_dungeon")
+            put("content/rank.yml", "rank")
+            put("content/profession.yml", "rank")
+            put("content/skill.yml", "rank")
+            put("content/tutorial_rank.yml", "rank")
+            put("content/mission.yml", "rank")
+            put("content/gui.yml", "rank")
         }
     }
 

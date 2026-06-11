@@ -4,12 +4,12 @@ main: jp.awabi2048.cccontent.CCContent
 api-version: '1.21'
 author: awabi2048
 description: Paper 1.21.8用統合コンテンツプラグイン
-softdepend: [HeadDatabase, Vault, CC-System, MyWorldManager, DeadChest, LuckPerms]
+softdepend: [HeadDatabase, Vault, CC-System, MyWorldManager, DeadChest, LuckPerms, FastAsyncWorldEdit]
 
 commands:
   cc-content:
     description: CC-Contentメインコマンド
-    usage: /ccc <give|reload|restart|summon|debug|update_day|npc-menu|help>
+    usage: /ccc <give|reload|restart|summon|structure|debug|update_day|npc-menu|help>
     aliases: [ccc]
   rank:
     description: ランクシステムコマンド（デバッグ用）

@@ -6,6 +6,7 @@ import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
 import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
+import jp.awabi2048.cccontent.structure.SchemStructureService
 import net.kyori.adventure.text.Component
 import org.bukkit.Color
 import org.bukkit.FluidCollisionMode
@@ -34,7 +35,6 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import org.bukkit.util.BoundingBox
 import org.bukkit.util.Vector
-import java.io.File
 import java.util.UUID
 import kotlin.math.round
 
@@ -71,11 +71,12 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         private const val DELETE_PREVIEW_DUST_SIZE = 0.75f
         private const val PREVIEW_INTERVAL_TICKS = 2L
         private const val MARKER_PARTICLE_INTERVAL_TICKS = 10L
-        private const val ARENA_LIFT_STRUCTURE_PATH = "structures/arena/lift.nbt"
+        private const val ARENA_LIFT_STRUCTURE_PATH = "structures/arena/lift.schem"
     }
 
     private val toolIdKey = NamespacedKey(plugin, "admin_marker_tool_type")
     private val modeIdKey = NamespacedKey(plugin, "admin_marker_tool_mode")
+    private val structureService = SchemStructureService(plugin)
     private val lastSwitchTime = mutableMapOf<UUID, Long>()
     private var cachedArenaLiftSize: Triple<Int, Int, Int>? = null
     private val definitions = listOf(
@@ -447,19 +448,9 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
 
     private fun resolveArenaLiftSize(): Triple<Int, Int, Int>? {
         cachedArenaLiftSize?.let { return it }
-        val file = File(plugin.dataFolder, ARENA_LIFT_STRUCTURE_PATH)
-        if (!file.exists()) {
-            return null
-        }
-        return runCatching {
-            val structure = org.bukkit.Bukkit.getStructureManager().loadStructure(file)
-            val size = structure.size
-            if (size.blockX <= 0 || size.blockY <= 0 || size.blockZ <= 0) {
-                return null
-            }
-            Triple(size.blockX, size.blockY, size.blockZ)
-        }.getOrNull()
-            ?.also { cachedArenaLiftSize = it }
+        val structure = structureService.load(ARENA_LIFT_STRUCTURE_PATH) ?: return null
+        val size = structure.size
+        return Triple(size.x, size.y, size.z).also { cachedArenaLiftSize = it }
     }
 
     private fun startMarkerParticleTask() {

@@ -1,7 +1,7 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon.generator
 
+import jp.awabi2048.cccontent.structure.LoadedSchemStructure
 import org.bukkit.Material
-import org.bukkit.structure.Structure
 
 data class Theme(
     val id: String,
@@ -11,7 +11,7 @@ data class Theme(
     val gravity: Double,
     val voidYLimit: Double?,
     val requiredTier: Int,
-    val structures: Map<StructureType, List<Structure>>
+    val structures: Map<StructureType, List<LoadedSchemStructure>>
 ) {
     fun getDisplayName(player: org.bukkit.entity.Player? = null): String {
         return jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager.getMessage(player, "theme.$id.name")

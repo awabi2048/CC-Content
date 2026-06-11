@@ -17,6 +17,7 @@ import org.bukkit.util.Vector
  */
 class CCCommand(
     private val giveCommand: GiveCommand,
+    private val structureCommand: StructureCommand? = null,
     private val onReload: (() -> Unit)? = null,
     private val onRestart: (() -> Unit)? = null,
     private val onClearBlockPlacementData: (() -> Unit)? = null,
@@ -55,6 +56,13 @@ class CCCommand(
             }
             "summon" -> {
                 handleSummon(sender, args)
+            }
+            "structure" -> {
+                val subArgs = args.drop(1).toTypedArray()
+                structureCommand?.onCommand(sender, subArgs) ?: run {
+                    sender.sendMessage("§cStructure command is not available")
+                    true
+                }
             }
             "debug" -> {
                 handleDebug(sender, args)
@@ -396,6 +404,7 @@ class CCCommand(
                      candidates.add("reload")
                      candidates.add("restart")
                      candidates.add("summon")
+                     candidates.add("structure")
                      candidates.add("debug")
                      candidates.add("update_day")
                 }
@@ -435,6 +444,10 @@ class CCCommand(
                       3, 4, 5 -> listOf("~", "~1", "~-1").filter { it.startsWith(args[args.lastIndex]) }
                       else -> emptyList()
                   }
+              }
+              "structure" -> {
+                  val subArgs = args.drop(1).toTypedArray()
+                  structureCommand?.onTabComplete(sender, cmd, subArgs).orEmpty()
               }
                "npc-menu" -> {
                    when (args.size) {
