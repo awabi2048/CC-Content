@@ -5,12 +5,10 @@ package jp.awabi2048.cccontent.features.arena.generator
 import jp.awabi2048.cccontent.features.arena.ArenaBounds
 import jp.awabi2048.cccontent.features.arena.ArenaBlockKey
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
+import jp.awabi2048.cccontent.structure.StructurePasteOptions
 import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.World
-import org.bukkit.block.structure.Mirror
-import org.bukkit.block.structure.StructureRotation
-import org.bukkit.entity.EntityType
 import org.bukkit.entity.Marker
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
@@ -127,6 +125,7 @@ data class ArenaDoorAnimationPlacement(
 class ArenaStageGenerator {
     companion object {
         private const val CONNECTION_MARKER_TAG = "arena.marker.connection"
+        private const val MARKER_ENTITY_TYPE_ID = "minecraft:marker"
     }
 
     private enum class BuildPhase {
@@ -959,7 +958,7 @@ class ArenaStageGenerator {
             val variant = theme.staticStructures[ArenaStructureType.GOAL]
                 .orEmpty()
                 .firstOrNull { it.variation == requiredVariation }
-                ?: error("[Arena] goal.${requiredVariation}.nbt が見つかりません: theme=${theme.id}")
+                ?: error("[Arena] goal.${requiredVariation}.schem が見つかりません: theme=${theme.id}")
             return SelectedStructureVariant(
                 baseTemplate = variant.template,
                 animatedVariant = null,
@@ -1046,31 +1045,16 @@ class ArenaStageGenerator {
         transform: PlacementTransform,
         location: Location
     ) {
-        val rotation = toRotation(transform.rotationQuarter)
-        val mirror = toMirror(transform)
-
-        template.structure.place(
+        template.structure.paste(
             location,
-            true,
-            rotation,
-            mirror,
-            0,
-            1.0f,
-            java.util.Random()
+            StructurePasteOptions(
+                rotationQuarter = transform.rotationQuarter,
+                mirrorX = transform.mirrored,
+                pasteAir = true,
+                copyEntities = true,
+                copyBiomes = true
+            )
         )
-    }
-
-    private fun toRotation(rotationQuarter: Int): StructureRotation {
-        return when (rotationQuarter.mod(4)) {
-            1 -> StructureRotation.CLOCKWISE_90
-            2 -> StructureRotation.CLOCKWISE_180
-            3 -> StructureRotation.COUNTERCLOCKWISE_90
-            else -> StructureRotation.NONE
-        }
-    }
-
-    private fun toMirror(transform: PlacementTransform): Mirror {
-        return if (transform.mirrored) Mirror.LEFT_RIGHT else Mirror.NONE
     }
 
     private fun computeFirstPlacementGeometry(
@@ -1247,13 +1231,13 @@ class ArenaStageGenerator {
         var markerCount = 0
 
         template.structure.entities.forEach { entity ->
-            if (entity.type != EntityType.MARKER) return@forEach
+            if (entity.typeId != MARKER_ENTITY_TYPE_ID) return@forEach
             if (!entity.scoreboardTags.contains(CONNECTION_MARKER_TAG)) return@forEach
             markerCount += 1
 
-            val blockX = floor(entity.location.x).toInt()
-            val blockY = floor(entity.location.y).toInt()
-            val blockZ = floor(entity.location.z).toInt()
+            val blockX = floor(entity.x).toInt()
+            val blockY = floor(entity.y).toInt()
+            val blockZ = floor(entity.z).toInt()
             val touchedSides = mutableListOf<ArenaPathDirection>()
             if (blockX == 0) touchedSides.add(ArenaPathDirection.WEST)
             if (blockX == size.x - 1) touchedSides.add(ArenaPathDirection.EAST)
@@ -1276,8 +1260,8 @@ class ArenaStageGenerator {
                 blockX = blockX,
                 blockY = blockY,
                 blockZ = blockZ,
-                posX = entity.location.x,
-                posZ = entity.location.z
+                posX = entity.x,
+                posZ = entity.z
             )
             val sideList = sideMarkers[marker.side] ?: return@forEach
             sideList.add(marker)

@@ -1,8 +1,7 @@
 ﻿package jp.awabi2048.cccontent.features.sukima_dungeon.generator
 
+import jp.awabi2048.cccontent.structure.StructurePasteOptions
 import org.bukkit.Location
-import org.bukkit.block.structure.StructureRotation
-import org.bukkit.structure.Structure
 import org.bukkit.scheduler.BukkitRunnable
 import java.util.Random
 
@@ -350,13 +349,7 @@ object StructureBuilder {
         
         val structure = structures[random.nextInt(structures.size)]
         
-        val structureRotation = when (rotation) {
-            0 -> StructureRotation.NONE
-            1 -> StructureRotation.CLOCKWISE_90
-            2 -> StructureRotation.CLOCKWISE_180
-            3 -> StructureRotation.COUNTERCLOCKWISE_90
-            else -> StructureRotation.NONE
-        }
+        val rotationQuarter = rotation.mod(4)
 
         // Adjust location based on rotation to keep structure inside the grid cell
         // Assuming structure rotates around (0,0,0)
@@ -366,15 +359,15 @@ object StructureBuilder {
         // E.g. Size 2 (0,1) -> Rotated becomes (0, -1). To get back to (0,1) range we shift by 1.
         val shift = (theme.tileSize - 1).toDouble()
 
-        when (structureRotation) {
-            StructureRotation.CLOCKWISE_90 -> {
+        when (rotationQuarter) {
+            1 -> {
                 offsetX = shift
             }
-            StructureRotation.CLOCKWISE_180 -> {
+            2 -> {
                 offsetX = shift
                 offsetZ = shift
             }
-            StructureRotation.COUNTERCLOCKWISE_90 -> {
+            3 -> {
                 offsetZ = shift
             }
             else -> {}
@@ -382,8 +375,15 @@ object StructureBuilder {
 
         val placeLocation = location.clone().add(offsetX, 0.0, offsetZ)
 
-        // Place structure
-        structure.place(placeLocation, true, structureRotation, org.bukkit.block.structure.Mirror.NONE, 0, 1.0f, random)
+        structure.paste(
+            placeLocation,
+            StructurePasteOptions(
+                rotationQuarter = rotationQuarter,
+                pasteAir = true,
+                copyEntities = true,
+                copyBiomes = true
+            )
+        )
         
         return BuiltStructureInfo(type, "${theme.id}/${type.keyword}")
     }

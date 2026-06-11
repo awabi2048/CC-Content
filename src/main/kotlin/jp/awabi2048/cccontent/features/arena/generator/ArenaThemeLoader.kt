@@ -2,15 +2,14 @@ package jp.awabi2048.cccontent.features.arena.generator
 
 import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
+import jp.awabi2048.cccontent.structure.LoadedSchemStructure
+import jp.awabi2048.cccontent.structure.SchemStructureService
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
-import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
-import org.bukkit.structure.Structure
 import java.io.File
-import java.io.IOException
 import kotlin.random.Random
 
 data class ArenaTheme(
@@ -136,7 +135,7 @@ data class ArenaStructureSize(
 
 data class ArenaStructureTemplate(
     val name: String,
-    val structure: Structure,
+    val structure: LoadedSchemStructure,
     val size: ArenaStructureSize
 )
 
@@ -151,6 +150,8 @@ enum class ArenaStructureType(val keyword: String, val supportsAnimation: Boolea
 }
 
 class ArenaThemeLoader(private val plugin: JavaPlugin) {
+    private val structureService = SchemStructureService(plugin)
+
     private companion object {
         const val THEME_CONFIG_DIR = "config/arena/themes"
 
@@ -659,12 +660,11 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             animatedResult[it] = mutableListOf()
         }
 
-        val files = folder.listFiles() ?: return LoadedThemeStructures(staticResult, animatedResult)
+        val files = structureService.listSchemFiles(folder)
         val parsedStatic = mutableListOf<ParsedStaticFile>()
         val parsedAnimated = mutableListOf<ParsedAnimatedFile>()
 
         for (file in files) {
-            if (!file.name.endsWith(".nbt", ignoreCase = true)) continue
             try {
                 val template = loadTemplate(file)
                 if (template == null) continue
@@ -698,8 +698,6 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                     }
                     parsedStatic.add(parsed)
                 }
-            } catch (e: IOException) {
-                plugin.logger.warning("[Arena] ストラクチャー読み込み失敗: ${file.name} (${e.message})")
             } catch (e: Exception) {
                 plugin.logger.warning("[Arena] ストラクチャー処理中に例外: ${file.name} (${e.message})")
             }
@@ -791,9 +789,9 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
     }
 
     private fun loadTemplate(file: File): ArenaStructureTemplate? {
-        val structure = Bukkit.getStructureManager().loadStructure(file)
+        val structure = structureService.load(file) ?: return null
         val blockSize = structure.size
-        val size = ArenaStructureSize(blockSize.blockX, blockSize.blockY, blockSize.blockZ)
+        val size = ArenaStructureSize(blockSize.x, blockSize.y, blockSize.z)
         if (size.x <= 0 || size.y <= 0 || size.z <= 0) {
             plugin.logger.warning("[Arena] 不正なサイズのためスキップ: ${file.name} size=${size.x}*${size.y}*${size.z}")
             return null

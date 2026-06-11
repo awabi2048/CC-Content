@@ -1,15 +1,15 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon.generator
 
-import org.bukkit.Bukkit
+import jp.awabi2048.cccontent.structure.LoadedSchemStructure
+import jp.awabi2048.cccontent.structure.SchemStructureService
 import org.bukkit.Material
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
-import org.bukkit.structure.Structure
 import java.io.File
-import java.io.IOException
 
 class StructureLoader(val plugin: JavaPlugin) {
     private val themes = mutableMapOf<String, Theme>()
+    private val structureService = SchemStructureService(plugin)
 
     fun loadThemes() {
         val themeFile = File(plugin.dataFolder, "config/sukima_dungeon/theme.yml")
@@ -18,7 +18,7 @@ class StructureLoader(val plugin: JavaPlugin) {
             plugin.saveResource("config/sukima_dungeon/theme.yml", false)
         }
         val config = YamlConfiguration.loadConfiguration(themeFile)
-        
+
         themes.clear()
         val themesSection = config.getConfigurationSection("themes") ?: return
 
@@ -28,9 +28,7 @@ class StructureLoader(val plugin: JavaPlugin) {
         }
 
         for (key in themesSection.getKeys(false)) {
-
-            // path defaults to key if not specified
-            val path = themesSection.getString("$key.path") ?: key 
+            val path = themesSection.getString("$key.path") ?: key
             val iconStr = themesSection.getString("$key.icon") ?: "GRASS_BLOCK"
             val icon = Material.matchMaterial(iconStr) ?: Material.GRASS_BLOCK
             val tileSize = themesSection.getInt("$key.tileSize", 16)
@@ -38,7 +36,7 @@ class StructureLoader(val plugin: JavaPlugin) {
             val gravity = themesSection.getDouble("$key.gravity", 1.0)
             val voidYLimit = if (themesSection.contains("$key.void_y_limit")) themesSection.getDouble("$key.void_y_limit") else null
             val requiredTier = themesSection.getInt("$key.required_tier", 1)
-            
+
             val themeFolder = File(baseStructureFolder, path)
             if (!themeFolder.exists()) {
                 themeFolder.mkdirs()
@@ -48,46 +46,29 @@ class StructureLoader(val plugin: JavaPlugin) {
             val theme = Theme(key, icon, tileSize, time, gravity, voidYLimit, requiredTier, structures)
             themes[key] = theme
         }
-        
+
         validateThemes()
     }
 
-    private fun loadStructuresForTheme(folder: File): Map<StructureType, List<Structure>> {
-        val structures = mutableMapOf<StructureType, MutableList<Structure>>()
-        
-        // Initialize lists
+    private fun loadStructuresForTheme(folder: File): Map<StructureType, List<LoadedSchemStructure>> {
+        val structures = mutableMapOf<StructureType, MutableList<LoadedSchemStructure>>()
         for (type in StructureType.values()) {
             structures[type] = mutableListOf()
         }
 
-        val files = folder.listFiles() ?: return emptyMap()
-
-        for (file in files) {
-            if (!file.name.endsWith(".nbt")) continue
-            
-            val matchedType = StructureType.fromFileName(file.name)
-
-            if (matchedType != null) {
-                try {
-                    val structure = Bukkit.getStructureManager().loadStructure(file)
-                    structures[matchedType]?.add(structure)
-                } catch (e: IOException) {
-                    plugin.logger.severe("ストラクチャーの読み込みに失敗しました: ${file.name}")
-                    e.printStackTrace()
-                } catch (e: Exception) {
-                    plugin.logger.severe("ストラクチャー読み込み中に予期しないエラーが発生しました: ${file.name}")
-                    e.printStackTrace()
-                }
-            }
+        for (file in structureService.listSchemFiles(folder)) {
+            val matchedType = StructureType.fromFileName(file.name) ?: continue
+            val structure = structureService.load(file) ?: continue
+            structures[matchedType]?.add(structure)
         }
-        
+
         return structures
     }
 
     fun getTheme(name: String): Theme? {
         return themes[name]
     }
-    
+
     fun getDefaultTheme(): Theme? {
         return themes["default"] ?: themes.values.firstOrNull()
     }
@@ -99,12 +80,11 @@ class StructureLoader(val plugin: JavaPlugin) {
     fun validateThemes() {
         val invalidThemeKeys = mutableListOf<String>()
         val errorThemes = mutableMapOf<String, List<StructureType>>()
-        
+
         for ((key, theme) in themes) {
             val missingTypes = mutableListOf<StructureType>()
             for (type in StructureType.values()) {
                 if (theme.structures[type].isNullOrEmpty()) {
-                    // MINIBOSS and REST are optional for now (mock implementation)
                     if (type != StructureType.MINIBOSS && type != StructureType.REST) {
                         missingTypes.add(type)
                     }
@@ -121,7 +101,12 @@ class StructureLoader(val plugin: JavaPlugin) {
         }
 
         if (errorThemes.isNotEmpty()) {
-            // エラー情報はSukimaDungeon統合ロガーで処理される
+            plugin.logger.warning(
+                "[SukimaDungeon] Missing schem structures: " +
+                    errorThemes.entries.joinToString("; ") { (theme, types) ->
+                        "$theme=${types.joinToString(",") { it.keyword }}"
+                    }
+            )
         }
     }
 }
@@ -139,7 +124,7 @@ enum class StructureType(val keyword: String) {
 
     companion object {
         fun fromFileName(fileName: String): StructureType? {
-            val name = fileName.lowercase().removeSuffix(".nbt")
+            val name = fileName.lowercase().removeSuffix(".schem")
             return values().find { type ->
                 name == type.keyword || name.startsWith("${type.keyword}.")
             }

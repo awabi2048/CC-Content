@@ -39,6 +39,9 @@ import jp.awabi2048.cccontent.mob.MobSpawnCondition
 import jp.awabi2048.cccontent.mob.MobService
 import jp.awabi2048.cccontent.mob.MobSpawnOptions
 import jp.awabi2048.cccontent.mob.ability.PeriodicCobwebAbility
+import jp.awabi2048.cccontent.structure.LoadedSchemStructure
+import jp.awabi2048.cccontent.structure.SchemStructureService
+import jp.awabi2048.cccontent.structure.StructurePasteOptions
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import jp.awabi2048.cccontent.util.OageMessageSender
 import jp.awabi2048.cccontent.world.WorldSettingsHelper
@@ -62,8 +65,6 @@ import org.bukkit.WorldCreator
 import org.bukkit.attribute.Attribute
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
-import org.bukkit.block.structure.Mirror
-import org.bukkit.block.structure.StructureRotation
 import org.bukkit.block.data.Waterlogged
 import org.bukkit.block.data.BlockData
 import org.bukkit.entity.Entity
@@ -269,7 +270,7 @@ private data class EntranceLiftTemplate(
     val sizeX: Int,
     val sizeY: Int,
     val sizeZ: Int,
-    val structure: org.bukkit.structure.Structure
+    val structure: LoadedSchemStructure
 )
 
 class ArenaManager(
@@ -277,6 +278,7 @@ class ArenaManager(
     private val mobService: MobService = MobService(plugin)
 ) {
     val confusionManager = ConfusionManager(plugin)
+    private val structureService = SchemStructureService(plugin)
 
     private companion object {
         const val DEBUG_VOID_WORLD_MARKER_FILE_NAME = ".cc-debug-void-world"
@@ -357,7 +359,7 @@ class ArenaManager(
         const val DOWNED_GAME_OVER_WALK_SPEED = 0.0f
         const val ARENA_SIDEBAR_OBJECTIVE_NAME = "arena"
         const val ARENA_SIDEBAR_MAX_LINES = 15
-        const val ENTRANCE_LIFT_STRUCTURE_PATH = "structures/arena/lift.nbt"
+        const val ENTRANCE_LIFT_STRUCTURE_PATH = "structures/arena/lift.schem"
         const val ENTRANCE_LIFT_INTERVAL_TICKS_DEFAULT = 10L
         const val ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT = 10
         const val ENTRANCE_LIFT_MAX_RISE_BLOCKS_DEFAULT = 17
@@ -372,6 +374,9 @@ class ArenaManager(
         const val FINAL_WAVE_OVERTIME_DISCHARGE_KNOCKBACK_BASE = 0.75
         const val LOBBY_TUTORIAL_HOLD_TICKS = 40
         const val LOBBY_TUTORIAL_COMPLETE_DELAY_TICKS = 40L
+        const val LOBBY_GUIDE_TOTAL_CHAT_LINES = 20
+        const val LOBBY_GUIDE_SEPARATOR = "――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――"
+        const val LOBBY_GUIDE_SOUND_KEY = "minecraft:entity.villager.work_cartographer"
         const val LOBBY_MARKER_TAG_RETURN = "arena.marker.lobby"
         const val LOBBY_MARKER_TAG_MAIN = "arena.marker.lobby_main"
         const val LOBBY_MARKER_TAG_TUTORIAL_START = "arena.marker.lobby_tutorial_start"
@@ -1071,7 +1076,10 @@ class ArenaManager(
         return when (lobbyType?.lowercase(Locale.ROOT)) {
             "tutorial" -> ArenaLobbyTargetType.TUTORIAL
             "main" -> ArenaLobbyTargetType.MAIN
-            else -> ArenaLobbyTargetType.MAIN
+            else -> {
+                val progress = loadLobbyProgress(playerId)
+                if (progress.tutorialCompleted) ArenaLobbyTargetType.MAIN else ArenaLobbyTargetType.TUTORIAL
+            }
         }
     }
 
@@ -5118,24 +5126,16 @@ class ArenaManager(
     private fun applyDoorAnimationFrame(placement: ArenaDoorAnimationPlacement, frameIndex: Int) {
         val world = placement.placeOrigin.world ?: return
         val template = placement.openFrames.getOrNull(frameIndex - 1) ?: return
-        template.structure.place(
+        template.structure.paste(
             placement.placeOrigin.clone().apply { this.world = world },
-            false,
-            toStructureRotation(placement.rotationQuarter),
-            if (placement.mirrored) Mirror.LEFT_RIGHT else Mirror.NONE,
-            0,
-            1.0f,
-            java.util.Random()
+            StructurePasteOptions(
+                rotationQuarter = placement.rotationQuarter,
+                mirrorX = placement.mirrored,
+                pasteAir = true,
+                copyEntities = false,
+                copyBiomes = false
+            )
         )
-    }
-
-    private fun toStructureRotation(rotationQuarter: Int): StructureRotation {
-        return when (rotationQuarter.mod(4)) {
-            1 -> StructureRotation.CLOCKWISE_90
-            2 -> StructureRotation.CLOCKWISE_180
-            3 -> StructureRotation.COUNTERCLOCKWISE_90
-            else -> StructureRotation.NONE
-        }
     }
 
     private fun onCorridorOpened(session: ArenaSession, wave: Int) {
@@ -7404,21 +7404,15 @@ class ArenaManager(
     }
 
     private fun resolveLiftTemplate(path: String): EntranceLiftTemplate? {
-        val file = File(plugin.dataFolder, path)
-        if (!file.exists()) {
-            return null
-        }
-        val loaded = runCatching {
-            Bukkit.getStructureManager().loadStructure(file)
-        }.getOrNull() ?: return null
+        val loaded = structureService.load(path) ?: return null
         val size = loaded.size
-        if (size.blockX <= 0 || size.blockY <= 0 || size.blockZ <= 0) {
+        if (size.x <= 0 || size.y <= 0 || size.z <= 0) {
             return null
         }
         return EntranceLiftTemplate(
-            sizeX = size.blockX,
-            sizeY = size.blockY,
-            sizeZ = size.blockZ,
+            sizeX = size.x,
+            sizeY = size.y,
+            sizeZ = size.z,
             structure = loaded
         )
     }
@@ -7428,14 +7422,13 @@ class ArenaManager(
         origin: Location,
         template: EntranceLiftTemplate
     ) {
-        template.structure.place(
+        template.structure.paste(
             origin.clone().apply { this.world = world },
-            false,
-            StructureRotation.NONE,
-            Mirror.NONE,
-            0,
-            1.0f,
-            java.util.Random()
+            StructurePasteOptions(
+                pasteAir = true,
+                copyEntities = false,
+                copyBiomes = false
+            )
         )
     }
 
@@ -7827,7 +7820,7 @@ class ArenaManager(
         val stepMessages = ArenaI18n.stringList(player, "arena.messages.lobby.tutorial.steps")
         stepMessages.getOrNull(stepIndex)
             ?.takeIf { it.isNotBlank() }
-            ?.let { player.sendMessage(it) }
+            ?.let { sendLobbyGuideMessage(player, listOf(it)) }
 
         lobbyTutorialHoldStates.remove(playerId)
         if (tutorialState == null) {
@@ -7843,6 +7836,21 @@ class ArenaManager(
         }
 
         spawnLobbyTutorialMarker(player, tutorialState)
+    }
+
+    private fun sendLobbyGuideMessage(player: Player, messageLines: List<String>) {
+        val bodyLineCount = LOBBY_GUIDE_TOTAL_CHAT_LINES - 2
+        val bodyLines = messageLines
+            .take(bodyLineCount)
+            .toMutableList()
+        while (bodyLines.size < bodyLineCount) {
+            bodyLines += ""
+        }
+
+        player.sendMessage(LOBBY_GUIDE_SEPARATOR)
+        bodyLines.forEach { line -> player.sendMessage(line) }
+        player.sendMessage(LOBBY_GUIDE_SEPARATOR)
+        player.playSound(player.location, LOBBY_GUIDE_SOUND_KEY, 1.0f, 1.0f)
     }
 
     private fun updateBarrierReturnHoldStates(currentTick: Long) {
