@@ -27,6 +27,7 @@ import jp.awabi2048.cccontent.items.misc.GulliverScaleManager
 import jp.awabi2048.cccontent.items.misc.HeadDatabaseBridge
 import jp.awabi2048.cccontent.items.misc.StorageBoxGuiListener
 import jp.awabi2048.cccontent.items.misc.StorageBoxSingleItem
+import jp.awabi2048.cccontent.items.misc.StopwatchItem
 import jp.awabi2048.cccontent.items.misc.StorageBoxTripleItem
 import jp.awabi2048.cccontent.items.misc.TransparentGlowItemFrameItem
 import jp.awabi2048.cccontent.items.misc.TransparentItemFrameItem
@@ -424,6 +425,11 @@ class CCContent : JavaPlugin(), Listener {
         }
         server.pluginManager.registerEvents(StorageBoxGuiListener(this), this)
         server.pluginManager.registerEvents(TransparentItemFrameListener(this), this)
+        CustomItemManager.getItem("misc.stopwatch")?.let { item ->
+            if (item is StopwatchItem) {
+                server.pluginManager.registerEvents(item, this)
+            }
+        }
 
         server.scheduler.runTaskTimer(this, GulliverScaleManager(), 0L, 1L)
 
@@ -877,6 +883,7 @@ class CCContent : JavaPlugin(), Listener {
         CustomItemManager.register(BronzeNozzleItem())
         CustomItemManager.register(AirTriggerItem())
         CustomItemManager.register(DecentBowItem())
+        CustomItemManager.register(StopwatchItem(this))
         
         registerCustomHeadItems()
 
