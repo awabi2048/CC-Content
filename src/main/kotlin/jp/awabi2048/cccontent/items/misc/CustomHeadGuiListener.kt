@@ -17,6 +17,7 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.ItemMeta
+import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.plugin.java.JavaPlugin
 
 class CustomHeadGuiListener(private val plugin: JavaPlugin) : Listener {
@@ -25,7 +26,7 @@ class CustomHeadGuiListener(private val plugin: JavaPlugin) : Listener {
     fun onInventoryClick(event: InventoryClickEvent) {
         val player = event.whoClicked as? Player ?: return
         val holder = event.inventory.holder as? CustomHeadSelectionHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("CustomHeadGuiListener.onInventoryClick: selection_click")
 
         if (event.rawSlot < 0 || event.rawSlot >= event.inventory.size) {
             return

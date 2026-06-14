@@ -15,6 +15,7 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
+import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import java.util.UUID
@@ -222,7 +223,7 @@ class ArenaSessionInfoMenu(
     @EventHandler
     fun onInventoryClick(event: InventoryClickEvent) {
         val holder = event.view.topInventory.holder as? ArenaSessionInfoHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("ArenaSessionInfoMenu.onInventoryClick: info_menu")
     }
 
     @EventHandler

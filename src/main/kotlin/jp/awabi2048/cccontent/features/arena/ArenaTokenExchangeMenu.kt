@@ -8,6 +8,7 @@ import jp.awabi2048.cccontent.gui.VirtualInventoryEscrowService
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
 import jp.awabi2048.cccontent.util.ItemMetaCompat
+import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -220,23 +221,23 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
     private fun handleMenuClick(event: InventoryClickEvent, holder: ArenaTokenExchangeHolder) {
         val player = event.whoClicked as? Player ?: return
         if (player.uniqueId != holder.ownerId) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaTokenExchangeMenu.handleMenuClick: wrong_owner")
             return
         }
         val top = holder.backingInventory
         if (blockedClick(event.click)) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaTokenExchangeMenu.handleMenuClick: blocked_click")
             return
         }
         val clickedTop = event.clickedInventory == top
         if (!clickedTop) {
             if (event.isShiftClick) {
-                event.isCancelled = true
+                event.cancelWithDebug("ArenaTokenExchangeMenu.handleMenuClick: shift_click_store")
                 insertFromPlayerSlot(player, holder, event.slot, "shift_click")
             }
             return
         }
-        event.isCancelled = true
+        event.cancelWithDebug("ArenaTokenExchangeMenu.handleMenuClick: menu_click")
         when (event.rawSlot) {
             ArenaTokenExchangeLayout.EXCHANGE_SLOT -> openConfirmation(player, holder, TokenExchangeMode.INPUT_SLOTS)
             ArenaTokenExchangeLayout.BULK_EXCHANGE_SLOT -> {
@@ -256,7 +257,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
 
     private fun handleConfirmClick(event: InventoryClickEvent, holder: ArenaTokenExchangeConfirmHolder) {
         val player = event.whoClicked as? Player ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("ArenaTokenExchangeMenu.handleConfirmClick: confirm_click")
         if (player.uniqueId != holder.ownerId || event.clickedInventory != holder.backingInventory) return
         when (event.rawSlot) {
             ArenaTokenExchangeLayout.CONFIRM_OK_SLOT -> {

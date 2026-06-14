@@ -26,6 +26,7 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.SkullMeta
+import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
@@ -323,11 +324,11 @@ class ArenaMissionService(
         val holder = event.view.topInventory.holder
         when (holder) {
             is ArenaMissionMenuHolder -> {
-                event.isCancelled = true
+                event.cancelWithDebug("ArenaMissionService.onMissionMenuClick: menu_click")
                 handleMenuClick(player, holder, event.rawSlot)
             }
             is ArenaMissionConfirmHolder -> {
-                event.isCancelled = true
+                event.cancelWithDebug("ArenaMissionService.onMissionMenuClick: confirm_click")
                 handleConfirmClick(player, holder, event.rawSlot)
             }
         }

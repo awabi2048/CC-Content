@@ -7,6 +7,7 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.player.PlayerDropItemEvent
+import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.plugin.java.JavaPlugin
 
 class TalismanListener(private val plugin: JavaPlugin) : Listener {
@@ -19,11 +20,11 @@ class TalismanListener(private val plugin: JavaPlugin) : Listener {
         if (event.inventory.holder is TalismanConfirmGui) {
             // Apply cooldown
             if (MenuCooldownManager.checkAndSetCooldown(player.uniqueId)) {
-                event.isCancelled = true
+                event.cancelWithDebug("TalismanListener.onInventoryClick: cooldown")
                 return
             }
 
-            event.isCancelled = true
+            event.cancelWithDebug("TalismanListener.onInventoryClick: gui_click")
             val slot = event.rawSlot
             when (slot) {
                 11 -> {

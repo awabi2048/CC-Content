@@ -33,6 +33,7 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.SkullMeta
+import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 import java.time.LocalDate
@@ -147,7 +148,7 @@ class NpcMenuService(
     @EventHandler
     fun onInventoryClick(event: InventoryClickEvent) {
         val holder = event.view.topInventory.holder as? NpcMenuHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("NpcMenuService.onInventoryClick: menu_click")
 
         val player = event.whoClicked as? Player ?: return
         if (player.uniqueId != holder.ownerId) return
@@ -160,7 +161,7 @@ class NpcMenuService(
     fun onInventoryDrag(event: InventoryDragEvent) {
         val holder = event.view.topInventory.holder as? NpcMenuHolder ?: return
         if (event.rawSlots.any { it in 0 until event.view.topInventory.size } || holder.ownerId != (event.whoClicked as? Player)?.uniqueId) {
-            event.isCancelled = true
+            event.cancelWithDebug("NpcMenuService.onInventoryDrag: drag_cancelled")
         }
     }
 

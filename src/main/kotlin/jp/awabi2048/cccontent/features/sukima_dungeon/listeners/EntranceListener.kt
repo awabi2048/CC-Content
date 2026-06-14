@@ -18,6 +18,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.PortalManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.PortalSession
 import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
+import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.event.player.PlayerInteractEntityEvent
 
 import org.bukkit.ChatColor
@@ -37,11 +38,11 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
         if (holder is DungeonEntranceGui) {
             // Apply cooldown
             if (jp.awabi2048.cccontent.features.sukima_dungeon.MenuCooldownManager.checkAndSetCooldown(player.uniqueId)) {
-                event.isCancelled = true
+                event.cancelWithDebug("EntranceListener.onInventoryClick: entrance_cooldown")
                 return
             }
 
-            event.isCancelled = true
+            event.cancelWithDebug("EntranceListener.onInventoryClick: entrance_click")
             val item = event.currentItem ?: return
             if (item.type == Material.AIR || item.type == Material.GRAY_STAINED_GLASS_PANE || item.type == Material.BLACK_STAINED_GLASS_PANE) return
 
@@ -78,11 +79,11 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
 
         } else if (holder is DungeonConfirmGui) {
             if (jp.awabi2048.cccontent.features.sukima_dungeon.MenuCooldownManager.checkAndSetCooldown(player.uniqueId)) {
-                event.isCancelled = true
+                event.cancelWithDebug("EntranceListener.onInventoryClick: confirm_cooldown")
                 return
             }
 
-            event.isCancelled = true
+            event.cancelWithDebug("EntranceListener.onInventoryClick: confirm_click")
             val slot = event.rawSlot
             when (slot) {
                 11 -> {
@@ -103,11 +104,11 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
             }
         } else if (holder is DungeonJoinGui) {
             if (jp.awabi2048.cccontent.features.sukima_dungeon.MenuCooldownManager.checkAndSetCooldown(player.uniqueId)) {
-                event.isCancelled = true
+                event.cancelWithDebug("EntranceListener.onInventoryClick: join_cooldown")
                 return
             }
 
-            event.isCancelled = true
+            event.cancelWithDebug("EntranceListener.onInventoryClick: join_click")
             val slot = event.rawSlot
             when (slot) {
                 13 -> {
@@ -135,11 +136,11 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
             }
         } else if (holder is DungeonExitGui) {
             if (jp.awabi2048.cccontent.features.sukima_dungeon.MenuCooldownManager.checkAndSetCooldown(player.uniqueId)) {
-                event.isCancelled = true
+                event.cancelWithDebug("EntranceListener.onInventoryClick: exit_cooldown")
                 return
             }
 
-            event.isCancelled = true
+            event.cancelWithDebug("EntranceListener.onInventoryClick: exit_click")
             val slot = event.rawSlot
             when (slot) {
                 11 -> {

@@ -19,6 +19,7 @@ import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillManager
 import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillIdentifier
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
 import jp.awabi2048.cccontent.features.rank.skill.handlers.AttackReachBoostHandler
+import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.Sound
@@ -2396,7 +2397,7 @@ class RankCommand(
     @EventHandler
     fun onSkillTreeGuiClick(event: InventoryClickEvent) {
         val holder = event.view.topInventory.holder as? SkillTreeGuiHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("RankCommand.onSkillTreeGuiClick: skill_tree")
 
         val clickedSlot = event.rawSlot
         if (clickedSlot !in 0 until event.view.topInventory.size) {
@@ -2769,7 +2770,7 @@ class RankCommand(
     @EventHandler
     fun onProfessionMainMenuClick(event: InventoryClickEvent) {
         val holder = event.view.topInventory.holder as? ProfessionMainMenuGuiHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("RankCommand.onProfessionMainMenuClick: profession_main_menu")
 
         val clickedSlot = event.rawSlot
         if (clickedSlot !in 0 until event.view.topInventory.size) {
@@ -2826,7 +2827,7 @@ class RankCommand(
     @EventHandler
     fun onProfessionSettingsMenuClick(event: InventoryClickEvent) {
         val holder = event.view.topInventory.holder as? ProfessionSettingsGuiHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("RankCommand.onProfessionSettingsMenuClick: settings_menu")
 
         val clickedSlot = event.rawSlot
         if (clickedSlot !in 0 until event.view.topInventory.size) {
@@ -3014,7 +3015,7 @@ class RankCommand(
     @EventHandler
     fun onProfessionSelectionGuiClick(event: InventoryClickEvent) {
         val holder = event.view.topInventory.holder as? ProfessionSelectionGuiHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("RankCommand.onProfessionSelectionGuiClick: selection_gui")
 
         val clickedSlot = event.rawSlot
         if (clickedSlot !in 0 until event.view.topInventory.size) {
@@ -3061,7 +3062,7 @@ class RankCommand(
     @EventHandler
     fun onTutorialRankMenuClick(event: InventoryClickEvent) {
         val holder = event.view.topInventory.holder as? TutorialRankMenuGuiHolder ?: return
-        event.isCancelled = true
+        event.cancelWithDebug("RankCommand.onTutorialRankMenuClick: tutorial_menu")
 
         val clickedSlot = event.rawSlot
         if (clickedSlot !in 0 until event.view.topInventory.size) {
@@ -3101,7 +3102,7 @@ class RankCommand(
         if (event.view.topInventory.holder !is TaskInfoGuiHolder) {
             return
         }
-        event.isCancelled = true
+        event.cancelWithDebug("RankCommand.onTaskInfoGuiClick: task_info")
     }
 
     @EventHandler

@@ -32,6 +32,7 @@ import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.ShapedRecipe
 import org.bukkit.persistence.PersistentDataType
+import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import java.io.File
@@ -190,24 +191,24 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
 
         val owner = machineLocks[locationKey]
         if (owner != null && owner != player.uniqueId) {
-            event.isCancelled = true
+            event.cancelWithDebug("BreweryController.onInventoryClick: wrong_owner")
             return
         }
 
         if (event.clickedInventory == null) {
-            event.isCancelled = true
+            event.cancelWithDebug("BreweryController.onInventoryClick: null_clicked_inv")
             return
         }
 
         if (event.isShiftClick) {
-            event.isCancelled = true
+            event.cancelWithDebug("BreweryController.onInventoryClick: shift_click")
             handleShiftQuickMove(player, holder, event)
             return
         }
 
         if (event.clickedInventory != top) return
 
-        event.isCancelled = true
+        event.cancelWithDebug("BreweryController.onInventoryClick: menu_click")
         when (holder) {
             is FermentationHolder -> handleFermentationClick(player, holder.locationKey, event)
             is DistillationHolder -> handleDistillationClick(player, holder.locationKey, event)

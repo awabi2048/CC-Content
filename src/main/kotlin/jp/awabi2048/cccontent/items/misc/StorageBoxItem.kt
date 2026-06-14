@@ -25,6 +25,7 @@ import org.bukkit.event.player.PlayerItemHeldEvent
 import org.bukkit.event.player.PlayerItemConsumeEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
+import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.event.player.PlayerSwapHandItemsEvent
 import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.player.PlayerInteractEvent
@@ -846,17 +847,17 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         val holder = event.view.topInventory.holder as? StorageBoxMenuHolder
         if (holder != null) {
             if (holder.owner != player.uniqueId) {
-                event.isCancelled = true
+                event.cancelWithDebug("StorageBoxItem.onAnyInventoryClick: wrong_owner")
                 return
             }
 
             if (isMovingOpenedBoxItem(event, holder, player)) {
-                event.isCancelled = true
+                event.cancelWithDebug("StorageBoxItem.onAnyInventoryClick: moving_box_item")
                 return
             }
 
             if (event.rawSlot in 0 until menuSize) {
-                event.isCancelled = true
+                event.cancelWithDebug("StorageBoxItem.onAnyInventoryClick: storage_slot_click")
                 if (event.click == ClickType.SWAP_OFFHAND) {
                     return
                 }
@@ -984,7 +985,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         val request = source.clone().apply { amount = amountToStore }
         val stored = StorageBoxCodec.storeStack(state, request)
 
-        event.isCancelled = true
+        event.cancelWithDebug("StorageBoxItem.handleBottomInventoryStoreClick: store_click")
         if (stored <= 0) {
             player.sendMessage("§eこのアイテムは格納できません（種類上限または対象外）")
             return true

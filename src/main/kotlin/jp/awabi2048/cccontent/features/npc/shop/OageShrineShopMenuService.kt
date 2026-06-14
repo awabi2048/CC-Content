@@ -5,6 +5,7 @@ import jp.awabi2048.cccontent.economy.ContentEconomyBridge
 import jp.awabi2048.cccontent.gui.GuiMenuItems
 import jp.awabi2048.cccontent.gui.OwnedMenuHolder
 import jp.awabi2048.cccontent.util.ContentLocaleResolver
+import jp.awabi2048.cccontent.util.cancelWithDebug
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
@@ -111,7 +112,7 @@ class OageShrineShopMenuService(
         val player = event.whoClicked as? Player ?: return
         when (val holder = event.view.topInventory.holder) {
             is ShopHolder -> {
-                event.isCancelled = true
+                event.cancelWithDebug("OageShrineShopMenuService.onInventoryClick: shop_click")
                 if (player.uniqueId != holder.ownerId) return
                 if (event.rawSlot !in 0 until event.view.topInventory.size) return
 
@@ -133,7 +134,7 @@ class OageShrineShopMenuService(
                 }
             }
             is ConfirmHolder -> {
-                event.isCancelled = true
+                event.cancelWithDebug("OageShrineShopMenuService.onInventoryClick: confirm_click")
                 if (player.uniqueId != holder.ownerId) return
                 when (event.rawSlot) {
                     CONFIRM_CONFIRM_SLOT -> confirmPurchase(player, holder.resolved)

@@ -11,6 +11,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.gui.DungeonEntranceGui
 import jp.awabi2048.cccontent.features.sukima_dungeon.gui.TalismanConfirmGui
 import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
 import jp.awabi2048.cccontent.items.CustomItem
+import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.Sound
@@ -325,7 +326,7 @@ class SukimaTalismanItem : CustomItem {
             event.click == ClickType.WINDOW_BORDER_LEFT ||
             event.click == ClickType.WINDOW_BORDER_RIGHT
         ) {
-            event.isCancelled = true
+            event.cancelWithDebug("SukimaDungeonItems.SukimaTalismanItem.onInventoryClick: drop_denied")
             return
         }
 
@@ -337,7 +338,7 @@ class SukimaTalismanItem : CustomItem {
             topInventory.type != InventoryType.CRAFTING &&
             topInventory.type != InventoryType.PLAYER
         ) {
-            event.isCancelled = true
+            event.cancelWithDebug("SukimaDungeonItems.SukimaTalismanItem.onInventoryClick: move_to_other_denied")
             return
         }
 
@@ -346,7 +347,7 @@ class SukimaTalismanItem : CustomItem {
             topInventory.type != InventoryType.CRAFTING &&
             topInventory.type != InventoryType.PLAYER
         ) {
-            event.isCancelled = true
+            event.cancelWithDebug("SukimaDungeonItems.SukimaTalismanItem.onInventoryClick: top_inv_denied")
             return
         }
 
@@ -356,7 +357,7 @@ class SukimaTalismanItem : CustomItem {
             topInventory.type != InventoryType.CRAFTING &&
             topInventory.type != InventoryType.PLAYER
         ) {
-            event.isCancelled = true
+            event.cancelWithDebug("SukimaDungeonItems.SukimaTalismanItem.onInventoryClick: number_key_denied")
         }
     }
 }

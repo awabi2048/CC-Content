@@ -26,6 +26,7 @@ import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataType
+import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import java.util.Locale
@@ -237,24 +238,24 @@ class ArenaEnchantPedestalMenu(
         val holder = event.view.topInventory.holder as? ArenaEnchantPedestalHolder ?: return
         val player = event.whoClicked as? Player ?: return
         if (player.uniqueId != holder.ownerId) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.onInventoryClick: wrong_owner")
             return
         }
 
         val runtime = runtimes.getOrPut(holder.ownerId) { ViewerRuntime() }
         if (runtime.isForging) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.onInventoryClick: is_forging")
             return
         }
         val top = event.view.topInventory
         val clickedTop = event.clickedInventory == top
         if (runtime.isPanelAnimating && !isAllowedDuringPanelAnimation(event, top, clickedTop)) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.onInventoryClick: panel_animating")
             return
         }
 
         if (isBlockedClickType(event)) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.onInventoryClick: blocked_click_type")
             return
         }
 
@@ -269,18 +270,18 @@ class ArenaEnchantPedestalMenu(
 
         val rawSlot = event.rawSlot
         if (rawSlot == ArenaEnchantPedestalLayout.EXECUTE_SLOT) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.onInventoryClick: execute_slot")
             handleExecuteClick(player, top, runtime)
             return
         }
 
         if (rawSlot == ArenaEnchantPedestalLayout.PROGRESS_SLOT || rawSlot == ArenaEnchantPedestalLayout.INFO_SLOT || rawSlot == ArenaEnchantPedestalLayout.EXP_SLOT) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.onInventoryClick: static_slot")
             return
         }
 
         if (rawSlot != ArenaEnchantPedestalLayout.TOOL_SLOT && rawSlot !in ArenaEnchantPedestalLayout.CATALYST_SLOTS) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.onInventoryClick: invalid_slot")
             return
         }
 
@@ -291,26 +292,26 @@ class ArenaEnchantPedestalMenu(
         }
 
         if (isBlockedInventoryAction(event.action)) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.onInventoryClick: blocked_action")
             return
         }
 
         if (event.click != ClickType.LEFT && event.click != ClickType.RIGHT) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.onInventoryClick: invalid_click_type")
             return
         }
 
         if (isInputPlaceholder(top.getItem(rawSlot))) {
             if (event.cursor.isNullOrAir()) {
-                event.isCancelled = true
+                event.cancelWithDebug("ArenaEnchantPedestalMenu.onInventoryClick: placeholder_air_cursor")
                 return
             }
             if (!isTopSlotOperationAllowed(event, rawSlot)) {
-                event.isCancelled = true
+                event.cancelWithDebug("ArenaEnchantPedestalMenu.onInventoryClick: placeholder_not_allowed")
                 return
             }
             val before = captureSnapshot(player, top)
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.onInventoryClick: placeholder_place")
             placeFromCursorIntoInputSlot(event, top, rawSlot)
             Bukkit.getScheduler().runTask(plugin, Runnable {
                 val after = captureSnapshot(player, top)
@@ -320,7 +321,7 @@ class ArenaEnchantPedestalMenu(
         }
 
         if (!isTopSlotOperationAllowed(event, rawSlot)) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.onInventoryClick: operation_not_allowed")
             return
         }
 
@@ -390,7 +391,7 @@ class ArenaEnchantPedestalMenu(
         if (clickedTop) {
             val rawSlot = event.rawSlot
             if (rawSlot != ArenaEnchantPedestalLayout.TOOL_SLOT && rawSlot !in ArenaEnchantPedestalLayout.CATALYST_SLOTS) {
-                event.isCancelled = true
+                event.cancelWithDebug("ArenaEnchantPedestalMenu.handleShiftClick: invalid_shift_slot")
                 return
             }
             if (runtime != null) {
@@ -400,7 +401,7 @@ class ArenaEnchantPedestalMenu(
                 return
             }
             if (isInputPlaceholder(top.getItem(rawSlot))) {
-                event.isCancelled = true
+                event.cancelWithDebug("ArenaEnchantPedestalMenu.handleShiftClick: shift_placeholder")
                 return
             }
 
@@ -413,19 +414,19 @@ class ArenaEnchantPedestalMenu(
         }
 
         if (runtime?.isPanelAnimating == true) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.handleShiftClick: shift_panel_animating")
             return
         }
 
         val moving = event.currentItem?.takeUnless { it.type.isAir } ?: return
         val targetSlot = resolveInputSlotForItem(moving, top, evaluation)
         if (targetSlot == null || !isInputSlotAvailableForInsert(top, targetSlot)) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.handleShiftClick: shift_no_target")
             return
         }
 
         val before = captureSnapshot(player, top)
-        event.isCancelled = true
+        event.cancelWithDebug("ArenaEnchantPedestalMenu.handleShiftClick: shift_manual")
         val source = event.clickedInventory ?: return
         val placed = moving.clone().apply { amount = 1 }
         top.setItem(targetSlot, placed)
@@ -504,7 +505,7 @@ class ArenaEnchantPedestalMenu(
             else -> false
         }
         if (placing) {
-            event.isCancelled = true
+            event.cancelWithDebug("ArenaEnchantPedestalMenu.handleReverseOnToolRemovalDuringAnimation: placing_during_anim")
             return true
         }
 
