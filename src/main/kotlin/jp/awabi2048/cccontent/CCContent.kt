@@ -106,6 +106,10 @@ import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import net.luckperms.api.LuckPerms
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
+import org.bukkit.command.Command
+import org.bukkit.command.CommandExecutor
+import org.bukkit.command.CommandSender
+import org.bukkit.command.TabCompleter
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.entity.Player
 import org.bukkit.event.Listener
@@ -156,7 +160,7 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var npcMenuService: NpcMenuService
     private var rankManagerInstance: RankManagerImpl? = null
     private var ignoreBlockStoreInstance: IgnoreBlockStore? = null
-    private lateinit var contentEnabledAtStartup: ContentEnabledSettings
+    private lateinit var activeContentEnabledSettings: ContentEnabledSettings
     private var arenaFeatureReady: Boolean = false
     private var arenaFeatureFailureReason: String? = null
     private var customItemsLanguageAvailable: Boolean = true
@@ -168,6 +172,25 @@ class CCContent : JavaPlugin(), Listener {
         val cooking: Boolean,
         val sukimaDungeon: Boolean
     )
+
+    private class FeatureUnavailableCommand(private val featureName: String) : CommandExecutor, TabCompleter {
+        override fun onCommand(
+            sender: CommandSender,
+            command: Command,
+            label: String,
+            args: Array<String>
+        ): Boolean {
+            sender.sendMessage("§c$featureName is not available. Check content_enabled and reload status.")
+            return true
+        }
+
+        override fun onTabComplete(
+            sender: CommandSender,
+            command: Command,
+            alias: String,
+            args: Array<String>
+        ): List<String> = emptyList()
+    }
     
     fun getMarkerManager(): MarkerManager = markerManager
     fun getAdminMarkerToolService(): AdminMarkerToolService = adminMarkerToolService
@@ -185,7 +208,7 @@ class CCContent : JavaPlugin(), Listener {
         saveSplitLanguageResources()
         coreConfig = CoreConfigManager.load(this)
         validateAndRegisterLanguageSources()
-        contentEnabledAtStartup = loadContentEnabledSettings()
+        activeContentEnabledSettings = loadContentEnabledSettings()
 
         languageManager = LanguageLoader(this, "ja_jp")
 
@@ -234,6 +257,8 @@ class CCContent : JavaPlugin(), Listener {
             featureInitLogger.addDetailMessage("Oage Shrine", "[Oage Shrine] 初期化失敗: ${e.message}")
             logger.warning("[Oage Shrine] 初期化に失敗しました: ${e.message}")
         }
+
+        installFeatureUnavailableCommands()
 
         initializeFeatureIfEnabled("Rank System", "rank") {
             if (hasLanguageErrorsFor("rank")) {
@@ -372,7 +397,7 @@ class CCContent : JavaPlugin(), Listener {
         getCommand("cc")?.setExecutor(ccCommand)
         getCommand("cc")?.tabCompleter = ccCommand
 
-        if (isContentEnabledAtStartup("arena")) {
+        if (isContentEnabled("arena")) {
             ArenaI18n.initialize(this)
             val arenaCommand = ArenaCommand(
                 arenaManagerProvider = { if (::arenaManager.isInitialized) arenaManager else null },
@@ -400,7 +425,7 @@ class CCContent : JavaPlugin(), Listener {
         server.pluginManager.registerEvents(GulliverItemListener(this), this)
         server.pluginManager.registerEvents(AutoIgnitionBoosterListener(this), this)
         server.pluginManager.registerEvents(MobEventListener(sharedMobService), this)
-        if (isContentEnabledAtStartup("arena") && arenaFeatureReady && ::arenaManager.isInitialized) {
+        if (isContentEnabled("arena") && arenaFeatureReady && ::arenaManager.isInitialized) {
             server.pluginManager.registerEvents(ArenaItemListener(), this)
             server.pluginManager.registerEvents(ArenaListener(arenaManager), this)
             arenaMissionService?.let {
@@ -524,28 +549,28 @@ class CCContent : JavaPlugin(), Listener {
         persistenceFlushTask?.cancel()
         val intervalTicks = getPersistenceFlushIntervalMinutes() * 60L * 20L
         persistenceFlushTask = server.scheduler.runTaskTimer(this, Runnable {
-            if (isContentEnabledAtStartup("sukima_dungeon")) {
+            if (isContentEnabled("sukima_dungeon")) {
                 DungeonSessionManager.flushIfDirty(this)
             }
-            if (isContentEnabledAtStartup("brewery") && ::breweryFeature.isInitialized) {
+            if (isContentEnabled("brewery") && ::breweryFeature.isInitialized) {
                 breweryFeature.flushDirty()
             }
         }, intervalTicks, intervalTicks)
     }
 
-    private fun isContentEnabledAtStartup(contentKey: String): Boolean {
+    private fun isContentEnabled(contentKey: String): Boolean {
         return when (contentKey) {
-            "arena" -> contentEnabledAtStartup.arena
-            "rank" -> contentEnabledAtStartup.rank
-            "brewery" -> contentEnabledAtStartup.brewery
-            "cooking" -> contentEnabledAtStartup.cooking
-            "sukima_dungeon" -> contentEnabledAtStartup.sukimaDungeon
+            "arena" -> activeContentEnabledSettings.arena
+            "rank" -> activeContentEnabledSettings.rank
+            "brewery" -> activeContentEnabledSettings.brewery
+            "cooking" -> activeContentEnabledSettings.cooking
+            "sukima_dungeon" -> activeContentEnabledSettings.sukimaDungeon
             else -> true
         }
     }
 
     private fun initializeFeatureIfEnabled(featureName: String, contentKey: String, initialize: () -> Unit) {
-        if (!isContentEnabledAtStartup(contentKey)) {
+        if (!isContentEnabled(contentKey)) {
             featureInitLogger.setStatus(featureName, FeatureInitializationLogger.Status.WARNING)
             featureInitLogger.addSummaryMessage(featureName, "configで無効化(content_enabled.$contentKey=false)")
             logger.info("[$featureName] content_enabled.$contentKey=false のため無効化されています")
@@ -562,15 +587,35 @@ class CCContent : JavaPlugin(), Listener {
         }
     }
 
-    private fun logContentEnabledChangeIfNeeded(reloaded: ContentEnabledSettings) {
-        if (reloaded == contentEnabledAtStartup) {
-            return
+    private fun reloadContentEnabledSettings(): Boolean {
+        val previous = activeContentEnabledSettings
+        val reloaded = loadContentEnabledSettings()
+        activeContentEnabledSettings = reloaded
+
+        if (reloaded == previous) {
+            return false
         }
 
-        logger.warning(
-            "content_enabled の変更は再起動後に反映されます: " +
-                "startup=$contentEnabledAtStartup, reloaded=$reloaded"
+        logger.info(
+            "content_enabled changed; reinitializing feature set. " +
+                "previous=$previous, reloaded=$reloaded"
         )
+        restartPlugin()
+        return true
+    }
+
+    private fun installFeatureUnavailableCommands() {
+        setFeatureUnavailableCommand("rank", "Rank System")
+        setFeatureUnavailableCommand("rankmenu", "Rank System")
+        setFeatureUnavailableCommand("arenaa", "Arena")
+        setFeatureUnavailableCommand("sukima_dungeon", "SukimaDungeon")
+    }
+
+    private fun setFeatureUnavailableCommand(commandName: String, featureName: String) {
+        val command = getCommand(commandName) ?: return
+        val unavailable = FeatureUnavailableCommand(featureName)
+        command.setExecutor(unavailable)
+        command.tabCompleter = unavailable
     }
     
     /**
@@ -887,20 +932,20 @@ class CCContent : JavaPlugin(), Listener {
         
         registerCustomHeadItems()
 
-        if (isContentEnabledAtStartup("brewery")) {
+        if (isContentEnabled("brewery")) {
             CustomItemManager.register(BrewerySampleFilterItem(this))
             CustomItemManager.register(BreweryMockClockItem(this))
             CustomItemManager.register(BreweryMockYeastItem(this))
         }
 
-        if (isContentEnabledAtStartup("arena")) {
+        if (isContentEnabled("arena")) {
             CustomItemManager.register(ArenaStructureMarkerToolItem())
             CustomItemManager.register(ArenaOtherMarkerToolItem())
             CustomItemManager.register(ArenaLiftToolItem())
             CustomItemManager.register(ArenaEnchantShardItem())
         }
 
-        if (isContentEnabledAtStartup("sukima_dungeon")) {
+        if (isContentEnabled("sukima_dungeon")) {
             CustomItemManager.register(SukimaCompassTier1Item())
             CustomItemManager.register(SukimaCompassTier2Item())
             CustomItemManager.register(SukimaCompassTier3Item())
@@ -938,6 +983,9 @@ class CCContent : JavaPlugin(), Listener {
         mergeMissingLanguageKeys()
         coreConfig = CoreConfigManager.load(this)
         validateAndRegisterLanguageSources()
+        if (reloadContentEnabledSettings()) {
+            return
+        }
         if (hasLanguageErrorsFor("arena")) {
             if (arenaFeatureReady) {
                 arenaMissionService?.shutdown()
@@ -958,15 +1006,20 @@ class CCContent : JavaPlugin(), Listener {
             return
         }
 
-        if (!arenaFeatureReady && isContentEnabledAtStartup("arena") && arenaFeatureFailureReason != null) {
+        if (!arenaFeatureReady && isContentEnabled("arena") && arenaFeatureFailureReason != null) {
+            logger.info("[Arena] Arena is currently disabled; retrying initialization after reload.")
+            restartPlugin()
+            return
+        }
+
+        if (!arenaFeatureReady && isContentEnabled("arena") && arenaFeatureFailureReason != null) {
             logger.warning("[Arena] 現在Arena機能は無効です。再有効化にはサーバー再起動が必要です")
         }
-        logContentEnabledChangeIfNeeded(loadContentEnabledSettings())
         SukimaConfigHelper.reload(this)
         MessageManager.load(this)
         BGMManager.loadConfig()
 
-        if (isContentEnabledAtStartup("sukima_dungeon") && ::structureLoader.isInitialized && ::mobManager.isInitialized && ::itemManager.isInitialized) {
+        if (isContentEnabled("sukima_dungeon") && ::structureLoader.isInitialized && ::mobManager.isInitialized && ::itemManager.isInitialized) {
             reloadSukimaDungeon()
         }
         sharedMobService.reloadDefinitions()
@@ -999,7 +1052,7 @@ class CCContent : JavaPlugin(), Listener {
         if (::cookingFeature.isInitialized) {
             cookingFeature.reload()
         }
-        if (arenaFeatureReady && ::arenaManager.isInitialized && isContentEnabledAtStartup("arena")) {
+        if (arenaFeatureReady && ::arenaManager.isInitialized && isContentEnabled("arena")) {
             arenaManager.reloadThemes()
             arenaTokenExchangeMenu?.reload()
         }
