@@ -1,4 +1,4 @@
-﻿normal:
+normal:
   weight: 5
   icon: CHISELED_SANDSTONE
   difficulty_star: 1
@@ -265,17 +265,6 @@
   door_open_sound:
     key: minecraft:block.sand.break
     pitch: 0.5
-  orientation:
-    entrance_exit: south
-    corner_entry: north
-    corner_exit: west
-    straight_entry: east
-    corridor_entry: north
-    goal_entry: east
-    tjunction_entry: east
-    tjunction_through: west
-    tjunction_branch: north
-    pedestal_entry: south
 
 promoted:
   difficulty_star: 2

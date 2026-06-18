@@ -7,6 +7,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
 import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
 import jp.awabi2048.cccontent.structure.SchemStructureService
+import jp.awabi2048.cccontent.structure.StructureSchemas
 import net.kyori.adventure.text.Component
 import org.bukkit.Color
 import org.bukkit.FluidCollisionMode
@@ -108,7 +109,8 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             modes = listOf(
                 MarkerToolMode("mob", "arena.marker.mob", "modes.mob", "§cモブ", Particle.FLAME, Color.fromRGB(255, 96, 96)),
                 MarkerToolMode("checkpoint", "arena.marker.checkpoint", "modes.checkpoint", "§aチェックポイント", Particle.HAPPY_VILLAGER, Color.fromRGB(96, 255, 128)),
-                MarkerToolMode("connection", "arena.marker.connection", "modes.connection", "§6接続部", Particle.CRIT, Color.fromRGB(255, 176, 64)),
+                MarkerToolMode("connection_in", StructureSchemas.ARENA_CONNECTION_IN_TAG, "modes.connection_in", "§6接続(入口)", Particle.CRIT, Color.fromRGB(255, 176, 64)),
+                MarkerToolMode("connection_out", StructureSchemas.ARENA_CONNECTION_OUT_TAG, "modes.connection_out", "§b接続(出口)", Particle.CRIT, Color.fromRGB(96, 176, 255)),
                 MarkerToolMode("door_block", "arena.marker.door_block", "modes.door_block", "§e扉", Particle.WAX_OFF, Color.fromRGB(255, 224, 96)),
                 MarkerToolMode("barrier_core", "arena.marker.barrier_core", "modes.barrier_core", "§b結界核", Particle.END_ROD, Color.fromRGB(96, 224, 255)),
                 MarkerToolMode("barrier_point", "arena.marker.barrier_point", "modes.barrier_point", "§3結界起動点", Particle.GLOW, Color.fromRGB(128, 200, 255)),
@@ -409,6 +411,10 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                     val definition = resolveDefinition(item) ?: continue
                     if (definition.unavailableMessage(player) != null) continue
 
+                    val mode = getMode(item, definition)
+                    val modeName = getModeDisplayName(player, definition, mode)
+                    player.sendActionBar(Component.text("§7§l| §f$modeName"))
+
                     if (player.isSneaking) {
                         val preview = resolveDeletionPreview(player, definition)
                         if (preview != null) {
@@ -416,11 +422,9 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                             continue
                         }
                         val placementPreview = resolvePlacementPreview(player) ?: continue
-                        val mode = getMode(item, definition)
                         drawPlacementPreview(placementPreview, mode)
                     } else {
                         val preview = resolvePlacementPreview(player) ?: continue
-                        val mode = getMode(item, definition)
                         drawPlacementPreview(preview, mode)
                     }
                 }

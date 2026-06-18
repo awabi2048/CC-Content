@@ -5,7 +5,10 @@ package jp.awabi2048.cccontent.features.arena.generator
 import jp.awabi2048.cccontent.features.arena.ArenaBounds
 import jp.awabi2048.cccontent.features.arena.ArenaBlockKey
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
+import jp.awabi2048.cccontent.structure.CardinalDirection
+import jp.awabi2048.cccontent.structure.StructureSchemas
 import jp.awabi2048.cccontent.structure.StructurePasteOptions
+import jp.awabi2048.cccontent.structure.StructureTransform
 import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.World
@@ -59,7 +62,7 @@ private data class RotatedConnectionMarker(
 )
 
 private data class RawConnectionMarker(
-    val side: ArenaPathDirection,
+    val side: CardinalDirection,
     val blockX: Int,
     val blockY: Int,
     val blockZ: Int,
@@ -68,7 +71,7 @@ private data class RawConnectionMarker(
 )
 
 private data class ConnectionMarkerProfile(
-    val sideMarkers: Map<ArenaPathDirection, List<RotatedConnectionMarker>>,
+    val sideMarkers: Map<CardinalDirection, List<RotatedConnectionMarker>>,
     val widthX: Int,
     val widthZ: Int,
     val markerCount: Int,
@@ -124,8 +127,9 @@ data class ArenaDoorAnimationPlacement(
 
 class ArenaStageGenerator {
     companion object {
-        private const val CONNECTION_MARKER_TAG = "arena.marker.connection"
-        private const val MARKER_ENTITY_TYPE_ID = "minecraft:marker"
+        private val CONNECTION_MARKER_TAGS = StructureSchemas.ARENA_CONNECTION_TAGS
+        private const val CONNECTION_MARKER_LABEL = "arena.marker.connection"
+        private const val MARKER_ENTITY_TYPE_ID = StructureSchemas.MARKER_ENTITY_TYPE
     }
 
     private enum class BuildPhase {
@@ -239,7 +243,6 @@ class ArenaStageGenerator {
         val placements = generateAlternatingPlacements(
             waves,
             random,
-            theme.orientation,
             if (pedestalRoomEnabled) pedestalRoomProbability else 0.0
         )
             .sortedBy { it.index }
@@ -295,7 +298,7 @@ class ArenaStageGenerator {
             job.validationIssues.add(
                 ArenaStageValidationIssue(
                     structureName = template.name,
-                    missingMarkers = listOf(CONNECTION_MARKER_TAG)
+                    missingMarkers = listOf(CONNECTION_MARKER_LABEL)
                 )
             )
         }
@@ -339,7 +342,7 @@ class ArenaStageGenerator {
                 )
                 if (collidedPlacement != null) {
                     error(
-                        "$CONNECTION_MARKER_TAG(collision collidedWith=$collidedPlacement " +
+                        "$CONNECTION_MARKER_LABEL(collision collidedWith=$collidedPlacement " +
                             "candidate=${boundsSummary(connectedGeometry.bounds)})"
                     )
                 }
@@ -349,7 +352,7 @@ class ArenaStageGenerator {
                     listOf(
                         ArenaStageValidationIssue(
                             structureName = template.name,
-                            missingMarkers = listOf(e.message ?: "$CONNECTION_MARKER_TAG(connection_failed)")
+                            missingMarkers = listOf(e.message ?: "$CONNECTION_MARKER_LABEL(connection_failed)")
                         )
                     )
                 )
@@ -599,7 +602,6 @@ class ArenaStageGenerator {
     private fun generateAlternatingPlacements(
         waves: Int,
         random: Random,
-        orientation: ArenaStructureOrientation,
         pedestalRoomProbability: Double
     ): List<TilePlacement> {
         if (waves <= 0) {
@@ -608,7 +610,7 @@ class ArenaStageGenerator {
                     index = 0,
                     point = TilePoint(0, 0),
                     structureType = ArenaStructureType.ENTRANCE,
-                    transform = entranceTransform(orientation, ArenaPathDirection.NORTH),
+                    transform = entranceTransform(CardinalDirection.NORTH),
                     role = PlacementRole.ENTRANCE,
                     wave = 0
                 )
@@ -622,24 +624,23 @@ class ArenaStageGenerator {
         }
 
         for (pedestalWave in pedestalWaveCandidates + listOf<Int?>(null)) {
-            val placements = generatePlacementsForPedestalWave(waves, random, orientation, pedestalWave)
+            val placements = generatePlacementsForPedestalWave(waves, random, pedestalWave)
             if (placements != null) {
                 return placements
             }
         }
 
-        return buildLinearFallbackPlacements(waves, orientation)
+        return buildLinearFallbackPlacements(waves)
     }
 
     private fun generatePlacementsForPedestalWave(
         waves: Int,
         random: Random,
-        orientation: ArenaStructureOrientation,
         pedestalWave: Int?
     ): List<TilePlacement>? {
         repeat(200) {
             val combatRoomPoints = mutableListOf(TilePoint(0, 0))
-            val roomDirections = mutableListOf(ArenaPathDirection.entries.random(random))
+            val roomDirections = mutableListOf(CardinalDirection.entries.random(random))
             val occupied = mutableSetOf(TilePoint(0, 0))
             val placements = mutableListOf<TilePlacement>()
             var nextIndex = 0
@@ -649,7 +650,7 @@ class ArenaStageGenerator {
                     index = nextIndex++,
                     point = TilePoint(0, 0),
                     structureType = ArenaStructureType.ENTRANCE,
-                    transform = entranceTransform(orientation, roomDirections.first()),
+                    transform = entranceTransform(roomDirections.first()),
                     role = PlacementRole.ENTRANCE,
                     wave = 0
                 )
@@ -666,7 +667,7 @@ class ArenaStageGenerator {
                 }
 
                 val candidateDirections = listOf(startDirection, startDirection.left(), startDirection.right()).shuffled(random)
-                var selectedDirection: ArenaPathDirection? = null
+                var selectedDirection: CardinalDirection? = null
                 var selectedCombatRoomPoint: TilePoint? = null
                 var selectedTransitPoint: TilePoint? = null
                 var selectedPedestalPoint: TilePoint? = null
@@ -674,7 +675,7 @@ class ArenaStageGenerator {
                 var selectedPedestalTransform: PlacementTransform? = null
 
                 for (endDirection in candidateDirections) {
-                    if (endDirection != startDirection && !canResolveCornerTransform(orientation, startDirection.opposite(), endDirection)) {
+                    if (endDirection != startDirection && !canResolveCornerTransform(startDirection.opposite(), endDirection)) {
                         continue
                     }
 
@@ -694,7 +695,6 @@ class ArenaStageGenerator {
                                 continue
                             }
                             val transitTransform = tjunctionRoomTransform(
-                                orientation,
                                 actualEntry = endDirection.opposite(),
                                 actualThrough = endDirection,
                                 actualBranch = branchDirection
@@ -702,7 +702,7 @@ class ArenaStageGenerator {
                             selectedTransitPoint = transitPoint
                             selectedPedestalPoint = pedestalPoint
                             selectedTransitTransform = transitTransform
-                            selectedPedestalTransform = pedestalRoomTransform(orientation, branchDirection.opposite())
+                            selectedPedestalTransform = pedestalRoomTransform(branchDirection.opposite())
                             resolved = true
                             break
                         }
@@ -734,9 +734,9 @@ class ArenaStageGenerator {
 
                 val corridorType = if (selectedDirection == startDirection) ArenaStructureType.CORRIDOR else ArenaStructureType.CORNER
                 val corridorTransform = if (selectedDirection == startDirection) {
-                    corridorTransform(orientation, startDirection.opposite())
+                    corridorTransform(startDirection.opposite())
                 } else {
-                    cornerTransform(orientation, startDirection.opposite(), selectedDirection)
+                    cornerTransform(startDirection.opposite(), selectedDirection)
                 }
 
                 val previousPlacementIndex = placements.last().index
@@ -798,9 +798,9 @@ class ArenaStageGenerator {
                         point = selectedCombatRoomPoint,
                         structureType = if (wave == waves) ArenaStructureType.GOAL else ArenaStructureType.STRAIGHT,
                         transform = if (wave == waves) {
-                            goalTransform(orientation, selectedDirection.opposite())
+                            goalTransform(selectedDirection.opposite())
                         } else {
-                            straightTransform(orientation, selectedDirection.opposite())
+                            straightTransform(selectedDirection.opposite())
                         },
                         role = if (wave == waves) PlacementRole.GOAL_ROOM else PlacementRole.COMBAT_ROOM,
                         wave = wave,
@@ -822,7 +822,7 @@ class ArenaStageGenerator {
         return null
     }
 
-    private fun buildLinearFallbackPlacements(waves: Int, orientation: ArenaStructureOrientation): List<TilePlacement> {
+    private fun buildLinearFallbackPlacements(waves: Int): List<TilePlacement> {
         val result = mutableListOf<TilePlacement>()
         var roomPoint = TilePoint(0, 0)
         var index = 0
@@ -831,7 +831,7 @@ class ArenaStageGenerator {
                 index = index,
                 point = roomPoint,
                 structureType = ArenaStructureType.ENTRANCE,
-                transform = entranceTransform(orientation, ArenaPathDirection.EAST),
+                transform = entranceTransform(CardinalDirection.EAST),
                 role = PlacementRole.ENTRANCE,
                 wave = 0
             )
@@ -839,13 +839,13 @@ class ArenaStageGenerator {
         index += 1
 
         for (wave in 1..waves) {
-            val corridorPoint = TilePoint(roomPoint.x + ArenaPathDirection.EAST.dx, roomPoint.z + ArenaPathDirection.EAST.dz)
+            val corridorPoint = TilePoint(roomPoint.x + CardinalDirection.EAST.dx, roomPoint.z + CardinalDirection.EAST.dz)
             result.add(
                 TilePlacement(
                     index = index,
                     point = corridorPoint,
                     structureType = ArenaStructureType.CORRIDOR,
-                    transform = corridorTransform(orientation, ArenaPathDirection.WEST),
+                    transform = corridorTransform(CardinalDirection.WEST),
                     role = PlacementRole.CORRIDOR,
                     wave = wave,
                     parentIndex = index - 1
@@ -853,16 +853,16 @@ class ArenaStageGenerator {
             )
             index += 1
 
-            roomPoint = TilePoint(corridorPoint.x + ArenaPathDirection.EAST.dx, corridorPoint.z + ArenaPathDirection.EAST.dz)
+            roomPoint = TilePoint(corridorPoint.x + CardinalDirection.EAST.dx, corridorPoint.z + CardinalDirection.EAST.dz)
             result.add(
                 TilePlacement(
                     index = index,
                     point = roomPoint,
                     structureType = if (wave == waves) ArenaStructureType.GOAL else ArenaStructureType.STRAIGHT,
                     transform = if (wave == waves) {
-                        goalTransform(orientation, ArenaPathDirection.WEST)
+                        goalTransform(CardinalDirection.WEST)
                     } else {
-                        straightTransform(orientation, ArenaPathDirection.WEST)
+                        straightTransform(CardinalDirection.WEST)
                     },
                     role = if (wave == waves) PlacementRole.GOAL_ROOM else PlacementRole.COMBAT_ROOM,
                     wave = wave,
@@ -875,78 +875,84 @@ class ArenaStageGenerator {
         return result
     }
 
-    private fun directionOf(from: TilePoint, to: TilePoint): ArenaPathDirection {
+    private fun directionOf(from: TilePoint, to: TilePoint): CardinalDirection {
         val dx = to.x - from.x
         val dz = to.z - from.z
-        return ArenaPathDirection.entries.first { it.dx == dx && it.dz == dz }
+        return CardinalDirection.entries.first { it.dx == dx && it.dz == dz }
     }
 
-    private fun entranceTransform(orientation: ArenaStructureOrientation, actualExit: ArenaPathDirection): PlacementTransform {
-        return PlacementTransform(rotationQuarterBetween(orientation.entranceExit, actualExit))
+    private fun entranceTransform(actualExit: CardinalDirection): PlacementTransform {
+        val schema = requireArenaSchema(ArenaStructureType.ENTRANCE)
+        return PlacementTransform(StructureTransform.rotationBetween(schema.entrySide, actualExit))
     }
 
-    private fun straightTransform(orientation: ArenaStructureOrientation, actualEntry: ArenaPathDirection): PlacementTransform {
-        return PlacementTransform(rotationQuarterBetween(orientation.straightEntry, actualEntry))
+    private fun straightTransform(actualEntry: CardinalDirection): PlacementTransform {
+        val schema = requireArenaSchema(ArenaStructureType.STRAIGHT)
+        return PlacementTransform(StructureTransform.rotationBetween(schema.entrySide, actualEntry))
     }
 
-    private fun corridorTransform(orientation: ArenaStructureOrientation, actualEntry: ArenaPathDirection): PlacementTransform {
-        return PlacementTransform(rotationQuarterBetween(orientation.corridorEntry, actualEntry))
+    private fun corridorTransform(actualEntry: CardinalDirection): PlacementTransform {
+        val schema = requireArenaSchema(ArenaStructureType.CORRIDOR)
+        return PlacementTransform(StructureTransform.rotationBetween(schema.entrySide, actualEntry))
     }
 
-    private fun goalTransform(orientation: ArenaStructureOrientation, actualEntry: ArenaPathDirection): PlacementTransform {
-        return PlacementTransform(rotationQuarterBetween(orientation.goalEntry, actualEntry))
+    private fun goalTransform(actualEntry: CardinalDirection): PlacementTransform {
+        val schema = requireArenaSchema(ArenaStructureType.GOAL)
+        return PlacementTransform(StructureTransform.rotationBetween(schema.entrySide, actualEntry))
     }
 
-    private fun pedestalRoomTransform(orientation: ArenaStructureOrientation, actualEntry: ArenaPathDirection): PlacementTransform {
-        return PlacementTransform(rotationQuarterBetween(orientation.pedestalEntry, actualEntry))
+    private fun pedestalRoomTransform(actualEntry: CardinalDirection): PlacementTransform {
+        val schema = requireArenaSchema(ArenaStructureType.PEDESTAL_ROOM)
+        return PlacementTransform(StructureTransform.rotationBetween(schema.entrySide, actualEntry))
     }
 
     private fun cornerTransform(
-        orientation: ArenaStructureOrientation,
-        actualEntry: ArenaPathDirection,
-        actualExit: ArenaPathDirection
+        actualEntry: CardinalDirection,
+        actualExit: CardinalDirection
     ): PlacementTransform {
+        val schema = requireArenaSchema(ArenaStructureType.CORNER)
+        val canonicalExit = schema.exitSide ?: error("[Arena] corner schema exitSide is missing")
         val candidates = buildList {
             for (quarter in 0..3) add(PlacementTransform(quarter, mirrored = false))
             for (quarter in 0..3) add(PlacementTransform(quarter, mirrored = true))
         }
         return candidates.firstOrNull { transform ->
-            transformDirection(orientation.cornerEntry, transform) == actualEntry &&
-                transformDirection(orientation.cornerExit, transform) == actualExit
+            transformDirection(schema.entrySide, transform) == actualEntry &&
+                transformDirection(canonicalExit, transform) == actualExit
         } ?: error("[Arena] corner 回転が解決できません: entry=${actualEntry.token}, exit=${actualExit.token}")
     }
 
     private fun canResolveCornerTransform(
-        orientation: ArenaStructureOrientation,
-        actualEntry: ArenaPathDirection,
-        actualExit: ArenaPathDirection
+        actualEntry: CardinalDirection,
+        actualExit: CardinalDirection
     ): Boolean {
         if (actualEntry == actualExit || actualEntry.opposite() == actualExit) {
             return false
         }
-        return runCatching { cornerTransform(orientation, actualEntry, actualExit) }.isSuccess
+        return runCatching { cornerTransform(actualEntry, actualExit) }.isSuccess
     }
 
     private fun tjunctionRoomTransform(
-        orientation: ArenaStructureOrientation,
-        actualEntry: ArenaPathDirection,
-        actualThrough: ArenaPathDirection,
-        actualBranch: ArenaPathDirection
+        actualEntry: CardinalDirection,
+        actualThrough: CardinalDirection,
+        actualBranch: CardinalDirection
     ): PlacementTransform? {
+        val schema = requireArenaSchema(ArenaStructureType.TJUNCTION_ROOM)
+        val canonicalThrough = schema.throughSide ?: error("[Arena] tjunction schema throughSide is missing")
+        val canonicalBranch = schema.branchSide ?: error("[Arena] tjunction schema branchSide is missing")
         val candidates = buildList {
             for (quarter in 0..3) add(PlacementTransform(quarter, mirrored = false))
             for (quarter in 0..3) add(PlacementTransform(quarter, mirrored = true))
         }
         return candidates.firstOrNull { transform ->
-            transformDirection(orientation.tjunctionEntry, transform) == actualEntry &&
-                transformDirection(orientation.tjunctionThrough, transform) == actualThrough &&
-                transformDirection(orientation.tjunctionBranch, transform) == actualBranch
+            transformDirection(schema.entrySide, transform) == actualEntry &&
+                transformDirection(canonicalThrough, transform) == actualThrough &&
+                transformDirection(canonicalBranch, transform) == actualBranch
         }
     }
 
-    private fun rotationQuarterBetween(from: ArenaPathDirection, to: ArenaPathDirection): Int {
-        return (to.ordinal - from.ordinal).mod(4)
-    }
+    private fun requireArenaSchema(type: ArenaStructureType) =
+        StructureSchemas.arena(type.keyword) ?: error("[Arena] structure schema is missing: ${type.keyword}")
 
     private fun pickStructureVariant(job: BuildJob, placement: TilePlacement): SelectedStructureVariant? {
         val theme = job.theme
@@ -1102,20 +1108,20 @@ class ArenaStageGenerator {
         val currentMarkers = currentConnectionProfile.sideMarkers[currentSide].orEmpty()
 
         if (previousMarkers.isEmpty()) {
-            error("$CONNECTION_MARKER_TAG(previous_${previousSideUnrotated.token}_missing detected=$previousDetected $connectionContext)")
+            error("$CONNECTION_MARKER_LABEL(previous_${previousSideUnrotated.token}_missing detected=$previousDetected $connectionContext)")
         }
         if (currentMarkers.isEmpty()) {
-            error("$CONNECTION_MARKER_TAG(current_${currentSideUnrotated.token}_missing detected=$currentDetected $connectionContext)")
+            error("$CONNECTION_MARKER_LABEL(current_${currentSideUnrotated.token}_missing detected=$currentDetected $connectionContext)")
         }
 
         if (previousMarkers.size > 1) {
             error(
-                "$CONNECTION_MARKER_TAG(previous_${previousSideUnrotated.token}_multiple detected=${previousMarkers.size} points=$previousDetected $connectionContext)"
+                "$CONNECTION_MARKER_LABEL(previous_${previousSideUnrotated.token}_multiple detected=${previousMarkers.size} points=$previousDetected $connectionContext)"
             )
         }
         if (currentMarkers.size > 1) {
             error(
-                "$CONNECTION_MARKER_TAG(current_${currentSideUnrotated.token}_multiple detected=${currentMarkers.size} points=$currentDetected $connectionContext)"
+                "$CONNECTION_MARKER_LABEL(current_${currentSideUnrotated.token}_multiple detected=${currentMarkers.size} points=$currentDetected $connectionContext)"
             )
         }
 
@@ -1140,7 +1146,7 @@ class ArenaStageGenerator {
             currentWorldBlockZ != targetBlockZ
         ) {
             error(
-                "$CONNECTION_MARKER_TAG(anchor_mismatch expected=(x=$targetBlockX,y=$targetBlockY,z=$targetBlockZ) " +
+                "$CONNECTION_MARKER_LABEL(anchor_mismatch expected=(x=$targetBlockX,y=$targetBlockY,z=$targetBlockZ) " +
                     "actual=(x=$currentWorldBlockX,y=$currentWorldBlockY,z=$currentWorldBlockZ) $connectionContext)"
             )
         }
@@ -1154,7 +1160,7 @@ class ArenaStageGenerator {
             currentWorldBlockZ != expectedPreviousConnectedZ
         ) {
             error(
-                "$CONNECTION_MARKER_TAG(adjacent_mismatch previous=(x=$previousWorldBlockX,y=$previousWorldBlockY,z=$previousWorldBlockZ) " +
+                "$CONNECTION_MARKER_LABEL(adjacent_mismatch previous=(x=$previousWorldBlockX,y=$previousWorldBlockY,z=$previousWorldBlockZ) " +
                     "current=(x=$currentWorldBlockX,y=$currentWorldBlockY,z=$currentWorldBlockZ) direction=${direction.token} $connectionContext)"
             )
         }
@@ -1173,10 +1179,10 @@ class ArenaStageGenerator {
         val size = template.size
         val (widthX, widthZ) = rotatedFootprint(size, transform)
         val sideMarkers = mutableMapOf(
-            ArenaPathDirection.NORTH to mutableListOf<RotatedConnectionMarker>(),
-            ArenaPathDirection.EAST to mutableListOf<RotatedConnectionMarker>(),
-            ArenaPathDirection.SOUTH to mutableListOf<RotatedConnectionMarker>(),
-            ArenaPathDirection.WEST to mutableListOf<RotatedConnectionMarker>()
+            CardinalDirection.NORTH to mutableListOf<RotatedConnectionMarker>(),
+            CardinalDirection.EAST to mutableListOf<RotatedConnectionMarker>(),
+            CardinalDirection.SOUTH to mutableListOf<RotatedConnectionMarker>(),
+            CardinalDirection.WEST to mutableListOf<RotatedConnectionMarker>()
         )
         val rawResult = buildRawConnectionMarkers(template)
         val issues = mutableListOf<String>()
@@ -1200,7 +1206,7 @@ class ArenaStageGenerator {
             val sideList = sideMarkers[rotatedSide] ?: return@forEach
             sideList.add(rotatedMarker)
             if (sideList.size > 1) {
-                issues.add("$CONNECTION_MARKER_TAG(multiple_points side=${rotatedSide.token} count=${sideList.size})")
+                issues.add("$CONNECTION_MARKER_LABEL(multiple_points side=${rotatedSide.token} count=${sideList.size})")
             }
         }
 
@@ -1222,35 +1228,35 @@ class ArenaStageGenerator {
     private fun buildRawConnectionMarkers(template: ArenaStructureTemplate): RawConnectionMarkerResult {
         val size = template.size
         val sideMarkers = mutableMapOf(
-            ArenaPathDirection.NORTH to mutableListOf<RawConnectionMarker>(),
-            ArenaPathDirection.EAST to mutableListOf<RawConnectionMarker>(),
-            ArenaPathDirection.SOUTH to mutableListOf<RawConnectionMarker>(),
-            ArenaPathDirection.WEST to mutableListOf<RawConnectionMarker>()
+            CardinalDirection.NORTH to mutableListOf<RawConnectionMarker>(),
+            CardinalDirection.EAST to mutableListOf<RawConnectionMarker>(),
+            CardinalDirection.SOUTH to mutableListOf<RawConnectionMarker>(),
+            CardinalDirection.WEST to mutableListOf<RawConnectionMarker>()
         )
         val issues = mutableListOf<String>()
         var markerCount = 0
 
         template.structure.entities.forEach { entity ->
             if (entity.typeId != MARKER_ENTITY_TYPE_ID) return@forEach
-            if (!entity.scoreboardTags.contains(CONNECTION_MARKER_TAG)) return@forEach
+            if (!entity.scoreboardTags.any { it in CONNECTION_MARKER_TAGS }) return@forEach
             markerCount += 1
 
             val blockX = floor(entity.x).toInt()
             val blockY = floor(entity.y).toInt()
             val blockZ = floor(entity.z).toInt()
-            val touchedSides = mutableListOf<ArenaPathDirection>()
-            if (blockX == 0) touchedSides.add(ArenaPathDirection.WEST)
-            if (blockX == size.x - 1) touchedSides.add(ArenaPathDirection.EAST)
-            if (blockZ == 0) touchedSides.add(ArenaPathDirection.NORTH)
-            if (blockZ == size.z - 1) touchedSides.add(ArenaPathDirection.SOUTH)
+            val touchedSides = mutableListOf<CardinalDirection>()
+            if (blockX == 0) touchedSides.add(CardinalDirection.WEST)
+            if (blockX == size.x - 1) touchedSides.add(CardinalDirection.EAST)
+            if (blockZ == 0) touchedSides.add(CardinalDirection.NORTH)
+            if (blockZ == size.z - 1) touchedSides.add(CardinalDirection.SOUTH)
 
             if (touchedSides.isEmpty()) {
-                issues.add("$CONNECTION_MARKER_TAG(non_boundary x=$blockX z=$blockZ)")
+                issues.add("$CONNECTION_MARKER_LABEL(non_boundary x=$blockX z=$blockZ)")
                 return@forEach
             }
             if (touchedSides.size != 1) {
                 issues.add(
-                    "$CONNECTION_MARKER_TAG(ambiguous_boundary sides=${touchedSides.joinToString { it.token }} x=$blockX z=$blockZ)"
+                    "$CONNECTION_MARKER_LABEL(ambiguous_boundary sides=${touchedSides.joinToString { it.token }} x=$blockX z=$blockZ)"
                 )
                 return@forEach
             }
@@ -1266,7 +1272,7 @@ class ArenaStageGenerator {
             val sideList = sideMarkers[marker.side] ?: return@forEach
             sideList.add(marker)
             if (sideList.size > 1) {
-                issues.add("$CONNECTION_MARKER_TAG(multiple_points side=${marker.side.token} count=${sideList.size})")
+                issues.add("$CONNECTION_MARKER_LABEL(multiple_points side=${marker.side.token} count=${sideList.size})")
             }
         }
 
@@ -1304,14 +1310,8 @@ class ArenaStageGenerator {
         z: Double,
         transform: PlacementTransform
     ): Pair<Double, Double> {
-        val mirroredX = x
-        val mirroredZ = if (transform.mirrored) -z else z
-        return when (transform.rotationQuarter.mod(4)) {
-            1 -> -mirroredZ to mirroredX
-            2 -> -mirroredX to -mirroredZ
-            3 -> mirroredZ to -mirroredX
-            else -> mirroredX to mirroredZ
-        }
+        val point = structureTransform(transform).applyRawPoint(x, z)
+        return point.x to point.z
     }
 
     private fun transformRawEntityPoint(
@@ -1319,43 +1319,23 @@ class ArenaStageGenerator {
         z: Double,
         transform: PlacementTransform
     ): Pair<Double, Double> {
-        val mirroredX = x
-        val mirroredZ = if (transform.mirrored) 1.0 - z else z
-        return when (transform.rotationQuarter.mod(4)) {
-            1 -> 1.0 - mirroredZ to mirroredX
-            2 -> 1.0 - mirroredX to 1.0 - mirroredZ
-            3 -> mirroredZ to 1.0 - mirroredX
-            else -> mirroredX to mirroredZ
-        }
+        val point = structureTransform(transform).applyRawPoint(x, z)
+        return point.x to point.z
     }
 
-    private fun transformDirection(direction: ArenaPathDirection, transform: PlacementTransform): ArenaPathDirection {
-        val mirrored = if (transform.mirrored) {
-            when (direction) {
-                ArenaPathDirection.NORTH -> ArenaPathDirection.SOUTH
-                ArenaPathDirection.SOUTH -> ArenaPathDirection.NORTH
-                else -> direction
-            }
-        } else {
-            direction
-        }
-        return mirrored.rotateClockwise(transform.rotationQuarter)
+    private fun transformDirection(direction: CardinalDirection, transform: PlacementTransform): CardinalDirection {
+        return structureTransform(transform).applyDirection(direction)
     }
 
-    private fun toUnrotatedDirection(direction: ArenaPathDirection, transform: PlacementTransform): ArenaPathDirection {
-        val unrotated = direction.rotateClockwise(-transform.rotationQuarter)
-        return if (transform.mirrored) {
-            when (unrotated) {
-                ArenaPathDirection.NORTH -> ArenaPathDirection.SOUTH
-                ArenaPathDirection.SOUTH -> ArenaPathDirection.NORTH
-                else -> unrotated
-            }
-        } else {
-            unrotated
-        }
+    private fun toUnrotatedDirection(direction: CardinalDirection, transform: PlacementTransform): CardinalDirection {
+        return structureTransform(transform).inverseDirection(direction)
     }
 
-    private fun sideDetectedCoordinates(profile: ConnectionMarkerProfile, side: ArenaPathDirection): String {
+    private fun structureTransform(transform: PlacementTransform): StructureTransform {
+        return StructureTransform(transform.rotationQuarter, mirrorX = transform.mirrored)
+    }
+
+    private fun sideDetectedCoordinates(profile: ConnectionMarkerProfile, side: CardinalDirection): String {
         val markers = profile.sideMarkers[side].orEmpty()
             .sortedWith(compareBy<RotatedConnectionMarker> { it.blockY }.thenBy { it.blockX }.thenBy { it.blockZ })
         if (markers.isEmpty()) return "[]"
@@ -1385,29 +1365,13 @@ class ArenaStageGenerator {
     }
 
     private fun placementOffset(size: ArenaStructureSize, transform: PlacementTransform): Pair<Double, Double> {
-        val corners = listOf(
-            transformRawPoint(0.0, 0.0, transform),
-            transformRawPoint((size.x - 1).toDouble(), 0.0, transform),
-            transformRawPoint(0.0, (size.z - 1).toDouble(), transform),
-            transformRawPoint((size.x - 1).toDouble(), (size.z - 1).toDouble(), transform)
-        )
-        val minX = corners.minOf { it.first }
-        val minZ = corners.minOf { it.second }
-        return -minX to -minZ
+        val bounds = structureTransform(transform).bounds(size.x, size.z)
+        return -bounds.minX.toDouble() to -bounds.minZ.toDouble()
     }
 
     private fun rotatedFootprint(size: ArenaStructureSize, transform: PlacementTransform): Pair<Int, Int> {
-        val corners = listOf(
-            transformRawPoint(0.0, 0.0, transform),
-            transformRawPoint((size.x - 1).toDouble(), 0.0, transform),
-            transformRawPoint(0.0, (size.z - 1).toDouble(), transform),
-            transformRawPoint((size.x - 1).toDouble(), (size.z - 1).toDouble(), transform)
-        )
-        val minX = floor(corners.minOf { it.first }).toInt()
-        val maxX = floor(corners.maxOf { it.first }).toInt()
-        val minZ = floor(corners.minOf { it.second }).toInt()
-        val maxZ = floor(corners.maxOf { it.second }).toInt()
-        return (maxX - minX + 1) to (maxZ - minZ + 1)
+        val bounds = structureTransform(transform).bounds(size.x, size.z)
+        return bounds.width to bounds.depth
     }
 
     private fun placementBounds(base: Location, widthX: Int, widthZ: Int, height: Int): ArenaBounds {

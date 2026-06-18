@@ -1,6 +1,8 @@
 package jp.awabi2048.cccontent.command
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureType
+import jp.awabi2048.cccontent.structure.CardinalDirection
+import jp.awabi2048.cccontent.structure.SavedSchemStructure
 import jp.awabi2048.cccontent.structure.SchemStructureService
 import org.bukkit.command.Command
 import org.bukkit.command.CommandSender
@@ -56,74 +58,134 @@ class StructureCommand(
     }
 
     private fun saveArena(player: Player, args: Array<out String>): Boolean {
-        if (args.size !in 4..5) {
-            player.sendMessage("§cUsage: /ccc structure save arena <theme> <file> [--overwrite]")
-            return true
+        val parsed = parseOptions(player, args, 4, ARENA_USAGE) ?: return true
+        val theme = sanitizePathSegment(parsed.positional[2]) ?: return true.also {
+            player.sendMessage("§cInvalid theme: ${parsed.positional[2]}")
         }
-        val overwrite = hasOverwrite(args, 4)
-        val theme = sanitizePathSegment(args[2]) ?: return true.also {
-            player.sendMessage("§cInvalid theme: ${args[2]}")
+        val fileName = sanitizeFileName(parsed.positional[3]) ?: return true.also {
+            player.sendMessage("§cInvalid file: ${parsed.positional[3]}")
         }
-        val fileName = sanitizeFileName(args[3]) ?: return true.also {
-            player.sendMessage("§cInvalid file: ${args[3]}")
-        }
-        val result = trySave(player, "structures/arena/$theme/$fileName", overwrite) ?: return true
+        val result = trySave(player, "structures/arena/$theme/$fileName", parsed) ?: return true
         onArenaStructureSaved?.invoke()
-        player.sendMessage("§aSaved arena structure: ${result.file.name} (${result.size.x}x${result.size.y}x${result.size.z})")
+        sendSaveResult(player, "arena structure", result, parsed)
         return true
     }
 
     private fun saveArenaLift(player: Player, args: Array<out String>): Boolean {
-        if (args.size !in 2..3) {
-            player.sendMessage("§cUsage: /ccc structure save arena-lift [--overwrite]")
-            return true
-        }
-        val overwrite = hasOverwrite(args, 2)
-        val result = trySave(player, "structures/arena/lift.schem", overwrite) ?: return true
+        val parsed = parseOptions(player, args, 2, ARENA_LIFT_USAGE) ?: return true
+        val result = trySave(player, "structures/arena/lift.schem", parsed) ?: return true
         onArenaStructureSaved?.invoke()
-        player.sendMessage("§aSaved arena lift: ${result.size.x}x${result.size.y}x${result.size.z}")
+        sendSaveResult(player, "arena lift", result, parsed)
         return true
     }
 
     private fun saveSukima(player: Player, args: Array<out String>): Boolean {
-        if (args.size !in 5..6) {
-            player.sendMessage("§cUsage: /ccc structure save sukima <theme> <type> <name> [--overwrite]")
-            return true
+        val parsed = parseOptions(player, args, 5, SUKIMA_USAGE) ?: return true
+        val theme = sanitizePathSegment(parsed.positional[2]) ?: return true.also {
+            player.sendMessage("§cInvalid theme: ${parsed.positional[2]}")
         }
-        val overwrite = hasOverwrite(args, 5)
-        val theme = sanitizePathSegment(args[2]) ?: return true.also {
-            player.sendMessage("§cInvalid theme: ${args[2]}")
-        }
-        val type = StructureType.values().firstOrNull { it.keyword.equals(args[3], ignoreCase = true) }
+        val type = StructureType.values().firstOrNull { it.keyword.equals(parsed.positional[3], ignoreCase = true) }
         if (type == null) {
-            player.sendMessage("§cInvalid sukima type: ${args[3]}")
+            player.sendMessage("§cInvalid sukima type: ${parsed.positional[3]}")
             return true
         }
-        val name = sanitizePathSegment(args[4]) ?: return true.also {
-            player.sendMessage("§cInvalid name: ${args[4]}")
+        val name = sanitizePathSegment(parsed.positional[4]) ?: return true.also {
+            player.sendMessage("§cInvalid name: ${parsed.positional[4]}")
         }
-        val result = trySave(player, "structures/sukima_dungeon/$theme/${type.keyword}.$name.schem", overwrite)
+        val result = trySave(player, "structures/sukima_dungeon/$theme/${type.keyword}.$name.schem", parsed)
             ?: return true
         onSukimaStructureSaved?.invoke()
-        player.sendMessage("§aSaved sukima structure: ${result.file.name} (${result.size.x}x${result.size.y}x${result.size.z})")
+        sendSaveResult(player, "sukima structure", result, parsed)
         return true
     }
 
-    private fun trySave(player: Player, relativePath: String, overwrite: Boolean) = try {
-        structureService.saveSelection(player, relativePath, overwrite)
+    private fun sendSaveResult(player: Player, label: String, result: SavedSchemStructure, options: SaveOptions) {
+        val base = "§aSaved $label: ${result.file.name} (${result.size.x}x${result.size.y}x${result.size.z}) facing=${facingLabel(options, result)}"
+        player.sendMessage(base)
+        val v = result.validation
+        if (v != null && v.hasIssues()) {
+            if (v.missingMarkers.isNotEmpty())
+                player.sendMessage("§e⚠ Missing markers: ${v.missingMarkers.joinToString(", ")}")
+            if (v.extraMarkers.isNotEmpty())
+                player.sendMessage("§e⚠ Extra markers: ${v.extraMarkers.joinToString(", ")}")
+            if (v.warnings.isNotEmpty())
+                v.warnings.forEach { player.sendMessage("§e⚠ $it") }
+        }
+    }
+
+    private fun trySave(player: Player, relativePath: String, options: SaveOptions) = try {
+        structureService.saveSelection(player, relativePath, options.overwrite, options.facing, options.force)
     } catch (e: Exception) {
         player.sendMessage("§cFailed to save structure: ${e.message}")
         null
     }
 
     private fun sendUsage(sender: CommandSender) {
-        sender.sendMessage("§e/ccc structure save arena <theme> <file> [--overwrite]")
-        sender.sendMessage("§e/ccc structure save arena-lift [--overwrite]")
-        sender.sendMessage("§e/ccc structure save sukima <theme> <type> <name> [--overwrite]")
+        sender.sendMessage("§e$ARENA_USAGE")
+        sender.sendMessage("§e$ARENA_LIFT_USAGE")
+        sender.sendMessage("§e$SUKIMA_USAGE")
     }
 
-    private fun hasOverwrite(args: Array<out String>, index: Int): Boolean {
-        return args.getOrNull(index)?.equals("--overwrite", ignoreCase = true) == true
+    private data class SaveOptions(
+        val positional: List<String>,
+        val overwrite: Boolean,
+        val facing: CardinalDirection?,
+        val force: Boolean
+    )
+
+    private fun facingLabel(options: SaveOptions, result: SavedSchemStructure): String {
+        return if (options.facing != null) options.facing.token else "auto(${result.facing.token})"
+    }
+
+    private fun parseOptions(
+        player: Player,
+        args: Array<out String>,
+        positionalCount: Int,
+        usage: String
+    ): SaveOptions? {
+        val positional = mutableListOf<String>()
+        var overwrite = false
+        var facing: CardinalDirection? = null
+        var force = false
+        var i = 0
+        while (i < args.size) {
+            val arg = args[i]
+            when {
+                arg.equals("--overwrite", ignoreCase = true) -> {
+                    overwrite = true
+                }
+                arg.equals("--force", ignoreCase = true) -> {
+                    force = true
+                }
+                arg.equals("--facing", ignoreCase = true) -> {
+                    val value = args.getOrNull(i + 1)
+                    if (value == null) {
+                        player.sendMessage("§c--facing には north/east/south/west のいずれかを指定してください")
+                        player.sendMessage("§e$usage")
+                        return null
+                    }
+                    facing = CardinalDirection.fromToken(value)
+                    if (facing == null) {
+                        player.sendMessage("§c無効な facing 値: $value (north/east/south/west のいずれか)")
+                        player.sendMessage("§e$usage")
+                        return null
+                    }
+                    i += 1
+                }
+                arg.startsWith("--") -> {
+                    player.sendMessage("§c不明なオプションです: $arg")
+                    player.sendMessage("§e$usage")
+                    return null
+                }
+                else -> positional.add(arg)
+            }
+            i += 1
+        }
+        if (positional.size != positionalCount) {
+            player.sendMessage("§e$usage")
+            return null
+        }
+        return SaveOptions(positional, overwrite, facing, force)
     }
 
     private fun sanitizePathSegment(raw: String): String? {
@@ -145,6 +207,10 @@ class StructureCommand(
     }
 
     companion object {
+        private const val FACING_FLAG = "[--facing <north|east|south|west>] [--overwrite] [--force]"
+        private const val ARENA_USAGE = "/ccc structure save arena <theme> <file> $FACING_FLAG"
+        private const val ARENA_LIFT_USAGE = "/ccc structure save arena-lift $FACING_FLAG"
+        private const val SUKIMA_USAGE = "/ccc structure save sukima <theme> <type> <name> $FACING_FLAG"
         private val SAFE_SEGMENT = Regex("[A-Za-z0-9_-]+")
         private val SAFE_FILE_STEM = Regex("[A-Za-z0-9_.-]+")
     }

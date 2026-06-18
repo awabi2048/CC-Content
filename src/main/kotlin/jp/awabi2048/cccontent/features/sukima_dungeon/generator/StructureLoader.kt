@@ -31,11 +31,14 @@ class StructureLoader(val plugin: JavaPlugin) {
             val path = themesSection.getString("$key.path") ?: key
             val iconStr = themesSection.getString("$key.icon") ?: "GRASS_BLOCK"
             val icon = Material.matchMaterial(iconStr) ?: Material.GRASS_BLOCK
-            val tileSize = themesSection.getInt("$key.tileSize", 16)
             val time = if (themesSection.contains("$key.time")) themesSection.getLong("$key.time") else null
             val gravity = themesSection.getDouble("$key.gravity", 1.0)
             val voidYLimit = if (themesSection.contains("$key.void_y_limit")) themesSection.getDouble("$key.void_y_limit") else null
             val requiredTier = themesSection.getInt("$key.required_tier", 1)
+
+            if (themesSection.contains("$key.tileSize")) {
+                plugin.logger.warning("[SukimaDungeon] theme.yml の $key.tileSize は廃止されました（ストラクチャーサイズから自動算出）。エントリを無視します。")
+            }
 
             val themeFolder = File(baseStructureFolder, path)
             if (!themeFolder.exists()) {
@@ -43,6 +46,7 @@ class StructureLoader(val plugin: JavaPlugin) {
             }
 
             val structures = loadStructuresForTheme(themeFolder)
+            val tileSize = structures.values.flatten().maxOfOrNull { maxOf(it.size.x, it.size.z) } ?: 16
             val theme = Theme(key, icon, tileSize, time, gravity, voidYLimit, requiredTier, structures)
             themes[key] = theme
         }

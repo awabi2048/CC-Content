@@ -1,4 +1,4 @@
-﻿normal:
+normal:
   weight: 5
   icon: CHISELED_STONE_BRICKS
   difficulty_star: 1
@@ -178,17 +178,6 @@
   door_open_sound:
     key: minecraft:block.wood.break
     pitch: 0.5
-  orientation:
-    entrance_exit: north
-    corner_entry: south
-    corner_exit: east
-    straight_entry: south
-    corridor_entry: south
-    goal_entry: west
-    tjunction_entry: west
-    tjunction_through: east
-    tjunction_branch: south
-    pedestal_entry: south
 
 promoted:
   difficulty_star: 2

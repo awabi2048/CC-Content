@@ -26,7 +26,6 @@ data class ArenaTheme(
     val normalVariant: ArenaThemeVariant get() = normalConfig.variant
     val promotedVariant: ArenaThemeVariant? get() = promotedConfig?.variant
     val doorOpenSound: ArenaThemeDoorOpenSound get() = normalConfig.doorOpenSound
-    val orientation: ArenaStructureOrientation get() = normalConfig.orientation
     val clearingBossMobId: String? get() = normalConfig.clearingBossMobId
 
     fun config(promoted: Boolean): ArenaThemeConfig {
@@ -47,7 +46,6 @@ data class ArenaThemeConfig(
     val weight: Int,
     val variant: ArenaThemeVariant,
     val doorOpenSound: ArenaThemeDoorOpenSound,
-    val orientation: ArenaStructureOrientation,
     val clearingBossMobId: String? = null
 )
 
@@ -101,19 +99,6 @@ data class ArenaThemeLoadStatus(
 data class ArenaThemeLoadIssue(
     val themeId: String,
     val details: List<String>
-)
-
-data class ArenaStructureOrientation(
-    val entranceExit: ArenaPathDirection,
-    val cornerEntry: ArenaPathDirection,
-    val cornerExit: ArenaPathDirection,
-    val straightEntry: ArenaPathDirection,
-    val corridorEntry: ArenaPathDirection,
-    val goalEntry: ArenaPathDirection,
-    val tjunctionEntry: ArenaPathDirection,
-    val tjunctionThrough: ArenaPathDirection,
-    val tjunctionBranch: ArenaPathDirection,
-    val pedestalEntry: ArenaPathDirection
 )
 
 data class ArenaStaticStructureVariant(
@@ -413,16 +398,10 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             ?: defaultDoorSoundPitch.toDouble()).toFloat().coerceIn(0.5f, 2.0f)
 
         val variant = parseThemeVariant(section, themeId, variantName, warnings, fallback?.variant) ?: return null
-        val orientationSection = section.getConfigurationSection("orientation")
-        val orientation = if (orientationSection != null) {
-            parseOrientation(themeId, orientationSection, warnings) ?: return null
-        } else if (fallback != null) {
-            fallback.orientation
-        } else {
-            val warning = "[Arena] $THEME_CONFIG_DIR/$themeId.yml の orientation が見つからないためスキップします: theme=$themeId variant=$variantName"
+        if (section.contains("orientation")) {
+            val warning = "[Arena] $THEME_CONFIG_DIR/$themeId.yml の orientation は廃止されました（ストラクチャーは NORTH 基準で保存される前提）。エントリを無視します: theme=$themeId variant=$variantName"
             plugin.logger.warning(warning)
             warnings.add(warning)
-            return null
         }
         val clearingBossMobId = if (section.contains("clearing_boss_mob_id")) {
             section.getString("clearing_boss_mob_id")?.trim()?.takeIf { it.isNotBlank() }
@@ -438,68 +417,10 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 key = doorSoundKey,
                 pitch = doorSoundPitch
             ),
-            orientation = orientation,
             clearingBossMobId = clearingBossMobId
         )
     }
 
-    private fun parseOrientation(
-        themeId: String,
-        orientationSection: ConfigurationSection,
-        warnings: MutableList<String>
-    ): ArenaStructureOrientation? {
-        val entranceExit = parseDirection(themeId, orientationSection, "entrance_exit", warnings) ?: return null
-        val cornerEntry = parseDirection(themeId, orientationSection, "corner_entry", warnings) ?: return null
-        val cornerExit = parseDirection(themeId, orientationSection, "corner_exit", warnings) ?: return null
-        val straightEntry = parseDirection(themeId, orientationSection, "straight_entry", warnings) ?: return null
-        val corridorEntry = parseDirection(themeId, orientationSection, "corridor_entry", warnings) ?: return null
-        val goalEntry = parseDirection(themeId, orientationSection, "goal_entry", warnings) ?: return null
-        val tjunctionEntry = parseOptionalDirection(orientationSection, "tjunction_entry") ?: straightEntry
-        val tjunctionThrough = parseOptionalDirection(orientationSection, "tjunction_through") ?: straightEntry.opposite()
-        val tjunctionBranch = parseOptionalDirection(orientationSection, "tjunction_branch") ?: straightEntry.right()
-        val pedestalEntry = parseOptionalDirection(orientationSection, "pedestal_entry") ?: tjunctionBranch.opposite()
-
-        if (cornerEntry == cornerExit) {
-            val warning = "[Arena] $THEME_CONFIG_DIR/$themeId.yml の corner_entry/corner_exit が同じ方向のためスキップします: theme=$themeId value=${cornerEntry.token}"
-            plugin.logger.warning(warning)
-            warnings.add(warning)
-            return null
-        }
-
-        if (!cornerEntry.isAdjacent(cornerExit)) {
-            val warning = "[Arena] $THEME_CONFIG_DIR/$themeId.yml の corner_entry/corner_exit は隣接方向のみ許可されています: theme=$themeId entry=${cornerEntry.token} exit=${cornerExit.token}"
-            plugin.logger.warning(warning)
-            warnings.add(warning)
-            return null
-        }
-
-        if (tjunctionEntry == tjunctionThrough || tjunctionEntry != tjunctionThrough.opposite()) {
-            val warning = "[Arena] $THEME_CONFIG_DIR/$themeId.yml の tjunction_entry/tjunction_through は向かい合う必要があります: theme=$themeId entry=${tjunctionEntry.token} through=${tjunctionThrough.token}"
-            plugin.logger.warning(warning)
-            warnings.add(warning)
-            return null
-        }
-
-        if (!tjunctionBranch.isAdjacent(tjunctionEntry) || !tjunctionBranch.isAdjacent(tjunctionThrough)) {
-            val warning = "[Arena] $THEME_CONFIG_DIR/$themeId.yml の tjunction_branch は entry/through の側面である必要があります: theme=$themeId entry=${tjunctionEntry.token} through=${tjunctionThrough.token} branch=${tjunctionBranch.token}"
-            plugin.logger.warning(warning)
-            warnings.add(warning)
-            return null
-        }
-
-        return ArenaStructureOrientation(
-            entranceExit = entranceExit,
-            cornerEntry = cornerEntry,
-            cornerExit = cornerExit,
-            straightEntry = straightEntry,
-            corridorEntry = corridorEntry,
-            goalEntry = goalEntry,
-            tjunctionEntry = tjunctionEntry,
-            tjunctionThrough = tjunctionThrough,
-            tjunctionBranch = tjunctionBranch,
-            pedestalEntry = pedestalEntry
-        )
-    }
     private fun parseThemeVariant(
         section: ConfigurationSection,
         themeId: String,
@@ -601,38 +522,6 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             clearMobCount = clearMobCount,
             weightedMobs = weightedMobs
         )
-    }
-
-    private fun parseDirection(
-        themeId: String,
-        section: org.bukkit.configuration.ConfigurationSection,
-        key: String,
-        warnings: MutableList<String>
-    ): ArenaPathDirection? {
-        val raw = section.getString(key)?.trim().orEmpty()
-        if (raw.isEmpty()) {
-            val warning = "[Arena] $THEME_CONFIG_DIR/$themeId.yml の方向指定が未設定のためスキップ: theme=$themeId key=$key"
-            plugin.logger.warning(warning)
-            warnings.add(warning)
-            return null
-        }
-        val direction = ArenaPathDirection.fromToken(raw)
-        if (direction == null) {
-            val warning = "[Arena] $THEME_CONFIG_DIR/$themeId.yml の方向指定が不正のためスキップ: theme=$themeId key=$key value=$raw"
-            plugin.logger.warning(warning)
-            warnings.add(warning)
-            return null
-        }
-        return direction
-    }
-
-    private fun parseOptionalDirection(
-        section: org.bukkit.configuration.ConfigurationSection,
-        key: String
-    ): ArenaPathDirection? {
-        val raw = section.getString(key)?.trim().orEmpty()
-        if (raw.isEmpty()) return null
-        return ArenaPathDirection.fromToken(raw)
     }
 
     private fun parseWaveRange(text: String): ArenaThemeWaveRange? {

@@ -1,6 +1,9 @@
-﻿package jp.awabi2048.cccontent.features.sukima_dungeon.generator
+package jp.awabi2048.cccontent.features.sukima_dungeon.generator
 
 import jp.awabi2048.cccontent.structure.StructurePasteOptions
+import jp.awabi2048.cccontent.structure.CardinalDirection
+import jp.awabi2048.cccontent.structure.StructureSchemas
+import jp.awabi2048.cccontent.structure.StructureTransform
 import org.bukkit.Location
 import org.bukkit.scheduler.BukkitRunnable
 import java.util.Random
@@ -455,45 +458,26 @@ object StructureBuilder {
         
         val connections = listOf(n, s, e, w).count { it }
 
-        return when (connections) {
-            1 -> {
-                // Dead End
-                when {
-                    n -> StructureType.DEAD_END to 2 
-                    s -> StructureType.DEAD_END to 0
-                    e -> StructureType.DEAD_END to 3 
-                    w -> StructureType.DEAD_END to 1 
-                    else -> StructureType.DEAD_END to 0
-                }
-            }
-            2 -> {
-                if ((n && s) || (e && w)) {
-                    // Straight
-                    if (n && s) StructureType.STRAIGHT to 0
-                    else StructureType.STRAIGHT to 1 
-                } else {
-                    // Corner
-                    when {
-                        n && e -> StructureType.CORNER to 2 
-                        e && s -> StructureType.CORNER to 3 
-                        s && w -> StructureType.CORNER to 0 
-                        w && n -> StructureType.CORNER to 1 
-                        else -> StructureType.CORNER to 0
-                    }
-                }
-            }
-            3 -> {
-                // T-Shape
-                when {
-                    !n -> StructureType.T_SHAPE to 2 
-                    !s -> StructureType.T_SHAPE to 0 
-                    !e -> StructureType.T_SHAPE to 3 
-                    !w -> StructureType.T_SHAPE to 1 
-                    else -> StructureType.T_SHAPE to 0
-                }
-            }
-            4 -> StructureType.CROSS to 0
-            else -> StructureType.STRAIGHT to 0 
+        val type = when (connections) {
+            1 -> StructureType.DEAD_END
+            2 -> if ((n && s) || (e && w)) StructureType.STRAIGHT else StructureType.CORNER
+            3 -> StructureType.T_SHAPE
+            4 -> StructureType.CROSS
+            else -> StructureType.STRAIGHT
         }
+        val actualOpenings = buildSet {
+            if (n) add(CardinalDirection.NORTH)
+            if (e) add(CardinalDirection.EAST)
+            if (s) add(CardinalDirection.SOUTH)
+            if (w) add(CardinalDirection.WEST)
+        }
+        val schema = StructureSchemas.sukima(type.keyword)
+            ?: error("[SukimaDungeon] structure schema is missing: ${type.keyword}")
+        val rotation = StructureTransform.rotationMatching(schema.canonicalOpenings, actualOpenings)
+            ?: error(
+                "[SukimaDungeon] rotation cannot be resolved: type=${type.keyword} " +
+                    "canonical=${schema.canonicalOpenings} actual=$actualOpenings"
+            )
+        return type to rotation
     }
 }
