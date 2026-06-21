@@ -15,6 +15,7 @@ import kotlin.random.Random
 data class ArenaTheme(
     val id: String,
     val path: String,
+    val promotionProbability: Double,
     val normalConfig: ArenaThemeConfig,
     val promotedConfig: ArenaThemeConfig?,
     val gridPitch: Int,
@@ -161,6 +162,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
     )
 
     private data class ParsedThemeConfig(
+        val promotionProbability: Double,
         val normalConfig: ArenaThemeConfig,
         val promotedConfig: ArenaThemeConfig?
     )
@@ -290,6 +292,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             themes[themeId] = ArenaTheme(
                 id = themeId,
                 path = folder.name,
+                promotionProbability = parsedThemeConfig.promotionProbability,
                 normalConfig = parsedThemeConfig.normalConfig,
                 promotedConfig = parsedThemeConfig.promotedConfig,
                 gridPitch = gridPitch,
@@ -322,6 +325,10 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
     ): ParsedThemeConfig? {
         val themeConfig = YamlConfiguration.loadConfiguration(themeConfigFile)
         val sourcePath = "$THEME_CONFIG_DIR/${themeConfigFile.name}"
+        val promotionProbability = themeConfig.getDouble("promotion_probability", -1.0)
+        if (promotionProbability < 0.0 || promotionProbability > 1.0) {
+            throw IllegalStateException("[Arena] $sourcePath の promotion_probability は0.0〜1.0である必要があります: $promotionProbability")
+        }
         val normalSection = themeConfig.getConfigurationSection("normal")
         if (normalSection == null) {
             val warning = "[Arena] invalid normal section: $sourcePath"
@@ -336,6 +343,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             ?.let { parseThemeConfigVariant(it, themeId, "promoted", warnings, normalConfig) }
 
         return ParsedThemeConfig(
+            promotionProbability = promotionProbability,
             normalConfig = normalConfig,
             promotedConfig = promotedConfig
         )

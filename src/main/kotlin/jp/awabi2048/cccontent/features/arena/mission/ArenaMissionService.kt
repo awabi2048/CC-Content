@@ -540,13 +540,11 @@ class ArenaMissionService(
             throw IllegalStateException("有効なテーマが0件のためミッションを生成できません")
         }
         val random = Random.Default
-        val promotionProbability = loadPromotionProbability()
-
         val missions = (0 until generateCount).map { index ->
             val theme = selectWeightedTheme(weightedThemes, random)
             val themeId = theme.id
             val missionType = ArenaMissionType.BARRIER_RESTART
-            val promoted = theme.promotedVariant != null && random.nextDouble() < promotionProbability
+            val promoted = theme.promotedVariant != null && random.nextDouble() < theme.promotionProbability
             val variant = theme.variant(promoted)
 
             ArenaMissionEntry(
@@ -563,15 +561,6 @@ class ArenaMissionService(
             generatedAtMillis = System.currentTimeMillis(),
             missions = missions
         )
-    }
-
-    private fun loadPromotionProbability(): Double {
-        val missionConfig = currentMissionConfig()
-        val value = missionConfig.getDouble("mission.promotion_probability", -1.0)
-        if (value < 0.0 || value > 1.0) {
-            throw IllegalStateException("mission.promotion_probability は0.0〜1.0である必要があります: $value")
-        }
-        return value
     }
 
     private fun saveMissionSet(missionSet: ArenaMissionSet) {
