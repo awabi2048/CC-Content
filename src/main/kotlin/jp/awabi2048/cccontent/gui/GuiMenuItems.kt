@@ -1,6 +1,14 @@
 package jp.awabi2048.cccontent.gui
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiFrameSection
+import com.awabi2048.ccsystem.api.gui.GuiFrameSpec
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import io.papermc.paper.datacomponent.DataComponentTypes
 import io.papermc.paper.datacomponent.item.TooltipDisplay
 import net.kyori.adventure.text.Component
@@ -23,24 +31,19 @@ open class OwnedMenuHolder(
 
 object GuiMenuItems {
     fun backgroundPane(material: Material, name: String = " "): ItemStack {
-        val item = ItemStack(material)
-        val meta = item.itemMeta ?: return hideTooltip(item)
-        meta.displayName(legacy(name))
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        item.itemMeta = meta
-        return hideTooltip(item)
+        return CCSystem.getAPI().getGuiElementService().item(decorationSpec(material, name))
     }
 
-    fun icon(material: Material, name: String, lore: List<String> = emptyList()): ItemStack {
-        val item = ItemStack(material)
-        val meta = item.itemMeta ?: return item
-        meta.displayName(legacy(name))
-        if (lore.isNotEmpty()) {
-            meta.lore(lore.map { legacy(it) })
-        }
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        item.itemMeta = meta
-        return item
+    fun icon(material: Material, name: String, lore: List<String> = emptyList(), frame: GuiLoreFrame = GuiLoreFrame.NONE): ItemStack {
+        return CCSystem.getAPI().getGuiElementService().item(
+            GuiItemSpec(
+                material = material,
+                name = GuiNameSpec.Text(name, GuiNameStyle.DEFAULT),
+                lore = if (lore.isEmpty()) GuiLoreSpec.None else GuiLoreSpec.Auto(lore, frame),
+                role = GuiElementRole.CONTENT,
+                amount = 1
+            )
+        )
     }
 
     fun backButton(name: String = "§c戻る", lore: List<String> = emptyList()): ItemStack {
@@ -53,18 +56,28 @@ object GuiMenuItems {
     }
 
     fun fillFramed(inventory: Inventory) {
-        val size = inventory.size
-        val footerStart = size - 9
-        val header = backgroundPane(Material.BLACK_STAINED_GLASS_PANE)
-        val middle = backgroundPane(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 0 until size) {
-            inventory.setItem(slot, if (slot < 9 || slot >= footerStart) header else middle)
-        }
+        val frame = decorationSpec(Material.BLACK_STAINED_GLASS_PANE)
+        CCSystem.getAPI().getGuiElementService().applyFrame(
+            inventory,
+            GuiFrameSpec(
+                header = GuiFrameSection.Row(frame),
+                footer = GuiFrameSection.Row(frame),
+                emptySlot = decorationSpec(Material.GRAY_STAINED_GLASS_PANE)
+            )
+        )
     }
 
-    fun separator(lines: Collection<String>): String {
-        return CCSystem.getAPI().createLoreSeparator(lines)
+    fun fillEmpty(inventory: Inventory, material: Material = Material.GRAY_STAINED_GLASS_PANE) {
+        CCSystem.getAPI().getGuiElementService().fillEmpty(inventory, decorationSpec(material))
     }
+
+    private fun decorationSpec(material: Material, name: String = " "): GuiItemSpec = GuiItemSpec(
+        material = material,
+        name = if (name.isEmpty()) GuiNameSpec.Empty else GuiNameSpec.Text(name, GuiNameStyle.DEFAULT),
+        lore = GuiLoreSpec.None,
+        role = GuiElementRole.DECORATION,
+        amount = 1
+    )
 
     private fun legacy(text: String): Component {
         return LegacyComponentSerializer.legacySection().deserialize(text).decoration(TextDecoration.ITALIC, false)

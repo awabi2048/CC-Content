@@ -2,6 +2,9 @@
 
 package jp.awabi2048.cccontent.features.brewery
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.features.brewery.item.BreweryItemCodec
@@ -1101,10 +1104,10 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             null -> "未点火"
         }
         startMeta?.lore(
-            listOf(
-                net.kyori.adventure.text.Component.text("§7火の強さ: $fireText"),
-                net.kyori.adventure.text.Component.text("§7現在煮込み中: ${if (state.running) recipeName else "なし"}")
-            )
+            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
+                "§7火の強さ: $fireText",
+                "§7現在煮込み中: ${if (state.running) recipeName else "なし"}"
+            ), GuiLoreFrame.NONE))
         )
         start.itemMeta = startMeta
         state.inventory.setItem(FERMENT_START_SLOT, start)
@@ -1114,10 +1117,10 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         clockMeta?.setDisplayName("§b時計（モック）")
         val elapsed = state.elapsedSeconds
         clockMeta?.lore(
-            listOf(
-                net.kyori.adventure.text.Component.text("§7経過: ${elapsed}s"),
-                net.kyori.adventure.text.Component.text("§7判定(30秒切り捨て): ${(elapsed / 30) * 30}s")
-            )
+            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
+                "§7経過: ${elapsed}s",
+                "§7判定(30秒切り捨て): ${(elapsed / 30) * 30}s"
+            ), GuiLoreFrame.NONE))
         )
         clock.itemMeta = clockMeta
         state.inventory.setItem(FERMENT_CLOCK_SLOT, clock)
@@ -1188,11 +1191,11 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         val meta = start.itemMeta
         meta?.setDisplayName(if (state.running) "§e蒸留停止" else "§a蒸留開始")
         meta?.lore(
-            listOf(
-                net.kyori.adventure.text.Component.text("§7現在ステップ経過: ${state.elapsedSecondsInCurrentStep}s"),
-                net.kyori.adventure.text.Component.text("§7現在セッション蒸留回数: ${state.sessionDistillationRuns}"),
-                net.kyori.adventure.text.Component.text("§71回の蒸留時間: ${state.lastRequiredSeconds}s")
-            )
+            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
+                "§7現在ステップ経過: ${state.elapsedSecondsInCurrentStep}s",
+                "§7現在セッション蒸留回数: ${state.sessionDistillationRuns}",
+                "§71回の蒸留時間: ${state.lastRequiredSeconds}s"
+            ), GuiLoreFrame.NONE))
         )
         start.itemMeta = meta
         state.inventory.setItem(DISTILL_START_SLOT, start)
@@ -1355,7 +1358,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         val clock = state.inventory.getItem(clockSlot) ?: ItemStack(Material.COMPASS)
         val clockMeta = clock.itemMeta
         clockMeta?.setDisplayName("§bふしぎな時計（モック）")
-        clockMeta?.lore(listOf(net.kyori.adventure.text.Component.text("§7投入のみ可能（効果なし）")))
+        clockMeta?.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf("§7投入のみ可能（効果なし）"), GuiLoreFrame.NONE)))
         clock.itemMeta = clockMeta
         state.inventory.setItem(clockSlot, clock)
     }

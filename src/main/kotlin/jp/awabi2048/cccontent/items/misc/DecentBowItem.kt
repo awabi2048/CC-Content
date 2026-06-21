@@ -31,9 +31,8 @@ class DecentBowItem : CustomItem {
         val item = ItemStack(Material.BOW, amount.coerceAtLeast(1))
         val meta = item.itemMeta ?: return item
         val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
-        val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
         meta.displayName(Component.text(name))
-        meta.lore(localizedLore.map { Component.text(it) })
+        meta.lore(CustomItemI18n.lore(player, "custom_items.$feature.$id.lore", lore))
         meta.persistentDataContainer.set(itemKey, PersistentDataType.BYTE, 1)
 
         meta.addEnchant(Enchantment.INFINITY, 1, true)

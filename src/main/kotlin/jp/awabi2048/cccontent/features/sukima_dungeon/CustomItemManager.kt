@@ -2,6 +2,9 @@
 
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.items.CustomItemManager as GlobalCustomItemManager
 import org.bukkit.Material
@@ -148,7 +151,7 @@ object CustomItemManager {
         val tierDisplayName = MessageManager.getTierName(player, tier.name)
         meta.setMaxStackSize(1)
         meta.setDisplayName(MessageManager.getMessage(player, "item_bookmark_name", mapOf("tier" to tierDisplayName)))
-        meta.lore = MessageManager.getList(player, "item_bookmark_lore")
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(MessageManager.getList(player, "item_bookmark_lore"), GuiLoreFrame.NONE)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         meta.persistentDataContainer.set(TIER_KEY, PersistentDataType.STRING, tier.internalName)
         meta.persistentDataContainer.set(ITEM_TYPE_KEY, PersistentDataType.STRING, "bookmark")
@@ -160,7 +163,7 @@ object CustomItemManager {
 
         meta.setMaxStackSize(1)
         meta.setDisplayName(MessageManager.getMessage(player, "item_talisman_name"))
-        meta.lore = MessageManager.getList(player, "item_talisman_lore")
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(MessageManager.getList(player, "item_talisman_lore"), GuiLoreFrame.NONE)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         meta.persistentDataContainer.set(ITEM_TYPE_KEY, PersistentDataType.STRING, "talisman")
         item.itemMeta = meta
@@ -171,12 +174,12 @@ object CustomItemManager {
         val bar = MessageManager.getMessage(null, "common_bar")
 
         meta.setDisplayName("§dワールドの芽")
-        meta.lore = listOf(
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
             bar,
             "§7スキマダンジョンで刈り取ってきた、ワールドの芽。",
             "§7おあげちゃんに渡すと、アイテムと交換してもらえる。",
             bar
-        )
+        ), GuiLoreFrame.NONE)))
         meta.setEnchantmentGlintOverride(true)
         meta.persistentDataContainer.set(ITEM_TYPE_KEY, PersistentDataType.STRING, "world_sprout")
         item.itemMeta = meta
@@ -208,7 +211,7 @@ object CustomItemManager {
         val bar = MessageManager.getMessage(player, "common_bar")
         meta.setMaxStackSize(1)
         meta.setDisplayName("§bワールドの芽コンパス [Tier $normalizedTier]")
-        meta.lore = listOf(
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
             bar,
             "§7スキマダンジョン内で§bShiftを長押し§7ことで、近くにある",
             "§aワールドの芽§7の場所を知ることができます！",
@@ -217,7 +220,7 @@ object CustomItemManager {
             "§7最大展開: §b${time} 秒",
             "§7クールタイム: §b${cooldown} 秒",
             bar
-        )
+        ), GuiLoreFrame.NONE)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         meta.persistentDataContainer.set(ITEM_TYPE_KEY, PersistentDataType.STRING, "compass")
         meta.persistentDataContainer.set(COMPASS_RADIUS_KEY, PersistentDataType.DOUBLE, radius)

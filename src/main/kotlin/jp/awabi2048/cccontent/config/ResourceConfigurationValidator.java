@@ -151,7 +151,6 @@ public final class ResourceConfigurationValidator {
         Map<String, Object> mission = requireMap(root, "mission", file, errors);
         if (mission != null) {
             requirePositiveNumber(mission, "generate_count", file, "mission.generate_count", errors);
-            requireRatio(mission.get("promotion_probability"), file, "mission.promotion_probability", errors);
         }
         requireMap(root, "license", file, errors);
         Map<String, Object> barrierRestart = requireMap(root, "barrier_restart", file, errors);
@@ -327,6 +326,7 @@ public final class ResourceConfigurationValidator {
                 if (root == null) {
                     continue;
                 }
+                requireRatio(root.get("promotion_probability"), file, "promotion_probability", errors);
                 validateArenaThemeVariant(file, root, "normal", true, errors);
                 validateArenaThemeVariant(file, root, "promoted", false, errors);
             }

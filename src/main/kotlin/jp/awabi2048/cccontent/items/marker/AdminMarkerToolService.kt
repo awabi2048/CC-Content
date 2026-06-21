@@ -2,6 +2,11 @@
 
 package jp.awabi2048.cccontent.items.marker
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
@@ -312,20 +317,17 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
     }
 
     private fun updateLore(meta: ItemMeta, definition: MarkerToolDefinition, mode: MarkerToolMode, player: Player?) {
-        val bar = if (definition.toolId == "sukima_dungeon.marker_tool") {
-            MessageManager.getMessage(player, "common_bar")
-        } else {
-            "§8----------------"
-        }
         val modeName = getModeDisplayName(player, definition, mode)
-        meta.lore = listOf(
-            bar,
-            text(definition, player, "current_mode", "§f§l| §7現在のモード §a{mode}", "mode" to modeName),
-            "",
-            text(definition, player, "usage.place", "§e右クリック(ブロック)§7 クリック面の外側にマーカーを設置"),
-            text(definition, player, "usage.delete", "§eShift + 右クリック§7 視線上のマーカーを削除"),
-            text(definition, player, "usage.switch", "§eFキー§7 次のモードへ変更"),
-            bar
+        meta.lore(
+            CCSystem.getAPI().getLoreService().render(
+                GuiLoreSpec.Blocks(listOf(GuiLoreBlock(buildList {
+                    add(GuiLoreLine.Raw(text(definition, player, "current_mode", "§f§l| §7現在のモード §a{mode}", "mode" to modeName)))
+                    add(GuiLoreLine.Spacer)
+                    add(GuiLoreLine.Raw(text(definition, player, "usage.place", "§e右クリック(ブロック)§7 クリック面の外側にマーカーを設置")))
+                    add(GuiLoreLine.Raw(text(definition, player, "usage.delete", "§eShift + 右クリック§7 視線上のマーカーを削除")))
+                    add(GuiLoreLine.Raw(text(definition, player, "usage.switch", "§eFキー§7 次のモードへ変更")))
+                })))
+            )
         )
     }
 

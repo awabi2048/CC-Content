@@ -2,6 +2,9 @@
 
 package jp.awabi2048.cccontent.items.misc
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.ItemMeta
 import org.bukkit.plugin.Plugin
@@ -100,9 +103,16 @@ object HeadDatabaseBridge {
         val item = ItemStack(org.bukkit.Material.PLAYER_HEAD)
         val meta: ItemMeta? = item.itemMeta
         meta?.setDisplayName("§fテストヘッド §7(HDB:$hdbId)")
-        meta?.lore = mutableListOf(
-            "§7HeadDatabase バイパスモード",
-            "§7実ID: $hdbId"
+        meta?.lore(
+            CCSystem.getAPI().getLoreService().render(
+                GuiLoreSpec.Auto(
+                    listOf(
+                        "§7HeadDatabase バイパスモード",
+                        "§7実ID: $hdbId"
+                    ),
+                    GuiLoreFrame.NONE
+                )
+            )
         )
         item.itemMeta = meta
         return item

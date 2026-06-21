@@ -2,6 +2,11 @@
 
 package jp.awabi2048.cccontent.features.rank.prestige
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import org.bukkit.Material
@@ -46,16 +51,16 @@ class PrestigeToken {
             meta.setDisplayName("§d§l${professionName}の思念")
 
             // Lore設定
-            val bar = "§8§m                        "
-            val lore = mutableListOf(
-                bar,
-                "§6${professionName}の職を極めた証",
-                bar,
-                "§f§l| §7プレステージレベル §b$prestigeLevel",
-                "§f§l| §7保有者 §6${owner.name}",
-                bar
+            val lore = CCSystem.getAPI().getLoreService().render(
+                GuiLoreSpec.Blocks(listOf(
+                    GuiLoreBlock(listOf(GuiLoreLine.Raw("§6${professionName}の職を極めた証"))),
+                    GuiLoreBlock(listOf(
+                        GuiLoreLine.Data("プレステージレベル", prestigeLevel, "§b"),
+                        GuiLoreLine.Data("保有者", owner.name, "§6")
+                    ))
+                ))
             )
-            meta.lore = lore
+            meta.lore(lore)
 
             // PersistentDataContainerにデータを保存
             val container = meta.persistentDataContainer

@@ -3,6 +3,9 @@
 package jp.awabi2048.cccontent.features.arena.mission
 
 import jp.awabi2048.cccontent.config.FeatureConfigManager
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.features.arena.ArenaAuditLogger
 import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.arena.ArenaMenuItems
@@ -537,13 +540,11 @@ class ArenaMissionService(
             throw IllegalStateException("有効なテーマが0件のためミッションを生成できません")
         }
         val random = Random.Default
-        val promotionProbability = loadPromotionProbability()
-
         val missions = (0 until generateCount).map { index ->
             val theme = selectWeightedTheme(weightedThemes, random)
             val themeId = theme.id
             val missionType = ArenaMissionType.BARRIER_RESTART
-            val promoted = theme.promotedVariant != null && random.nextDouble() < promotionProbability
+            val promoted = theme.promotedVariant != null && random.nextDouble() < theme.promotionProbability
             val variant = theme.variant(promoted)
 
             ArenaMissionEntry(
@@ -560,15 +561,6 @@ class ArenaMissionService(
             generatedAtMillis = System.currentTimeMillis(),
             missions = missions
         )
-    }
-
-    private fun loadPromotionProbability(): Double {
-        val missionConfig = currentMissionConfig()
-        val value = missionConfig.getDouble("mission.promotion_probability", -1.0)
-        if (value < 0.0 || value > 1.0) {
-            throw IllegalStateException("mission.promotion_probability は0.0〜1.0である必要があります: $value")
-        }
-        return value
     }
 
     private fun saveMissionSet(missionSet: ArenaMissionSet) {
@@ -800,7 +792,7 @@ class ArenaMissionService(
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(name)
         if (lore.isNotEmpty()) {
-            meta.lore = lore
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(lore, GuiLoreFrame.NONE)))
         }
         item.itemMeta = meta
         return item
@@ -817,7 +809,7 @@ class ArenaMissionService(
                 ArenaI18n.text(player, "arena.ui.mission.item_name", "mission" to title)
             }
         )
-        meta.lore = buildMissionLore(player, mission)
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(buildMissionLore(player, mission), GuiLoreFrame.NONE)))
         item.itemMeta = meta
         return item
     }
@@ -839,13 +831,13 @@ class ArenaMissionService(
         val meta = item.itemMeta as? SkullMeta ?: return item
         meta.owningPlayer = player
         meta.setDisplayName(ArenaI18n.text(player, "arena.ui.player.name_format", "player" to player.name))
-        meta.lore = listOf(
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
             ArenaI18n.text(player, "arena.ui.separator"),
             ArenaI18n.text(player, "arena.ui.player.mob_kills", "count" to playerData.totalMobKillCount),
             ArenaI18n.text(player, "arena.ui.separator"),
             ArenaI18n.text(player, "arena.ui.player.barrier_restarts", "count" to playerData.barrierRestartCount),
             ArenaI18n.text(player, "arena.ui.separator")
-        )
+        ), GuiLoreFrame.NONE)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return item

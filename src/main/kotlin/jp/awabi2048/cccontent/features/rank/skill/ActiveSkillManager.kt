@@ -1,5 +1,9 @@
 package jp.awabi2048.cccontent.features.rank.skill
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
@@ -299,21 +303,17 @@ object ActiveSkillManager {
         )
 
         // Lore
-        val lore = mutableListOf<Component>()
+        val lore = mutableListOf<GuiLoreLine>()
 
         // 切替対象スキル表示
         if (toggleableSkills.isEmpty()) {
-            lore.add(Component.text("切替対象のスキルがありません")
-                .color(NamedTextColor.GRAY)
-                .decoration(TextDecoration.ITALIC, false))
+            lore.add(GuiLoreLine.Text("切替対象のスキルがありません"))
         } else {
             val skillTree = profession?.profession?.let {
                 SkillTreeRegistry.getSkillTree(it)
             }
 
-            lore.add(Component.text("切替対象スキル:")
-                .color(NamedTextColor.GRAY)
-                .decoration(TextDecoration.ITALIC, false))
+            lore.add(GuiLoreLine.Text("切替対象スキル:"))
 
             for (skillId in toggleableSkills) {
                 val skillNode = skillTree?.getSkill(skillId)
@@ -332,31 +332,23 @@ object ActiveSkillManager {
                     else -> " [OFF]"
                 }
                 val color = when {
-                    isSelected && isEnabled -> NamedTextColor.GREEN
-                    isSelected && !isEnabled -> NamedTextColor.RED
-                    else -> NamedTextColor.DARK_GRAY
+                    isSelected && isEnabled -> "§a"
+                    isSelected && !isEnabled -> "§c"
+                    else -> "§8"
                 }
 
-                lore.add(Component.text("$prefix$skillName$stateIndicator")
-                    .color(color)
-                    .decoration(TextDecoration.ITALIC, false))
+                lore.add(GuiLoreLine.Raw("$color$prefix$skillName$stateIndicator"))
             }
 
-            lore.add(Component.empty())
-            lore.add(Component.text("切替様式: ${currentMode.displayName}")
-                .color(NamedTextColor.YELLOW)
-                .decoration(TextDecoration.ITALIC, false))
+            lore.add(GuiLoreLine.Spacer)
+            lore.add(GuiLoreLine.Raw("§e切替様式: ${currentMode.displayName}"))
         }
 
-        lore.add(Component.empty())
-        lore.add(Component.text("左クリック: スキル選択切替")
-            .color(NamedTextColor.AQUA)
-            .decoration(TextDecoration.ITALIC, false))
-        lore.add(Component.text("右クリック: 様式変更")
-            .color(NamedTextColor.AQUA)
-            .decoration(TextDecoration.ITALIC, false))
+        lore.add(GuiLoreLine.Spacer)
+        lore.add(GuiLoreLine.Action("左クリック", "スキル選択切替"))
+        lore.add(GuiLoreLine.Action("右クリック", "様式変更"))
 
-        meta.lore(lore)
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lore, GuiLoreFrame.NONE)))
         button.itemMeta = meta
 
         return button

@@ -1,6 +1,5 @@
 mission:
   generate_count: 14
-  promotion_probability: 0.25
 
 license:
   strong_enemy_mob_type_ids:

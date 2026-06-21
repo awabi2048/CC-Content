@@ -2,6 +2,11 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.gui.GuiMenuItems
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -163,18 +168,20 @@ class ArenaSessionInfoMenu(
             add(ArenaI18n.text(null, "arena.ui.broadcast.radio_header"))
             add(radioLine)
         }
-        val separator = GuiMenuItems.separator(bodyLines)
-        val lore = mutableListOf<String>()
-        lore.add(separator)
-        waveLine?.let { lore.add(it) }
-        lore.add(separator)
-        lore.add(ArenaI18n.text(null, "arena.ui.broadcast.players_header"))
-        lore.addAll(participantLines)
-        lore.add("")
-        lore.add(ArenaI18n.text(null, "arena.ui.broadcast.radio_header"))
-        lore.add(radioLine)
-        lore.add(separator)
-        meta.lore = lore
+        meta.lore(
+            CCSystem.getAPI().getLoreService().render(
+                GuiLoreSpec.Blocks(buildList {
+                    waveLine?.let { add(GuiLoreBlock(listOf(GuiLoreLine.Raw(it)))) }
+                    add(GuiLoreBlock(buildList {
+                        add(GuiLoreLine.Raw(ArenaI18n.text(null, "arena.ui.broadcast.players_header")))
+                        participantLines.forEach { add(GuiLoreLine.Raw(it)) }
+                        add(GuiLoreLine.Spacer)
+                        add(GuiLoreLine.Raw(ArenaI18n.text(null, "arena.ui.broadcast.radio_header")))
+                        add(GuiLoreLine.Raw(radioLine))
+                    }))
+                })
+            )
+        )
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return item
@@ -186,7 +193,7 @@ class ArenaSessionInfoMenu(
         meta.setDisplayName(
             ArenaI18n.text(null, "arena.ui.broadcast.empty_slot")
         )
-        meta.lore = emptyList()
+        meta.lore(emptyList())
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return item
@@ -214,7 +221,7 @@ class ArenaSessionInfoMenu(
         meta.setDisplayName(
             ArenaI18n.text(null, "arena.ui.broadcast.info.name")
         )
-        meta.lore = ArenaI18n.stringList(null, "arena.ui.broadcast.info.lore")
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(ArenaI18n.stringList(null, "arena.ui.broadcast.info.lore"), GuiLoreFrame.NONE)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return item
