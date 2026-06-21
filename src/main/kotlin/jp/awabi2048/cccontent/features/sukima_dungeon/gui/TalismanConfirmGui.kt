@@ -2,6 +2,10 @@
 
 package jp.awabi2048.cccontent.features.sukima_dungeon.gui
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -21,22 +25,7 @@ class TalismanConfirmGui : InventoryHolder {
         inventory = Bukkit.createInventory(this, 27, title)
         val inv = inventory!!
 
-        val blackGlass = createGuiItem(Material.BLACK_STAINED_GLASS_PANE, " ")
-        val blackMeta = blackGlass.itemMeta
-        blackMeta?.isHideTooltip = true
-        blackGlass.itemMeta = blackMeta
-
-        val grayGlass = createGuiItem(Material.GRAY_STAINED_GLASS_PANE, " ")
-        val grayMeta = grayGlass.itemMeta
-        grayMeta?.isHideTooltip = true
-        grayGlass.itemMeta = grayMeta
-
-        // Fill Header & Footer (Row 0 and 2)
-        for (i in 0..8) inv.setItem(i, blackGlass)
-        for (i in 18..26) inv.setItem(i, blackGlass)
-
-        // Fill Middle Row (Row 1)
-        for (i in 9..17) inv.setItem(i, grayGlass)
+        jp.awabi2048.cccontent.gui.GuiMenuItems.fillFramed(inv)
 
         // Confirm Button (Slot 11) - Escape
         val confirmItem = createGuiItem(
@@ -57,13 +46,6 @@ class TalismanConfirmGui : InventoryHolder {
     }
 
     private fun createGuiItem(material: Material, name: String, vararg lore: String): ItemStack {
-        val item = ItemStack(material, 1)
-        val meta: ItemMeta? = item.itemMeta
-        meta?.setDisplayName(name)
-        if (lore.isNotEmpty()) {
-            meta?.lore = lore.toList()
-        }
-        item.itemMeta = meta
-        return item
+        return jp.awabi2048.cccontent.gui.GuiMenuItems.icon(material, name, lore.toList())
     }
 }

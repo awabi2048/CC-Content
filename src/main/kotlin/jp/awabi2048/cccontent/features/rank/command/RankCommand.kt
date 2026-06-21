@@ -36,6 +36,11 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
@@ -519,20 +524,18 @@ class RankCommand(
 
         val description = messageProvider.getMessage("tutorial_rank.${rank.name.lowercase()}.description")
 
-        val lore = mutableListOf<Component>()
-        lore += toComponent(BAR)
-        lore += toComponent("§f§l| §7$description")
-        lore += toComponent(BAR)
-        if (loader == null) {
-            lore += toComponent("§f§l| §c${messageProvider.getMessage("tutorial_rank.task.system_not_initialized")}")
+        val taskLore = if (loader == null) {
+            listOf(toComponent("§f§l| §c${messageProvider.getMessage("tutorial_rank.task.system_not_initialized")}"))
         } else {
-            lore += buildTutorialRankTaskLore(viewer, tutorial.taskProgress, requirement, mode)
+            buildTutorialRankTaskLore(viewer, tutorial.taskProgress, requirement, mode)
         }
-        lore += toComponent(BAR)
 
         val icon = resolveTutorialRankIcon(loader?.getRankIcon(rank.name), rank)
         val name = messageProvider.getMessage("tutorial_rank.${rank.name.lowercase()}.name")
-        return createGuiItem(icon, toComponent("§6§l$name"), lore)
+        return createGuiBlockItem(icon, toComponent("§6§l$name"), listOf(
+            listOf(toComponent("§f§l| §7$description")),
+            taskLore
+        ))
     }
 
     private fun buildTutorialRankTaskLore(
@@ -723,13 +726,11 @@ class RankCommand(
         if (meta != null) {
             meta.owningPlayer = viewer
             meta.displayName(withoutItalic(toComponent("§e${viewer.name}")))
-            meta.lore(
-                listOf(
-                    withoutItalic(toComponent(BAR)),
-                    withoutItalic(toComponent("§f§l| §7${messageProvider.getMessage("tutorial_rank.task.page_hint")}")),
-                    withoutItalic(toComponent(BAR))
-                )
-            )
+            meta.lore(CCSystem.getAPI().getLoreService().render(
+                GuiLoreSpec.Blocks(listOf(GuiLoreBlock(listOf(
+                    GuiLoreLine.Raw("§f§l| §7${messageProvider.getMessage("tutorial_rank.task.page_hint")}")
+                ))))
+            ))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
             item.itemMeta = meta
         }
@@ -824,7 +825,9 @@ class RankCommand(
             it.owningPlayer = player
             it.displayName(toComponent("§a§l${player.name}"))
             val playerHeadLore = messageProvider.getMessageList("gui.profession.selection.player_head.lore")
-            it.lore(playerHeadLore.map { lore -> toComponent(lore) })
+            it.lore(CCSystem.getAPI().getLoreService().render(
+                GuiLoreSpec.Rich(playerHeadLore.map(GuiLoreLine::Raw), GuiLoreFrame.NONE)
+            ))
             head.itemMeta = it
         }
         return head
@@ -944,10 +947,10 @@ class RankCommand(
         }
 
         val skillTreeLore = messageProvider.getMessageList("rank.gui.tree_button_lore")
-        val skillTreeItem = createGuiItem(
+        val skillTreeItem = createGuiBlockItem(
             Material.OAK_SAPLING,
             toComponent(messageProvider.getMessage("rank.gui.tree_button")),
-            listOf(toComponent(BAR)) + skillTreeLore.map { toComponent(it) } + listOf(toComponent(BAR))
+            listOf(skillTreeLore.map { toComponent(it) })
         )
         inventory.setItem(MAIN_MENU_SKILL_TREE_SLOT, skillTreeItem)
 
@@ -969,25 +972,24 @@ class RankCommand(
         
         val professionIcon = getProfessionOverviewIcon(playerProfession.profession)
         
-        val professionOverviewItem = createGuiItem(
+        val professionOverviewItem = createGuiBlockItem(
             professionIcon,
             toComponent("§b【$professionName】"),
             listOf(
-                toComponent(BAR),
-                toComponent("§7$professionDescription"),
-                toComponent(BAR),
-                toComponent("§f§l| §7Lv. §e§l$currentLevel"),
-                toComponent("§f§l| §7経験値 §a${String.format("%,d", currentLevelExp)}§7/${String.format("%,d", levelExp)}"),
-                toComponent(BAR)
+                listOf(toComponent("§7$professionDescription")),
+                listOf(
+                    toComponent("§f§l| §7Lv. §e§l$currentLevel"),
+                    toComponent("§f§l| §7経験値 §a${String.format("%,d", currentLevelExp)}§7/${String.format("%,d", levelExp)}")
+                )
             )
         )
         inventory.setItem(MAIN_MENU_PROFESSION_OVERVIEW_SLOT, professionOverviewItem)
 
         val settingsLore = messageProvider.getMessageList("rank.gui.settings_button_lore")
-        val settingsItem = createGuiItem(
+        val settingsItem = createGuiBlockItem(
             Material.COMPARATOR,
             toComponent(messageProvider.getMessage("rank.gui.settings_button")),
-            listOf(toComponent(BAR)) + settingsLore.map { toComponent(it) } + listOf(toComponent(BAR))
+            listOf(settingsLore.map { toComponent(it) })
         )
         inventory.setItem(MAIN_MENU_SETTINGS_SLOT, settingsItem)
 
@@ -997,7 +999,9 @@ class RankCommand(
         if (skullMeta != null) {
             skullMeta.owningPlayer = viewer
             skullMeta.displayName(withoutItalic(toComponent("§e${viewer.name}")))
-            skullMeta.lore((listOf(toComponent(BAR)) + settingsLore.map { toComponent(it) } + listOf(toComponent(BAR))).map { withoutItalic(it) })
+            skullMeta.lore(CCSystem.getAPI().getLoreService().render(
+                GuiLoreSpec.Blocks(listOf(GuiLoreBlock(settingsLore.map(GuiLoreLine::Raw))))
+            ))
             skullMeta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
             playerHead.itemMeta = skullMeta
         }
@@ -1005,10 +1009,10 @@ class RankCommand(
 
         // 職業のヒントアイコン (スロット42) - モック実装
         val hintLoreMain = messageProvider.getMessageList("rank.gui.hint_button_lore")
-        val hintItem = createGuiItem(
+        val hintItem = createGuiBlockItem(
             Material.COMPASS,
             toComponent(messageProvider.getMessage("rank.gui.hint_button")),
-            listOf(toComponent(BAR)) + hintLoreMain.map { toComponent(it) } + listOf(toComponent(BAR))
+            listOf(hintLoreMain.map { toComponent(it) })
         )
         inventory.setItem(MAIN_MENU_HINT_SLOT, hintItem)
 
@@ -1153,15 +1157,13 @@ class RankCommand(
             BossBarDisplayMode.SHORT -> "§e"
             BossBarDisplayMode.HIDDEN -> "§c"
         }
-        val bossBarItem = createGuiItem(
+        val bossBarItem = createGuiBlockItem(
             Material.CLOCK,
             toComponent(messageProvider.getMessage("rank.gui.settings.bossbar.title")),
-            listOf(
-                toComponent(BAR),
+            listOf(listOf(
                 toComponent("§f§l| §7現在 $bossBarValueColor${bossBarMode.displayName}"),
-                toComponent(messageProvider.getMessage("rank.gui.settings.bossbar.action")),
-                toComponent(BAR)
-            )
+                toComponent(messageProvider.getMessage("rank.gui.settings.bossbar.action"))
+            ))
         )
         inventory.setItem(SETTINGS_MENU_BOSSBAR_SLOT, bossBarItem)
 
@@ -1171,15 +1173,13 @@ class RankCommand(
         } else {
             "§c${messageProvider.getMessage("rank.gui.settings.level_up.disabled")}"
         }
-        val levelUpItem = createGuiItem(
+        val levelUpItem = createGuiBlockItem(
             Material.BELL,
             toComponent(messageProvider.getMessage("rank.gui.settings.level_up.title")),
-            listOf(
-                toComponent(BAR),
+            listOf(listOf(
                 toComponent("§f§l| §7現在 $levelUpValue"),
-                toComponent(messageProvider.getMessage("rank.gui.settings.level_up.action")),
-                toComponent(BAR)
-            )
+                toComponent(messageProvider.getMessage("rank.gui.settings.level_up.action"))
+            ))
         )
         inventory.setItem(SETTINGS_MENU_LEVELUP_NOTIFY_SLOT, levelUpItem)
 
@@ -2369,7 +2369,26 @@ class RankCommand(
         val meta = item.itemMeta
         if (meta != null) {
             meta.displayName(withoutItalic(displayName))
-            meta.lore(lore.map { withoutItalic(it) })
+            meta.lore(CCSystem.getAPI().getLoreService().render(
+                GuiLoreSpec.Rich(lore.map { GuiLoreLine.Raw(LEGACY_SERIALIZER.serialize(it)) }, GuiLoreFrame.NONE)
+            ))
+            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
+            item.itemMeta = meta
+        }
+        return item
+    }
+
+    /** Module code supplies semantic blocks; CC-System renders every boundary separator. */
+    private fun createGuiBlockItem(material: Material, displayName: Component, blocks: List<List<Component>>): ItemStack {
+        val item = ItemStack(material)
+        val meta = item.itemMeta
+        if (meta != null) {
+            meta.displayName(withoutItalic(displayName))
+            meta.lore(CCSystem.getAPI().getLoreService().render(
+                GuiLoreSpec.Blocks(blocks.map { block ->
+                    GuiLoreBlock(block.map { GuiLoreLine.Raw(LEGACY_SERIALIZER.serialize(it)) })
+                })
+            ))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
             item.itemMeta = meta
         }
@@ -3283,8 +3302,6 @@ class RankCommand(
             26 to TutorialRank.ATTAINER
         )
 
-        // 区切り線
-        private const val BAR = "§7§m――――――――――――――――――――――――――――――"
     }
     
     /**

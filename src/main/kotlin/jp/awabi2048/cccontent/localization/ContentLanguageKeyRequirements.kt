@@ -5,11 +5,20 @@ import org.yaml.snakeyaml.Yaml
 import org.yaml.snakeyaml.constructor.SafeConstructor
 import java.nio.file.Files
 import java.nio.file.Path
+import jp.awabi2048.cccontent.items.marker.MarkerToolLanguageKeyRequirements
 
 object ContentLanguageKeyRequirements {
+    private val providers: List<LanguageKeyRequirementProvider> = listOf(
+        LanguageKeyRequirementProvider(::arenaThemeKeys),
+        MarkerToolLanguageKeyRequirements
+    )
+
     @JvmStatic
     fun requiredKeys(resourcesRoot: Path): List<LanguageKeyRequirement> {
-        return arenaThemeKeys(resourcesRoot)
+        return providers
+            .flatMap { it.requiredKeys(resourcesRoot) }
+            .distinctBy { it.sourceId to it.key }
+            .sortedBy(LanguageKeyRequirement::key)
     }
 
     private fun arenaThemeKeys(resourcesRoot: Path): List<LanguageKeyRequirement> {

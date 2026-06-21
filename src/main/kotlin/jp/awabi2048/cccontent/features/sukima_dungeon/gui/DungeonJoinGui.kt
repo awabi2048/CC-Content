@@ -2,6 +2,10 @@
 
 package jp.awabi2048.cccontent.features.sukima_dungeon.gui
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+
 import jp.awabi2048.cccontent.features.sukima_dungeon.PortalSession
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.listeners.EntranceListener
@@ -26,20 +30,7 @@ class DungeonJoinGui(val portal: PortalSession, private val loader: StructureLoa
         inventory = Bukkit.createInventory(this, 27, title)
         val inv = inventory!!
 
-        val blackGlass = createGuiItem(Material.BLACK_STAINED_GLASS_PANE, " ")
-        val blackMeta = blackGlass.itemMeta
-        blackMeta?.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        blackGlass.itemMeta = blackMeta
-
-        val grayGlass = createGuiItem(Material.GRAY_STAINED_GLASS_PANE, " ")
-        val grayMeta = grayGlass.itemMeta
-        grayMeta?.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        grayGlass.itemMeta = grayMeta
-
-        // Fill Header & Footer
-        for (i in 0..8) inv.setItem(i, blackGlass)
-        for (i in 18..26) inv.setItem(i, blackGlass)
-        for (i in 9..17) inv.setItem(i, grayGlass)
+        jp.awabi2048.cccontent.gui.GuiMenuItems.fillFramed(inv)
 
         // Join Button (Slot 13 or 11/15)
         val themeName = portal.themeName
@@ -70,13 +61,6 @@ class DungeonJoinGui(val portal: PortalSession, private val loader: StructureLoa
     }
 
     private fun createGuiItem(material: Material, name: String, vararg lore: String): ItemStack {
-        val item = ItemStack(material, 1)
-        val meta: ItemMeta? = item.itemMeta
-        meta?.setDisplayName(name)
-        if (lore.isNotEmpty()) {
-            meta?.lore = lore.toList()
-        }
-        item.itemMeta = meta
-        return item
+        return jp.awabi2048.cccontent.gui.GuiMenuItems.icon(material, name, lore.toList())
     }
 }

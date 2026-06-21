@@ -46,9 +46,8 @@ private fun applyLocalizedMeta(
     lore: List<String>
 ) {
     val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
-    val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
     meta.displayName(Component.text(name))
-    meta.lore(localizedLore.map { Component.text(it) })
+    meta.lore(CustomItemI18n.lore(player, "custom_items.$feature.$id.lore", lore))
 }
 
 class SparklingStoneItem : CustomItem {

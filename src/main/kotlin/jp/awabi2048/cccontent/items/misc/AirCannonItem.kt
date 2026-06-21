@@ -77,10 +77,9 @@ class AirCannonItem : CustomItem {
         val meta = item.itemMeta ?: return item
 
         val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
-        val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
 
         meta.displayName(Component.text(name))
-        meta.lore(localizedLore.map { Component.text(it) })
+        meta.lore(CustomItemI18n.lore(player, "custom_items.$feature.$id.lore", lore))
         meta.persistentDataContainer.set(airCannonKey, PersistentDataType.BYTE, 1)
         item.itemMeta = meta
         return item

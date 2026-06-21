@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent;
 
 import jp.awabi2048.cccontent.testsupport.LanguageResourceValidator;
+import jp.awabi2048.cccontent.localization.ContentLanguageKeyRequirements;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -14,7 +15,15 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 class LanguageResourceValidationTest {
     @Test
-    void languageResourcesStayComplete() {
+    void languageResourcesStayComplete() throws IOException {
+        var result = LanguageResourceValidator.validate(
+            Path.of("../cc-system/src/main/resources/lang"),
+            ContentLanguageKeyRequirements.requiredKeys(Path.of("src/main/resources"))
+        );
+        if (result.hasErrors()) {
+            fail("[lang validation] " + result.errors().size() + " error(s)\n\n"
+                + String.join("\n", result.errors()));
+        }
     }
 
     @Test

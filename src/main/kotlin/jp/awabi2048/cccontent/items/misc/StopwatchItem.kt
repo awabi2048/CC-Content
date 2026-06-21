@@ -45,7 +45,7 @@ class StopwatchItem(private val plugin: JavaPlugin) : CustomItem, Listener {
         val meta = item.itemMeta ?: return item
 
         val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
-        val lore = CustomItemI18n.list(
+        val lore = CustomItemI18n.lore(
             player,
             "custom_items.$feature.$id.lore",
             listOf(
@@ -55,7 +55,7 @@ class StopwatchItem(private val plugin: JavaPlugin) : CustomItem, Listener {
         )
 
         meta.displayName(Component.text(name))
-        meta.lore(lore.map { Component.text(it) })
+        meta.lore(lore)
         meta.persistentDataContainer.set(stopwatchKey, PersistentDataType.BYTE, 1)
         item.itemMeta = meta
         return item

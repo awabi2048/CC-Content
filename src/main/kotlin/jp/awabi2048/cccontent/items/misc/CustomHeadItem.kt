@@ -1,5 +1,8 @@
 package jp.awabi2048.cccontent.items.misc
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.util.ItemMetaCompat
 import net.kyori.adventure.text.Component
@@ -30,7 +33,7 @@ class CustomHeadItem(
         val item = ItemStack(material, amount)
         val meta = item.itemMeta ?: return item
         meta.displayName(Component.text(variant.itemDisplayName))
-        meta.lore(variant.itemLore.map { Component.text(it) })
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(variant.itemLore, GuiLoreFrame.NONE)))
         variant.itemCustomModelData?.let { ItemMetaCompat.setLegacyCustomModelData(meta, it) }
         meta.persistentDataContainer.set(variantKey, PersistentDataType.STRING, variant.variantId)
         item.itemMeta = meta

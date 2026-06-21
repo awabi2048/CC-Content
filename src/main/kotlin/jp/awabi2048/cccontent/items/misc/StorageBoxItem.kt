@@ -2,11 +2,17 @@
 
 package jp.awabi2048.cccontent.items.misc
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextDecoration
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -36,6 +42,8 @@ import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.Base64
 import java.util.UUID
+
+private val storageLoreLegacy = LegacyComponentSerializer.legacySection()
 
 private object StorageBoxKeys {
     val BOX_MARKER = NamespacedKey("cccontent", "storage_box_marker")
@@ -84,7 +92,6 @@ private object StorageBoxCodec {
     private const val RECORD_SEPARATOR = "|"
     private const val FIELD_SEPARATOR = ","
     private const val MAX_ITEMS_PER_SLOT = 64L * 4096L
-    private const val LORE_SEPARATOR = "§8§m――――――――――――――――――――――――"
 
     fun isStorageBox(item: ItemStack?): Boolean {
         val stack = item ?: return false
@@ -255,12 +262,14 @@ private object StorageBoxCodec {
 
             visualMeta.displayName(Component.text("Storage Box").decoration(TextDecoration.ITALIC, false))
             visualMeta.lore(
-                listOf(
-                    Component.text(LORE_SEPARATOR).decoration(TextDecoration.ITALIC, false),
-                    Component.text("§f§l| §7収納中 ").decoration(TextDecoration.ITALIC, false).append(storedName),
-                    Component.text("§f§l| §7個数 ${countColor}$count§7/$maxCount §7(${stacks}st + $remainder)").decoration(TextDecoration.ITALIC, false),
-                    Component.text("§f§l| §7自動回収 $autoPickup").decoration(TextDecoration.ITALIC, false),
-                    Component.text(LORE_SEPARATOR).decoration(TextDecoration.ITALIC, false)
+                CCSystem.getAPI().getLoreService().render(
+                    GuiLoreSpec.Blocks(listOf(GuiLoreBlock(
+                        listOf(
+                            GuiLoreLine.Raw(storageLoreLegacy.serialize(Component.text("§f§l| §7収納中 ").append(storedName))),
+                            GuiLoreLine.Raw("§f§l| §7個数 ${countColor}$count§7/$maxCount §7(${stacks}st + $remainder)"),
+                            GuiLoreLine.Raw("§f§l| §7自動回収 $autoPickup")
+                        )
+                    )))
                 )
             )
             if (forcePotatoVisual) {
@@ -1083,21 +1092,19 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
             val icon = entry.prototype.clone().apply {
                 amount = iconAmount
                 val m = itemMeta
-                val loreLines = (m?.lore() ?: emptyList()) + listOf(
-                    Component.text(" "),
-                    Component.text("§7格納数: §f${entry.count}"),
-                    if (entry.count > 0L) {
-                        Component.text("§7Shift左クリック: 1スタック取り出し")
-                    } else {
-                        Component.text("§7未格納（この種類を収納対象として指定済み）")
-                    },
-                    if (entry.count > 0L) {
-                        Component.text("§7Shift右クリック: インベントリいっぱいまで取り出し")
-                    } else {
-                        Component.text("§7この種類をShiftクリックで格納できます")
-                    },
-                    if (idx == state.selectedIndex) Component.text("§a現在選択中") else Component.text("§8未選択")
+                val appendedLore = CCSystem.getAPI().getLoreService().render(
+                    GuiLoreSpec.Rich(
+                        listOf(
+                            GuiLoreLine.Spacer,
+                            GuiLoreLine.Data("格納数:", entry.count, "§f"),
+                            GuiLoreLine.Raw(if (entry.count > 0L) "§7Shift左クリック: 1スタック取り出し" else "§7未格納（この種類を収納対象として指定済み）"),
+                            GuiLoreLine.Raw(if (entry.count > 0L) "§7Shift右クリック: インベントリいっぱいまで取り出し" else "§7この種類をShiftクリックで格納できます"),
+                            GuiLoreLine.Raw(if (idx == state.selectedIndex) "§a現在選択中" else "§8未選択")
+                        ),
+                        GuiLoreFrame.NONE
+                    )
                 )
+                val loreLines = (m?.lore() ?: emptyList()) + appendedLore
                 m?.lore(loreLines)
                 itemMeta = m
             }
@@ -1234,7 +1241,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         val item = ItemStack(material)
         val meta = item.itemMeta
         meta?.displayName(Component.text(name))
-        meta?.lore(lore.map { Component.text(it) })
+        meta?.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(lore, GuiLoreFrame.NONE)))
         item.itemMeta = meta
         return item
     }

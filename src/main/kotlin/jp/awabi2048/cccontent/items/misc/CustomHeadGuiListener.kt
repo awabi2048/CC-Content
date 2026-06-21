@@ -2,6 +2,9 @@
 
 package jp.awabi2048.cccontent.items.misc
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.gui.SimpleConfirmationDialog
 import jp.awabi2048.cccontent.items.CustomItemManager
 import net.kyori.adventure.text.Component
@@ -197,13 +200,22 @@ class CustomHeadGuiListener(private val plugin: JavaPlugin) : Listener {
             val meta = base.itemMeta
             choice.displayName?.let { meta?.setDisplayName(it) }
             if (choice.lore.isNotEmpty()) {
-                meta?.lore = choice.lore.toMutableList()
+                meta?.lore(
+                    CCSystem.getAPI().getLoreService().render(
+                        GuiLoreSpec.Auto(choice.lore, GuiLoreFrame.NONE)
+                    )
+                )
             }
             if (base.type == Material.BARRIER) {
                 meta?.setDisplayName("§c取得失敗: ${choice.hdbId}")
-                val lore = choice.lore.toMutableList()
-                lore.add(0, "§7HeadDatabaseのIDを確認してください")
-                meta?.lore = lore
+                meta?.lore(
+                    CCSystem.getAPI().getLoreService().render(
+                        GuiLoreSpec.Auto(
+                            listOf("§7HeadDatabaseのIDを確認してください") + choice.lore,
+                            GuiLoreFrame.NONE
+                        )
+                    )
+                )
             }
             base.itemMeta = meta
             return base

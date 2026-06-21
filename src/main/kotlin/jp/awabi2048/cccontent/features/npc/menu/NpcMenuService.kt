@@ -3,6 +3,10 @@
 package jp.awabi2048.cccontent.features.npc.menu
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.economy.ContentEconomyBridge
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
 import jp.awabi2048.cccontent.features.npc.request.DeadChestRecoveryService
@@ -466,16 +470,15 @@ class NpcMenuService(
             check.snapshot == null -> "§7デスチェストが見つかりませんでした"
             else -> check.failureMessage ?: "§c失具還術を行えません"
         }
-        val sep = separator(body + costOrStatusLine)
-        val lore = buildList {
-            add(sep)
-            addAll(body)
-            add(sep)
-            add(costOrStatusLine)
-            add(sep)
-        }
-        return GuiMenuItems.icon(Material.RECOVERY_COMPASS, "§a失具還術", lore).apply {
+        val renderedLore = CCSystem.getAPI().getLoreService().render(
+            GuiLoreSpec.Blocks(listOf(
+                GuiLoreBlock(body.map(GuiLoreLine::Raw)),
+                GuiLoreBlock(listOf(GuiLoreLine.Raw(costOrStatusLine)))
+            ))
+        )
+        return GuiMenuItems.icon(Material.RECOVERY_COMPASS, "§a失具還術").apply {
             itemMeta = itemMeta?.also { meta ->
+                meta.lore(renderedLore)
                 meta.setEnchantmentGlintOverride(check.executable)
                 meta.addItemFlags(ItemFlag.HIDE_ENCHANTS)
             }
@@ -556,22 +559,20 @@ class NpcMenuService(
             add("§c※ 奉納は1週間に1回まで行えます")
             add(statusLine)
         }
-        val sep = separator(body)
-        val icon = GuiMenuItems.icon(
-            Material.PLAYER_HEAD,
-            "§e奉納品",
-            buildList {
-                add(sep)
-                addAll(offeringLore)
-                add(sep)
-                add(body[offeringLore.size])
-                add(body[offeringLore.size + 1])
-                add(body[offeringLore.size + 2])
-                add(sep)
-                add(statusLine)
-                add(sep)
-            }
+        val renderedLore = CCSystem.getAPI().getLoreService().render(
+            GuiLoreSpec.Blocks(listOf(
+                GuiLoreBlock(offeringLore.map(GuiLoreLine::Raw)),
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Raw(body[offeringLore.size]),
+                    GuiLoreLine.Raw(body[offeringLore.size + 1]),
+                    GuiLoreLine.Raw(body[offeringLore.size + 2])
+                )),
+                GuiLoreBlock(listOf(GuiLoreLine.Raw(statusLine)))
+            ))
         )
+        val icon = GuiMenuItems.icon(Material.PLAYER_HEAD, "§e奉納品").apply {
+            itemMeta = itemMeta?.also { it.lore(renderedLore) }
+        }
         val skullMeta = icon.itemMeta as? SkullMeta
         val offeringMeta = offering.itemMeta as? SkullMeta
         if (skullMeta != null && offeringMeta != null) {
@@ -597,18 +598,20 @@ class NpcMenuService(
             if (opened) add("§c今日の分は既に受け取っています")
             if (extraLine != null) addAll(extraLine.lines())
         }
-        val sep = separator(body)
-        return GuiMenuItems.icon(Material.BARREL, "§6おあげちゃんアルバイト", buildList {
-            add(sep)
-            add(body[0])
-            add(body[1])
-            add(sep)
-            add(body[2])
-            add(body[3])
-            if (opened) add("§c今日の分は既に受け取っています")
-            add(sep)
-            if (extraLine != null) addAll(extraLine.lines())
-        })
+        val renderedLore = CCSystem.getAPI().getLoreService().render(
+            GuiLoreSpec.Blocks(buildList {
+                add(GuiLoreBlock(listOf(GuiLoreLine.Raw(body[0]), GuiLoreLine.Raw(body[1]))))
+                add(GuiLoreBlock(buildList {
+                    add(GuiLoreLine.Raw(body[2]))
+                    add(GuiLoreLine.Raw(body[3]))
+                    if (opened) add(GuiLoreLine.Raw("§c今日の分は既に受け取っています"))
+                }))
+                if (extraLine != null) add(GuiLoreBlock(extraLine.lines().map(GuiLoreLine::Raw)))
+            })
+        )
+        return GuiMenuItems.icon(Material.BARREL, "§6おあげちゃんアルバイト").apply {
+            itemMeta = itemMeta?.also { it.lore(renderedLore) }
+        }
     }
 
     private fun comingSoonIcon(): ItemStack = GuiMenuItems.icon(Material.BEDROCK, "§7Coming Soon")
@@ -817,10 +820,6 @@ class NpcMenuService(
 
     private fun playError(player: Player) {
         player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BASS, 0.7f, 0.7f)
-    }
-
-    private fun separator(lines: Collection<String>): String {
-        return GuiMenuItems.separator(lines)
     }
 
     private fun formatAcorn(amount: Double, color: String = "§e"): String = ContentEconomyBridge.formatAcorn(amount, color)

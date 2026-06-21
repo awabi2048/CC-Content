@@ -1,6 +1,10 @@
 package jp.awabi2048.cccontent.features.npc.shop
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.economy.ContentEconomyBridge
 import jp.awabi2048.cccontent.gui.GuiMenuItems
 import jp.awabi2048.cccontent.gui.OwnedMenuHolder
@@ -199,16 +203,15 @@ class OageShrineShopMenuService(
         val costLine = "§f❙ §7初穂料 ${ContentEconomyBridge.formatAcorn(price)}"
         val limit = item.purchaseLimitDaily ?: tab.purchaseLimitDaily ?: item.purchaseLimitWeekly ?: tab.purchaseLimitWeekly
         val limitLine = limit?.let { "§f❙ §7交換可能個数 §b${it}個" }
-        val body = headLore + listOfNotNull(costLine, limitLine)
-        val separator = separator(body)
-        val lines = mutableListOf<Component>()
-        lines += separator
-        headLore.forEach { lines += legacy(it) }
-        lines += separator
-        lines += legacy(costLine)
-        if (limitLine != null) lines += legacy(limitLine)
-        lines += separator
-        return lines
+        return CCSystem.getAPI().getLoreService().render(
+            GuiLoreSpec.Blocks(listOf(
+                GuiLoreBlock(headLore.map(GuiLoreLine::Raw)),
+                GuiLoreBlock(buildList {
+                    add(GuiLoreLine.Raw(costLine))
+                    if (limitLine != null) add(GuiLoreLine.Raw(limitLine))
+                })
+            ))
+        )
     }
 
     private fun confirmButton(player: Player, resolved: OageShrineShopResolvedItem): ItemStack {
@@ -269,10 +272,6 @@ class OageShrineShopMenuService(
     private fun canAcceptReward(player: Player, item: ItemStack): Boolean {
         if (player.inventory.firstEmpty() >= 0) return true
         return player.inventory.storageContents.filterNotNull().any { existing -> existing.isSimilar(item) && existing.amount + item.amount <= existing.maxStackSize }
-    }
-
-    private fun separator(lines: Collection<String>): Component {
-        return legacy(GuiMenuItems.separator(lines))
     }
 
     private fun legacy(text: String): Component = LegacyComponentSerializer.legacySection().deserialize(text).decoration(TextDecoration.ITALIC, false)

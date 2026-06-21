@@ -2,6 +2,10 @@
 
 package jp.awabi2048.cccontent.items.arena
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemManager
@@ -44,9 +48,8 @@ abstract class ArenaSimpleItem(
         val item = ItemStack(material, amount.coerceAtLeast(1))
         val meta = item.itemMeta ?: return item
         val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
-        val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
         meta.displayName(Component.text(name))
-        meta.lore(localizedLore.map { Component.text(it) })
+        meta.lore(CustomItemI18n.lore(player, "custom_items.$feature.$id.lore", lore))
         modelData?.let { ItemMetaCompat.setLegacyCustomModelData(meta, it) }
         meta.persistentDataContainer.set(arenaItemKey, PersistentDataType.STRING, id)
         item.itemMeta = meta
@@ -92,14 +95,14 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
             "custom_items.arena.mob_token.token_names.$normalizedTypeId",
             normalizedTypeId
         )
-        val localizedLore = CustomItemI18n.list(
+        val localizedLore = CustomItemI18n.lore(
             player,
             "custom_items.arena.mob_token.lore",
             listOf("§7アリーナに出現するモンスターが落としたアイテム", "§7アリーナロビーで報酬と交換しよう！")
         )
 
         meta.displayName(Component.text("§6$tokenName"))
-        meta.lore(localizedLore.map { Component.text(it) })
+        meta.lore(localizedLore)
         meta.setItemModel(itemModel)
         meta.persistentDataContainer.set(arenaItemKey, PersistentDataType.STRING, id)
         meta.persistentDataContainer.set(arenaMobTokenCategoryKey, PersistentDataType.STRING, normalizedTypeId)
@@ -585,9 +588,14 @@ class ArenaEnchantShardItem : ArenaSimpleItem(
                 ArenaEnchantShardEffectType.INVALID_TARGET_ATTACH,
                 ArenaEnchantShardEffectType.CUSTOM_ENCHANT_ATTACH -> "§f§o調和をもたらす力を秘めている"
             }
-            return listOf(
-                Component.text("Tier $tier", NamedTextColor.GRAY).decoration(TextDecoration.ITALIC, false),
-                Component.text(description).decoration(TextDecoration.ITALIC, false),
+            return CCSystem.getAPI().getLoreService().render(
+                GuiLoreSpec.Rich(
+                    listOf(
+                        GuiLoreLine.Raw("§7Tier $tier"),
+                        GuiLoreLine.Raw(description)
+                    ),
+                    GuiLoreFrame.NONE
+                )
             )
         }
 

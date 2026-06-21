@@ -3,6 +3,9 @@
 package jp.awabi2048.cccontent.features.arena.mission
 
 import jp.awabi2048.cccontent.config.FeatureConfigManager
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.features.arena.ArenaAuditLogger
 import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.arena.ArenaMenuItems
@@ -800,7 +803,7 @@ class ArenaMissionService(
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(name)
         if (lore.isNotEmpty()) {
-            meta.lore = lore
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(lore, GuiLoreFrame.NONE)))
         }
         item.itemMeta = meta
         return item
@@ -817,7 +820,7 @@ class ArenaMissionService(
                 ArenaI18n.text(player, "arena.ui.mission.item_name", "mission" to title)
             }
         )
-        meta.lore = buildMissionLore(player, mission)
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(buildMissionLore(player, mission), GuiLoreFrame.NONE)))
         item.itemMeta = meta
         return item
     }
@@ -839,13 +842,13 @@ class ArenaMissionService(
         val meta = item.itemMeta as? SkullMeta ?: return item
         meta.owningPlayer = player
         meta.setDisplayName(ArenaI18n.text(player, "arena.ui.player.name_format", "player" to player.name))
-        meta.lore = listOf(
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
             ArenaI18n.text(player, "arena.ui.separator"),
             ArenaI18n.text(player, "arena.ui.player.mob_kills", "count" to playerData.totalMobKillCount),
             ArenaI18n.text(player, "arena.ui.separator"),
             ArenaI18n.text(player, "arena.ui.player.barrier_restarts", "count" to playerData.barrierRestartCount),
             ArenaI18n.text(player, "arena.ui.separator")
-        )
+        ), GuiLoreFrame.NONE)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return item

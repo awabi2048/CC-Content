@@ -2,10 +2,14 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import io.papermc.paper.datacomponent.DataComponentTypes
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardData
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardEffectType
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
+import jp.awabi2048.cccontent.gui.GuiMenuItems
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -1310,14 +1314,24 @@ class ArenaEnchantPedestalMenu(
             meta.lore = null
         } else if (evaluation.missingLevel != null && evaluation.missingLevel > 0) {
             meta.setDisplayName("§c智力が足りません")
-            meta.lore = listOf(
-                ArenaI18n.text(player, "arena.ui.pedestal.execute.missing_level", "value" to evaluation.missingLevel)
+            meta.lore(
+                CCSystem.getAPI().getLoreService().render(
+                    GuiLoreSpec.Auto(
+                        listOf(ArenaI18n.text(player, "arena.ui.pedestal.execute.missing_level", "value" to evaluation.missingLevel)),
+                        GuiLoreFrame.NONE
+                    )
+                )
             )
         } else {
             val consume = evaluation.requiredLevel ?: 0
             meta.setDisplayName("§a智力は十分です")
-            meta.lore = listOf(
-                ArenaI18n.text(player, "arena.ui.pedestal.execute.consume_level", "value" to consume)
+            meta.lore(
+                CCSystem.getAPI().getLoreService().render(
+                    GuiLoreSpec.Auto(
+                        listOf(ArenaI18n.text(player, "arena.ui.pedestal.execute.consume_level", "value" to consume)),
+                        GuiLoreFrame.NONE
+                    )
+                )
             )
         }
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
@@ -1346,7 +1360,7 @@ class ArenaEnchantPedestalMenu(
         val item = ItemStack(Material.MAP)
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
-        meta.lore = ArenaI18n.stringList(player, "arena.ui.pedestal.info.dummy")
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(ArenaI18n.stringList(player, "arena.ui.pedestal.info.dummy"), GuiLoreFrame.NONE)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return ArenaMenuItems.hideTooltip(item)
@@ -1403,32 +1417,23 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun buildInputSlotPlaceholder(player: Player): ItemStack {
-        val item = ItemStack(Material.LIGHT_GRAY_STAINED_GLASS_PANE)
+        val item = GuiMenuItems.backgroundPane(Material.LIGHT_GRAY_STAINED_GLASS_PANE, ArenaI18n.text(player, "arena.ui.pedestal.blank"))
         val meta = item.itemMeta ?: return item
-        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
         meta.persistentDataContainer.set(inputPlaceholderKey, PersistentDataType.BYTE, 1)
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
-        return ArenaMenuItems.hideTooltip(item)
+        return item
     }
 
     private fun buildHiddenAnimationPane(player: Player): ItemStack {
-        val item = ItemStack(Material.GRAY_STAINED_GLASS_PANE)
+        val item = GuiMenuItems.backgroundPane(Material.GRAY_STAINED_GLASS_PANE, ArenaI18n.text(player, "arena.ui.pedestal.blank"))
         val meta = item.itemMeta ?: return item
-        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
         meta.persistentDataContainer.set(inputPlaceholderKey, PersistentDataType.BYTE, 1)
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
-        return ArenaMenuItems.hideTooltip(item)
+        return item
     }
 
     private fun buildSimplePane(player: Player, material: Material): ItemStack {
-        val item = ItemStack(material)
-        val meta = item.itemMeta ?: return item
-        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        item.itemMeta = meta
-        return ArenaMenuItems.hideTooltip(item)
+        return GuiMenuItems.backgroundPane(material, ArenaI18n.text(player, "arena.ui.pedestal.blank"))
     }
 
     private fun buildPathPane(player: Player, material: Material, glint: Boolean): ItemStack {

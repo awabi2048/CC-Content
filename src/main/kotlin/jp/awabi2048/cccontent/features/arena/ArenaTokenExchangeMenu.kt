@@ -2,6 +2,9 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.economy.ContentEconomyBridge
 import jp.awabi2048.cccontent.gui.GuiMenuItems
 import jp.awabi2048.cccontent.gui.VirtualInventoryEscrowService
@@ -601,7 +604,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
             )
         )
         if (lines.isNotEmpty()) {
-            meta.lore = buildExchangeLore(player, lines)
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(buildExchangeLore(player, lines), GuiLoreFrame.NONE)))
         }
         ItemMetaCompat.hideAdditionalTooltip(meta)
         item.itemMeta = meta

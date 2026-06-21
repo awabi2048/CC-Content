@@ -37,9 +37,8 @@ class TransparentItemFrameItem : CustomItem {
         val item = ItemStack(Material.ITEM_FRAME, amount)
         val meta = item.itemMeta ?: return item
         val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
-        val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
         meta.displayName(Component.text(name))
-        meta.lore(localizedLore.map { Component.text(it) })
+        meta.lore(CustomItemI18n.lore(player, "custom_items.$feature.$id.lore", lore))
         meta.persistentDataContainer.set(TransparentItemFrameKeys.NORMAL_ITEM_KEY, PersistentDataType.BYTE, 1)
         item.itemMeta = meta
         return item
@@ -67,9 +66,8 @@ class TransparentGlowItemFrameItem : CustomItem {
         val item = ItemStack(Material.GLOW_ITEM_FRAME, amount)
         val meta = item.itemMeta ?: return item
         val name = CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)
-        val localizedLore = CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore)
         meta.displayName(Component.text(name))
-        meta.lore(localizedLore.map { Component.text(it) })
+        meta.lore(CustomItemI18n.lore(player, "custom_items.$feature.$id.lore", lore))
         meta.persistentDataContainer.set(TransparentItemFrameKeys.GLOW_ITEM_KEY, PersistentDataType.BYTE, 1)
         item.itemMeta = meta
         return item

@@ -29,7 +29,7 @@ object BoxedDaiginjoItem : CustomItem {
         val item = ItemStack(Material.PLAYER_HEAD, amount.coerceAtLeast(1))
         val meta = item.itemMeta as? SkullMeta ?: return item
         meta.displayName(Component.text(CustomItemI18n.text(player, "custom_items.$feature.$id.name", displayName)))
-        meta.lore(CustomItemI18n.list(player, "custom_items.$feature.$id.lore", lore).map { Component.text(it) })
+        meta.lore(CustomItemI18n.lore(player, "custom_items.$feature.$id.lore", lore))
         meta.playerProfile = Bukkit.createProfile("boxed_daiginjo").also {
             it.setProperty(ProfileProperty("textures", TEXTURE))
         }

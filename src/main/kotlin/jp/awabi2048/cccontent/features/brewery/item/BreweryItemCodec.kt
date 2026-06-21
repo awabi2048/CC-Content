@@ -2,6 +2,9 @@
 
 package jp.awabi2048.cccontent.features.brewery.item
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.features.brewery.BreweryRecipe
 import jp.awabi2048.cccontent.features.brewery.model.BrewStage
 import org.bukkit.Color
@@ -60,11 +63,11 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         } else ""
 
         meta.lore(
-            listOf(
-                net.kyori.adventure.text.Component.text("§7レシピ: ${recipe?.name ?: recipeId}"),
-                net.kyori.adventure.text.Component.text("§7段階: 発酵"),
-                net.kyori.adventure.text.Component.text("§f$loreDesc")
-            ).filter { it != net.kyori.adventure.text.Component.text("§f") }
+            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOfNotNull(
+                "§7レシピ: ${recipe?.name ?: recipeId}",
+                "§7段階: 発酵",
+                if (loreDesc.isNotEmpty()) "§f$loreDesc" else null
+            ), GuiLoreFrame.NONE))
         )
 
         val pdc = meta.persistentDataContainer
@@ -171,13 +174,13 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         meta.setDisplayName(displayName)
         val description = if (recipe != null) getFinalDescriptionByQuality(recipe, quality) else ""
         meta.lore(
-            listOfNotNull(
-                net.kyori.adventure.text.Component.text("§7レシピ: ${recipe?.name ?: state.recipeId}"),
-                net.kyori.adventure.text.Component.text("§7品質: ${"%.1f".format(quality)}"),
-                net.kyori.adventure.text.Component.text("§7蒸留回数: ${state.distillCount}/$targetDistillCount"),
-                net.kyori.adventure.text.Component.text("§7アルコール: ${"%.1f".format(state.alcohol)}%"),
-                if (description.isNotBlank()) net.kyori.adventure.text.Component.text("§f$description") else null
-            )
+            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOfNotNull(
+                "§7レシピ: ${recipe?.name ?: state.recipeId}",
+                "§7品質: ${"%.1f".format(quality)}",
+                "§7蒸留回数: ${state.distillCount}/$targetDistillCount",
+                "§7アルコール: ${"%.1f".format(state.alcohol)}%",
+                if (description.isNotBlank()) "§f$description" else null
+            ), GuiLoreFrame.NONE))
         )
 
         if (recipe != null && recipe.finalOutputColor != null) {
@@ -240,16 +243,15 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
             getFinalDescriptionByQuality(recipe, finalQuality)
         } else ""
         
-        val loreList = mutableListOf(
-            net.kyori.adventure.text.Component.text("§7レシピ: ${recipe?.name ?: state.recipeId}"),
-            net.kyori.adventure.text.Component.text("§7最終品質: ${"%.1f".format(finalQuality.coerceIn(0.0, 100.0))}"),
-            net.kyori.adventure.text.Component.text("§7評価: ${"★".repeat(stars)}"),
-            net.kyori.adventure.text.Component.text("§7アルコール: ${"%.1f".format(state.alcohol)}%")
+        meta.lore(
+            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOfNotNull(
+                "§7レシピ: ${recipe?.name ?: state.recipeId}",
+                "§7最終品質: ${"%.1f".format(finalQuality.coerceIn(0.0, 100.0))}",
+                "§7評価: ${"★".repeat(stars)}",
+                "§7アルコール: ${"%.1f".format(state.alcohol)}%",
+                if (desc.isNotEmpty()) "§f$desc" else null
+            ), GuiLoreFrame.NONE))
         )
-        if (desc.isNotEmpty()) {
-            loreList.add(net.kyori.adventure.text.Component.text("§f$desc"))
-        }
-        meta.lore(loreList)
         
         if (recipe != null && recipe.finalOutputColor != null) {
             applyPotionColor(meta, recipe.finalOutputColor)
@@ -271,10 +273,10 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         meta.setItemModel(NamespacedKey.minecraft("shears"))
         meta.setDisplayName("§e蒸留フィルター（試作）")
         meta.lore(
-            listOf(
-                net.kyori.adventure.text.Component.text("§7蒸留時間 -15%"),
-                net.kyori.adventure.text.Component.text("§7蒸留1回ごとに耐久を1消費")
-            )
+            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
+                "§7蒸留時間 -15%",
+                "§7蒸留1回ごとに耐久を1消費"
+            ), GuiLoreFrame.NONE))
         )
         meta.persistentDataContainer.set(filterKey, PersistentDataType.BYTE, 1)
         meta.persistentDataContainer.set(filterRemainingUsesKey, PersistentDataType.INTEGER, FILTER_MAX_USES)
