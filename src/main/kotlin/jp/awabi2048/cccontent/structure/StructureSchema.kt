@@ -10,11 +10,7 @@ data class MarkerRequirement(
 data class ArenaStructureSchema(
     val keyword: String,
     val inSide: CardinalDirection?,
-    val outSides: Set<CardinalDirection>,
-    val entrySide: CardinalDirection,
-    val exitSide: CardinalDirection? = null,
-    val throughSide: CardinalDirection? = null,
-    val branchSide: CardinalDirection? = null
+    val outSides: Set<CardinalDirection>
 ) {
     val connectionSides: Set<CardinalDirection>
         get() = setOfNotNull(inSide) + outSides
@@ -37,56 +33,42 @@ object StructureSchemas {
         ArenaStructureSchema(
             keyword = "entrance",
             inSide = null,
-            outSides = setOf(CardinalDirection.NORTH),
-            entrySide = CardinalDirection.NORTH
+            outSides = setOf(CardinalDirection.NORTH)
         ),
         ArenaStructureSchema(
             keyword = "straight",
             inSide = CardinalDirection.NORTH,
-            outSides = setOf(CardinalDirection.SOUTH),
-            entrySide = CardinalDirection.NORTH,
-            exitSide = CardinalDirection.SOUTH
+            outSides = setOf(CardinalDirection.SOUTH)
         ),
         ArenaStructureSchema(
             keyword = "corner",
             inSide = CardinalDirection.NORTH,
-            outSides = setOf(CardinalDirection.EAST),
-            entrySide = CardinalDirection.NORTH,
-            exitSide = CardinalDirection.EAST
+            outSides = setOf(CardinalDirection.EAST)
         ),
         ArenaStructureSchema(
             keyword = "corridor",
             inSide = CardinalDirection.NORTH,
-            outSides = setOf(CardinalDirection.SOUTH),
-            entrySide = CardinalDirection.NORTH,
-            exitSide = CardinalDirection.SOUTH
+            outSides = setOf(CardinalDirection.SOUTH)
         ),
         ArenaStructureSchema(
             keyword = "goal",
             inSide = CardinalDirection.NORTH,
-            outSides = emptySet(),
-            entrySide = CardinalDirection.NORTH
+            outSides = emptySet()
         ),
         ArenaStructureSchema(
             keyword = "tjunction_room",
             inSide = CardinalDirection.NORTH,
-            outSides = setOf(CardinalDirection.SOUTH, CardinalDirection.EAST),
-            entrySide = CardinalDirection.NORTH,
-            throughSide = CardinalDirection.SOUTH,
-            branchSide = CardinalDirection.EAST
+            outSides = setOf(CardinalDirection.SOUTH, CardinalDirection.EAST)
         ),
         ArenaStructureSchema(
             keyword = "pedestal_room",
             inSide = CardinalDirection.NORTH,
-            outSides = emptySet(),
-            entrySide = CardinalDirection.NORTH
+            outSides = emptySet()
         ),
         ArenaStructureSchema(
             keyword = "lift",
             inSide = CardinalDirection.NORTH,
-            outSides = setOf(CardinalDirection.SOUTH),
-            entrySide = CardinalDirection.NORTH,
-            exitSide = CardinalDirection.SOUTH
+            outSides = setOf(CardinalDirection.SOUTH)
         )
     ).associateBy { it.keyword }
 

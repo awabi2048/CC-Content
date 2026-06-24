@@ -65,8 +65,8 @@ class StructureTransformTest {
 
     @Test
     void canonicalSchemasUseTheSameNorthFacingContract() {
-        assertEquals(CardinalDirection.NORTH, StructureSchemas.INSTANCE.arena("goal").getEntrySide());
-        assertEquals(CardinalDirection.NORTH, StructureSchemas.INSTANCE.arena("pedestal_room").getEntrySide());
+        assertEquals(CardinalDirection.NORTH, StructureSchemas.INSTANCE.arena("goal").getInSide());
+        assertEquals(CardinalDirection.NORTH, StructureSchemas.INSTANCE.arena("pedestal_room").getInSide());
         assertNotNull(StructureTransform.Companion.rotationMatching(
             StructureSchemas.INSTANCE.sukima("corner").getCanonicalOpenings(),
             Set.of(CardinalDirection.SOUTH, CardinalDirection.WEST)

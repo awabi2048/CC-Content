@@ -55,14 +55,18 @@ private data class ConnectionProfileCacheKey(
     val mirrored: Boolean
 )
 
+private enum class ConnectionRole { IN, OUT }
+
 private data class RotatedConnectionMarker(
     val blockX: Int,
     val blockY: Int,
-    val blockZ: Int
+    val blockZ: Int,
+    val role: ConnectionRole
 )
 
 private data class RawConnectionMarker(
     val side: CardinalDirection,
+    val role: ConnectionRole,
     val blockX: Int,
     val blockY: Int,
     val blockZ: Int,
@@ -127,7 +131,6 @@ data class ArenaDoorAnimationPlacement(
 
 class ArenaStageGenerator {
     companion object {
-        private val CONNECTION_MARKER_TAGS = StructureSchemas.ARENA_CONNECTION_TAGS
         private const val CONNECTION_MARKER_LABEL = "arena.marker.connection"
         private const val MARKER_ENTITY_TYPE_ID = StructureSchemas.MARKER_ENTITY_TYPE
     }
@@ -696,8 +699,7 @@ class ArenaStageGenerator {
                             }
                             val transitTransform = tjunctionRoomTransform(
                                 actualEntry = endDirection.opposite(),
-                                actualThrough = endDirection,
-                                actualBranch = branchDirection
+                                actualOuts = setOf(endDirection, branchDirection)
                             ) ?: continue
                             selectedTransitPoint = transitPoint
                             selectedPedestalPoint = pedestalPoint
@@ -733,7 +735,7 @@ class ArenaStageGenerator {
                 }
 
                 val corridorType = if (selectedDirection == startDirection) ArenaStructureType.CORRIDOR else ArenaStructureType.CORNER
-                val corridorTransform = if (selectedDirection == startDirection) {
+                val selectedCorridorTransform = if (selectedDirection == startDirection) {
                     corridorTransform(startDirection.opposite())
                 } else {
                     cornerTransform(startDirection.opposite(), selectedDirection)
@@ -746,7 +748,7 @@ class ArenaStageGenerator {
                         index = corridorIndex,
                         point = corridorPoint,
                         structureType = corridorType,
-                        transform = corridorTransform,
+                        transform = selectedCorridorTransform,
                         role = PlacementRole.CORRIDOR,
                         wave = wave,
                         parentIndex = previousPlacementIndex
@@ -883,27 +885,33 @@ class ArenaStageGenerator {
 
     private fun entranceTransform(actualExit: CardinalDirection): PlacementTransform {
         val schema = requireArenaSchema(ArenaStructureType.ENTRANCE)
-        return PlacementTransform(StructureTransform.rotationBetween(schema.entrySide, actualExit))
+        val canonicalOut = schema.outSides.firstOrNull()
+            ?: error("[Arena] entrance schema outSides is empty")
+        return PlacementTransform(StructureTransform.rotationBetween(canonicalOut, actualExit))
     }
 
     private fun straightTransform(actualEntry: CardinalDirection): PlacementTransform {
         val schema = requireArenaSchema(ArenaStructureType.STRAIGHT)
-        return PlacementTransform(StructureTransform.rotationBetween(schema.entrySide, actualEntry))
+        val canonicalIn = schema.inSide ?: error("[Arena] straight schema inSide is missing")
+        return PlacementTransform(StructureTransform.rotationBetween(canonicalIn, actualEntry))
     }
 
     private fun corridorTransform(actualEntry: CardinalDirection): PlacementTransform {
         val schema = requireArenaSchema(ArenaStructureType.CORRIDOR)
-        return PlacementTransform(StructureTransform.rotationBetween(schema.entrySide, actualEntry))
+        val canonicalIn = schema.inSide ?: error("[Arena] corridor schema inSide is missing")
+        return PlacementTransform(StructureTransform.rotationBetween(canonicalIn, actualEntry))
     }
 
     private fun goalTransform(actualEntry: CardinalDirection): PlacementTransform {
         val schema = requireArenaSchema(ArenaStructureType.GOAL)
-        return PlacementTransform(StructureTransform.rotationBetween(schema.entrySide, actualEntry))
+        val canonicalIn = schema.inSide ?: error("[Arena] goal schema inSide is missing")
+        return PlacementTransform(StructureTransform.rotationBetween(canonicalIn, actualEntry))
     }
 
     private fun pedestalRoomTransform(actualEntry: CardinalDirection): PlacementTransform {
         val schema = requireArenaSchema(ArenaStructureType.PEDESTAL_ROOM)
-        return PlacementTransform(StructureTransform.rotationBetween(schema.entrySide, actualEntry))
+        val canonicalIn = schema.inSide ?: error("[Arena] pedestal_room schema inSide is missing")
+        return PlacementTransform(StructureTransform.rotationBetween(canonicalIn, actualEntry))
     }
 
     private fun cornerTransform(
@@ -911,14 +919,16 @@ class ArenaStageGenerator {
         actualExit: CardinalDirection
     ): PlacementTransform {
         val schema = requireArenaSchema(ArenaStructureType.CORNER)
-        val canonicalExit = schema.exitSide ?: error("[Arena] corner schema exitSide is missing")
+        val canonicalIn = schema.inSide ?: error("[Arena] corner schema inSide is missing")
+        val canonicalOut = schema.outSides.firstOrNull()
+            ?: error("[Arena] corner schema outSides is empty")
         val candidates = buildList {
             for (quarter in 0..3) add(PlacementTransform(quarter, mirrored = false))
             for (quarter in 0..3) add(PlacementTransform(quarter, mirrored = true))
         }
         return candidates.firstOrNull { transform ->
-            transformDirection(schema.entrySide, transform) == actualEntry &&
-                transformDirection(canonicalExit, transform) == actualExit
+            transformDirection(canonicalIn, transform) == actualEntry &&
+                transformDirection(canonicalOut, transform) == actualExit
         } ?: error("[Arena] corner 回転が解決できません: entry=${actualEntry.token}, exit=${actualExit.token}")
     }
 
@@ -934,20 +944,19 @@ class ArenaStageGenerator {
 
     private fun tjunctionRoomTransform(
         actualEntry: CardinalDirection,
-        actualThrough: CardinalDirection,
-        actualBranch: CardinalDirection
+        actualOuts: Set<CardinalDirection>
     ): PlacementTransform? {
         val schema = requireArenaSchema(ArenaStructureType.TJUNCTION_ROOM)
-        val canonicalThrough = schema.throughSide ?: error("[Arena] tjunction schema throughSide is missing")
-        val canonicalBranch = schema.branchSide ?: error("[Arena] tjunction schema branchSide is missing")
+        val canonicalIn = schema.inSide ?: error("[Arena] tjunction schema inSide is missing")
+        if (schema.outSides.size != actualOuts.size) return null
         val candidates = buildList {
             for (quarter in 0..3) add(PlacementTransform(quarter, mirrored = false))
             for (quarter in 0..3) add(PlacementTransform(quarter, mirrored = true))
         }
         return candidates.firstOrNull { transform ->
-            transformDirection(schema.entrySide, transform) == actualEntry &&
-                transformDirection(canonicalThrough, transform) == actualThrough &&
-                transformDirection(canonicalBranch, transform) == actualBranch
+            val transformedIn = transformDirection(canonicalIn, transform)
+            val transformedOuts = schema.outSides.map { transformDirection(it, transform) }.toSet()
+            transformedIn == actualEntry && transformedOuts == actualOuts
         }
     }
 
@@ -1105,23 +1114,25 @@ class ArenaStageGenerator {
         val previousDetected = sideDetectedCoordinates(previousConnectionProfile, previousSide)
         val currentDetected = sideDetectedCoordinates(currentConnectionProfile, currentSide)
         val previousMarkers = previousConnectionProfile.sideMarkers[previousSide].orEmpty()
+            .filter { it.role == ConnectionRole.OUT }
         val currentMarkers = currentConnectionProfile.sideMarkers[currentSide].orEmpty()
+            .filter { it.role == ConnectionRole.IN }
 
         if (previousMarkers.isEmpty()) {
-            error("$CONNECTION_MARKER_LABEL(previous_${previousSideUnrotated.token}_missing detected=$previousDetected $connectionContext)")
+            error("$CONNECTION_MARKER_LABEL(previous_${previousSideUnrotated.token}_out_missing detected=$previousDetected $connectionContext)")
         }
         if (currentMarkers.isEmpty()) {
-            error("$CONNECTION_MARKER_LABEL(current_${currentSideUnrotated.token}_missing detected=$currentDetected $connectionContext)")
+            error("$CONNECTION_MARKER_LABEL(current_${currentSideUnrotated.token}_in_missing detected=$currentDetected $connectionContext)")
         }
 
         if (previousMarkers.size > 1) {
             error(
-                "$CONNECTION_MARKER_LABEL(previous_${previousSideUnrotated.token}_multiple detected=${previousMarkers.size} points=$previousDetected $connectionContext)"
+                "$CONNECTION_MARKER_LABEL(previous_${previousSideUnrotated.token}_out_multiple detected=${previousMarkers.size} points=$previousDetected $connectionContext)"
             )
         }
         if (currentMarkers.size > 1) {
             error(
-                "$CONNECTION_MARKER_LABEL(current_${currentSideUnrotated.token}_multiple detected=${currentMarkers.size} points=$currentDetected $connectionContext)"
+                "$CONNECTION_MARKER_LABEL(current_${currentSideUnrotated.token}_in_multiple detected=${currentMarkers.size} points=$currentDetected $connectionContext)"
             )
         }
 
@@ -1201,7 +1212,8 @@ class ArenaStageGenerator {
             val rotatedMarker = RotatedConnectionMarker(
                 blockX = rotatedBlockX,
                 blockY = rawMarker.blockY,
-                blockZ = rotatedBlockZ
+                blockZ = rotatedBlockZ,
+                role = rawMarker.role
             )
             val sideList = sideMarkers[rotatedSide] ?: return@forEach
             sideList.add(rotatedMarker)
@@ -1238,8 +1250,19 @@ class ArenaStageGenerator {
 
         template.structure.entities.forEach { entity ->
             if (entity.typeId != MARKER_ENTITY_TYPE_ID) return@forEach
-            if (!entity.scoreboardTags.any { it in CONNECTION_MARKER_TAGS }) return@forEach
+            val hasIn = StructureSchemas.ARENA_CONNECTION_IN_TAG in entity.scoreboardTags
+            val hasOut = StructureSchemas.ARENA_CONNECTION_OUT_TAG in entity.scoreboardTags
+            if (!hasIn && !hasOut) return@forEach
             markerCount += 1
+
+            val role = when {
+                hasIn && !hasOut -> ConnectionRole.IN
+                hasOut && !hasIn -> ConnectionRole.OUT
+                else -> {
+                    issues.add("$CONNECTION_MARKER_LABEL(ambiguous_role x=${floor(entity.x).toInt()} z=${floor(entity.z).toInt()})")
+                    return@forEach
+                }
+            }
 
             val blockX = floor(entity.x).toInt()
             val blockY = floor(entity.y).toInt()
@@ -1263,6 +1286,7 @@ class ArenaStageGenerator {
 
             val marker = RawConnectionMarker(
                 side = touchedSides.first(),
+                role = role,
                 blockX = blockX,
                 blockY = blockY,
                 blockZ = blockZ,
