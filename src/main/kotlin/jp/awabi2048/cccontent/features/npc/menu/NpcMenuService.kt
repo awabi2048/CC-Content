@@ -15,7 +15,9 @@ import jp.awabi2048.cccontent.features.npc.shop.OageShrineShopMenuService
 import jp.awabi2048.cccontent.features.npc.shop.OageShrineShopState
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.gui.GuiMenuItems
+import jp.awabi2048.cccontent.gui.MenuEventGuards
 import jp.awabi2048.cccontent.gui.OwnedMenuHolder
+import jp.awabi2048.cccontent.gui.StandardMenuLayouts
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.misc.BoxedDaiginjoItem
 import jp.awabi2048.cccontent.util.ContentLocaleResolver
@@ -37,7 +39,6 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.SkullMeta
-import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 import java.time.LocalDate
@@ -52,26 +53,26 @@ class NpcMenuService(
     private companion object {
         const val CONFIG_PATH = "config/npc/menu.yml"
         const val MENU_ID = "oage_shrine"
-        const val MENU_SIZE = 45
-        const val TALK_MENU_SIZE = 54
-        const val OAGE_BOX_SIZE = 54
-        const val BACK_SLOT = 40
-        const val TALK_BACK_SLOT = 49
-        const val OAGE_BOX_BACK_SLOT = 49
+        const val MENU_SIZE = StandardMenuLayouts.SIZE_45
+        const val TALK_MENU_SIZE = StandardMenuLayouts.SIZE_54
+        const val OAGE_BOX_SIZE = StandardMenuLayouts.SIZE_54
+        const val BACK_SLOT = StandardMenuLayouts.BACK_SLOT_45
+        const val TALK_BACK_SLOT = StandardMenuLayouts.BACK_SLOT_54
+        const val OAGE_BOX_BACK_SLOT = StandardMenuLayouts.BACK_SLOT_54
         const val DELIVERY_SLOT = 20
         const val PART_TIME_SLOT = 24
         const val DAILY_HEADER_SLOT = 4
         const val OAGE_BOX_HEADER_SLOT = 4
-        const val OAGE_BOX_CONFIRM_PREVIEW_SLOT = 22
-        const val OAGE_BOX_CONFIRM_SLOT = 20
-        const val OAGE_BOX_CANCEL_SLOT = 24
+        val OAGE_BOX_CONFIRM_PREVIEW_SLOT = StandardMenuLayouts.CONFIRM_45.previewSlot
+        val OAGE_BOX_CONFIRM_SLOT = StandardMenuLayouts.CONFIRM_45.confirmSlot
+        val OAGE_BOX_CANCEL_SLOT = StandardMenuLayouts.CONFIRM_45.cancelSlot
         const val DEAD_CHEST_RECOVERY_COST = 300.0
-        const val DEAD_CHEST_CONFIRM_PREVIEW_SLOT = 22
-        const val DEAD_CHEST_CONFIRM_SLOT = 20
-        const val DEAD_CHEST_CANCEL_SLOT = 24
-        const val DELIVERY_CONFIRM_PREVIEW_SLOT = 22
-        const val DELIVERY_CONFIRM_SLOT = 20
-        const val DELIVERY_CANCEL_SLOT = 24
+        val DEAD_CHEST_CONFIRM_PREVIEW_SLOT = StandardMenuLayouts.CONFIRM_45.previewSlot
+        val DEAD_CHEST_CONFIRM_SLOT = StandardMenuLayouts.CONFIRM_45.confirmSlot
+        val DEAD_CHEST_CANCEL_SLOT = StandardMenuLayouts.CONFIRM_45.cancelSlot
+        val DELIVERY_CONFIRM_PREVIEW_SLOT = StandardMenuLayouts.CONFIRM_45.previewSlot
+        val DELIVERY_CONFIRM_SLOT = StandardMenuLayouts.CONFIRM_45.confirmSlot
+        val DELIVERY_CANCEL_SLOT = StandardMenuLayouts.CONFIRM_45.cancelSlot
         const val PART_TIME_TASK_ARENA = "arena_mission_clear"
         const val DELIVERY_WORLD_POINT_REWARD = 100
         val OAGE_BOX_REWARD_SLOTS = listOf(20, 21, 22, 23, 24, 29, 30, 31, 32, 33)
@@ -152,11 +153,7 @@ class NpcMenuService(
     @EventHandler
     fun onInventoryClick(event: InventoryClickEvent) {
         val holder = event.view.topInventory.holder as? NpcMenuHolder ?: return
-        event.cancelWithDebug("NpcMenuService.onInventoryClick: menu_click")
-
-        val player = event.whoClicked as? Player ?: return
-        if (player.uniqueId != holder.ownerId) return
-        if (event.rawSlot !in 0 until event.view.topInventory.size) return
+        val player = MenuEventGuards.ownedTopClick(event, holder, "NpcMenuService.onInventoryClick: menu_click") ?: return
 
         handleClick(player, holder, event.rawSlot)
     }
@@ -164,9 +161,7 @@ class NpcMenuService(
     @EventHandler
     fun onInventoryDrag(event: InventoryDragEvent) {
         val holder = event.view.topInventory.holder as? NpcMenuHolder ?: return
-        if (event.rawSlots.any { it in 0 until event.view.topInventory.size } || holder.ownerId != (event.whoClicked as? Player)?.uniqueId) {
-            event.cancelWithDebug("NpcMenuService.onInventoryDrag: drag_cancelled")
-        }
+        MenuEventGuards.cancelOwnedTopDrag(event, holder, "NpcMenuService.onInventoryDrag: drag_cancelled")
     }
 
     @EventHandler
