@@ -113,6 +113,68 @@ class StructureMarkerValidatorTest {
     }
 
     @Test
+    void arenaCornerDetectsFacingFromAllFourAdjacentDirections() {
+        CardinalDirection[][] cases = {
+            {CardinalDirection.NORTH, CardinalDirection.EAST},
+            {CardinalDirection.EAST, CardinalDirection.SOUTH},
+            {CardinalDirection.SOUTH, CardinalDirection.WEST},
+            {CardinalDirection.WEST, CardinalDirection.NORTH}
+        };
+        CardinalDirection[] expectedFacings = {
+            CardinalDirection.NORTH,
+            CardinalDirection.EAST,
+            CardinalDirection.SOUTH,
+            CardinalDirection.WEST
+        };
+        for (int i = 0; i < cases.length; i++) {
+            jp.awabi2048.cccontent.structure.DirectionalConnectionSides sides =
+                new jp.awabi2048.cccontent.structure.DirectionalConnectionSides(
+                    Set.of(cases[i][0]),
+                    Set.of(cases[i][1])
+                );
+            CardinalDirection facing = StructureMarkerValidator.INSTANCE.detectArenaFacing(
+                StructureSchemas.INSTANCE.arena("corner"),
+                sides,
+                CardinalDirection.NORTH
+            );
+            assertTrue(facing == expectedFacings[i],
+                "corner facing for in=" + cases[i][0] + " out=" + cases[i][1] +
+                    " expected=" + expectedFacings[i] + " actual=" + facing);
+        }
+    }
+
+    @Test
+    void arenaStraightDetectsFacingFromAllFourOppositeDirections() {
+        CardinalDirection[][] cases = {
+            {CardinalDirection.NORTH, CardinalDirection.SOUTH},
+            {CardinalDirection.EAST, CardinalDirection.WEST},
+            {CardinalDirection.SOUTH, CardinalDirection.NORTH},
+            {CardinalDirection.WEST, CardinalDirection.EAST}
+        };
+        CardinalDirection[] expectedFacings = {
+            CardinalDirection.NORTH,
+            CardinalDirection.EAST,
+            CardinalDirection.SOUTH,
+            CardinalDirection.WEST
+        };
+        for (int i = 0; i < cases.length; i++) {
+            jp.awabi2048.cccontent.structure.DirectionalConnectionSides sides =
+                new jp.awabi2048.cccontent.structure.DirectionalConnectionSides(
+                    Set.of(cases[i][0]),
+                    Set.of(cases[i][1])
+                );
+            CardinalDirection facing = StructureMarkerValidator.INSTANCE.detectArenaFacing(
+                StructureSchemas.INSTANCE.arena("straight"),
+                sides,
+                CardinalDirection.NORTH
+            );
+            assertTrue(facing == expectedFacings[i],
+                "straight facing for in=" + cases[i][0] + " out=" + cases[i][1] +
+                    " expected=" + expectedFacings[i] + " actual=" + facing);
+        }
+    }
+
+    @Test
     void sukimaRequiresMinecraftMarkerEntity() {
         LoadedSchemEntity wrongType = new LoadedSchemEntity(
             "minecraft:armor_stand",

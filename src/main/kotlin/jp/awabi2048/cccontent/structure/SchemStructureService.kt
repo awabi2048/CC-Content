@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.structure
 
 import com.sk89q.worldedit.WorldEdit
 import com.sk89q.worldedit.bukkit.BukkitAdapter
+import com.sk89q.worldedit.entity.BaseEntity
 import com.sk89q.worldedit.extent.clipboard.BlockArrayClipboard
 import com.sk89q.worldedit.extent.clipboard.Clipboard
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormats
@@ -12,9 +13,13 @@ import com.sk89q.worldedit.math.BlockVector3
 import com.sk89q.worldedit.math.transform.AffineTransform
 import com.sk89q.worldedit.session.ClipboardHolder
 import com.sk89q.worldedit.regions.CuboidRegion
+import com.sk89q.worldedit.util.concurrency.LazyReference
 import org.bukkit.Location
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
+import org.enginehub.linbus.tree.LinCompoundTag
+import org.enginehub.linbus.tree.LinListTag
+import org.enginehub.linbus.tree.LinStringTag
 import org.enginehub.linbus.tree.LinTagType
 import java.io.File
 import java.io.FileInputStream
@@ -24,6 +29,7 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.UUID
+import kotlin.math.floor
 
 data class CcStructureSize(
     val x: Int,
@@ -164,7 +170,7 @@ class SchemStructureService(private val plugin: JavaPlugin) {
             throw IllegalArgumentException("Target file must end with $SCHEM_EXTENSION: $relativePath")
         }
         if (targetFile.exists() && !overwrite) {
-            throw IllegalStateException("Structure already exists: ${plugin.dataFolder.toPath().relativize(targetFile.toPath())}")
+            throw IllegalStateException("Structure already exists: $relativePath")
         }
 
         val world = BukkitAdapter.adapt(player.world)
@@ -185,6 +191,8 @@ class SchemStructureService(private val plugin: JavaPlugin) {
 
         val effectiveFacing = determineEffectiveFacing(relativePath, sourceClipboard, facing, player)
         val savedClipboard = normalizeToNorth(sourceClipboard, effectiveFacing)
+
+        relabelConnectionMarkers(relativePath, savedClipboard)
 
         val validation = validateClipboardMarkers(relativePath, savedClipboard)
         if (validation.hasIssues()) {
@@ -234,6 +242,92 @@ class SchemStructureService(private val plugin: JavaPlugin) {
         if (facing == CardinalDirection.NORTH) return source
         val quarter = StructureTransform.rotationBetween(facing, CardinalDirection.NORTH)
         return rotateClipboard(source, StructureTransform(quarter))
+    }
+
+    /**
+     * 回転後（NORTH 正規形）クリップボード上の Arena コネクションマーカーの in/out タグを、
+     * schema 定義に基づいて位置から再設定する。
+     *
+     * normalizeToNorth でクリップボード全体が回転されるが、Marker エンティティの
+     * scoreboardTags は回転されない。そのため、回転後のマーカー位置と schema.inSide/outSides を
+     * 照合し、正しいタグを付与し直す必要がある。
+     *
+     * これにより、ユーザーが schema と異なる向きで in/out タグを付けて保存した場合でも、
+     * 自動的に正規形のタグ付けに直される。
+     */
+    private fun relabelConnectionMarkers(relativePath: String, clipboard: Clipboard) {
+        val path = relativePath.replace('\\', '/').lowercase()
+        if (!path.contains("structures/arena/")) return
+
+        val fileName = path.substringAfterLast('/').removeSuffix(".schem")
+        val typeKeyword = fileName.substringBefore('.')
+        val schema = StructureSchemas.arena(typeKeyword) ?: return
+        if (!StructureSchemas.arenaRequiresConnectionMarkers(fileName)) return
+
+        val dims = clipboard.dimensions
+        val size = CcStructureSize(dims.x(), dims.y(), dims.z())
+        val maxX = size.x - 1
+        val maxZ = size.z - 1
+        val minPoint = clipboard.region.minimumPoint
+        val region = clipboard.region
+        val toRecreate = mutableListOf<Pair<com.sk89q.worldedit.entity.Entity, BaseEntity>>()
+
+        for (entity in clipboard.getEntities(region)) {
+            val state = entity.state ?: continue
+            if (state.type.id() != StructureSchemas.MARKER_ENTITY_TYPE) continue
+
+            val nbt = state.nbtReference?.value
+            val currentTags = nbt
+                ?.findListTag("Tags", LinTagType.stringTag())
+                ?.value()
+                ?.map { it.value() }
+                ?.toSet()
+                .orEmpty()
+            val isConnectionMarker = StructureSchemas.ARENA_CONNECTION_TAGS.any { it in currentTags }
+            if (!isConnectionMarker) continue
+
+            val location = entity.location
+            val blockX = floor(location.x - minPoint.x.toDouble()).toInt()
+            val blockZ = floor(location.z - minPoint.z.toDouble()).toInt()
+            val touchedSides = buildList {
+                if (blockX == 0) add(CardinalDirection.WEST)
+                if (blockX == maxX) add(CardinalDirection.EAST)
+                if (blockZ == 0) add(CardinalDirection.NORTH)
+                if (blockZ == maxZ) add(CardinalDirection.SOUTH)
+            }
+            if (touchedSides.size != 1) continue
+            val side = touchedSides.single()
+
+            val expectedRole = when (side) {
+                schema.inSide -> StructureSchemas.ARENA_CONNECTION_IN_TAG
+                in schema.outSides -> StructureSchemas.ARENA_CONNECTION_OUT_TAG
+                else -> null
+            }
+            val newTags = currentTags
+                .filterNot { it in StructureSchemas.ARENA_CONNECTION_TAGS }
+                .toMutableSet()
+            if (expectedRole != null) {
+                newTags.add(expectedRole)
+            }
+
+            if (newTags == currentTags) continue
+
+            val newList = LinListTag.builder(LinTagType.stringTag())
+                .addAll(newTags.map { LinStringTag.of(it) })
+                .build()
+            val newNbt = (nbt?.toBuilder() ?: LinCompoundTag.builder())
+                .put("Tags", newList)
+                .build()
+
+            state.nbtReference = LazyReference.computed(newNbt)
+            toRecreate += entity to state
+        }
+
+        for ((old, newState) in toRecreate) {
+            val location = old.location
+            old.remove()
+            clipboard.createEntity(location, newState)
+        }
     }
 
     private fun rotateClipboard(source: Clipboard, transform: StructureTransform): Clipboard {
