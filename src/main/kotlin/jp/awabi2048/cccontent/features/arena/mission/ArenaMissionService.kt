@@ -17,7 +17,6 @@ import jp.awabi2048.cccontent.features.arena.event.ArenaMissionStartRequestEvent
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
 import jp.awabi2048.cccontent.features.arena.generator.ArenaTheme
 import jp.awabi2048.cccontent.gui.MenuEventGuards
-import jp.awabi2048.cccontent.gui.StandardMenuLayouts
 import jp.awabi2048.cccontent.util.OageMessageSender
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -771,7 +770,7 @@ class ArenaMissionService(
     }
 
     private fun fillConfirmBackground(inventory: Inventory) {
-        StandardMenuLayouts.applyStandardFrame(inventory)
+        CCSystem.getAPI().getGuiLayoutService().applyStandardFrame(inventory)
     }
 
     private fun createBackgroundPane(material: Material): ItemStack {

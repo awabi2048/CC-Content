@@ -9,7 +9,6 @@ import jp.awabi2048.cccontent.economy.ContentEconomyBridge
 import jp.awabi2048.cccontent.gui.GuiMenuItems
 import jp.awabi2048.cccontent.gui.MenuEventGuards
 import jp.awabi2048.cccontent.gui.OwnedMenuHolder
-import jp.awabi2048.cccontent.gui.StandardMenuLayouts
 import jp.awabi2048.cccontent.util.ContentLocaleResolver
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextDecoration
@@ -227,7 +226,7 @@ class OageShrineShopMenuService(
     }
 
     private fun applyConfirmFrame(inventory: Inventory) {
-        StandardMenuLayouts.applyStandardFrame(inventory)
+        CCSystem.getAPI().getGuiLayoutService().applyStandardFrame(inventory)
     }
 
     private fun emptyShopItem(): ItemStack = GuiMenuItems.backgroundPane(Material.WHITE_STAINED_GLASS_PANE)
@@ -282,12 +281,12 @@ class OageShrineShopMenuService(
     ) : OwnedMenuHolder(ownerId)
 
     companion object {
-        const val SIZE = StandardMenuLayouts.SIZE_54
-        const val CONFIRM_SIZE = StandardMenuLayouts.SIZE_45
-        const val SHOP_BACK_SLOT = StandardMenuLayouts.FOOTER_LEFT_SLOT_54
-        val CONFIRM_PREVIEW_SLOT = StandardMenuLayouts.CONFIRM_45.previewSlot
-        val CONFIRM_CONFIRM_SLOT = StandardMenuLayouts.CONFIRM_45.confirmSlot
-        val CONFIRM_CANCEL_SLOT = StandardMenuLayouts.CONFIRM_45.cancelSlot
+        val SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size54()
+        val CONFIRM_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().size
+        val SHOP_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().footerLeftSlot54()
+        val CONFIRM_PREVIEW_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().previewSlot
+        val CONFIRM_CONFIRM_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().confirmSlot
+        val CONFIRM_CANCEL_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().cancelSlot
         val TAB_SLOTS = listOf(47, 48)
         val CONTENT_SLOTS = (19..25).toList() + (28..34).toList()
     }

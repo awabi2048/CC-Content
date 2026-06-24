@@ -2,8 +2,8 @@
 
 package jp.awabi2048.cccontent.features.arena.mission
 
+import com.awabi2048.ccsystem.CCSystem
 import jp.awabi2048.cccontent.gui.OwnedMenuHolder
-import jp.awabi2048.cccontent.gui.StandardMenuLayouts
 import java.util.UUID
 import jp.awabi2048.cccontent.features.arena.ArenaI18n
 
@@ -237,8 +237,8 @@ data class ArenaActiveMissionRecord(
 )
 
 object ArenaMissionLayout {
-    const val MENU_SIZE = StandardMenuLayouts.SIZE_54
-    const val CONFIRM_SIZE = StandardMenuLayouts.SIZE_45
+    val MENU_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size54()
+    val CONFIRM_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().size
 
     val MENU_TITLE: String
         get() = ArenaI18n.text(null, "arena.ui.menu_title")
@@ -251,9 +251,9 @@ object ArenaMissionLayout {
     const val MENU_INFO_SLOT = 49
     const val MENU_REFRESH_SLOT = 51
 
-    val CONFIRM_OK_SLOT = StandardMenuLayouts.CONFIRM_45.confirmSlot
-    val CONFIRM_MISSION_SLOT = StandardMenuLayouts.CONFIRM_45.previewSlot
-    val CONFIRM_CANCEL_SLOT = StandardMenuLayouts.CONFIRM_45.cancelSlot
+    val CONFIRM_OK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().confirmSlot
+    val CONFIRM_MISSION_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().previewSlot
+    val CONFIRM_CANCEL_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().cancelSlot
 
     fun missionIndexForSlot(slot: Int): Int? {
         return MENU_MISSION_SLOTS.indexOf(slot).takeIf { it >= 0 }

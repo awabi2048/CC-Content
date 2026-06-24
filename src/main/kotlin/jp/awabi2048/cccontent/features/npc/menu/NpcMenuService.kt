@@ -17,7 +17,6 @@ import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.gui.GuiMenuItems
 import jp.awabi2048.cccontent.gui.MenuEventGuards
 import jp.awabi2048.cccontent.gui.OwnedMenuHolder
-import jp.awabi2048.cccontent.gui.StandardMenuLayouts
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.misc.BoxedDaiginjoItem
 import jp.awabi2048.cccontent.util.ContentLocaleResolver
@@ -53,26 +52,26 @@ class NpcMenuService(
     private companion object {
         const val CONFIG_PATH = "config/npc/menu.yml"
         const val MENU_ID = "oage_shrine"
-        const val MENU_SIZE = StandardMenuLayouts.SIZE_45
-        const val TALK_MENU_SIZE = StandardMenuLayouts.SIZE_54
-        const val OAGE_BOX_SIZE = StandardMenuLayouts.SIZE_54
-        const val BACK_SLOT = StandardMenuLayouts.BACK_SLOT_45
-        const val TALK_BACK_SLOT = StandardMenuLayouts.BACK_SLOT_54
-        const val OAGE_BOX_BACK_SLOT = StandardMenuLayouts.BACK_SLOT_54
+        val MENU_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size45()
+        val TALK_MENU_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size54()
+        val OAGE_BOX_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size54()
+        val BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().backSlot45()
+        val TALK_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().backSlot54()
+        val OAGE_BOX_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().backSlot54()
         const val DELIVERY_SLOT = 20
         const val PART_TIME_SLOT = 24
         const val DAILY_HEADER_SLOT = 4
         const val OAGE_BOX_HEADER_SLOT = 4
-        val OAGE_BOX_CONFIRM_PREVIEW_SLOT = StandardMenuLayouts.CONFIRM_45.previewSlot
-        val OAGE_BOX_CONFIRM_SLOT = StandardMenuLayouts.CONFIRM_45.confirmSlot
-        val OAGE_BOX_CANCEL_SLOT = StandardMenuLayouts.CONFIRM_45.cancelSlot
+        val OAGE_BOX_CONFIRM_PREVIEW_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().previewSlot
+        val OAGE_BOX_CONFIRM_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().confirmSlot
+        val OAGE_BOX_CANCEL_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().cancelSlot
         const val DEAD_CHEST_RECOVERY_COST = 300.0
-        val DEAD_CHEST_CONFIRM_PREVIEW_SLOT = StandardMenuLayouts.CONFIRM_45.previewSlot
-        val DEAD_CHEST_CONFIRM_SLOT = StandardMenuLayouts.CONFIRM_45.confirmSlot
-        val DEAD_CHEST_CANCEL_SLOT = StandardMenuLayouts.CONFIRM_45.cancelSlot
-        val DELIVERY_CONFIRM_PREVIEW_SLOT = StandardMenuLayouts.CONFIRM_45.previewSlot
-        val DELIVERY_CONFIRM_SLOT = StandardMenuLayouts.CONFIRM_45.confirmSlot
-        val DELIVERY_CANCEL_SLOT = StandardMenuLayouts.CONFIRM_45.cancelSlot
+        val DEAD_CHEST_CONFIRM_PREVIEW_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().previewSlot
+        val DEAD_CHEST_CONFIRM_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().confirmSlot
+        val DEAD_CHEST_CANCEL_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().cancelSlot
+        val DELIVERY_CONFIRM_PREVIEW_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().previewSlot
+        val DELIVERY_CONFIRM_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().confirmSlot
+        val DELIVERY_CANCEL_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().cancelSlot
         const val PART_TIME_TASK_ARENA = "arena_mission_clear"
         const val DELIVERY_WORLD_POINT_REWARD = 100
         val OAGE_BOX_REWARD_SLOTS = listOf(20, 21, 22, 23, 24, 29, 30, 31, 32, 33)
