@@ -53,11 +53,11 @@ class NpcMenuService(
         const val CONFIG_PATH = "config/npc/menu.yml"
         const val MENU_ID = "oage_shrine"
         val MENU_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size45()
-        val TALK_MENU_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size54()
-        val OAGE_BOX_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size54()
+        val TALK_MENU_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().settings54().size
+        val OAGE_BOX_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().settings54().size
         val BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().backSlot45()
-        val TALK_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().backSlot54()
-        val OAGE_BOX_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().backSlot54()
+        val TALK_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().settings54().infoSlot
+        val OAGE_BOX_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().settings54().infoSlot
         const val DELIVERY_SLOT = 20
         const val PART_TIME_SLOT = 24
         const val DAILY_HEADER_SLOT = 4
