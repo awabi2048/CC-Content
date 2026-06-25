@@ -16,6 +16,7 @@ import jp.awabi2048.cccontent.features.arena.event.ArenaMissionGeneratedEvent
 import jp.awabi2048.cccontent.features.arena.event.ArenaMissionStartRequestEvent
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
 import jp.awabi2048.cccontent.features.arena.generator.ArenaTheme
+import jp.awabi2048.cccontent.gui.MenuEventGuards
 import jp.awabi2048.cccontent.util.OageMessageSender
 import org.bukkit.Bukkit
 import org.bukkit.Material
@@ -29,7 +30,6 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.SkullMeta
-import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.configuration.file.YamlConfiguration
@@ -315,23 +315,21 @@ class ArenaMissionService(
 
     @EventHandler
     fun onMissionMenuDrag(event: InventoryDragEvent) {
-        val holder = event.view.topInventory.holder
-        if (holder is ArenaMissionMenuHolder || holder is ArenaMissionConfirmHolder) {
-            event.isCancelled = true
+        when (val holder = event.view.topInventory.holder) {
+            is ArenaMissionMenuHolder -> MenuEventGuards.cancelOwnedTopDrag(event, holder, "ArenaMissionService.onMissionMenuDrag: menu_drag")
+            is ArenaMissionConfirmHolder -> MenuEventGuards.cancelOwnedTopDrag(event, holder, "ArenaMissionService.onMissionMenuDrag: confirm_drag")
         }
     }
 
     @EventHandler
     fun onMissionMenuClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
-        val holder = event.view.topInventory.holder
-        when (holder) {
+        when (val holder = event.view.topInventory.holder) {
             is ArenaMissionMenuHolder -> {
-                event.cancelWithDebug("ArenaMissionService.onMissionMenuClick: menu_click")
+                val player = MenuEventGuards.ownedTopClick(event, holder, "ArenaMissionService.onMissionMenuClick: menu_click") ?: return
                 handleMenuClick(player, holder, event.rawSlot)
             }
             is ArenaMissionConfirmHolder -> {
-                event.cancelWithDebug("ArenaMissionService.onMissionMenuClick: confirm_click")
+                val player = MenuEventGuards.ownedTopClick(event, holder, "ArenaMissionService.onMissionMenuClick: confirm_click") ?: return
                 handleConfirmClick(player, holder, event.rawSlot)
             }
         }
@@ -772,15 +770,7 @@ class ArenaMissionService(
     }
 
     private fun fillConfirmBackground(inventory: Inventory) {
-        for (slot in 0 until 9) {
-            inventory.setItem(slot, createBackgroundPane(Material.BLACK_STAINED_GLASS_PANE))
-        }
-        for (slot in 9 until 36) {
-            inventory.setItem(slot, createBackgroundPane(Material.GRAY_STAINED_GLASS_PANE))
-        }
-        for (slot in 36 until 45) {
-            inventory.setItem(slot, createBackgroundPane(Material.BLACK_STAINED_GLASS_PANE))
-        }
+        CCSystem.getAPI().getGuiLayoutService().applyStandardFrame(inventory)
     }
 
     private fun createBackgroundPane(material: Material): ItemStack {

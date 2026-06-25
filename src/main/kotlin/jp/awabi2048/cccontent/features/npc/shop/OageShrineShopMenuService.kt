@@ -7,9 +7,9 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.economy.ContentEconomyBridge
 import jp.awabi2048.cccontent.gui.GuiMenuItems
+import jp.awabi2048.cccontent.gui.MenuEventGuards
 import jp.awabi2048.cccontent.gui.OwnedMenuHolder
 import jp.awabi2048.cccontent.util.ContentLocaleResolver
-import jp.awabi2048.cccontent.util.cancelWithDebug
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextDecoration
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
@@ -113,12 +113,9 @@ class OageShrineShopMenuService(
 
     @EventHandler
     fun onInventoryClick(event: InventoryClickEvent) {
-        val player = event.whoClicked as? Player ?: return
         when (val holder = event.view.topInventory.holder) {
             is ShopHolder -> {
-                event.cancelWithDebug("OageShrineShopMenuService.onInventoryClick: shop_click")
-                if (player.uniqueId != holder.ownerId) return
-                if (event.rawSlot !in 0 until event.view.topInventory.size) return
+                val player = MenuEventGuards.ownedTopClick(event, holder, "OageShrineShopMenuService.onInventoryClick: shop_click") ?: return
 
                 when (event.rawSlot) {
                     SHOP_BACK_SLOT -> {
@@ -138,8 +135,7 @@ class OageShrineShopMenuService(
                 }
             }
             is ConfirmHolder -> {
-                event.cancelWithDebug("OageShrineShopMenuService.onInventoryClick: confirm_click")
-                if (player.uniqueId != holder.ownerId) return
+                val player = MenuEventGuards.ownedTopClick(event, holder, "OageShrineShopMenuService.onInventoryClick: confirm_click") ?: return
                 when (event.rawSlot) {
                     CONFIRM_CONFIRM_SLOT -> confirmPurchase(player, holder.resolved)
                     CONFIRM_CANCEL_SLOT -> {
@@ -153,9 +149,9 @@ class OageShrineShopMenuService(
 
     @EventHandler
     fun onInventoryDrag(event: InventoryDragEvent) {
-        if (event.view.topInventory.holder !is ShopHolder && event.view.topInventory.holder !is ConfirmHolder) return
-        if (event.rawSlots.any { it in 0 until event.view.topInventory.size }) {
-            event.isCancelled = true
+        when (val holder = event.view.topInventory.holder) {
+            is ShopHolder -> MenuEventGuards.cancelOwnedTopDrag(event, holder, "OageShrineShopMenuService.onInventoryDrag: shop_drag")
+            is ConfirmHolder -> MenuEventGuards.cancelOwnedTopDrag(event, holder, "OageShrineShopMenuService.onInventoryDrag: confirm_drag")
         }
     }
 
@@ -230,13 +226,7 @@ class OageShrineShopMenuService(
     }
 
     private fun applyConfirmFrame(inventory: Inventory) {
-        val black = GuiMenuItems.backgroundPane(Material.BLACK_STAINED_GLASS_PANE)
-        val gray = GuiMenuItems.backgroundPane(Material.GRAY_STAINED_GLASS_PANE)
-        for (slot in 0 until inventory.size) {
-            inventory.setItem(slot, gray)
-        }
-        for (slot in 0..8) inventory.setItem(slot, black)
-        for (slot in inventory.size - 9 until inventory.size) inventory.setItem(slot, black)
+        CCSystem.getAPI().getGuiLayoutService().applyStandardFrame(inventory)
     }
 
     private fun emptyShopItem(): ItemStack = GuiMenuItems.backgroundPane(Material.WHITE_STAINED_GLASS_PANE)
@@ -291,12 +281,12 @@ class OageShrineShopMenuService(
     ) : OwnedMenuHolder(ownerId)
 
     companion object {
-        const val SIZE = 54
-        const val CONFIRM_SIZE = 45
-        const val SHOP_BACK_SLOT = 45
-        const val CONFIRM_PREVIEW_SLOT = 22
-        const val CONFIRM_CONFIRM_SLOT = 20
-        const val CONFIRM_CANCEL_SLOT = 24
+        val SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size54()
+        val CONFIRM_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().size
+        val SHOP_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().footerLeftSlot54()
+        val CONFIRM_PREVIEW_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().previewSlot
+        val CONFIRM_CONFIRM_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().confirmSlot
+        val CONFIRM_CANCEL_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().cancelSlot
         val TAB_SLOTS = listOf(47, 48)
         val CONTENT_SLOTS = (19..25).toList() + (28..34).toList()
     }
