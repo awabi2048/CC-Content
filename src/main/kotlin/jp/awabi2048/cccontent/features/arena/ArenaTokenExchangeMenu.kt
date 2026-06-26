@@ -167,6 +167,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
         syncTemporaryHints(player)
         render(player, holder)
         player.openInventory(inventory)
+        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_token_exchange")
     }
 
     @EventHandler
@@ -391,6 +392,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
             mode.id, quote.total.toDouble(), quote.stacks
         )
         player.openInventory(inventory)
+        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_token_exchange_confirm")
     }
 
     private fun executeConfirmedExchange(player: Player, holder: ArenaTokenExchangeConfirmHolder) {
@@ -604,7 +606,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
             )
         )
         if (lines.isNotEmpty()) {
-            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(buildExchangeLore(player, lines), GuiLoreFrame.NONE)))
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(buildExchangeLore(player, lines), GuiLoreFrame.BOTH)))
         }
         ItemMetaCompat.hideAdditionalTooltip(meta)
         item.itemMeta = meta
@@ -612,9 +614,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
     }
 
     private fun buildExchangeLore(player: Player, lines: List<TokenExchangeLine>): List<String> {
-        val separator = ArenaI18n.text(player, "arena.ui.separator")
         return buildList {
-            add(separator)
             add("§f❙ §7交換するモブドロップ")
             lines.take(4).forEach { line ->
                 val name = CustomItemI18n.text(player, "custom_items.arena.mob_token.token_names.${line.categoryId}", line.categoryId)
@@ -625,7 +625,6 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
                 val remaining = lines.drop(4).fold(ZERO) { sum, line -> truncate(sum + line.subtotal) }
                 add("§fその他 ${formatAcorn(remaining)}")
             }
-            add(separator)
         }
     }
 
@@ -688,7 +687,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
     }
 
     private fun playInputSound(player: Player) {
-        player.playSound(player.location, Sound.UI_BUTTON_CLICK, 1.0f, 2.0f)
+        CCSystem.getAPI().getMenuSoundService().onMenuClick(player, "arena_token_exchange")
     }
 
     private fun blockedClick(click: ClickType): Boolean = click in setOf(

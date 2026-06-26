@@ -58,6 +58,7 @@ class ArenaSessionInfoMenu(
         holder.backingInventory = inventory
         render(inventory)
         player.openInventory(inventory)
+        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_session_info")
         startUpdateTask(player, holder)
     }
 

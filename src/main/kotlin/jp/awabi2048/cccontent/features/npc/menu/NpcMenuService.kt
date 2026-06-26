@@ -53,11 +53,11 @@ class NpcMenuService(
         const val CONFIG_PATH = "config/npc/menu.yml"
         const val MENU_ID = "oage_shrine"
         val MENU_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size45()
-        val TALK_MENU_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size54()
-        val OAGE_BOX_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size54()
+        val TALK_MENU_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().settings54().size
+        val OAGE_BOX_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().settings54().size
         val BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().backSlot45()
-        val TALK_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().backSlot54()
-        val OAGE_BOX_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().backSlot54()
+        val TALK_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().settings54().infoSlot
+        val OAGE_BOX_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().settings54().infoSlot
         const val DELIVERY_SLOT = 20
         const val PART_TIME_SLOT = 24
         const val DAILY_HEADER_SLOT = 4
@@ -235,6 +235,7 @@ class NpcMenuService(
         holder.backingInventory = inventory
         render(player, holder, inventory)
         player.openInventory(inventory)
+        playMenuOpen(player)
     }
 
     private fun openShopMenu(player: Player) {
@@ -248,6 +249,7 @@ class NpcMenuService(
         holder.backingInventory = inventory
         render(player, holder, inventory)
         player.openInventory(inventory)
+        playMenuOpen(player)
     }
 
     private fun openOageBoxConfirm(player: Player, reward: OageBoxReward) {
@@ -257,6 +259,7 @@ class NpcMenuService(
         holder.backingInventory = inventory
         render(player, holder, inventory)
         player.openInventory(inventory)
+        playMenuOpen(player)
     }
 
     private fun render(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
@@ -295,6 +298,7 @@ class NpcMenuService(
         holder.backingInventory = inventory
         render(player, holder, inventory)
         player.openInventory(inventory)
+        playMenuOpen(player)
     }
 
     private fun openDeliveryConfirm(player: Player, item: DeliveryItemMatch) {
@@ -304,6 +308,7 @@ class NpcMenuService(
         holder.backingInventory = inventory
         render(player, holder, inventory)
         player.openInventory(inventory)
+        playMenuOpen(player)
     }
 
     private fun renderDeadChestConfirm(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
@@ -809,11 +814,15 @@ class NpcMenuService(
     }
 
     private fun playClick(player: Player) {
-        player.playSound(player.location, "minecraft:ui.button.click", 0.7f, 1.6f)
+        CCSystem.getAPI().getMenuSoundService().onMenuClick(player, MENU_ID)
     }
 
     private fun playError(player: Player) {
-        player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BASS, 0.7f, 0.7f)
+        CCSystem.getAPI().getMenuSoundService().onMenuClick(player, MENU_ID, com.awabi2048.ccsystem.api.gui.MenuClickType.CANCEL)
+    }
+
+    private fun playMenuOpen(player: Player) {
+        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, MENU_ID)
     }
 
     private fun formatAcorn(amount: Double, color: String = "§e"): String = ContentEconomyBridge.formatAcorn(amount, color)

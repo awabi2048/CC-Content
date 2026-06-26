@@ -281,9 +281,9 @@ class OageShrineShopMenuService(
     ) : OwnedMenuHolder(ownerId)
 
     companion object {
-        val SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size54()
+        val SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().settings54().size
         val CONFIRM_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().size
-        val SHOP_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().footerLeftSlot54()
+        val SHOP_BACK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().settings54().backSlot
         val CONFIRM_PREVIEW_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().previewSlot
         val CONFIRM_CONFIRM_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().confirmSlot
         val CONFIRM_CANCEL_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().cancelSlot

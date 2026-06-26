@@ -237,7 +237,7 @@ data class ArenaActiveMissionRecord(
 )
 
 object ArenaMissionLayout {
-    val MENU_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().size54()
+    val MENU_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().settings54().size
     val CONFIRM_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().size
 
     val MENU_TITLE: String
@@ -248,7 +248,7 @@ object ArenaMissionLayout {
 
     val MENU_MISSION_SLOTS = listOf(19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34)
     const val MENU_PLAYER_SLOT = 47
-    const val MENU_INFO_SLOT = 49
+    val MENU_INFO_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().settings54().infoSlot
     const val MENU_REFRESH_SLOT = 51
 
     val CONFIRM_OK_SLOT: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().confirmSlot
