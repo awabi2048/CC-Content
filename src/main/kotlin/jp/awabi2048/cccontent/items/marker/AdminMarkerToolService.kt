@@ -202,7 +202,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         val blockFace = event.blockFace
         val mode = getMode(item, definition)
         val placementLocation = resolvePlacementLocation(player, clickedBlock, blockFace)
-        val marker = spawnMarker(placementLocation, mode)
+        val marker = spawnMarker(placementLocation, mode, player.location.yaw)
         if (definition.toolId == "arena.other_marker_tool" && mode.id == "lobby_tutorial_step") {
             val world = placementLocation.world
             if (world != null && marker != null) {
@@ -331,11 +331,13 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         )
     }
 
-    private fun spawnMarker(markerLocation: Location, mode: MarkerToolMode): Marker? {
+    private fun spawnMarker(markerLocation: Location, mode: MarkerToolMode, facingYaw: Float): Marker? {
         val world = markerLocation.world
         if (world == null) return null
         val marker = world.spawnEntity(markerLocation, EntityType.MARKER) as Marker
         marker.addScoreboardTag(mode.tag)
+        // 設置時の向き（yaw）を記録。connection_in/out 等の方向を持つマーカーで参照される。
+        marker.addScoreboardTag("marker.facing.${facingYaw.toInt().mod(360)}")
         return marker
     }
 
@@ -424,17 +426,17 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                             continue
                         }
                         val placementPreview = resolvePlacementPreview(player) ?: continue
-                        drawPlacementPreview(placementPreview, mode)
+                        drawPlacementPreview(placementPreview, mode, player.location.yaw)
                     } else {
                         val preview = resolvePlacementPreview(player) ?: continue
-                        drawPlacementPreview(preview, mode)
+                        drawPlacementPreview(preview, mode, player.location.yaw)
                     }
                 }
             }
         }.runTaskTimer(plugin, PREVIEW_INTERVAL_TICKS, PREVIEW_INTERVAL_TICKS)
     }
 
-    private fun drawPlacementPreview(location: Location, mode: MarkerToolMode) {
+    private fun drawPlacementPreview(location: Location, mode: MarkerToolMode, facingYaw: Float) {
         if (mode.id == "lift") {
             val world = location.world ?: return
             val liftSize = resolveArenaLiftSize()
@@ -450,6 +452,60 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             }
         }
         drawDustLocationCubeOutline(location, 0.5, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
+        // 設置時の向きを矢印で表示（MWMのスポーン地点設定と同様）
+        drawDirectionArrow(location, facingYaw, mode.previewColor)
+    }
+
+    /**
+     * 水平面上に方向を示す矢印を描画する。
+     * MWM の WorldSettingsListener.spawnDirectionArrow と同じ形状（主軸＋左右の矢羽）。
+     */
+    private fun drawDirectionArrow(location: Location, yaw: Float, color: Color) {
+        val world = location.world ?: return
+        val rad = Math.toRadians(yaw.toDouble())
+        val forwardX = -kotlin.math.sin(rad)
+        val forwardZ = kotlin.math.cos(rad)
+
+        val dust = Particle.DustOptions(color, BLOCK_OUTLINE_DUST_SIZE)
+        val arrowY = location.y + 0.15
+
+        // 主軸: 中心から前方へ
+        val startX = location.x
+        val startZ = location.z
+        val tipX = startX + forwardX * 1.0
+        val tipZ = startZ + forwardZ * 1.0
+        drawDustLine(world, startX, arrowY, startZ, tipX, arrowY, tipZ, dust)
+
+        // 矢羽: 先端から左右に広がる2本
+        val baseX = tipX - forwardX * 0.4
+        val baseZ = tipZ - forwardZ * 0.4
+        val sideX = -forwardZ * 0.2
+        val sideZ = forwardX * 0.2
+        drawDustLine(world, tipX, arrowY, tipZ, baseX + sideX, arrowY, baseZ + sideZ, dust)
+        drawDustLine(world, tipX, arrowY, tipZ, baseX - sideX, arrowY, baseZ - sideZ, dust)
+    }
+
+    private fun drawDustLine(
+        world: World,
+        fromX: Double, fromY: Double, fromZ: Double,
+        toX: Double, toY: Double, toZ: Double,
+        dust: Particle.DustOptions
+    ) {
+        val dx = toX - fromX
+        val dy = toY - fromY
+        val dz = toZ - fromZ
+        val length = maxOf(kotlin.math.abs(dx), kotlin.math.abs(dy), kotlin.math.abs(dz))
+        val steps = maxOf(1, kotlin.math.ceil(length / PREVIEW_OUTLINE_STEP).toInt())
+        for (step in 0..steps) {
+            val progress = step.toDouble() / steps.toDouble()
+            world.spawnParticle(
+                Particle.DUST,
+                fromX + dx * progress,
+                fromY + dy * progress,
+                fromZ + dz * progress,
+                1, 0.0, 0.0, 0.0, 0.0, dust
+            )
+        }
     }
 
     private fun resolveArenaLiftSize(): Triple<Int, Int, Int>? {
