@@ -159,6 +159,7 @@ class ArenaMissionService(
             holder.backingInventory = inventory
             renderMenu(player, inventory, missionSet)
             player.openInventory(inventory)
+            CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_mission")
             true
         } catch (e: Exception) {
             plugin.logger.warning("[Arena] アリーナメニューの表示に失敗しました: message=${e.message}")
@@ -754,6 +755,7 @@ class ArenaMissionService(
         holder.backingInventory = inventory
         renderConfirmMenu(player, inventory, mission)
         player.openInventory(inventory)
+        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_mission_confirm")
         return true
     }
 
@@ -782,7 +784,7 @@ class ArenaMissionService(
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(name)
         if (lore.isNotEmpty()) {
-            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(lore, GuiLoreFrame.NONE)))
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(lore, GuiLoreFrame.BOTH)))
         }
         item.itemMeta = meta
         return item
@@ -799,7 +801,7 @@ class ArenaMissionService(
                 ArenaI18n.text(player, "arena.ui.mission.item_name", "mission" to title)
             }
         )
-        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(buildMissionLore(player, mission), GuiLoreFrame.NONE)))
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(buildMissionLore(player, mission), GuiLoreFrame.BOTH)))
         item.itemMeta = meta
         return item
     }
@@ -822,12 +824,9 @@ class ArenaMissionService(
         meta.owningPlayer = player
         meta.setDisplayName(ArenaI18n.text(player, "arena.ui.player.name_format", "player" to player.name))
         meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
-            ArenaI18n.text(player, "arena.ui.separator"),
             ArenaI18n.text(player, "arena.ui.player.mob_kills", "count" to playerData.totalMobKillCount),
-            ArenaI18n.text(player, "arena.ui.separator"),
             ArenaI18n.text(player, "arena.ui.player.barrier_restarts", "count" to playerData.barrierRestartCount),
-            ArenaI18n.text(player, "arena.ui.separator")
-        ), GuiLoreFrame.NONE)))
+        ), GuiLoreFrame.BOTH)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return item
@@ -845,10 +844,9 @@ class ArenaMissionService(
         val currentTier = playerData.licenseTier
         val nextTier = currentTier.next()
         val lore = mutableListOf<String>()
-        lore += ArenaI18n.text(player, "arena.ui.separator")
         lore += ArenaI18n.text(player, "arena.ui.license_card.current_license", "tier" to licenseTierDisplayName(player, currentTier))
         lore += ArenaI18n.text(player, "arena.ui.license_card.allowed_difficulty", "difficulty" to difficultyDisplay(currentTier.maxDifficultyStar))
-        lore += ArenaI18n.text(player, "arena.ui.separator")
+        lore += ""
         lore += ArenaI18n.text(player, "arena.ui.license_card.next_header")
 
         if (nextTier == null) {
@@ -860,7 +858,6 @@ class ArenaMissionService(
             lore += rows
         }
 
-        lore += ArenaI18n.text(player, "arena.ui.separator")
         return createActionItem(
             Material.NAME_TAG,
             ArenaI18n.text(player, "arena.ui.license_card.title"),
@@ -871,12 +868,10 @@ class ArenaMissionService(
     private fun buildMissionLore(player: Player, mission: ArenaMissionEntry): List<String> {
         val missionType = ArenaMissionType.fromId(mission.missionTypeId) ?: ArenaMissionType.BARRIER_RESTART
         val lore = mutableListOf<String>()
-        lore += ArenaI18n.text(player, "arena.ui.separator")
         lore += ArenaI18n.text(player, "arena.ui.mission.mission_title")
         lore += missionGuideHints(missionType, player)
         lore += ""
         lore += ArenaI18n.text(player, "arena.ui.mission.difficulty_inline", "difficulty" to difficultyDisplay(mission.difficultyStar))
-        lore += ArenaI18n.text(player, "arena.ui.separator")
         return lore
     }
 
@@ -884,27 +879,21 @@ class ArenaMissionService(
         val missionType = ArenaMissionType.fromId(mission.missionTypeId) ?: ArenaMissionType.BARRIER_RESTART
         val memo = randomMissionMemo(player)
         val lore = mutableListOf<String>()
-        lore += ArenaI18n.text(player, "arena.ui.separator")
         lore += ArenaI18n.text(player, "arena.ui.mission.mission_title")
         lore += missionGuideHints(missionType, player)
         lore += ""
         lore += ArenaI18n.text(player, "arena.ui.mission.difficulty_inline", "difficulty" to difficultyDisplay(mission.difficultyStar))
         lore += ArenaI18n.text(player, "arena.ui.mission.memo_inline", "memo" to memo)
-        lore += ArenaI18n.text(player, "arena.ui.separator")
         return lore
     }
 
     private fun buildInfoLore(): List<String> {
         val lines = ArenaI18n.stringList(null, "arena.ui.info.lines")
-        return listOf(
-            ArenaI18n.text(null, "arena.ui.separator"),
-            *lines.toTypedArray(),
-            ArenaI18n.text(null, "arena.ui.separator")
-        )
+        return lines
     }
 
     private fun playUiClick(player: Player) {
-        player.playSound(player.location, "minecraft:ui.button.click", 0.8f, 2.0f)
+        CCSystem.getAPI().getMenuSoundService().onMenuClick(player, "arena_mission")
     }
 
     private fun randomMissionMemo(player: Player): String {

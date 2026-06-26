@@ -227,8 +227,7 @@ class ArenaEnchantPedestalMenu(
         runtimes[player.uniqueId] = ViewerRuntime()
         renderStatic(player, inventory)
         player.openInventory(inventory)
-        playSound(player, "minecraft:block.ender_chest.open", 0.5f)
-        playSound(player, "minecraft:entity.illusioner.mirror_move", 0.75f)
+        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_pedestal")
     }
 
     @EventHandler
