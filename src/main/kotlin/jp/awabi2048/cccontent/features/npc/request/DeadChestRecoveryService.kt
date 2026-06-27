@@ -3,8 +3,8 @@ package jp.awabi2048.cccontent.features.npc.request
 import me.crylonz.deadchest.ChestData
 import me.crylonz.deadchest.DeadChestAPI
 import me.crylonz.deadchest.DeadChestLoader
+import me.crylonz.deadchest.DeadChestManager
 import org.bukkit.Bukkit
-import org.bukkit.Location
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
@@ -24,15 +24,40 @@ class DeadChestRecoveryService(private val plugin: JavaPlugin) {
                 DeadChestLoader.getChestDataCache().chestData.filter { it.playerUUID == player.uniqueId }
             }
             chests.mapIndexed { index, chest ->
-                DeadChestSnapshot(index, chest, describe(chest))
+                DeadChestSnapshot(index, chest, identity(chest), describe(chest))
             }
         }.onFailure {
             plugin.logger.warning("[OageShrine] DeadChest list fetch failed: ${it.message}")
         }.getOrDefault(emptyList())
     }
 
-    fun getLatestChest(player: Player): DeadChestSnapshot? {
-        return getActiveChests(player).maxByOrNull { it.chest.chestDate?.time ?: Long.MIN_VALUE }
+    fun getLatestChests(player: Player, limit: Int = 5): List<DeadChestSnapshot> {
+        return getActiveChests(player)
+            .sortedByDescending { it.chest.chestDate?.time ?: Long.MIN_VALUE }
+            .take(limit)
+    }
+
+    fun timeUntilLost(chest: ChestData): String {
+        val remaining = DeadChestManager.getCurrentPhaseRemainingMillis(chest, Date())
+        if (remaining < 0) return "無期限"
+        if (remaining <= 0) return "§c期限切れ"
+        val sec = remaining / 1000
+        return when {
+            sec >= 3600 -> "あと${sec / 3600}時間${(sec % 3600) / 60}分"
+            sec >= 60 -> "あと${sec / 60}分${sec % 60}秒"
+            else -> "まもなく"
+        }
+    }
+
+    fun findArmorItemName(chest: ChestData): String? {
+        return chest.inventory.filterNotNull().firstOrNull { item ->
+            val name = item.type.name
+            name.endsWith("_HELMET") || name.endsWith("_CHESTPLATE") ||
+            name.endsWith("_LEGGINGS") || name.endsWith("_BOOTS") ||
+            name == "ELYTRA" || name == "TURTLE_HELMET"
+        }?.let { item ->
+            item.type.name.lowercase(Locale.ROOT).replace('_', ' ')
+        }
     }
 
     fun canRecoverToInventory(player: Player, chest: ChestData): Boolean {
@@ -82,9 +107,18 @@ class DeadChestRecoveryService(private val plugin: JavaPlugin) {
             .getOrDefault(false)
     }
 
-    fun chestLocation(chest: ChestData): Location = chest.chestLocation
-
-    fun chestOwnerId(chest: ChestData): UUID = chest.playerUUID
+    private fun identity(chest: ChestData): DeadChestIdentity {
+        val location = chest.chestLocation
+        val worldName = chest.worldName ?: location.world?.name ?: "unknown"
+        return DeadChestIdentity(
+            ownerId = chest.playerUUID,
+            worldName = worldName,
+            x = location.blockX,
+            y = location.blockY,
+            z = location.blockZ,
+            createdAtMillis = chest.chestDate?.time
+        )
+    }
 
     private fun describe(chest: ChestData): DeadChestDescription {
         val location = chest.chestLocation
@@ -100,7 +134,9 @@ class DeadChestRecoveryService(private val plugin: JavaPlugin) {
             createdAt = formatDate(chest.chestDate),
             itemCount = itemCount,
             itemKinds = itemKinds,
-            summary = summarize(inventory)
+            summary = summarize(inventory),
+            timeUntilLost = timeUntilLost(chest),
+            armorItemName = findArmorItemName(chest)
         )
     }
 
@@ -125,7 +161,17 @@ class DeadChestRecoveryService(private val plugin: JavaPlugin) {
 data class DeadChestSnapshot(
     val index: Int,
     val chest: ChestData,
+    val identity: DeadChestIdentity,
     val description: DeadChestDescription
+)
+
+data class DeadChestIdentity(
+    val ownerId: UUID,
+    val worldName: String,
+    val x: Int,
+    val y: Int,
+    val z: Int,
+    val createdAtMillis: Long?
 )
 
 data class DeadChestDescription(
@@ -136,5 +182,7 @@ data class DeadChestDescription(
     val createdAt: String,
     val itemCount: Int,
     val itemKinds: Int,
-    val summary: String
+    val summary: String,
+    val timeUntilLost: String,
+    val armorItemName: String?
 )
