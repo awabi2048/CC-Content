@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.arena
 
 import net.kyori.adventure.bossbar.BossBar
 import jp.awabi2048.cccontent.features.arena.generator.ArenaDoorAnimationPlacement
+import jp.awabi2048.cccontent.features.arena.mechanic.ArenaMechanicMarker
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
 import org.bukkit.Location
 import org.bukkit.scheduler.BukkitTask
@@ -33,6 +34,10 @@ data class ArenaBlockKey(
         }
     }
 }
+
+data class ArenaMechanicCleanupBounds(
+    val bounds: ArenaBounds
+)
 
 data class TimedPlayerLocation(
     val timestampMillis: Long,
@@ -127,6 +132,7 @@ data class ArenaSession(
     val activatedRoomCheckpoints: MutableMap<Int, Location>,
     val corridorDoorBlocks: MutableMap<Int, List<Location>>,
     val doorAnimationPlacements: MutableMap<Int, List<ArenaDoorAnimationPlacement>>,
+    val mechanicMarkersByWave: MutableMap<Int, List<ArenaMechanicMarker>>,
     var barrierLocation: Location,
     val barrierPointLocations: MutableList<Location>,
     val joinAreaMarkerLocations: MutableList<Location> = mutableListOf(),
@@ -245,6 +251,7 @@ data class ArenaSession(
     // 掃討ミッション用フィールド
     var missionTypeId: ArenaMissionType = ArenaMissionType.BARRIER_RESTART,
     val clearingBossLocations: MutableList<Location> = mutableListOf(),
+    val mechanicCleanupBounds: MutableList<ArenaMechanicCleanupBounds> = mutableListOf(),
     var clearingBossSpawned: Boolean = false,
     val clearingBossEntityIds: MutableSet<UUID> = mutableSetOf(),
     var firstDoorOpenedAtMillis: Long? = null,

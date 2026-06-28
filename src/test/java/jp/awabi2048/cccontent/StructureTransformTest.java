@@ -5,6 +5,8 @@ import jp.awabi2048.cccontent.structure.StructureBounds2D;
 import jp.awabi2048.cccontent.structure.StructurePoint2D;
 import jp.awabi2048.cccontent.structure.StructureSchemas;
 import jp.awabi2048.cccontent.structure.StructureTransform;
+import com.sk89q.worldedit.math.Vector3;
+import com.sk89q.worldedit.math.transform.AffineTransform;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
@@ -61,6 +63,31 @@ class StructureTransformTest {
         assertEquals(-1.0, east.getZ(), 1.0e-9);
         assertEquals(-1.0, south.getX(), 1.0e-9);
         assertEquals(0.0, south.getZ(), 1.0e-9);
+    }
+
+    @Test
+    void rawPointTransformMatchesWorldEditPasteTransform() {
+        for (int quarter = 0; quarter < 4; quarter++) {
+            for (boolean mirrored : new boolean[] { false, true }) {
+                StructureTransform transform = new StructureTransform(quarter, mirrored);
+                AffineTransform worldEditTransform = new AffineTransform();
+                if (mirrored) {
+                    worldEditTransform = worldEditTransform.scale(-1.0, 1.0, 1.0);
+                }
+                if (quarter != 0) {
+                    worldEditTransform = worldEditTransform.rotateY(quarter * 90.0);
+                }
+
+                for (double x : new double[] { 0.0, 1.0, 12.5 }) {
+                    for (double z : new double[] { 0.0, 2.0, 15.5 }) {
+                        StructurePoint2D actual = transform.applyRawPoint(x, z);
+                        Vector3 expected = worldEditTransform.apply(Vector3.at(x, 0.0, z));
+                        assertEquals(expected.x(), actual.getX(), 1.0e-9);
+                        assertEquals(expected.z(), actual.getZ(), 1.0e-9);
+                    }
+                }
+            }
+        }
     }
 
     @Test

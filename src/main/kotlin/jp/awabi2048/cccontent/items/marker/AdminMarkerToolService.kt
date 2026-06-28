@@ -14,6 +14,8 @@ import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
 import jp.awabi2048.cccontent.structure.SchemStructureService
 import jp.awabi2048.cccontent.structure.StructureSchemas
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+import net.kyori.adventure.title.Title
 import org.bukkit.Color
 import org.bukkit.FluidCollisionMode
 import org.bukkit.Location
@@ -32,6 +34,7 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
 import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.event.player.PlayerItemHeldEvent
 import org.bukkit.event.player.PlayerSwapHandItemsEvent
 import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
@@ -41,6 +44,7 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import org.bukkit.util.BoundingBox
 import org.bukkit.util.Vector
+import java.time.Duration
 import java.util.UUID
 import kotlin.math.round
 
@@ -78,12 +82,15 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         private const val PREVIEW_INTERVAL_TICKS = 2L
         private const val MARKER_PARTICLE_INTERVAL_TICKS = 10L
         private const val ARENA_LIFT_STRUCTURE_PATH = "structures/arena/lift.schem"
+        private const val MODE_SWITCH_COOLDOWN_MILLIS = 50L
+        private const val DELETE_COOLDOWN_MILLIS = 150L
     }
 
     private val toolIdKey = NamespacedKey(plugin, "admin_marker_tool_type")
     private val modeIdKey = NamespacedKey(plugin, "admin_marker_tool_mode")
     private val structureService = SchemStructureService(plugin)
     private val lastSwitchTime = mutableMapOf<UUID, Long>()
+    private val lastDeleteTime = mutableMapOf<UUID, Long>()
     private var cachedArenaLiftSize: Triple<Int, Int, Int>? = null
     private val definitions = listOf(
         MarkerToolDefinition(
@@ -146,6 +153,23 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                 MarkerToolMode("lift", "arena.marker.lift", "modes.lift", "§dリフト", Particle.END_ROD, Color.fromRGB(216, 128, 255))
             ),
             unavailableMessage = { null }
+        ),
+        MarkerToolDefinition(
+            toolId = "arena.mechanic_marker_tool",
+            displayName = "§6アリーナギミックマーカーツール",
+            itemModel = NamespacedKey.minecraft("blaze_rod"),
+            messageKeyPrefix = "marker",
+            modes = listOf(
+                // Theme mechanics interpret these tags directly; the marker tool only preserves builder intent.
+                MarkerToolMode("nether_track_path_left", "arena.marker.mechanic.nether.track_path.left", "modes.nether_track_path_left", "§cネザー: トロッコ経路L", Particle.FLAME, Color.fromRGB(255, 96, 64)),
+                MarkerToolMode("nether_track_path_right", "arena.marker.mechanic.nether.track_path.right", "modes.nether_track_path_right", "§cネザー: トロッコ経路R", Particle.SOUL_FIRE_FLAME, Color.fromRGB(255, 128, 96)),
+                MarkerToolMode("nether_magma_vent", "arena.marker.mechanic.nether.magma_vent", "modes.nether_magma_vent", "§6ネザー: マグマ噴出口", Particle.LAVA, Color.fromRGB(255, 144, 32)),
+                MarkerToolMode("ocean_geyser", "arena.marker.mechanic.ocean_monument.geyser", "modes.ocean_geyser", "§b海底神殿: 間欠泉", Particle.BUBBLE_COLUMN_UP, Color.fromRGB(96, 224, 255)),
+                MarkerToolMode("ocean_whirlpool", "arena.marker.mechanic.ocean_monument.whirlpool", "modes.ocean_whirlpool", "§3海底神殿: 渦潮", Particle.BUBBLE, Color.fromRGB(64, 160, 255)),
+                MarkerToolMode("natura_stalactite", "arena.marker.mechanic.natura.stalactite", "modes.natura_stalactite", "§7繁茂洞窟: 鍾乳石", Particle.CRIT, Color.fromRGB(180, 180, 180)),
+                MarkerToolMode("natura_mist", "arena.marker.mechanic.natura.mist", "modes.natura_mist", "§a繁茂洞窟: 霧", Particle.SPORE_BLOSSOM_AIR, Color.fromRGB(120, 200, 80))
+            ),
+            unavailableMessage = { null }
         )
     ).associateBy { it.toolId }
 
@@ -187,22 +211,12 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             return
         }
 
-        if (player.isSneaking) {
-            val preview = resolveDeletionPreview(player, definition)
-            if (preview != null) {
-                preview.marker.remove()
-                player.sendMessage(text(definition, player, "removed", "§b[Marker] {mode} §fマーカーを削除しました。", "mode" to getModeDisplayName(player, definition, preview.mode)))
-                player.playSound(player.location, Sound.BLOCK_ANVIL_BREAK, 0.5f, 2.0f)
-                return
-            }
-        }
-
         if (event.action != Action.RIGHT_CLICK_BLOCK) return
         val clickedBlock = event.clickedBlock ?: return
         val blockFace = event.blockFace
         val mode = getMode(item, definition)
         val placementLocation = resolvePlacementLocation(player, clickedBlock, blockFace)
-        val marker = spawnMarker(placementLocation, mode, player.location.yaw)
+        val marker = spawnMarker(placementLocation, mode, alignedYaw(player.location.yaw))
         if (definition.toolId == "arena.other_marker_tool" && mode.id == "lobby_tutorial_step") {
             val world = placementLocation.world
             if (world != null && marker != null) {
@@ -240,6 +254,38 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         val player = event.player
         val item = player.inventory.itemInMainHand
         val definition = resolveDefinition(item) ?: return
+        event.isCancelled = true
+
+        definition.unavailableMessage(player)?.let {
+            player.sendMessage(it)
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val last = lastDeleteTime.getOrDefault(player.uniqueId, 0L)
+        if (now - last < DELETE_COOLDOWN_MILLIS) {
+            return
+        }
+        lastDeleteTime[player.uniqueId] = now
+
+        val preview = resolveDeletionPreview(player, definition)
+        if (preview == null) {
+            player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.6f, 0.7f)
+            return
+        }
+        preview.marker.remove()
+        player.sendMessage(text(definition, player, "removed", "§b[Marker] {mode} §fマーカーを削除しました。", "mode" to getModeDisplayName(player, definition, preview.mode)))
+        player.playSound(player.location, Sound.BLOCK_ANVIL_BREAK, 0.5f, 2.0f)
+    }
+
+    @EventHandler
+    fun onItemHeld(event: PlayerItemHeldEvent) {
+        val player = event.player
+        if (!player.isSneaking) return
+
+        val item = player.inventory.itemInMainHand
+        val definition = resolveDefinition(item) ?: return
+        event.isCancelled = true
 
         definition.unavailableMessage(player)?.let {
             player.sendMessage(it)
@@ -248,17 +294,21 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
 
         val now = System.currentTimeMillis()
         val last = lastSwitchTime.getOrDefault(player.uniqueId, 0L)
-        if (now - last < 50) {
-            event.isCancelled = true
+        if (now - last < MODE_SWITCH_COOLDOWN_MILLIS) {
             return
         }
         lastSwitchTime[player.uniqueId] = now
-        event.isCancelled = true
 
+        val forwardDistance = (event.newSlot - event.previousSlot).floorMod(9)
+        val step = if (forwardDistance in 1..4) 1 else -1
+        switchMode(player, item, definition, step)
+    }
+
+    private fun switchMode(player: Player, item: ItemStack, definition: MarkerToolDefinition, step: Int) {
         val currentMode = getMode(item, definition)
         val modes = definition.modes
         val currentIndex = modes.indexOfFirst { it.id == currentMode.id }.coerceAtLeast(0)
-        val newMode = modes[(currentIndex + 1) % modes.size]
+        val newMode = modes[(currentIndex + step).floorMod(modes.size)]
 
         val meta = item.itemMeta ?: return
         meta.persistentDataContainer.set(modeIdKey, PersistentDataType.STRING, newMode.id)
@@ -305,7 +355,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         }
 
         return when (definition.toolId) {
-            "arena.structure_marker_tool", "arena.other_marker_tool", "arena.lift_tool" ->
+            "arena.structure_marker_tool", "arena.other_marker_tool", "arena.lift_tool", "arena.mechanic_marker_tool" ->
                 ArenaI18n.text(player, fullKey, *placeholders)
             "sukima_dungeon.marker_tool" -> MessageManager.getMessage(
                 player,
@@ -324,8 +374,8 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                     add(GuiLoreLine.Raw(text(definition, player, "current_mode", "§f§l| §7現在のモード §a{mode}", "mode" to modeName)))
                     add(GuiLoreLine.Spacer)
                     add(GuiLoreLine.Raw(text(definition, player, "usage.place", "§e右クリック(ブロック)§7 クリック面の外側にマーカーを設置")))
-                    add(GuiLoreLine.Raw(text(definition, player, "usage.delete", "§eShift + 右クリック§7 視線上のマーカーを削除")))
-                    add(GuiLoreLine.Raw(text(definition, player, "usage.switch", "§eFキー§7 次のモードへ変更")))
+                    add(GuiLoreLine.Raw(text(definition, player, "usage.delete", "§eFキー§7 視線上のマーカーを削除")))
+                    add(GuiLoreLine.Raw(text(definition, player, "usage.switch", "§eShift + ホットバースクロール§7 前後のモードへ変更")))
                 })))
             )
         )
@@ -419,18 +469,15 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                     val modeName = getModeDisplayName(player, definition, mode)
                     player.sendActionBar(Component.text("§7§l| §f$modeName"))
 
-                    if (player.isSneaking) {
-                        val preview = resolveDeletionPreview(player, definition)
-                        if (preview != null) {
-                            drawDustLocationOutline(preview.location, Color.fromRGB(255, 64, 64), DELETE_PREVIEW_DUST_SIZE)
-                            continue
-                        }
-                        val placementPreview = resolvePlacementPreview(player) ?: continue
-                        drawPlacementPreview(placementPreview, mode, player.location.yaw)
-                    } else {
-                        val preview = resolvePlacementPreview(player) ?: continue
-                        drawPlacementPreview(preview, mode, player.location.yaw)
+                    val deletionPreview = resolveDeletionPreview(player, definition)
+                    if (deletionPreview != null) {
+                        drawDustLocationOutline(deletionPreview.location, Color.fromRGB(255, 64, 64), DELETE_PREVIEW_DUST_SIZE)
+                        showDeletionSubtitle(player, definition, deletionPreview.mode)
+                        continue
                     }
+
+                    val preview = resolvePlacementPreview(player) ?: continue
+                    drawPlacementPreview(preview, mode, alignedYaw(player.location.yaw))
                 }
             }
         }.runTaskTimer(plugin, PREVIEW_INTERVAL_TICKS, PREVIEW_INTERVAL_TICKS)
@@ -452,7 +499,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             }
         }
         drawDustLocationCubeOutline(location, 0.5, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
-        // 設置時の向きを矢印で表示（MWMのスポーン地点設定と同様）
+        // 保存される facing と見た目がずれないよう、プレビューの矢印も4方向へ丸める。
         drawDirectionArrow(location, facingYaw, mode.previewColor)
     }
 
@@ -462,27 +509,29 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
      */
     private fun drawDirectionArrow(location: Location, yaw: Float, color: Color) {
         val world = location.world ?: return
-        val rad = Math.toRadians(yaw.toDouble())
+        val rad = Math.toRadians(alignedYaw(yaw).toDouble())
         val forwardX = -kotlin.math.sin(rad)
         val forwardZ = kotlin.math.cos(rad)
 
         val dust = Particle.DustOptions(color, BLOCK_OUTLINE_DUST_SIZE)
-        val arrowY = location.y + 0.15
+        val centerX = location.blockX + 0.5
+        val centerY = location.blockY + 0.65
+        val centerZ = location.blockZ + 0.5
 
-        // 主軸: 中心から前方へ
-        val startX = location.x
-        val startZ = location.z
-        val tipX = startX + forwardX * 1.0
-        val tipZ = startZ + forwardZ * 1.0
-        drawDustLine(world, startX, arrowY, startZ, tipX, arrowY, tipZ, dust)
+        // 主軸の中央をブロック中央に合わせる。
+        val tailX = centerX - forwardX * 0.55
+        val tailZ = centerZ - forwardZ * 0.55
+        val tipX = centerX + forwardX * 0.55
+        val tipZ = centerZ + forwardZ * 0.55
+        drawDustLine(world, tailX, centerY, tailZ, tipX, centerY, tipZ, dust)
 
         // 矢羽: 先端から左右に広がる2本
         val baseX = tipX - forwardX * 0.4
         val baseZ = tipZ - forwardZ * 0.4
         val sideX = -forwardZ * 0.2
         val sideZ = forwardX * 0.2
-        drawDustLine(world, tipX, arrowY, tipZ, baseX + sideX, arrowY, baseZ + sideZ, dust)
-        drawDustLine(world, tipX, arrowY, tipZ, baseX - sideX, arrowY, baseZ - sideZ, dust)
+        drawDustLine(world, tipX, centerY, tipZ, baseX + sideX, centerY, baseZ + sideZ, dust)
+        drawDustLine(world, tipX, centerY, tipZ, baseX - sideX, centerY, baseZ - sideZ, dust)
     }
 
     private fun drawDustLine(
@@ -526,7 +575,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                         .forEach { marker ->
                             val mode = definition.modes.firstOrNull { marker.scoreboardTags.contains(it.tag) } ?: return@forEach
                             if (marker.scoreboardTags.none { it in tags }) return@forEach
-                            drawParticleLocationOutline(marker.location, mode.particle)
+                            drawMarkerParticleOutline(marker.location, mode)
                         }
                 }
             }
@@ -666,6 +715,11 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         }
     }
 
+    private fun drawMarkerParticleOutline(location: Location, mode: MarkerToolMode) {
+        drawDustLocationCubeOutline(location, 0.32, mode.previewColor, 0.55f)
+        drawParticleLocationOutline(location, mode.particle)
+    }
+
     private fun drawParticleLocationOutline(location: Location, particle: Particle) {
         val world = location.world ?: return
         for ((x, y, z) in outlinePoints(
@@ -735,5 +789,25 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         addEdge(corners.getValue("100"), corners.getValue("110"))
 
         return points
+    }
+
+    private fun showDeletionSubtitle(player: Player, definition: MarkerToolDefinition, mode: MarkerToolMode) {
+        val modeName = getModeDisplayName(player, definition, mode)
+        player.showTitle(
+            Title.title(
+                Component.empty(),
+                LegacyComponentSerializer.legacySection().deserialize("§c削除対象: §f$modeName"),
+                Title.Times.times(Duration.ZERO, Duration.ofMillis(250), Duration.ZERO)
+            )
+        )
+    }
+
+    private fun alignedYaw(yaw: Float): Float {
+        return (round(yaw / 90.0f) * 90.0f).toInt().mod(360).toFloat()
+    }
+
+    private fun Int.floorMod(size: Int): Int {
+        val mod = this % size
+        return if (mod < 0) mod + size else mod
     }
 }

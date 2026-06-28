@@ -942,6 +942,7 @@ class CCContent : JavaPlugin(), Listener {
             CustomItemManager.register(ArenaStructureMarkerToolItem())
             CustomItemManager.register(ArenaOtherMarkerToolItem())
             CustomItemManager.register(ArenaLiftToolItem())
+            CustomItemManager.register(ArenaMechanicMarkerToolItem())
             CustomItemManager.register(ArenaEnchantShardItem())
         }
 

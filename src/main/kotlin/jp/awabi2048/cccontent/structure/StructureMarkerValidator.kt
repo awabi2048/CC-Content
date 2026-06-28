@@ -140,34 +140,41 @@ object StructureMarkerValidator {
         return counts
     }
 
-    fun detectArenaFacing(
+    fun detectArenaTransform(
         schema: ArenaStructureSchema,
         sides: DirectionalConnectionSides,
         yawFacing: CardinalDirection
-    ): CardinalDirection? {
+    ): StructureTransform? {
         val expectedSides = schema.connectionSides
 
-        val candidates = CardinalDirection.entries.filter { facing ->
-            val undoQuarter = (4 - facing.ordinal) % 4
-            val rotated = sides.allSides.map { it.rotateClockwise(undoQuarter) }.toSet()
-            rotated == expectedSides
+        val candidates = buildList {
+            for (quarter in 0..3) {
+                for (mirrored in listOf(false, true)) {
+                    add(StructureTransform(quarter, mirrored))
+                }
+            }
+        }.filter { transform ->
+            sides.allSides.map { transform.applyDirection(it) }.toSet() == expectedSides
         }
 
         if (candidates.isEmpty()) return null
         if (candidates.size == 1) return candidates.first()
 
         if (schema.inSide != null && sides.inSides.isNotEmpty()) {
-            val disambiguated = candidates.filter { facing ->
-                val undoQuarter = (4 - facing.ordinal) % 4
-                sides.inSides.any { it.rotateClockwise(undoQuarter) == schema.inSide }
+            val inMatch = candidates.filter { transform ->
+                sides.inSides.any { transform.applyDirection(it) == schema.inSide }
             }
-            if (disambiguated.size == 1) return disambiguated.first()
-            if (disambiguated.isNotEmpty()) {
-                return disambiguated.minByOrNull { angularDistance(it, yawFacing) }
+            if (inMatch.size == 1) return inMatch.first()
+            if (inMatch.isNotEmpty()) {
+                return inMatch.minByOrNull { angularDistance(transformFacing(it), yawFacing) }
             }
         }
 
-        return candidates.minByOrNull { angularDistance(it, yawFacing) }
+        return candidates.minByOrNull { angularDistance(transformFacing(it), yawFacing) }
+    }
+
+    private fun transformFacing(transform: StructureTransform): CardinalDirection {
+        return CardinalDirection.entries[transform.normalizedQuarter]
     }
 
     private fun angularDistance(a: CardinalDirection, b: CardinalDirection): Int {

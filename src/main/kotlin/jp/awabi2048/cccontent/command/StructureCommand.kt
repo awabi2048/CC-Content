@@ -134,7 +134,10 @@ class StructureCommand(
     )
 
     private fun facingLabel(options: SaveOptions, result: SavedSchemStructure): String {
-        return if (options.facing != null) options.facing.token else "auto(${result.facing.token})"
+        if (options.facing != null) return options.facing.token
+        val t = result.transform
+        val facing = result.facing.token
+        return if (t.mirrorX) "auto($facing, mirrored)" else "auto($facing)"
     }
 
     private fun parseOptions(

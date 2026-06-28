@@ -20,6 +20,7 @@ import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeWeightedMobEntr
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeVariant
 import jp.awabi2048.cccontent.features.arena.generator.ArenaWaveSpawnRule
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
+import jp.awabi2048.cccontent.features.arena.mechanic.ArenaThemeMechanicCoordinator
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionModifiers
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
@@ -393,6 +394,7 @@ class ArenaManager(
     private val legacySerializer = LegacyComponentSerializer.legacySection()
     private val themeLoader = ArenaThemeLoader(plugin)
     private val stageGenerator = ArenaStageGenerator()
+    private val themeMechanics = ArenaThemeMechanicCoordinator(plugin)
     private val legacyColorPattern = Regex("(?i)§[0-9A-FK-ORX]")
     private val sessionsByWorld = mutableMapOf<String, ArenaSession>()
     private val playerToSessionWorld = mutableMapOf<UUID, String>()
@@ -865,6 +867,7 @@ class ArenaManager(
             activatedRoomCheckpoints = mutableMapOf(),
             corridorDoorBlocks = mutableMapOf(),
             doorAnimationPlacements = mutableMapOf(),
+            mechanicMarkersByWave = mutableMapOf(),
             barrierLocation = placeholderLocation.clone(),
             barrierPointLocations = mutableListOf(),
             joinAreaMarkerLocations = mutableListOf(),
@@ -927,10 +930,12 @@ class ArenaManager(
                     buildResult
                         .onSuccess { built ->
                             applyStageBuildResult(session, built)
+                            themeMechanics.registerStageReady(session)
                             initializeActionMarkers(session)
                             initializeBarrierRestartState(session)
                             startBarrierAmbientTask(session)
                             initializeWavePipeline(session, activeTheme)
+                            themeMechanics.notifySessionStarted(session)
                             updateSessionProgressBossBar(session)
                             session.stageGenerationCompleted = true
                             onCompleted?.invoke(elapsedMillisSince(startedAtNanos))
@@ -959,6 +964,7 @@ class ArenaManager(
                     random
                 )
                 applyStageBuildResult(session, stage)
+                themeMechanics.registerStageReady(session)
                 initializeActionMarkers(session)
                 initializeBarrierRestartState(session)
                 startBarrierAmbientTask(session)
@@ -977,6 +983,7 @@ class ArenaManager(
                 setDoorActionMarkersReadySilently(session, 1)
                 broadcastStageStartMessage(session)
                 initializeWavePipeline(session, activeTheme)
+                themeMechanics.notifySessionStarted(session)
                 updateSessionProgressBossBar(session)
                 onCompleted?.invoke(elapsedMillisSince(startedAtNanos))
             }
@@ -1553,6 +1560,8 @@ class ArenaManager(
         session.corridorDoorBlocks.putAll(stage.corridorDoorBlocks)
         session.doorAnimationPlacements.clear()
         session.doorAnimationPlacements.putAll(stage.doorAnimationPlacements)
+        session.mechanicMarkersByWave.clear()
+        session.mechanicMarkersByWave.putAll(stage.mechanicMarkersByWave.mapValues { (_, markers) -> markers.map { it.clone() } })
         session.barrierLocation = stage.barrierLocation.clone()
         session.barrierPointLocations.clear()
         session.barrierPointLocations.addAll(stage.barrierPointLocations.map { it.clone() })
@@ -3589,6 +3598,7 @@ class ArenaManager(
             )
         )
 
+        themeMechanics.unregister(session, success)
         sessionsByWorld.remove(session.worldName)
 
         session.waveSpawnTasks.values.forEach { it.cancel() }
@@ -3782,6 +3792,8 @@ class ArenaManager(
 
         val cleanupBounds = collectCleanupBounds(session)
         if (cleanupBounds.isEmpty()) {
+            // 生成失敗直後は WorldEdit/FAWE の Marker が遅れて見えることがあるため、READY に戻す直前にも再掃除する。
+            cleanupNonPlayerEntities(world)
             markArenaWorldReady(worldName)
             logArenaPoolState("驛｢・ｧ繝ｻ・ｻ驛｢譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬩搾ｽｨ郢ｧ繝ｻ・ｽ・ｺ郢晢ｽｻ, worldName")
             return
@@ -3816,6 +3828,9 @@ class ArenaManager(
         }
         session.corridorBounds.values.forEach { value ->
             bounds[boundsKey(value)] = value
+        }
+        session.mechanicCleanupBounds.forEach { value ->
+            bounds[boundsKey(value.bounds)] = value.bounds
         }
         session.transitBounds.values.forEach { value ->
             bounds[boundsKey(value)] = value
@@ -3932,6 +3947,7 @@ class ArenaManager(
 
         session.lastClearedWaveForBossBar = null
         session.startedWaves.add(wave)
+        themeMechanics.notifyWaveStarted(session, wave)
         if (wave == session.waves && session.finalWaveStartedAtMillis <= 0L) {
             session.finalWaveStartedAtMillis = System.currentTimeMillis()
             session.overtimeDischargeState = ArenaOvertimeDischargeState(
@@ -4698,6 +4714,7 @@ class ArenaManager(
         session.clearedWaves.add(wave)
         session.lastClearedWaveForBossBar = wave
         stopWaveSpawning(session, wave)
+        themeMechanics.notifyWaveCleared(session, wave)
         updateSessionProgressBossBar(session)
         playSound(session, Sound.ENTITY_GENERIC_EXPLODE, 1.0f, 1.25f)
         tryQueueWaveClearedMessage(session, wave)
@@ -8593,6 +8610,7 @@ class ArenaManager(
                 updateArenaBgmTransitions()
                 processArenaWorldCleanupQueue()
                 confusionManager.tick()
+                themeMechanics.tick(sessionsByWorld.values, currentTick)
                 if (currentTick % 5L == 0L) {
                     updateArenaSidebars()
                 }
@@ -8615,6 +8633,8 @@ class ArenaManager(
             val volume = job.volumes.firstOrNull()
             if (volume == null) {
                 cleanupWorldJobs.removeFirstOrNull()
+                // ブロック清掃後に出現した Marker 等を残したままプールへ返さない。
+                cleanupNonPlayerEntities(world)
                 val elapsedMillis = (now - job.startedAtMillis).coerceAtLeast(0L)
                 plugin.logger.info(
                     "[Arena] 驛｢・ｧ繝ｻ・ｯ驛｢譎｢・ｽ・ｪ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｳ驛｢・ｧ繝ｻ・｢驛｢譏ｴ繝ｻ郢晢ｽｻ髯橸ｽｳ陟包ｽ｡繝ｻ・ｺ郢晢ｽｻ world=${job.worldName} blocks=${job.processedBlocks}/${job.totalBlocks} elapsed=${elapsedMillis}ms"

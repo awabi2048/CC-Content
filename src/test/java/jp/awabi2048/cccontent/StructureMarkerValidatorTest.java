@@ -6,12 +6,15 @@ import jp.awabi2048.cccontent.structure.LoadedSchemEntity;
 import jp.awabi2048.cccontent.structure.StructureMarkerValidation;
 import jp.awabi2048.cccontent.structure.StructureMarkerValidator;
 import jp.awabi2048.cccontent.structure.StructureSchemas;
+import jp.awabi2048.cccontent.structure.StructureTransform;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class StructureMarkerValidatorTest {
@@ -83,94 +86,115 @@ class StructureMarkerValidatorTest {
     }
 
     @Test
-    void arenaDetectsFacingFromInOutMarkers() {
-        jp.awabi2048.cccontent.structure.DirectionalConnectionSides sides =
-            new jp.awabi2048.cccontent.structure.DirectionalConnectionSides(
-                Set.of(CardinalDirection.NORTH),
-                Set.of(CardinalDirection.SOUTH)
-            );
-        CardinalDirection facing = StructureMarkerValidator.INSTANCE.detectArenaFacing(
+    void arenaDetectsTransformFromInOutMarkers() {
+        var sides = new jp.awabi2048.cccontent.structure.DirectionalConnectionSides(
+            Set.of(CardinalDirection.NORTH),
+            Set.of(CardinalDirection.SOUTH)
+        );
+        StructureTransform result = StructureMarkerValidator.INSTANCE.detectArenaTransform(
             StructureSchemas.INSTANCE.arena("straight"),
             sides,
             CardinalDirection.NORTH
         );
-        assertTrue(facing == CardinalDirection.NORTH);
+        assertNotNull(result);
+        assertEquals(0, result.getNormalizedQuarter());
+        assertFalse(result.getMirrorX());
     }
 
     @Test
-    void arenaDetectsReversedFacingFromSwappedMarkers() {
-        jp.awabi2048.cccontent.structure.DirectionalConnectionSides sides =
-            new jp.awabi2048.cccontent.structure.DirectionalConnectionSides(
-                Set.of(CardinalDirection.SOUTH),
-                Set.of(CardinalDirection.NORTH)
-            );
-        CardinalDirection facing = StructureMarkerValidator.INSTANCE.detectArenaFacing(
+    void arenaDetectsReversedTransformFromSwappedMarkers() {
+        var sides = new jp.awabi2048.cccontent.structure.DirectionalConnectionSides(
+            Set.of(CardinalDirection.SOUTH),
+            Set.of(CardinalDirection.NORTH)
+        );
+        StructureTransform result = StructureMarkerValidator.INSTANCE.detectArenaTransform(
             StructureSchemas.INSTANCE.arena("straight"),
             sides,
             CardinalDirection.NORTH
         );
-        assertTrue(facing == CardinalDirection.SOUTH);
+        assertNotNull(result);
+        assertEquals(2, result.getNormalizedQuarter());
+        assertFalse(result.getMirrorX());
     }
 
     @Test
-    void arenaCornerDetectsFacingFromAllFourAdjacentDirections() {
+    void arenaCornerDetectsTransformFromAllFourLeftTurns() {
         CardinalDirection[][] cases = {
             {CardinalDirection.NORTH, CardinalDirection.EAST},
             {CardinalDirection.EAST, CardinalDirection.SOUTH},
             {CardinalDirection.SOUTH, CardinalDirection.WEST},
             {CardinalDirection.WEST, CardinalDirection.NORTH}
         };
-        CardinalDirection[] expectedFacings = {
-            CardinalDirection.NORTH,
-            CardinalDirection.EAST,
-            CardinalDirection.SOUTH,
-            CardinalDirection.WEST
-        };
+        int[] expectedQuarters = {0, 1, 2, 3};
         for (int i = 0; i < cases.length; i++) {
-            jp.awabi2048.cccontent.structure.DirectionalConnectionSides sides =
-                new jp.awabi2048.cccontent.structure.DirectionalConnectionSides(
-                    Set.of(cases[i][0]),
-                    Set.of(cases[i][1])
-                );
-            CardinalDirection facing = StructureMarkerValidator.INSTANCE.detectArenaFacing(
+            var sides = new jp.awabi2048.cccontent.structure.DirectionalConnectionSides(
+                Set.of(cases[i][0]),
+                Set.of(cases[i][1])
+            );
+            StructureTransform result = StructureMarkerValidator.INSTANCE.detectArenaTransform(
                 StructureSchemas.INSTANCE.arena("corner"),
                 sides,
                 CardinalDirection.NORTH
             );
-            assertTrue(facing == expectedFacings[i],
-                "corner facing for in=" + cases[i][0] + " out=" + cases[i][1] +
-                    " expected=" + expectedFacings[i] + " actual=" + facing);
+            assertNotNull(result, "corner transform for in=" + cases[i][0] + " out=" + cases[i][1]);
+            assertEquals(expectedQuarters[i], result.getNormalizedQuarter(),
+                "corner quarter for in=" + cases[i][0] + " out=" + cases[i][1]);
+            assertFalse(result.getMirrorX(),
+                "corner should not be mirrored for in=" + cases[i][0] + " out=" + cases[i][1]);
         }
     }
 
     @Test
-    void arenaStraightDetectsFacingFromAllFourOppositeDirections() {
+    void arenaCornerDetectsTransformForMirroredRightTurns() {
+        CardinalDirection[][] cases = {
+            {CardinalDirection.NORTH, CardinalDirection.WEST},
+            {CardinalDirection.EAST, CardinalDirection.NORTH},
+            {CardinalDirection.SOUTH, CardinalDirection.EAST},
+            {CardinalDirection.WEST, CardinalDirection.SOUTH}
+        };
+        int[] expectedQuarters = {0, 1, 2, 3};
+        for (int i = 0; i < cases.length; i++) {
+            var sides = new jp.awabi2048.cccontent.structure.DirectionalConnectionSides(
+                Set.of(cases[i][0]),
+                Set.of(cases[i][1])
+            );
+            StructureTransform result = StructureMarkerValidator.INSTANCE.detectArenaTransform(
+                StructureSchemas.INSTANCE.arena("corner"),
+                sides,
+                CardinalDirection.NORTH
+            );
+            assertNotNull(result, "mirrored corner for in=" + cases[i][0] + " out=" + cases[i][1]);
+            assertEquals(expectedQuarters[i], result.getNormalizedQuarter(),
+                "mirrored corner quarter for in=" + cases[i][0] + " out=" + cases[i][1]);
+            assertTrue(result.getMirrorX(),
+                "mirrored corner should have mirrorX for in=" + cases[i][0] + " out=" + cases[i][1]);
+        }
+    }
+
+    @Test
+    void arenaStraightDetectsTransformFromAllFourOppositeDirections() {
         CardinalDirection[][] cases = {
             {CardinalDirection.NORTH, CardinalDirection.SOUTH},
             {CardinalDirection.EAST, CardinalDirection.WEST},
             {CardinalDirection.SOUTH, CardinalDirection.NORTH},
             {CardinalDirection.WEST, CardinalDirection.EAST}
         };
-        CardinalDirection[] expectedFacings = {
-            CardinalDirection.NORTH,
-            CardinalDirection.EAST,
-            CardinalDirection.SOUTH,
-            CardinalDirection.WEST
-        };
+        int[] expectedQuarters = {0, 1, 2, 3};
         for (int i = 0; i < cases.length; i++) {
-            jp.awabi2048.cccontent.structure.DirectionalConnectionSides sides =
-                new jp.awabi2048.cccontent.structure.DirectionalConnectionSides(
-                    Set.of(cases[i][0]),
-                    Set.of(cases[i][1])
-                );
-            CardinalDirection facing = StructureMarkerValidator.INSTANCE.detectArenaFacing(
+            var sides = new jp.awabi2048.cccontent.structure.DirectionalConnectionSides(
+                Set.of(cases[i][0]),
+                Set.of(cases[i][1])
+            );
+            StructureTransform result = StructureMarkerValidator.INSTANCE.detectArenaTransform(
                 StructureSchemas.INSTANCE.arena("straight"),
                 sides,
                 CardinalDirection.NORTH
             );
-            assertTrue(facing == expectedFacings[i],
-                "straight facing for in=" + cases[i][0] + " out=" + cases[i][1] +
-                    " expected=" + expectedFacings[i] + " actual=" + facing);
+            assertNotNull(result, "straight transform for in=" + cases[i][0] + " out=" + cases[i][1]);
+            assertEquals(expectedQuarters[i], result.getNormalizedQuarter(),
+                "straight quarter for in=" + cases[i][0] + " out=" + cases[i][1]);
+            assertFalse(result.getMirrorX(),
+                "straight should not be mirrored for in=" + cases[i][0] + " out=" + cases[i][1]);
         }
     }
 

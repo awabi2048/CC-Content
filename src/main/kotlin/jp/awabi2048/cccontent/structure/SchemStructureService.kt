@@ -2,7 +2,6 @@ package jp.awabi2048.cccontent.structure
 
 import com.sk89q.worldedit.WorldEdit
 import com.sk89q.worldedit.bukkit.BukkitAdapter
-import com.sk89q.worldedit.entity.BaseEntity
 import com.sk89q.worldedit.extent.clipboard.BlockArrayClipboard
 import com.sk89q.worldedit.extent.clipboard.Clipboard
 import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormats
@@ -105,9 +104,11 @@ data class LoadedSchemEntity(
 data class SavedSchemStructure(
     val file: File,
     val size: CcStructureSize,
-    val facing: CardinalDirection,
+    val transform: StructureTransform,
     val validation: StructureMarkerValidation? = null
-)
+) {
+    val facing: CardinalDirection get() = CardinalDirection.entries[transform.normalizedQuarter]
+}
 
 class SchemStructureService(private val plugin: JavaPlugin) {
     fun load(relativePath: String): LoadedSchemStructure? {
@@ -128,6 +129,9 @@ class SchemStructureService(private val plugin: JavaPlugin) {
                     val clipboard = reader.read()
                     val minimum = clipboard.region.minimumPoint
                     clipboard.setOrigin(minimum)
+                    // 既存schemには保存元ワールドの Pos / UUID / Paper 系NBTを持つMarkerが混在するため、
+                    // 読み込み時にも正規化して、貼り付け時の実体座標をトップレベルのローカルPosに揃える。
+                    normalizeMarkerEntityNbtForSave(clipboard)
                     val dimensions = clipboard.dimensions
                     if (dimensions.x() <= 0 || dimensions.y() <= 0 || dimensions.z() <= 0) {
                         plugin.logger.warning("Invalid schematic size: ${file.path}")
@@ -189,10 +193,11 @@ class SchemStructureService(private val plugin: JavaPlugin) {
         copy.setCopyingBiomes(true)
         Operations.complete(copy)
 
-        val effectiveFacing = determineEffectiveFacing(relativePath, sourceClipboard, facing, player)
-        val savedClipboard = normalizeToNorth(sourceClipboard, effectiveFacing)
+        val effectiveTransform = determineEffectiveTransform(relativePath, sourceClipboard, facing, player)
+        val savedClipboard = normalizeStructure(sourceClipboard, effectiveTransform)
 
         relabelConnectionMarkers(relativePath, savedClipboard)
+        normalizeMarkerEntityNbtForSave(savedClipboard)
 
         val validation = validateClipboardMarkers(relativePath, savedClipboard)
         if (validation.hasIssues()) {
@@ -229,19 +234,19 @@ class SchemStructureService(private val plugin: JavaPlugin) {
         return SavedSchemStructure(
             file = targetFile,
             size = CcStructureSize(dimensions.x(), dimensions.y(), dimensions.z()),
-            facing = effectiveFacing,
+            transform = effectiveTransform,
             validation = validation
         )
     }
 
     /**
-     * [source] を [facing] 方向が NORTH になるように回転した新しい Clipboard を返す。
-     * facing == NORTH の場合は [source] をそのまま返す。
+     * [source] に [transform] を適用し、正準形 (in=NORTH, out=EAST) に正規化した
+     * 新しい Clipboard を返す。
+     * transform が恒等変換の場合は [source] をそのまま返す。
      */
-    private fun normalizeToNorth(source: Clipboard, facing: CardinalDirection): Clipboard {
-        if (facing == CardinalDirection.NORTH) return source
-        val quarter = StructureTransform.rotationBetween(facing, CardinalDirection.NORTH)
-        return rotateClipboard(source, StructureTransform(quarter))
+    private fun normalizeStructure(source: Clipboard, transform: StructureTransform): Clipboard {
+        if (transform.normalizedQuarter == 0 && !transform.mirrorX) return source
+        return rotateClipboard(source, transform)
     }
 
     /**
@@ -270,8 +275,6 @@ class SchemStructureService(private val plugin: JavaPlugin) {
         val maxZ = size.z - 1
         val minPoint = clipboard.region.minimumPoint
         val region = clipboard.region
-        val toRecreate = mutableListOf<Pair<com.sk89q.worldedit.entity.Entity, BaseEntity>>()
-
         for (entity in clipboard.getEntities(region)) {
             val state = entity.state ?: continue
             if (state.type.id() != StructureSchemas.MARKER_ENTITY_TYPE) continue
@@ -287,8 +290,8 @@ class SchemStructureService(private val plugin: JavaPlugin) {
             if (!isConnectionMarker) continue
 
             val location = entity.location
-            val blockX = floor(location.x - minPoint.x.toDouble()).toInt()
-            val blockZ = floor(location.z - minPoint.z.toDouble()).toInt()
+            val blockX = floor(location.x - minPoint.x().toDouble()).toInt()
+            val blockZ = floor(location.z - minPoint.z().toDouble()).toInt()
             val touchedSides = buildList {
                 if (blockX == 0) add(CardinalDirection.WEST)
                 if (blockX == maxX) add(CardinalDirection.EAST)
@@ -320,13 +323,31 @@ class SchemStructureService(private val plugin: JavaPlugin) {
                 .build()
 
             state.nbtReference = LazyReference.computed(newNbt)
-            toRecreate += entity to state
         }
+    }
 
-        for ((old, newState) in toRecreate) {
-            val location = old.location
-            old.remove()
-            clipboard.createEntity(location, newState)
+    private fun normalizeMarkerEntityNbtForSave(clipboard: Clipboard) {
+        val region = clipboard.region
+        for (entity in clipboard.getEntities(region)) {
+            val state = entity.state ?: continue
+            if (state.type.id() != StructureSchemas.MARKER_ENTITY_TYPE) continue
+
+            val nbt = state.nbtReference?.value
+            val tags = nbt
+                ?.findListTag("Tags", LinTagType.stringTag())
+                ?.value()
+                ?.map { it.value() }
+                ?.toSet()
+                .orEmpty()
+            val tagList = LinListTag.builder(LinTagType.stringTag())
+                .addAll(tags.map { LinStringTag.of(it) })
+                .build()
+
+            // Marker は構造上の制御点なので、保存時はワールド依存NBTを持ち込まずタグだけを永続化する。
+            val normalizedNbt = LinCompoundTag.builder()
+                .put("Tags", tagList)
+                .build()
+            state.nbtReference = LazyReference.computed(normalizedNbt)
         }
     }
 
@@ -416,30 +437,33 @@ class SchemStructureService(private val plugin: JavaPlugin) {
         return target
     }
 
-    private fun determineEffectiveFacing(
+    private fun determineEffectiveTransform(
         relativePath: String,
         sourceClipboard: Clipboard,
         manualFacing: CardinalDirection?,
         player: Player
-    ): CardinalDirection {
-        if (manualFacing != null) return manualFacing
+    ): StructureTransform {
+        if (manualFacing != null) {
+            val quarter = StructureTransform.rotationBetween(manualFacing, CardinalDirection.NORTH)
+            return StructureTransform(quarter)
+        }
 
         val path = relativePath.replace('\\', '/').lowercase()
         val yawFacing = CardinalDirection.fromPlayerYaw(player.location.yaw)
 
         if (path.contains("structures/arena/")) {
-            val detected = detectArenaFacingFromPath(path, sourceClipboard, yawFacing)
+            val detected = detectArenaTransformFromPath(path, sourceClipboard, yawFacing)
             if (detected != null) return detected
         }
 
-        return yawFacing
+        return StructureTransform(yawFacing.ordinal)
     }
 
-    private fun detectArenaFacingFromPath(
+    private fun detectArenaTransformFromPath(
         path: String,
         clipboard: Clipboard,
         yawFacing: CardinalDirection
-    ): CardinalDirection? {
+    ): StructureTransform? {
         val fileName = path.substringAfterLast('/').removeSuffix(".schem")
         if (!StructureSchemas.arenaRequiresConnectionMarkers(fileName)) return null
 
@@ -453,7 +477,7 @@ class SchemStructureService(private val plugin: JavaPlugin) {
 
         if (sides.allSides.isEmpty()) return null
 
-        return StructureMarkerValidator.detectArenaFacing(schema, sides, yawFacing)
+        return StructureMarkerValidator.detectArenaTransform(schema, sides, yawFacing)
     }
 
     /**

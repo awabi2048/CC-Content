@@ -4,6 +4,8 @@ package jp.awabi2048.cccontent.features.arena.generator
 
 import jp.awabi2048.cccontent.features.arena.ArenaBounds
 import jp.awabi2048.cccontent.features.arena.ArenaBlockKey
+import jp.awabi2048.cccontent.features.arena.mechanic.ARENA_MECHANIC_MARKER_PREFIX
+import jp.awabi2048.cccontent.features.arena.mechanic.ArenaMechanicMarker
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
 import jp.awabi2048.cccontent.structure.CardinalDirection
 import jp.awabi2048.cccontent.structure.StructureSchemas
@@ -12,7 +14,6 @@ import jp.awabi2048.cccontent.structure.StructureTransform
 import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.World
-import org.bukkit.entity.Marker
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import kotlin.math.floor
@@ -110,6 +111,7 @@ data class ArenaStageBuildResult(
     val goalCheckpoint: Location,
     val corridorDoorBlocks: Map<Int, List<Location>>,
     val doorAnimationPlacements: Map<Int, List<ArenaDoorAnimationPlacement>>,
+    val mechanicMarkersByWave: Map<Int, List<ArenaMechanicMarker>>,
     val barrierLocation: Location,
     val barrierPointLocations: List<Location>,
     val clearingBossLocations: List<Location> = emptyList()
@@ -137,6 +139,7 @@ class ArenaStageGenerator {
 
     private enum class BuildPhase {
         PLACE_STRUCTURES,
+        WAIT_FOR_MARKER_ENTITIES,
         SCAN_ROOMS,
         SCAN_CORRIDORS,
         FINALIZE,
@@ -168,6 +171,7 @@ class ArenaStageGenerator {
         val roomMobSpawns: MutableMap<Int, List<Location>> = mutableMapOf(),
         val roomCheckpoints: MutableMap<Int, Location> = mutableMapOf(),
         val corridorDoorBlocks: MutableMap<Int, List<Location>> = mutableMapOf(),
+        val mechanicMarkersByWave: MutableMap<Int, MutableList<ArenaMechanicMarker>> = mutableMapOf(),
         var entranceLocation: Location? = null,
         var entranceCheckpoint: Location? = null,
         var goalCheckpoint: Location? = null,
@@ -215,9 +219,18 @@ class ArenaStageGenerator {
         lateinit var task: BukkitTask
         task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
             try {
-                repeat(safeStepsPerTick) {
-                    if (job.phase == BuildPhase.COMPLETE) return@repeat
+                var stepsRun = 0
+                while (stepsRun < safeStepsPerTick) {
+                    if (job.phase == BuildPhase.COMPLETE) break
+                    val phaseBefore = job.phase
                     stepBuildJob(job)
+                    stepsRun += 1
+                    if (
+                        phaseBefore == BuildPhase.WAIT_FOR_MARKER_ENTITIES ||
+                        job.phase == BuildPhase.WAIT_FOR_MARKER_ENTITIES
+                    ) {
+                        break
+                    }
                 }
 
                 if (job.phase == BuildPhase.COMPLETE) {
@@ -264,6 +277,7 @@ class ArenaStageGenerator {
     private fun stepBuildJob(job: BuildJob) {
         when (job.phase) {
             BuildPhase.PLACE_STRUCTURES -> processPlaceStructure(job)
+            BuildPhase.WAIT_FOR_MARKER_ENTITIES -> processWaitForMarkerEntities(job)
             BuildPhase.SCAN_ROOMS -> processScanRoom(job)
             BuildPhase.SCAN_CORRIDORS -> processScanCorridor(job)
             BuildPhase.FINALIZE -> processFinalize(job)
@@ -283,7 +297,8 @@ class ArenaStageGenerator {
                 minZ = allBounds.minOf { it.minZ },
                 maxZ = allBounds.maxOf { it.maxZ }
             )
-            job.phase = BuildPhase.SCAN_ROOMS
+            // WorldEdit/FAWE の貼り付け直後は Bukkit の chunk.entities に Marker がまだ見えないことがある。
+            job.phase = BuildPhase.WAIT_FOR_MARKER_ENTITIES
             return
         }
 
@@ -351,11 +366,13 @@ class ArenaStageGenerator {
                 }
                 connectedGeometry
             } catch (e: IllegalStateException) {
+                val msg = e.message ?: "$CONNECTION_MARKER_LABEL(connection_failed)"
+                val structName = if (msg.contains("previous_")) previousTemplateName else template.name
                 throw ArenaStageBuildException(
                     listOf(
                         ArenaStageValidationIssue(
-                            structureName = template.name,
-                            missingMarkers = listOf(e.message ?: "$CONNECTION_MARKER_LABEL(connection_failed)")
+                            structureName = structName,
+                            missingMarkers = listOf(msg)
                         )
                     )
                 )
@@ -371,6 +388,10 @@ class ArenaStageGenerator {
         job.placementCursor += 1
     }
 
+    private fun processWaitForMarkerEntities(job: BuildJob) {
+        job.phase = BuildPhase.SCAN_ROOMS
+    }
+
     private fun processScanRoom(job: BuildJob) {
         val roomPlacements = job.placements.filter { it.role != PlacementRole.CORRIDOR }.sortedBy { it.index }
         val roomPlacement = roomPlacements.getOrNull(job.roomCursor) ?: run {
@@ -382,9 +403,15 @@ class ArenaStageGenerator {
             job.roomCursor += 1
             return
         }
-        val markers = findMarkers(job.world, bounds)
-        val templateName = job.selectedByPlacementIndex[roomPlacement.index]?.baseTemplate?.name ?: "unknown"
+        val selected = job.selectedByPlacementIndex[roomPlacement.index]
+        val markers = collectTemplateMarkers(job.world, selected?.baseTemplate, roomPlacement.transform, bounds)
+        val templateName = selected?.baseTemplate?.name ?: "unknown"
         val wave = roomPlacement.wave
+        val markerWave = wave ?: 0
+        if (markers.mechanics.isNotEmpty()) {
+            // Theme mechanics own the meaning of these markers; generation only preserves their room/wave placement.
+            job.mechanicMarkersByWave.getOrPut(markerWave) { mutableListOf() }.addAll(markers.mechanics)
+        }
 
         when (roomPlacement.role) {
             PlacementRole.ENTRANCE -> {
@@ -507,7 +534,8 @@ class ArenaStageGenerator {
             ?: error("[Arena] 最終部屋が見つかりません")
         val finalRoomBounds = job.placementBoundsByIndex[finalRoomPlacement.index]
             ?: error("[Arena] 最終部屋の境界が見つかりません")
-        val finalMarkers = findMarkers(job.world, finalRoomBounds)
+        val selectedFinal = job.selectedByPlacementIndex[finalRoomPlacement.index]
+        val finalMarkers = collectTemplateMarkers(job.world, selectedFinal?.baseTemplate, finalRoomPlacement.transform, finalRoomBounds)
         if (finalMarkers.barrierCores.size != 1) {
             val reason = if (finalMarkers.barrierCores.isEmpty()) {
                 "arena.marker.barrier_core"
@@ -516,7 +544,7 @@ class ArenaStageGenerator {
             }
             job.validationIssues.add(
                 ArenaStageValidationIssue(
-                    structureName = job.selectedByPlacementIndex[finalRoomPlacement.index]?.baseTemplate?.name ?: "unknown",
+                    structureName = selectedFinal?.baseTemplate?.name ?: "unknown",
                     missingMarkers = listOf(reason)
                 )
             )
@@ -524,7 +552,7 @@ class ArenaStageGenerator {
         if (finalMarkers.barrierPoints.isEmpty()) {
             job.validationIssues.add(
                 ArenaStageValidationIssue(
-                    structureName = job.selectedByPlacementIndex[finalRoomPlacement.index]?.baseTemplate?.name ?: "unknown",
+                    structureName = selectedFinal?.baseTemplate?.name ?: "unknown",
                     missingMarkers = listOf("arena.marker.barrier_point")
                 )
             )
@@ -549,7 +577,7 @@ class ArenaStageGenerator {
         if (job.waves > 0 && goalCheckpoint == null) {
             job.validationIssues.add(
                 ArenaStageValidationIssue(
-                    structureName = job.selectedByPlacementIndex[finalRoomPlacement.index]?.baseTemplate?.name ?: "unknown",
+                    structureName = selectedFinal?.baseTemplate?.name ?: "unknown",
                     missingMarkers = listOf("arena.marker.checkpoint")
                 )
             )
@@ -595,6 +623,7 @@ class ArenaStageGenerator {
             goalCheckpoint = resolvedGoalCheckpoint,
             corridorDoorBlocks = job.corridorDoorBlocks,
             doorAnimationPlacements = job.doorAnimationPlacements,
+            mechanicMarkersByWave = job.mechanicMarkersByWave.mapValues { (_, markers) -> markers.toList() },
             barrierLocation = resolvedBarrierLocation,
             barrierPointLocations = resolvedBarrierPoints,
             clearingBossLocations = resolvedClearingBossLocations
@@ -1082,8 +1111,9 @@ class ArenaStageGenerator {
         val offsetX = ((gridPitch - widthX) / 2.0).coerceAtLeast(0.0)
         val offsetZ = ((gridPitch - widthZ) / 2.0).coerceAtLeast(0.0)
         val footprintMin = tileBase.clone().add(offsetX, 0.0, offsetZ)
-        val (rotationOffsetX, rotationOffsetZ) = placementOffset(size, transform)
-        val placeOrigin = footprintMin.clone().add(rotationOffsetX, 0.0, rotationOffsetZ)
+        // LoadedSchemStructure.paste() 側で回転後boundsのmin補正を行うため、
+        // 生成器から渡すoriginは実際に置きたいフットプリント最小座標に揃える。
+        val placeOrigin = footprintMin.clone()
         val bounds = placementBounds(footprintMin, widthX, widthZ, size.y)
         return PlacementGeometry(placeOrigin, bounds)
     }
@@ -1177,8 +1207,8 @@ class ArenaStageGenerator {
         }
 
         val footprintMin = Location(world, minX.toDouble(), minY.toDouble(), minZ.toDouble())
-        val (rotationOffsetX, rotationOffsetZ) = placementOffset(currentSize, currentTransform)
-        val placeOrigin = footprintMin.clone().add(rotationOffsetX, 0.0, rotationOffsetZ)
+        // paste() が回転後boundsのminを内部補正するため、originにplacementOffsetを二重適用しない。
+        val placeOrigin = footprintMin.clone()
         val bounds = placementBounds(footprintMin, currentWidthX, currentWidthZ, currentSize.y)
         return PlacementGeometry(placeOrigin, bounds)
     }
@@ -1416,7 +1446,8 @@ class ArenaStageGenerator {
         val barrierCores: List<Location>,
         val barrierPoints: List<Location>,
         val clearingBosses: List<Location> = emptyList(),
-        val pedestals: List<Location> = emptyList()
+        val pedestals: List<Location> = emptyList(),
+        val mechanics: List<ArenaMechanicMarker> = emptyList()
     )
 
     private fun validateSingleRequiredMarker(markers: List<Location>, markerTag: String): String? {
@@ -1428,19 +1459,12 @@ class ArenaStageGenerator {
         }
     }
 
-    private fun findMarkers(world: World, bounds: ArenaBounds): TileMarkers {
-        val minX = bounds.minX
-        val maxX = bounds.maxX
-        val minZ = bounds.minZ
-        val maxZ = bounds.maxZ
-        val minY = bounds.minY - 2
-        val maxY = bounds.maxY + 2
-
-        val minChunkX = minX shr 4
-        val maxChunkX = maxX shr 4
-        val minChunkZ = minZ shr 4
-        val maxChunkZ = maxZ shr 4
-
+    private fun collectTemplateMarkers(
+        world: World,
+        template: ArenaStructureTemplate?,
+        transform: PlacementTransform,
+        bounds: ArenaBounds
+    ): TileMarkers {
         val mobs = mutableListOf<Location>()
         val checkpoints = mutableListOf<Location>()
         val doorBlocks = mutableListOf<Location>()
@@ -1448,46 +1472,55 @@ class ArenaStageGenerator {
         val barrierPoints = mutableListOf<Location>()
         val clearingBosses = mutableListOf<Location>()
         val pedestals = mutableListOf<Location>()
+        val mechanics = mutableListOf<ArenaMechanicMarker>()
 
-        for (cx in minChunkX..maxChunkX) {
-            for (cz in minChunkZ..maxChunkZ) {
-                val chunk = world.getChunkAt(cx, cz)
-                if (!chunk.isLoaded) chunk.load()
-
-                for (entity in chunk.entities) {
-                    val loc = entity.location
-                    if (loc.x < minX.toDouble() || loc.x > maxX.toDouble() + 1.0) continue
-                    if (loc.z < minZ.toDouble() || loc.z > maxZ.toDouble() + 1.0) continue
-                    if (loc.y < minY.toDouble() || loc.y > maxY.toDouble() + 1.0) continue
-
-                    if (entity is Marker) {
-                        if (entity.scoreboardTags.contains("arena.marker.mob")) {
-                            mobs.add(loc.clone())
-                        }
-                        if (entity.scoreboardTags.contains("arena.marker.checkpoint")) {
-                            checkpoints.add(loc.clone())
-                        }
-                        if (entity.scoreboardTags.contains("arena.marker.door_block")) {
-                            doorBlocks.add(loc.clone())
-                        }
-                        if (entity.scoreboardTags.contains("arena.marker.barrier_core")) {
-                            barrierCores.add(loc.clone())
-                        }
-                        if (entity.scoreboardTags.contains("arena.marker.barrier_point")) {
-                            barrierPoints.add(loc.clone())
-                        }
-                        if (entity.scoreboardTags.contains("arena.marker.clearing_boss")) {
-                            clearingBosses.add(loc.clone())
-                        }
-                        if (entity.scoreboardTags.contains("arena.marker.pedestal")) {
-                            pedestals.add(loc.clone())
-                        }
-                    }
-                }
-            }
+        if (template == null) {
+            return TileMarkers(mobs, checkpoints, doorBlocks, barrierCores, barrierPoints, clearingBosses, pedestals, mechanics)
         }
 
-        return TileMarkers(mobs, checkpoints, doorBlocks, barrierCores, barrierPoints, clearingBosses, pedestals)
+        template.structure.entities.forEach { entity ->
+            if (entity.typeId != MARKER_ENTITY_TYPE_ID) return@forEach
+
+            val (rotatedX, rotatedZ) = rotateEntityPoint(entity.x, entity.z, template.size, transform)
+            // 生成直後の同一tickではWorldEditが貼ったMarker実体がまだ列挙できない場合があるため、
+            // 構造ファイルのMarker座標を配置boundsへ写像して、生成ロジックの判定ソースをschemへ寄せる。
+            val loc = Location(
+                world,
+                bounds.minX + rotatedX,
+                bounds.minY + entity.y,
+                bounds.minZ + rotatedZ
+            )
+
+            if (entity.scoreboardTags.contains("arena.marker.mob")) {
+                mobs.add(loc.clone())
+            }
+            if (entity.scoreboardTags.contains("arena.marker.checkpoint")) {
+                checkpoints.add(loc.clone())
+            }
+            if (entity.scoreboardTags.contains("arena.marker.door_block")) {
+                doorBlocks.add(loc.clone())
+            }
+            if (entity.scoreboardTags.contains("arena.marker.barrier_core")) {
+                barrierCores.add(loc.clone())
+            }
+            if (entity.scoreboardTags.contains("arena.marker.barrier_point")) {
+                barrierPoints.add(loc.clone())
+            }
+            if (entity.scoreboardTags.contains("arena.marker.clearing_boss")) {
+                clearingBosses.add(loc.clone())
+            }
+            if (entity.scoreboardTags.contains("arena.marker.pedestal")) {
+                pedestals.add(loc.clone())
+            }
+            entity.scoreboardTags
+                .asSequence()
+                .filter { it.startsWith(ARENA_MECHANIC_MARKER_PREFIX) }
+                .forEach { tag ->
+                    mechanics.add(ArenaMechanicMarker(tag, loc.clone()))
+                }
+        }
+
+        return TileMarkers(mobs, checkpoints, doorBlocks, barrierCores, barrierPoints, clearingBosses, pedestals, mechanics)
     }
 
     private fun locationForTile(origin: Location, point: TilePoint, gridPitch: Int): Location {

@@ -9,7 +9,9 @@ object MarkerToolLanguageKeyRequirements : LanguageKeyRequirementProvider {
     private val arenaModes = setOf(
         "mob", "checkpoint", "connection_in", "connection_out", "door_block",
         "barrier_core", "barrier_point", "pedestal", "join_area", "lobby",
-        "lobby_main", "lobby_tutorial_start", "lobby_tutorial_step", "lift"
+        "lobby_main", "lobby_tutorial_start", "lobby_tutorial_step", "lift",
+        "nether_track_path_left", "nether_track_path_right", "nether_magma_vent", "ocean_geyser", "ocean_whirlpool",
+        "natura_stalactite", "natura_mist"
     )
 
     override fun requiredKeys(resourcesRoot: Path): List<LanguageKeyRequirement> =

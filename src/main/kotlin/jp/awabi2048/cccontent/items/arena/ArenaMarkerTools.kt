@@ -65,3 +65,23 @@ class ArenaLiftToolItem : CustomItem {
         return CCContent.instance.getAdminMarkerToolService().isTool(item, "arena.lift_tool")
     }
 }
+
+class ArenaMechanicMarkerToolItem : CustomItem {
+    override val feature: String = "arena"
+    override val id: String = "mechanic_marker_tool"
+    override val displayName: String = "§6アリーナギミックマーカーツール"
+    override val itemModel = NamespacedKey.minecraft("blaze_rod")
+    override val lore: List<String> = emptyList()
+
+    override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
+
+    override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
+        val item = CCContent.instance.getAdminMarkerToolService().createTool("arena.mechanic_marker_tool", player)
+        item.amount = amount
+        return item
+    }
+
+    override fun matches(item: ItemStack): Boolean {
+        return CCContent.instance.getAdminMarkerToolService().isTool(item, "arena.mechanic_marker_tool")
+    }
+}
