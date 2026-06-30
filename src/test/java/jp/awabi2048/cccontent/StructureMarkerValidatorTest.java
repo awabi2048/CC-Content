@@ -86,6 +86,13 @@ class StructureMarkerValidatorTest {
     }
 
     @Test
+    void arenaGoalConnectionValidationOnlyAppliesToBarrierRestartVariation() {
+        assertTrue(StructureSchemas.INSTANCE.arenaRequiresConnectionMarkers("goal.barrier_restart"));
+        assertFalse(StructureSchemas.INSTANCE.arenaRequiresConnectionMarkers("goal.clearing"));
+        assertFalse(StructureSchemas.INSTANCE.arenaRequiresConnectionMarkers("goal"));
+    }
+
+    @Test
     void arenaDetectsTransformFromInOutMarkers() {
         var sides = new jp.awabi2048.cccontent.structure.DirectionalConnectionSides(
             Set.of(CardinalDirection.NORTH),

@@ -102,7 +102,7 @@ data class ArenaStageBuildResult(
     val entranceCheckpoint: Location,
     val stageBounds: ArenaBounds,
     val roomBounds: Map<Int, ArenaBounds>,
-    val corridorBounds: Map<Int, ArenaBounds>,
+    val corridorBounds: Map<Int, List<ArenaBounds>>,
     val transitBounds: Map<Int, ArenaBounds>,
     val pedestalBounds: Map<Int, ArenaBounds>,
     val pedestalMarkerBlocks: Set<ArenaBlockKey>,
@@ -122,6 +122,7 @@ data class ArenaDoorAnimationPlacement(
     val placeOrigin: Location,
     val rotationQuarter: Int,
     val mirrored: Boolean,
+    val closedSize: ArenaStructureSize,
     val openFrames: List<ArenaStructureTemplate>
 )
 
@@ -164,7 +165,7 @@ class ArenaStageGenerator {
         val validationIssues: MutableList<ArenaStageValidationIssue> = mutableListOf(),
         var stageBounds: ArenaBounds? = null,
         val roomBounds: MutableMap<Int, ArenaBounds> = mutableMapOf(),
-        val corridorBounds: MutableMap<Int, ArenaBounds> = mutableMapOf(),
+        val corridorBounds: MutableMap<Int, MutableList<ArenaBounds>> = mutableMapOf(),
         val transitBounds: MutableMap<Int, ArenaBounds> = mutableMapOf(),
         val pedestalBounds: MutableMap<Int, ArenaBounds> = mutableMapOf(),
         val pedestalMarkerBlocks: MutableSet<ArenaBlockKey> = mutableSetOf(),
@@ -522,7 +523,8 @@ class ArenaStageGenerator {
         val targetWave = corridorPlacement.wave
         if (targetWave != null && targetWave in 1..job.waves) {
             if (bounds != null) {
-                job.corridorBounds[targetWave] = bounds
+                // T字路などで同じ波に複数通路が紐づくため、波番号で上書きせず全通路を保持する。
+                job.corridorBounds.getOrPut(targetWave) { mutableListOf() }.add(bounds)
             }
         }
         job.corridorCursor += 1
@@ -614,7 +616,7 @@ class ArenaStageGenerator {
             entranceCheckpoint = resolvedEntranceCheckpoint,
             stageBounds = job.stageBounds ?: error("[Arena] ステージ境界が見つかりません"),
             roomBounds = job.roomBounds,
-            corridorBounds = job.corridorBounds,
+            corridorBounds = job.corridorBounds.mapValues { (_, bounds) -> bounds.toList() },
             transitBounds = job.transitBounds,
             pedestalBounds = job.pedestalBounds,
             pedestalMarkerBlocks = job.pedestalMarkerBlocks,
@@ -714,33 +716,38 @@ class ArenaStageGenerator {
                     val candidateCombatRoomPoint: TilePoint
                     if (wave == pedestalWave) {
                         val transitPoint = TilePoint(corridorPoint.x + endDirection.dx, corridorPoint.z + endDirection.dz)
-                        val combatRoomPoint = TilePoint(transitPoint.x + endDirection.dx, transitPoint.z + endDirection.dz)
-                        if (occupied.contains(transitPoint) || occupied.contains(combatRoomPoint)) {
+                        if (occupied.contains(transitPoint)) {
                             continue
                         }
 
                         val branchDirections = listOf(endDirection.left(), endDirection.right()).shuffled(random)
                         var resolved = false
                         for (branchDirection in branchDirections) {
-                            val pedestalPoint = TilePoint(transitPoint.x + branchDirection.dx, transitPoint.z + branchDirection.dz)
-                            if (occupied.contains(pedestalPoint)) {
+                            val swapTransitOutPair = random.nextBoolean()
+                            val combatDirection = if (swapTransitOutPair) branchDirection else endDirection
+                            val pedestalDirection = if (swapTransitOutPair) endDirection else branchDirection
+                            val combatRoomPoint = TilePoint(transitPoint.x + combatDirection.dx, transitPoint.z + combatDirection.dz)
+                            val pedestalPoint = TilePoint(transitPoint.x + pedestalDirection.dx, transitPoint.z + pedestalDirection.dz)
+                            if (occupied.contains(combatRoomPoint) || occupied.contains(pedestalPoint)) {
                                 continue
                             }
                             val transitTransform = tjunctionRoomTransform(
                                 actualEntry = endDirection.opposite(),
-                                actualOuts = setOf(endDirection, branchDirection)
+                                actualOuts = setOf(combatDirection, pedestalDirection)
                             ) ?: continue
                             selectedTransitPoint = transitPoint
                             selectedPedestalPoint = pedestalPoint
                             selectedTransitTransform = transitTransform
-                            selectedPedestalTransform = pedestalRoomTransform(branchDirection.opposite())
+                            selectedPedestalTransform = pedestalRoomTransform(pedestalDirection.opposite())
+                            selectedDirection = combatDirection
                             resolved = true
                             break
                         }
                         if (!resolved) {
                             continue
                         }
-                        candidateCombatRoomPoint = combatRoomPoint
+                        val combatDirection = selectedDirection ?: continue
+                        candidateCombatRoomPoint = TilePoint(transitPoint.x + combatDirection.dx, transitPoint.z + combatDirection.dz)
                     } else {
                         val nextRoom = if (endDirection == startDirection) {
                             TilePoint(corridorPoint.x + startDirection.dx, corridorPoint.z + startDirection.dz)
@@ -753,7 +760,9 @@ class ArenaStageGenerator {
                         candidateCombatRoomPoint = nextRoom
                     }
 
-                    selectedDirection = endDirection
+                    if (selectedDirection == null) {
+                        selectedDirection = endDirection
+                    }
                     selectedCombatRoomPoint = candidateCombatRoomPoint
                     break
                 }
@@ -1071,6 +1080,7 @@ class ArenaStageGenerator {
                         placeOrigin = origin.clone(),
                         rotationQuarter = placement.transform.rotationQuarter,
                         mirrored = placement.transform.mirrored,
+                        closedSize = variant.closedTemplate.size,
                         openFrames = variant.openFrames
                     )
                 )
@@ -1354,9 +1364,8 @@ class ArenaStageGenerator {
         size: ArenaStructureSize,
         transform: PlacementTransform
     ): Pair<Double, Double> {
-        val (rawX, rawZ) = transformRawEntityPoint(x, z, transform)
-        val (offsetX, offsetZ) = placementOffset(size, transform)
-        return rawX + offsetX to rawZ + offsetZ
+        val point = structureTransform(transform).applyLocalMarkerEntityPoint(x, z, size.x, size.z)
+        return point.x to point.z
     }
 
     private fun transformRawPoint(
@@ -1490,6 +1499,7 @@ class ArenaStageGenerator {
                 bounds.minY + entity.y,
                 bounds.minZ + rotatedZ
             )
+            val facingYaw = transformedMarkerFacingYaw(entity.scoreboardTags, transform)
 
             if (entity.scoreboardTags.contains("arena.marker.mob")) {
                 mobs.add(loc.clone())
@@ -1516,11 +1526,31 @@ class ArenaStageGenerator {
                 .asSequence()
                 .filter { it.startsWith(ARENA_MECHANIC_MARKER_PREFIX) }
                 .forEach { tag ->
-                    mechanics.add(ArenaMechanicMarker(tag, loc.clone()))
+                    mechanics.add(ArenaMechanicMarker(tag, loc.clone(), facingYaw))
                 }
         }
 
         return TileMarkers(mobs, checkpoints, doorBlocks, barrierCores, barrierPoints, clearingBosses, pedestals, mechanics)
+    }
+
+    private fun transformedMarkerFacingYaw(tags: Set<String>, transform: PlacementTransform): Float? {
+        val rawYaw = tags.firstNotNullOfOrNull { tag ->
+            tag.removePrefix("marker.facing.")
+                .takeIf { it != tag }
+                ?.toFloatOrNull()
+        } ?: return null
+        val rawDirection = CardinalDirection.fromPlayerYaw(rawYaw)
+        val transformedDirection = transformDirection(rawDirection, transform)
+        return yawForDirection(transformedDirection)
+    }
+
+    private fun yawForDirection(direction: CardinalDirection): Float {
+        return when (direction) {
+            CardinalDirection.SOUTH -> 0.0f
+            CardinalDirection.WEST -> 90.0f
+            CardinalDirection.NORTH -> 180.0f
+            CardinalDirection.EAST -> 270.0f
+        }
     }
 
     private fun locationForTile(origin: Location, point: TilePoint, gridPitch: Int): Location {

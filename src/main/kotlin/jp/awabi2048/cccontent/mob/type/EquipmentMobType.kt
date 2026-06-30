@@ -55,26 +55,26 @@ open class EquipmentMobType(
                 skullMeta.playerProfile = profile
                 skull.itemMeta = skullMeta
             }
-            equipment.helmet = skull
-            equipment.helmetDropChance = 0.0f
+            equipment.setHelmet(skull)
+            equipment.setHelmetDropChance(0.0f)
         } else {
             val helmet = defaultHelmet
             if (helmet != null) {
-                equipment.helmet = ItemStack(helmet)
+                equipment.setHelmet(ItemStack(helmet))
             }
         }
 
         val chestplate = defaultChestplate
         if (chestplate != null) {
-            equipment.chestplate = ItemStack(chestplate)
+            equipment.setChestplate(ItemStack(chestplate))
         }
         val leggings = defaultLeggings
         if (leggings != null) {
-            equipment.leggings = ItemStack(leggings)
+            equipment.setLeggings(ItemStack(leggings))
         }
         val boots = defaultBoots
         if (boots != null) {
-            equipment.boots = ItemStack(boots)
+            equipment.setBoots(ItemStack(boots))
         }
     }
 

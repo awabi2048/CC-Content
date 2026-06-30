@@ -97,6 +97,9 @@ object StructureSchemas {
     fun arenaRequiresConnectionMarkers(fileNameWithoutExtension: String): Boolean {
         val parts = fileNameWithoutExtension.lowercase().split('.')
         if (parts.isEmpty() || arena(parts.first()) == null) return false
+        if (parts.first() == "goal") {
+            return parts.getOrNull(1) == "barrier_restart"
+        }
         return parts.none { OPEN_FRAME_PATTERN.matches(it) }
     }
 

@@ -72,6 +72,7 @@ class ArenaCommand(
             "license" -> handleLicense(sender, args)
             "lobby" -> handleLobby(sender, args)
             "status" -> handleStatus(sender)
+            "debug" -> handleDebug(sender, args)
             else -> {
                 showUsage(sender)
                 true
@@ -170,6 +171,30 @@ class ArenaCommand(
         sender.sendMessage(buildLobbyStatusLine(report))
         sender.sendMessage(buildMissionStatusLine(report))
         sender.sendMessage(buildThemeStatusLine(report))
+        return true
+    }
+
+    private fun handleDebug(sender: CommandSender, args: Array<out String>): Boolean {
+        if (args.getOrNull(1)?.equals("skip_wave", ignoreCase = true) != true) {
+            sender.sendMessage("§c使用法: /arenaa debug skip_wave")
+            return true
+        }
+        val player = sender as? Player
+        if (player == null) {
+            sender.sendMessage("§cこのデバッグ操作はステージ中のプレイヤーから実行してください。")
+            return true
+        }
+        val manager = arenaManagerProvider()
+        if (manager == null) {
+            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable"))
+            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "reason" to it)) }
+            return true
+        }
+        if (!manager.debugSkipCurrentWave(player)) {
+            sender.sendMessage("§cステージ中の現在ウェーブをスキップできませんでした。")
+            return true
+        }
+        sender.sendMessage("§a現在のウェーブをクリア扱いにし、対象モブを削除しました。")
         return true
     }
 
@@ -586,13 +611,14 @@ class ArenaCommand(
         if (!featureEnabledProvider()) return emptyList()
 
         return when (args.size) {
-            1 -> listOf("menu", "lobby", "start", "stop", "license", "status").filter { it.startsWith(args[0], ignoreCase = true) }
+            1 -> listOf("menu", "lobby", "start", "stop", "license", "status", "debug").filter { it.startsWith(args[0], ignoreCase = true) }
             2 -> when (args[0].lowercase()) {
                 "menu" -> ArenaMenuType.entries.map { it.id }.filter { it.startsWith(args[1], ignoreCase = true) }
                 "lobby" -> Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], ignoreCase = true) }
                 "start" -> listOf("@s", "@near") + Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[1], ignoreCase = true) }
                 "stop" -> arenaManagerProvider()?.getActiveSessionPlayerNames()?.filter { it.startsWith(args[1], ignoreCase = true) } ?: emptyList()
                 "license" -> listOf("set").filter { it.startsWith(args[1], ignoreCase = true) }
+                "debug" -> listOf("skip_wave").filter { it.startsWith(args[1], ignoreCase = true) }
                 else -> emptyList()
             }
             3 -> when (args[0].lowercase()) {

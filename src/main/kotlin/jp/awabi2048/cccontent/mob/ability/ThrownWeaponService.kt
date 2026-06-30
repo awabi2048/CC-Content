@@ -26,7 +26,8 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
         val projectile: Projectile,
         val weapon: ItemStack,
         val damage: Double,
-        val loaderKey: String
+        val loaderKey: String,
+        val spinDisplay: Boolean = true
     )
 
     private data class ActiveThrownWeapon(
@@ -72,7 +73,7 @@ class ThrownWeaponService private constructor(private val plugin: JavaPlugin) {
         val projectile = spec.projectile
         val world = projectile.world
 
-        val flyingDisplay = FlyingItemDisplay.spawn(world, projectile.location, spec.weapon.clone())
+        val flyingDisplay = FlyingItemDisplay.spawn(world, projectile.location, spec.weapon.clone(), spec.spinDisplay)
         hideInternalProjectile(projectile)
 
         val active = ActiveThrownWeapon(

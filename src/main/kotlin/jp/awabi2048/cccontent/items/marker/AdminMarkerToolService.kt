@@ -161,8 +161,14 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             messageKeyPrefix = "marker",
             modes = listOf(
                 // Theme mechanics interpret these tags directly; the marker tool only preserves builder intent.
+                MarkerToolMode("nether_engine_start", "arena.marker.mechanic.nether.engine_start", "modes.nether_engine_start", "§6ネザー: エンジン起動", Particle.FLAME, Color.fromRGB(255, 128, 48)),
+                MarkerToolMode("nether_core_center_left", "arena.marker.mechanic.nether.core_center.left", "modes.nether_core_center_left", "§cネザー: コア中心左", Particle.SOUL_FIRE_FLAME, Color.fromRGB(255, 96, 96)),
+                MarkerToolMode("nether_core_center_right", "arena.marker.mechanic.nether.core_center.right", "modes.nether_core_center_right", "§9ネザー: コア中心右", Particle.SOUL, Color.fromRGB(96, 160, 255)),
+                MarkerToolMode("nether_core_activate", "arena.marker.mechanic.nether.core_activate", "modes.nether_core_activate", "§fネザー: コア起動", Particle.END_ROD, Color.fromRGB(240, 240, 240)),
                 MarkerToolMode("nether_track_path_left", "arena.marker.mechanic.nether.track_path.left", "modes.nether_track_path_left", "§cネザー: トロッコ経路L", Particle.FLAME, Color.fromRGB(255, 96, 64)),
                 MarkerToolMode("nether_track_path_right", "arena.marker.mechanic.nether.track_path.right", "modes.nether_track_path_right", "§cネザー: トロッコ経路R", Particle.SOUL_FIRE_FLAME, Color.fromRGB(255, 128, 96)),
+                MarkerToolMode("nether_cart_reference_left", "arena.marker.mechanic.nether.cart_reference.left", "modes.nether_cart_reference_left", "§eネザー: トロッコ基準L", Particle.CRIT, Color.fromRGB(255, 224, 96)),
+                MarkerToolMode("nether_cart_reference_right", "arena.marker.mechanic.nether.cart_reference.right", "modes.nether_cart_reference_right", "§eネザー: トロッコ基準R", Particle.CRIT, Color.fromRGB(255, 224, 128)),
                 MarkerToolMode("nether_magma_vent", "arena.marker.mechanic.nether.magma_vent", "modes.nether_magma_vent", "§6ネザー: マグマ噴出口", Particle.LAVA, Color.fromRGB(255, 144, 32)),
                 MarkerToolMode("ocean_geyser", "arena.marker.mechanic.ocean_monument.geyser", "modes.ocean_geyser", "§b海底神殿: 間欠泉", Particle.BUBBLE_COLUMN_UP, Color.fromRGB(96, 224, 255)),
                 MarkerToolMode("ocean_whirlpool", "arena.marker.mechanic.ocean_monument.whirlpool", "modes.ocean_whirlpool", "§3海底神殿: 渦潮", Particle.BUBBLE, Color.fromRGB(64, 160, 255)),

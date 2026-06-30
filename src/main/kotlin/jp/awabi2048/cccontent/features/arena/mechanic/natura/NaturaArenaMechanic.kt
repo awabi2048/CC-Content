@@ -8,11 +8,13 @@ import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.Particle
 import org.bukkit.Sound
+import org.bukkit.block.BlockFace
 import org.bukkit.entity.BlockDisplay
 import org.bukkit.entity.Display
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
+import org.bukkit.block.data.type.PointedDripstone
 import org.bukkit.util.Transformation
 import org.joml.Quaternionf
 import org.joml.Vector3f
@@ -163,7 +165,9 @@ class NaturaArenaMechanic(private val plugin: JavaPlugin) : ArenaThemeMechanic {
                 Location(world, location.x + 0.5, startY, location.z + 0.5),
                 BlockDisplay::class.java
             )
-            display.setBlock(Material.POINTED_DRIPSTONE.createBlockData())
+            val dripstone = Material.POINTED_DRIPSTONE.createBlockData() as PointedDripstone
+            dripstone.verticalDirection = BlockFace.DOWN
+            display.setBlock(dripstone)
             display.isInvulnerable = true
             display.interpolationDuration = 1
             display.teleportDuration = 1
@@ -253,9 +257,10 @@ class NaturaArenaMechanic(private val plugin: JavaPlugin) : ArenaThemeMechanic {
             val world = location.world ?: return
             val count = (MIST_PARTICLE_COUNT * intensity).toInt().coerceAtLeast(3)
             val dust = Particle.DustOptions(Color.fromRGB(120, 200, 80), 1.4f)
+            val center = mistCenter()
             world.spawnParticle(
                 Particle.DUST,
-                location.clone().add(0.5, 1.0, 0.5),
+                center,
                 count,
                 MIST_RADIUS,
                 0.65,
@@ -263,16 +268,20 @@ class NaturaArenaMechanic(private val plugin: JavaPlugin) : ArenaThemeMechanic {
                 0.02,
                 dust
             )
-            world.spawnParticle(Particle.SPORE_BLOSSOM_AIR, location.clone().add(0.5, 1.0, 0.5), count / 2, MIST_RADIUS, 0.6, MIST_RADIUS, 0.01)
+            world.spawnParticle(Particle.SPORE_BLOSSOM_AIR, center, count / 2, MIST_RADIUS, 0.6, MIST_RADIUS, 0.01)
         }
 
         private fun applyPoison(context: ArenaMechanicContext) {
-            val center = location.clone().add(0.5, 1.0, 0.5)
-            ArenaMechanicSupport.targetsNear(context, center, MIST_RADIUS, 1.5, MIST_RADIUS, playersOnly = true)
+            val center = mistCenter()
+            ArenaMechanicSupport.targetsNear(context, center, MIST_RADIUS, 1.5, MIST_RADIUS)
                 .filter { it.location.distanceSquared(center) <= MIST_RADIUS * MIST_RADIUS + 2.25 }
-                .forEach { player ->
-                    player.addPotionEffect(PotionEffect(PotionEffectType.POISON, MIST_POISON_TICKS, 1, false, true, true))
+                .forEach { target ->
+                    target.addPotionEffect(PotionEffect(PotionEffectType.POISON, MIST_POISON_TICKS, 1, false, true, true))
                 }
+        }
+
+        private fun mistCenter(): Location {
+            return location.clone().add(0.5, MIST_CENTER_Y_OFFSET, 0.5)
         }
 
         override fun toString(): String = "MistCloud(wave=$wave,location=${location.blockX},${location.blockY},${location.blockZ})"
@@ -310,6 +319,7 @@ class NaturaArenaMechanic(private val plugin: JavaPlugin) : ArenaThemeMechanic {
         private const val MIST_ACTIVE_TICKS = 160L
         private const val MIST_FADE_TICKS = 30L
         private const val MIST_RADIUS = 3.0
+        private const val MIST_CENTER_Y_OFFSET = -1.0
         private const val MIST_PARTICLE_COUNT = 18
         private const val MIST_POISON_INTERVAL_TICKS = 60L
         private const val MIST_POISON_TICKS = 60

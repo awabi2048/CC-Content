@@ -1,9 +1,9 @@
 name: CC-Content
 version: 1.1.0
 main: jp.awabi2048.cccontent.CCContent
-api-version: '1.21'
+api-version: '26.1.2'
 author: awabi2048
-description: Paper 1.21.8用統合コンテンツプラグイン
+description: Paper 26.1.2用統合コンテンツプラグイン
 softdepend: [HeadDatabase, Vault, CC-System, MyWorldManager, DeadChest, LuckPerms, FastAsyncWorldEdit]
 
 commands:
@@ -22,7 +22,7 @@ commands:
     permission: sukimadungeon.command.base
   arenaa:
     description: アリーナ管理コマンド
-    usage: /arenaa <menu|lobby|start|stop|license|status>
+    usage: /arenaa <menu|lobby|start|stop|license|status|debug>
     permission: cc-content.arena.admin
   rankmenu:
     description: 職業メインメニューを開く

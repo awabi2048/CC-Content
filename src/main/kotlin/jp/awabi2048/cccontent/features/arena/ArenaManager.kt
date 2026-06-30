@@ -43,6 +43,7 @@ import jp.awabi2048.cccontent.mob.ability.PeriodicCobwebAbility
 import jp.awabi2048.cccontent.structure.LoadedSchemStructure
 import jp.awabi2048.cccontent.structure.SchemStructureService
 import jp.awabi2048.cccontent.structure.StructurePasteOptions
+import jp.awabi2048.cccontent.structure.StructureTransform
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import jp.awabi2048.cccontent.util.OageMessageSender
 import jp.awabi2048.cccontent.world.WorldSettingsHelper
@@ -347,6 +348,8 @@ class ArenaManager(
         const val MULTIPLAYER_INVITE_SWING_COOLDOWN_TICKS = 5L
         const val MULTIPLAYER_WAITING_EXIT_GRACE_TICKS = 10
         const val MULTIPLAYER_LIFT_AREA_MARGIN = 0.15
+        const val MULTIPLAYER_WAITING_AREA_PARTICLE_INTERVAL_TICKS = 5L
+        const val MULTIPLAYER_WAITING_AREA_PARTICLE_STEP = 0.75
         const val OAGE_FOLLOWUP_DELAY_TICKS = 60L
         const val OAGE_COMBAT_MONITOR_INTERVAL_TICKS = 1200L
         const val WAVE_CATCHUP_TELEPORT_DELAY_MILLIS = 30_000L
@@ -394,7 +397,9 @@ class ArenaManager(
     private val legacySerializer = LegacyComponentSerializer.legacySection()
     private val themeLoader = ArenaThemeLoader(plugin)
     private val stageGenerator = ArenaStageGenerator()
-    private val themeMechanics = ArenaThemeMechanicCoordinator(plugin)
+    private val themeMechanics = ArenaThemeMechanicCoordinator(plugin) { session ->
+        startBarrierRestartSequence(session)
+    }
     private val legacyColorPattern = Regex("(?i)§[0-9A-FK-ORX]")
     private val sessionsByWorld = mutableMapOf<String, ArenaSession>()
     private val playerToSessionWorld = mutableMapOf<UUID, String>()
@@ -779,10 +784,7 @@ class ArenaManager(
             selectSpawnCandidates(theme, promoted, wave).isEmpty()
         }
         if (undefinedWave != null) {
-            plugin.logger.severe(
-                "[Arena] 驛｢・ｧ繝ｻ・ｻ驛｢譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬯ｮ・｢陷ｿ・･繝ｻ・ｧ陷ｿ・･繝ｻ・､繝ｻ・ｱ髫ｰ・ｨ郢晢ｽｻ theme驛｢・ｧ繝ｻ・ｹ驛｢譎・ｺ｢郢晢ｽｻ驛｢譎｢・ｽ・ｳ髫ｴ蟷｢・ｽ・ｪ髯橸ｽｳ陞溘ｑ・ｽ・ｾ繝ｻ・ｩ驛｢・ｧ繝ｻ・ｦ驛｢・ｧ繝ｻ・ｧ驛｢譎｢・ｽ・ｼ驛｢譎・§遯ｶ・ｲ驍ｵ・ｺ郢ｧ繝ｻ・ｽ鬘費ｽｸ・ｺ繝ｻ・ｾ驍ｵ・ｺ郢晢ｽｻ" +
-                    "theme=${theme.id} promoted=$promoted wave=$undefinedWave"
-            )
+            plugin.logger.severe("[Arena] theme has no spawn candidates: theme=${theme.id} promoted=$promoted wave=$undefinedWave")
             return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.undefined_wave_spawn",
                 arrayOf("theme" to theme.id, "mob_type" to theme.id, "wave" to undefinedWave)
@@ -898,7 +900,7 @@ class ArenaManager(
         if (enableMultiplayerJoin) {
             liftMarkers.forEach { liftOccupiedMarkerKeys.add(liftMarkerKey(it)) }
         }
-        logArenaPoolState("驛｢・ｧ繝ｻ・ｻ驛｢譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬯ｮ・｢陷ｿ・･繝ｻ・ｧ郢晢ｽｻ, world.name")
+        logArenaPoolState("session_start_acquired_pool", world.name)
 
         return try {
             if (enableMultiplayerJoin) {
@@ -942,7 +944,7 @@ class ArenaManager(
                         }
                         .onFailure { throwable ->
                             if (throwable is ArenaStageBuildException) {
-                                plugin.logger.severe("[Arena] 驛｢・ｧ繝ｻ・ｹ驛｢譏ｴ繝ｻ郢晢ｽｻ驛｢・ｧ繝ｻ・ｸ驍ｵ・ｺ繝ｻ・ｮ鬨ｾ蠅難ｽｻ阮吶・驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ ${throwable.message}")
+                                plugin.logger.severe("[Arena] stage build failed: ${throwable.message}")
                                 throwable.printStackTrace()
                             }
                             terminateSession(
@@ -995,7 +997,7 @@ class ArenaManager(
             ArenaStartResult.Success(theme.id, variant.waves.size, promoted, difficultyDisplay)
         } catch (e: Exception) {
             if (e is ArenaStageBuildException) {
-                plugin.logger.severe("[Arena] 驛｢・ｧ繝ｻ・ｹ驛｢譏ｴ繝ｻ郢晢ｽｻ驛｢・ｧ繝ｻ・ｸ驍ｵ・ｺ繝ｻ・ｮ鬨ｾ蠅難ｽｻ阮吶・驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ ${e.message}")
+                plugin.logger.severe("[Arena] stage build failed: ${e.message}")
                 e.printStackTrace()
             }
             val failedSession = sessionsByWorld[world.name]
@@ -1354,6 +1356,26 @@ class ArenaManager(
         return sessionsByWorld.values.toList()
     }
 
+    fun debugSkipCurrentWave(player: Player): Boolean {
+        val session = getSession(player) ?: return false
+        if (!session.participants.contains(player.uniqueId)) return false
+        if (!session.stageStarted || session.missionCompleted || session.barrierRestartCompleted) return false
+
+        val wave = session.currentWave.coerceIn(1, session.waves)
+        val mobIds = session.waveMobIds[wave].orEmpty().toSet()
+        mobIds.forEach { mobId ->
+            val entity = Bukkit.getEntity(mobId) ?: return@forEach
+            if (entity.world.name == session.worldName) {
+                entity.remove()
+            }
+        }
+        session.activeMobs.removeAll(mobIds)
+        session.waveMobIds.remove(wave)
+        session.waveKillCount[wave] = session.waveClearTargets[wave] ?: session.waveKillCount[wave] ?: 0
+        clearWave(session, wave)
+        return true
+    }
+
     fun isActiveSessionWorld(worldName: String): Boolean {
         return sessionsByWorld.containsKey(worldName)
     }
@@ -1544,7 +1566,7 @@ class ArenaManager(
         session.roomBounds.clear()
         session.roomBounds.putAll(stage.roomBounds)
         session.corridorBounds.clear()
-        session.corridorBounds.putAll(stage.corridorBounds)
+        session.corridorBounds.putAll(stage.corridorBounds.mapValues { (_, bounds) -> bounds.toMutableList() })
         session.transitBounds.clear()
         session.transitBounds.putAll(stage.transitBounds)
         session.pedestalBounds.clear()
@@ -1673,14 +1695,14 @@ class ArenaManager(
                 }
 
                 val currentWave = session.currentWave.coerceAtLeast(1)
-                if (location.world?.name != world.name || !session.stageBounds.contains(location.x, location.y, location.z)) {
+                if (location.world?.name != world.name || !isInsideAllowedActiveArea(session, location, currentWave)) {
                     teleportOnOutOfBounds(player, session, world, currentWave)
                     continue
                 }
 
                 val room = locateRoom(session, location)
                 if (room != null && room > currentWave) {
-                    teleportToCurrentWavePosition(player, session, world, applyBlindness = true)
+                    teleportToLatestCheckpoint(player, session, world, applyBlindness = true)
                     continue
                 }
                 if (session.entranceNormalBgmStarted && room != null && room > 0) {
@@ -1690,7 +1712,7 @@ class ArenaManager(
                 val corridorWave = locateCorridorTargetWave(session, location)
                 if (corridorWave != null) {
                     if (!session.openedCorridors.contains(corridorWave)) {
-                        teleportToCurrentWavePosition(player, session, world, applyBlindness = true)
+                        teleportToLatestCheckpoint(player, session, world, applyBlindness = true)
                         continue
                     }
                     clearPreviousRoomMobTargetsOnCorridorEntry(session, corridorWave)
@@ -1810,7 +1832,7 @@ class ArenaManager(
         try {
             applyArenaMobDrop(event)
         } catch (exception: Exception) {
-            plugin.logger.log(Level.SEVERE, "[Arena] 驛｢譎｢・ｽ・｢驛｢譎・§郢晢ｽｩ驛｢譎｢・ｽ・ｭ驛｢譏ｴ繝ｻ郢晢ｽｻ髯ｷ繝ｻ・ｽ・ｦ鬨ｾ繝ｻ繝ｻ遶頑･｢譽斐・・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ・ｸ・ｺ霑ｹ螟ｲ・ｽ・ｨ隲・ｹ繝ｻ・ｼ陞ｳ・｣・つ繝ｻ・ｲ鬮ｯ・ｦ陟募ｾ後・鬩搾ｽｯ陷･謫ｾ・ｽ・ｶ陞｢・ｹ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ郢晢ｽｻ entityId=$entityId", exception)
+            plugin.logger.log(Level.SEVERE, "[Arena] アリーナモブのドロップ処理中に例外が発生しました: entityId=$entityId", exception)
         }
         val worldName = mobToSessionWorld.remove(entityId)
             ?: entityMobToSessionWorld.remove(entityId)
@@ -3784,7 +3806,7 @@ class ArenaManager(
         val world = Bukkit.getWorld(worldName)
         if (world == null) {
             markArenaWorldBroken(worldName)
-            logArenaPoolState("驛｢・ｧ繝ｻ・ｻ驛｢譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬩搾ｽｨ郢ｧ繝ｻ・ｽ・ｺ郢晢ｽｻ, worldName")
+            logArenaPoolState("cleanup skipped: world missing", worldName)
             return
         }
 
@@ -3795,7 +3817,7 @@ class ArenaManager(
             // 生成失敗直後は WorldEdit/FAWE の Marker が遅れて見えることがあるため、READY に戻す直前にも再掃除する。
             cleanupNonPlayerEntities(world)
             markArenaWorldReady(worldName)
-            logArenaPoolState("驛｢・ｧ繝ｻ・ｻ驛｢譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬩搾ｽｨ郢ｧ繝ｻ・ｽ・ｺ郢晢ｽｻ, worldName")
+            logArenaPoolState("cleanup skipped: no bounds", worldName)
             return
         }
 
@@ -3813,10 +3835,10 @@ class ArenaManager(
             )
         )
         arenaWorldStates[worldName] = ArenaPoolWorldState.CLEANING
-        logArenaPoolState("驛｢・ｧ繝ｻ・ｻ驛｢譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬩搾ｽｨ郢ｧ繝ｻ・ｽ・ｺ郢晢ｽｻ, worldName")
+        logArenaPoolState("cleanup queued", worldName)
         val estimatedSeconds = estimateCleanupSeconds(totalBlocks)
         plugin.logger.info(
-            "[Arena] 驛｢・ｧ繝ｻ・ｯ驛｢譎｢・ｽ・ｪ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｳ驛｢・ｧ繝ｻ・｢驛｢譏ｴ繝ｻ郢晢ｽｻ鬯ｮ・｢陷ｿ・･繝ｻ・ｧ郢晢ｽｻ world=$worldName blocks=$totalBlocks " +
+            "[Arena] arena world cleanup queued: world=$worldName blocks=$totalBlocks " +
                 "estimated=${formatSeconds(estimatedSeconds)}s budget=${cleanupBlocksPerTick}/tick"
         )
     }
@@ -3826,7 +3848,7 @@ class ArenaManager(
         session.roomBounds.values.forEach { value ->
             bounds[boundsKey(value)] = value
         }
-        session.corridorBounds.values.forEach { value ->
+        session.corridorBounds.values.flatten().forEach { value ->
             bounds[boundsKey(value)] = value
         }
         session.mechanicCleanupBounds.forEach { value ->
@@ -3918,7 +3940,7 @@ class ArenaManager(
         val isFinalWaveBarrierObjective = wave == session.waves && hasBarrierActivationObjective(session)
         if (candidates.isEmpty()) {
             plugin.logger.severe(
-                "[Arena] 鬯ｮ・｢陷ｿ・･繝ｻ・ｧ陋滂ｽｶ繝ｻ・ｸ陝蠑ｱ繝ｻ驛｢・ｧ繝ｻ・ｦ驛｢・ｧ繝ｻ・ｧ驛｢譎｢・ｽ・ｼ驛｢譎・§繝ｻ螳夲ｽｮﾂ隲幢ｽｷ郢晢ｽｻ: world=${session.worldName} theme=${theme.id} wave=$wave"
+                "[Arena] wave spawn candidates are empty: world=${session.worldName} theme=${theme.id} wave=$wave"
             )
             session.startedWaves.add(wave)
             if (isFinalWaveBarrierObjective) {
@@ -3931,8 +3953,7 @@ class ArenaManager(
 
         if (spawns.isEmpty()) {
             plugin.logger.severe(
-                "[Arena] wave=$wave 驍ｵ・ｺ繝ｻ・ｮ mob 驛｢・ｧ繝ｻ・ｹ驛｢譎・ｺ｢郢晢ｽｻ驛｢譎｢・ｽ・ｳ髣厄ｽｴ陷･・ｲ繝ｻ・ｽ繝ｻ・ｮ驍ｵ・ｺ郢晢ｽｻ髣比ｼ夲ｽｽ・ｶ驍ｵ・ｺ繝ｻ・ｮ驍ｵ・ｺ雋・∞・ｽ繝ｻ譏弱・・ｪ髯ｷ蟠趣ｽｼ譁撰ｿ驛｢譎｢・ｽ・ｪ驛｢・ｧ繝ｻ・｢驍ｵ・ｺ陷会ｽｱ遶擾ｽｪ驍ｵ・ｺ陷ｷ・ｶ・つ郢晢ｽｻ " +
-                    " 髯昴・・ｽ・ｾ鬮ｮ雜｣・ｽ・｡鬯ｩ蟷｢・ｽ・ｨ髯橸ｽｻ闕ｵ譏ｶ繝ｻ 'arena.marker.mob' 驛｢・ｧ郢晢ｽｻ髯区ｺｷﾂ・ｶ繝ｻ・ｻ繝ｻ・･髣包ｽｳ闔ｨ竏壹・鬩励ｑ・ｽ・ｮ驍ｵ・ｺ陷会ｽｱ遯ｶ・ｻ驍ｵ・ｺ闕ｳ蟯ｩ蜻ｳ驍ｵ・ｺ髴郁ｲｻ・ｼ繝ｻ world=${session.worldName}"
+                "[Arena] wave=$wave has no mob spawn markers. Check arena.marker.mob in the generated room: world=${session.worldName}"
             )
             session.startedWaves.add(wave)
             if (isFinalWaveBarrierObjective) {
@@ -4075,8 +4096,8 @@ class ArenaManager(
     }
 
     private fun locateCorridorTargetWave(session: ArenaSession, location: Location): Int? {
-        return session.corridorBounds.entries.firstOrNull { (_, bounds) ->
-            bounds.contains(location.x, location.y, location.z)
+        return session.corridorBounds.entries.firstOrNull { (_, boundsList) ->
+            boundsList.any { bounds -> bounds.contains(location.x, location.y, location.z) }
         }?.key
     }
 
@@ -4090,6 +4111,33 @@ class ArenaManager(
         return session.pedestalBounds.entries.firstOrNull { (_, bounds) ->
             bounds.contains(location.x, location.y, location.z)
         }?.key
+    }
+
+    private fun isInsideAllowedActiveArea(session: ArenaSession, location: Location, currentWave: Int): Boolean {
+        if (!session.stageBounds.contains(location.x, location.y, location.z)) return false
+
+        val room = locateRoom(session, location)
+        if (room != null) {
+            return room <= currentWave
+        }
+
+        val transitWave = locateTransitWave(session, location)
+        if (transitWave != null) {
+            return transitWave <= currentWave
+        }
+
+        val pedestalWave = locatePedestalWave(session, location)
+        if (pedestalWave != null) {
+            return pedestalWave <= currentWave
+        }
+
+        val corridorWave = locateCorridorTargetWave(session, location)
+        if (corridorWave != null) {
+            // 解放済みの現在部屋から次の通路へ踏み出す余地を残す。
+            return session.openedCorridors.contains(corridorWave) && corridorWave <= currentWave + 1
+        }
+
+        return false
     }
 
     private fun teleportToCurrentWavePosition(player: Player, session: ArenaSession, world: World, applyBlindness: Boolean = false) {
@@ -4108,7 +4156,13 @@ class ArenaManager(
         player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 15, 0, false, false, false))
     }
 
-    private enum class OutOfBoundsOrigin {
+    private data class OutOfBoundsOrigin(
+        val type: OutOfBoundsOriginType,
+        val wave: Int? = null,
+        val location: Location? = null
+    )
+
+    private enum class OutOfBoundsOriginType {
         ENTRANCE,
         ROOM,
         CORRIDOR,
@@ -4135,27 +4189,30 @@ class ArenaManager(
         val latestValidLocation = session.participantLocationHistory[player.uniqueId]
             ?.lastOrNull()
             ?.location
-            ?: return OutOfBoundsOrigin.UNKNOWN
+            ?: return OutOfBoundsOrigin(OutOfBoundsOriginType.UNKNOWN)
 
         val corridorWave = locateCorridorTargetWave(session, latestValidLocation)
         if (corridorWave != null) {
-            return OutOfBoundsOrigin.CORRIDOR
+            return OutOfBoundsOrigin(OutOfBoundsOriginType.CORRIDOR, corridorWave, latestValidLocation.clone())
         }
 
-        if (locateTransitWave(session, latestValidLocation) != null) {
-            return OutOfBoundsOrigin.TRANSIT
+        val transitWave = locateTransitWave(session, latestValidLocation)
+        if (transitWave != null) {
+            return OutOfBoundsOrigin(OutOfBoundsOriginType.TRANSIT, transitWave, latestValidLocation.clone())
         }
 
-        if (locatePedestalWave(session, latestValidLocation) != null) {
-            return OutOfBoundsOrigin.PEDESTAL
+        val pedestalWave = locatePedestalWave(session, latestValidLocation)
+        if (pedestalWave != null) {
+            return OutOfBoundsOrigin(OutOfBoundsOriginType.PEDESTAL, pedestalWave, latestValidLocation.clone())
         }
 
-        val room = locateRoom(session, latestValidLocation) ?: return OutOfBoundsOrigin.UNKNOWN
-        return when {
-            room <= 0 -> OutOfBoundsOrigin.ENTRANCE
-            room >= session.waves -> OutOfBoundsOrigin.GOAL
-            else -> OutOfBoundsOrigin.ROOM
+        val room = locateRoom(session, latestValidLocation) ?: return OutOfBoundsOrigin(OutOfBoundsOriginType.UNKNOWN)
+        val type = when {
+            room <= 0 -> OutOfBoundsOriginType.ENTRANCE
+            room >= session.waves -> OutOfBoundsOriginType.GOAL
+            else -> OutOfBoundsOriginType.ROOM
         }
+        return OutOfBoundsOrigin(type, room, latestValidLocation.clone())
     }
 
     private fun resolveOutOfBoundsCheckpoint(
@@ -4163,23 +4220,53 @@ class ArenaManager(
         world: World,
         origin: OutOfBoundsOrigin
     ): Location? {
-        return when (origin) {
-            OutOfBoundsOrigin.ENTRANCE -> session.entranceCheckpoint.clone().apply { this.world = world }
-            OutOfBoundsOrigin.GOAL -> session.goalCheckpoint.clone().apply { this.world = world }
-            OutOfBoundsOrigin.CORRIDOR,
-            OutOfBoundsOrigin.TRANSIT,
-            OutOfBoundsOrigin.PEDESTAL,
-            OutOfBoundsOrigin.ROOM -> resolveLatestRoomCheckpoint(session, world)
+        return when (origin.type) {
+            OutOfBoundsOriginType.ENTRANCE -> session.entranceCheckpoint.clone().apply { this.world = world }
+            OutOfBoundsOriginType.GOAL -> session.goalCheckpoint.clone().apply { this.world = world }
+            OutOfBoundsOriginType.CORRIDOR -> resolveNearestCorridorDoorCheckpoint(session, world, origin.wave, origin.location)
+                ?: resolveRoomCheckpointAtOrBefore(session, world, origin.wave?.minus(1))
                 ?: session.entranceCheckpoint.clone().apply { this.world = world }
-            OutOfBoundsOrigin.UNKNOWN -> resolveLatestRoomCheckpoint(session, world)
+            OutOfBoundsOriginType.TRANSIT,
+            OutOfBoundsOriginType.PEDESTAL,
+            OutOfBoundsOriginType.ROOM -> resolveRoomCheckpointAtOrBefore(session, world, origin.wave)
+                ?: session.entranceCheckpoint.clone().apply { this.world = world }
+            OutOfBoundsOriginType.UNKNOWN -> resolveLatestRoomCheckpoint(session, world)
                 ?: session.entranceCheckpoint.clone().apply { this.world = world }
         }
     }
 
     private fun resolveLatestRoomCheckpoint(session: ArenaSession, world: World): Location? {
-        val latestWave = latestEnteredWave(session) ?: return null
-        val checkpoint = session.activatedRoomCheckpoints[latestWave] ?: return null
-        return checkpoint.clone().apply { this.world = world }
+        return resolveRoomCheckpointAtOrBefore(
+            session,
+            world,
+            session.activatedRoomCheckpoints.keys.maxOrNull() ?: latestEnteredWave(session)
+        )
+    }
+
+    private fun resolveRoomCheckpointAtOrBefore(session: ArenaSession, world: World, wave: Int?): Location? {
+        val upperWave = wave ?: return null
+        val checkpointWave = session.activatedRoomCheckpoints.keys
+            .filter { it <= upperWave }
+            .maxOrNull()
+            ?: return null
+        return session.activatedRoomCheckpoints[checkpointWave]?.clone()?.apply { this.world = world }
+    }
+
+    private fun resolveNearestCorridorDoorCheckpoint(
+        session: ArenaSession,
+        world: World,
+        wave: Int?,
+        reference: Location?
+    ): Location? {
+        val targetWave = wave ?: return null
+        val markers = session.corridorDoorBlocks[targetWave].orEmpty()
+        if (markers.isEmpty()) return null
+        val nearest = if (reference != null) {
+            markers.minByOrNull { marker -> marker.distanceSquared(reference) }
+        } else {
+            markers.firstOrNull()
+        }
+        return nearest?.clone()?.apply { this.world = world }
     }
 
     private fun teleportToRecentValidPosition(
@@ -4224,23 +4311,7 @@ class ArenaManager(
 
     private fun isValidPositionForRestore(session: ArenaSession, location: Location, world: World, currentWave: Int): Boolean {
         if (location.world?.name != world.name) return false
-        if (!session.stageBounds.contains(location.x, location.y, location.z)) return false
-
-        val room = locateRoom(session, location)
-        if (room != null && room > currentWave) return false
-
-        val transitWave = locateTransitWave(session, location)
-        if (transitWave != null) {
-            return transitWave <= currentWave
-        }
-
-        val pedestalWave = locatePedestalWave(session, location)
-        if (pedestalWave != null) {
-            return pedestalWave <= currentWave
-        }
-
-        val corridorWave = locateCorridorTargetWave(session, location) ?: return true
-        return session.openedCorridors.contains(corridorWave)
+        return isInsideAllowedActiveArea(session, location, currentWave)
     }
 
     private fun recordParticipantValidLocation(session: ArenaSession, participantId: UUID, location: Location) {
@@ -4648,6 +4719,7 @@ class ArenaManager(
         val removed = session.activeMobs.remove(mobId)
         if (!removed) return
 
+        val killedMob = Bukkit.getEntity(mobId) as? LivingEntity
         val wasEntityMob = entityMobToSessionWorld.containsKey(mobId)
         mobToSessionWorld.remove(mobId)
         entityMobToSessionWorld.remove(mobId)
@@ -4684,6 +4756,10 @@ class ArenaManager(
         }
 
         session.totalKillCount += 1
+
+        if (killedMob != null) {
+            themeMechanics.notifyMobKilled(session, killedMob)
+        }
 
         if (session.clearedWaves.contains(wave)) {
             return
@@ -4789,7 +4865,8 @@ class ArenaManager(
         if (isClearingMission(session)) {
             return false
         }
-        return session.actionMarkers.values.any { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }
+        return session.actionMarkers.values.any { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE } ||
+            themeMechanics.hasCustomBarrierRestartObjective(session)
     }
 
     private fun isClearingMission(session: ArenaSession): Boolean {
@@ -4800,7 +4877,7 @@ class ArenaManager(
         if (!isClearingMission(session)) return
         if (session.clearingBossSpawned) return
         if (session.clearingBossLocations.isEmpty()) {
-            plugin.logger.warning("[Arena] CLEARING 驛｢譎・ｽｺ蛟･ﾎ暮Δ・ｧ繝ｻ・ｷ驛｢譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ驍ｵ・ｺ繝ｻ・ｧ驍ｵ・ｺ陷ｷ・ｶ遯ｶ・ｲ clearingBossLocations 驍ｵ・ｺ隶呵ｶ｣・ｽ・ｩ繝ｻ・ｺ驍ｵ・ｺ繝ｻ・ｧ驍ｵ・ｺ郢晢ｽｻ world=${session.worldName}")
+            plugin.logger.warning("[Arena] action marker initialization skipped because world is not loaded: world=${session.worldName}")
             return
         }
 
@@ -4808,7 +4885,7 @@ class ArenaManager(
         val bossMobId = if (!themeConfig?.clearingBossMobId.isNullOrBlank()) {
             themeConfig!!.clearingBossMobId!!
         } else {
-            plugin.logger.warning("[Arena] CLEARING 驛｢譎・ｽｺ蛟･ﾎ暮Δ・ｧ繝ｻ・ｷ驛｢譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ: clearingBossMobId 驍ｵ・ｺ隴ｴ・ｧ隰費ｽｴ髯橸ｽｳ陞溘ｑ・ｽ・ｾ繝ｻ・ｩ驍ｵ・ｺ繝ｻ・ｮ驍ｵ・ｺ雋・∞・ｽ竏ｫ・ｹ譏ｴ繝ｻ郢晢ｽｵ驛｢・ｧ繝ｻ・ｩ驛｢譎｢・ｽ・ｫ驛｢譏ｴ繝ｻobId=zombie 驛｢・ｧ陷代・・ｽ・ｽ繝ｻ・ｿ鬨ｾ蛹・ｽｽ・ｨ: theme=${session.themeId}")
+            plugin.logger.warning("[Arena] CLEARING mission has no clearingBossMobId; using fallback mobId=zombie: theme=${session.themeId}")
             "zombie"
         }
 
@@ -4820,7 +4897,7 @@ class ArenaManager(
 
         val world = Bukkit.getWorld(session.worldName)
         if (world == null) {
-            plugin.logger.severe("[Arena] 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ郢晢ｽｻ驛｢・ｧ繝ｻ・ｹ驛｢・ｧ繝ｻ・ｹ驛｢譎・ｺ｢郢晢ｽｻ驛｢譎｢・ｽ・ｳ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ郢晢ｽｻ 驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ遯ｶ・ｲ鬮ｫ遨ゑｽｹ譏ｶ蜻ｽ驍ｵ・ｺ闕ｵ譎｢・ｽ鬘費ｽｸ・ｺ繝ｻ・ｾ驍ｵ・ｺ陝ｶ蜻ｻ・ｽ繝ｻworld=${session.worldName}")
+            plugin.logger.severe("[Arena] CLEARING boss spawn skipped because arena world is not loaded: world=${session.worldName}")
             return
         }
 
@@ -4866,9 +4943,9 @@ class ArenaManager(
                 entityMobToSessionWorld.remove(entity.uniqueId)
                 mobToDefinitionTypeId[entity.uniqueId] = definition.typeId.trim().lowercase(Locale.ROOT)
                 entityMobToDefinitionTypeId.remove(entity.uniqueId)
-                plugin.logger.info("[Arena] 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ郢晢ｽｻ驛｢・ｧ繝ｻ・ｹ驛｢・ｧ陋幢ｽｵ邵ｺ蟶ｷ・ｹ譎・ｺ｢郢晢ｽｻ驛｢譎｢・ｽ・ｳ: mobId=$bossMobId location=${spawnLocation.blockX},${spawnLocation.blockY},${spawnLocation.blockZ}")
+                plugin.logger.info("[Arena] CLEARING boss spawned: mobId=$bossMobId location=${spawnLocation.blockX},${spawnLocation.blockY},${spawnLocation.blockZ}")
             } else {
-                plugin.logger.warning("[Arena] 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ郢晢ｽｻ驛｢・ｧ繝ｻ・ｹ驍ｵ・ｺ繝ｻ・ｮ驛｢・ｧ繝ｻ・ｹ驛｢譎・ｺ｢郢晢ｽｻ驛｢譎｢・ｽ・ｳ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ郢晢ｽｻ mobId=$bossMobId")
+                plugin.logger.warning("[Arena] CLEARING boss spawn failed: mobId=$bossMobId")
             }
         }
 
@@ -4907,7 +4984,7 @@ class ArenaManager(
     private fun onClearingBossDefeated(session: ArenaSession) {
         if (session.phase == ArenaPhase.TERMINATING) return
 
-        plugin.logger.info("[Arena] 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ郢晢ｽｻ驛｢・ｧ繝ｻ・ｹ髯ｷ闌ｨ・ｽ・ｨ髮狗ｿｫ繝ｻ world=${session.worldName}")
+        plugin.logger.info("[Arena] CLEARING bosses defeated: world=${session.worldName}")
 
         completeClearingMission(session)
     }
@@ -5001,7 +5078,7 @@ class ArenaManager(
         if (session.phase == ArenaPhase.TERMINATING) return
         if (session.phase == ArenaPhase.GAME_OVER) return
 
-        plugin.logger.info("[Arena] 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ・朱・・ｹ譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ髫ｴ蠑ｱ・玖将・｣髯具ｽｻ郢晢ｽｻ繝ｻ繝ｻ world=${session.worldName}")
+        plugin.logger.info("[Arena] CLEARING boss time expired: world=${session.worldName}")
 
         stopWaveSpawning(session, session.waves)
 
@@ -5066,7 +5143,7 @@ class ArenaManager(
                         applyDoorAnimationFrame(placement, targetFrame)
                     }.onFailure { throwable ->
                         plugin.logger.warning(
-                            "[Arena] 驛｢譎擾ｽｳ・ｨ邵ｺ繝ｻ・ｹ・ｧ繝ｻ・｢驛｢譏懶ｽｹ譁滄豪・ｹ譎・ｽｼ驥・ｨ抵ｽｹ譎｢・ｽ・ｼ驛｢譎｢・｣・ｰ鬯ｩ蛹・ｽｽ・ｩ鬨ｾ蛹・ｽｽ・ｨ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ郢晢ｽｻ world=${currentSession.worldName} wave=$targetWave frame=$targetFrame error=${throwable.message}"
+                            "[Arena] failed to apply door animation frame: world=${currentSession.worldName} wave=$targetWave frame=$targetFrame error=${throwable.message}"
                         )
                     }.isSuccess
                     if (!applied) return@forEachIndexed
@@ -5083,7 +5160,7 @@ class ArenaManager(
                             applyDoorAnimationFrame(placement, lastFrame)
                         }.onFailure { throwable ->
                             plugin.logger.warning(
-                                "[Arena] 驛｢譎擾ｽｳ・ｨ邵ｺ繝ｻ・ｹ・ｧ繝ｻ・｢驛｢譏懶ｽｹ譁滓･｢・ｭ蟠｢ﾂ鬩搾ｽｨ郢ｧ繝ｻﾎｨ驛｢譎｢・ｽ・ｬ驛｢譎｢・ｽ・ｼ驛｢譎｢・｣・ｰ鬯ｩ蛹・ｽｽ・ｩ鬨ｾ蛹・ｽｽ・ｨ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ郢晢ｽｻ world=${currentSession.worldName} wave=$targetWave error=${throwable.message}"
+                                "[Arena] failed to apply final door animation frame: world=${currentSession.worldName} wave=$targetWave error=${throwable.message}"
                             )
                         }
                     }
@@ -5143,8 +5220,9 @@ class ArenaManager(
     private fun applyDoorAnimationFrame(placement: ArenaDoorAnimationPlacement, frameIndex: Int) {
         val world = placement.placeOrigin.world ?: return
         val template = placement.openFrames.getOrNull(frameIndex - 1) ?: return
+        val origin = adjustedDoorAnimationOrigin(placement, template).apply { this.world = world }
         template.structure.paste(
-            placement.placeOrigin.clone().apply { this.world = world },
+            origin,
             StructurePasteOptions(
                 rotationQuarter = placement.rotationQuarter,
                 mirrorX = placement.mirrored,
@@ -5152,6 +5230,21 @@ class ArenaManager(
                 copyEntities = false,
                 copyBiomes = false
             )
+        )
+    }
+
+    private fun adjustedDoorAnimationOrigin(
+        placement: ArenaDoorAnimationPlacement,
+        frame: jp.awabi2048.cccontent.features.arena.generator.ArenaStructureTemplate
+    ): Location {
+        val transform = StructureTransform(placement.rotationQuarter, mirrorX = placement.mirrored)
+        val closedBounds = transform.bounds(placement.closedSize.x, placement.closedSize.z)
+        val frameBounds = transform.bounds(frame.size.x, frame.size.z)
+        // WorldEdit は各templateの変換後bounds.minで内部補正するため、frameサイズ差があっても閉じた構造の基準点に合わせる。
+        return placement.placeOrigin.clone().add(
+            (frameBounds.minX - closedBounds.minX).toDouble(),
+            0.0,
+            (frameBounds.minZ - closedBounds.minZ).toDouble()
         )
     }
 
@@ -5304,6 +5397,15 @@ class ArenaManager(
     private fun startBarrierRestartSequence(session: ArenaSession) {
         if (session.barrierRestartCompleted) return
         if (session.barrierRestarting) return
+
+        val gate = themeMechanics.barrierRestartGate(session)
+        if (!gate.allowed) {
+            updateSessionProgressBossBar(session)
+            gate.reason
+                ?.takeIf { it.isNotBlank() }
+                ?.let { reason -> plugin.logger.info("[Arena] Barrier restart gated by theme: world=${session.worldName} theme=${session.themeId} reason=$reason") }
+            return
+        }
 
         val world = Bukkit.getWorld(session.worldName) ?: return
         val durationMillis = ((barrierRestartConfig.defaultDurationSeconds * session.sessionVariance) * 1000.0)
@@ -5833,6 +5935,14 @@ class ArenaManager(
         }
 
         if (wave == session.waves && hasBarrierActivationObjective(session)) {
+            val mechanicProgress = themeMechanics.barrierRestartProgress(session)
+            if (mechanicProgress != null) {
+                bossBar.name(legacySerializer.deserialize(mechanicProgress.title))
+                bossBar.color(mechanicProgress.color)
+                bossBar.progress(mechanicProgress.progress.coerceIn(0.0f, 1.0f))
+                return
+            }
+
             val total = session.actionMarkers.values.count { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }.coerceAtLeast(1)
             val activated = session.actionMarkers.values.count {
                 it.type == ArenaActionMarkerType.BARRIER_ACTIVATE && it.state == ArenaActionMarkerState.RUNNING
@@ -6548,25 +6658,25 @@ class ArenaManager(
             }
         }
 
-        plugin.logger.info("[Arena] 驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｻ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ髯具ｽｻ隴弱・・・刹・ｹ郢晢ｽｻ ready=${readyArenaWorldNames.size} / total=${names.size}")
+        plugin.logger.info("[Arena] arena pool initialized: ready=${readyArenaWorldNames.size} / total=${names.size}")
     }
 
     private fun resetArenaPoolWorld(worldName: String): Boolean {
         val loadedWorld = Bukkit.getWorld(worldName)
         if (loadedWorld != null && !Bukkit.unloadWorld(loadedWorld, false)) {
-            plugin.logger.warning("[Arena] 驛｢譎丞ｹｲ郢晢ｽｻ驛｢譎｢・ｽ・ｫ驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｻ驛｢・ｧ繝ｻ・｢驛｢譎｢・ｽ・ｳ驛｢譎｢・ｽ・ｭ驛｢譎｢・ｽ・ｼ驛｢譎擾ｽｳ・ｨ遶頑･｢譽斐・・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ $worldName")
+            plugin.logger.warning("[Arena] failed to unload arena pool world before reset: $worldName")
             return false
         }
 
         val worldFolder = worldFolder(worldName)
         if (worldFolder.exists() && !deleteDirectory(worldFolder)) {
-            plugin.logger.warning("[Arena] 驛｢譎丞ｹｲ郢晢ｽｻ驛｢譎｢・ｽ・ｫ驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｵ驛｢・ｧ繝ｻ・ｩ驛｢譎｢・ｽ・ｫ驛｢謨鳴髯ｷ蜿ｰ・ｼ竏晄ｱるし・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ $worldName")
+            plugin.logger.warning("[Arena] failed to delete arena pool world folder before reset: $worldName")
             return false
         }
 
         val created = createArenaWorld(worldName)
         if (created == null) {
-            plugin.logger.warning("[Arena] 驛｢譎丞ｹｲ郢晢ｽｻ驛｢譎｢・ｽ・ｫ驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎√・陷・ｽｽ髫ｰ迹壹・遶頑･｢譽斐・・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ $worldName")
+            plugin.logger.warning("[Arena] failed to create arena pool world: $worldName")
             return false
         }
 
@@ -6613,7 +6723,7 @@ class ArenaManager(
     fun createDebugVoidWorld(): World? {
         val world = createArenaWorld() ?: return null
         if (!markDebugVoidWorld(world)) {
-            plugin.logger.warning("[Arena] 驛｢譏ｴ繝ｻ郢晢ｽｰ驛｢譏ｴ繝ｻ邵ｺ蟶敖蛹・ｽｽ・ｨ驛｢譎・鯵邵ｺ繝ｻ・ｹ譎擾ｽｳ・ｨ・趣ｽ｡驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｻ驛｢譎・ｽｧ・ｭ郢晢ｽｻ驛｢・ｧ繝ｻ・ｫ驛｢譎｢・ｽ・ｼ髣厄ｽｴ隲帛現繝ｻ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ ${world.name}")
+            plugin.logger.warning("[Arena] failed to mark debug void world: ${world.name}")
             tryDeleteWorld(world)
             return null
         }
@@ -6629,7 +6739,7 @@ class ArenaManager(
         }
 
         if (!templateFolder.copyRecursively(cloneFolder, overwrite = false)) {
-            plugin.logger.warning("[Arena] 驛｢譏ｴ繝ｻ郢晢ｽｰ驛｢譏ｴ繝ｻ邵ｺ蟶敖蛹・ｽｽ・ｨ驛｢譎・鯵邵ｺ繝ｻ・ｹ譎擾ｽｳ・ｨ・趣ｽ｡驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｻ鬮ｫ髦ｪ繝ｻ繝ｻ・｣繝ｻ・ｽ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ ${templateFolder.name} -> $cloneWorldName")
+            plugin.logger.warning("[Arena] failed to copy debug void world template: ${templateFolder.name} -> $cloneWorldName")
             return null
         }
 
@@ -6640,7 +6750,7 @@ class ArenaManager(
             return null
         }
         if (!markDebugVoidWorld(world)) {
-            plugin.logger.warning("[Arena] 鬮ｫ髦ｪ繝ｻ繝ｻ・｣繝ｻ・ｽ驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｻ驛｢譎・ｽｧ・ｭ郢晢ｽｻ驛｢・ｧ繝ｻ・ｫ驛｢譎｢・ｽ・ｼ髣厄ｽｴ隲帛現繝ｻ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ ${world.name}")
+            plugin.logger.warning("[Arena] failed to mark cloned debug void world: ${world.name}")
             tryDeleteWorld(world)
             return null
         }
@@ -6677,7 +6787,7 @@ class ArenaManager(
 
         val created = createArenaWorld(DEBUG_VOID_WORLD_TEMPLATE_NAME) ?: return null
         if (!markTemplateMarker(created.worldFolder)) {
-            plugin.logger.warning("[Arena] 驛｢譏ｴ繝ｻ郢晢ｽｰ驛｢譏ｴ繝ｻ邵ｺ蝣､・ｹ譏ｴ繝ｻ・趣ｽｦ驛｢譎丞ｹｲ・取ｨ抵ｽｹ譎｢・ｽ・ｼ驛｢譎冗樟郢晢ｽｻ驛｢譎・ｽｧ・ｭ郢晢ｽｻ驛｢・ｧ繝ｻ・ｫ驛｢譎｢・ｽ・ｼ髣厄ｽｴ隲帛現繝ｻ驍ｵ・ｺ繝ｻ・ｫ髯樊ｻゑｽｽ・ｱ髫ｰ・ｨ陷会ｽｱ繝ｻ・ｰ驍ｵ・ｺ繝ｻ・ｾ驍ｵ・ｺ陷会ｽｱ隨ｳ繝ｻ ${created.name}")
+            plugin.logger.warning("[Arena] failed to mark debug void world template: ${created.name}")
         }
         Bukkit.unloadWorld(created, false)
         return templateFolder
@@ -6801,7 +6911,7 @@ class ArenaManager(
     private fun markQueuedWorldDeletionFailed(pending: PendingWorldDeletion, maxAttempts: Int) {
         pending.attempts += 1
         if (pending.attempts >= maxAttempts) {
-            plugin.logger.severe("[Arena] 驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎臥櫨霓､譛ｱ・ｫ・ｯ繝ｻ・､驛｢・ｧ陷ｻ莠･・ｦ蜻ｵ・ｰ・｢繝ｻ・ｵ: ${pending.worldName} path=${pending.folder.absolutePath}")
+            plugin.logger.severe("[Arena] queued world deletion failed: ${pending.worldName} path=${pending.folder.absolutePath}")
             pendingWorldDeletions.remove(pending.worldName)
         }
     }
@@ -6813,12 +6923,12 @@ class ArenaManager(
     private fun initializeActionMarkers(session: ArenaSession) {
         val world = Bukkit.getWorld(session.worldName)
         if (world == null) {
-            plugin.logger.warning("[Arena] 驛｢・ｧ繝ｻ・｢驛｢・ｧ繝ｻ・ｯ驛｢・ｧ繝ｻ・ｷ驛｢譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ驛｢譎・ｽｧ・ｭ郢晢ｽｻ驛｢・ｧ繝ｻ・ｫ驛｢譎｢・ｽ・ｼ髯具ｽｻ隴弱・・・刹・ｹ隰費ｽｶ邵ｺ蟶ｷ・ｹ・ｧ繝ｻ・ｭ驛｢譏ｴ繝ｻ郢晢ｽｻ: 驛｢譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎牙愛隰費ｽｴ髯ｷ・ｿ鬮｢ﾂ繝ｻ・ｾ郢晢ｽｻworld=${session.worldName}")
+            plugin.logger.warning("[Arena] action marker initialization skipped because world is not loaded: world=${session.worldName}")
             return
         }
         val markers = mutableMapOf<UUID, ArenaActionMarker>()
 
-        if (!isClearingMission(session)) {
+        if (!isClearingMission(session) && !themeMechanics.hasCustomBarrierRestartObjective(session)) {
             session.barrierPointLocations.forEach { location ->
                 val marker = ArenaActionMarker(
                     id = UUID.randomUUID(),
@@ -6845,7 +6955,8 @@ class ArenaManager(
         session.actionMarkers.clear()
         session.actionMarkers.putAll(markers)
         session.actionMarkerHoldStates.clear()
-        plugin.logger.info("[Arena] 驛｢・ｧ繝ｻ・｢驛｢・ｧ繝ｻ・ｯ驛｢・ｧ繝ｻ・ｷ驛｢譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ驛｢譎・ｽｧ・ｭ郢晢ｽｻ驛｢・ｧ繝ｻ・ｫ驛｢譎｢・ｽ・ｼ髯具ｽｻ隴弱・・・刹・ｹ郢晢ｽｻ world=${session.worldName} total=${markers.size} barrier=${markers.values.count { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }}")
+        themeMechanics.notifyActionMarkersInitialized(session)
+        plugin.logger.info("[Arena] action markers initialized: world=${session.worldName} total=${markers.size} barrier=${markers.values.count { it.type == ArenaActionMarkerType.BARRIER_ACTIVATE }}")
     }
 
     private fun ensureDoorActionMarkersForTargetWave(session: ArenaSession, targetWave: Int) {
@@ -7049,6 +7160,7 @@ class ArenaManager(
         }
 
         val currentTick = Bukkit.getCurrentTick().toLong()
+        renderWaitingAreaParticles(session, candidateIds, currentTick)
         val withinGrace = System.currentTimeMillis() < session.joinGraceEndMillis
         if (withinGrace) {
             waitingNow.forEach { playerId ->
@@ -7070,6 +7182,68 @@ class ArenaManager(
                 ArenaI18n.text(player, "arena.messages.multiplayer.waiting_exited")
             )
         }
+    }
+
+    private fun renderWaitingAreaParticles(session: ArenaSession, candidateIds: Set<UUID>, currentTick: Long) {
+        if (currentTick % MULTIPLAYER_WAITING_AREA_PARTICLE_INTERVAL_TICKS != 0L) return
+        if (!session.multiplayerJoinEnabled || session.liftMarkerLocations.isEmpty()) return
+        val template = resolveEntranceLiftTemplate() ?: return
+        val dust = Particle.DustOptions(Color.fromRGB(120, 240, 255), 1.1f)
+
+        candidateIds
+            .asSequence()
+            .mapNotNull { Bukkit.getPlayer(it) }
+            .filter { it.isOnline }
+            .forEach { player ->
+                session.liftMarkerLocations
+                    .filter { marker -> marker.world?.uid == player.world.uid }
+                    .forEach { marker -> renderWaitingAreaBottom(player, marker, template, dust) }
+            }
+    }
+
+    private fun renderWaitingAreaBottom(
+        player: Player,
+        markerLocation: Location,
+        template: EntranceLiftTemplate,
+        dust: Particle.DustOptions
+    ) {
+        val world = markerLocation.world ?: return
+        if (player.world.uid != world.uid) return
+
+        val minX = markerLocation.blockX.toDouble()
+        val maxX = markerLocation.blockX + template.sizeX.toDouble()
+        val minZ = markerLocation.blockZ.toDouble()
+        val maxZ = markerLocation.blockZ + template.sizeZ.toDouble()
+        val y = markerLocation.blockY - 0.04
+
+        var x = minX
+        while (x <= maxX + 0.001) {
+            spawnWaitingAreaParticle(player, world, x, y, minZ, dust)
+            spawnWaitingAreaParticle(player, world, x, y, maxZ, dust)
+            x += MULTIPLAYER_WAITING_AREA_PARTICLE_STEP
+        }
+
+        var z = minZ
+        while (z <= maxZ + 0.001) {
+            spawnWaitingAreaParticle(player, world, minX, y, z, dust)
+            spawnWaitingAreaParticle(player, world, maxX, y, z, dust)
+            z += MULTIPLAYER_WAITING_AREA_PARTICLE_STEP
+        }
+
+        val centerX = (minX + maxX) / 2.0
+        val centerZ = (minZ + maxZ) / 2.0
+        spawnWaitingAreaParticle(player, world, centerX, y, centerZ, dust)
+    }
+
+    private fun spawnWaitingAreaParticle(
+        player: Player,
+        world: World,
+        x: Double,
+        y: Double,
+        z: Double,
+        dust: Particle.DustOptions
+    ) {
+        player.spawnParticle(Particle.DUST, Location(world, x, y, z), 1, 0.0, 0.0, 0.0, 0.0, dust)
     }
 
     private fun updateMultiplayerFastStart(session: ArenaSession, nowMillis: Long) {
@@ -7507,8 +7681,20 @@ class ArenaManager(
         corners.forEach { (x, z) ->
             val block = world.getBlockAt(x, y, z)
             if (block.type == Material.AIR) {
-                block.setType(Material.CHAIN, false)
+                // 1.21.11 APIではCHAINが解決できないため、リフトの吊り具表現をIRON_BARSで維持する。
+                block.setType(Material.IRON_BARS, false)
             }
+        }
+    }
+
+    private fun teleportToLatestCheckpoint(player: Player, session: ArenaSession, world: World, applyBlindness: Boolean = false) {
+        val target = resolveLatestRoomCheckpoint(session, world)
+            ?: session.entranceCheckpoint.clone().apply { this.world = world }
+        target.yaw = player.location.yaw
+        target.pitch = player.location.pitch
+        player.teleport(target)
+        if (applyBlindness) {
+            player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 15, 0, false, false, false))
         }
     }
 
@@ -7754,6 +7940,9 @@ class ArenaManager(
             if (participants.isEmpty()) return@forEach
 
             session.actionMarkers.values.forEach { marker ->
+                if (marker.state == ArenaActionMarkerState.RUNNING && !marker.renderWhenRunning) {
+                    return@forEach
+                }
                 val holdProgress = markerHoldProgress(session, marker)
                 advanceMarkerMiddleRingRotation(marker, holdProgress)
                 val color = resolveActionMarkerDisplayColor(marker, currentTick, holdProgress)
@@ -8041,6 +8230,12 @@ class ArenaManager(
             ArenaActionMarkerType.TUTORIAL_PROGRESS -> {
                 return
             }
+            ArenaActionMarkerType.NETHER_ENGINE_START,
+            ArenaActionMarkerType.NETHER_CORE_ACTIVATE -> {
+                if (themeMechanics.notifyActionMarkerTriggered(session, marker)) {
+                    updateSessionProgressBossBar(session)
+                }
+            }
         }
     }
 
@@ -8235,6 +8430,8 @@ class ArenaManager(
             ArenaActionMarkerType.BARRIER_ACTIVATE -> Sound.BLOCK_BEACON_POWER_SELECT
             ArenaActionMarkerType.DOOR_TOGGLE -> Sound.BLOCK_IRON_DOOR_OPEN
             ArenaActionMarkerType.TUTORIAL_PROGRESS -> Sound.BLOCK_NOTE_BLOCK_PLING
+            ArenaActionMarkerType.NETHER_ENGINE_START -> Sound.BLOCK_RESPAWN_ANCHOR_CHARGE
+            ArenaActionMarkerType.NETHER_CORE_ACTIVATE -> Sound.BLOCK_BEACON_POWER_SELECT
         }
         session.participants
             .asSequence()
@@ -8637,10 +8834,10 @@ class ArenaManager(
                 cleanupNonPlayerEntities(world)
                 val elapsedMillis = (now - job.startedAtMillis).coerceAtLeast(0L)
                 plugin.logger.info(
-                    "[Arena] 驛｢・ｧ繝ｻ・ｯ驛｢譎｢・ｽ・ｪ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｳ驛｢・ｧ繝ｻ・｢驛｢譏ｴ繝ｻ郢晢ｽｻ髯橸ｽｳ陟包ｽ｡繝ｻ・ｺ郢晢ｽｻ world=${job.worldName} blocks=${job.processedBlocks}/${job.totalBlocks} elapsed=${elapsedMillis}ms"
+                    "[Arena] arena world cleanup completed: world=${job.worldName} blocks=${job.processedBlocks}/${job.totalBlocks} elapsed=${elapsedMillis}ms"
                 )
                 markArenaWorldReady(job.worldName)
-                logArenaPoolState("驛｢・ｧ繝ｻ・ｯ驛｢譎｢・ｽ・ｪ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｳ驛｢・ｧ繝ｻ・｢驛｢譏ｴ繝ｻ郢晢ｽｻ髯橸ｽｳ陟包ｽ｡繝ｻ・ｺ郢晢ｽｻ, job.worldName")
+                logArenaPoolState("cleanup completed", job.worldName)
                 continue
             }
 
@@ -8662,7 +8859,7 @@ class ArenaManager(
                 val rate = if (elapsedSeconds <= 0.0) 0.0 else job.processedBlocks.toDouble() / elapsedSeconds
                 val remainingSeconds = if (rate <= 0.0) estimateCleanupSeconds(remainingBlocks) else remainingBlocks.toDouble() / rate
                 plugin.logger.info(
-                    "[Arena] 驛｢・ｧ繝ｻ・ｯ驛｢譎｢・ｽ・ｪ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｳ驛｢・ｧ繝ｻ・｢驛｢譏ｴ繝ｻ郢晢ｽｻ鬯ｨ・ｾ繝ｻ・ｲ髫ｰ闊後・ world=${job.worldName} progress=${formatPercent(progress)}% " +
+                    "[Arena] arena world cleanup progress: world=${job.worldName} progress=${formatPercent(progress)}% " +
                         "processed=${job.processedBlocks}/${job.totalBlocks} elapsed=${formatSeconds(elapsedSeconds)}s " +
                         "remaining=${formatSeconds(remainingSeconds)}s"
                 )
@@ -8711,7 +8908,7 @@ class ArenaManager(
 
             if (deleteQueuedWorldFolder(pending)) {
                 pendingWorldDeletions.remove(pending.worldName)
-                plugin.logger.info("[Arena] 髫ｴ蟷｢・ｽ・ｪ髯ｷ蜿ｰ・ｼ竏晄ｱるΔ譎｢・ｽ・ｯ驛｢譎｢・ｽ・ｼ驛｢譎｢・ｽ・ｫ驛｢譎擾ｽｳ・ｨ郢晢ｽｻ髯ｷ蜿ｰ・ｼ竏晄ｱるし・ｺ繝ｻ・ｫ髫ｰ蠕｡・ｻ蜥擾ｽｲ・･: ${pending.worldName}")
+                plugin.logger.info("[Arena] queued world deleted: ${pending.worldName}")
                 return@forEach
             }
 
