@@ -10,7 +10,9 @@ object MarkerToolLanguageKeyRequirements : LanguageKeyRequirementProvider {
         "mob", "checkpoint", "connection_in", "connection_out", "door_block",
         "barrier_core", "barrier_point", "pedestal", "join_area", "lobby",
         "lobby_main", "lobby_tutorial_start", "lobby_tutorial_step", "lift",
-        "nether_track_path_left", "nether_track_path_right", "nether_magma_vent", "ocean_geyser", "ocean_whirlpool",
+        "nether_track_path_left", "nether_track_path_right", "nether_cart_reference_left", "nether_cart_reference_right", "nether_magma_vent",
+        "nether_engine_start", "nether_core_center_left", "nether_core_center_right", "nether_core_activate",
+        "ocean_geyser", "ocean_whirlpool",
         "natura_stalactite", "natura_mist"
     )
 

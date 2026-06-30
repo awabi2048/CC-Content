@@ -20,7 +20,8 @@ import java.util.UUID
 
 class FlyingItemDisplay private constructor(
     private val display: ItemDisplay,
-    private val itemStack: ItemStack
+    private val itemStack: ItemStack,
+    private val spinning: Boolean
 ) {
     private var lastDirection: Vector = Vector(0.0, 0.0, 1.0)
     private var lastSpinAngle: Float = 0.0f
@@ -31,7 +32,7 @@ class FlyingItemDisplay private constructor(
         private const val DISC_HALF_HEIGHT = 0.15
         private const val BASE_ROTATION_ANGLE = 1.5708f
 
-        fun spawn(world: World, location: Location, itemStack: ItemStack): FlyingItemDisplay {
+        fun spawn(world: World, location: Location, itemStack: ItemStack, spinning: Boolean = true): FlyingItemDisplay {
             val display = world.spawnEntity(location, EntityType.ITEM_DISPLAY) as ItemDisplay
             display.setItemStack(itemStack.clone())
             display.billboard = Display.Billboard.FIXED
@@ -43,7 +44,7 @@ class FlyingItemDisplay private constructor(
                 Vector3f(0.55f, 0.55f, 0.55f),
                 Quaternionf()
             )
-            return FlyingItemDisplay(display, itemStack)
+            return FlyingItemDisplay(display, itemStack, spinning)
         }
     }
 
@@ -55,7 +56,7 @@ class FlyingItemDisplay private constructor(
         val dir = direction.clone()
         if (dir.lengthSquared() < 0.0001) return
         dir.normalize()
-        val spinAngle = (elapsedTicks.toDouble() * SPIN_SPEED).toFloat()
+        val spinAngle = if (spinning) (elapsedTicks.toDouble() * SPIN_SPEED).toFloat() else 0.0f
         applyTransform(dir, spinAngle)
     }
 

@@ -7,7 +7,9 @@ import java.util.UUID
 enum class ArenaActionMarkerType {
     DOOR_TOGGLE,
     BARRIER_ACTIVATE,
-    TUTORIAL_PROGRESS
+    TUTORIAL_PROGRESS,
+    NETHER_ENGINE_START,
+    NETHER_CORE_ACTIVATE
 }
 
 enum class ArenaActionMarkerState(val defaultColor: Color) {
@@ -22,6 +24,7 @@ data class ArenaActionMarker(
     val center: Location,
     val holdTicksRequired: Int,
     val wave: Int? = null,
+    val renderWhenRunning: Boolean = true,
     val stateColors: Map<ArenaActionMarkerState, Color> = ArenaActionMarkerState.entries.associateWith { it.defaultColor },
     var state: ArenaActionMarkerState = ArenaActionMarkerState.PRE_ACTIVATED,
     var colorTransitionFrom: Color = ArenaActionMarkerState.PRE_ACTIVATED.defaultColor,

@@ -812,10 +812,10 @@ class MobService(private val plugin: JavaPlugin) {
         val equipment = entity.equipment ?: return
         equipment.setItemInMainHand(ItemStack(Material.AIR))
         equipment.setItemInOffHand(ItemStack(Material.AIR))
-        equipment.helmet = ItemStack(Material.AIR)
-        equipment.chestplate = ItemStack(Material.AIR)
-        equipment.leggings = ItemStack(Material.AIR)
-        equipment.boots = ItemStack(Material.AIR)
+        equipment.setHelmet(ItemStack(Material.AIR))
+        equipment.setChestplate(ItemStack(Material.AIR))
+        equipment.setLeggings(ItemStack(Material.AIR))
+        equipment.setBoots(ItemStack(Material.AIR))
     }
 
     fun handleEntityTransform(event: EntityTransformEvent) {

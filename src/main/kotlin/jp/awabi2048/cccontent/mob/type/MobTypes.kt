@@ -1305,17 +1305,17 @@ class WitherGhostMobType : EquipmentMobType(
         equipment.setItemInMainHand(ItemStack(Material.DIAMOND_HOE))
         equipment.setItemInMainHandDropChance(0.0f)
 
-        equipment.helmet = skullHeadItem(
+        equipment.setHelmet(skullHeadItem(
             "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvZjRiYWRlZjYzZTE1YzM5N2UyMTE1MDcwZTJiYmQwMDIxNDQ3NjRjNDQxZWJkZjg4YzAxZWFhYmY5YTc2NzY0NSJ9fX0="
-        )
-        equipment.chestplate = coloredLeatherArmor(Material.LEATHER_CHESTPLATE, CHESTPLATE_COLOR)
-        equipment.leggings = coloredLeatherArmor(Material.LEATHER_LEGGINGS, LEGGINGS_COLOR)
-        equipment.boots = coloredLeatherArmor(Material.LEATHER_BOOTS, BOOTS_COLOR)
+        ))
+        equipment.setChestplate(coloredLeatherArmor(Material.LEATHER_CHESTPLATE, CHESTPLATE_COLOR))
+        equipment.setLeggings(coloredLeatherArmor(Material.LEATHER_LEGGINGS, LEGGINGS_COLOR))
+        equipment.setBoots(coloredLeatherArmor(Material.LEATHER_BOOTS, BOOTS_COLOR))
 
-        equipment.helmetDropChance = 0.0f
-        equipment.chestplateDropChance = 0.0f
-        equipment.leggingsDropChance = 0.0f
-        equipment.bootsDropChance = 0.0f
+        equipment.setHelmetDropChance(0.0f)
+        equipment.setChestplateDropChance(0.0f)
+        equipment.setLeggingsDropChance(0.0f)
+        equipment.setBootsDropChance(0.0f)
     }
 
     companion object {
@@ -1587,11 +1587,8 @@ class DrownedTridentGuardMobType : EquipmentMobType(
         TridentThrowAbility(
             id = "drowned_trident_guard_throw",
             throwCooldownTicks = 90L,
-            homingConfig = MobShootUtil.HomingConfig(
-                accuracy = 0.9,
-                turnStrength = 0.2,
-                maxTurnDegrees = 14.0
-            )
+            gravityCompensationPerBlock = 0.0,
+            spread = 0.0
         )
     ),
     defaultMainHand = Material.TRIDENT,

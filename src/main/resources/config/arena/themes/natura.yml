@@ -134,6 +134,9 @@ normal:
       spider_ferocious:
         weight: 6
         stat_multiplier: 1.35
+      spider_venom_frenzy:
+        weight: 4
+        stat_multiplier: 1.35
       frog_big:
         weight: 4
         stat_multiplier: 1.35
@@ -453,6 +456,9 @@ promoted:
         stat_multiplier: 1.9
       spider_ferocious:
         weight: 6
+        stat_multiplier: 1.9
+      spider_venom_frenzy:
+        weight: 4
         stat_multiplier: 1.9
       frog_big:
         weight: 4

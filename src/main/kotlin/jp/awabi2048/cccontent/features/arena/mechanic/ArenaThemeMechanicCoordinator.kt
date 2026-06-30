@@ -1,12 +1,17 @@
 package jp.awabi2048.cccontent.features.arena.mechanic
 
+import jp.awabi2048.cccontent.features.arena.ArenaActionMarker
 import jp.awabi2048.cccontent.features.arena.ArenaSession
 import jp.awabi2048.cccontent.features.arena.mechanic.natura.NaturaArenaMechanic
 import jp.awabi2048.cccontent.features.arena.mechanic.nether.NetherArenaMechanic
 import jp.awabi2048.cccontent.features.arena.mechanic.ocean.OceanMonumentArenaMechanic
+import org.bukkit.entity.LivingEntity
 import org.bukkit.plugin.java.JavaPlugin
 
-class ArenaThemeMechanicCoordinator(private val plugin: JavaPlugin) {
+class ArenaThemeMechanicCoordinator(
+    private val plugin: JavaPlugin,
+    private val barrierRestartRequester: (ArenaSession) -> Unit
+) {
     private val mechanicsByWorld = mutableMapOf<String, ArenaThemeMechanic>()
 
     fun registerStageReady(session: ArenaSession) {
@@ -20,12 +25,37 @@ class ArenaThemeMechanicCoordinator(private val plugin: JavaPlugin) {
         mechanicsByWorld[session.worldName]?.onSessionStarted(context(session))
     }
 
+    fun notifyActionMarkersInitialized(session: ArenaSession) {
+        mechanicsByWorld[session.worldName]?.onActionMarkersInitialized(context(session))
+    }
+
     fun notifyWaveStarted(session: ArenaSession, wave: Int) {
         mechanicsByWorld[session.worldName]?.onWaveStarted(context(session), wave)
     }
 
     fun notifyWaveCleared(session: ArenaSession, wave: Int) {
         mechanicsByWorld[session.worldName]?.onWaveCleared(context(session), wave)
+    }
+
+    fun notifyActionMarkerTriggered(session: ArenaSession, marker: ArenaActionMarker): Boolean {
+        return mechanicsByWorld[session.worldName]?.onActionMarkerTriggered(context(session), marker) == true
+    }
+
+    fun notifyMobKilled(session: ArenaSession, mob: LivingEntity) {
+        mechanicsByWorld[session.worldName]?.onMobKilled(context(session), mob)
+    }
+
+    fun hasCustomBarrierRestartObjective(session: ArenaSession): Boolean {
+        return mechanicsByWorld[session.worldName]?.hasCustomBarrierRestartObjective(context(session)) == true
+    }
+
+    fun barrierRestartGate(session: ArenaSession): ArenaMechanicBarrierGateResult {
+        return mechanicsByWorld[session.worldName]?.barrierRestartGate(context(session))
+            ?: ArenaMechanicBarrierGateResult.allowed()
+    }
+
+    fun barrierRestartProgress(session: ArenaSession): ArenaMechanicObjectiveProgress? {
+        return mechanicsByWorld[session.worldName]?.barrierRestartProgress(context(session))
     }
 
     fun tick(sessions: Collection<ArenaSession>, currentTick: Long) {
@@ -60,6 +90,6 @@ class ArenaThemeMechanicCoordinator(private val plugin: JavaPlugin) {
     }
 
     private fun context(session: ArenaSession): ArenaMechanicContext {
-        return ArenaMechanicContext(plugin, session)
+        return ArenaMechanicContext(plugin, session, barrierRestartRequester)
     }
 }

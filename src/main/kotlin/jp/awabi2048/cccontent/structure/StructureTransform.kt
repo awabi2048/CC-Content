@@ -55,6 +55,12 @@ data class StructureTransform(
         return StructurePoint2D(raw.x - bounds.minX, raw.z - bounds.minZ)
     }
 
+    fun applyLocalMarkerEntityPoint(x: Double, z: Double, width: Int, depth: Int): StructurePoint2D {
+        val local = applyLocalPoint(x, z, width, depth)
+        // WorldEdit の mirrorX はエンティティ中心も反転するため、マーカーをブロック中心として読む用途ではXを1ブロック戻す。
+        return if (mirrorX) StructurePoint2D(local.x + 1.0, local.z) else local
+    }
+
     fun applyDirection(direction: CardinalDirection): CardinalDirection {
         val rotated = direction.rotateClockwise(-normalizedQuarter)
         return if (mirrorX) {

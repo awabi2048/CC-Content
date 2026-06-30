@@ -93,7 +93,7 @@ open class TridentThrowAbility(
         projectile.velocity = direction.normalize().multiply(throwSpeed)
         projectile.isSilent = true
         projectile.pickupStatus = AbstractArrow.PickupStatus.DISALLOWED
-        projectile.setGravity(true)
+        projectile.setGravity(false)
 
         val throwDamage = resolveThrowDamage(entity, context)
 
@@ -103,7 +103,8 @@ open class TridentThrowAbility(
                 projectile = projectile,
                 weapon = ItemStack(weapon),
                 damage = throwDamage,
-                loaderKey = loaderKeyString()
+                loaderKey = loaderKeyString(),
+                spinDisplay = false
             )
         )
         if (!launched) {

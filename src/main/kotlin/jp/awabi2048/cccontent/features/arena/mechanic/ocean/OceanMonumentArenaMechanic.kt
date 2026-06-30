@@ -4,6 +4,7 @@ import jp.awabi2048.cccontent.features.arena.mechanic.ArenaMechanicContext
 import jp.awabi2048.cccontent.features.arena.mechanic.ArenaMechanicSupport
 import jp.awabi2048.cccontent.features.arena.mechanic.ArenaThemeMechanic
 import org.bukkit.Location
+import org.bukkit.Material
 import org.bukkit.Particle
 import org.bukkit.Sound
 import org.bukkit.entity.LivingEntity
@@ -142,18 +143,19 @@ class OceanMonumentArenaMechanic(private val plugin: JavaPlugin) : ArenaThemeMec
         }
 
         private fun renderWarning() {
-            location.world?.spawnParticle(Particle.BUBBLE_COLUMN_UP, location.clone().add(0.5, 0.25, 0.5), 8, 0.25, 0.1, 0.25, 0.02)
+            location.world?.spawnParticle(Particle.WHITE_SMOKE, location.clone().add(0.5, 0.25, 0.5), 8, 0.18, 0.08, 0.18, 0.04)
         }
 
         private fun renderColumn() {
             val world = location.world ?: return
             for (height in 0..4) {
-                world.spawnParticle(Particle.BUBBLE_COLUMN_UP, location.clone().add(0.5, height + 0.4, 0.5), 5, 0.22, 0.1, 0.22, 0.03)
+                val spread = 0.10 + height * 0.18
+                world.spawnParticle(Particle.WHITE_SMOKE, location.clone().add(0.5, height + 0.35, 0.5), 5, spread, 0.08, spread, 0.07)
             }
         }
 
         private fun renderFade() {
-            location.world?.spawnParticle(Particle.BUBBLE, location.clone().add(0.5, 1.0, 0.5), 10, 0.35, 0.45, 0.35, 0.01)
+            location.world?.spawnParticle(Particle.WHITE_SMOKE, location.clone().add(0.5, 1.0, 0.5), 8, 0.5, 0.45, 0.5, 0.02)
         }
 
         private fun applyLift(context: ArenaMechanicContext) {
@@ -234,12 +236,11 @@ class OceanMonumentArenaMechanic(private val plugin: JavaPlugin) : ArenaThemeMec
         }
 
         private fun renderWarning() {
-            renderRing(WHIRLPOOL_RADIUS, Particle.BUBBLE_COLUMN_UP, 12)
+            renderRing(WHIRLPOOL_RADIUS, Particle.BUBBLE_COLUMN_UP, 8)
         }
 
         private fun renderWhirlpool() {
-            renderRing(WHIRLPOOL_RADIUS, Particle.BUBBLE, 18)
-            renderRing(WHIRLPOOL_RADIUS * 0.55, Particle.BUBBLE_COLUMN_UP, 10)
+            renderSpiral()
         }
 
         private fun renderFade() {
@@ -250,10 +251,11 @@ class OceanMonumentArenaMechanic(private val plugin: JavaPlugin) : ArenaThemeMec
             val world = location.world ?: return
             val tickOffset = remainingTicks.toDouble() * 0.2
             repeat(count) { index ->
-                val angle = (index.toDouble() / count.toDouble()) * PI * 2.0 + tickOffset
+                val angle = (index.toDouble() / count.toDouble()) * PI * 2.0 + tickOffset + Random.nextDouble(-0.18, 0.18)
+                val randomizedRadius = radius + Random.nextDouble(-0.15, 0.15)
                 world.spawnParticle(
                     particle,
-                    location.clone().add(0.5 + cos(angle) * radius, 0.35, 0.5 + sin(angle) * radius),
+                    location.clone().add(0.5 + cos(angle) * randomizedRadius, 0.35, 0.5 + sin(angle) * randomizedRadius),
                     1,
                     0.02,
                     0.02,
@@ -263,10 +265,36 @@ class OceanMonumentArenaMechanic(private val plugin: JavaPlugin) : ArenaThemeMec
             }
         }
 
+        private fun renderSpiral() {
+            val world = location.world ?: return
+            val spinOffset = remainingTicks.toDouble() * 0.18
+            repeat(WHIRLPOOL_SPIRAL_ARMS) { arm ->
+                repeat(WHIRLPOOL_SPIRAL_POINTS_PER_ARM) { point ->
+                    val progress = point.toDouble() / WHIRLPOOL_SPIRAL_POINTS_PER_ARM.toDouble()
+                    val radius = WHIRLPOOL_RADIUS * (1.0 - progress * 0.85) + Random.nextDouble(-0.08, 0.08)
+                    val angle = arm * PI * 2.0 / WHIRLPOOL_SPIRAL_ARMS +
+                        progress * PI * 1.75 +
+                        spinOffset +
+                        Random.nextDouble(-0.12, 0.12)
+                    val y = 0.25 + progress * 0.9 + Random.nextDouble(-0.05, 0.05)
+                    world.spawnParticle(
+                        if (point % 3 == 0) Particle.BUBBLE_COLUMN_UP else Particle.BUBBLE,
+                        location.clone().add(0.5 + cos(angle) * radius, y, 0.5 + sin(angle) * radius),
+                        1,
+                        0.02,
+                        0.02,
+                        0.02,
+                        0.0
+                    )
+                }
+            }
+        }
+
         private fun applyPull(context: ArenaMechanicContext, currentTick: Long) {
             val center = location.clone().add(0.5, 0.5, 0.5)
             val targets = ArenaMechanicSupport.targetsNear(context, center, WHIRLPOOL_RADIUS, 2.0, WHIRLPOOL_RADIUS)
                 .filter { it.location.distanceSquared(center) <= WHIRLPOOL_RADIUS * WHIRLPOOL_RADIUS + 2.0 }
+                .filter { isInWater(it) }
             val activeIds = targets.mapTo(mutableSetOf()) { it.uniqueId }
             trappedTicksByEntity.keys.removeIf { it !in activeIds }
 
@@ -279,6 +307,12 @@ class OceanMonumentArenaMechanic(private val plugin: JavaPlugin) : ArenaThemeMec
                 trappedTicksByEntity[target.uniqueId] = (trappedTicksByEntity[target.uniqueId] ?: 0) + 1
                 applyPlayerPenalty(context, target, currentTick)
             }
+        }
+
+        private fun isInWater(target: LivingEntity): Boolean {
+            return target.location.block.type == Material.WATER ||
+                target.eyeLocation.block.type == Material.WATER ||
+                target.isInWater
         }
 
         private fun applyPlayerPenalty(context: ArenaMechanicContext, target: LivingEntity, currentTick: Long) {
@@ -325,15 +359,17 @@ class OceanMonumentArenaMechanic(private val plugin: JavaPlugin) : ArenaThemeMec
         private const val GEYSER_FIRE_TICKS = 40
         private const val GEYSER_FIRE_TICKS_PROMOTED = 60
         private const val GEYSER_LIFT_Y = 0.9
-        private const val WHIRLPOOL_IDLE_MIN_TICKS = 120L
-        private const val WHIRLPOOL_IDLE_MAX_TICKS = 160L
+        private const val WHIRLPOOL_IDLE_MIN_TICKS = 240L
+        private const val WHIRLPOOL_IDLE_MAX_TICKS = 320L
         private const val WHIRLPOOL_WARNING_TICKS = 30L
         private const val WHIRLPOOL_ACTIVE_TICKS = 100L
         private const val WHIRLPOOL_FADE_TICKS = 20L
         private const val WHIRLPOOL_RADIUS = 3.0
-        private const val WHIRLPOOL_PULL = 0.08
-        private const val WHIRLPOOL_PULL_PROMOTED = 0.12
-        private const val WHIRLPOOL_SPIN = 0.06
+        private const val WHIRLPOOL_PULL = 0.04
+        private const val WHIRLPOOL_PULL_PROMOTED = 0.06
+        private const val WHIRLPOOL_SPIN = 0.03
+        private const val WHIRLPOOL_SPIRAL_ARMS = 3
+        private const val WHIRLPOOL_SPIRAL_POINTS_PER_ARM = 8
         private const val WHIRLPOOL_NAUSEA_TICKS = 40
         private const val WHIRLPOOL_DAMAGE_START_TICKS = 80
         private const val WHIRLPOOL_DAMAGE_INTERVAL_TICKS = 20L

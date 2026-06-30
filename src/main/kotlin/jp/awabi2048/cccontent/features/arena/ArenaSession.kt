@@ -123,7 +123,7 @@ data class ArenaSession(
     var goalCheckpoint: Location,
     var stageBounds: ArenaBounds,
     val roomBounds: MutableMap<Int, ArenaBounds>,
-    val corridorBounds: MutableMap<Int, ArenaBounds>,
+    val corridorBounds: MutableMap<Int, MutableList<ArenaBounds>>,
     val transitBounds: MutableMap<Int, ArenaBounds>,
     val pedestalBounds: MutableMap<Int, ArenaBounds>,
     val pedestalMarkerBlocks: MutableSet<ArenaBlockKey>,

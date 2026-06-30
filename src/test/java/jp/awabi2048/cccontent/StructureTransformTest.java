@@ -91,6 +91,19 @@ class StructureTransformTest {
     }
 
     @Test
+    void mirroredMarkerEntityPointKeepsBlockCenterAlignment() {
+        StructureTransform transform = new StructureTransform(0, true);
+
+        StructurePoint2D westMarker = transform.applyLocalMarkerEntityPoint(0.5, 2.5, 5, 5);
+        StructurePoint2D eastMarker = transform.applyLocalMarkerEntityPoint(4.5, 2.5, 5, 5);
+
+        assertEquals(4.5, westMarker.getX(), 1.0e-9);
+        assertEquals(2.5, westMarker.getZ(), 1.0e-9);
+        assertEquals(0.5, eastMarker.getX(), 1.0e-9);
+        assertEquals(2.5, eastMarker.getZ(), 1.0e-9);
+    }
+
+    @Test
     void canonicalSchemasUseTheSameNorthFacingContract() {
         assertEquals(CardinalDirection.NORTH, StructureSchemas.INSTANCE.arena("goal").getInSide());
         assertEquals(CardinalDirection.NORTH, StructureSchemas.INSTANCE.arena("pedestal_room").getInSide());

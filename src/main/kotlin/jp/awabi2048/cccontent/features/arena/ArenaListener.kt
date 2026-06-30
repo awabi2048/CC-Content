@@ -7,6 +7,7 @@ import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.mob.ability.MobShootUtil
 import jp.awabi2048.cccontent.mob.event.CustomEntityMobSpawnEvent
 import jp.awabi2048.cccontent.mob.event.CustomMobSpawnEvent
+import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.Sound
 import org.bukkit.entity.AbstractWindCharge
@@ -29,8 +30,11 @@ import org.bukkit.event.entity.EntityToggleGlideEvent
 import org.bukkit.event.entity.EntityShootBowEvent
 import org.bukkit.event.entity.EntityPickupItemEvent
 import org.bukkit.event.block.BlockBreakEvent
+import org.bukkit.event.block.BlockFormEvent
 import org.bukkit.event.block.BlockPlaceEvent
+import org.bukkit.event.block.BlockSpreadEvent
 import org.bukkit.event.entity.PlayerDeathEvent
+import org.bukkit.event.entity.EntityChangeBlockEvent
 import org.bukkit.event.entity.EntityMountEvent
 import org.bukkit.event.entity.EntityRemoveEvent
 import org.bukkit.event.player.PlayerChangedWorldEvent
@@ -165,6 +169,30 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    fun onBlockSpread(event: BlockSpreadEvent) {
+        if (!arenaManager.isActiveSessionWorld(event.block.world.name)) return
+        if (isSculkMaterial(event.block.type) || isSculkMaterial(event.newState.type) || isSculkMaterial(event.source.type)) {
+            event.isCancelled = true
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onBlockForm(event: BlockFormEvent) {
+        if (!arenaManager.isActiveSessionWorld(event.block.world.name)) return
+        if (isSculkMaterial(event.block.type) || isSculkMaterial(event.newState.type)) {
+            event.isCancelled = true
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityChangeBlock(event: EntityChangeBlockEvent) {
+        if (!arenaManager.isActiveSessionWorld(event.block.world.name)) return
+        if (isSculkMaterial(event.block.type) || isSculkMaterial(event.to)) {
+            event.isCancelled = true
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     fun onExplosionPrime(event: ExplosionPrimeEvent) {
         if (event.entity !is AbstractWindCharge) return
         if (arenaManager.isActiveSessionWorld(event.entity.world.name)) {
@@ -242,6 +270,10 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
                 player.world.playSound(player.location, Sound.ENTITY_PLAYER_ATTACK_NODAMAGE, 1.0f, 1.0f)
             }
         }
+    }
+
+    private fun isSculkMaterial(material: Material): Boolean {
+        return material.name.startsWith("SCULK")
     }
 
     private fun handleConfusionArrowHit(event: EntityDamageByEntityEvent) {

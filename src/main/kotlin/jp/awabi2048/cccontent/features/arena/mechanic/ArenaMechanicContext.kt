@@ -10,7 +10,8 @@ import org.bukkit.plugin.java.JavaPlugin
 
 class ArenaMechanicContext(
     val plugin: JavaPlugin,
-    val session: ArenaSession
+    val session: ArenaSession,
+    private val barrierRestartRequester: (ArenaSession) -> Unit = {}
 ) {
     val world: World?
         get() = Bukkit.getWorld(session.worldName)
@@ -37,5 +38,9 @@ class ArenaMechanicContext(
 
     fun addCleanupBounds(bounds: ArenaBounds) {
         session.mechanicCleanupBounds += ArenaMechanicCleanupBounds(bounds)
+    }
+
+    fun requestBarrierRestart() {
+        barrierRestartRequester(session)
     }
 }
