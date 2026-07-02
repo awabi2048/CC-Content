@@ -31,6 +31,8 @@ class ArenaCommand(
     private val legacySerializer = LegacyComponentSerializer.legacySection()
     private val statusTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.JAPAN)
         .withZone(ZoneId.systemDefault())
+    // barrier_restart 以外は、構造・クリア条件が揃うまでコマンド起動対象から外す。
+    private val startCommandMissionTypes = listOf(ArenaMissionType.BARRIER_RESTART)
 
     private enum class ArenaMenuType(
         val id: String,
@@ -358,7 +360,7 @@ class ArenaCommand(
 
         val theme = args[2]
         val missionType = ArenaMissionType.fromId(args[3].lowercase())
-        if (missionType == null) {
+        if (missionType == null || missionType !in startCommandMissionTypes) {
             sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.start_error.invalid_mission_type", "type" to args[3]))
             return true
         }
@@ -633,7 +635,7 @@ class ArenaCommand(
                 else -> emptyList()
             }
             4 -> when (args[0].lowercase()) {
-                "start" -> ArenaMissionType.entries.map { it.id }.filter { it.startsWith(args[3], ignoreCase = true) }
+                "start" -> startCommandMissionTypes.map { it.id }.filter { it.startsWith(args[3], ignoreCase = true) }
                 "license" -> if (args[1].equals("set", ignoreCase = true)) {
                     ArenaLicenseTier.entries.map { it.id }.filter { it.startsWith(args[3], ignoreCase = true) }
                 } else {

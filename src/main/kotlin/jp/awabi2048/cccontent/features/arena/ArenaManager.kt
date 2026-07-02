@@ -9,6 +9,7 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.CCSystem
 import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageGenerator
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageBuildException
@@ -108,8 +109,6 @@ import org.bukkit.scheduler.BukkitTask
 import org.bukkit.scoreboard.DisplaySlot
 import org.bukkit.util.Vector
 import java.io.File
-import java.io.InputStreamReader
-import java.nio.charset.StandardCharsets
 import java.util.Locale
 import java.util.UUID
 import java.util.logging.Level
@@ -334,6 +333,8 @@ class ArenaManager(
         const val MIDDLE_RING_MAX_ANGULAR_VELOCITY = 0.14
         const val MOB_TOKEN_DROP_CHANCE_DEFAULT = 0.30
         const val MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT = 0.033
+        const val MOB_TOKEN_LORE_LANGUAGE_KEY = "custom_items.arena.mob_token.lore"
+        const val MOB_TOKEN_NAME_LANGUAGE_KEY_PREFIX = "custom_items.arena.mob_token.token_names"
         const val ENCHANT_SHARD_DROP_RATE_MULTIPLIER_DEFAULT = 1.0
         const val ENCHANT_SHARD_LOOTING_MULTIPLIER_PER_LEVEL_DEFAULT = 0.10
         const val STAGE_TRANSFER_BLINDNESS_TICKS = 60
@@ -3427,29 +3428,25 @@ class ArenaManager(
     private fun validateMobTokenLanguageKeys(requiredTypeIds: Set<String>) {
         if (requiredTypeIds.isEmpty()) return
 
-        val locales = discoverAvailableLocales()
+        val api = CCSystem.getAPI()
+        val locales = api.getSupportedLanguages().ifEmpty { setOf("ja_jp", "en_us") }
         locales.forEach { locale ->
-            val config = loadLangConfig(locale)
-            if (config == null) {
-                plugin.logger.warning("[Arena] mob token language file could not be loaded: locale=$locale")
-                return@forEach
-            }
-
             val missingKeys = mutableListOf<String>()
-            if (!config.isList("custom_items.arena.mob_token.lore")) {
-                missingKeys += "custom_items.arena.mob_token.lore"
+            // 表示時と同じCC-System言語ソースを検証し、CC-Content側の旧ファイル配置に依存しない。
+            if (!hasI18nStringList(locale, MOB_TOKEN_LORE_LANGUAGE_KEY)) {
+                missingKeys += MOB_TOKEN_LORE_LANGUAGE_KEY
             }
 
             requiredTypeIds.forEach { typeId ->
                 val normalizedTypeId = normalizeMobTokenLanguageTypeId(typeId)
-                val key = "custom_items.arena.mob_token.token_names.$normalizedTypeId"
-                if (!config.isString(key)) {
+                val key = "$MOB_TOKEN_NAME_LANGUAGE_KEY_PREFIX.$normalizedTypeId"
+                if (!hasI18nString(locale, key)) {
                     missingKeys += key
                 }
             }
 
             if (missingKeys.isNotEmpty()) {
-                plugin.logger.warning("[Arena] mob token language file could not be loaded: locale=$locale")
+                plugin.logger.warning("[Arena] mob token language keys are missing or invalid: locale=$locale")
                 missingKeys.forEach { key ->
                     plugin.logger.warning("[Arena]   - $key")
                 }
@@ -3457,39 +3454,22 @@ class ArenaManager(
         }
     }
 
+    private fun hasI18nString(locale: String, key: String): Boolean {
+        return runCatching {
+            CCSystem.getAPI().getI18nString(locale, key)
+        }.isSuccess
+    }
+
+    private fun hasI18nStringList(locale: String, key: String): Boolean {
+        return runCatching {
+            CCSystem.getAPI().getI18nStringList(locale, key)
+        }.isSuccess
+    }
+
     private fun normalizeMobTokenLanguageTypeId(typeId: String): String {
         return when (sanitizeMobTypeId(typeId)) {
             "cave_spider" -> "spider"
             else -> sanitizeMobTypeId(typeId)
-        }
-    }
-
-    private fun discoverAvailableLocales(): Set<String> {
-        val locales = linkedSetOf("ja_jp", "en_us")
-
-        val langDir = File(plugin.dataFolder, "lang")
-        if (langDir.exists()) {
-            val fromDataFolder = langDir.listFiles { file -> file.isDirectory }
-                .orEmpty()
-                .map { it.name.lowercase(Locale.ROOT) }
-            locales.addAll(fromDataFolder)
-        }
-
-        return locales
-    }
-
-    private fun loadLangConfig(locale: String): YamlConfiguration? {
-        val normalized = locale.lowercase(Locale.ROOT)
-        val fromDataFolder = File(plugin.dataFolder, "lang/$normalized/custom_items.yml")
-        if (fromDataFolder.exists()) {
-            return YamlConfiguration.loadConfiguration(fromDataFolder)
-        }
-
-        val resource = plugin.getResource("lang/$normalized/custom_items.yml") ?: return null
-        resource.use { input ->
-            InputStreamReader(input, StandardCharsets.UTF_8).use { reader ->
-                return YamlConfiguration.loadConfiguration(reader)
-            }
         }
     }
 
