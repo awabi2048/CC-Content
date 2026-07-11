@@ -51,7 +51,6 @@ public final class ResourceConfigurationValidator {
         validateRankSettingsConfig(configRoot, configs, errors);
         validateRankJobExp(configRoot, configs, errors);
         validateRankJobs(configRoot, configs, errors);
-        validateTutorialTasks(configRoot, configs, errors);
         validateNpcMenu(configRoot, configs, errors);
         validateCustomItemConfigs(configRoot, configs, errors);
         validateBreweryConfigs(configRoot, configs, errors);
@@ -443,15 +442,6 @@ public final class ResourceConfigurationValidator {
                 }
             }
         }
-    }
-
-    private static void validateTutorialTasks(Path configRoot, Map<Path, Object> configs, List<String> errors) {
-        Path file = configRoot.resolve("rank/tutorial_tasks.yml");
-        Map<String, Object> root = rootMap(configs, file, errors);
-        if (root == null) {
-            return;
-        }
-        requireNonEmpty(root, file, "<root>", errors);
     }
 
     private static void validateNpcMenu(Path configRoot, Map<Path, Object> configs, List<String> errors) {

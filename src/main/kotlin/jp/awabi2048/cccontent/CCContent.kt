@@ -75,6 +75,7 @@ import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.impl.RankManagerImpl
 import jp.awabi2048.cccontent.features.rank.impl.YamlRankStorage
 import jp.awabi2048.cccontent.features.rank.localization.LanguageLoader
+import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
 import jp.awabi2048.cccontent.features.rank.localization.MessageProviderImpl
 import jp.awabi2048.cccontent.features.rank.command.RankCommand
 import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
@@ -640,7 +641,7 @@ class CCContent : JavaPlugin(), Listener {
             registerRankCommands(rankCommand)
             server.pluginManager.registerEvents(rankCommand, this)
             server.pluginManager.registerEvents(
-                jp.awabi2048.cccontent.features.rank.listener.TutorialRankUpListener(rankManager, rankCommand),
+                jp.awabi2048.cccontent.features.rank.listener.TutorialRankUpListener(rankManager, messageProvider),
                 this
             )
 
@@ -654,7 +655,7 @@ class CCContent : JavaPlugin(), Listener {
             registerSkillTrees()
 
             // チュートリアルランク タスクシステムの初期化
-            val (taskLoader, taskChecker) = initializeTutorialTaskSystem(rankManager, storage, ignoreBlockStore)
+            val (taskLoader, taskChecker) = initializeTutorialTaskSystem(rankManager, storage, ignoreBlockStore, messageProvider)
             rankCommand.setTutorialTaskSystem(taskLoader, taskChecker)
 
             // プレイ時間トラッカータスクを起動（1分ごとに更新）
@@ -773,21 +774,22 @@ class CCContent : JavaPlugin(), Listener {
     private fun initializeTutorialTaskSystem(
         rankManager: RankManager,
         storage: YamlRankStorage,
-        ignoreBlockStore: IgnoreBlockStore
+        ignoreBlockStore: IgnoreBlockStore,
+        messageProvider: MessageProvider
     ): Pair<TutorialTaskLoader?, TutorialTaskCheckerImpl?> {
         try {
-            // tutorial_tasks.yml ファイルを確認・抽出
-            val tutorialTasksFile = File(dataFolder, "config/rank/tutorial_tasks.yml")
-            if (!tutorialTasksFile.exists()) {
-                extractTutorialTasksFile(tutorialTasksFile)
+            if (server.pluginManager.getPlugin("MyWorldManager") == null) {
+                logger.severe("MyWorldManagerが見つからないため、チュートリアルランク進行機能を無効化します。その他のランク機能は継続します。")
+                return Pair(null, null)
             }
+            // ランクアップ要件は固定仕様としてコード側に集約する。
             
             // TutorialTaskLoader を初期化
             val taskLoader = TutorialTaskLoader()
-            taskLoader.loadRequirements(tutorialTasksFile)
             
             // TutorialTaskChecker を作成
             val taskChecker = TutorialTaskCheckerImpl()
+            val routeProgressListener = TutorialRouteProgressListener(this, rankManager, taskChecker, taskLoader, storage, messageProvider)
 
             // 7つのイベントリスナーを登録
             server.pluginManager.registerEvents(
@@ -810,26 +812,14 @@ class CCContent : JavaPlugin(), Listener {
                 TutorialPlayerExpListener(rankManager, taskChecker, taskLoader, storage),
                 this
             )
+            server.pluginManager.registerEvents(routeProgressListener, this)
+            routeProgressListener.startActiveTimeTask()
             
             return Pair(taskLoader, taskChecker)
         } catch (e: Exception) {
             logger.warning("チュートリアルランク タスクシステムの初期化に失敗しました: ${e.message}")
             e.printStackTrace()
             return Pair(null, null)
-        }
-    }
-    
-    /**
-     * リソースから tutorial_tasks.yml をコピー
-     */
-    private fun extractTutorialTasksFile(destination: File) {
-        val resourceStream = getResource("config/rank/tutorial_tasks.yml")
-            ?: throw IllegalArgumentException("リソースが見つかりません: config/rank/tutorial_tasks.yml")
-        
-        resourceStream.use { input ->
-            destination.outputStream().use { output ->
-                input.copyTo(output)
-            }
         }
     }
     

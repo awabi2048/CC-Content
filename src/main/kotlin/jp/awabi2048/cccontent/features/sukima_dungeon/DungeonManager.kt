@@ -6,6 +6,7 @@ import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.util.ContentLocaleResolver
 import jp.awabi2048.cccontent.world.WorldSettingsHelper
 import org.bukkit.Bukkit
+import org.bukkit.GameRules
 import org.bukkit.World
 import org.bukkit.WorldCreator
 import java.util.UUID
@@ -43,9 +44,9 @@ object DungeonManager {
         
         val world = creator.createWorld()
         world?.let {
-            it.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false)
-            it.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, false)
-            it.setGameRule(org.bukkit.GameRule.DO_WEATHER_CYCLE, false)
+            it.setGameRule(GameRules.SPAWN_MOBS, false)
+            it.setGameRule(GameRules.ADVANCE_TIME, false)
+            it.setGameRule(GameRules.ADVANCE_WEATHER, false)
             it.time = 6000
             WorldSettingsHelper.applyDistanceSettings(
                 CCContent.instance,

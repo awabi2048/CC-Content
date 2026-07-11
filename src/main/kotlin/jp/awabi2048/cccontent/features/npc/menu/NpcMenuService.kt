@@ -425,8 +425,15 @@ class NpcMenuService(
                 add(GuiLoreLine.Data("死亡時刻", desc.createdAt, "§e"))
             }
             loreBlocks.add(GuiLoreBlock(infoLines))
+            val operation = CCSystem.getAPI().getI18nString(player, "lore.click.any")
+            val action = CCSystem.getAPI().getI18nString(player, "gui.npc.oage_shrine.request.restore.action")
+            val resolvedAction = CCSystem.getAPI().getI18nString(
+                player,
+                "lore.action_single_with_operation",
+                mapOf("operation" to operation, "action" to action)
+            )
             loreBlocks.add(GuiLoreBlock(listOf(
-                GuiLoreLine.SingleAction("クリックで回収する"),
+                GuiLoreLine.SingleAction(operation, action, resolvedAction),
                 GuiLoreLine.Raw("§7初穂料: §6🐿 §e${ContentEconomyBridge.formatPrice(DEAD_CHEST_RECOVERY_COST)}")
             )))
             val renderedLore = CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(loreBlocks))

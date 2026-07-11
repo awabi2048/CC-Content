@@ -109,6 +109,13 @@ class YamlRankStorage(
         val taskProgress = tutorialRank.taskProgress
         tutorialSection.set("taskProgress.playTime", taskProgress.playTime)
         tutorialSection.set("taskProgress.vanillaExp", taskProgress.vanillaExp)
+        tutorialSection.set("taskProgress.myWorldCreated", taskProgress.myWorldCreated)
+        tutorialSection.set("taskProgress.activeOverworldTime", taskProgress.activeOverworldTime)
+        tutorialSection.set("taskProgress.diamondOresMined", taskProgress.diamondOresMined)
+        tutorialSection.set("taskProgress.netherPortalIgnited", taskProgress.netherPortalIgnited)
+        tutorialSection.set("taskProgress.activeNetherResourceTime", taskProgress.activeNetherResourceTime)
+        tutorialSection.set("taskProgress.enderEyesCrafted", taskProgress.enderEyesCrafted)
+        tutorialSection.set("taskProgress.endPortalOpened", taskProgress.endPortalOpened)
         
         // モブ討伐数
         taskProgress.mobKills.forEach { (mobType, count) ->
@@ -148,8 +155,9 @@ class YamlRankStorage(
             val rawRankName = tutorialSection.getString("currentRank", "NEWBIE") ?: "NEWBIE"
             val rank = TutorialRank.entries.firstOrNull { it.name.equals(rawRankName, ignoreCase = true) }
                 ?: run {
-                    logger.warning("[YamlRankStorage] 無効な currentRank '${rawRankName}' を検出したため NEWBIE を使用します: ${playerUuid}")
-                    TutorialRank.NEWBIE
+                    throw IllegalStateException(
+                        "[YamlRankStorage] Unknown currentRank '$rawRankName' for player $playerUuid"
+                    )
                 }
             
             val lastUpdated = tutorialSection.getLong("lastUpdated", System.currentTimeMillis())
@@ -164,7 +172,14 @@ class YamlRankStorage(
                 mutableMapOf(),
                 tutorialSection.getLong("taskProgress.vanillaExp", 0L),
                 mutableMapOf(),
-                mutableMapOf()
+                mutableMapOf(),
+                tutorialSection.getBoolean("taskProgress.myWorldCreated", false),
+                tutorialSection.getLong("taskProgress.activeOverworldTime", 0L),
+                tutorialSection.getInt("taskProgress.diamondOresMined", 0),
+                tutorialSection.getBoolean("taskProgress.netherPortalIgnited", false),
+                tutorialSection.getLong("taskProgress.activeNetherResourceTime", 0L),
+                tutorialSection.getInt("taskProgress.enderEyesCrafted", 0),
+                tutorialSection.getBoolean("taskProgress.endPortalOpened", false)
             )
             
             // モブ討伐数を読み込み
