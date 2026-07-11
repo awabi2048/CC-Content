@@ -1,56 +1,46 @@
 package jp.awabi2048.cccontent.features.rank.tutorial.task
 
 /**
- * ランクアップのためのタスク要件を定義するクラス
+ * チュートリアルランクの固定要件。
+ *
+ * ランク経路は運用で変更しない前提のため、要件はYAMLではなく型付きの進捗項目で保持する。
  */
 data class TaskRequirement(
-    /** 必要なプレイ時間（分） */
     val playTimeMin: Int = 0,
-    
-    /** 必要なモブ討伐数（モブタイプ -> 数） */
+    val activeOverworldMin: Int = 0,
+    val activeNetherResourceMin: Int = 0,
+    val diamondOreMines: Int = 0,
+    val enderEyeCrafts: Int = 0,
+    val requiresMyWorldCreated: Boolean = false,
+    val requiresNetherPortalIgnited: Boolean = false,
+    val requiresEndPortalOpened: Boolean = false,
     val mobKills: Map<String, Int> = emptyMap(),
-    
-    /** 必要なブロック採掘数（ブロックタイプ -> 数） */
     val blockMines: Map<String, Int> = emptyMap(),
-    
-    /** 必要なバニラEXP */
     val vanillaExp: Long = 0L,
-    
-    /** 必要なアイテム（Material名 -> 数） */
     val itemsRequired: Map<String, Int> = emptyMap(),
-    
-    /** 必要なボス討伐数（ボスタイプ -> 数） */
     val bossKills: Map<String, Int> = emptyMap()
 ) {
-    /**
-     * すべてのタスク要件が空（要件なし）かどうかを判定
-     */
     fun isEmpty(): Boolean {
         return playTimeMin == 0 &&
+                activeOverworldMin == 0 &&
+                activeNetherResourceMin == 0 &&
+                diamondOreMines == 0 &&
+                enderEyeCrafts == 0 &&
+                !requiresMyWorldCreated &&
+                !requiresNetherPortalIgnited &&
+                !requiresEndPortalOpened &&
                 mobKills.isEmpty() &&
                 blockMines.isEmpty() &&
                 vanillaExp == 0L &&
                 itemsRequired.isEmpty() &&
                 bossKills.isEmpty()
     }
-    
-    /**
-     * 必要なモブ討伐数を取得
-     */
+
     fun getRequiredMobKills(mobType: String): Int = mobKills[mobType] ?: 0
-    
-    /**
-     * 必要なブロック採掘数を取得
-     */
+
     fun getRequiredBlockMines(blockType: String): Int = blockMines[blockType] ?: 0
-    
-    /**
-     * 必要なボス討伐数を取得
-     */
+
     fun getRequiredBossKills(bossType: String): Int = bossKills[bossType] ?: 0
-    
-    /**
-     * 必要なアイテム数を取得
-     */
+
     fun getRequiredItemCount(material: String): Int = itemsRequired[material] ?: 0
 }

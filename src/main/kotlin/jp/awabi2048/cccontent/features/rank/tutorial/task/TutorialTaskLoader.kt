@@ -1,89 +1,21 @@
 package jp.awabi2048.cccontent.features.rank.tutorial.task
 
-import org.bukkit.configuration.file.YamlConfiguration
-import java.io.File
-
 /**
- * YAML ファイルから チュートリアルタスクの要件を読み込むローダー
+ * チュートリアル要件の参照口。
+ *
+ * 旧実装はYAMLを読んでいたが、ランク経路を固定仕様にしたため現在は
+ * TutorialRankRequirementRegistry を唯一の正として返す。
  */
 class TutorialTaskLoader {
-    
-    /** ロードされた要件キャッシュ */
-    private val requirementCache: MutableMap<String, TaskRequirement> = mutableMapOf()
-    private val iconCache: MutableMap<String, String> = mutableMapOf()
-    private val rankLevelCache: MutableMap<String, Int> = mutableMapOf()
-    
-    /**
-     * YAML ファイルからタスク要件を読み込む
-     * @param file tutorial_tasks.yml ファイル
-     */
-    fun loadRequirements(file: File) {
-        if (!file.exists()) {
-            return
-        }
-        
-        try {
-            clearCache()
-            val config = YamlConfiguration.loadConfiguration(file)
-            val tutorialRanksSection = config.getConfigurationSection("tutorial_ranks") ?: return
-            
-            for (rankId in tutorialRanksSection.getKeys(false)) {
-                val rankSection = tutorialRanksSection.getConfigurationSection(rankId) ?: continue
-                val requirementsSection = rankSection.getConfigurationSection("requirements")
-                val iconName = rankSection.getString("icon")
-                val level = rankSection.getInt("level", Int.MAX_VALUE)
-                
-                val requirement = TaskRequirement(
-                    playTimeMin = requirementsSection?.getInt("play_time_min", 0) ?: 0,
-                    mobKills = requirementsSection?.getConfigurationSection("kill_mobs")?.let { section ->
-                        section.getKeys(false).associateWith { section.getInt(it, 0) }
-                    } ?: emptyMap(),
-                    blockMines = requirementsSection?.getConfigurationSection("mine_blocks")?.let { section ->
-                        section.getKeys(false).associateWith { section.getInt(it, 0) }
-                    } ?: emptyMap(),
-                    vanillaExp = requirementsSection?.getLong("vanilla_exp", 0L) ?: 0L,
-                    itemsRequired = requirementsSection?.getConfigurationSection("items")?.let { section ->
-                        section.getKeys(false).associateWith { section.getInt(it, 0) }
-                    } ?: emptyMap(),
-                    bossKills = requirementsSection?.getConfigurationSection("kill_boss")?.let { section ->
-                        section.getKeys(false).associateWith { section.getInt(it, 0) }
-                    } ?: emptyMap()
-                )
-                
-                requirementCache[rankId.uppercase()] = requirement
-                rankLevelCache[rankId.uppercase()] = level
-                if (!iconName.isNullOrBlank()) {
-                    iconCache[rankId.uppercase()] = iconName.trim()
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-    
-    /**
-     * 指定されたランクの要件を取得
-     * @param rankId ランクID（大文字）
-     * @return タスク要件、見つからない場合は空の要件
-     */
     fun getRequirement(rankId: String): TaskRequirement {
-        return requirementCache[rankId.uppercase()] ?: TaskRequirement()
+        return TutorialRankRequirementRegistry.getRequirement(rankId)
     }
 
     fun getRankIcon(rankId: String): String? {
-        return iconCache[rankId.uppercase()]
+        return TutorialRankRequirementRegistry.getRankIcon(rankId)
     }
 
     fun getLowestDefinedRankId(): String? {
-        return rankLevelCache.minByOrNull { it.value }?.key
-    }
-    
-    /**
-     * すべてのキャッシュをクリア
-     */
-    fun clearCache() {
-        requirementCache.clear()
-        iconCache.clear()
-        rankLevelCache.clear()
+        return TutorialRankRequirementRegistry.getLowestDefinedRankId()
     }
 }

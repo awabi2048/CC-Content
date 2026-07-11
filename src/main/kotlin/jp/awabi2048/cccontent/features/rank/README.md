@@ -91,9 +91,9 @@
 
 ### 3.3 チュートリアル条件
 
-- `src/main/resources/config/rank/tutorial_tasks.yml`
+- `tutorial/task/TutorialRankRequirementRegistry.kt`
 
-`play_time_min`, `kill_mobs`, `mine_blocks`, `vanilla_exp`, `items`, `kill_boss` などを定義する。
+チュートリアルランクの要件は運用で変更しない前提のため、YAMLではなくKotlin上の固定定義を正とする。
 
 ## 4. 効果フレームワークの実行モデル
 
@@ -135,7 +135,7 @@
 
 ```text
 NEWBIE
-  -> (tutorial_tasks.yml達成)
+  -> (固定ランク要件を達成)
 ATTAINER
   -> 職業選択
 職業EXP蓄積

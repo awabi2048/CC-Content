@@ -21,6 +21,13 @@ class TutorialTaskCheckerImpl : TutorialTaskChecker {
         }
         
         return isPlayTimeComplete(progress, requirement.playTimeMin) &&
+                isLongProgressComplete(progress.activeOverworldTime, requirement.activeOverworldMin) &&
+                isLongProgressComplete(progress.activeNetherResourceTime, requirement.activeNetherResourceMin) &&
+                isIntProgressComplete(progress.diamondOresMined, requirement.diamondOreMines) &&
+                isIntProgressComplete(progress.enderEyesCrafted, requirement.enderEyeCrafts) &&
+                isBooleanComplete(progress.myWorldCreated, requirement.requiresMyWorldCreated) &&
+                isBooleanComplete(progress.netherPortalIgnited, requirement.requiresNetherPortalIgnited) &&
+                isBooleanComplete(progress.endPortalOpened, requirement.requiresEndPortalOpened) &&
                 isMobKillsComplete(progress, requirement.mobKills) &&
                 isBlockMinesComplete(progress, requirement.blockMines) &&
                 isVanillaExpComplete(progress, requirement.vanillaExp) &&
@@ -36,6 +43,18 @@ class TutorialTaskCheckerImpl : TutorialTaskChecker {
             return true
         }
         return progress.playTime >= required
+    }
+
+    private fun isLongProgressComplete(current: Long, required: Int): Boolean {
+        return required <= 0 || current >= required
+    }
+
+    private fun isIntProgressComplete(current: Int, required: Int): Boolean {
+        return required <= 0 || current >= required
+    }
+
+    private fun isBooleanComplete(current: Boolean, required: Boolean): Boolean {
+        return !required || current
     }
     
     /**
@@ -139,6 +158,55 @@ class TutorialTaskCheckerImpl : TutorialTaskChecker {
         if (requirement.playTimeMin > 0) {
             totalTasks++
             if (isPlayTimeComplete(progress, requirement.playTimeMin)) {
+                completedTasks++
+            }
+        }
+
+        if (requirement.activeOverworldMin > 0) {
+            totalTasks++
+            if (isLongProgressComplete(progress.activeOverworldTime, requirement.activeOverworldMin)) {
+                completedTasks++
+            }
+        }
+
+        if (requirement.activeNetherResourceMin > 0) {
+            totalTasks++
+            if (isLongProgressComplete(progress.activeNetherResourceTime, requirement.activeNetherResourceMin)) {
+                completedTasks++
+            }
+        }
+
+        if (requirement.diamondOreMines > 0) {
+            totalTasks++
+            if (isIntProgressComplete(progress.diamondOresMined, requirement.diamondOreMines)) {
+                completedTasks++
+            }
+        }
+
+        if (requirement.enderEyeCrafts > 0) {
+            totalTasks++
+            if (isIntProgressComplete(progress.enderEyesCrafted, requirement.enderEyeCrafts)) {
+                completedTasks++
+            }
+        }
+
+        if (requirement.requiresMyWorldCreated) {
+            totalTasks++
+            if (progress.myWorldCreated) {
+                completedTasks++
+            }
+        }
+
+        if (requirement.requiresNetherPortalIgnited) {
+            totalTasks++
+            if (progress.netherPortalIgnited) {
+                completedTasks++
+            }
+        }
+
+        if (requirement.requiresEndPortalOpened) {
+            totalTasks++
+            if (progress.endPortalOpened) {
                 completedTasks++
             }
         }

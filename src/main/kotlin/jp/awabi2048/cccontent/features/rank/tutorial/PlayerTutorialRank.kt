@@ -34,7 +34,8 @@ data class PlayerTutorialRank(
         val nextRank = TutorialRank.values().getOrNull(currentRank.ordinal + 1)
         if (nextRank != null) {
             currentRank = nextRank
-            taskProgress = TaskProgress(playerUuid, nextRank.name)  // 新しいランクのタスク進捗を初期化
+            // ログイン時間や探索実績はチュートリアル全体の累計として扱うため、ランクIDだけを更新して進捗を引き継ぐ。
+            taskProgress = taskProgress.copy(rankId = nextRank.name)
             lastUpdated = System.currentTimeMillis()
             return true
         }

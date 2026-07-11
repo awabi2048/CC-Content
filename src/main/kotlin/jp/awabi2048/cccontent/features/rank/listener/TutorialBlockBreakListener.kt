@@ -6,6 +6,7 @@ import jp.awabi2048.cccontent.features.rank.job.BlockPositionCodec
 import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskChecker
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader
+import org.bukkit.Material
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockBreakEvent
@@ -41,6 +42,9 @@ class TutorialBlockBreakListener(
         
         // ブロック採掘数をカウント
         tutorial.taskProgress.addBlockMine(blockType)
+        if (block.type == Material.DIAMOND_ORE || block.type == Material.DEEPSLATE_DIAMOND_ORE) {
+            tutorial.taskProgress.diamondOresMined += 1
+        }
         
         // タスク完了判定
         val requirement = taskLoader.getRequirement(tutorial.currentRank.name)
