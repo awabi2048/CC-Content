@@ -1,0 +1,50 @@
+schema_version: 1
+
+# 資源ワールドで未加工素材を採取したときの職業経験値です。
+harvest:
+  wheat:
+    material: WHEAT
+    profession: farmer
+    experience: 2
+    minimum_age: 7
+  potato:
+    material: POTATOES
+    profession: farmer
+    experience: 2
+    minimum_age: 7
+  carrot:
+    material: CARROTS
+    profession: farmer
+    experience: 2
+    minimum_age: 7
+  sugar_cane:
+    material: SUGAR_CANE
+    profession: farmer
+    experience: 2
+  cocoa:
+    material: COCOA
+    profession: farmer
+    experience: 3
+  sweet_berry:
+    material: SWEET_BERRY_BUSH
+    profession: farmer
+    experience: 3
+
+# 資源ワールドで料理・醸造素材をクラフトしたときの職業経験値です。
+craft:
+  bread:
+    material: BREAD
+    profession: cook
+    experience: 5
+  cake:
+    material: CAKE
+    profession: cook
+    experience: 8
+  fermented_spider_eye:
+    material: FERMENTED_SPIDER_EYE
+    profession: brewer
+    experience: 6
+  sugar:
+    material: SUGAR
+    profession: brewer
+    experience: 2

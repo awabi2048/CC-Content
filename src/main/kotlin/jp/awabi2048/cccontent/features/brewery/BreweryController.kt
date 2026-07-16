@@ -3,14 +3,25 @@
 package jp.awabi2048.cccontent.features.brewery
 
 import com.awabi2048.ccsystem.CCSystem
-import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuIconData
+import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.features.brewery.item.BreweryItemCodec
 import jp.awabi2048.cccontent.features.brewery.model.BarrelSize
 import jp.awabi2048.cccontent.features.brewery.model.BreweryLocationKey
+import jp.awabi2048.cccontent.features.brewery.model.BrewStage
 import jp.awabi2048.cccontent.features.brewery.model.FirePower
+import jp.awabi2048.cccontent.features.brewery.BreweryIntoxicationMath
+import jp.awabi2048.cccontent.features.brewery.BreweryIntoxicationState
+import jp.awabi2048.cccontent.features.catalog.CatalogItem
+import jp.awabi2048.cccontent.features.catalog.CatalogStore
+import jp.awabi2048.cccontent.features.catalog.CatalogType
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -30,6 +41,10 @@ import org.bukkit.event.inventory.ClickType
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryCloseEvent
 import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.event.player.PlayerItemConsumeEvent
+import org.bukkit.event.player.PlayerJoinEvent
+import org.bukkit.event.player.PlayerMoveEvent
+import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
@@ -38,16 +53,22 @@ import org.bukkit.persistence.PersistentDataType
 import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
+import org.bukkit.potion.PotionEffect
+import org.bukkit.potion.PotionEffectType
+import org.bukkit.util.Vector
 import java.io.File
+import java.util.UUID
+import kotlin.random.Random
 import kotlin.math.ceil
 import kotlin.math.floor
 
-class BreweryController(private val plugin: JavaPlugin) : Listener {
+class BreweryController(private val plugin: JavaPlugin, private val catalogStore: CatalogStore) : Listener {
     private val settingsLoader = BrewerySettingsLoader(plugin)
     private val codec = BreweryItemCodec(plugin)
     private val stateFile = File(plugin.dataFolder, "data/brewery/state.yml")
     private val filterRecipeKey = NamespacedKey(plugin, "brewery_sample_filter")
     private val mockClockKey = NamespacedKey(plugin, "brewery_mock_clock")
+    private val uiKindKey = NamespacedKey(plugin, "brewery_ui_kind")
     private val rankManager = (plugin as? CCContent)?.getRankManager()
 
     private var settings: BrewerySettings = settingsLoader.loadSettings()
@@ -60,6 +81,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
     private val distillationStates = mutableMapOf<BreweryLocationKey, DistillationState>()
     private val agingStates = mutableMapOf<BreweryLocationKey, AgingState>()
     private val machineLocks = mutableMapOf<BreweryLocationKey, java.util.UUID>()
+    private val intoxicationStates = mutableMapOf<UUID, BreweryIntoxicationState>()
 
     private data class BarrelSignContext(
         val size: BarrelSize,
@@ -100,7 +122,8 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         tickerTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
             tickFermentation()
             tickDistillation()
-            if (fermentationStates.isNotEmpty() || distillationStates.isNotEmpty() || agingStates.isNotEmpty()) {
+            tickIntoxication()
+            if (fermentationStates.isNotEmpty() || distillationStates.isNotEmpty() || agingStates.isNotEmpty() || intoxicationStates.isNotEmpty()) {
                 markDirty()
             }
         }, 20L, 20L)
@@ -130,6 +153,82 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         }
         saveStateInternal()
         dirty = false
+    }
+
+    @EventHandler
+    fun onPlayerItemConsume(event: PlayerItemConsumeEvent) {
+        val parsed = codec.parse(event.item) ?: return
+        if (parsed.stage != BrewStage.AGED) return
+
+        val recipe = recipes[parsed.recipeId] ?: return
+        val now = System.currentTimeMillis()
+        val state = intoxicationStates.getOrPut(event.player.uniqueId) { BreweryIntoxicationState() }
+        BreweryIntoxicationMath.decay(
+            state,
+            now,
+            settings.intoxicationDecayPerSecond,
+            settings.stateRetentionSeconds
+        )
+        val alcohol = parsed.alcohol.coerceIn(0.0, 100.0)
+        state.alcohol = (state.alcohol + alcohol).coerceIn(0.0, 100.0)
+        state.updatedAtMillis = now
+        if (state.alcohol >= settings.faintThreshold) {
+            state.faintUntilMillis = maxOf(state.faintUntilMillis, now + settings.faintDurationSeconds * 1000L)
+        }
+
+        recipe.finalOutputEffects.forEach { definition ->
+            val resolved = definition.resolve(parsed.quality)
+            event.player.addPotionEffect(
+                PotionEffect(
+                    resolved.type,
+                    resolved.durationSeconds * 20,
+                    resolved.amplifier,
+                    false,
+                    true,
+                    true
+                )
+            )
+        }
+        recordCatalog(event.player.uniqueId, recipe.id, parsed.quality, drunk = true, obtained = false)
+        applyIntoxicationEffects(event.player, state, now, forceStumble = true)
+        event.player.sendMessage(
+            i18n(
+                event.player,
+                "brewery.drink.completed",
+                "recipe" to i18n(event.player, "brewery.recipe.${recipe.id}.name"),
+                "alcohol" to "%.1f".format(state.alcohol)
+            )
+        )
+        markDirty()
+    }
+
+    @EventHandler
+    fun onPlayerJoin(event: PlayerJoinEvent) {
+        val state = intoxicationStates[event.player.uniqueId] ?: return
+        val now = System.currentTimeMillis()
+        BreweryIntoxicationMath.decay(
+            state,
+            now,
+            settings.intoxicationDecayPerSecond,
+            settings.stateRetentionSeconds
+        )
+        state.updatedAtMillis = now
+        applyIntoxicationEffects(event.player, state, now, forceStumble = false)
+        markDirty()
+    }
+
+    @EventHandler
+    fun onPlayerQuit(event: PlayerQuitEvent) {
+        intoxicationStates[event.player.uniqueId]?.updatedAtMillis = System.currentTimeMillis()
+        markDirty()
+    }
+
+    @EventHandler
+    fun onPlayerMove(event: PlayerMoveEvent) {
+        val state = intoxicationStates[event.player.uniqueId] ?: return
+        if (state.faintUntilMillis > System.currentTimeMillis() && event.from != event.to) {
+            event.isCancelled = true
+        }
     }
 
     @EventHandler
@@ -212,6 +311,10 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         if (event.clickedInventory != top) return
 
         event.cancelWithDebug("BreweryController.onInventoryClick: menu_click")
+        if (event.rawSlot in setOf(FERMENT_START_SLOT, DISTILL_START_SLOT, BIG_AGING_CORE_SLOT, SMALL_AGING_CORE_SLOT) &&
+            event.click !in setOf(ClickType.LEFT, ClickType.RIGHT)) {
+            return
+        }
         when (holder) {
             is FermentationHolder -> handleFermentationClick(player, holder.locationKey, event)
             is DistillationHolder -> handleDistillationClick(player, holder.locationKey, event)
@@ -230,8 +333,10 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
 
         if (clicked == top) {
             if (holder is DistillationHolder && event.slot in DISTILL_INPUT_SLOTS) {
-                finalizeDistilledItem(source)
+                finalizeDistilledItem(source, player)
                 distillationStates[holder.locationKey]?.elapsedSecondsInCurrentStep = 0
+            } else if (holder is AgingHolder && event.slot in agingInputSlots(holder)) {
+                finalizeAgedItem(source, player, agingStates[holder.locationKey] ?: return, event.slot)
             }
             val moving = source.clone()
             val moved = moveToPlayerInventory(player, moving)
@@ -427,24 +532,26 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         if (!acquireLock(player, key)) return
         val state = fermentationStates.getOrPut(key) {
             val holder = FermentationHolder(key)
-            val inv = Bukkit.createInventory(holder, 45, "発酵")
+            val inv = Bukkit.createInventory(holder, 45, i18n(player, "brewery.ui.title.fermentation"))
             holder.backingInventory = inv
             FermentationState(key, inv)
         }
-        refreshFermentationDecor(state)
+        localizeInventory(player, state)
         player.openInventory(state.inventory)
+        refreshFermentationDecor(state, player)
     }
 
     private fun openDistillation(player: Player, key: BreweryLocationKey) {
         if (!acquireLock(player, key)) return
         val state = distillationStates.getOrPut(key) {
             val holder = DistillationHolder(key)
-            val inv = Bukkit.createInventory(holder, 45, "蒸留")
+            val inv = Bukkit.createInventory(holder, 45, i18n(player, "brewery.ui.title.distillation"))
             holder.backingInventory = inv
             DistillationState(key, inv)
         }
-        refreshDistillationDecor(state)
+        localizeInventory(player, state)
         player.openInventory(state.inventory)
+        refreshDistillationDecor(state, player)
     }
 
     private fun openAging(player: Player, key: BreweryLocationKey, context: BarrelSignContext) {
@@ -453,18 +560,19 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         val state = agingStates.getOrPut(key) {
             val invSize = if (size == BarrelSize.BIG) 45 else 27
             val holder = AgingHolder(key)
-            val inv = Bukkit.createInventory(holder, invSize, if (size == BarrelSize.BIG) "熟成（大樽）" else "熟成（小樽）")
+            val inv = Bukkit.createInventory(holder, invSize, i18n(player, if (size == BarrelSize.BIG) "brewery.ui.title.aging_big" else "brewery.ui.title.aging_small"))
             holder.backingInventory = inv
             AgingState(key, size, inv, barrelWoodType = context.woodType)
         }
         if (state.size != size) {
-            player.sendMessage("§c樽サイズが一致しません。再設置してください。")
+            player.sendMessage(i18n(player, "brewery.error.barrel_size"))
             return
         }
         state.barrelWoodType = context.woodType
         applyAngelShare(state)
-        refreshAgingDecor(state)
+        localizeInventory(player, state)
         player.openInventory(state.inventory)
+        refreshAgingDecor(state, player)
     }
 
     private fun acquireLock(player: Player, key: BreweryLocationKey): Boolean {
@@ -473,8 +581,12 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             machineLocks[key] = player.uniqueId
             return true
         }
-        player.sendMessage("§cこの設備は他のプレイヤーが使用中です。")
+        player.sendMessage(i18n(player, "brewery.error.machine_locked"))
         return false
+    }
+
+    private fun machinePlayer(key: BreweryLocationKey): Player? {
+        return machineLocks[key]?.let { Bukkit.getPlayer(it) }
     }
 
     private fun handleFermentationClick(player: Player, key: BreweryLocationKey, event: InventoryClickEvent) {
@@ -576,7 +688,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
                 state.running = false
                 state.elapsedSecondsInCurrentStep = 0
                 state.sessionDistillationRuns = 0
-                player.sendMessage("§e蒸留を停止しました。")
+                player.sendMessage(i18n(player, "brewery.process.distillation_stopped"))
                 playUiSuccessSound(player)
                 refreshDistillationDecor(state)
                 return
@@ -587,7 +699,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
                 .mapNotNull { codec.parse(it) }
                 .any { it.stage != jp.awabi2048.cccontent.features.brewery.model.BrewStage.AGED }
             if (!hasValidItem) {
-                player.sendMessage("§c蒸留素材がないため開始できません。")
+                player.sendMessage(i18n(player, "brewery.error.no_material"))
                 refreshDistillationDecor(state)
                 return
             }
@@ -595,7 +707,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             state.running = true
             state.elapsedSecondsInCurrentStep = 0
             state.sessionDistillationRuns = 0
-            player.sendMessage("§a蒸留を開始しました。")
+            player.sendMessage(i18n(player, "brewery.process.distillation_started"))
             playStartSound(player)
             refreshDistillationDecor(state)
             return
@@ -636,10 +748,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             return
         }
 
-        if (slot == barrelSlot) {
-            event.whoClicked.sendMessage("§7このスロットは樽種表示用です。")
-            return
-        }
+        if (slot == barrelSlot) return
 
         if (slot in inputSlots) {
             handleAgingInputSlot(event, state, slot)
@@ -647,15 +756,13 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             return
         }
 
-        if (slot == if (state.size == BarrelSize.BIG) BIG_AGING_CORE_SLOT else SMALL_AGING_CORE_SLOT) {
-            event.whoClicked.sendMessage("§7熟成コア（表示のみ）")
-        }
+        if (slot == if (state.size == BarrelSize.BIG) BIG_AGING_CORE_SLOT else SMALL_AGING_CORE_SLOT) return
     }
 
     private fun startFermentation(player: Player, state: FermentationState) {
         if (state.running) {
             state.running = false
-            player.sendMessage("§e発酵を停止しました。")
+            player.sendMessage(i18n(player, "brewery.process.fermentation_stopped"))
             playUiSuccessSound(player)
             return
         }
@@ -663,7 +770,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         val fuel = state.inventory.getItem(FERMENT_FUEL_SLOT)
         val hasFuelNow = state.fuelRemainingSeconds > 0 || firePowerFor(fuel?.type) != null
         if (!hasFuelNow) {
-            player.sendMessage("§c燃料がないため発酵を開始できません。")
+            player.sendMessage(i18n(player, "brewery.error.no_fuel"))
             return
         }
 
@@ -671,13 +778,13 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             state.inventory.getItem(slot)?.takeUnless { it.type.isAir || isFermentationPlaceholderItem(it) }
         }
         if (inputItems.isEmpty()) {
-            player.sendMessage("§c材料スロットにアイテムを入れてください。")
+            player.sendMessage(i18n(player, "brewery.error.no_ingredients"))
             return
         }
 
         val matchResult = settingsLoader.findBestRecipe(recipes, inputItems)
         if (matchResult == null) {
-            player.sendMessage("§c一致するレシピが見つかりません。")
+            player.sendMessage(i18n(player, "brewery.error.recipe_not_found"))
             return
         }
 
@@ -706,11 +813,12 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         state.running = true
         state.baseQuality = matchResult.quality
         state.inputIngredientCounts = ingredientMap.toMap()
-        state.currentBrewingItemName = recipe.name
         state.lastCalculatedQuality = matchResult.quality
+        state.ownerUuid = player.uniqueId
+        state.fermentationExpAwarded = false
 
         FERMENT_INPUT_SLOTS.forEach { state.inventory.setItem(it, null) }
-        player.sendMessage("§a発酵を開始しました。§7(レシピ: ${recipe.name})")
+        player.sendMessage(i18n(player, "brewery.process.fermentation_started", "recipe" to i18n(player, "brewery.recipe.${recipe.id}.name")))
         playStartSound(player)
     }
 
@@ -719,19 +827,19 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
 
         val profession = rankManager?.getPlayerProfession(player.uniqueId)
         if (profession == null) {
-            player.sendMessage("§cこのレシピの実行には職業情報が必要です。")
+            player.sendMessage(i18n(player, "brewery.error.skill_required"))
             return false
         }
 
         val currentLevel = rankManager?.getCurrentProfessionLevel(player.uniqueId) ?: 1
         if (currentLevel < recipe.requiredSkillLevel) {
-            player.sendMessage("§c必要職業レベル不足: Lv${recipe.requiredSkillLevel} が必要です。")
+            player.sendMessage(i18n(player, "brewery.error.level_required", "level" to recipe.requiredSkillLevel))
             return false
         }
 
         val missingSkills = recipe.requiredSkills.filterNot { it in profession.acquiredSkills }
         if (missingSkills.isNotEmpty()) {
-            player.sendMessage("§c必要スキル不足: ${missingSkills.joinToString(", ")}")
+            player.sendMessage(i18n(player, "brewery.error.skills_required", "skills" to missingSkills.joinToString(", ")))
             return false
         }
         return true
@@ -739,12 +847,12 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
 
     private fun bottleFermentation(player: Player, state: FermentationState, event: InventoryClickEvent) {
         if (!state.running && state.elapsedSeconds <= 0) {
-            player.sendMessage("§c発酵が開始されていません。")
+            player.sendMessage(i18n(player, "brewery.error.not_started"))
             return
         }
 
         if (state.producedBottleCount >= 3) {
-            player.sendMessage("§eこのバッチは最大3本までです。")
+            player.sendMessage(i18n(player, "brewery.error.batch_limit"))
             return
         }
 
@@ -755,7 +863,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         val quality = calculateFermentationQuality(state, recipe)
         val muddy = state.elapsedSeconds < 60
         val history = "fermentation=${state.elapsedSeconds}s;mismatchSteps=${state.mismatchPenaltyStepCount}"
-        val product = codec.createFermentedBottle(state.recipeId, quality, muddy, history, recipe)
+        val product = codec.createFermentedBottle(state.recipeId, quality, muddy, history, recipe ?: return, player)
 
         cursor.amount = (cursor.amount - 1).coerceAtLeast(0)
         event.setCursor(if (cursor.amount == 0) ItemStack(Material.AIR) else cursor)
@@ -764,10 +872,14 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         overflow.values.forEach { player.world.dropItemNaturally(player.location, it) }
 
         state.producedBottleCount += 1
+        if (!muddy && state.elapsedSeconds >= (recipe?.fermentationTime?.toLong() ?: Long.MAX_VALUE) && !state.fermentationExpAwarded) {
+            awardProcessExp(player.uniqueId, settings.fermentationExp)
+            state.fermentationExpAwarded = true
+        }
         playUiSuccessSound(player)
         if (state.producedBottleCount >= 3) {
             state.running = false
-            player.sendMessage("§a瓶詰めが完了しました。")
+            player.sendMessage(i18n(player, "brewery.process.bottled"))
         }
     }
 
@@ -778,7 +890,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
 
         if (cursor == null || cursor.type.isAir) {
             if (current == null || current.type.isAir || isPlaceholder) return
-            finalizeDistilledItem(current)
+            finalizeDistilledItem(current, event.whoClicked as? Player)
             event.setCursor(current)
             state.inventory.setItem(slot, null)
             state.elapsedSecondsInCurrentStep = 0
@@ -787,7 +899,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         }
 
         if (cursor.amount != 1) {
-            (event.whoClicked as? Player)?.sendMessage("§cスタック不可です。1個ずつ入れてください。")
+            (event.whoClicked as? Player)?.sendMessage(i18n(event.whoClicked as? Player, "brewery.error.single_item"))
             return
         }
 
@@ -797,7 +909,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
 
         val parsed = codec.parse(cursor)
         if (parsed == null || parsed.stage == jp.awabi2048.cccontent.features.brewery.model.BrewStage.AGED) {
-            (event.whoClicked as? Player)?.sendMessage("§c発酵済みの醸造物のみ投入できます。")
+            (event.whoClicked as? Player)?.sendMessage(i18n(event.whoClicked as? Player, "brewery.error.invalid_input"))
             return
         }
 
@@ -816,13 +928,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             if (current == null || current.type.isAir || isPlaceholder) return
             val parsed = codec.parse(current)
             if (parsed != null) {
-                val startedAt = state.insertedAtEpochMillis[slot] ?: System.currentTimeMillis()
-                val years = calculateAgingYears(startedAt, state.size)
-                val finalQuality = (parsed.quality + years * 4.0).coerceIn(0.0, 100.0)
-                val recipe = recipes[parsed.recipeId]
-                codec.markAged(current, parsed, finalQuality, recipe)
-                codec.clearAgingStart(current)
-                debugQuality("aging", parsed.recipeId, parsed.quality, finalQuality, "years=${"%.2f".format(years)}")
+                finalizeAgedItem(current, event.whoClicked as? Player, state, slot)
             }
             state.insertedAtEpochMillis.remove(slot)
             event.setCursor(current)
@@ -832,7 +938,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         }
 
         if (cursor.amount != 1) {
-            (event.whoClicked as? Player)?.sendMessage("§cスタック不可です。1個ずつ入れてください。")
+            (event.whoClicked as? Player)?.sendMessage(i18n(event.whoClicked as? Player, "brewery.error.single_item"))
             return
         }
 
@@ -841,8 +947,8 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         }
 
         val parsed = codec.parse(cursor)
-        if (parsed == null) {
-            (event.whoClicked as? Player)?.sendMessage("§c醸造物のみ投入できます。")
+        if (parsed == null || parsed.stage == BrewStage.AGED) {
+            (event.whoClicked as? Player)?.sendMessage(i18n(event.whoClicked as? Player, "brewery.error.invalid_input"))
             return
         }
 
@@ -851,7 +957,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             detectBarrelSignContext(loc)?.let { ctx -> state.barrelWoodType = ctx.woodType }
         }
         if (recipe != null && !isBarrelTypeAllowed(state.barrelWoodType, recipe.agingBarrelTypes)) {
-            (event.whoClicked as? Player)?.sendMessage("§cこのレシピは ${recipe.agingBarrelTypes.joinToString(", ")} 看板樽のみ対応です。")
+            (event.whoClicked as? Player)?.sendMessage(i18n(event.whoClicked as? Player, "brewery.error.barrel_type", "types" to recipe.agingBarrelTypes.joinToString(", ")))
             return
         }
 
@@ -886,12 +992,12 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         }
 
         if (!allowStackPlacement && cursor.amount != 1) {
-            (event.whoClicked as? Player)?.sendMessage("§cスタック不可です。1個ずつ入れてください。")
+            (event.whoClicked as? Player)?.sendMessage(i18n(event.whoClicked as? Player, "brewery.error.single_item"))
             return false
         }
 
         if (!placementValidator(cursor)) {
-            (event.whoClicked as? Player)?.sendMessage("§cこのスロットには入れられません。")
+            (event.whoClicked as? Player)?.sendMessage(i18n(event.whoClicked as? Player, "brewery.error.invalid_slot"))
             return false
         }
 
@@ -1084,46 +1190,28 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         }
     }
 
-    private fun refreshFermentationDecor(state: FermentationState) {
+    private fun refreshFermentationDecor(state: FermentationState, player: Player? = null) {
+        val localePlayer = player ?: machinePlayer(state.locationKey)
         applyFermentationBackground(state)
-        applyHeaderFooter(
-            inventory = state.inventory,
-            protectedSlots = FERMENT_INPUT_SLOTS.toSet() + setOf(FERMENT_YEAST_SLOT, FERMENT_FUEL_SLOT, FERMENT_START_SLOT, FERMENT_CLOCK_SLOT),
-            headerText = "§3§l発酵システム",
-            footerText = "§7素材を入れて中央で開始"
-        )
-
-        val start = ItemStack(Material.CAULDRON)
-        val startMeta = start.itemMeta
-        startMeta?.setDisplayName(if (state.running) "§e発酵停止" else "§a発酵開始")
-        val recipeName = recipes[state.recipeId]?.name ?: state.currentBrewingItemName
+        applyBlackFrame(state.inventory, FERMENT_INPUT_SLOTS.toSet() + setOf(FERMENT_YEAST_SLOT, FERMENT_FUEL_SLOT, FERMENT_START_SLOT, FERMENT_CLOCK_SLOT))
+        val recipeName = recipes[state.recipeId]?.let { i18n(localePlayer, "brewery.recipe.${it.id}.name") }
+            ?: i18n(localePlayer, "brewery.ui.data.none")
         val fireText = when (state.currentFirePower) {
-            FirePower.HIGH -> "高"
-            FirePower.MEDIUM -> "中"
-            FirePower.LOW -> "低"
-            null -> "未点火"
+            FirePower.HIGH -> i18n(localePlayer, "brewery.ui.fire.high")
+            FirePower.MEDIUM -> i18n(localePlayer, "brewery.ui.fire.medium")
+            FirePower.LOW -> i18n(localePlayer, "brewery.ui.fire.low")
+            null -> i18n(localePlayer, "brewery.ui.fire.none")
         }
-        startMeta?.lore(
-            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
-                "§7火の強さ: $fireText",
-                "§7現在煮込み中: ${if (state.running) recipeName else "なし"}"
-            ), GuiLoreFrame.NONE))
-        )
-        start.itemMeta = startMeta
-        state.inventory.setItem(FERMENT_START_SLOT, start)
-
-        val clock = state.inventory.getItem(FERMENT_CLOCK_SLOT) ?: ItemStack(Material.COMPASS)
-        val clockMeta = clock.itemMeta
-        clockMeta?.setDisplayName("§b時計（モック）")
-        val elapsed = state.elapsedSeconds
-        clockMeta?.lore(
-            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
-                "§7経過: ${elapsed}s",
-                "§7判定(30秒切り捨て): ${(elapsed / 30) * 30}s"
-            ), GuiLoreFrame.NONE))
-        )
-        clock.itemMeta = clockMeta
-        state.inventory.setItem(FERMENT_CLOCK_SLOT, clock)
+        state.inventory.setItem(FERMENT_START_SLOT, actionIcon(
+            localePlayer,
+            Material.CAULDRON,
+            if (state.running) "brewery.ui.action.fermentation_stop" else "brewery.ui.action.fermentation_start",
+            listOf(
+                GuiMenuIconData(i18n(localePlayer, "brewery.ui.data.fire"), fireText, "§e"),
+                GuiMenuIconData(i18n(localePlayer, "brewery.ui.data.current"), if (state.running) recipeName else i18n(localePlayer, "brewery.ui.data.none"), "§f")
+            ),
+            if (state.running) "brewery.ui.action.stop" else "brewery.ui.action.start"
+        ))
     }
 
     private fun applyFermentationBackground(state: FermentationState) {
@@ -1136,75 +1224,117 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             }
             val existing = inventory.getItem(slot)
             if (existing == null || existing.type.isAir) {
-                inventory.setItem(slot, backgroundPane(Material.GRAY_STAINED_GLASS_PANE, " "))
+                inventory.setItem(slot, placeholder(Material.GRAY_STAINED_GLASS_PANE, "generic"))
             }
         }
 
         FERMENT_INPUT_SLOTS.forEach { slot ->
             val existing = inventory.getItem(slot)
             if (existing == null || existing.type.isAir) {
-                inventory.setItem(slot, backgroundPane(Material.LIGHT_BLUE_STAINED_GLASS_PANE, "§b材料スロット"))
+                inventory.setItem(slot, placeholder(Material.LIGHT_BLUE_STAINED_GLASS_PANE, "fermentation_material"))
             }
         }
 
         val yeast = inventory.getItem(FERMENT_YEAST_SLOT)
         if (yeast == null || yeast.type.isAir) {
-            inventory.setItem(FERMENT_YEAST_SLOT, backgroundPane(Material.GREEN_STAINED_GLASS_PANE, "§a酵母スロット（モック）"))
+            inventory.setItem(FERMENT_YEAST_SLOT, placeholder(Material.GREEN_STAINED_GLASS_PANE, "fermentation_yeast"))
         }
 
         val fuel = inventory.getItem(FERMENT_FUEL_SLOT)
         if (fuel == null || fuel.type.isAir) {
-            inventory.setItem(FERMENT_FUEL_SLOT, backgroundPane(Material.ORANGE_STAINED_GLASS_PANE, "§6燃料スロット"))
+            inventory.setItem(FERMENT_FUEL_SLOT, placeholder(Material.ORANGE_STAINED_GLASS_PANE, "fermentation_fuel"))
+        }
+        if (inventory.getItem(FERMENT_CLOCK_SLOT).isEmptyOrAir()) {
+            inventory.setItem(FERMENT_CLOCK_SLOT, placeholder(Material.COMPASS, "clock"))
         }
     }
 
-    private fun backgroundPane(material: Material, name: String): ItemStack {
-        val pane = ItemStack(material)
-        val meta = pane.itemMeta
-        meta?.setDisplayName(name)
-        pane.itemMeta = meta
-        return pane
+    private fun backgroundPane(material: Material): ItemStack {
+        return CCSystem.getAPI().getGuiElementService().item(
+            GuiItemSpec(material, GuiNameSpec.Empty, GuiLoreSpec.None, GuiElementRole.DECORATION, 1)
+        ).also { markUi(it, "generic") }
     }
+
+    private fun placeholder(material: Material, kind: String): ItemStack = backgroundPane(material).also { markUi(it, kind) }
+
+    private fun uiItem(player: Player?, material: Material, nameKey: String, kind: String): ItemStack {
+        return CCSystem.getAPI().getGuiElementService().item(
+            GuiItemSpec(material, GuiNameSpec.Text(i18n(player, nameKey), com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT), GuiLoreSpec.None, GuiElementRole.DECORATION, 1)
+        ).also { markUi(it, kind) }
+    }
+
+    private fun menuIcon(player: Player?, material: Material, nameKey: String, kind: String, data: List<GuiMenuIconData>, role: GuiElementRole = GuiElementRole.CONTENT): ItemStack {
+        return CCSystem.getAPI().getGuiElementService().menuIcon(
+            GuiMenuIconSpec(
+                material = material,
+                name = GuiNameSpec.Text(i18n(player, nameKey), com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
+                role = role,
+                amount = 1,
+                description = emptyList(),
+                data = data,
+                options = emptyList(),
+                warnings = emptyList(),
+                dangers = emptyList(),
+                actions = emptyList(),
+                glint = null
+            )
+        ).also { markUi(it, kind) }
+    }
+
+    private fun actionIcon(
+        player: Player?,
+        material: Material,
+        nameKey: String,
+        data: List<GuiMenuIconData>,
+        actionKey: String
+    ): ItemStack {
+        val operation = i18n(player, "lore.click.any")
+        val action = i18n(player, actionKey)
+        return CCSystem.getAPI().getGuiElementService().menuIcon(
+            GuiMenuIconSpec(
+                material = material,
+                name = GuiNameSpec.Text(i18n(player, nameKey), com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
+                role = GuiElementRole.ACTION,
+                amount = 1,
+                description = emptyList(),
+                data = data,
+                options = emptyList(),
+                warnings = emptyList(),
+                dangers = emptyList(),
+                actions = listOf(GuiMenuIconAction(operation, action, i18n(player, "lore.action_single_with_operation", "operation" to operation, "action" to action), true)),
+                glint = null
+            )
+        ).also { markUi(it, "action") }
+    }
+
+    private fun markUi(item: ItemStack, kind: String) {
+        item.editMeta { meta -> meta.persistentDataContainer.set(uiKindKey, PersistentDataType.STRING, kind) }
+    }
+
+    private fun uiKind(item: ItemStack?): String? = item?.itemMeta?.persistentDataContainer?.get(uiKindKey, PersistentDataType.STRING)
+
+    private fun ItemStack?.isEmptyOrAir(): Boolean = this == null || this.type.isAir
 
     private fun isFermentationPlaceholderItem(item: ItemStack): Boolean {
-        val validType = item.type == Material.GRAY_STAINED_GLASS_PANE ||
-            item.type == Material.LIGHT_BLUE_STAINED_GLASS_PANE ||
-            item.type == Material.GREEN_STAINED_GLASS_PANE ||
-            item.type == Material.ORANGE_STAINED_GLASS_PANE
-        if (!validType) return false
-
-        val name = item.itemMeta?.displayName ?: return false
-        return name == " " || name.contains("材料スロット") || name.contains("酵母スロット") || name.contains("燃料スロット")
+        return uiKind(item)?.startsWith("fermentation_") == true || uiKind(item) == "generic"
     }
 
-    private fun refreshDistillationDecor(state: DistillationState) {
+    private fun refreshDistillationDecor(state: DistillationState, player: Player? = null) {
+        val localePlayer = player ?: machinePlayer(state.locationKey)
         applyDistillationBackground(state)
+        applyBlackFrame(state.inventory, DISTILL_INPUT_SLOTS.toSet() + setOf(DISTILL_FILTER_SLOT, DISTILL_START_SLOT, DISTILL_CLOCK_SLOT))
         state.lastRequiredSeconds = estimateDistillationSeconds(state)
-        applyHeaderFooter(
-            inventory = state.inventory,
-            protectedSlots = DISTILL_INPUT_SLOTS.toSet() + setOf(DISTILL_FILTER_SLOT, DISTILL_START_SLOT, DISTILL_CLOCK_SLOT),
-            headerText = "§6§l蒸留システム",
-            footerText = "§7黄色スロットに醸造物を投入"
-        )
-
-        val start = ItemStack(Material.BREWING_STAND)
-        val meta = start.itemMeta
-        meta?.setDisplayName(if (state.running) "§e蒸留停止" else "§a蒸留開始")
-        meta?.lore(
-            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
-                "§7現在ステップ経過: ${state.elapsedSecondsInCurrentStep}s",
-                "§7現在セッション蒸留回数: ${state.sessionDistillationRuns}",
-                "§71回の蒸留時間: ${state.lastRequiredSeconds}s"
-            ), GuiLoreFrame.NONE))
-        )
-        start.itemMeta = meta
-        state.inventory.setItem(DISTILL_START_SLOT, start)
-
-        val clock = state.inventory.getItem(DISTILL_CLOCK_SLOT) ?: ItemStack(Material.COMPASS)
-        val clockMeta = clock.itemMeta
-        clockMeta?.setDisplayName("§b時計（モック）")
-        clock.itemMeta = clockMeta
-        state.inventory.setItem(DISTILL_CLOCK_SLOT, clock)
+        state.inventory.setItem(DISTILL_START_SLOT, actionIcon(
+            localePlayer,
+            Material.BREWING_STAND,
+            if (state.running) "brewery.ui.action.distillation_stop" else "brewery.ui.action.distillation_start",
+            listOf(
+                GuiMenuIconData(i18n(localePlayer, "brewery.ui.data.step_elapsed"), "${state.elapsedSecondsInCurrentStep}s", "§f"),
+                GuiMenuIconData(i18n(localePlayer, "brewery.ui.data.session_runs"), state.sessionDistillationRuns, "§f"),
+                GuiMenuIconData(i18n(localePlayer, "brewery.ui.data.duration"), "${state.lastRequiredSeconds}s", "§e")
+            ),
+            if (state.running) "brewery.ui.action.stop" else "brewery.ui.action.start"
+        ))
     }
 
     private fun estimateDistillationSeconds(state: DistillationState): Int {
@@ -1231,62 +1361,28 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             }
             val existing = inventory.getItem(slot)
             if (existing == null || existing.type.isAir) {
-                inventory.setItem(slot, backgroundPane(Material.GRAY_STAINED_GLASS_PANE, " "))
+                inventory.setItem(slot, placeholder(Material.GRAY_STAINED_GLASS_PANE, "generic"))
             }
         }
 
         DISTILL_INPUT_SLOTS.forEach { slot ->
             val existing = inventory.getItem(slot)
             if (existing == null || existing.type.isAir) {
-                inventory.setItem(slot, backgroundPane(Material.YELLOW_STAINED_GLASS_PANE, "§e蒸留スロット"))
+                inventory.setItem(slot, placeholder(Material.YELLOW_STAINED_GLASS_PANE, "distillation_material"))
             }
         }
 
         val filter = inventory.getItem(DISTILL_FILTER_SLOT)
         if (filter == null || filter.type.isAir) {
-            inventory.setItem(DISTILL_FILTER_SLOT, backgroundPane(Material.LIME_STAINED_GLASS_PANE, "§aフィルタースロット"))
+            inventory.setItem(DISTILL_FILTER_SLOT, placeholder(Material.LIME_STAINED_GLASS_PANE, "distillation_filter"))
         }
-    }
-
-    private fun applyHeaderFooter(
-        inventory: Inventory,
-        protectedSlots: Set<Int>,
-        headerText: String,
-        footerText: String
-    ) {
-        val headerSlots = 0..8
-        for (slot in headerSlots) {
-            if (slot in protectedSlots) continue
-            inventory.setItem(slot, backgroundPane(Material.BLACK_STAINED_GLASS_PANE, headerText))
-        }
-
-        val footerSlots = (inventory.size - 9) until inventory.size
-        for (slot in footerSlots) {
-            if (slot in protectedSlots) continue
-            if (inventory.getItem(slot) == null || isUiPlaceholderItem(inventory.getItem(slot)!!)) {
-                inventory.setItem(slot, backgroundPane(Material.BLACK_STAINED_GLASS_PANE, footerText))
-            }
+        if (inventory.getItem(DISTILL_CLOCK_SLOT).isEmptyOrAir()) {
+            inventory.setItem(DISTILL_CLOCK_SLOT, placeholder(Material.COMPASS, "clock"))
         }
     }
 
     private fun isDistillationPlaceholderItem(item: ItemStack): Boolean {
-        val validType = item.type == Material.GRAY_STAINED_GLASS_PANE ||
-            item.type == Material.YELLOW_STAINED_GLASS_PANE ||
-            item.type == Material.LIME_STAINED_GLASS_PANE
-        if (!validType) return false
-        val name = item.itemMeta?.displayName ?: return false
-        return name == " " || name.contains("蒸留スロット") || name.contains("フィルタースロット")
-    }
-
-    private fun isHeaderFooterItem(item: ItemStack): Boolean {
-        if (item.type != Material.BLACK_STAINED_GLASS_PANE) return false
-        val name = item.itemMeta?.displayName ?: return false
-        return name.contains("発酵システム") ||
-            name.contains("素材を入れて") ||
-            name.contains("蒸留システム") ||
-            name.contains("黄色スロット") ||
-            name.contains("熟成システム") ||
-            name.contains("白スロットで熟成")
+        return uiKind(item)?.startsWith("distillation_") == true || uiKind(item) == "generic"
     }
 
     private fun isAgingPlaceholderItem(item: ItemStack): Boolean {
@@ -1295,72 +1391,48 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             item.type == Material.BROWN_STAINED_GLASS_PANE ||
             item.type == Material.YELLOW_STAINED_GLASS_PANE
         if (!validType) return false
-        val name = item.itemMeta?.displayName ?: return false
-        return name == " " ||
-            name.contains("熟成スロット") ||
-            name.contains("樽表示スロット") ||
-            name.contains("時計スロット")
+        return uiKind(item)?.startsWith("aging_") == true || uiKind(item) == "generic"
     }
 
     private fun isClockDisplayPlaceholder(item: ItemStack): Boolean {
-        if (item.type != Material.COMPASS) return false
-        val name = item.itemMeta?.displayName ?: return false
-        return name.contains("時計") && name.contains("モック")
+        return uiKind(item) == "clock" || uiKind(item) == "aging_clock"
     }
 
     private fun isControlDisplayItem(item: ItemStack): Boolean {
-        val name = item.itemMeta?.displayName ?: return false
-        return name.contains("発酵開始") ||
-            name.contains("発酵停止") ||
-            name.contains("蒸留開始") ||
-            name.contains("蒸留停止") ||
-            name.contains("熟成コア") ||
-            name.contains("大樽") ||
-            name.contains("小樽")
+        return uiKind(item) in setOf("action", "barrel", "aging_core")
     }
 
     private fun isUiPlaceholderItem(item: ItemStack): Boolean {
         return isFermentationPlaceholderItem(item) ||
             isDistillationPlaceholderItem(item) ||
             isAgingPlaceholderItem(item) ||
-            isHeaderFooterItem(item) ||
             isClockDisplayPlaceholder(item) ||
             isControlDisplayItem(item)
     }
 
-    private fun refreshAgingDecor(state: AgingState) {
+    private fun refreshAgingDecor(state: AgingState, player: Player? = null) {
+        val localePlayer = player ?: machinePlayer(state.locationKey)
         applyAgingBackground(state)
         val inputSlots = if (state.size == BarrelSize.BIG) BIG_AGING_INPUT_SLOTS else SMALL_AGING_INPUT_SLOTS
         val barrelSlot = if (state.size == BarrelSize.BIG) BIG_AGING_BARREL_SLOT else SMALL_AGING_BARREL_SLOT
         val coreSlot = if (state.size == BarrelSize.BIG) BIG_AGING_CORE_SLOT else SMALL_AGING_CORE_SLOT
         val clockSlot = if (state.size == BarrelSize.BIG) BIG_AGING_CLOCK_SLOT else SMALL_AGING_CLOCK_SLOT
-        applyHeaderFooter(
-            inventory = state.inventory,
-            protectedSlots = inputSlots.toSet() + setOf(barrelSlot, coreSlot, clockSlot),
-            headerText = "§6§l熟成システム",
-            footerText = "§7白スロットで熟成・取り出し"
-        )
-
-        
-
-        val barrel = ItemStack(if (state.size == BarrelSize.BIG) Material.DARK_OAK_LOG else Material.OAK_LOG)
-        val barrelMeta = barrel.itemMeta
-        barrelMeta?.setDisplayName(if (state.size == BarrelSize.BIG) "§f大樽" else "§f小樽")
-        barrel.itemMeta = barrelMeta
-        state.inventory.setItem(barrelSlot, barrel)
-
-        val core = ItemStack(Material.BARREL)
-        val coreMeta = core.itemMeta
-        coreMeta?.setDisplayName("§6熟成コア")
-        core.itemMeta = coreMeta
-        state.inventory.setItem(coreSlot, core)
-
-        val clock = state.inventory.getItem(clockSlot) ?: ItemStack(Material.COMPASS)
-        val clockMeta = clock.itemMeta
-        clockMeta?.setDisplayName("§bふしぎな時計（モック）")
-        clockMeta?.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf("§7投入のみ可能（効果なし）"), GuiLoreFrame.NONE)))
-        clock.itemMeta = clockMeta
-        state.inventory.setItem(clockSlot, clock)
+        applyBlackFrame(state.inventory, inputSlots.toSet() + setOf(barrelSlot, coreSlot, clockSlot))
+        if (state.inventory.getItem(barrelSlot).isEmptyOrAir() || uiKind(state.inventory.getItem(barrelSlot)) == "barrel") {
+            state.inventory.setItem(barrelSlot, uiItem(
+                localePlayer,
+                if (state.size == BarrelSize.BIG) Material.DARK_OAK_LOG else Material.OAK_LOG,
+                if (state.size == BarrelSize.BIG) "brewery.ui.barrel.big" else "brewery.ui.barrel.small",
+                "barrel"
+            ))
+        }
+        if (state.inventory.getItem(coreSlot).isEmptyOrAir() || uiKind(state.inventory.getItem(coreSlot)) == "aging_core") {
+            state.inventory.setItem(coreSlot, menuIcon(
+                localePlayer, Material.BARREL, "brewery.ui.aging_core", "aging_core",
+                listOf(GuiMenuIconData(i18n(localePlayer, "brewery.ui.data.items"), inputSlots.count { !state.inventory.getItem(it).isEmptyOrAir() }, "§f")),
+                GuiElementRole.CONTENT
+            ))
+        }
     }
 
     private fun applyAgingBackground(state: AgingState) {
@@ -1375,25 +1447,25 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             if (slot in interactiveSlots) continue
             val existing = inventory.getItem(slot)
             if (existing == null || existing.type.isAir) {
-                inventory.setItem(slot, backgroundPane(Material.GRAY_STAINED_GLASS_PANE, " "))
+                inventory.setItem(slot, placeholder(Material.GRAY_STAINED_GLASS_PANE, "generic"))
             }
         }
 
         inputSlots.forEach { slot ->
             val existing = inventory.getItem(slot)
             if (existing == null || existing.type.isAir) {
-                inventory.setItem(slot, backgroundPane(Material.WHITE_STAINED_GLASS_PANE, "§f熟成スロット"))
+                inventory.setItem(slot, placeholder(Material.WHITE_STAINED_GLASS_PANE, "aging_material"))
             }
         }
 
         val barrel = inventory.getItem(barrelSlot)
         if (barrel == null || barrel.type.isAir) {
-            inventory.setItem(barrelSlot, backgroundPane(Material.BROWN_STAINED_GLASS_PANE, "§6樽表示スロット"))
+            inventory.setItem(barrelSlot, placeholder(Material.BROWN_STAINED_GLASS_PANE, "aging_barrel"))
         }
 
         val clock = inventory.getItem(clockSlot)
         if (clock == null || clock.type.isAir) {
-            inventory.setItem(clockSlot, backgroundPane(Material.YELLOW_STAINED_GLASS_PANE, "§e時計スロット"))
+            inventory.setItem(clockSlot, placeholder(Material.YELLOW_STAINED_GLASS_PANE, "aging_clock"))
         }
     }
 
@@ -1454,14 +1526,118 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         return "any" in allowedTypes || currentWoodType in allowedTypes
     }
 
-    private fun finalizeDistilledItem(item: ItemStack) {
+    private fun finalizeDistilledItem(item: ItemStack, player: Player?) {
         val parsed = codec.parse(item) ?: return
         val before = parsed.quality
         val recipe = recipes[parsed.recipeId]
         val target = recipe?.distillationRuns ?: 1
-        codec.markDistilled(item, parsed, target, settings.distillationOverPenalty, recipe)
+        codec.markDistilled(item, parsed, target, settings.distillationOverPenalty, recipe ?: return, player)
+        if (!codec.hasStageExpAwarded(item, BrewStage.DISTILLED)) {
+            player?.let { awardProcessExp(it.uniqueId, settings.distillationExp) }
+            codec.markStageExpAwarded(item, BrewStage.DISTILLED)
+        }
         val after = codec.parse(item)?.quality ?: before
         debugQuality("distillation-finalize", parsed.recipeId, before, after, "targetRuns=$target,actualRuns=${parsed.distillCount}")
+    }
+
+    private fun applyBlackFrame(inventory: Inventory, protectedSlots: Set<Int>) {
+        val frameSlots = (0..8) + ((inventory.size - 9) until inventory.size).toList()
+        frameSlots.distinct().forEach { slot ->
+            if (slot in protectedSlots) return@forEach
+            val current = inventory.getItem(slot)
+            if (current.isEmptyOrAir() || isUiPlaceholderItem(current!!)) {
+                inventory.setItem(slot, backgroundPane(Material.BLACK_STAINED_GLASS_PANE))
+            }
+        }
+    }
+
+    private fun finalizeAgedItem(item: ItemStack, player: Player?, state: AgingState, slot: Int) {
+        val parsed = codec.parse(item) ?: return
+        if (parsed.stage == BrewStage.AGED) return
+        val startedAt = state.insertedAtEpochMillis[slot] ?: System.currentTimeMillis()
+        val years = calculateAgingYears(startedAt, state.size)
+        val recipe = recipes[parsed.recipeId]
+        val targetDays = recipe?.agingTimeDays?.coerceAtLeast(1) ?: 1
+        val ageProgress = years * 365.0 / targetDays.toDouble()
+        val finalQuality = (parsed.quality + ageProgress * 4.0).coerceIn(0.0, 100.0)
+        codec.markAged(item, parsed, finalQuality, recipe ?: return, player)
+        codec.clearAgingStart(item)
+        if (!codec.hasStageExpAwarded(item, BrewStage.AGED)) {
+            player?.let { awardProcessExp(it.uniqueId, settings.agingExp) }
+            codec.markStageExpAwarded(item, BrewStage.AGED)
+        }
+        player?.let {
+            recordCatalog(it.uniqueId, parsed.recipeId, finalQuality, drunk = false, obtained = true)
+        }
+        debugQuality("aging", parsed.recipeId, parsed.quality, finalQuality, "years=${"%.2f".format(years)},targetDays=$targetDays")
+    }
+
+    private fun agingInputSlots(holder: AgingHolder): List<Int> {
+        val state = agingStates[holder.locationKey] ?: return emptyList()
+        return if (state.size == BarrelSize.BIG) BIG_AGING_INPUT_SLOTS else SMALL_AGING_INPUT_SLOTS
+    }
+
+    private fun awardProcessExp(playerUuid: UUID, amount: Long) {
+        if (amount <= 0L) return
+        rankManager?.addProfessionExp(playerUuid, amount)
+    }
+
+    private fun recordCatalog(
+        playerUuid: UUID,
+        recipeId: String,
+        quality: Double,
+        drunk: Boolean,
+        obtained: Boolean
+    ) {
+        val before = catalogStore.entries(playerUuid, CatalogType.BREWERY)[recipeId]
+        catalogStore.record(playerUuid, CatalogType.BREWERY, recipeId,
+            qualityValue = quality, completion = null, obtained = obtained, drunk = drunk)
+        if (before == null || !before.discovered) {
+            val player = Bukkit.getPlayer(playerUuid)
+            player?.sendMessage(i18n(player, "brewery.catalog.discovered", "recipe" to i18n(player, "brewery.recipe.$recipeId.name")))
+        }
+    }
+
+    private fun tickIntoxication() {
+        val now = System.currentTimeMillis()
+        intoxicationStates.forEach { (uuid, state) ->
+            val changed = BreweryIntoxicationMath.decay(
+                state,
+                now,
+                settings.intoxicationDecayPerSecond,
+                settings.stateRetentionSeconds
+            )
+            val player = Bukkit.getPlayer(uuid) ?: return@forEach
+            applyIntoxicationEffects(player, state, now, forceStumble = changed)
+        }
+    }
+
+    private fun applyIntoxicationEffects(
+        player: Player,
+        state: BreweryIntoxicationState,
+        now: Long,
+        forceStumble: Boolean
+    ) {
+        if (state.alcohol >= settings.nauseaThreshold) {
+            player.addPotionEffect(PotionEffect(PotionEffectType.NAUSEA, 40, 0, false, false, true))
+        }
+        if (state.alcohol >= settings.stumbleThreshold) {
+            player.addPotionEffect(PotionEffect(PotionEffectType.SLOWNESS, 40, 0, false, false, true))
+            if (forceStumble && Random.nextBoolean()) {
+                player.velocity = Vector(Random.nextDouble(-0.12, 0.12), 0.02, Random.nextDouble(-0.12, 0.12))
+            }
+        }
+        if (state.faintUntilMillis > now) {
+            player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, 40, 0, false, false, true))
+            player.addPotionEffect(PotionEffect(PotionEffectType.SLOWNESS, 40, 10, false, false, true))
+            player.velocity = Vector(0.0, 0.0, 0.0)
+        }
+    }
+
+    private fun i18n(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): String {
+        return com.awabi2048.ccsystem.CCSystem.getAPI()
+            .getI18nString(player, key, placeholders.associate { it.first to (it.second ?: "") })
+            .replace('&', '§')
     }
 
     private fun playUiSuccessSound(player: Player) {
@@ -1525,7 +1701,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
 
     private fun registerSampleFilterRecipe() {
         Bukkit.removeRecipe(filterRecipeKey)
-        val result = codec.buildSampleFilterItem()
+        val result = codec.buildSampleFilterItem(null)
         val recipe = ShapedRecipe(filterRecipeKey, result)
         recipe.shape("PSP", "SCS", "PSP")
         recipe.setIngredient('P', Material.PAPER)
@@ -1536,6 +1712,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
 
     private fun saveStateInternal() {
         val yml = YamlConfiguration()
+        yml.set("schema_version", 2)
         fermentationStates.forEach { (key, state) ->
             val base = "fermentation.${key.toSerialized()}"
             yml.set("$base.running", state.running)
@@ -1546,8 +1723,9 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             yml.set("$base.mismatchPenaltyStepCount", state.mismatchPenaltyStepCount)
             yml.set("$base.baseQuality", state.baseQuality)
             yml.set("$base.currentFirePower", state.currentFirePower?.name)
-            yml.set("$base.currentBrewingItemName", state.currentBrewingItemName)
             yml.set("$base.lastCalculatedQuality", state.lastCalculatedQuality)
+            yml.set("$base.ownerUuid", state.ownerUuid?.toString())
+            yml.set("$base.fermentationExpAwarded", state.fermentationExpAwarded)
             state.inputIngredientCounts.forEach { (material, count) ->
                 yml.set("$base.ingredients.$material", count)
             }
@@ -1573,6 +1751,12 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             }
         }
 
+        intoxicationStates.forEach { (uuid, state) ->
+            val base = "intoxication.$uuid"
+            yml.set("$base.alcohol", state.alcohol)
+            yml.set("$base.updatedAtMillis", state.updatedAtMillis)
+            yml.set("$base.faintUntilMillis", state.faintUntilMillis)
+        }
         stateFile.parentFile?.mkdirs()
         yml.save(stateFile)
     }
@@ -1586,15 +1770,18 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         fermentationStates.clear()
         distillationStates.clear()
         agingStates.clear()
+        intoxicationStates.clear()
 
         if (!stateFile.exists()) return
         val yml = YamlConfiguration.loadConfiguration(stateFile)
+        val schemaVersion = yml.getInt("schema_version", -1)
+        require(schemaVersion == 2) { "Brewery状態のschema_versionが2ではありません: $schemaVersion" }
 
         val fSection = yml.getConfigurationSection("fermentation")
         fSection?.getKeys(false)?.forEach { rawKey ->
             val key = BreweryLocationKey.parse(rawKey) ?: return@forEach
             val holder = FermentationHolder(key)
-            val inv = Bukkit.createInventory(holder, 45, "発酵")
+            val inv = Bukkit.createInventory(holder, 45, " ")
             holder.backingInventory = inv
             loadInventory(yml, "fermentation.$rawKey.inventory", inv)
             val state = FermentationState(key, inv)
@@ -1602,11 +1789,12 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             state.elapsedSeconds = yml.getLong("fermentation.$rawKey.elapsedSeconds", 0L)
             state.fuelRemainingSeconds = yml.getInt("fermentation.$rawKey.fuelRemainingSeconds", 0)
             state.producedBottleCount = yml.getInt("fermentation.$rawKey.producedBottleCount", 0)
-            state.recipeId = yml.getString("fermentation.$rawKey.recipeId", "unknown") ?: "unknown"
+            state.recipeId = yml.getString("fermentation.$rawKey.recipeId") ?: return@forEach
             state.mismatchPenaltyStepCount = yml.getInt("fermentation.$rawKey.mismatchPenaltyStepCount", 0)
             state.baseQuality = yml.getDouble("fermentation.$rawKey.baseQuality", 40.0)
-            state.currentBrewingItemName = yml.getString("fermentation.$rawKey.currentBrewingItemName", "なし") ?: "なし"
             state.lastCalculatedQuality = yml.getDouble("fermentation.$rawKey.lastCalculatedQuality", state.baseQuality)
+            state.ownerUuid = yml.getString("fermentation.$rawKey.ownerUuid")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+            state.fermentationExpAwarded = yml.getBoolean("fermentation.$rawKey.fermentationExpAwarded", false)
             state.currentFirePower = yml.getString("fermentation.$rawKey.currentFirePower")?.let {
                 runCatching { FirePower.valueOf(it) }.getOrNull()
             }
@@ -1624,7 +1812,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         dSection?.getKeys(false)?.forEach { rawKey ->
             val key = BreweryLocationKey.parse(rawKey) ?: return@forEach
             val holder = DistillationHolder(key)
-            val inv = Bukkit.createInventory(holder, 45, "蒸留")
+            val inv = Bukkit.createInventory(holder, 45, " ")
             holder.backingInventory = inv
             loadInventory(yml, "distillation.$rawKey.inventory", inv)
             val state = DistillationState(key, inv)
@@ -1644,7 +1832,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             }.getOrDefault(BarrelSize.BIG)
             val invSize = if (size == BarrelSize.BIG) 45 else 27
             val holder = AgingHolder(key)
-            val inv = Bukkit.createInventory(holder, invSize, if (size == BarrelSize.BIG) "熟成（大樽）" else "熟成（小樽）")
+            val inv = Bukkit.createInventory(holder, invSize, " ")
             holder.backingInventory = inv
             loadInventory(yml, "aging.$rawKey.inventory", inv)
             val state = AgingState(key, size, inv)
@@ -1657,8 +1845,19 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
             agingStates[key] = state
             refreshAgingDecor(state)
         }
+
+        yml.getConfigurationSection("intoxication")?.getKeys(false)?.forEach { rawUuid ->
+            val uuid = runCatching { UUID.fromString(rawUuid) }.getOrNull() ?: return@forEach
+            intoxicationStates[uuid] = BreweryIntoxicationState(
+                alcohol = yml.getDouble("intoxication.$rawUuid.alcohol", 0.0).coerceIn(0.0, 100.0),
+                updatedAtMillis = yml.getLong("intoxication.$rawUuid.updatedAtMillis", 0L),
+                faintUntilMillis = yml.getLong("intoxication.$rawUuid.faintUntilMillis", 0L)
+            )
+        }
         dirty = false
     }
+
+    fun catalogItems(): List<CatalogItem> = recipes.values.map { CatalogItem(it.id, Material.POTION) }
 
     private fun markDirty() {
         dirty = true
@@ -1687,25 +1886,73 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
         }
     }
 
+    private fun localizeInventory(player: Player, state: FermentationState) {
+        replaceInventoryIfNeeded(player, state, "brewery.ui.title.fermentation")
+    }
+
+    private fun localizeInventory(player: Player, state: DistillationState) {
+        replaceInventoryIfNeeded(player, state, "brewery.ui.title.distillation")
+    }
+
+    private fun localizeInventory(player: Player, state: AgingState) {
+        replaceInventoryIfNeeded(
+            player,
+            state,
+            if (state.size == BarrelSize.BIG) "brewery.ui.title.aging_big" else "brewery.ui.title.aging_small"
+        )
+    }
+
+    private fun replaceInventoryIfNeeded(player: Player, state: FermentationState, titleKey: String) {
+        val title = i18n(player, titleKey)
+        val holder = state.inventory.holder as? FermentationHolder ?: return
+        val replacement = Bukkit.createInventory(holder, state.inventory.size, title)
+        copyInventoryContents(state.inventory, replacement)
+        holder.backingInventory = replacement
+        state.inventory = replacement
+    }
+
+    private fun replaceInventoryIfNeeded(player: Player, state: DistillationState, titleKey: String) {
+        val title = i18n(player, titleKey)
+        val holder = state.inventory.holder as? DistillationHolder ?: return
+        val replacement = Bukkit.createInventory(holder, state.inventory.size, title)
+        copyInventoryContents(state.inventory, replacement)
+        holder.backingInventory = replacement
+        state.inventory = replacement
+    }
+
+    private fun replaceInventoryIfNeeded(player: Player, state: AgingState, titleKey: String) {
+        val title = i18n(player, titleKey)
+        val holder = state.inventory.holder as? AgingHolder ?: return
+        val replacement = Bukkit.createInventory(holder, state.inventory.size, title)
+        copyInventoryContents(state.inventory, replacement)
+        holder.backingInventory = replacement
+        state.inventory = replacement
+    }
+
+    private fun copyInventoryContents(source: Inventory, target: Inventory) {
+        for (slot in 0 until minOf(source.size, target.size)) target.setItem(slot, source.getItem(slot))
+    }
+
     private data class FermentationState(
         val locationKey: BreweryLocationKey,
-        val inventory: Inventory,
+        var inventory: Inventory,
         var running: Boolean = false,
         var elapsedSeconds: Long = 0,
         var fuelRemainingSeconds: Int = 0,
         var producedBottleCount: Int = 0,
-        var recipeId: String = "unknown",
+        var recipeId: String = "",
         var mismatchPenaltyStepCount: Int = 0,
         var baseQuality: Double = 40.0,
         var currentFirePower: FirePower? = null,
         var inputIngredientCounts: Map<Material, Int> = emptyMap(),
-        var currentBrewingItemName: String = "なし",
-        var lastCalculatedQuality: Double = 40.0
+        var lastCalculatedQuality: Double = 40.0,
+        var ownerUuid: UUID? = null,
+        var fermentationExpAwarded: Boolean = false
     )
 
     private data class DistillationState(
         val locationKey: BreweryLocationKey,
-        val inventory: Inventory,
+        var inventory: Inventory,
         var running: Boolean = false,
         var elapsedSecondsInCurrentStep: Int = 0,
         var sessionDistillationRuns: Int = 0,
@@ -1715,7 +1962,7 @@ class BreweryController(private val plugin: JavaPlugin) : Listener {
     private data class AgingState(
         val locationKey: BreweryLocationKey,
         val size: BarrelSize,
-        val inventory: Inventory,
+        var inventory: Inventory,
         val insertedAtEpochMillis: MutableMap<Int, Long> = mutableMapOf(),
         var barrelWoodType: String = "any"
     )

@@ -1,0 +1,77 @@
+minigame:
+  click_count: 5
+  timeout_ticks: 120
+
+schema_version: 1
+enabled: true
+
+fish:
+  cod:
+    material: COD
+    weight: 55
+    min_level: 1
+    exp: 5
+    bobber_y:
+      min: 0
+      max: 320
+    bobber_distance:
+      min: 0
+      max: 100000
+    quality:
+      common: 70
+      uncommon: 22
+      rare: 7
+      epic: 1
+  salmon:
+    material: SALMON
+    weight: 30
+    min_level: 1
+    exp: 7
+    biomes: [river, frozen_river, ocean, cold_ocean]
+    bobber_y:
+      min: 0
+      max: 320
+    bobber_distance:
+      min: 0
+      max: 100000
+    quality:
+      common: 65
+      uncommon: 25
+      rare: 9
+      epic: 1
+  pufferfish:
+    material: PUFFERFISH
+    weight: 10
+    min_level: 5
+    exp: 12
+    weather: [clear]
+    times: [day, dusk]
+    bobber_y:
+      min: 40
+      max: 320
+    bobber_distance:
+      min: 0
+      max: 100000
+    quality:
+      common: 50
+      uncommon: 30
+      rare: 15
+      epic: 5
+  tropical_fish:
+    material: TROPICAL_FISH
+    weight: 5
+    min_level: 10
+    exp: 20
+    biomes: [warm_ocean, lukewarm_ocean, deep_lukewarm_ocean]
+    weather: [clear]
+    bobber_y:
+      min: 30
+      max: 320
+    bobber_distance:
+      min: 0
+      max: 100000
+    quality:
+      uncommon: 45
+      rare: 35
+      epic: 15
+      legendary: 5

@@ -1,148 +1,152 @@
-sample_ale:
-  name: "サンプルエール"
-  required_skill_level: 2
-  required_skills:
-    - "skill1"
-  fermentation:
-    ingredients:
-      grain_wheat: 3
-      sweetener: 1
-    time: 180
-    heat: medium
-    particle_color: "#FFAA00"
-  distillation:
-    time: 45
-    filter_consumption: 1
-    runs: 3
-  aging:
-    time: 7
-    barrel_type:
-      - oak
-      - birch
-  middle_output:
-    name: "若いエール原液"
-    description: "発酵直後の若い原液。蒸留を通すと香りが安定する。"
-    color: "#E3B84B"
-  final_output:
-    name:
-      - "荒削りエール"
-      - "エール"
-      - "極上エール"
-    description:
-      - "雑味がやや残るが飲める品質。"
-      - "香りと甘みのバランスが良い。"
-      - "麦の余韻が長く続く逸品。"
-    alchol: 5.0
-    color: "#D98B2B"
+schema_version: 2
 
-kelp_spirit:
-  name: "昆布スピリッツ"
-  required_skill_level: 4
-  required_skills:
-    - "skill2"
-  fermentation:
-    ingredients:
-      kelp_base: 2
-      sweetener: 1
-      berry_note: 2
-    time: 240
-    heat: low
-    particle_color: "#00FF88"
-  distillation:
-    time: 60
-    filter_consumption: 2
-    runs: 4
-  aging:
-    time: 30
-    barrel_type:
-      - dark_oak
-      - spruce
-  middle_output:
-    name: "昆布蒸留前原液"
-    description: "海藻由来の香りが強い。熟成で角が取れる。"
-    color: "#4E9C73"
-  final_output:
-    name:
-      - "粗悪な昆布酒"
-      - "昆布スピリッツ"
-      - "深海の雫"
-    description:
-      - "塩気が強く荒い口当たり。"
-      - "海の香りと甘みが調和した味。"
-      - "深い旨味と滑らかな余韻を持つ。"
-    alchol: 45.0
-    color: "#3D7252"
+recipes:
+  wheatbeer:
+    required_skill_level: 1
+    required_skills: []
+    fermentation:
+      ingredients:
+        WHEAT: 3
+      time_seconds: 480
+      heat: medium
+      particle_color: "#FFAA00"
+    distillation:
+      time_seconds: 40
+      filter_consumption: 1
+      runs: 0
+    aging:
+      time_days: 2
+      barrel_type: any
+    middle_output:
+      color: "#E3B84B"
+    final_output:
+      alcohol: 5.0
+      color: "#D98B2B"
+      effects:
+        - "SPEED/0-1/20-60"
 
-honey_mead:
-  name: "蜂蜜酒"
-  required_skill_level: 3
-  required_skills:
-    - "skill1"
-  fermentation:
-    ingredients:
-      honey_source: 3
-      sweetener: 1
-      fruit_apple: 1
-    time: 300
-    heat: medium
-    particle_color: "#FFD700"
-  distillation:
-    time: 50
-    filter_consumption: 1
-    runs: 2
-  aging:
-    time: 14
-    barrel_type: any
-  middle_output:
-    name: "ミード原液"
-    description: "蜂蜜香が前面に出た甘い中間生成物。"
-    color: "#F4CA54"
-  final_output:
-    name:
-      - "甘すぎる蜂蜜水"
-      - "蜂蜜酒"
-      - "黄金の蜜酒"
-    description:
-      - "甘みが勝ちすぎて輪郭が弱い。"
-      - "柔らかな甘みと酸味が共存する。"
-      - "華やかな香りと上品な余韻が続く。"
-    alchol: 12.0
-    color: "#F2B43A"
+  apple_cider:
+    required_skill_level: 1
+    required_skills: []
+    fermentation:
+      ingredients:
+        APPLE: 5
+        SUGAR: 2
+      time_seconds: 360
+      heat: low
+      particle_color: "#F86820"
+    distillation:
+      time_seconds: 45
+      filter_consumption: 1
+      runs: 0
+    aging:
+      time_days: 3
+      barrel_type: any
+    middle_output:
+      color: "#F6A24A"
+    final_output:
+      alcohol: 7.0
+      color: "#F86820"
+      effects:
+        - "WATER_BREATHING/0-1/30-90"
 
-blaze_whiskey:
-  name: "ブレイズウイスキー"
-  required_skill_level: 6
-  required_skills:
-    - "skill4"
-    - "skill5"
-  fermentation:
-    ingredients:
-      grain_wheat: 4
-      wart_herb: 1
-      blaze_essence: 1
-    time: 360
-    heat: high
-    particle_color: "#FF4500"
-  distillation:
-    time: 90
-    filter_consumption: 3
-    runs: 5
-  aging:
-    time: 60
-    barrel_type:
-      - dark_oak
-  middle_output:
-    name: "烈火原酒"
-    description: "刺激が強い危険な中間生成物。"
-    color: "#B24A2A"
-  final_output:
-    name:
-      - "火傷しそうな酒"
-      - "ブレイズウイスキー"
-      - "業火の雫"
-    description:
-      - "刺激が強すぎて雑味が目立つ。"
-      - "スモーキーで力強い味わい。"
-      - "深いコクと燃えるような余韻を持つ。"
-    alchol: 60.0
-    color: "#8B2E1B"
+  sake:
+    required_skill_level: 2
+    required_skills: []
+    fermentation:
+      ingredients:
+        PUMPKIN_SEEDS: 4
+      time_seconds: 540
+      heat: medium
+      particle_color: "#F6F1D5"
+    distillation:
+      time_seconds: 50
+      filter_consumption: 1
+      runs: 0
+    aging:
+      time_days: 6
+      barrel_type: any
+    middle_output:
+      color: "#F4E7C1"
+    final_output:
+      alcohol: 15.0
+      color: "#F8F4E3"
+      effects:
+        - "REGENERATION/0-1/10-30"
+
+  whiskey:
+    required_skill_level: 3
+    required_skills: []
+    fermentation:
+      ingredients:
+        WHEAT: 10
+      time_seconds: 600
+      heat: high
+      particle_color: "#FF7A2A"
+    distillation:
+      time_seconds: 50
+      filter_consumption: 1
+      runs: 2
+    aging:
+      time_days: 18
+      barrel_type: spruce
+    middle_output:
+      color: "#C87831"
+    final_output:
+      alcohol: 26.0
+      color: "#C87831"
+      effects:
+        - "FIRE_RESISTANCE/0-1/20-80"
+        - "SLOWNESS/1-0/20-0"
+
+  rum:
+    required_skill_level: 4
+    required_skills: []
+    fermentation:
+      ingredients:
+        SUGAR_CANE: 18
+      time_seconds: 360
+      heat: medium
+      particle_color: "#B73522"
+    distillation:
+      time_seconds: 30
+      filter_consumption: 1
+      runs: 2
+    aging:
+      time_days: 14
+      barrel_type: oak
+    middle_output:
+      color: "#7A1F1F"
+    final_output:
+      alcohol: 30.0
+      color: "#7A1F1F"
+      effects:
+        - "FIRE_RESISTANCE/0-1/20-100"
+        - "POISON/1-0/30-0"
+
+  moonshine:
+    required_skill_level: 5
+    required_skills: []
+    fermentation:
+      ingredients:
+        WHEAT: 12
+        POTATO: 15
+      time_seconds: 540
+      heat: high
+      particle_color: "#8C0000"
+    distillation:
+      time_seconds: 10
+      filter_consumption: 3
+      runs: 4
+    aging:
+      time_days: 5
+      barrel_type: warped
+    middle_output:
+      color: "#8C0000"
+    final_output:
+      alcohol: 70.0
+      color: "#8C0000"
+      effects:
+        - "LEVITATION/2/5-10"
+        - "NAUSEA/0-2/18-60"
+        - "SLOWNESS/2-4/16-40"

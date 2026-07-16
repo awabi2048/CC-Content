@@ -44,7 +44,7 @@ class FireproofLeggingsItem : CustomItem {
     companion object {
         fun isWearing(player: Player): Boolean {
             val leggings = player.inventory.leggings
-            return leggings?.let { FireproofLeggingsItem().matches(it) } ?: false
+            return FireproofLeggingsItem().matches(leggings)
         }
     }
 }

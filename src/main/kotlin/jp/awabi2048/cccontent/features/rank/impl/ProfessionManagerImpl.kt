@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.rank.impl
 
 import jp.awabi2048.cccontent.features.rank.RankStorage
+import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.event.PlayerExperienceGainEvent
 import jp.awabi2048.cccontent.features.rank.event.PrestigeExecutedEvent
 import jp.awabi2048.cccontent.features.rank.event.PrestigeSkillAcquiredEvent
@@ -121,6 +122,9 @@ class ProfessionManagerImpl(
         }
 
         val prof = getPlayerProfession(playerUuid) ?: return false
+        if (!RankReleasePolicy.canAccessProfession(playerUuid, prof.profession)) {
+            return false
+        }
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
         val oldLevel = skillTree.calculateLevelByExp(prof.currentExp)
 
@@ -180,6 +184,9 @@ class ProfessionManagerImpl(
 
     override fun acquireSkill(playerUuid: UUID, skillId: String): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
+        if (!RankReleasePolicy.canUseSkills(playerUuid)) {
+            return false
+        }
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
         val normalizedSkillId = resolveSkillId(skillTree.getAllSkills().keys, skillId)
         val skill = skillTree.getSkill(normalizedSkillId) ?: return false
@@ -212,6 +219,7 @@ class ProfessionManagerImpl(
     }
 
     override fun getAvailableSkills(playerUuid: UUID): List<String> {
+        if (!RankReleasePolicy.canUseSkills(playerUuid)) return emptyList()
         val prof = getPlayerProfession(playerUuid) ?: return emptyList()
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return emptyList()
         val currentLevel = skillTree.calculateLevelByExp(prof.currentExp)
@@ -219,6 +227,7 @@ class ProfessionManagerImpl(
     }
 
     override fun getAcquiredSkills(playerUuid: UUID): Set<String> {
+        if (!RankReleasePolicy.canUseSkills(playerUuid)) return emptySet()
         return getPlayerProfession(playerUuid)?.acquiredSkills?.toSet() ?: emptySet()
     }
 
@@ -308,6 +317,9 @@ class ProfessionManagerImpl(
 
     override fun acquirePrestigeSkill(playerUuid: UUID, skillId: String): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
+        if (!RankReleasePolicy.canUseSkills(playerUuid)) {
+            return false
+        }
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
         val normalizedSkillId = resolveSkillId(skillTree.getAllSkills().keys, skillId)
         val skill = skillTree.getSkill(normalizedSkillId) ?: return false

@@ -4,6 +4,7 @@ package jp.awabi2048.cccontent.features.arena
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import io.papermc.paper.datacomponent.DataComponentTypes
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardData
@@ -1315,8 +1316,8 @@ class ArenaEnchantPedestalMenu(
             meta.setDisplayName("§c智力が足りません")
             meta.lore(
                 CCSystem.getAPI().getLoreService().render(
-                    GuiLoreSpec.Auto(
-                        listOf(ArenaI18n.text(player, "arena.ui.pedestal.execute.missing_level", "value" to evaluation.missingLevel)),
+                    GuiLoreSpec.Rich(
+                        listOf(GuiLoreLine.Warning(ArenaI18n.text(player, "arena.ui.pedestal.execute.missing_level", "value" to evaluation.missingLevel))),
                         GuiLoreFrame.NONE
                     )
                 )
@@ -1326,8 +1327,8 @@ class ArenaEnchantPedestalMenu(
             meta.setDisplayName("§a智力は十分です")
             meta.lore(
                 CCSystem.getAPI().getLoreService().render(
-                    GuiLoreSpec.Auto(
-                        listOf(ArenaI18n.text(player, "arena.ui.pedestal.execute.consume_level", "value" to consume)),
+                    GuiLoreSpec.Rich(
+                        listOf(GuiLoreLine.Text(ArenaI18n.text(player, "arena.ui.pedestal.execute.consume_level", "value" to consume))),
                         GuiLoreFrame.NONE
                     )
                 )
@@ -1359,7 +1360,7 @@ class ArenaEnchantPedestalMenu(
         val item = ItemStack(Material.MAP)
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
-        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(ArenaI18n.stringList(player, "arena.ui.pedestal.info.dummy"), GuiLoreFrame.NONE)))
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(ArenaI18n.stringList(player, "arena.ui.pedestal.info.dummy").map { GuiLoreLine.Text(it) }, GuiLoreFrame.NONE)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return ArenaMenuItems.hideTooltip(item)

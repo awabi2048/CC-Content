@@ -2,9 +2,7 @@
 
 package jp.awabi2048.cccontent.features.sukima_dungeon.gui
 
-import com.awabi2048.ccsystem.CCSystem
-import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
-import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.PortalSession
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
@@ -14,9 +12,6 @@ import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
-import org.bukkit.inventory.ItemStack
-import org.bukkit.inventory.meta.ItemMeta
-import org.bukkit.inventory.ItemFlag
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureLoader
 
@@ -39,18 +34,25 @@ class DungeonJoinGui(val portal: PortalSession, private val loader: StructureLoa
         val randomDisplayName = MessageManager.getMessage(player, "gui_theme_random") // Should retrieve "???"
         
         val baseDisplayName = if (isRandom) randomDisplayName else theme?.getDisplayName(player) ?: themeName
-        val displaySuffix = if (isRandom) "" else "の世界"
-        val fullDisplayName = "$baseDisplayName$displaySuffix"
+        val fullDisplayName = if (isRandom) baseDisplayName else MessageManager.getMessage(
+            player,
+            "gui_theme_world_value",
+            mapOf("theme" to baseDisplayName)
+        )
         
         val sizeName = portal.sizeKey
         
         val buttonMaterial = if (portal.isReady) Material.END_CRYSTAL else Material.STRUCTURE_VOID
         val buttonName = if (portal.isReady) MessageManager.getMessage(player, "gui_join_button_ready") else MessageManager.getMessage(player, "gui_join_button_wait")
-        val lore = MessageManager.getList(player, "gui_join_button_lore").map { 
-            it.replace("{theme}", fullDisplayName).replace("{size}", sizeName)
+        val lore = mutableListOf<GuiLoreLine>(
+            GuiLoreLine.Data(MessageManager.getMessage(player, "gui_join_theme_label"), fullDisplayName, "§d"),
+            GuiLoreLine.Data(MessageManager.getMessage(player, "gui_join_size_label"), sizeName, "§e")
+        )
+        if (portal.isReady) {
+            lore += SukimaGuiItems.singleAction(player, MessageManager.getMessage(player, "gui_join_action"))
         }
 
-        val joinItem = createGuiItem(buttonMaterial, buttonName, *lore.toTypedArray())
+        val joinItem = createGuiItem(buttonMaterial, buttonName, lore)
         inv.setItem(13, joinItem)
 
         // Close Button (Slot 22 - though it's already filled by blackGlass, let's put it at 26)
@@ -60,7 +62,6 @@ class DungeonJoinGui(val portal: PortalSession, private val loader: StructureLoa
         player.openInventory(inv)
     }
 
-    private fun createGuiItem(material: Material, name: String, vararg lore: String): ItemStack {
-        return jp.awabi2048.cccontent.gui.GuiMenuItems.icon(material, name, lore.toList())
-    }
+    private fun createGuiItem(material: Material, name: String, lore: List<GuiLoreLine> = emptyList()) =
+        SukimaGuiItems.icon(material, name, lore)
 }

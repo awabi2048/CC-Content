@@ -3,17 +3,21 @@
 package jp.awabi2048.cccontent.features.brewery
 
 import jp.awabi2048.cccontent.features.brewery.model.FirePower
+import jp.awabi2048.cccontent.items.CustomItemManager
 import org.bukkit.Material
+import org.bukkit.potion.PotionEffectType
 import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 data class IngredientDefinition(
     val key: String,
     val materials: Set<Material> = emptySet(),
+    val customItemIds: Set<String> = emptySet(),
     val itemName: String? = null,
     val itemNameContains: String? = null
 ) {
@@ -22,6 +26,7 @@ data class IngredientDefinition(
         val name = item.itemMeta?.displayName ?: ""
         val conditions = mutableListOf<Boolean>()
         if (materials.isNotEmpty()) conditions += item.type in materials
+        if (customItemIds.isNotEmpty()) conditions += CustomItemManager.identify(item)?.fullId in customItemIds
         if (!itemName.isNullOrBlank()) conditions += name == itemName
         if (!itemNameContains.isNullOrBlank()) conditions += name.contains(itemNameContains)
         return conditions.any { it }
@@ -30,7 +35,6 @@ data class IngredientDefinition(
 
 data class BreweryRecipe(
     val id: String,
-    val name: String,
     val requiredSkillLevel: Int,
     val requiredSkills: Set<String>,
     val fermentationIngredients: Map<String, Int>,
@@ -42,13 +46,49 @@ data class BreweryRecipe(
     val distillationRuns: Int,
     val agingTimeDays: Int,
     val agingBarrelTypes: Set<String>,
-    val middleOutputName: String,
-    val middleOutputDescription: String,
     val middleOutputColor: String?,
-    val finalOutputNames: List<String>,
-    val finalOutputDescriptions: List<String>,
     val finalOutputAlcohol: Double,
-    val finalOutputColor: String?
+    val finalOutputColor: String?,
+    val finalOutputEffects: List<BreweryEffectDefinition>
+)
+
+fun breweryQualityIndex(quality: Double): Int = when {
+    quality < 34 -> 0
+    quality < 67 -> 1
+    else -> 2
+}
+
+fun breweryQualityTier(quality: Double): String = when (breweryQualityIndex(quality)) {
+    0 -> "low"
+    1 -> "standard"
+    else -> "high"
+}
+
+data class BreweryEffectDefinition(
+    val type: PotionEffectType,
+    val worstAmplifier: Int,
+    val bestAmplifier: Int,
+    val worstDurationSeconds: Int,
+    val bestDurationSeconds: Int
+) {
+    fun resolve(quality: Double): ResolvedBreweryEffect {
+        val ratio = quality.coerceIn(0.0, 100.0) / 100.0
+        return ResolvedBreweryEffect(
+            type = type,
+            amplifier = interpolate(worstAmplifier, bestAmplifier, ratio),
+            durationSeconds = interpolate(worstDurationSeconds, bestDurationSeconds, ratio).coerceAtLeast(1)
+        )
+    }
+
+    private fun interpolate(worst: Int, best: Int, ratio: Double): Int {
+        return (worst + (best - worst) * ratio).roundToInt().coerceAtLeast(0)
+    }
+}
+
+data class ResolvedBreweryEffect(
+    val type: PotionEffectType,
+    val amplifier: Int,
+    val durationSeconds: Int
 )
 
 data class RecipeMatchResult(
@@ -63,6 +103,7 @@ data class RecipeMatchResult(
 }
 
 data class BrewerySettings(
+    val schemaVersion: Int,
     val mismatchFirePenaltyPer30Seconds: Double,
     val distillationOverPenalty: Double,
     val fuelSecondsPerItem: Int,
@@ -71,7 +112,16 @@ data class BrewerySettings(
     val agingRealSecondsPerYear: Long,
     val smallBarrelSpeedMultiplier: Double,
     val allowedMediumFireMaterials: Set<Material>,
-    val qualityDebugLog: Boolean
+    val qualityDebugLog: Boolean,
+    val nauseaThreshold: Double,
+    val stumbleThreshold: Double,
+    val faintThreshold: Double,
+    val intoxicationDecayPerSecond: Double,
+    val faintDurationSeconds: Long,
+    val stateRetentionSeconds: Long,
+    val fermentationExp: Long,
+    val distillationExp: Long,
+    val agingExp: Long
 )
 
 class BrewerySettingsLoader(private val plugin: JavaPlugin) {
@@ -80,27 +130,44 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
     fun loadSettings(): BrewerySettings {
         val file = File(plugin.dataFolder, "config/brewery/config.yml")
         val yml = YamlConfiguration.loadConfiguration(file)
-        val mediumRaw = yml.getStringList("settings.fire.medium_materials")
+        val schemaVersion = yml.getInt("schema_version", -1)
+        require(schemaVersion == 2) { "Brewery設定のschema_versionが2ではありません: $schemaVersion" }
+        val root = yml.getConfigurationSection("brewery")
+            ?: error("Brewery設定にbreweryセクションがありません")
+        val mediumRaw = root.getStringList("fire.medium_materials")
         val mediumMaterials = mediumRaw.mapNotNull { runCatching { Material.valueOf(it) }.getOrNull() }.toSet()
         return BrewerySettings(
-            mismatchFirePenaltyPer30Seconds = yml.getDouble("settings.quality.penalty_per_30s_mismatch_fire", 2.0),
-            distillationOverPenalty = yml.getDouble("settings.quality.penalty_per_over_distillation", 5.0),
-            fuelSecondsPerItem = yml.getInt("settings.fire.fuel_seconds_per_item", 30).coerceAtLeast(1),
-            filterSpeedBonus = yml.getDouble("settings.distillation.filter_speed_bonus", 0.15).coerceIn(0.0, 0.9),
-            angelSharePercentPerYear = yml.getDouble("settings.aging.angel_share_percent_per_year", 2.0).coerceAtLeast(0.0),
-            agingRealSecondsPerYear = yml.getLong("settings.aging.real_seconds_per_year", 1200L).coerceAtLeast(1L),
-            smallBarrelSpeedMultiplier = yml.getDouble("settings.aging.small_barrel_speed_multiplier", 1.25).coerceAtLeast(0.1),
+            schemaVersion = schemaVersion,
+            mismatchFirePenaltyPer30Seconds = root.getDouble("quality.penalty_per_30s_mismatch_fire", 2.0),
+            distillationOverPenalty = root.getDouble("quality.penalty_per_over_distillation", 5.0),
+            fuelSecondsPerItem = root.getInt("fire.fuel_seconds_per_item", 30).coerceAtLeast(1),
+            filterSpeedBonus = root.getDouble("distillation.filter_speed_bonus", 0.15).coerceIn(0.0, 0.9),
+            angelSharePercentPerYear = root.getDouble("aging.angel_share_percent_per_year", 2.0).coerceAtLeast(0.0),
+            agingRealSecondsPerYear = root.getLong("aging.real_seconds_per_year", 1200L).coerceAtLeast(1L),
+            smallBarrelSpeedMultiplier = root.getDouble("aging.small_barrel_speed_multiplier", 1.25).coerceAtLeast(0.1),
             allowedMediumFireMaterials = mediumMaterials,
-            qualityDebugLog = yml.getBoolean("settings.debug.quality_log", true)
+            qualityDebugLog = root.getBoolean("debug.quality_log", true),
+            nauseaThreshold = root.getDouble("intoxication.nausea_threshold", 25.0).coerceAtLeast(0.0),
+            stumbleThreshold = root.getDouble("intoxication.stumble_threshold", 50.0).coerceAtLeast(0.0),
+            faintThreshold = root.getDouble("intoxication.faint_threshold", 90.0).coerceAtLeast(0.0),
+            intoxicationDecayPerSecond = root.getDouble("intoxication.decay_per_second", 0.05).coerceAtLeast(0.0),
+            faintDurationSeconds = root.getLong("intoxication.faint_duration_seconds", 8L).coerceAtLeast(1L),
+            stateRetentionSeconds = root.getLong("state.retention_seconds", 604800L).coerceAtLeast(1L),
+            fermentationExp = root.getLong("rank_exp.fermentation", 10L).coerceAtLeast(0L),
+            distillationExp = root.getLong("rank_exp.distillation", 20L).coerceAtLeast(0L),
+            agingExp = root.getLong("rank_exp.aging", 30L).coerceAtLeast(0L)
         )
     }
 
     fun loadRecipes(): Map<String, BreweryRecipe> {
         val file = File(plugin.dataFolder, "config/brewery/recipe.yml")
         val yml = YamlConfiguration.loadConfiguration(file)
+        require(yml.getInt("schema_version", -1) == 2) { "Breweryレシピ設定のschema_versionが2ではありません" }
+        val recipeSection = yml.getConfigurationSection("recipes")
+            ?: error("Breweryレシピ設定にrecipesセクションがありません")
         val recipes = mutableMapOf<String, BreweryRecipe>()
-        for (id in yml.getKeys(false)) {
-            val node = yml.getConfigurationSection(id) ?: continue
+        for (id in recipeSection.getKeys(false)) {
+            val node = recipeSection.getConfigurationSection(id) ?: continue
             val recipe = parseRecipe(id, node)
             if (recipe != null) {
                 recipes[id] = recipe
@@ -112,7 +179,6 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
     fun getIngredientDefinition(key: String): IngredientDefinition? = ingredientDefinitions[key]
 
     private fun parseRecipe(id: String, node: ConfigurationSection): BreweryRecipe? {
-        val name = node.getString("name", id) ?: id
         val requiredSkillLevel = node.getInt("required_skill_level", 1).coerceAtLeast(1)
         val requiredSkills = node.getStringList("required_skills").map { it.trim() }.filter { it.isNotBlank() }.toSet()
 
@@ -125,34 +191,31 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
         }
         if (ingredients.isEmpty()) return null
 
-        val fermentationTime = fermentationSection.getInt("time", 180).coerceAtLeast(1)
+        val fermentationTime = fermentationSection.getInt("time_seconds", 180).coerceAtLeast(1)
         val heatStr = fermentationSection.getString("heat", "medium")?.uppercase() ?: "MEDIUM"
         val firePower = runCatching { FirePower.valueOf(heatStr) }.getOrDefault(FirePower.MEDIUM)
         val particleColor = fermentationSection.getString("particle_color")
 
         val distillationSection = node.getConfigurationSection("distillation")
-        val distillationTime = distillationSection?.getInt("time", 45)?.coerceAtLeast(1) ?: 45
+        val distillationTime = distillationSection?.getInt("time_seconds", 45)?.coerceAtLeast(1) ?: 45
         val distillationFilterConsumption = distillationSection?.getInt("filter_consumption", 1)?.coerceAtLeast(1) ?: 1
         val distillationRuns = distillationSection?.getInt("runs", 3)?.coerceAtLeast(1) ?: 3
 
         val agingSection = node.getConfigurationSection("aging")
-        val agingTimeDays = agingSection?.getInt("time", 1)?.coerceAtLeast(1) ?: 1
+        val agingTimeDays = agingSection?.getInt("time_days", 1)?.coerceAtLeast(1) ?: 1
         val barrelTypes = parseBarrelTypes(agingSection)
 
         val middleOutputSection = node.getConfigurationSection("middle_output") ?: return null
-        val middleOutputName = middleOutputSection.getString("name", "中間生成物") ?: "中間生成物"
-        val middleOutputDescription = middleOutputSection.getString("description", "") ?: ""
         val middleOutputColor = middleOutputSection.getString("color")
 
         val finalOutputSection = node.getConfigurationSection("final_output") ?: return null
-        val names = finalOutputSection.getStringList("name")
-        val descriptions = finalOutputSection.getStringList("description")
-        val alcohol = finalOutputSection.getDouble("alchol", 40.0).coerceIn(0.0, 100.0)
+        require(finalOutputSection.contains("alcohol")) { "レシピ$id のfinal_output.alcoholがありません" }
+        val alcohol = finalOutputSection.getDouble("alcohol").coerceIn(0.0, 100.0)
         val color = finalOutputSection.getString("color")
+        val effects = finalOutputSection.getStringList("effects").map { parseEffect(id, it) }
 
         return BreweryRecipe(
             id = id,
-            name = name,
             requiredSkillLevel = requiredSkillLevel,
             requiredSkills = requiredSkills,
             fermentationIngredients = ingredients,
@@ -164,14 +227,31 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
             distillationRuns = distillationRuns,
             agingTimeDays = agingTimeDays,
             agingBarrelTypes = barrelTypes,
-            middleOutputName = middleOutputName,
-            middleOutputDescription = middleOutputDescription,
             middleOutputColor = middleOutputColor,
-            finalOutputNames = if (names.size >= 3) names else listOf("${name}（低品質）", name, "${name}（高品質）"),
-            finalOutputDescriptions = if (descriptions.size >= 3) descriptions else listOf("", "", ""),
             finalOutputAlcohol = alcohol,
-            finalOutputColor = color
+            finalOutputColor = color,
+            finalOutputEffects = effects
         )
+    }
+
+    private fun parseEffect(recipeId: String, raw: String): BreweryEffectDefinition {
+        val parts = raw.split('/')
+        require(parts.size == 3) { "レシピ$recipeId の効果は TYPE/amplifier/duration_seconds 形式が必要です: $raw" }
+        val type = PotionEffectType.getByName(parts[0].trim().uppercase())
+            ?: error("レシピ$recipeId のPotionEffectTypeが不正です: ${parts[0]}")
+        val amplifier = parseRange(parts[1], recipeId, raw)
+        val duration = parseRange(parts[2], recipeId, raw)
+        return BreweryEffectDefinition(type, amplifier.first, amplifier.second, duration.first, duration.second)
+    }
+
+    private fun parseRange(raw: String, recipeId: String, whole: String): Pair<Int, Int> {
+        val values = raw.split('-').map { it.toIntOrNull() }
+        require(values.size in 1..2 && values.all { it != null && it >= 0 }) {
+            "レシピ$recipeId の効果範囲が不正です: $whole"
+        }
+        val first = values[0]!!
+        val second = values.getOrNull(1) ?: first
+        return first to second
     }
 
     private fun parseBarrelTypes(agingSection: ConfigurationSection?): Set<String> {
@@ -214,6 +294,12 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
                     IngredientDefinition(
                         key = key,
                         materials = materials,
+                        customItemIds = buildSet {
+                            raw.getString("custom_item_id")?.takeIf { it.isNotBlank() }?.let(::add)
+                            addAll(raw.getStringList("custom_item_ids").onEach {
+                                require(it.isNotBlank()) { "材料定義${key}のcustom_item_idsに空文字があります" }
+                            })
+                        },
                         itemName = raw.getString("item_name"),
                         itemNameContains = raw.getString("item_name_contains")
                     )
@@ -291,21 +377,5 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
         return item.type == material
     }
 
-    fun getFinalOutputNameByQuality(recipe: BreweryRecipe, quality: Double): String {
-        val index = when {
-            quality < 34 -> 0
-            quality < 67 -> 1
-            else -> 2
-        }
-        return recipe.finalOutputNames.getOrElse(index) { recipe.name }
-    }
-
-    fun getFinalOutputDescriptionByQuality(recipe: BreweryRecipe, quality: Double): String {
-        val index = when {
-            quality < 34 -> 0
-            quality < 67 -> 1
-            else -> 2
-        }
-        return recipe.finalOutputDescriptions.getOrElse(index) { "" }
-    }
+    fun getFinalQualityIndex(quality: Double): Int = breweryQualityIndex(quality)
 }

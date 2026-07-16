@@ -4,12 +4,12 @@ main: jp.awabi2048.cccontent.CCContent
 api-version: '26.1.2'
 author: awabi2048
 description: Paper 26.1.2用統合コンテンツプラグイン
-softdepend: [HeadDatabase, Vault, CC-System, MyWorldManager, DeadChest, LuckPerms, FastAsyncWorldEdit]
+softdepend: [HeadDatabase, Vault, CC-System, MyWorldManager, DeadChest, LuckPerms, FastAsyncWorldEdit, LunaChat]
 
 commands:
   cc-content:
     description: CC-Contentメインコマンド
-    usage: /ccc <give|reload|restart|summon|structure|debug|update_day|npc-menu|help>
+    usage: /ccc <status|enable|disable|give|reload|restart|summon|structure|debug|update_day|npc-menu|help>
     aliases: [ccc]
   rank:
     description: ランクシステムコマンド（デバッグ用）
@@ -28,6 +28,26 @@ commands:
     description: 職業メインメニューを開く
     usage: /rankmenu [skill]
     permission: cc-content.rank
+  fishdex:
+    description: Fishdexを開く
+    usage: /fishdex [page]
+    permission: cc-content.fishing
+  catalog:
+    description: 釣り・料理・醸造の図鑑を開く
+    usage: /catalog <fishing|cooking|brewery> [page]
+    permission: cc-content.catalog
+  cookdex:
+    description: 料理図鑑を開く
+    usage: /cookdex [page]
+    permission: cc-content.catalog
+  brewdex:
+    description: 醸造図鑑を開く
+    usage: /brewdex [page]
+    permission: cc-content.catalog
+  party:
+    description: パーティ管理コマンド
+    usage: /party <menu|list|create|info|invite|accept|join|leave|kick|leader|disband|recruit|chat>
+    permission: cc-content.party
 
 permissions:
   cc-content.admin:
@@ -35,8 +55,29 @@ permissions:
     default: op
     children:
       cc-content.npc.menu.open: true
+      cc-content.status: true
+      cc-content.enable: true
+      cc-content.disable: true
+  cc-content.status:
+    description: CC-Contentのコンテンツ状態を確認できる
+    default: op
+  cc-content.enable:
+    description: CC-Contentのコンテンツを有効化できる
+    default: op
+  cc-content.disable:
+    description: CC-Contentのコンテンツを無効化できる
+    default: op
   cc-content.rank:
     description: 職業メインメニューを開ける
+    default: true
+  cc-content.fishing:
+    description: 釣りとFishdexを利用できる
+    default: true
+  cc-content.catalog:
+    description: 釣り・料理・醸造の図鑑を利用できる
+    default: true
+  cc-content.party:
+    description: パーティ機能を利用できる
     default: true
   sukimadungeon.command.base:
     description: Allows using the base command

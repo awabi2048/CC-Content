@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.gui
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiFrameSection
@@ -11,9 +12,6 @@ import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import io.papermc.paper.datacomponent.DataComponentTypes
 import io.papermc.paper.datacomponent.item.TooltipDisplay
-import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.TextDecoration
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import org.bukkit.Material
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
@@ -34,19 +32,27 @@ object GuiMenuItems {
         return CCSystem.getAPI().getGuiElementService().item(decorationSpec(material, name))
     }
 
-    fun icon(material: Material, name: String, lore: List<String> = emptyList(), frame: GuiLoreFrame = GuiLoreFrame.NONE): ItemStack {
+    fun icon(
+        material: Material,
+        name: String,
+        lore: List<GuiLoreLine> = emptyList(),
+        frame: GuiLoreFrame = GuiLoreFrame.NONE
+    ): ItemStack {
         return CCSystem.getAPI().getGuiElementService().item(
             GuiItemSpec(
                 material = material,
                 name = GuiNameSpec.Text(name, GuiNameStyle.DEFAULT),
-                lore = if (lore.isEmpty()) GuiLoreSpec.None else GuiLoreSpec.Auto(lore, frame),
+                lore = if (lore.isEmpty()) GuiLoreSpec.None else GuiLoreSpec.Rich(
+                    lore,
+                    frame
+                ),
                 role = GuiElementRole.CONTENT,
                 amount = 1
             )
         )
     }
 
-    fun backButton(name: String = "§c戻る", lore: List<String> = emptyList()): ItemStack {
+    fun backButton(name: String = "§c戻る", lore: List<GuiLoreLine> = emptyList()): ItemStack {
         return icon(Material.REDSTONE, name, lore)
     }
 
@@ -78,8 +84,4 @@ object GuiMenuItems {
         role = GuiElementRole.DECORATION,
         amount = 1
     )
-
-    private fun legacy(text: String): Component {
-        return LegacyComponentSerializer.legacySection().deserialize(text).decoration(TextDecoration.ITALIC, false)
-    }
 }

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package jp.awabi2048.cccontent.mob.ability
 
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
@@ -8,7 +10,8 @@ import org.bukkit.Sound
 import org.bukkit.block.Block
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Player
-import org.bukkit.metadata.FixedMetadataValue
+import org.bukkit.metadata.MetadataValue
+import org.bukkit.plugin.Plugin
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.util.Vector
 import java.util.UUID
@@ -17,6 +20,7 @@ import kotlin.math.cos
 import kotlin.math.roundToLong
 import kotlin.math.sin
 
+@Suppress("DEPRECATION")
 class SandShockwaveAbility(
     override val id: String,
     private val cooldownTicks: Long = 120L,
@@ -222,7 +226,7 @@ class SandShockwaveAbility(
             .filter { it.isValid && !it.isDead }
             .filter { hitPlayers.add(it.uniqueId) }
             .forEach { player ->
-                player.setMetadata(MeleeKnockbackBoostAbility.IGNORE_METADATA_KEY, FixedMetadataValue(plugin, true))
+                player.setMetadata(MeleeKnockbackBoostAbility.IGNORE_METADATA_KEY, IgnoreMeleeKnockbackMetadata(plugin))
                 try {
                     player.damage(damage, entity)
                 } finally {
@@ -235,5 +239,20 @@ class SandShockwaveAbility(
 
     private fun waveBandRadius(distance: Double, extraMargin: Double): Double {
         return maxOf(hitRadius, distance * sin(PI / angleSegments.coerceAtLeast(8)) + extraMargin)
+    }
+
+    /** Paper metadata is retained for the existing melee-suppression listener contract. */
+    private class IgnoreMeleeKnockbackMetadata(private val owner: Plugin) : MetadataValue {
+        override fun value(): Any = true
+        override fun asInt(): Int = 1
+        override fun asFloat(): Float = 1.0f
+        override fun asDouble(): Double = 1.0
+        override fun asLong(): Long = 1L
+        override fun asShort(): Short = 1
+        override fun asByte(): Byte = 1
+        override fun asBoolean(): Boolean = true
+        override fun asString(): String = "true"
+        override fun getOwningPlugin(): Plugin = owner
+        override fun invalidate() = Unit
     }
 }

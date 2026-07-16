@@ -109,6 +109,8 @@ import org.bukkit.scheduler.BukkitTask
 import org.bukkit.scoreboard.DisplaySlot
 import org.bukkit.util.Vector
 import java.io.File
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Locale
 import java.util.UUID
 import java.util.logging.Level
@@ -286,6 +288,8 @@ class ArenaManager(
         const val DEBUG_VOID_TEMPLATE_MARKER_FILE_NAME = ".cc-debug-void-template"
         const val DEBUG_VOID_WORLD_TEMPLATE_NAME = "arena.debug.template"
         const val ARENA_POOL_WORLD_NAME_PREFIX = "arena.pool"
+        const val ARENA_INVITE_CLAIM_OWNER = "cc-content:arena-invite"
+        const val ARENA_INVITED_CLAIM_OWNER = "cc-content:arena-invited"
         const val ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT = 3
         const val ARENA_POOL_SIZE_DEFAULT = 3
         const val ARENA_CLEANUP_BLOCKS_PER_TICK_DEFAULT = 300
@@ -338,6 +342,8 @@ class ArenaManager(
         const val ENCHANT_SHARD_DROP_RATE_MULTIPLIER_DEFAULT = 1.0
         const val ENCHANT_SHARD_LOOTING_MULTIPLIER_PER_LEVEL_DEFAULT = 0.10
         const val STAGE_TRANSFER_BLINDNESS_TICKS = 60
+        const val ARENA_DEMAND_HALF_LIFE_DAYS_DEFAULT = 30.0
+        const val ARENA_DEMAND_MAX_AGE_DAYS_DEFAULT = 90
         const val BARRIER_RETURN_HOLD_TICKS = 60
         const val MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT = 45
         const val MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT = 16.0
@@ -429,6 +435,11 @@ class ArenaManager(
     private val liftOccupiedMarkerKeys = mutableSetOf<String>()
     private val liftReturningMarkerKeys = mutableSetOf<String>()
     private val liftOccupiedWaiters = mutableSetOf<UUID>()
+    private val dailyEntryStore = ArenaDailyEntryStore(File(plugin.dataFolder, "data/arena/daily_entries.yml"))
+    private val historyStore = ArenaHistoryStore(File(plugin.dataFolder, "data/arena/history.yml"))
+    private val dailyEntryParticipantsByWorld = mutableMapOf<String, MutableSet<UUID>>()
+    private var demandConfig = ArenaDemandConfig()
+    private var demandModel = ArenaDemandModel(demandConfig)
     private var maintenanceTask: BukkitTask? = null
     private var playerMonitorTask: BukkitTask? = null
     private var actionMarkerTask: BukkitTask? = null
@@ -487,9 +498,12 @@ class ArenaManager(
     private var dropConfig = ArenaDropConfig(
         byMobDefinition = emptyMap()
     )
+    private lateinit var shardRewardService: ArenaShardRewardService
     private var pedestalMenuProvider: (() -> ArenaEnchantPedestalMenu?)? = null
 
     fun initialize(featureInitLogger: FeatureInitializationLogger? = null) {
+        dailyEntryStore.load()
+        historyStore.load()
         loadBattleConfigs()
         themeLoader.load(featureInitLogger)
         ensureDebugVoidWorldBootstrap()
@@ -510,6 +524,7 @@ class ArenaManager(
         loadBarrierRestartConfig()
         loadArenaBgmConfig()
         loadRewardConfig(rewardFile)
+        loadShardRewardConfig(ensureArenaConfig("config/arena/shard_reward.yml"))
         loadMobDefinitions()
         loadDropConfig(dropFile)
     }
@@ -521,6 +536,15 @@ class ArenaManager(
             defaultDurationSeconds = missionConfig.getInt("barrier_restart.default_duration_seconds", 30).coerceAtLeast(1),
             corruptionRatioBase = missionConfig.getDouble("barrier_restart.corruption_ratio_base", 0.05).coerceAtLeast(0.0)
         )
+        demandConfig = ArenaDemandConfig(
+            halfLifeDays = config.getDouble("difficulty_demand.half_life_days", ARENA_DEMAND_HALF_LIFE_DAYS_DEFAULT),
+            maxAgeDays = config.getInt("difficulty_demand.max_age_days", ARENA_DEMAND_MAX_AGE_DAYS_DEFAULT),
+            clearCountWeight = config.getDouble("difficulty_demand.weights.clear_count", 1.0),
+            difficultyWeight = config.getDouble("difficulty_demand.weights.difficulty", 1.0),
+            durationWeight = config.getDouble("difficulty_demand.weights.duration", 0.25),
+            influenceStrength = config.getDouble("difficulty_demand.influence_strength", 1.0)
+        )
+        demandModel = ArenaDemandModel(demandConfig)
         multiplayerJoinGraceSeconds = config.getInt(
             "multiplayer.join_grace_seconds",
             MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT
@@ -592,6 +616,13 @@ class ArenaManager(
         enchantShardLootingMultiplierPerLevel = config
             .getDouble("enchant_shard.looting_multiplier_per_level", ENCHANT_SHARD_LOOTING_MULTIPLIER_PER_LEVEL_DEFAULT)
             .coerceAtLeast(0.0)
+    }
+
+    private fun loadShardRewardConfig(file: File) {
+        shardRewardService = ArenaShardRewardService.load(
+            YamlConfiguration.loadConfiguration(file),
+            ArenaEnchantShardRegistry.definitions
+        )
     }
 
     private fun loadArenaBgmConfig() {
@@ -752,6 +783,10 @@ class ArenaManager(
         val participantPlayers = (listOf(target) + initialParticipants)
             .distinctBy { it.uniqueId }
 
+        if (participantPlayers.any { dailyEntryStore.lastEntryDate(it.uniqueId) == LocalDate.now(ZoneId.systemDefault()) }) {
+            return completed(ArenaStartResult.Error("arena.messages.mission.start_cancelled"))
+        }
+
         val alreadyInSession = participantPlayers.firstOrNull { playerToSessionWorld.containsKey(it.uniqueId) }
         if (alreadyInSession != null) {
             return completed(ArenaStartResult.Error(
@@ -842,6 +877,9 @@ class ArenaManager(
         val placeholderLocation = Location(world, 0.0, 64.0, 0.0)
         val placeholderBounds = ArenaBounds(0, 0, 0, 0, 0, 0)
         val difficultyDisplay = ArenaMenuItems.difficultyStars(variant.difficultyStar)
+        if (enableMultiplayerJoin && !CCSystem.getAPI().getPlayerInteractionClaimService().tryClaim(target.uniqueId, ARENA_INVITE_CLAIM_OWNER)) {
+            return completed(ArenaStartResult.Error("arena.messages.command.start_error.interaction_busy"))
+        }
         val session = ArenaSession(
             ownerPlayerId = target.uniqueId,
             worldName = world.name,
@@ -972,6 +1010,12 @@ class ArenaManager(
                 initializeBarrierRestartState(session)
                 startBarrierAmbientTask(session)
                 session.stageGenerationCompleted = true
+
+                if (!reserveDailyEntry(session.participants)) {
+                    terminateSession(session, false)
+                    return completed(ArenaStartResult.Error("arena.messages.mission.start_cancelled"))
+                }
+                dailyEntryParticipantsByWorld[session.worldName] = session.participants.toMutableSet()
 
                 session.participants.forEach { participantId ->
                     val participant = Bukkit.getPlayer(participantId) ?: return@forEach
@@ -1349,6 +1393,31 @@ class ArenaManager(
 
     fun getTheme(themeId: String): ArenaTheme? = themeLoader.getTheme(themeId)
 
+    fun selectPromotedDifficulty(theme: ArenaTheme): Boolean {
+        val promotedStar = theme.promotedVariant?.difficultyStar ?: return false
+        val selectedStar = demandModel.selectDifficulty(
+            listOf(theme.normalConfig.variant.difficultyStar, promotedStar),
+            historyStore.all(),
+            LocalDate.now(ZoneId.systemDefault()),
+            random
+        )
+        return selectedStar == promotedStar
+    }
+
+    private fun reserveDailyEntry(playerIds: Collection<UUID>): Boolean {
+        val today = LocalDate.now(ZoneId.systemDefault())
+        return dailyEntryStore.tryReserveAll(playerIds, today)
+    }
+
+    private fun recordSuccessfulHistory(session: ArenaSession) {
+        val date = LocalDate.now(ZoneId.systemDefault())
+        val durationSeconds = ((System.currentTimeMillis() - session.startedAtMillis) / 1000L).coerceAtLeast(0L)
+        val participantIds = dailyEntryParticipantsByWorld.remove(session.worldName).orEmpty()
+        participantIds.forEach { playerId ->
+            historyStore.add(ArenaHistoryRecord(playerId, date, session.difficultyStar, durationSeconds))
+        }
+    }
+
     fun getActiveSessionPlayerNames(): Set<String> {
         return playerToSessionWorld.keys.mapNotNull { uuid -> Bukkit.getPlayer(uuid)?.name }.toSet()
     }
@@ -1602,6 +1671,7 @@ class ArenaManager(
 
     private fun releaseInvitedPlayerLock(playerId: UUID) {
         invitedPlayerLocks.remove(playerId)
+        CCSystem.getAPI().getPlayerInteractionClaimService().release(playerId, ARENA_INVITED_CLAIM_OWNER)
         val player = Bukkit.getPlayer(playerId)
         if (player != null && player.isOnline) {
             player.isGlowing = false
@@ -1618,6 +1688,7 @@ class ArenaManager(
 
     private fun clearMultiplayerRecruitmentState(session: ArenaSession) {
         val ownerId = session.ownerPlayerId
+        CCSystem.getAPI().getPlayerInteractionClaimService().release(ownerId, ARENA_INVITE_CLAIM_OWNER)
         hideJoinCountdownBossBar(session, ownerId)
         removeArenaSidebar(ownerId)
 
@@ -2392,7 +2463,15 @@ class ArenaManager(
             return
         }
 
+        if (!CCSystem.getAPI().getPlayerInteractionClaimService().tryClaim(invited.uniqueId, ARENA_INVITED_CLAIM_OWNER)) {
+            owner.sendMessage(
+                ArenaI18n.text(owner, "arena.messages.multiplayer.invite_failed_already_locked", "player" to invited.name)
+            )
+            return
+        }
+
         if (!session.invitedParticipants.add(invited.uniqueId)) {
+            CCSystem.getAPI().getPlayerInteractionClaimService().release(invited.uniqueId, ARENA_INVITED_CLAIM_OWNER)
             owner.sendMessage(
                 ArenaI18n.text(owner, "arena.messages.multiplayer.already_invited", "player" to invited.name)
             )
@@ -3318,12 +3397,13 @@ class ArenaManager(
 
     private fun createEnchantShardDrop(killer: Player, mobDefinitionId: String, lootingLevel: Int): ItemStack? {
         val missionService = arenaMissionService ?: return null
-        val candidateDefinitions = ArenaEnchantShardRegistry.getDropDefinitionsForMob(mobDefinitionId)
-        if (candidateDefinitions.isEmpty()) {
+        val session = sessionsByWorld[killer.world.name] ?: return null
+        val candidate = shardRewardService.select(session.difficultyStar, mobDefinitionId, random)
+        if (candidate == null) {
             return null
         }
 
-        val evaluated = candidateDefinitions.mapNotNull { definition ->
+        val evaluated = listOfNotNull(candidate.definition).mapNotNull { definition ->
             val baseChance = definition.baseDropChance ?: return@mapNotNull null
             val adjustedBaseChance = (baseChance * enchantShardDropRateMultiplier).coerceIn(0.0, 1.0)
             val previousCount = missionService.getEnchantShardKillCount(killer.uniqueId, definition.key, mobDefinitionId)
@@ -3587,6 +3667,11 @@ class ArenaManager(
         vararg messagePlaceholders: Pair<String, Any?>
     ) {
         transitionSessionPhase(session, ArenaPhase.TERMINATING)
+        if (success) {
+            recordSuccessfulHistory(session)
+        } else {
+            dailyEntryParticipantsByWorld.remove(session.worldName)
+        }
         Bukkit.getPluginManager().callEvent(
             ArenaSessionEndedEvent(
                 ownerPlayerId = session.ownerPlayerId,
@@ -7299,7 +7384,10 @@ class ArenaManager(
             .filter { !playerToSessionWorld.containsKey(it.uniqueId) || playerToSessionWorld[it.uniqueId] == session.worldName }
             .toList()
 
-        if (participants.none { it.uniqueId == session.ownerPlayerId }) {
+        val today = LocalDate.now(ZoneId.systemDefault())
+        val availableParticipants = participants.filter { dailyEntryStore.lastEntryDate(it.uniqueId) != today }
+        if (availableParticipants.none { it.uniqueId == session.ownerPlayerId } ||
+            !reserveDailyEntry(availableParticipants.map { it.uniqueId })) {
             terminateSession(
                 session,
                 false,
@@ -7308,7 +7396,10 @@ class ArenaManager(
             return
         }
 
-        participants.forEach { player ->
+        dailyEntryParticipantsByWorld.getOrPut(session.worldName) { mutableSetOf() }
+            .addAll(availableParticipants.map { it.uniqueId })
+
+        availableParticipants.forEach { player ->
             session.participants.add(player.uniqueId)
             playerToSessionWorld[player.uniqueId] = session.worldName
             session.returnLocations.putIfAbsent(player.uniqueId, player.location.clone())
@@ -7318,7 +7409,7 @@ class ArenaManager(
         session.sidebarParticipantOrder.clear()
         session.sidebarParticipantOrder.add(session.ownerPlayerId)
         session.sidebarParticipantOrder.addAll(
-            participants
+            availableParticipants
                 .asSequence()
                 .filter { it.uniqueId != session.ownerPlayerId }
                 .map { it.uniqueId }
@@ -7329,7 +7420,7 @@ class ArenaManager(
         transitionSessionPhase(session, ArenaPhase.PREPARING)
         session.joinGraceEndMillis = 0L
 
-        startMultiplayerStageIntro(session, participants)
+        startMultiplayerStageIntro(session, availableParticipants)
     }
 
     private fun startMultiplayerStageIntro(session: ArenaSession, participants: List<Player>) {

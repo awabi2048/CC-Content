@@ -1,1 +1,61 @@
-recipes: {}
+ingredients:
+  potato:
+    material: POTATO
+  carrot:
+    material: CARROT
+  wheat:
+    material: WHEAT
+  beef:
+    material: BEEF
+  cod:
+    material: COD
+  sugar:
+    material: SUGAR
+  honey:
+    material: HONEY_BOTTLE
+
+recipes:
+  rustic_stew:
+    ingredients:
+      potato: 2
+      carrot: 1
+      beef: 1
+    seasonings:
+      sugar: 1
+    result:
+      material: BAKED_POTATO
+      item_model: kota_server:custom_item/cooking/rustic_stew
+    exp: 18
+    completion_seconds: 4
+  sweet_bread:
+    ingredients:
+      wheat: 3
+      sugar: 1
+    seasonings:
+      honey: 1
+    result:
+      material: BREAD
+      item_model: kota_server:custom_item/cooking/sweet_bread
+    exp: 15
+    completion_seconds: 3
+  grilled_cod:
+    ingredients:
+      cod: 2
+      potato: 1
+    seasonings:
+      honey: 1
+    result:
+      material: COOKED_COD
+      item_model: kota_server:custom_item/cooking/grilled_cod
+    exp: 16
+    completion_seconds: 3
+  carrot_cookie:
+    ingredients:
+      carrot: 2
+      wheat: 1
+      sugar: 1
+    result:
+      material: COOKIE
+      item_model: kota_server:custom_item/cooking/carrot_cookie
+    exp: 12
+    completion_seconds: 2

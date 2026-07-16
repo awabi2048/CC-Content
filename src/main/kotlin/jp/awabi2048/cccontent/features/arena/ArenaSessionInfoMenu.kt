@@ -162,23 +162,16 @@ class ArenaSessionInfoMenu(
             "\u00a77..."
         }
 
-        val bodyLines = buildList {
-            waveLine?.let { add(it) }
-            add(ArenaI18n.text(null, "arena.ui.broadcast.players_header"))
-            addAll(participantLines)
-            add(ArenaI18n.text(null, "arena.ui.broadcast.radio_header"))
-            add(radioLine)
-        }
         meta.lore(
             CCSystem.getAPI().getLoreService().render(
                 GuiLoreSpec.Blocks(buildList {
-                    waveLine?.let { add(GuiLoreBlock(listOf(GuiLoreLine.Raw(it)))) }
+                    waveLine?.let { add(GuiLoreBlock(listOf(GuiLoreLine.Text(it)))) }
                     add(GuiLoreBlock(buildList {
-                        add(GuiLoreLine.Raw(ArenaI18n.text(null, "arena.ui.broadcast.players_header")))
-                        participantLines.forEach { add(GuiLoreLine.Raw(it)) }
+                        add(GuiLoreLine.Text(ArenaI18n.text(null, "arena.ui.broadcast.players_header")))
+                        participantLines.forEach { add(GuiLoreLine.Text(it)) }
                         add(GuiLoreLine.Spacer)
-                        add(GuiLoreLine.Raw(ArenaI18n.text(null, "arena.ui.broadcast.radio_header")))
-                        add(GuiLoreLine.Raw(radioLine))
+                        add(GuiLoreLine.Text(ArenaI18n.text(null, "arena.ui.broadcast.radio_header")))
+                        add(GuiLoreLine.Text(radioLine))
                     }))
                 })
             )
@@ -222,7 +215,7 @@ class ArenaSessionInfoMenu(
         meta.setDisplayName(
             ArenaI18n.text(null, "arena.ui.broadcast.info.name")
         )
-        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(ArenaI18n.stringList(null, "arena.ui.broadcast.info.lore"), GuiLoreFrame.NONE)))
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(ArenaI18n.stringList(null, "arena.ui.broadcast.info.lore").map { GuiLoreLine.Text(it) }, GuiLoreFrame.NONE)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return item

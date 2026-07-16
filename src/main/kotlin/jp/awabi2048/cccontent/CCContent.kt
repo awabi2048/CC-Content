@@ -2,10 +2,14 @@ package jp.awabi2048.cccontent
 
 import com.awabi2048.ccsystem.CCSystem
 import jp.awabi2048.cccontent.command.CCCommand
+import jp.awabi2048.cccontent.command.ContentFeatureStatus
+import jp.awabi2048.cccontent.command.ContentOperationalState
 import jp.awabi2048.cccontent.command.GiveCommand
 import jp.awabi2048.cccontent.command.StructureCommand
 import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.config.FeatureConfigManager
+import jp.awabi2048.cccontent.config.ResourceConfigurationValidator
+import jp.awabi2048.cccontent.featurestate.ContentFeatureCatalog
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemInteractionListener
 import jp.awabi2048.cccontent.items.CustomItemManager
@@ -70,6 +74,20 @@ import jp.awabi2048.cccontent.features.arena.ArenaTokenExchangeMenu
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import jp.awabi2048.cccontent.features.brewery.BreweryFeature
 import jp.awabi2048.cccontent.features.cooking.CookingFeature
+import jp.awabi2048.cccontent.features.fishing.FishingFeature
+import jp.awabi2048.cccontent.features.catalog.CatalogCommand
+import jp.awabi2048.cccontent.features.catalog.CatalogStore
+import jp.awabi2048.cccontent.features.catalog.CatalogType
+import jp.awabi2048.cccontent.features.resourcecollection.ResourceCollectionFeature
+import jp.awabi2048.cccontent.features.party.PartyCommand
+import jp.awabi2048.cccontent.features.party.PartyController
+import jp.awabi2048.cccontent.features.party.PartyListener
+import jp.awabi2048.cccontent.features.party.PartyMenuListener
+import jp.awabi2048.cccontent.features.party.PartySettingsLoader
+import jp.awabi2048.cccontent.features.minigame.core.MiniGameMarkerItem
+import jp.awabi2048.cccontent.features.minigame.core.MiniGameMarkerType
+import jp.awabi2048.cccontent.features.minigame.core.MiniGameManagerItem
+import jp.awabi2048.cccontent.features.minigame.core.MiniGameRuntime
 import jp.awabi2048.cccontent.features.npc.menu.NpcMenuService
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.impl.RankManagerImpl
@@ -156,32 +174,35 @@ class CCContent : JavaPlugin(), Listener {
     private var arenaEnchantPedestalMenu: ArenaEnchantPedestalMenu? = null
     private var arenaTokenExchangeMenu: ArenaTokenExchangeMenu? = null
     private lateinit var sharedMobService: MobService
-    private lateinit var breweryFeature: BreweryFeature
-    private lateinit var cookingFeature: CookingFeature
+    private var breweryFeature: BreweryFeature? = null
+    private var cookingFeature: CookingFeature? = null
+    private var fishingFeature: FishingFeature? = null
+    private lateinit var catalogStore: CatalogStore
+    private var resourceCollectionFeature: ResourceCollectionFeature? = null
+    private var partyController: PartyController? = null
+    private var minigameRuntime: MiniGameRuntime? = null
     private lateinit var npcMenuService: NpcMenuService
     private var rankManagerInstance: RankManagerImpl? = null
     private var ignoreBlockStoreInstance: IgnoreBlockStore? = null
-    private lateinit var activeContentEnabledSettings: ContentEnabledSettings
+    private lateinit var activeContentEnabledSettings: Map<String, Boolean>
     private var arenaFeatureReady: Boolean = false
     private var arenaFeatureFailureReason: String? = null
     private var customItemsLanguageAvailable: Boolean = true
 
-    private data class ContentEnabledSettings(
-        val arena: Boolean,
-        val rank: Boolean,
-        val brewery: Boolean,
-        val cooking: Boolean,
-        val sukimaDungeon: Boolean
-    )
-
-    private class FeatureUnavailableCommand(private val featureName: String) : CommandExecutor, TabCompleter {
+    private class FeatureUnavailableCommand(private val featureId: String) : CommandExecutor, TabCompleter {
         override fun onCommand(
             sender: CommandSender,
             command: Command,
             label: String,
             args: Array<String>
         ): Boolean {
-            sender.sendMessage("§c$featureName is not available. Check content_enabled and reload status.")
+            sender.sendMessage(
+                jp.awabi2048.cccontent.command.ContentManagementI18n.text(
+                    sender,
+                    "feature_unavailable",
+                    "feature" to jp.awabi2048.cccontent.command.ContentManagementI18n.text(sender, "feature.$featureId")
+                )
+            )
             return true
         }
 
@@ -207,7 +228,10 @@ class CCContent : JavaPlugin(), Listener {
         instance = this
         ensureCCSystemAvailable()
         saveSplitLanguageResources()
+        synchronizeConfigurationResources()
+        validateConfigurationFiles()
         coreConfig = CoreConfigManager.load(this)
+        catalogStore = CatalogStore(File(dataFolder, "data/catalog/state.yml"))
         validateAndRegisterLanguageSources()
         activeContentEnabledSettings = loadContentEnabledSettings()
 
@@ -217,13 +241,44 @@ class CCContent : JavaPlugin(), Listener {
         featureInitLogger.registerFeature("Rank System")
         featureInitLogger.registerFeature("Brewery")
         featureInitLogger.registerFeature("Cooking")
+        featureInitLogger.registerFeature("Fishing")
+        featureInitLogger.registerFeature("Resource Collection")
         featureInitLogger.registerFeature("Arena")
         featureInitLogger.registerFeature("SukimaDungeon")
+        featureInitLogger.registerFeature("Party")
+        featureInitLogger.registerFeature("Minigame")
         featureInitLogger.registerFeature("Oage Shrine")
+
+        // 無効featureの入口を先に閉じ、有効featureの初期化成功時だけ正規コマンドへ差し替える。
+        installFeatureUnavailableCommands()
 
         CustomItemManager.clear()
         CustomItemManager.setLogger(logger)
         CustomItemI18n.initialize(this)
+
+        initializeFeatureIfEnabled("Party", "party") {
+            val controller = PartyController(this, PartySettingsLoader(this).load())
+            partyController = controller
+            val command = PartyCommand(controller)
+            getCommand("party")?.setExecutor(command)
+            getCommand("party")?.tabCompleter = command
+            server.pluginManager.registerEvents(PartyListener(controller), this)
+            server.pluginManager.registerEvents(PartyMenuListener(controller), this)
+            featureInitLogger.setStatus("Party", FeatureInitializationLogger.Status.SUCCESS)
+            featureInitLogger.addSummaryMessage("Party", "Bukkitコマンドとオンライン通知を登録")
+        }
+
+        initializeFeatureIfEnabled("Minigame", "minigame") {
+            check(featureInitLogger.getStatus("Party") == FeatureInitializationLogger.Status.SUCCESS) {
+                "Minigame requires an operational Party feature"
+            }
+            val controller = checkNotNull(partyController) { "Minigame requires the Party feature" }
+            // 参加者を確定するPartyServiceを必ず注入し、全員自動参加へ戻さない。
+            val runtime = MiniGameRuntime(this, controller.service)
+            minigameRuntime = runtime
+            runtime.initialize()
+            featureInitLogger.setStatus("Minigame", FeatureInitializationLogger.Status.SUCCESS)
+        }
 
         GulliverConfig.initialize(this)
         AutoIgnitionBoosterConfig.initialize(this)
@@ -243,6 +298,7 @@ class CCContent : JavaPlugin(), Listener {
             logger.warning("[CustomItems] 言語ファイル検証エラーによりカスタムアイテム登録をスキップします")
             languageErrorsFor("custom_items").forEach { error -> logger.warning("[CustomItems][Lang] $error") }
         }
+        if (minigameRuntime != null) registerMiniGameItems()
 
         try {
             val menuService = NpcMenuService(
@@ -258,8 +314,6 @@ class CCContent : JavaPlugin(), Listener {
             featureInitLogger.addDetailMessage("Oage Shrine", "[Oage Shrine] 初期化失敗: ${e.message}")
             logger.warning("[Oage Shrine] 初期化に失敗しました: ${e.message}")
         }
-
-        installFeatureUnavailableCommands()
 
         initializeFeatureIfEnabled("Rank System", "rank") {
             if (hasLanguageErrorsFor("rank")) {
@@ -330,6 +384,26 @@ class CCContent : JavaPlugin(), Listener {
             initializeCooking()
         }
 
+        initializeFeatureIfEnabled("Fishing", "fishing") {
+            if (rankManagerInstance == null) {
+                throw IllegalStateException("Fishing requires the Rank System")
+            }
+            val feature = FishingFeature(this, catalogStore)
+            fishingFeature = feature
+            feature.initialize(featureInitLogger)
+        }
+
+        initializeFeatureIfEnabled("Resource Collection", "resource_collection") {
+            val rankManager = rankManagerInstance
+                ?: throw IllegalStateException("Resource Collection requires the Rank System")
+            val feature = ResourceCollectionFeature(this, rankManager)
+            resourceCollectionFeature = feature
+            feature.initialize()
+            featureInitLogger.setStatus("Resource Collection", FeatureInitializationLogger.Status.SUCCESS)
+        }
+
+        registerCatalogCommands()
+
         val giveCommand = GiveCommand()
         val structureCommand = StructureCommand(
             structureService = SchemStructureService(this),
@@ -389,6 +463,20 @@ class CCContent : JavaPlugin(), Listener {
                         "reset-shop-weekly" -> npcMenuService.resetShopWeekly()
                         else -> false
                     }
+                }
+            },
+            contentStatusProvider = { contentOperationalStatuses() },
+            onSetContentEnabled = { featureId, enabled ->
+                val previous = isContentEnabled(featureId)
+                CoreConfigManager.setContentEnabled(this, featureId, enabled)
+                try {
+                    restartPluginLifecycle("content_enabled.$featureId=$enabled")
+                } catch (changeFailure: Exception) {
+                    runCatching {
+                        CoreConfigManager.setContentEnabled(this, featureId, previous)
+                        restartPluginLifecycle("content_enabled.$featureId rollback=$previous")
+                    }.onFailure(changeFailure::addSuppressed)
+                    throw changeFailure
                 }
             }
         )
@@ -465,85 +553,97 @@ class CCContent : JavaPlugin(), Listener {
     }
 
     private fun stopPlugin() {
-        try {
-            arenaTokenExchangeMenu?.shutdown()
-            HandlerList.unregisterAll(this as org.bukkit.plugin.Plugin)
-            server.scheduler.cancelTasks(this)
-
-            UnlockBatchBreakHandler.stopAll()
-            BlastMineHandler.stopAll()
-            BreakSpeedBoostHandler.clearAllBoosts()
-            AttackReachBoostHandler.removeAllModifiers()
-            UnlockItemTokenHandler.Companion.clearUnlockedItems()
-            ReplantHandler.clearAllProcessed()
-            SkillEffectEngine.clearAllCache()
-            SkillEffectRegistry.clear()
-            SkillTreeRegistry.clear()
-
-            rankManagerInstance?.hideAllProfessionBossBars()
-            rankManagerInstance?.saveData()
-            ignoreBlockStoreInstance?.flush()
-
-            if (::breweryFeature.isInitialized) {
-                breweryFeature.shutdown()
+        val failures = mutableListOf<Throwable>()
+        fun cleanup(name: String, action: () -> Unit) {
+            runCatching(action).onFailure { error ->
+                logger.warning("[CCContent] 停止処理に失敗しました: $name: ${error.message}")
+                failures += error
             }
-            arenaMissionService?.shutdown()
-            arenaSessionInfoMenu = null
-            arenaEnchantPedestalMenu = null
-            arenaTokenExchangeMenu = null
+        }
+
+        cleanup("minigame") { minigameRuntime?.shutdown() }
+        minigameRuntime = null
+        cleanup("arena token exchange") { arenaTokenExchangeMenu?.shutdown() }
+        cleanup("listeners") { HandlerList.unregisterAll(this as org.bukkit.plugin.Plugin) }
+        cleanup("scheduler") { server.scheduler.cancelTasks(this) }
+
+        cleanup("unlock batch break") { UnlockBatchBreakHandler.stopAll() }
+        cleanup("blast mine") { BlastMineHandler.stopAll() }
+        cleanup("break speed boost") { BreakSpeedBoostHandler.clearAllBoosts() }
+        cleanup("attack reach boost") { AttackReachBoostHandler.removeAllModifiers() }
+        cleanup("unlocked item token") { UnlockItemTokenHandler.Companion.clearUnlockedItems() }
+        cleanup("replant") { ReplantHandler.clearAllProcessed() }
+        cleanup("skill effect cache") { SkillEffectEngine.clearAllCache() }
+        cleanup("skill effect registry") { SkillEffectRegistry.clear() }
+        cleanup("skill tree registry") { SkillTreeRegistry.clear() }
+
+        cleanup("rank boss bars") { rankManagerInstance?.hideAllProfessionBossBars() }
+        cleanup("rank data") { rankManagerInstance?.saveData() }
+        cleanup("ignore block data") { ignoreBlockStoreInstance?.flush() }
+
+        cleanup("brewery") { breweryFeature?.shutdown() }
+        breweryFeature = null
+        cleanup("cooking") { cookingFeature?.shutdown() }
+        cookingFeature = null
+        cleanup("fishing") { fishingFeature?.shutdown() }
+        fishingFeature = null
+        cleanup("resource collection") { resourceCollectionFeature?.shutdown() }
+        resourceCollectionFeature = null
+        cleanup("party") { partyController?.close() }
+        partyController = null
+        cleanup("arena mission") { arenaMissionService?.shutdown() }
+        arenaSessionInfoMenu = null
+        arenaEnchantPedestalMenu = null
+        arenaTokenExchangeMenu = null
+        cleanup("arena providers") {
             if (::arenaManager.isInitialized) {
                 arenaManager.setPedestalMenuProvider(null)
                 arenaManager.setMissionService(null)
             }
-            arenaMissionService = null
-            if (::arenaManager.isInitialized) {
-                arenaManager.shutdown()
-            }
-
-            PortalManager.shutdown()
-            BGMManager.stopAll()
-            DungeonSessionManager.saveSessions(this)
-
-            persistenceFlushTask?.cancel()
-            persistenceFlushTask = null
-
-            if (::sharedMobService.isInitialized) {
-                sharedMobService.shutdown()
-            }
-
-            for (player in server.onlinePlayers) {
-                PlayerDataManager.unload(player)
-                MenuCooldownManager.clearCooldown(player.uniqueId)
-                rankManagerInstance?.hideProfessionBossBar(player.uniqueId)
-            }
-
-            PlayerDataManager.clearAll()
-            MenuCooldownManager.clearAll()
-            CustomItemManager.clear()
-            HeadDatabaseBridge.reset()
-            rankManagerInstance = null
-            ignoreBlockStoreInstance = null
-            playTimeTrackerTaskId = -1
-
-            logger.info("[CCContent] 停止処理を完了しました")
-        } catch (e: Exception) {
-            logger.warning("[CCContent] 停止処理中にエラーが発生しました: ${e.message}")
-            e.printStackTrace()
         }
+        arenaMissionService = null
+        cleanup("arena") { if (::arenaManager.isInitialized) arenaManager.shutdown() }
+
+        cleanup("sukima portal") { PortalManager.shutdown() }
+        cleanup("bgm") { BGMManager.stopAll() }
+        cleanup("dungeon sessions") { DungeonSessionManager.saveSessions(this) }
+
+        cleanup("persistence task") { persistenceFlushTask?.cancel() }
+        persistenceFlushTask = null
+        cleanup("shared mob service") { if (::sharedMobService.isInitialized) sharedMobService.shutdown() }
+
+        server.onlinePlayers.forEach { player ->
+            cleanup("player data: ${player.uniqueId}") { PlayerDataManager.unload(player) }
+            cleanup("menu cooldown: ${player.uniqueId}") { MenuCooldownManager.clearCooldown(player.uniqueId) }
+            cleanup("rank boss bar: ${player.uniqueId}") { rankManagerInstance?.hideProfessionBossBar(player.uniqueId) }
+        }
+
+        cleanup("player data cache") { PlayerDataManager.clearAll() }
+        cleanup("menu cooldown cache") { MenuCooldownManager.clearAll() }
+        cleanup("custom items") { CustomItemManager.clear() }
+        cleanup("head database bridge") { HeadDatabaseBridge.reset() }
+        rankManagerInstance = null
+        ignoreBlockStoreInstance = null
+        playTimeTrackerTaskId = -1
+
+        if (failures.isNotEmpty()) {
+            val failure = IllegalStateException("CC-Content停止処理に${failures.size}件失敗しました")
+            failures.forEach(failure::addSuppressed)
+            throw failure
+        }
+        logger.info("[CCContent] 停止処理を完了しました")
     }
 
     override fun onEnable() {
         startPlugin()
     }
 
-    private fun loadContentEnabledSettings(): ContentEnabledSettings {
-        return ContentEnabledSettings(
-            arena = coreConfig.getBoolean("content_enabled.arena", true),
-            rank = coreConfig.getBoolean("content_enabled.rank", true),
-            brewery = coreConfig.getBoolean("content_enabled.brewery", true),
-            cooking = coreConfig.getBoolean("content_enabled.cooking", true),
-            sukimaDungeon = coreConfig.getBoolean("content_enabled.sukima_dungeon", true)
-        )
+    private fun loadContentEnabledSettings(): Map<String, Boolean> {
+        return ContentFeatureCatalog.features.associate { feature ->
+            val path = "content_enabled.${feature.id}"
+            check(coreConfig.isBoolean(path)) { "$path must be a boolean" }
+            feature.id to coreConfig.getBoolean(path)
+        }
     }
 
     private fun startPersistenceFlushTask() {
@@ -553,20 +653,43 @@ class CCContent : JavaPlugin(), Listener {
             if (isContentEnabled("sukima_dungeon")) {
                 DungeonSessionManager.flushIfDirty(this)
             }
-            if (isContentEnabled("brewery") && ::breweryFeature.isInitialized) {
-                breweryFeature.flushDirty()
+            if (isContentEnabled("brewery")) {
+                breweryFeature?.flushDirty()
             }
         }, intervalTicks, intervalTicks)
     }
 
     private fun isContentEnabled(contentKey: String): Boolean {
-        return when (contentKey) {
-            "arena" -> activeContentEnabledSettings.arena
-            "rank" -> activeContentEnabledSettings.rank
-            "brewery" -> activeContentEnabledSettings.brewery
-            "cooking" -> activeContentEnabledSettings.cooking
-            "sukima_dungeon" -> activeContentEnabledSettings.sukimaDungeon
-            else -> true
+        return activeContentEnabledSettings[contentKey]
+            ?: throw IllegalArgumentException("Unknown content feature: $contentKey")
+    }
+
+    private fun contentOperationalStatuses(): Map<String, ContentFeatureStatus> {
+        val runtimeNames = mapOf(
+            "arena" to "Arena",
+            "rank" to "Rank System",
+            "brewery" to "Brewery",
+            "cooking" to "Cooking",
+            "fishing" to "Fishing",
+            "resource_collection" to "Resource Collection",
+            "sukima_dungeon" to "SukimaDungeon",
+            "party" to "Party",
+            "minigame" to "Minigame"
+        )
+        return ContentFeatureCatalog.features.associate { feature ->
+            val state = if (!isContentEnabled(feature.id)) {
+                ContentOperationalState.DISABLED
+            } else {
+                when (featureInitLogger.getStatus(checkNotNull(runtimeNames[feature.id]))) {
+                    FeatureInitializationLogger.Status.SUCCESS -> ContentOperationalState.ENABLED
+                    FeatureInitializationLogger.Status.WARNING -> ContentOperationalState.WARNING
+                    FeatureInitializationLogger.Status.FAILURE, null -> ContentOperationalState.FAILURE
+                }
+            }
+            feature.id to ContentFeatureStatus(
+                configuredEnabled = isContentEnabled(feature.id),
+                operationalState = state
+            )
         }
     }
 
@@ -581,6 +704,7 @@ class CCContent : JavaPlugin(), Listener {
         try {
             initialize()
         } catch (e: Exception) {
+            closeFeatureEntryPointsAfterFailure(contentKey)
             featureInitLogger.setStatus(featureName, FeatureInitializationLogger.Status.FAILURE)
             featureInitLogger.addDetailMessage(featureName, "[$featureName] 初期化失敗: ${e.message}")
             logger.warning("[$featureName] 初期化に失敗しました: ${e.message}")
@@ -588,33 +712,18 @@ class CCContent : JavaPlugin(), Listener {
         }
     }
 
-    private fun reloadContentEnabledSettings(): Boolean {
-        val previous = activeContentEnabledSettings
-        val reloaded = loadContentEnabledSettings()
-        activeContentEnabledSettings = reloaded
-
-        if (reloaded == previous) {
-            return false
-        }
-
-        logger.info(
-            "content_enabled changed; reinitializing feature set. " +
-                "previous=$previous, reloaded=$reloaded"
-        )
-        restartPlugin()
-        return true
-    }
-
     private fun installFeatureUnavailableCommands() {
-        setFeatureUnavailableCommand("rank", "Rank System")
-        setFeatureUnavailableCommand("rankmenu", "Rank System")
-        setFeatureUnavailableCommand("arenaa", "Arena")
-        setFeatureUnavailableCommand("sukima_dungeon", "SukimaDungeon")
+        setFeatureUnavailableCommand("rank", "rank")
+        setFeatureUnavailableCommand("rankmenu", "rank")
+        setFeatureUnavailableCommand("fishdex", "fishing")
+        setFeatureUnavailableCommand("party", "party")
+        setFeatureUnavailableCommand("arenaa", "arena")
+        setFeatureUnavailableCommand("sukima_dungeon", "sukima_dungeon")
     }
 
-    private fun setFeatureUnavailableCommand(commandName: String, featureName: String) {
+    private fun setFeatureUnavailableCommand(commandName: String, featureId: String) {
         val command = getCommand(commandName) ?: return
-        val unavailable = FeatureUnavailableCommand(featureName)
+        val unavailable = FeatureUnavailableCommand(featureId)
         command.setExecutor(unavailable)
         command.tabCompleter = unavailable
     }
@@ -634,16 +743,8 @@ class CCContent : JavaPlugin(), Listener {
             rankManager.setMessageProvider(messageProvider)
             rankManager.initBossBarManager(this)
 
-            // /rank, /rankmenu は早い段階で必ず登録する
-            // （後続の初期化で例外が発生してもコマンド実行自体は生かす）
             val translator = jp.awabi2048.cccontent.features.rank.tutorial.task.EntityBlockTranslator(messageProvider)
             val rankCommand = RankCommand(rankManager, messageProvider, null, null, translator)
-            registerRankCommands(rankCommand)
-            server.pluginManager.registerEvents(rankCommand, this)
-            server.pluginManager.registerEvents(
-                jp.awabi2048.cccontent.features.rank.listener.TutorialRankUpListener(rankManager, messageProvider),
-                this
-            )
 
             val ignoreBlockStore = IgnoreBlockStore(File(dataFolder, "data/rank/ignore_blocks.yml"))
             ignoreBlockStoreInstance = ignoreBlockStore
@@ -658,7 +759,23 @@ class CCContent : JavaPlugin(), Listener {
             val (taskLoader, taskChecker) = initializeTutorialTaskSystem(rankManager, storage, ignoreBlockStore, messageProvider)
             rankCommand.setTutorialTaskSystem(taskLoader, taskChecker)
 
-            // プレイ時間トラッカータスクを起動（1分ごとに更新）
+            // 追加のランク系リスナー登録
+            val minerListener = ProfessionMinerExpListener(this, rankManager, ignoreBlockStore)
+            val combatExpListener = ProfessionCombatExpListener(
+                rankManager,
+                FeatureConfigManager.load(this, FeatureConfigManager.RANK_SETTINGS_PATH)
+            )
+            // 依存設定の構築が完了した後にだけ利用者向け入口を開く。
+            server.pluginManager.registerEvents(minerListener, this)
+            server.pluginManager.registerEvents(combatExpListener, this)
+            server.pluginManager.registerEvents(rankCommand, this)
+            server.pluginManager.registerEvents(
+                jp.awabi2048.cccontent.features.rank.listener.TutorialRankUpListener(rankManager, messageProvider),
+                this
+            )
+            registerRankCommands(rankCommand)
+
+            // すべての登録完了後に定期処理を開始し、初期化失敗時の残存を防ぐ。
             if (taskLoader != null && taskChecker != null) {
                 val playTimeTracker = jp.awabi2048.cccontent.features.rank.tutorial.task.PlayTimeTrackerTask(
                     this,
@@ -669,21 +786,20 @@ class CCContent : JavaPlugin(), Listener {
                 )
                 playTimeTrackerTaskId = playTimeTracker.start()
             }
-
-            // 追加のランク系リスナー登録
-            val minerListener = ProfessionMinerExpListener(this, rankManager, ignoreBlockStore)
-            val combatExpListener = ProfessionCombatExpListener(
-                rankManager,
-                FeatureConfigManager.load(this, FeatureConfigManager.RANK_SETTINGS_PATH)
-            )
-            server.pluginManager.registerEvents(minerListener, this)
-            server.pluginManager.registerEvents(combatExpListener, this)
             
             // 登録されたスキルツリーをカウント
             val skillTreeCount = Profession.values().count { SkillTreeRegistry.getSkillTree(it) != null }
             featureInitLogger.addSummaryMessage("Rank System", "スキル${skillTreeCount}種登録")
             featureInitLogger.setStatus("Rank System", FeatureInitializationLogger.Status.SUCCESS)
         } catch (e: Exception) {
+            if (playTimeTrackerTaskId >= 0) server.scheduler.cancelTask(playTimeTrackerTaskId)
+            playTimeTrackerTaskId = -1
+            SkillEffectEngine.clearAllCache()
+            SkillEffectRegistry.clear()
+            SkillTreeRegistry.clear()
+            setFeatureUnavailableCommand("rank", "rank")
+            setFeatureUnavailableCommand("rankmenu", "rank")
+            rankManagerInstance = null
             featureInitLogger.setStatus("Rank System", FeatureInitializationLogger.Status.FAILURE)
             featureInitLogger.addDetailMessage("Rank System", "[Rank System] 初期化失敗: ${e.message}")
             logger.warning("ランクシステムの初期化に失敗しました: ${e.message}")
@@ -950,6 +1066,43 @@ class CCContent : JavaPlugin(), Listener {
         }
     }
 
+    private fun registerMiniGameItems() {
+        val pdc = checkNotNull(minigameRuntime) { "Minigame runtime is not initialized" }.markerPdc()
+        CustomItemManager.register(MiniGameManagerItem(pdc))
+        CustomItemManager.register(MiniGameManagerItem(pdc, "hideandseek"))
+        CustomItemManager.register(MiniGameManagerItem(pdc, "chase"))
+        CustomItemManager.register(MiniGameManagerItem(pdc, "colosseum"))
+        CustomItemManager.register(MiniGameManagerItem(pdc, "endergolf"))
+        setOf(MiniGameMarkerType.START, MiniGameMarkerType.CHECKPOINT, MiniGameMarkerType.GOAL, MiniGameMarkerType.JAIL).forEach { type ->
+            CustomItemManager.register(MiniGameMarkerItem(pdc, type))
+        }
+        CustomItemManager.register(MiniGameMarkerItem(pdc, MiniGameMarkerType.START, "colosseum"))
+        setOf(MiniGameMarkerType.START, MiniGameMarkerType.CUP, MiniGameMarkerType.WATER_HAZARD, MiniGameMarkerType.BUNKER).forEach { type ->
+            CustomItemManager.register(MiniGameMarkerItem(pdc, type, "endergolf"))
+        }
+    }
+
+    private fun closeFeatureEntryPointsAfterFailure(contentKey: String) {
+        when (contentKey) {
+            "party" -> {
+                runCatching { partyController?.close() }
+                partyController = null
+                setFeatureUnavailableCommand("party", "party")
+            }
+            "minigame" -> {
+                runCatching { minigameRuntime?.shutdown() }
+                minigameRuntime = null
+            }
+            "rank" -> {
+                if (playTimeTrackerTaskId >= 0) server.scheduler.cancelTask(playTimeTrackerTaskId)
+                playTimeTrackerTaskId = -1
+                setFeatureUnavailableCommand("rank", "rank")
+                setFeatureUnavailableCommand("rankmenu", "rank")
+            }
+            "sukima_dungeon" -> setFeatureUnavailableCommand("sukima_dungeon", "sukima_dungeon")
+        }
+    }
+
     private fun registerCustomHeadItems() {
         CustomItemManager.unregisterByPrefix("misc.custom_head.")
         val variants = CustomHeadConfigRegistry.getAllVariants()
@@ -970,85 +1123,7 @@ class CCContent : JavaPlugin(), Listener {
      * config 配下の設定を再読込
      */
     private fun reloadConfigFiles() {
-        saveSplitLanguageResources()
-        mergeMissingLanguageKeys()
-        coreConfig = CoreConfigManager.load(this)
-        validateAndRegisterLanguageSources()
-        if (reloadContentEnabledSettings()) {
-            return
-        }
-        if (hasLanguageErrorsFor("arena")) {
-            if (arenaFeatureReady) {
-                arenaMissionService?.shutdown()
-                arenaSessionInfoMenu = null
-                arenaEnchantPedestalMenu = null
-                arenaTokenExchangeMenu?.shutdown()
-                arenaTokenExchangeMenu = null
-                if (::arenaManager.isInitialized) {
-                    arenaManager.setMissionService(null)
-                    arenaManager.shutdown()
-                }
-            }
-            arenaFeatureReady = false
-            arenaFeatureFailureReason = "Arena言語ファイルの検証エラーにより無効化"
-            logger.warning("[Arena] 言語ファイル検証エラーを検出したためArena機能を停止します")
-            languageErrorsFor("arena").forEach { error -> logger.warning("[Arena][Lang] $error") }
-            logger.info("[CCContent] config 配下の再読込を完了しました(Arena無効)")
-            return
-        }
-
-        if (!arenaFeatureReady && isContentEnabled("arena") && arenaFeatureFailureReason != null) {
-            logger.info("[Arena] Arena is currently disabled; retrying initialization after reload.")
-            restartPlugin()
-            return
-        }
-
-        if (!arenaFeatureReady && isContentEnabled("arena") && arenaFeatureFailureReason != null) {
-            logger.warning("[Arena] 現在Arena機能は無効です。再有効化にはサーバー再起動が必要です")
-        }
-        SukimaConfigHelper.reload(this)
-        MessageManager.load(this)
-        BGMManager.loadConfig()
-
-        if (isContentEnabled("sukima_dungeon") && ::structureLoader.isInitialized && ::mobManager.isInitialized && ::itemManager.isInitialized) {
-            reloadSukimaDungeon()
-        }
-        sharedMobService.reloadDefinitions()
-
-        GulliverConfig.reload()
-        AutoIgnitionBoosterConfig.reload()
-        AirCannonConfig.reload()
-        CustomHeadConfigRegistry.reload(this)
-        if (::npcMenuService.isInitialized) {
-            npcMenuService.reload()
-        } else {
-            try {
-                val menuService = NpcMenuService(
-                    plugin = this,
-                    professionProvider = { playerId -> temporaryBrewerProfessionByLuckPerms(playerId) }
-                )
-                menuService.initialize()
-                npcMenuService = menuService
-                server.pluginManager.registerEvents(npcMenuService, this)
-                logger.info("[Oage Shrine] NPCメニューを再初期化しました")
-            } catch (e: Exception) {
-                logger.warning("[Oage Shrine] NPCメニューの再初期化に失敗しました: ${e.message}")
-            }
-        }
-        registerCustomHeadItems()
-
-        if (::breweryFeature.isInitialized) {
-            breweryFeature.reload()
-        }
-        if (::cookingFeature.isInitialized) {
-            cookingFeature.reload()
-        }
-        if (arenaFeatureReady && ::arenaManager.isInitialized && isContentEnabled("arena")) {
-            arenaManager.reloadThemes()
-            arenaTokenExchangeMenu?.reload()
-        }
-
-        logger.info("[CCContent] config 配下の再読込を完了しました")
+        restartPluginLifecycle("config reload")
     }
 
     private fun ensureCCSystemAvailable() {
@@ -1077,6 +1152,9 @@ class CCContent : JavaPlugin(), Listener {
         return buildMap {
             put("content/arena.yml", "arena")
             put("content/custom_items.yml", "custom_items")
+            put("content/brewery.yml", "brewery")
+            put("content/cooking.yml", "cooking")
+            put("content/fishing.yml", "fishing")
             put("content/sukima_dungeon.yml", "sukima_dungeon")
             put("content/rank.yml", "rank")
             put("content/profession.yml", "rank")
@@ -1084,6 +1162,9 @@ class CCContent : JavaPlugin(), Listener {
             put("content/tutorial_rank.yml", "rank")
             put("content/mission.yml", "rank")
             put("content/gui.yml", "rank")
+            put("content/minigame.yml", "minigame")
+            put("content/resource_collection.yml", "resource_collection")
+            put("content/management.yml", "management")
         }
     }
 
@@ -1149,9 +1230,64 @@ class CCContent : JavaPlugin(), Listener {
      * プラグインを再起動相当に再初期化
      */
     private fun restartPlugin() {
+        restartPluginLifecycle("restart")
+    }
+
+    /**
+     * 全 feature を停止してから設定を検証し、同じ起動経路で再初期化する。
+     * 個別 feature の reload は状態・イベント・コマンドの取り残しを作るため使用しない。
+     */
+    private fun restartPluginLifecycle(reason: String) {
         ArenaI18n.clearCache()
         stopPlugin()
+        saveSplitLanguageResources()
+        mergeMissingLanguageKeys()
+        synchronizeConfigurationResources()
+        validateConfigurationFiles()
         startPlugin()
+        logger.info("[CCContent] $reason lifecycle を完了しました")
+    }
+
+    private fun validateConfigurationFiles() {
+        val configRoot = File(dataFolder, "config").toPath()
+        val errors = ResourceConfigurationValidator.validateConfigDirectory(configRoot)
+        if (errors.isNotEmpty()) {
+            throw IllegalStateException(
+                "CC-Content設定の検証に失敗しました (${errors.size}件):\n${errors.joinToString("\n")}"
+            )
+        }
+    }
+
+    /** JARの設定定義から不足ファイルと不足キーだけを補い、運用中の設定値は保持する。 */
+    private fun synchronizeConfigurationResources() {
+        val codeSource = runCatching { File(javaClass.protectionDomain.codeSource.location.toURI()) }
+            .getOrNull() ?: return
+        if (!codeSource.isFile) return
+
+        JarFile(codeSource).use { jar ->
+            jar.entries().asSequence()
+                .filter { !it.isDirectory && it.name.startsWith("config/") && it.name.endsWith(".yml") }
+                .forEach { entry ->
+                    val target = File(dataFolder, entry.name)
+                    if (!target.exists()) {
+                        target.parentFile?.mkdirs()
+                        saveResource(entry.name, false)
+                        return@forEach
+                    }
+
+                    val defaults = jar.getInputStream(entry).use { input ->
+                        YamlConfiguration.loadConfiguration(InputStreamReader(input, StandardCharsets.UTF_8))
+                    }
+                    val current = YamlConfiguration.loadConfiguration(target)
+                    val missingKeys = defaults.getKeys(true)
+                        .filter { key -> !defaults.isConfigurationSection(key) && !current.contains(key) }
+                    if (missingKeys.isEmpty()) return@forEach
+
+                    missingKeys.forEach { key -> current.set(key, defaults.get(key)) }
+                    current.save(target)
+                    logger.info("[CCContent][Config] 不足設定を補完しました: ${entry.name} (${missingKeys.size} keys)")
+                }
+        }
     }
     
     /**
@@ -1191,13 +1327,35 @@ class CCContent : JavaPlugin(), Listener {
     }
 
     private fun initializeBrewery() {
-        breweryFeature = BreweryFeature(this)
-        breweryFeature.initialize(featureInitLogger)
+        val feature = BreweryFeature(this, catalogStore)
+        breweryFeature = feature
+        feature.initialize(featureInitLogger)
     }
 
     private fun initializeCooking() {
-        cookingFeature = CookingFeature(this)
-        cookingFeature.initialize(featureInitLogger)
+        val feature = CookingFeature(this, { rankManagerInstance }, catalogStore)
+        cookingFeature = feature
+        feature.initialize(featureInitLogger)
+    }
+
+    private fun registerCatalogCommands() {
+        val command = CatalogCommand(
+            store = catalogStore,
+            items = { type ->
+                when (type) {
+                    CatalogType.FISHING -> fishingFeature?.catalogItems().orEmpty()
+                    CatalogType.COOKING -> cookingFeature?.catalogItems().orEmpty()
+                    CatalogType.BREWERY -> breweryFeature?.catalogItems().orEmpty()
+                }
+            },
+            isAvailable = { type ->
+                contentOperationalStatuses()[type.id]?.operationalState == ContentOperationalState.ENABLED
+            }
+        )
+        server.pluginManager.registerEvents(command, this)
+        listOf("catalog", "fishdex", "cookdex", "brewdex").forEach { name ->
+            getCommand(name)?.setExecutor(command)
+        }
     }
     
     /**
@@ -1206,13 +1364,10 @@ class CCContent : JavaPlugin(), Listener {
     private fun initializeSukimaDungeon() {
         try {
             // 設定をリロード
-            reloadSukimaDungeon()
+            loadSukimaDungeonConfiguration()
             BGMManager.loadConfig()
             
-            // コマンド登録
             val commandExecutor = MazeCommand(this, structureLoader)
-            getCommand("sukima_dungeon")?.setExecutor(commandExecutor)
-            getCommand("sukima_dungeon")?.tabCompleter = commandExecutor
             
             // リスナー登録
             server.pluginManager.registerEvents(this, this)
@@ -1315,6 +1470,10 @@ class CCContent : JavaPlugin(), Listener {
 
             // Load sessions
             DungeonSessionManager.loadSessions(this)
+
+            // 全初期化の完了後にだけ利用者向け入口を開く。
+            getCommand("sukima_dungeon")?.setExecutor(commandExecutor)
+            getCommand("sukima_dungeon")?.tabCompleter = commandExecutor
             
             featureInitLogger.setStatus("SukimaDungeon", FeatureInitializationLogger.Status.SUCCESS)
         } catch (e: Exception) {
@@ -1329,26 +1488,25 @@ class CCContent : JavaPlugin(), Listener {
      * SukimaDungeonの設定をリロード
      */
     fun reloadSukimaDungeon() {
+        // 旧部分再読込の入口も、全 feature の停止・検証・再初期化へ統一する。
+        restartPluginLifecycle("SukimaDungeon reload")
+    }
+
+    private fun loadSukimaDungeonConfiguration() {
         // SukimaDungeon用config読み込み (config/core.yml)
         SukimaConfigHelper.reload(this)
         
         // Load messages
         MessageManager.load(this)
         
-        if (!::structureLoader.isInitialized) {
-            structureLoader = StructureLoader(this)
-        }
+        // 完全再初期化では旧managerを再利用せず、現在の設定と依存を持つ新規instanceを構築する。
+        structureLoader = StructureLoader(this)
         structureLoader.loadThemes()
         
-        // Re-initialize or refresh managers
-        if (!::mobManager.isInitialized) {
-            mobManager = MobManager(this, sharedMobService)
-        }
+        mobManager = MobManager(this, sharedMobService)
         mobManager.load()
         
-        if (!::itemManager.isInitialized) {
-            itemManager = ItemManager(this)
-        }
+        itemManager = ItemManager(this)
         itemManager.load()
 
         StructureBuilder.init(structureLoader, mobManager, itemManager)

@@ -417,7 +417,6 @@ class NpcMenuService(
             val slot = DEAD_CHEST_SELECTION_SLOTS.getOrNull(index) ?: return@forEachIndexed
             val desc = snapshot.description
             val loreBlocks = mutableListOf<GuiLoreBlock>()
-            loreBlocks.add(GuiLoreBlock(listOf(GuiLoreLine.Raw("§eデスチェスト #${index + 1}"))))
             val infoLines = buildList {
                 add(GuiLoreLine.Data("内容", "${desc.itemCount}個 (${desc.itemKinds}種類)", "§e"))
                 if (desc.armorItemName != null) add(GuiLoreLine.Data("装備", desc.armorItemName, "§e"))
@@ -434,7 +433,7 @@ class NpcMenuService(
             )
             loreBlocks.add(GuiLoreBlock(listOf(
                 GuiLoreLine.SingleAction(operation, action, resolvedAction),
-                GuiLoreLine.Raw("§7初穂料: §6🐿 §e${ContentEconomyBridge.formatPrice(DEAD_CHEST_RECOVERY_COST)}")
+                GuiLoreLine.Data("初穂料", "🐿 ${ContentEconomyBridge.formatPrice(DEAD_CHEST_RECOVERY_COST)}", "§e")
             )))
             val renderedLore = CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(loreBlocks))
             val icon = ItemStack(Material.CHEST).apply {
@@ -451,7 +450,7 @@ class NpcMenuService(
     private fun renderDeadChestConfirm(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
         val snapshot = holder.selectedDeadChest ?: run {
             inventory.setItem(DEAD_CHEST_CONFIRM_PREVIEW_SLOT, GuiMenuItems.icon(Material.BARRIER, "§c対象が見つかりません"))
-            inventory.setItem(DEAD_CHEST_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§c戻る", listOf("§7ご奉仕に戻ります。")))
+            inventory.setItem(DEAD_CHEST_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§c戻る", listOf(GuiLoreLine.Text("ご奉仕に戻る"))))
             return
         }
         val desc = snapshot.description
@@ -475,11 +474,11 @@ class NpcMenuService(
             Material.LIME_CONCRETE,
             "§a回収する",
             listOf(
-                "§7このデスチェストを回収します。",
-                "§f❙ §7初穂料 ${formatAcorn(DEAD_CHEST_RECOVERY_COST)}"
+                GuiLoreLine.Text("このデスチェストを回収"),
+                GuiLoreLine.Data("初穂料", formatAcorn(DEAD_CHEST_RECOVERY_COST), "§e")
             )
         ))
-        inventory.setItem(DEAD_CHEST_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§cキャンセル", listOf("§7ご奉仕に戻ります。")))
+        inventory.setItem(DEAD_CHEST_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§cキャンセル", listOf(GuiLoreLine.Text("ご奉仕に戻る"))))
     }
 
     private fun confirmDeadChestRecovery(player: Player, snapshot: DeadChestSnapshot) {
@@ -632,21 +631,20 @@ class NpcMenuService(
     private fun deadChestRecoveryIcon(player: Player): ItemStack {
         val check = evaluateDeadChestRecovery(player)
         val body = listOf(
-            "§7デスチェストからアイテムを取り戻すことができます",
-            "§7取り戻したアイテムは、直接インベントリに入ります",
-            "§7おあげちゃんが疲れてしまうので、連続で行うことはできません",
+            "デスチェストからアイテムを回収",
+            "回収したアイテムはインベントリへ格納",
+            "連続実行不可",
             "",
-            "§7一覧から選んで取り戻します"
+            "一覧から回収対象を選択"
         )
-        val costOrStatusLine = when {
-            check.executable -> "§f❙ §7初穂料 ${formatAcorn(DEAD_CHEST_RECOVERY_COST)}"
-            check.failureMessage != null -> check.failureMessage
-            else -> "§c失具還術を行えません"
-        }
         val renderedLore = CCSystem.getAPI().getLoreService().render(
             GuiLoreSpec.Blocks(listOf(
-                GuiLoreBlock(body.map(GuiLoreLine::Raw)),
-                GuiLoreBlock(listOf(GuiLoreLine.Raw(costOrStatusLine)))
+                GuiLoreBlock(body.filter(String::isNotBlank).map { GuiLoreLine.Text(it) }),
+                GuiLoreBlock(listOf(if (check.executable) {
+                    GuiLoreLine.Data("初穂料", formatAcorn(DEAD_CHEST_RECOVERY_COST), "§e")
+                } else {
+                    GuiLoreLine.Warning(check.failureMessage ?: "失具還術を実行不可")
+                }))
             ))
         )
         return GuiMenuItems.icon(Material.RECOVERY_COMPASS, "§a失具還術").apply {
@@ -660,18 +658,23 @@ class NpcMenuService(
 
     private fun evaluateDeadChestRecovery(player: Player): DeadChestRecoveryCheck {
         if (!deadChestRecoveryService.isAvailable()) {
-            return DeadChestRecoveryCheck(null, null, false, "§cDeadChestが利用できないため、失具還術を行えません。")
+            return DeadChestRecoveryCheck(null, null, false, "DeadChestが利用できないため実行不可")
         }
         val hasChests = deadChestRecoveryService.getLatestChests(player).isNotEmpty()
         if (!hasChests) {
-            return DeadChestRecoveryCheck(null, null, false, "§7現在アクティブなデスチェストはありません。")
+            return DeadChestRecoveryCheck(null, null, false, "現在アクティブなデスチェストなし")
         }
         if (ContentEconomyBridge.get(plugin) == null) {
-            return DeadChestRecoveryCheck(null, null, false, "§c経済機能が利用できません。")
+            return DeadChestRecoveryCheck(null, null, false, "経済機能を利用不可")
         }
         val balance = ContentEconomyBridge.balance(plugin, player) ?: 0.0
         if (balance < DEAD_CHEST_RECOVERY_COST || !ContentEconomyBridge.has(plugin, player, DEAD_CHEST_RECOVERY_COST)) {
-            return DeadChestRecoveryCheck(null, balance, false, insufficientAcornLine(DEAD_CHEST_RECOVERY_COST, balance))
+            return DeadChestRecoveryCheck(
+                null,
+                balance,
+                false,
+                "どんぐりが不足（必要 ${ContentEconomyBridge.formatPrice(DEAD_CHEST_RECOVERY_COST)} / 所持 ${ContentEconomyBridge.formatPrice(balance)}）"
+            )
         }
         return DeadChestRecoveryCheck(null, balance, true, null)
     }
@@ -689,12 +692,12 @@ class NpcMenuService(
     private fun renderOageBoxConfirm(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
         val reward = holder.selectedOageBoxReward ?: run {
             inventory.setItem(OAGE_BOX_CONFIRM_PREVIEW_SLOT, GuiMenuItems.icon(Material.BARRIER, "§c報酬が見つかりません"))
-            inventory.setItem(OAGE_BOX_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§c戻る", listOf("§7おあげBOXに戻ります。")))
+            inventory.setItem(OAGE_BOX_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§c戻る", listOf(GuiLoreLine.Text("おあげBOXに戻る"))))
             return
         }
         inventory.setItem(OAGE_BOX_CONFIRM_PREVIEW_SLOT, reward.icon(player))
-        inventory.setItem(OAGE_BOX_CONFIRM_SLOT, GuiMenuItems.icon(Material.LIME_CONCRETE, "§a受け取る", listOf("§7このご褒美を受け取ります。")))
-        inventory.setItem(OAGE_BOX_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§cキャンセル", listOf("§7おあげBOXに戻ります。")))
+        inventory.setItem(OAGE_BOX_CONFIRM_SLOT, GuiMenuItems.icon(Material.LIME_CONCRETE, "§a受け取る", listOf(GuiLoreLine.Text("このご褒美を受け取る"))))
+        inventory.setItem(OAGE_BOX_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§cキャンセル", listOf(GuiLoreLine.Text("おあげBOXに戻る"))))
     }
 
     private fun renderDeliveryConfirm(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
@@ -706,18 +709,18 @@ class NpcMenuService(
                 Material.LIME_CONCRETE,
                 "§a奉納する",
                 listOf(
-                    "§7${selected?.displayName ?: "奉納品"}§7を奉納します。",
-                    "§7報酬として§e$DELIVERY_WORLD_POINT_REWARD ワールドポイント§7を受け取ります。"
+                    GuiLoreLine.Data("奉納品", selected?.displayName ?: "奉納品", "§f"),
+                    GuiLoreLine.Data("報酬", "$DELIVERY_WORLD_POINT_REWARD ワールドポイント", "§e")
                 )
             )
         )
-        inventory.setItem(DELIVERY_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§cキャンセル", listOf("§7日課メニューに戻ります。")))
+        inventory.setItem(DELIVERY_CANCEL_SLOT, GuiMenuItems.icon(Material.RED_CONCRETE, "§cキャンセル", listOf(GuiLoreLine.Text("日課メニューに戻る"))))
     }
 
     private fun deliveryIcon(player: Player): ItemStack {
         val profession = professionProvider(player.uniqueId)
         if (profession != Profession.BREWER) {
-            return GuiMenuItems.icon(Material.GRAY_DYE, "§e奉納品", listOf("§7職業に就くと、おあげ神社への奉納が行えるようになります"))
+            return GuiMenuItems.icon(Material.GRAY_DYE, "§e奉納品", listOf(GuiLoreLine.Warning("職業に就くと奉納可能")))
         }
 
         val offering = boxedDaiginjoItem()
@@ -733,13 +736,13 @@ class NpcMenuService(
         }
         val renderedLore = CCSystem.getAPI().getLoreService().render(
             GuiLoreSpec.Blocks(listOf(
-                GuiLoreBlock(offeringLore.map(GuiLoreLine::Raw)),
+                GuiLoreBlock(offeringLore.map { GuiLoreLine.Text(it) }),
                 GuiLoreBlock(listOf(
-                    GuiLoreLine.Raw(body[offeringLore.size]),
-                    GuiLoreLine.Raw(body[offeringLore.size + 1]),
-                    GuiLoreLine.Raw(body[offeringLore.size + 2])
+                    GuiLoreLine.Text("おあげ神社に奉納"),
+                    GuiLoreLine.Data("お礼", "ワールドポイント・どんぐり", "§6"),
+                    GuiLoreLine.Warning("奉納は1週間に1回まで")
                 )),
-                GuiLoreBlock(listOf(GuiLoreLine.Raw(statusLine)))
+                GuiLoreBlock(listOf(GuiLoreLine.Text(statusLine)))
             ))
         )
         val icon = GuiMenuItems.icon(Material.PLAYER_HEAD, "§e奉納品").apply {
@@ -757,28 +760,19 @@ class NpcMenuService(
     private fun partTimeIcon(player: Player): ItemStack {
         val completed = isPartTimeTaskCompleted(player.uniqueId, PART_TIME_TASK_ARENA)
         val opened = isPartTimeOpened(player.uniqueId)
-        val taskLine = if (completed) "§7・ §aアリーナミッションを1回完了する" else "§7・ §fアリーナミッションを1回完了する"
-        val extraLine = when {
-            completed && !opened -> "§a今日のタスクがすべて完了しました！\n§e§nクリックで報酬を受け取る"
-            else -> null
-        }
-        val body = buildList {
-            add("§f❙ §a今日のお仕事")
-            add(taskLine)
-            add("§7おあげちゃんからの依頼をこなして、")
-            add("§6ご褒美§7を貰いましょう！")
-            if (opened) add("§c今日の分は既に受け取っています")
-            if (extraLine != null) addAll(extraLine.lines())
-        }
+        val canClaim = completed && !opened
         val renderedLore = CCSystem.getAPI().getLoreService().render(
             GuiLoreSpec.Blocks(buildList {
-                add(GuiLoreBlock(listOf(GuiLoreLine.Raw(body[0]), GuiLoreLine.Raw(body[1]))))
+                add(GuiLoreBlock(listOf(
+                    GuiLoreLine.Text("今日のお仕事"),
+                    GuiLoreLine.StyledText("アリーナミッションを1回完了", if (completed) "§a" else "§f", false)
+                )))
                 add(GuiLoreBlock(buildList {
-                    add(GuiLoreLine.Raw(body[2]))
-                    add(GuiLoreLine.Raw(body[3]))
-                    if (opened) add(GuiLoreLine.Raw("§c今日の分は既に受け取っています"))
+                    add(GuiLoreLine.Text("おあげちゃんからの依頼を達成"))
+                    add(GuiLoreLine.Text("ご褒美を獲得"))
+                    if (opened) add(GuiLoreLine.Warning("今日の分は受け取り済み"))
                 }))
-                if (extraLine != null) add(GuiLoreBlock(extraLine.lines().map(GuiLoreLine::Raw)))
+                if (canClaim) add(GuiLoreBlock(listOf(GuiLoreLine.Text("今日のタスクがすべて完了"), GuiLoreLine.SingleAction("クリック", "報酬を受け取る", "クリックで報酬を受け取る"))))
             })
         )
         return GuiMenuItems.icon(Material.BARREL, "§6おあげちゃんアルバイト").apply {
@@ -940,7 +934,7 @@ class NpcMenuService(
         return player.inventory.storageContents.filterNotNull().any { existing -> existing.isSimilar(item) && existing.amount + item.amount <= existing.maxStackSize }
     }
 
-    private fun icon(player: Player, key: String, material: Material): ItemStack = GuiMenuItems.icon(material, text(player, "$key.name"), list(player, "$key.lore"))
+    private fun icon(player: Player, key: String, material: Material): ItemStack = GuiMenuItems.icon(material, text(player, "$key.name"), list(player, "$key.lore").map { GuiLoreLine.Text(it) })
 
     private fun oageChanHead(): ItemStack {
         val item = GuiMenuItems.icon(Material.PLAYER_HEAD, "§aおあげ神社の授与所")
@@ -966,7 +960,7 @@ class NpcMenuService(
         }
     }
 
-    private fun backButton(player: Player): ItemStack = GuiMenuItems.backButton(text(player, "back.name"), list(player, "back.lore"))
+    private fun backButton(player: Player): ItemStack = GuiMenuItems.backButton(text(player, "back.name"), list(player, "back.lore").map { GuiLoreLine.Text(it) })
 
     private fun menuSize(view: NpcMenuView): Int = when (view) {
         NpcMenuView.TALK -> TALK_MENU_SIZE
@@ -1137,16 +1131,16 @@ class NpcMenuService(
 
     private fun OageBoxReward.icon(player: Player): ItemStack = when (this) {
         is OageBoxReward.CustomItem -> CustomItemManager.createItemForPlayer(itemId, player, amount)
-            ?: GuiMenuItems.icon(Material.BARRIER, "§c未登録アイテム", listOf("§7$itemId"))
+            ?: GuiMenuItems.icon(Material.BARRIER, "§c未登録アイテム", listOf(GuiLoreLine.Data("ID", itemId, "§7")))
         is OageBoxReward.Acorn -> GuiMenuItems.icon(
             Material.PLAYER_HEAD,
             "§6収穫したてのどんぐり",
-            listOf("§7${acornDisplay(amount)}")
+            listOf(GuiLoreLine.Text(acornDisplay(amount)))
         ).apply { applyAcornTexture() }
         is OageBoxReward.WorldPoint -> GuiMenuItems.icon(
             Material.HONEY_BOTTLE,
             "§6世界樹の樹液",
-            listOf("§7${worldPointDisplay(amount)}")
+            listOf(GuiLoreLine.Text(worldPointDisplay(amount)))
         )
     }
 

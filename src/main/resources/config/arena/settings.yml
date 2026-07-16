@@ -33,6 +33,19 @@ entrance_lift:
 session:
   max_concurrent: 3
 
+# Arena難易度は、全プレイヤーの直近クリア履歴を日次で指数減衰し、活動量で集約した目標難易度を使う。
+# clear_count はクリア1回、duration はプレイ時間1時間の活動量への重み。
+# difficulty は観測したクリア難易度を候補中心へ引き寄せる強度、influence_strength は目標近傍を選ぶ強度。
+# max_age_days は90以下、各重みと強度は有限の0以上で指定する。
+difficulty_demand:
+  half_life_days: 30.0
+  max_age_days: 90
+  weights:
+    clear_count: 1.0
+    difficulty: 1.0
+    duration: 0.25
+  influence_strength: 1.0
+
 world_pool:
   size: 3
   cleanup_blocks_per_tick: 300

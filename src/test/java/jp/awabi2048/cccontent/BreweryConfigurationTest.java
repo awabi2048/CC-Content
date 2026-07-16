@@ -1,0 +1,75 @@
+package jp.awabi2048.cccontent;
+
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.junit.jupiter.api.Test;
+
+import java.nio.file.Path;
+import java.nio.file.Files;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class BreweryConfigurationTest {
+    private static final Path CONFIG = Path.of("src/main/resources/config/brewery/config.yml");
+    private static final Path RECIPES = Path.of("src/main/resources/config/brewery/recipe.yml");
+
+    @Test
+    void usesOnlyTheVersionedConfigurationShape() {
+        var config = YamlConfiguration.loadConfiguration(CONFIG.toFile());
+        var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
+
+        assertEquals(2, config.getInt("schema_version"));
+        assertTrue(config.isConfigurationSection("brewery"));
+        assertFalse(config.contains("settings"));
+        assertEquals(2, recipes.getInt("schema_version"));
+        assertTrue(recipes.isConfigurationSection("recipes"));
+        assertTrue(recipes.getConfigurationSection("recipes").getKeys(false).size() >= 5);
+
+        for (String key : recipes.getKeys(true)) {
+            assertFalse(key.toLowerCase().endsWith("alchol"), "legacy alcohol typo remains: " + key);
+        }
+    }
+
+    @Test
+    void sampleRecipesExposeTypedPotionEffects() {
+        var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
+        var effects = recipes.getStringList("recipes.moonshine.final_output.effects");
+
+        assertFalse(effects.isEmpty());
+        for (String effect : effects) {
+            String[] parts = effect.split("/");
+            assertEquals(3, parts.length);
+            assertTrue(parts[0].matches("[A-Z_]+"));
+            assertTrue(parts[1].matches("\\d+(?:-\\d+)?"));
+            assertTrue(parts[2].matches("\\d+(?:-\\d+)?"));
+        }
+    }
+
+    @Test
+    void recipeConfigKeepsDisplayTextOutOfGameplayConfig() {
+        var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
+        for (String key : recipes.getKeys(true)) {
+            assertFalse(key.endsWith(".name"));
+            assertFalse(key.endsWith(".description"));
+            assertFalse(key.equals("recipes.wheatbeer.name"));
+        }
+    }
+
+    @Test
+    void codecUsesStructuredLoreAndNoAutomaticLegacyLore() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/kotlin/jp/awabi2048/cccontent/features/brewery/item/BreweryItemCodec.kt"));
+        assertFalse(source.contains("GuiLoreSpec.Auto"));
+        assertFalse(source.contains("GuiLoreLine.Raw"));
+        assertTrue(source.contains("GuiLoreSpec.Blocks"));
+    }
+
+    @Test
+    void qualityTierBoundariesRemainFixed() {
+        assertEquals("low", jp.awabi2048.cccontent.features.brewery.BrewerySettingsKt.breweryQualityTier(33.99));
+        assertEquals("standard", jp.awabi2048.cccontent.features.brewery.BrewerySettingsKt.breweryQualityTier(34.0));
+        assertEquals("standard", jp.awabi2048.cccontent.features.brewery.BrewerySettingsKt.breweryQualityTier(66.99));
+        assertEquals("high", jp.awabi2048.cccontent.features.brewery.BrewerySettingsKt.breweryQualityTier(67.0));
+    }
+}

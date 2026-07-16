@@ -1,0 +1,6 @@
+# ミニゲーム共通設定。ゲーム単位の変更値は data/minigame/games.yml に保存する。
+default_game_id: race
+
+defaults:
+  time_limit_seconds: 300
+  marker_radius: 1.75

@@ -35,6 +35,9 @@ class FeatureInitializationLogger(private val logger: Logger) {
     fun setStatus(featureName: String, status: Status) {
         features[featureName]?.status = status
     }
+
+    /** 管理コマンドが設定値と実際の初期化結果を区別して表示するための参照口。 */
+    fun getStatus(featureName: String): Status? = features[featureName]?.status
     
     /**
      * featureにサマリーメッセージを追加（一覧に表示される）

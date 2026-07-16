@@ -183,28 +183,26 @@ class OageShrineShopMenuService(
         val displayName = displayNameFrom(sourceItem) ?: item.displayNameOverride ?: "§f${item.goodsId}"
         purchaseMeta.displayName(legacy(displayName))
         val fixedLore = list(player, "item.head_lore")
-        purchaseMeta.lore(buildShopLore(fixedLore, item.price, tab, item))
+        purchaseMeta.lore(buildShopLore(player, fixedLore, item.price, tab, item))
         purchaseMeta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         purchaseItem.itemMeta = purchaseMeta
 
         val previewItem = purchaseItem.clone()
         val previewMeta = previewItem.itemMeta ?: return null
-        previewMeta.lore(buildShopLore(fixedLore, item.price, tab, item))
+        previewMeta.lore(buildShopLore(player, fixedLore, item.price, tab, item))
         previewItem.itemMeta = previewMeta
 
         return OageShrineShopResolvedItem(tab, item, purchaseItem, previewItem, displayName, fixedLore)
     }
 
-    private fun buildShopLore(headLore: List<String>, price: Double, tab: OageShrineShopTabDefinition, item: OageShrineShopItemDefinition): List<Component> {
-        val costLine = "§f❙ §7初穂料 ${ContentEconomyBridge.formatAcorn(price)}"
+    private fun buildShopLore(player: Player, headLore: List<String>, price: Double, tab: OageShrineShopTabDefinition, item: OageShrineShopItemDefinition): List<Component> {
         val limit = item.purchaseLimitDaily ?: tab.purchaseLimitDaily ?: item.purchaseLimitWeekly ?: tab.purchaseLimitWeekly
-        val limitLine = limit?.let { "§f❙ §7交換可能個数 §b${it}個" }
         return CCSystem.getAPI().getLoreService().render(
             GuiLoreSpec.Blocks(listOf(
-                GuiLoreBlock(headLore.map(GuiLoreLine::Raw)),
+                GuiLoreBlock(headLore.map(GuiLoreLine::Text)),
                 GuiLoreBlock(buildList {
-                    add(GuiLoreLine.Raw(costLine))
-                    if (limitLine != null) add(GuiLoreLine.Raw(limitLine))
+                    add(GuiLoreLine.Data(text(player, "shop.item.offering_label"), ContentEconomyBridge.formatAcorn(price), "§e"))
+                    if (limit != null) add(GuiLoreLine.Data(text(player, "shop.item.exchange_limit_label"), "$limit", "§b"))
                 })
             ))
         )
@@ -214,15 +212,19 @@ class OageShrineShopMenuService(
         return GuiMenuItems.icon(
             Material.LIME_CONCRETE,
             text(player, "confirm.confirm_button.name"),
-            list(player, "confirm.confirm_button.lore") + listOf(
-                "§7${resolved.displayName}",
-                "§7§f❙ §7初穂料 ${ContentEconomyBridge.formatAcorn(resolved.item.price)}"
+            list(player, "confirm.confirm_button.lore").map(GuiLoreLine::Text) + listOf(
+                GuiLoreLine.ComponentData(text(player, "shop.item.target_label"), legacy(resolved.displayName), "§f"),
+                GuiLoreLine.Data(text(player, "shop.item.offering_label"), ContentEconomyBridge.formatAcorn(resolved.item.price), "§e")
             )
         )
     }
 
     private fun cancelButton(player: Player): ItemStack {
-        return GuiMenuItems.icon(Material.RED_CONCRETE, text(player, "confirm.cancel_button.name"), list(player, "confirm.cancel_button.lore"))
+        return GuiMenuItems.icon(
+            Material.RED_CONCRETE,
+            text(player, "confirm.cancel_button.name"),
+            list(player, "confirm.cancel_button.lore").map(GuiLoreLine::Text)
+        )
     }
 
     private fun applyConfirmFrame(inventory: Inventory) {
@@ -232,10 +234,10 @@ class OageShrineShopMenuService(
     private fun emptyShopItem(): ItemStack = GuiMenuItems.backgroundPane(Material.WHITE_STAINED_GLASS_PANE)
 
     private fun icon(player: Player, key: String, material: Material): ItemStack =
-        GuiMenuItems.icon(material, text(player, "$key.name"), list(player, "$key.lore"))
+        GuiMenuItems.icon(material, text(player, "$key.name"), list(player, "$key.lore").map(GuiLoreLine::Text))
 
     private fun backButton(player: Player): ItemStack =
-        GuiMenuItems.backButton(text(player, "back.name"), list(player, "back.lore"))
+        GuiMenuItems.backButton(text(player, "back.name"), list(player, "back.lore").map(GuiLoreLine::Text))
 
     private fun text(player: Player, key: String, vararg placeholders: Pair<String, Any?>): String {
         val locale = ContentLocaleResolver.resolve(player)

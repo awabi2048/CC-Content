@@ -121,3 +121,9 @@ carpenter:
   chest: 2
   barrel: 2
   bookshelf: 3
+
+fisher:
+  cod: 5
+  salmon: 7
+  pufferfish: 12
+  tropical_fish: 20

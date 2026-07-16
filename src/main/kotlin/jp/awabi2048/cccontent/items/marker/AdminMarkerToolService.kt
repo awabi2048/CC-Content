@@ -377,11 +377,20 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         meta.lore(
             CCSystem.getAPI().getLoreService().render(
                 GuiLoreSpec.Blocks(listOf(GuiLoreBlock(buildList {
-                    add(GuiLoreLine.Raw(text(definition, player, "current_mode", "§f§l| §7現在のモード §a{mode}", "mode" to modeName)))
+                    add(GuiLoreLine.Data(text(definition, player, "current_mode", "現在のモード"), modeName, "§a"))
                     add(GuiLoreLine.Spacer)
-                    add(GuiLoreLine.Raw(text(definition, player, "usage.place", "§e右クリック(ブロック)§7 クリック面の外側にマーカーを設置")))
-                    add(GuiLoreLine.Raw(text(definition, player, "usage.delete", "§eFキー§7 視線上のマーカーを削除")))
-                    add(GuiLoreLine.Raw(text(definition, player, "usage.switch", "§eShift + ホットバースクロール§7 前後のモードへ変更")))
+                    add(GuiLoreLine.Action(
+                        text(definition, player, "usage.place.operation", "右クリック（ブロック）"),
+                        text(definition, player, "usage.place.action", "クリック面の外側にマーカーを設置")
+                    ))
+                    add(GuiLoreLine.Action(
+                        text(definition, player, "usage.delete.operation", "Fキー"),
+                        text(definition, player, "usage.delete.action", "視線上のマーカーを削除")
+                    ))
+                    add(GuiLoreLine.Action(
+                        text(definition, player, "usage.switch.operation", "Shift + ホットバースクロール"),
+                        text(definition, player, "usage.switch.action", "前後のモードへ変更")
+                    ))
                 })))
             )
         )

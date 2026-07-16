@@ -5,7 +5,11 @@ content_enabled:
   rank: true
   brewery: true
   cooking: true
+  fishing: true
+  resource_collection: true
   sukima_dungeon: true
+  party: true
+  minigame: true
 
 persistence:
   flush_interval_minutes: 1
