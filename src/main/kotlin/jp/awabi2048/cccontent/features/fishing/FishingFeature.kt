@@ -10,6 +10,8 @@ import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.profession.Profession
+import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
+import jp.awabi2048.cccontent.features.rank.skill.handlers.FisherBonusHandler
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import net.kyori.adventure.bossbar.BossBar
@@ -236,7 +238,9 @@ class FishingFeature(
             Title.Times.times(Duration.ZERO, Duration.ofMillis(500), Duration.ofMillis(200))
         ))
         player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 2.0f)
-        val hookTicks = settings.minigame.baseHookWindowTicks
+        val hookTicks = (settings.minigame.baseHookWindowTicks * fisher.hookWindowMultiplier)
+            .roundToLong()
+            .coerceAtLeast(1L)
         session.task = plugin.server.scheduler.runTaskLater(
             plugin,
             Runnable { fail(player.uniqueId, "fishing.failed.hook_timeout") },
@@ -651,13 +655,29 @@ class FishingFeature(
             RankReleasePolicy.canAccessProfession(player, Profession.FISHER)
         if (!active) return FisherContext(false, 1, 1.0, 1.0, 0.0)
         val skillsAvailable = RankReleasePolicy.canUseSkills(player)
-        val skills = if (skillsAvailable) profession.acquiredSkills else emptySet()
+        if (!skillsAvailable) return FisherContext(true, rank.getCurrentProfessionLevel(player.uniqueId), 1.0, 1.0, 0.0)
+        val playerId = player.uniqueId
         return FisherContext(
             true,
-            rank.getCurrentProfessionLevel(player.uniqueId),
-            if ("patient_cast" in skills) 1.2 else 1.0,
-            if ("master_angler" in skills) 0.85 else 1.0,
-            if ("deep_water" in skills) 0.15 else 0.0
+            rank.getCurrentProfessionLevel(playerId),
+            SkillEffectEngine.getCachedEffectValue(
+                playerId,
+                FisherBonusHandler.HOOK_WINDOW_EFFECT,
+                "multiplier",
+                1.0
+            ).coerceAtLeast(1.0),
+            SkillEffectEngine.getCachedEffectValue(
+                playerId,
+                FisherBonusHandler.DURATION_EFFECT,
+                "multiplier",
+                1.0
+            ).coerceIn(0.1, 1.0),
+            SkillEffectEngine.getCachedEffectValue(
+                playerId,
+                FisherBonusHandler.STABILITY_EFFECT,
+                "bonus",
+                0.0
+            ).coerceIn(0.0, 0.9)
         )
     }
 

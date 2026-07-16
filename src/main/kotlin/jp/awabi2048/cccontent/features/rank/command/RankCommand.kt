@@ -38,14 +38,10 @@ import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import com.awabi2048.ccsystem.CCSystem
-import com.awabi2048.ccsystem.api.gui.GuiElementRole
-import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiNameSpec
-import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
@@ -443,17 +439,17 @@ class RankCommand(
     }
 
     private fun openTutorialRankMenu(viewer: Player): Boolean {
-        val holder = TutorialRankMenuGuiHolder(TUTORIAL_MENU_PAGE_FIRST)
+        val holder = TutorialRankMenuGuiHolder()
         val inventory = Bukkit.createInventory(holder, 45, "§8チュートリアルランク")
         holder.backingInventory = inventory
 
-        renderTutorialRankMenu(inventory, viewer, holder.page)
+        renderTutorialRankMenu(inventory, viewer)
         viewer.openInventory(inventory)
         viewer.playSound(viewer.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
         return true
     }
 
-    private fun renderTutorialRankMenu(inventory: Inventory, viewer: Player, page: Int) {
+    private fun renderTutorialRankMenu(inventory: Inventory, viewer: Player) {
         val headerFooterPane = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
         val basePane = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
         val acquiredRoutePane = createBackgroundItem(Material.LIME_STAINED_GLASS_PANE)
@@ -470,18 +466,8 @@ class RankCommand(
         }
         val tutorial = rankManager.getPlayerTutorial(viewer.uniqueId)
         val currentRank = tutorial.currentRank
-        val routeSlots = if (page == TUTORIAL_MENU_PAGE_SECOND) {
-            TUTORIAL_MENU_ROUTE_SLOTS_PAGE2
-        } else {
-            TUTORIAL_MENU_ROUTE_SLOTS_PAGE1
-        }
-        val routeLeadingRank = if (page == TUTORIAL_MENU_PAGE_SECOND) {
-            TUTORIAL_MENU_ROUTE_LEADING_RANK_PAGE2
-        } else {
-            TUTORIAL_MENU_ROUTE_LEADING_RANK_PAGE1
-        }
-        routeSlots.forEach { slot ->
-            val leadingRank = routeLeadingRank[slot]
+        TUTORIAL_MENU_ROUTE_SLOTS.forEach { slot ->
+            val leadingRank = TUTORIAL_MENU_ROUTE_LEADING_RANK[slot]
             val routeItem = if (leadingRank != null && leadingRank.level <= currentRank.level) {
                 acquiredRoutePane
             } else {
@@ -490,38 +476,11 @@ class RankCommand(
             inventory.setItem(slot, routeItem)
         }
 
-        val entries = when (page) {
-            TUTORIAL_MENU_PAGE_FIRST -> listOf(
-                TutorialRank.NEWBIE to 19,
-                TutorialRank.VISITOR to 22,
-                TutorialRank.PIONEER to 25
-            )
-            TUTORIAL_MENU_PAGE_SECOND -> listOf(
-                TutorialRank.ADVENTURER to 19,
-                TutorialRank.ATTAINER to 22
-            )
-            else -> emptyList()
-        }
-
-        entries.forEach { (rank, slot) ->
+        TUTORIAL_MENU_RANK_SLOTS.forEach { (rank, slot) ->
             inventory.setItem(slot, createTutorialRankItem(viewer, tutorial, rank, currentRank))
         }
 
         inventory.setItem(TUTORIAL_MENU_PLAYER_SLOT, createTutorialPlayerInfoItem(viewer))
-        inventory.setItem(
-            TUTORIAL_MENU_PAGE_PREVIOUS_SLOT,
-            createTutorialPageArrowItem(
-                "前へ",
-                canMove = page > TUTORIAL_MENU_PAGE_FIRST
-            )
-        )
-        inventory.setItem(
-            TUTORIAL_MENU_PAGE_NEXT_SLOT,
-            createTutorialPageArrowItem(
-                "次へ",
-                canMove = page < TUTORIAL_MENU_PAGE_SECOND
-            )
-        )
     }
 
     private fun createTutorialRankItem(
@@ -832,18 +791,6 @@ class RankCommand(
             item.itemMeta = meta
         }
         return item
-    }
-
-    private fun createTutorialPageArrowItem(label: String, canMove: Boolean): ItemStack {
-        return CCSystem.getAPI().getGuiElementService().item(
-            GuiItemSpec(
-                material = Material.ARROW,
-                name = GuiNameSpec.Text(label, if (canMove) GuiNameStyle.DEFAULT else GuiNameStyle.MUTED),
-                lore = GuiLoreSpec.None,
-                role = GuiElementRole.NAVIGATION,
-                amount = 1
-            )
-        )
     }
 
     /**
@@ -3240,32 +3187,8 @@ class RankCommand(
 
     @EventHandler
     fun onTutorialRankMenuClick(event: InventoryClickEvent) {
-        val holder = event.view.topInventory.holder as? TutorialRankMenuGuiHolder ?: return
+        if (event.view.topInventory.holder !is TutorialRankMenuGuiHolder) return
         event.cancelWithDebug("RankCommand.onTutorialRankMenuClick: tutorial_menu")
-
-        val clickedSlot = event.rawSlot
-        if (clickedSlot !in 0 until event.view.topInventory.size) {
-            return
-        }
-
-        val player = event.whoClicked as? Player ?: return
-        when (clickedSlot) {
-            TUTORIAL_MENU_PAGE_PREVIOUS_SLOT -> {
-                if (holder.page > TUTORIAL_MENU_PAGE_FIRST) {
-                    holder.page -= 1
-                    renderTutorialRankMenu(holder.backingInventory, player, holder.page)
-                    player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.2f)
-                }
-            }
-
-            TUTORIAL_MENU_PAGE_NEXT_SLOT -> {
-                if (holder.page < TUTORIAL_MENU_PAGE_SECOND) {
-                    holder.page += 1
-                    renderTutorialRankMenu(holder.backingInventory, player, holder.page)
-                    player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.2f)
-                }
-            }
-        }
     }
 
     @EventHandler
@@ -3292,9 +3215,7 @@ class RankCommand(
         event.isCancelled = true
     }
 
-    private class TutorialRankMenuGuiHolder(
-        var page: Int
-    ) : InventoryHolder {
+    private class TutorialRankMenuGuiHolder : InventoryHolder {
         lateinit var backingInventory: Inventory
 
         override fun getInventory(): Inventory = backingInventory
@@ -3438,28 +3359,21 @@ class RankCommand(
         private const val SETTINGS_MENU_LEVELUP_NOTIFY_SLOT = 11
         private const val SETTINGS_MENU_BACK_SLOT = 18
 
-        private const val TUTORIAL_MENU_PAGE_FIRST = 1
-        private const val TUTORIAL_MENU_PAGE_SECOND = 2
-        private const val TUTORIAL_MENU_PAGE_PREVIOUS_SLOT = 39
-        private const val TUTORIAL_MENU_PAGE_NEXT_SLOT = 41
         private const val TUTORIAL_MENU_PLAYER_SLOT = 40
         private const val TUTORIAL_RANK_TASK_LORE_LIMIT = 10
-        private val TUTORIAL_MENU_ROUTE_SLOTS_PAGE1 = listOf(20, 21, 23, 24, 26)
-        private val TUTORIAL_MENU_ROUTE_SLOTS_PAGE2 = listOf(18, 20, 21, 23, 24, 25, 26)
-        private val TUTORIAL_MENU_ROUTE_LEADING_RANK_PAGE1 = mapOf(
-            20 to TutorialRank.NEWBIE,
-            21 to TutorialRank.NEWBIE,
-            23 to TutorialRank.VISITOR,
-            24 to TutorialRank.VISITOR,
-            26 to TutorialRank.PIONEER
+        private val TUTORIAL_MENU_RANK_SLOTS = mapOf(
+            TutorialRank.NEWBIE to 18,
+            TutorialRank.VISITOR to 20,
+            TutorialRank.PIONEER to 22,
+            TutorialRank.ADVENTURER to 24,
+            TutorialRank.ATTAINER to 26
         )
-        private val TUTORIAL_MENU_ROUTE_LEADING_RANK_PAGE2 = mapOf(
-            20 to TutorialRank.ADVENTURER,
-            21 to TutorialRank.ADVENTURER,
-            23 to TutorialRank.ATTAINER,
-            24 to TutorialRank.ATTAINER,
-            25 to TutorialRank.ATTAINER,
-            26 to TutorialRank.ATTAINER
+        private val TUTORIAL_MENU_ROUTE_SLOTS = listOf(19, 21, 23, 25)
+        private val TUTORIAL_MENU_ROUTE_LEADING_RANK = mapOf(
+            19 to TutorialRank.NEWBIE,
+            21 to TutorialRank.VISITOR,
+            23 to TutorialRank.PIONEER,
+            25 to TutorialRank.ADVENTURER
         )
 
     }

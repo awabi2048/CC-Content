@@ -101,7 +101,7 @@ import jp.awabi2048.cccontent.features.rank.job.ProfessionCombatExpListener
 import jp.awabi2048.cccontent.features.rank.job.ProfessionMinerExpListener
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
-import jp.awabi2048.cccontent.features.rank.profession.skilltree.ConfigBasedSkillTree
+import jp.awabi2048.cccontent.features.rank.profession.skilltree.CodeDefinedSkillTree
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectRegistry
 import jp.awabi2048.cccontent.features.rank.skill.handlers.*
@@ -848,6 +848,7 @@ class CCContent : JavaPlugin(), Listener {
             SkillEffectRegistry.register(UnlockRecipeHandler())
             SkillEffectRegistry.register(WorkSpeedBonusMockHandler())
             SkillEffectRegistry.register(SuccessRateBonusMockHandler())
+            FisherBonusHandler.all().forEach(SkillEffectRegistry::register)
 
             SkillEffectRegistry.register(UnlockItemTokenHandler())
 
@@ -944,7 +945,6 @@ class CCContent : JavaPlugin(), Listener {
      */
     private fun registerSkillTrees() {
         SkillTreeRegistry.clear()
-        val jobDir = File(dataFolder, "config/rank/job").apply { mkdirs() }
         val expFile = File(dataFolder, "config/rank/job_exp.yml")
         val errors = mutableListOf<String>()
 
@@ -955,28 +955,27 @@ class CCContent : JavaPlugin(), Listener {
                 logger.warning("ジョブ経験値設定ファイルのコピーに失敗しました: ${e.message}")
             }
         }
-        
+
         for (profession in Profession.values()) {
-            val ymlFile = File(jobDir, "${profession.id}.yml")
-            
-            // ファイルが存在しない場合はリソースからコピー
-            if (!ymlFile.exists()) {
-                try {
-                    extractJobFile("${profession.id}.yml", ymlFile)
-                } catch (e: Exception) {
-                    val error = "スキルツリーファイルのコピーに失敗しました (${profession.id}): ${e.message}"
-                    logger.warning(error)
-                    errors += error
-                    continue
-                }
-            }
-            
             try {
-                val skillTree = ConfigBasedSkillTree(profession.id, ymlFile)
+                val skillTree = CodeDefinedSkillTree.create(profession)
+                skillTree.getAllSkills().values.mapNotNull { it.effect?.type }.distinct().forEach { effectType ->
+                    val handler = requireNotNull(SkillEffectRegistry.getHandler(effectType)) {
+                        "${profession.id}: スキル効果 '$effectType' のハンドラが登録されていません"
+                    }
+                    require(handler.supportsProfession(profession.id)) {
+                        "${profession.id}: スキル効果 '$effectType' はこの職業をサポートしていません"
+                    }
+                }
+                skillTree.getAllSkills().values.mapNotNull { it.effect }.forEach { effect ->
+                    require(SkillEffectRegistry.getHandler(effect.type)?.validateParams(effect) == true) {
+                        "${profession.id}: スキル効果 '${effect.type}' のパラメータが無効です"
+                    }
+                }
                 SkillTreeRegistry.register(profession, skillTree)
             } catch (e: Exception) {
                 e.printStackTrace()
-                val error = "スキルツリー読み込み失敗 (${profession.id}): ${e.message}"
+                val error = "コード定義スキルツリー登録失敗 (${profession.id}): ${e.message}"
                 logger.warning(error)
                 errors += error
             }
@@ -986,21 +985,6 @@ class CCContent : JavaPlugin(), Listener {
             throw IllegalStateException("Rank feature 初期化失敗: ${errors.joinToString(" | ")}")
         }
     }
-    
-    /**
-     * リソースからジョブファイルをコピー
-     */
-    private fun extractJobFile(resourceName: String, destination: File) {
-        val resourceStream = getResource("config/rank/job/$resourceName")
-            ?: throw IllegalArgumentException("リソースが見つかりません: config/rank/job/$resourceName")
-        
-        resourceStream.use { input ->
-            destination.outputStream().use { output ->
-                input.copyTo(output)
-            }
-        }
-    }
-    
     private fun registerCustomItems() {
         // GulliverLight アイテム
         CustomItemManager.register(BigLight())

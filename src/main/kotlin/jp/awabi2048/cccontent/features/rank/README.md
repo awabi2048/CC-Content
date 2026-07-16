@@ -4,7 +4,7 @@
 現在の実装は「ティアスコア制」ではなく、以下の段階型フローで構成される。
 
 1. チュートリアルランク（`NEWBIE` → `ATTAINER`）
-2. 職業選択（9職業）
+2. 職業選択（10職業）
 3. 職業EXP・レベル進行
 4. スキルツリー解放
 5. 効果フレームワーク適用
@@ -29,12 +29,12 @@
 
 ### 1.3 職業・スキルツリー
 
-- `profession/Profession.kt`: 9職業定義
+- `profession/Profession.kt`: 10職業定義
 - `profession/PlayerProfession.kt`: 職業進行データ
 - `profession/ProfessionManager.kt`: 職業管理インターフェース
 - `impl/ProfessionManagerImpl.kt`: 実装
 - `profession/SkillTree.kt`: スキルツリーインターフェース
-- `profession/skilltree/ConfigBasedSkillTree.kt`: YAMLロード実装
+- `profession/skilltree/CodeDefinedSkillTree.kt`: コード定義スキルツリー実装
 - `profession/SkillNode.kt`: ノード定義
 - `profession/SkillTreeRegistry.kt`: ツリー登録
 
@@ -67,21 +67,16 @@
 - `farmer`
 - `gardener`
 - `carpenter`
+- `fisher`
 
-## 3. 設定ファイル構成
+## 3. 定義構成
 
 ### 3.1 スキルツリー
 
-- `src/main/resources/config/rank/job/*.yml`
+- `profession/skilltree/CodeDefinedSkillTree.kt`
 
-各ファイルは以下を持つ:
-
-- `skills.settings.level.initialExp`
-- `skills.settings.level.base`
-- `skills.settings.level.maxLevel`
-- `skills.settings.overviewIcon`
-- `skills.settings.bossBarColor`
-- ノード定義（`requiredLevel`, `children`, `effect`, `exclusiveBranch`, `activationToggleable`）
+職業のレベル曲線、最大レベル、概要アイコン、ボスバー色、ノード、分岐、効果は、
+運用中に変更しない固定仕様としてKotlin上に定義する。
 
 ### 3.2 EXPテーブル
 
@@ -167,7 +162,7 @@ ATTAINER
 
 ## 8. 実装時の注意
 
-- 効果追加時は、`SkillEffectHandler` 実装 + `SkillEffectRegistry` 登録 + 対応YAML更新をセットで行う。
+- 効果追加時は、`SkillEffectHandler` 実装 + `SkillEffectRegistry` 登録 + コード定義スキルノード更新をセットで行う。
 - 職業・スキル構成変更時は、旧データとの互換が必要かを先に判断する。
 - 職業EXP判定は `job/` リスナー群で分かれているため、対象イベントをまたぐ副作用に注意する。
 - `RankCommand.kt` は巨大ファイルのため、GUI・コマンド修正は局所化して変更範囲を限定する。

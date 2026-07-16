@@ -16,7 +16,7 @@ class FishingWorldBoundarySourceContractTest {
 
     @Test
     void nonResourceWorldLeavesVanillaFishingUntouched() throws Exception {
-        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String source = readSource();
 
         assertTrue(source.contains(
             "if (!CCSystem.getAPI().isResourceWorld(player.world)) {\n" +
@@ -28,7 +28,7 @@ class FishingWorldBoundarySourceContractTest {
 
     @Test
     void vanillaCatchIsCancelledOnlyForContentFishingSession() throws Exception {
-        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String source = readSource();
 
         assertTrue(source.contains("val session = sessions[player.uniqueId]"));
         assertTrue(source.contains("if (session != null) {\n                    event.isCancelled = true"));
@@ -36,7 +36,7 @@ class FishingWorldBoundarySourceContractTest {
 
     @Test
     void fightOwnsBobberAndRodMissingUsesGracePeriod() throws Exception {
-        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String source = readSource();
 
         assertTrue(source.contains("session.hook.teleport(location)"));
         assertTrue(source.contains("session.hook.velocity = Vector()"));
@@ -48,7 +48,7 @@ class FishingWorldBoundarySourceContractTest {
 
     @Test
     void hookWindowAcceptsAllRightClickFishingEventRoutes() throws Exception {
-        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String source = readSource();
 
         assertTrue(source.contains("Phase.HOOK_WINDOW -> startFight(player, session)"));
         assertTrue(source.contains(
@@ -60,11 +60,15 @@ class FishingWorldBoundarySourceContractTest {
 
     @Test
     void dictionaryAndSearchUseTheSameTenBlockWaterSurvey() throws Exception {
-        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+        String source = readSource();
 
         assertTrue(source.contains("player.rayTraceBlocks(10.0, FluidCollisionMode.ALWAYS)"));
         assertTrue(source.contains("val block = surveyWaterBlock(player)"));
         assertTrue(source.contains("val surveyBlock = surveyWaterBlock(player)"));
         assertTrue(source.contains("if (candidates.isEmpty()) return"));
+    }
+
+    private static String readSource() throws Exception {
+        return Files.readString(SOURCE, StandardCharsets.UTF_8).replace("\r\n", "\n");
     }
 }
