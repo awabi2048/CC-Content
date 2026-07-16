@@ -4,16 +4,37 @@ import jp.awabi2048.cccontent.features.fishing.FishCatch;
 import jp.awabi2048.cccontent.features.fishing.FishQuality;
 import jp.awabi2048.cccontent.features.fishing.FishdexEntry;
 import jp.awabi2048.cccontent.features.fishing.FishdexPage;
+import jp.awabi2048.cccontent.features.fishing.FishFightProfile;
+import jp.awabi2048.cccontent.features.fishing.FishingEffectivenessZone;
+import jp.awabi2048.cccontent.features.fishing.FishingFightStatus;
+import jp.awabi2048.cccontent.features.fishing.FishingFightState;
+import jp.awabi2048.cccontent.features.fishing.FishingWaterCondition;
+import jp.awabi2048.cccontent.features.fishing.FishingWaterProfile;
+import jp.awabi2048.cccontent.features.fishing.FishingWaterType;
 import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FishingModelTest {
+    @Test
+    void waterConditionsUseDepthAndWidth() {
+        var offshore = new FishingWaterCondition(
+            FishingWaterType.DEEP_OPEN,
+            new kotlin.ranges.IntRange(8, 32),
+            new kotlin.ranges.IntRange(21, 33)
+        );
+
+        assertTrue(offshore.matches(new FishingWaterProfile(12, 25)));
+        assertTrue(!offshore.matches(new FishingWaterProfile(4, 25)));
+        assertTrue(!offshore.matches(new FishingWaterProfile(12, 10)));
+    }
+
     @Test
     void fishdexStatsAreRecordedPerFish() {
         var first = new FishCatch("cod", Material.COD, 120, FishQuality.COMMON, 20, 5);
@@ -41,35 +62,74 @@ class FishingModelTest {
     }
 
     @Test
-    void fishingInputRequiresRodAndAlternatesLeftAndRight() {
-        var state = new jp.awabi2048.cccontent.features.fishing.FishingInputState(0, 2, true);
-        var first = state.accept(true, true);
-        assertEquals(jp.awabi2048.cccontent.features.fishing.FishingInputResult.ACCEPTED, first.getFirst());
-        assertEquals(false, first.getSecond().getExpectedLeft());
-        assertEquals(jp.awabi2048.cccontent.features.fishing.FishingInputResult.FAILED, first.getSecond().accept(true, true).getFirst());
-        assertEquals(jp.awabi2048.cccontent.features.fishing.FishingInputResult.FAILED, first.getSecond().accept(false, false).getFirst());
-        assertEquals(jp.awabi2048.cccontent.features.fishing.FishingInputResult.COMPLETE, first.getSecond().accept(false, true).getFirst());
+    void fishingEffectivenessUsesGreenYellowAndOrangeBands() {
+        var profile = new FishFightProfile(50.0, 4.0, 1.0, 1.0);
+        assertEquals(FishingEffectivenessZone.GREEN,
+            new FishingFightState(50.0, 20, 1).zone(profile, 10.0, 20.0));
+        assertEquals(FishingEffectivenessZone.YELLOW,
+            new FishingFightState(70.0, 20, 1).zone(profile, 10.0, 20.0));
+        assertEquals(FishingEffectivenessZone.ORANGE,
+            new FishingFightState(90.0, 20, 1).zone(profile, 10.0, 20.0));
     }
 
     @Test
-    void fishingInputNormalizationPreservesJavaAlternation() {
-        assertTrue(jp.awabi2048.cccontent.features.fishing.FishingInputNormalizer.normalize(true, true, false));
-        var state = new jp.awabi2048.cccontent.features.fishing.FishingInputState(0, 2, false);
-        assertEquals(jp.awabi2048.cccontent.features.fishing.FishingInputResult.FAILED,
-            state.accept(jp.awabi2048.cccontent.features.fishing.FishingInputNormalizer.normalize(true, false, false), true).getFirst());
+    void fishingInputRaisesAndLowersEffectivenessWithinBounds() {
+        var state = new FishingFightState(50.0, 20, 1);
+        assertEquals(60.0, state.applyInput(10.0).getEffectiveness());
+        assertEquals(0.0, state.applyInput(-100.0).getEffectiveness());
+        assertEquals(100.0, state.applyInput(100.0).getEffectiveness());
     }
 
     @Test
-    void fishingInputNormalizationAcceptsEitherBedrockClick() {
-        var state = new jp.awabi2048.cccontent.features.fishing.FishingInputState(0, 2, true);
-        var first = state.accept(jp.awabi2048.cccontent.features.fishing.FishingInputNormalizer.normalize(false, true, true), true);
-        var second = first.getSecond().accept(
-            jp.awabi2048.cccontent.features.fishing.FishingInputNormalizer.normalize(true, first.getSecond().getExpectedLeft(), true),
-            true
-        );
+    void fishDriftRespectsStabilityAndConsumesTime() {
+        var profile = new FishFightProfile(50.0, 10.0, 1.0, 1.0);
+        var state = new FishingFightState(50.0, 20, 1);
+        var unstable = state.advance(profile, 5, 0.0, 0.25, 0.18, new Random(1));
+        var stable = state.advance(profile, 5, 0.5, 0.25, 0.18, new Random(1));
+        assertEquals(15, unstable.getRemainingTicks());
+        assertTrue(Math.abs(unstable.getEffectiveness() - 50.0) >
+            Math.abs(stable.getEffectiveness() - 50.0));
+    }
 
-        assertEquals(jp.awabi2048.cccontent.features.fishing.FishingInputResult.ACCEPTED, first.getFirst());
-        assertEquals(false, first.getSecond().getExpectedLeft());
-        assertEquals(jp.awabi2048.cccontent.features.fishing.FishingInputResult.COMPLETE, second.getFirst());
+    @Test
+    void fishResistanceReversesWhenDirectionPersistenceEnds() {
+        var profile = new FishFightProfile(50.0, 10.0, 0.5, 1.0);
+        var state = new FishingFightState(50.0, 20, 1);
+        var reversed = state.advance(profile, 5, 0.0, 0.25, 0.18, new Random() {
+            @Override
+            public double nextDouble() {
+                return 0.9;
+            }
+        });
+
+        assertEquals(-1, reversed.getDriftDirection());
+        assertEquals(47.5, reversed.getEffectiveness());
+        assertEquals(-2.5, reversed.getDriftVelocity());
+    }
+
+    @Test
+    void fightStatusHasTwoMessagesForEveryEffectivenessZone() {
+        for (var zone : FishingEffectivenessZone.values()) {
+            assertEquals(2, FishingFightStatus.Companion.candidates(zone).size());
+        }
+    }
+
+    @Test
+    void fishQualityUsesThreeTiersAndAggregatesLegacyRecords() {
+        assertEquals(3, FishQuality.values().length);
+        assertEquals("§e★§7☆☆", FishQuality.COMMON.getStars());
+        assertEquals("§e★★§7☆", FishQuality.RARE.getStars());
+        assertEquals("§e★★★", FishQuality.LEGENDARY.getStars());
+        var normalized = FishQuality.Companion.normalizeStoredCounts(Map.of(
+            "common", 1L,
+            "uncommon", 2L,
+            "rare", 3L,
+            "epic", 4L,
+            "legendary", 5L
+        ));
+
+        assertEquals(1L, normalized.get(FishQuality.COMMON));
+        assertEquals(5L, normalized.get(FishQuality.RARE));
+        assertEquals(9L, normalized.get(FishQuality.LEGENDARY));
     }
 }

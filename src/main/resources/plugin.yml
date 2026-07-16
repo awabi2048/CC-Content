@@ -28,10 +28,6 @@ commands:
     description: 職業メインメニューを開く
     usage: /rankmenu [skill]
     permission: cc-content.rank
-  fishdex:
-    description: Fishdexを開く
-    usage: /fishdex [page]
-    permission: cc-content.fishing
   catalog:
     description: 釣り・料理・醸造の図鑑を開く
     usage: /catalog <fishing|cooking|brewery> [page]
@@ -71,7 +67,7 @@ permissions:
     description: 職業メインメニューを開ける
     default: true
   cc-content.fishing:
-    description: 釣りとFishdexを利用できる
+    description: 釣りとお魚辞典を利用できる
     default: true
   cc-content.catalog:
     description: 釣り・料理・醸造の図鑑を利用できる

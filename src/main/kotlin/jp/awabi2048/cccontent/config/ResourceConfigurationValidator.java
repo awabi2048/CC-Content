@@ -50,7 +50,6 @@ public final class ResourceConfigurationValidator {
         validateArenaThemes(configRoot, configs, errors);
         validateRankSettingsConfig(configRoot, configs, errors);
         validateRankJobExp(configRoot, configs, errors);
-        validateRankJobs(configRoot, configs, errors);
         validateNpcMenu(configRoot, configs, errors);
         validateCustomItemConfigs(configRoot, configs, errors);
         validateBreweryConfigs(configRoot, configs, errors);
@@ -434,48 +433,6 @@ public final class ResourceConfigurationValidator {
         }
     }
 
-    private static void validateRankJobs(Path configRoot, Map<Path, Object> configs, List<String> errors) throws IOException {
-        Path jobDir = configRoot.resolve("rank/job");
-        try (Stream<Path> paths = Files.list(jobDir)) {
-            for (Path file : paths.filter(ResourceConfigurationValidator::isYaml).sorted().toList()) {
-                Map<String, Object> root = rootMap(configs, file, errors);
-                if (root == null) {
-                    continue;
-                }
-                Map<String, Object> skills = requireMap(root, "skills", file, errors);
-                if (skills == null) {
-                    continue;
-                }
-                Map<String, Object> settings = requireMap(skills, "settings", file, errors, "skills.settings");
-                if (settings != null) {
-                    Map<String, Object> level = requireMap(settings, "level", file, errors, "skills.settings.level");
-                    if (level != null) {
-                        requirePositiveNumber(level, "initialExp", file, "skills.settings.level.initialExp", errors);
-                        requirePositiveNumber(level, "base", file, "skills.settings.level.base", errors);
-                        requirePositiveNumber(level, "maxLevel", file, "skills.settings.level.maxLevel", errors);
-                    }
-                    requireMaterial(settings.get("overviewIcon"), file, "skills.settings.overviewIcon", errors);
-                }
-                for (Map.Entry<String, Object> entry : skills.entrySet()) {
-                    if ("settings".equals(entry.getKey())) {
-                        continue;
-                    }
-                    Map<String, Object> skill = asMap(entry.getValue());
-                    String path = "skills." + entry.getKey();
-                    if (skill == null) {
-                        errors.add(format("invalid skill node", file, path, "skill must be a section"));
-                        continue;
-                    }
-                    requireNonNegativeNumber(skill, "requiredLevel", file, path + ".requiredLevel", errors);
-                    requireMaterial(skill.get("icon"), file, path + ".icon", errors);
-                    if (!(skill.get("children") instanceof List<?>)) {
-                        errors.add(format("missing skill children", file, path + ".children", "children list is required"));
-                    }
-                }
-            }
-        }
-    }
-
     private static void validateNpcMenu(Path configRoot, Map<Path, Object> configs, List<String> errors) {
         Path file = configRoot.resolve("npc/menu.yml");
         Map<String, Object> root = rootMap(configs, file, errors);
@@ -702,12 +659,61 @@ public final class ResourceConfigurationValidator {
         Path file = configRoot.resolve("fishing/fish.yml");
         Map<String, Object> root = rootMap(configs, file, errors);
         if (root == null) return;
-        requireSchemaVersion(root, file, errors);
+        Object schemaVersion = root.get("schema_version");
+        if (!(schemaVersion instanceof Number number) || number.doubleValue() != 9.0) {
+            errors.add(format("invalid schema version", file, "schema_version", "the integer 9 is required"));
+        }
         requireBoolean(root, "enabled", file, "enabled", errors);
+        Map<String, Object> waitTime = requireMap(root, "wait_time", file, errors);
+        if (waitTime != null) {
+            requirePositiveInteger(waitTime.get("min_ticks"), file, "wait_time.min_ticks", errors);
+            requirePositiveInteger(waitTime.get("max_ticks"), file, "wait_time.max_ticks", errors);
+        }
         Map<String, Object> minigame = requireMap(root, "minigame", file, errors);
         if (minigame != null) {
-            requirePositiveNumber(minigame, "click_count", file, "minigame.click_count", errors);
-            requirePositiveNumber(minigame, "timeout_ticks", file, "minigame.timeout_ticks", errors);
+            for (String key : List.of("hook_window_ticks", "fight_duration_ticks", "fight_interval_ticks",
+                "status_message_ticks",
+                "green_width", "input_step", "visual_forward_range", "visual_lateral_range",
+                "facing_bonus_multiplier")) {
+                requirePositiveNumber(minigame, key, file, "minigame." + key, errors);
+            }
+            requireNonNegativeNumber(minigame, "yellow_margin", file, "minigame.yellow_margin", errors);
+            requireFiniteNumberRange(minigame.get("initial_effectiveness"), 0.0, 100.0, file, "minigame.initial_effectiveness", errors);
+            requireFiniteNumberRange(minigame.get("lure_reduction_per_level"), 0.0, 0.9, file, "minigame.lure_reduction_per_level", errors);
+            requireFiniteNumberRange(minigame.get("resistance_smoothing"), 0.01, 1.0, file, "minigame.resistance_smoothing", errors);
+            requireFiniteNumberRange(minigame.get("lateral_smoothing"), 0.01, 1.0, file, "minigame.lateral_smoothing", errors);
+        }
+        Map<String, Object> rods = requireMap(root, "rod", file, errors);
+        if (rods != null) {
+            requireNonEmpty(rods, file, "rod", errors);
+            for (Map.Entry<String, Object> entry : rods.entrySet()) {
+                String path = "rod." + entry.getKey();
+                Map<String, Object> rod = asMap(entry.getValue());
+                if (rod == null) {
+                    errors.add(format("invalid fishing rod", file, path, "rod must be a section"));
+                    continue;
+                }
+                for (String key : List.of("power_multiplier", "finesse_multiplier")) {
+                    requirePositiveNumber(rod, key, file, path + "." + key, errors);
+                }
+                requirePositiveInteger(rod.get("max_durability"), file, path + ".max_durability", errors);
+            }
+        }
+        Map<String, Object> bait = requireMap(root, "bait", file, errors);
+        if (bait != null) {
+            requireNonEmpty(bait, file, "bait", errors);
+            for (Map.Entry<String, Object> entry : bait.entrySet()) {
+                String path = "bait." + entry.getKey();
+                Map<String, Object> definition = asMap(entry.getValue());
+                if (definition == null) {
+                    errors.add(format("invalid fishing bait", file, path, "bait must be a section"));
+                    continue;
+                }
+                requireMaterial(definition.get("material"), file, path + ".material", errors);
+                for (String key : List.of("wait_time_multiplier", "rare_catch_multiplier", "quality_multiplier")) {
+                    requirePositiveNumber(definition, key, file, path + "." + key, errors);
+                }
+            }
         }
         Map<String, Object> fish = requireMap(root, "fish", file, errors);
         if (fish != null) {
@@ -722,10 +728,43 @@ public final class ResourceConfigurationValidator {
                 requireMaterial(definition.get("material"), file, path + ".material", errors);
                 requirePositiveNumber(definition, "weight", file, path + ".weight", errors);
                 requirePositiveNumber(definition, "min_level", file, path + ".min_level", errors);
-                requirePositiveNumber(definition, "exp", file, path + ".exp", errors);
-                requireMap(definition, "quality", file, errors, path + ".quality");
-                requireMap(definition, "bobber_y", file, errors, path + ".bobber_y");
-                requireMap(definition, "bobber_distance", file, errors, path + ".bobber_distance");
+                requireString(definition, "rarity", file, path + ".rarity", errors);
+                Map<String, Object> quality = requireMap(definition, "quality", file, errors, path + ".quality");
+                if (quality != null) {
+                    requireNonEmpty(quality, file, path + ".quality", errors);
+                    Set<String> requiredQualityIds = Set.of("common", "rare", "legendary");
+                    if (!quality.keySet().equals(requiredQualityIds)) {
+                        errors.add(format("invalid fishing quality tiers", file, path + ".quality",
+                            "exactly common, rare and legendary are required"));
+                    }
+                    for (String qualityId : requiredQualityIds) {
+                        requirePositiveNumber(quality, qualityId, file, path + ".quality." + qualityId, errors);
+                    }
+                }
+                Map<String, Object> water = requireMap(definition, "water", file, errors, path + ".water");
+                if (water != null) {
+                    requireString(water, "type", file, path + ".water.type", errors);
+                    Object waterType = water.get("type");
+                    if (waterType instanceof String value &&
+                        !Set.of("any", "shore", "narrow", "open", "deep_open").contains(value)) {
+                        errors.add(format("invalid fishing water type", file, path + ".water.type",
+                            "one of any, shore, narrow, open or deep_open is required"));
+                    }
+                    for (String dimension : List.of("depth", "width")) {
+                        Map<String, Object> range = requireMap(water, dimension, file, errors, path + ".water." + dimension);
+                        if (range != null) {
+                            requirePositiveInteger(range.get("min"), file, path + ".water." + dimension + ".min", errors);
+                            requirePositiveInteger(range.get("max"), file, path + ".water." + dimension + ".max", errors);
+                        }
+                    }
+                }
+                Map<String, Object> fight = requireMap(definition, "fight", file, errors, path + ".fight");
+                if (fight != null) {
+                    requireFiniteNumberRange(fight.get("target_center"), 0.0, 100.0, file, path + ".fight.target_center", errors);
+                    requireFiniteNumberRange(fight.get("drift_per_step"), 0.0, 100.0, file, path + ".fight.drift_per_step", errors);
+                    requireFiniteNumberRange(fight.get("direction_persistence"), 0.0, 1.0, file, path + ".fight.direction_persistence", errors);
+                    requirePositiveNumber(fight, "duration_multiplier", file, path + ".fight.duration_multiplier", errors);
+                }
             }
         }
     }

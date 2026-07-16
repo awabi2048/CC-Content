@@ -228,6 +228,7 @@ class CCContent : JavaPlugin(), Listener {
         instance = this
         ensureCCSystemAvailable()
         saveSplitLanguageResources()
+        migrateFishingConfigurationSchema()
         synchronizeConfigurationResources()
         validateConfigurationFiles()
         coreConfig = CoreConfigManager.load(this)
@@ -715,7 +716,6 @@ class CCContent : JavaPlugin(), Listener {
     private fun installFeatureUnavailableCommands() {
         setFeatureUnavailableCommand("rank", "rank")
         setFeatureUnavailableCommand("rankmenu", "rank")
-        setFeatureUnavailableCommand("fishdex", "fishing")
         setFeatureUnavailableCommand("party", "party")
         setFeatureUnavailableCommand("arenaa", "arena")
         setFeatureUnavailableCommand("sukima_dungeon", "sukima_dungeon")
@@ -1210,6 +1210,14 @@ class CCContent : JavaPlugin(), Listener {
                         YamlConfiguration.loadConfiguration(InputStreamReader(input, StandardCharsets.UTF_8))
                     }
                     val current = YamlConfiguration.loadConfiguration(target)
+                    val currentSchema = (current.get("schema_version") as? Number)?.toInt()
+                    val defaultSchema = (defaults.get("schema_version") as? Number)?.toInt()
+                    if (entry.name == "config/fishing/fish.yml" &&
+                        (currentSchema != defaultSchema || current.contains("minigame.click_count"))) {
+                        defaults.save(target)
+                        logger.info("[CCContent][Config] スキーマ更新により正本へ同期しました: ${entry.name}")
+                        return@forEach
+                    }
                     val missingKeys = defaults.getKeys(true)
                         .filter { key -> !defaults.isConfigurationSection(key) && !current.contains(key) }
 
@@ -1350,12 +1358,28 @@ class CCContent : JavaPlugin(), Listener {
             },
             isAvailable = { type ->
                 contentOperationalStatuses()[type.id]?.operationalState == ContentOperationalState.ENABLED
-            }
+            },
+            fishingSearchTarget = { playerId -> fishingFeature?.getSearchTarget(playerId) },
+            setFishingSearchTarget = { player, fishId -> fishingFeature?.setSearchTarget(player, fishId) }
         )
         server.pluginManager.registerEvents(command, this)
-        listOf("catalog", "fishdex", "cookdex", "brewdex").forEach { name ->
+        listOf("catalog", "cookdex", "brewdex").forEach { name ->
             getCommand(name)?.setExecutor(command)
         }
+        fishingFeature?.registerDictionary { player ->
+            command.open(player, CatalogType.FISHING)
+        }
+    }
+
+    private fun migrateFishingConfigurationSchema() {
+        val resourcePath = "config/fishing/fish.yml"
+        val target = File(dataFolder, resourcePath)
+        if (!target.exists()) return
+        val current = YamlConfiguration.loadConfiguration(target)
+        val schemaVersion = (current.get("schema_version") as? Number)?.toInt()
+        if (schemaVersion == 9 && !current.contains("minigame.click_count")) return
+        copyResourceFile(resourcePath, target)
+        logger.info("[CCContent][Config] 釣り設定をschema_version 9の正本へ同期しました")
     }
     
     /**

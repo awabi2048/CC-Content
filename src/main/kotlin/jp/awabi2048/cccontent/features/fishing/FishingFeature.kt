@@ -1,173 +1,667 @@
 package jp.awabi2048.cccontent.features.fishing
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.CCContent
+import jp.awabi2048.cccontent.features.catalog.CatalogCondition
 import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
+import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
-import com.awabi2048.ccsystem.CCSystem
 import me.awabi2048.myworldmanager.api.MyWorldManagerApi
 import net.kyori.adventure.bossbar.BossBar
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.title.Title
 import org.bukkit.Bukkit
 import org.bukkit.Material
+import org.bukkit.Particle
+import org.bukkit.Sound
+import org.bukkit.FluidCollisionMode
+import org.bukkit.enchantments.Enchantment
+import org.bukkit.entity.FishHook
+import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
+import org.bukkit.event.player.PlayerChangedWorldEvent
 import org.bukkit.event.player.PlayerFishEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerQuitEvent
-import org.bukkit.entity.Player
+import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.scheduler.BukkitTask
+import org.bukkit.util.Vector
+import java.io.File
+import java.time.Duration
 import java.util.Random
 import java.util.UUID
+import kotlin.math.roundToLong
 
-class FishingFeature(private val plugin: CCContent, private val catalogStore: CatalogStore) : Listener {
+class FishingFeature(
+    private val plugin: CCContent,
+    private val catalogStore: CatalogStore
+) : Listener {
+    private enum class Phase { WAITING, HOOK_WINDOW, FIGHT }
+
+    private data class ActiveSession(
+        val hook: FishHook,
+        val bait: BaitDefinition?,
+        val rod: RodDefinition?,
+        var phase: Phase = Phase.WAITING,
+        var definition: FishDefinition? = null,
+        var catchData: FishCatch? = null,
+        var fightState: FishingFightState? = null,
+        var bossBar: BossBar? = null,
+        var task: BukkitTask? = null,
+        var lastZone: FishingEffectivenessZone? = null,
+        var statusTicksRemaining: Long = 0L,
+        var lastStatus: FishingFightStatus? = null,
+        var fightOrigin: org.bukkit.Location? = null,
+        var forwardAxis: Vector? = null,
+        var lateralAxis: Vector? = null,
+        var fightElapsedTicks: Long = 0L,
+        var rodMissingTicks: Long = 0L,
+        var lastInputTick: Int = -1
+    )
+
     private lateinit var settings: FishingSettings
     private lateinit var items: FishingItems
     private lateinit var fishdex: FishdexStore
+    private lateinit var searchStore: FishingSearchStore
     private val sessions = mutableMapOf<UUID, ActiveSession>()
-
-    private data class ActiveSession(
-        val catchData: FishCatch,
-        var input: FishingInputState,
-        val bedrock: Boolean,
-        val bossBar: BossBar,
-        val task: BukkitTask
-    )
+    private val searchReady = mutableMapOf<UUID, Boolean>()
+    private var searchTask: BukkitTask? = null
+    private val random = Random()
 
     fun initialize(logger: FeatureInitializationLogger) {
         settings = FishingSettings.load(plugin)
         if (!settings.enabled) return
-        items = FishingItems(plugin)
+        items = FishingItems(plugin, settings)
+        items.registerBaseItems()
         fishdex = FishdexStore(catalogStore)
+        searchStore = FishingSearchStore(File(plugin.dataFolder, "data/fishing/search.yml"))
         plugin.server.pluginManager.registerEvents(this, plugin)
+        searchTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable { updateSearchActionBars() }, 10L, 10L)
         logger.setStatus("Fishing", FeatureInitializationLogger.Status.SUCCESS)
-        logger.addSummaryMessage("Fishing", "釣りと魚図鑑を登録しました (${settings.fishes.size}種類)")
+        logger.addSummaryMessage("Fishing", "釣り・エサ・お魚辞典を登録しました (${settings.fishes.size}種類)")
+    }
+
+    fun registerDictionary(opener: (Player) -> Unit) {
+        items.registerDictionary(opener) { player, event -> showLocalFishingHint(player, event) }
+    }
+
+    private fun showLocalFishingHint(player: Player, event: PlayerInteractEvent) {
+        event.isCancelled = true
+        val block = surveyWaterBlock(player)
+        if (block == null || !CCSystem.getAPI().isResourceWorld(player.world)) {
+            player.sendMessage(message(player, "fishing.dictionary.hint.not_water"))
+            return
+        }
+        val bait = items.resolveBait(player.inventory.itemInOffHand)
+        val candidates = FishingCatchSelector.candidates(
+            FishingContext(player.world, block.location.add(0.5, 0.5, 0.5), fisherContext(player).level),
+            settings.fishes,
+            bait
+        )
+        if (candidates.isEmpty()) return
+        val lines = buildList {
+            add(GuiLoreLine.Text(message(player, "fishing.dictionary.hint.title")))
+            candidates.forEach { fish ->
+                add(GuiLoreLine.Text("§7・§f" + message(player, "fishing.catalog.item.${fish.id}")))
+            }
+        }
+        CCSystem.getAPI().getLoreService()
+            .render(GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH))
+            .forEach(player::sendMessage)
+        player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.7f, 1.4f)
     }
 
     fun shutdown() {
-        sessions.forEach { (playerId, session) ->
-            session.task.cancel()
-            Bukkit.getPlayer(playerId)?.let { player ->
-                player.hideBossBar(session.bossBar)
-                if (player.isOnline) player.sendActionBar(Component.empty())
-            }
+        searchTask?.cancel()
+        searchTask = null
+        sessions.keys.toList().forEach { fail(it, "fishing.failed.cancelled", false) }
+        searchReady.keys.forEach { playerId ->
+            Bukkit.getPlayer(playerId)?.sendActionBar(Component.empty())
         }
-        sessions.clear()
+        searchReady.clear()
+        if (::searchStore.isInitialized) searchStore.save()
+        if (::items.isInitialized) items.unregister()
     }
 
     @EventHandler
     fun onFish(event: PlayerFishEvent) {
         val player = event.player
-        if (player.inventory.itemInMainHand.type != Material.FISHING_ROD) return
-        if (event.state == PlayerFishEvent.State.FISHING) {
-            items.markRod(player.inventory.itemInMainHand)
-            return
+        when (event.state) {
+            PlayerFishEvent.State.FISHING -> startCast(event, player)
+            PlayerFishEvent.State.BITE -> onBite(event, player)
+            PlayerFishEvent.State.CAUGHT_FISH,
+            PlayerFishEvent.State.CAUGHT_ENTITY -> {
+                val session = sessions[player.uniqueId]
+                if (session != null) {
+                    event.isCancelled = true
+                    when (session.phase) {
+                        Phase.HOOK_WINDOW -> startFight(player, session)
+                        Phase.FIGHT -> if (session.fightElapsedTicks > 0L) {
+                            applyFightInput(player, session, true)
+                        }
+                        else -> Unit
+                    }
+                }
+            }
+            PlayerFishEvent.State.REEL_IN -> {
+                val session = sessions[player.uniqueId]
+                when (session?.phase) {
+                    Phase.HOOK_WINDOW -> {
+                        event.isCancelled = true
+                        startFight(player, session)
+                    }
+                    Phase.FIGHT -> {
+                        event.isCancelled = true
+                        if (session.fightElapsedTicks > 0L) applyFightInput(player, session, true)
+                    }
+                    else -> clearSession(player.uniqueId, removeHook = false)
+                }
+            }
+            PlayerFishEvent.State.IN_GROUND -> {
+                val session = sessions[player.uniqueId]
+                if (session?.phase == Phase.WAITING) {
+                    event.isCancelled = true
+                    fail(player.uniqueId, "fishing.failed.invalid_water")
+                } else if (session?.phase in setOf(Phase.HOOK_WINDOW, Phase.FIGHT)) {
+                    event.isCancelled = true
+                }
+            }
+            PlayerFishEvent.State.FAILED_ATTEMPT -> {
+                if (sessions[player.uniqueId]?.phase in setOf(Phase.HOOK_WINDOW, Phase.FIGHT)) {
+                    event.isCancelled = true
+                } else clearSession(player.uniqueId, removeHook = false)
+            }
+            else -> Unit
         }
-        if (event.state != PlayerFishEvent.State.CAUGHT_FISH || sessions.containsKey(player.uniqueId)) return
-        event.isCancelled = true
-        val level = plugin.getRankManager()?.getCurrentProfessionLevel(player.uniqueId) ?: 1
-        val catchData = FishingCatchSelector.select(
-            FishingContext(player.world, event.hook.location, level), settings.fishes, Random()
-        ) ?: run {
-            player.sendMessage(message(player, "fishing.no_catch"))
-            return
-        }
-        startMiniGame(player, catchData)
     }
 
-    private fun startMiniGame(player: Player, catchData: FishCatch) {
-        player.sendMessage(message(player, "fishing.hooked", "count" to settings.clickCount))
-        val bedrock = isBedrockPlayer(player)
-        val input = FishingInputState(0, settings.clickCount, expectedLeft = true)
-        val bossBar = BossBar.bossBar(
-            Component.text(message(player, if (bedrock) "fishing.input.tap" else "fishing.input.left")),
-            0.0f,
-            BossBar.Color.BLUE,
-            BossBar.Overlay.PROGRESS
+    private fun startCast(event: PlayerFishEvent, player: Player) {
+        clearSession(player.uniqueId, removeHook = false)
+        val rodItem = player.inventory.itemInMainHand
+        if (rodItem.type != Material.FISHING_ROD) return
+        if (!CCSystem.getAPI().isResourceWorld(player.world)) {
+            return
+        }
+        if (!items.isUsableRod(rodItem)) {
+            event.isCancelled = true
+            player.sendMessage(message(player, "fishing.error.rod_broken"))
+            player.playSound(player.location, Sound.ENTITY_ITEM_BREAK, 0.9f, 0.8f)
+            return
+        }
+        val bait = items.consumeBait(player)
+        val rod = items.resolveRod(rodItem)
+        val lureLevel = rodItem.getEnchantmentLevel(Enchantment.LURE)
+        val lureMultiplier = (1.0 - settings.minigame.lureReductionPerLevel * lureLevel).coerceAtLeast(0.2)
+        val waitMultiplier = (bait?.waitTimeMultiplier ?: 1.0) * lureMultiplier
+        event.hook.setApplyLure(false)
+        event.hook.setWaitTime(
+            (settings.minigame.waitTimeMinTicks * waitMultiplier).roundToLong().toInt().coerceAtLeast(1),
+            (settings.minigame.waitTimeMaxTicks * waitMultiplier).roundToLong().toInt().coerceAtLeast(1)
         )
-        player.showBossBar(bossBar)
-        val task = plugin.server.scheduler.runTaskLater(plugin, Runnable { fail(player.uniqueId) }, settings.timeoutTicks)
-        sessions[player.uniqueId] = ActiveSession(catchData, input, bedrock, bossBar, task)
-        updateDisplay(player, sessions.getValue(player.uniqueId))
+        sessions[player.uniqueId] = ActiveSession(event.hook, bait, rod)
+        player.playSound(player.location, Sound.ENTITY_FISHING_BOBBER_THROW, 0.7f, 1.0f)
+    }
+
+    private fun onBite(event: PlayerFishEvent, player: Player) {
+        val session = sessions[player.uniqueId] ?: return
+        if (session.hook.uniqueId != event.hook.uniqueId || session.phase != Phase.WAITING) return
+        val fisher = fisherContext(player)
+        val selected = FishingCatchSelector.select(
+            FishingContext(player.world, event.hook.location, fisher.level),
+            settings.fishes,
+            session.bait,
+            session.rod,
+            random
+        )
+        if (selected == null) {
+            event.isCancelled = true
+            player.sendMessage(message(player, "fishing.no_catch"))
+            player.playSound(player.location, Sound.ENTITY_FISHING_BOBBER_SPLASH, 0.6f, 0.6f)
+            clearSession(player.uniqueId, removeHook = true)
+            return
+        }
+        session.phase = Phase.HOOK_WINDOW
+        session.definition = selected.first
+        session.catchData = selected.second
+        player.showTitle(Title.title(
+            Component.empty(),
+            Component.text("§6HIT!"),
+            Title.Times.times(Duration.ZERO, Duration.ofMillis(500), Duration.ofMillis(200))
+        ))
+        player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 2.0f)
+        val hookTicks = settings.minigame.baseHookWindowTicks
+        session.task = plugin.server.scheduler.runTaskLater(
+            plugin,
+            Runnable { fail(player.uniqueId, "fishing.failed.hook_timeout") },
+            hookTicks
+        )
     }
 
     @EventHandler
     fun onRodClick(event: PlayerInteractEvent) {
+        if (event.hand != EquipmentSlot.HAND) return
         val session = sessions[event.player.uniqueId] ?: return
         val action = event.action
         if (action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK &&
             action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return
-        event.isCancelled = true
-        val leftClick = action == Action.LEFT_CLICK_AIR || action == Action.LEFT_CLICK_BLOCK
-        val normalizedLeftClick = FishingInputNormalizer.normalize(
-            leftClick,
-            session.input.expectedLeft,
-            session.bedrock
-        )
-        val (result, nextInput) = session.input.accept(
-            normalizedLeftClick,
-            event.player.inventory.itemInMainHand.type == Material.FISHING_ROD
-        )
-        if (result == FishingInputResult.FAILED) {
-            fail(event.player.uniqueId)
-            return
-        }
-        session.input = nextInput
-        if (result == FishingInputResult.COMPLETE) complete(event.player) else updateDisplay(event.player, session)
-    }
-
-    private fun updateDisplay(player: Player, session: ActiveSession) {
-        val inputKey = if (session.bedrock) "fishing.input.tap"
-        else if (session.input.expectedLeft) "fishing.input.left" else "fishing.input.right"
-        session.bossBar.progress((session.input.progress.toFloat() / session.input.required).coerceIn(0.0f, 1.0f))
-        session.bossBar.name(Component.text(message(player, inputKey)))
-        player.sendActionBar(Component.text(message(player,
-            "fishing.progress", "current" to session.input.progress, "required" to session.input.required
-        )))
-    }
-
-    private fun complete(player: Player) {
-        val session = sessions.remove(player.uniqueId) ?: return
-        session.task.cancel()
-        player.hideBossBar(session.bossBar)
-        player.sendActionBar(Component.empty())
-        val catchItem = items.createCatch(player, session.catchData)
-        player.inventory.addItem(catchItem).values.forEach { overflow ->
-            // 満杯時も釣果を失わず、プレイヤーの位置へ実体として返す。
-            player.world.dropItemNaturally(player.location, overflow)
-        }
-        if (plugin.getRankManager()?.getPlayerProfession(player.uniqueId)?.profession == Profession.FISHER) {
-            plugin.getRankManager()?.addProfessionExp(player.uniqueId, session.catchData.exp)
-        }
-        fishdex.record(player.uniqueId, session.catchData)
-        player.sendMessage(message(player,
-            "fishing.caught",
-            "fish" to message(player, "fishing.catalog.item.${session.catchData.fishId}"),
-            "weight" to session.catchData.weightGrams,
-            "quality" to message(player, "fishing.quality.${session.catchData.quality.id}")
-        ))
-    }
-
-    private fun fail(playerId: UUID) {
-        val session = sessions.remove(playerId) ?: return
-        session.task.cancel()
-        Bukkit.getPlayer(playerId)?.let { player ->
-            if (player.isOnline) {
-                player.hideBossBar(session.bossBar)
-                player.sendActionBar(Component.empty())
-                player.sendMessage(message(player, "fishing.failed"))
+        if (event.player.inventory.itemInMainHand.type != Material.FISHING_ROD) return
+        val right = action == Action.RIGHT_CLICK_AIR || action == Action.RIGHT_CLICK_BLOCK
+        when (session.phase) {
+            Phase.WAITING -> if (!right) {
+                if (session.hook.state == FishHook.HookState.BOBBING && isValidFishingWater(session.hook.location)) {
+                    event.isCancelled = true
+                    adjustWaitingHook(event.player, session, event.player.isSneaking)
+                }
+            }
+            Phase.HOOK_WINDOW -> if (right) {
+                event.isCancelled = true
+                startFight(event.player, session)
+            }
+            Phase.FIGHT -> {
+                if (session.fightElapsedTicks <= 0L) return
+                event.isCancelled = true
+                applyFightInput(event.player, session, right)
             }
         }
     }
 
+    private fun adjustWaitingHook(player: Player, session: ActiveSession, closer: Boolean) {
+        if (!session.hook.isValid) return
+        val playerVector = player.location.toVector()
+        val direction = session.hook.location.toVector().subtract(playerVector).setY(0.0)
+        if (direction.lengthSquared() < 0.0001) return
+        val distance = direction.length()
+        val nextDistance = (distance + if (closer) -0.75 else 0.75).coerceIn(2.0, 30.0)
+        val horizontal = direction.normalize().multiply(nextDistance)
+        val next = session.hook.location.clone()
+        next.x = playerVector.x + horizontal.x
+        next.z = playerVector.z + horizontal.z
+        if (!isValidFishingWater(next)) return
+        session.hook.teleport(next)
+        session.hook.velocity = Vector()
+        player.playSound(player.location, Sound.ENTITY_FISHING_BOBBER_SPLASH, 0.35f, 2.0f)
+    }
+
+    private fun startFight(player: Player, session: ActiveSession) {
+        session.task?.cancel()
+        val definition = session.definition ?: return
+        val fisher = fisherContext(player)
+        val duration = (
+            settings.minigame.baseFightDurationTicks *
+                definition.fight.durationMultiplier *
+                fisher.durationMultiplier
+            ).roundToLong().coerceAtLeast(settings.minigame.fightIntervalTicks)
+        session.phase = Phase.FIGHT
+        session.fightState = FishingFightState(
+            settings.minigame.initialEffectiveness,
+            duration,
+            if (random.nextBoolean()) 1 else -1
+        )
+        session.bossBar = BossBar.bossBar(
+            Component.text(message(player, "fishing.fight.status.${FishingFightStatus.HOOKED.messageId}")),
+            (settings.minigame.initialEffectiveness / 100.0).toFloat(),
+            BossBar.Color.YELLOW,
+            BossBar.Overlay.PROGRESS
+        ).also(player::showBossBar)
+        session.statusTicksRemaining = settings.minigame.statusMessageTicks
+        session.lastStatus = FishingFightStatus.HOOKED
+        val origin = session.hook.location.clone()
+        val forward = origin.toVector().subtract(player.location.toVector()).setY(0.0)
+        if (forward.lengthSquared() < 0.0001) forward.copy(player.location.direction.clone().setY(0.0))
+        forward.normalize()
+        session.fightOrigin = origin
+        session.forwardAxis = forward
+        session.lateralAxis = Vector(-forward.z, 0.0, forward.x)
+        session.hook.setApplyLure(false)
+        runCatching { session.hook.setTimeUntilBite(Int.MAX_VALUE) }
+        session.hook.velocity = Vector()
+        player.playSound(player.location, Sound.ENTITY_FISHING_BOBBER_SPLASH, 0.9f, 1.2f)
+        updateFightDisplay(player, session)
+        session.task = plugin.server.scheduler.runTaskTimer(
+            plugin,
+            Runnable { advanceFight(player.uniqueId) },
+            settings.minigame.fightIntervalTicks,
+            settings.minigame.fightIntervalTicks
+        )
+    }
+
+    private fun applyFightInput(player: Player, session: ActiveSession, rightClick: Boolean) {
+        val tick = Bukkit.getCurrentTick()
+        if (session.lastInputTick == tick) return
+        session.lastInputTick = tick
+        val current = session.fightState ?: return
+        val rodPower = session.rod?.powerMultiplier ?: 1.0
+        val bedrock = isBedrockPlayer(player)
+        val increase = if (bedrock) !player.isSneaking else rightClick
+        val facingBonus = facingResistanceBonus(player, session, current)
+        val delta = settings.minigame.inputStep * rodPower * facingBonus * if (increase) 1.0 else -1.0
+        session.fightState = current.applyInput(delta)
+        player.playSound(
+            player.location,
+            Sound.BLOCK_NOTE_BLOCK_HAT,
+            0.25f,
+            if (increase) 1.5f else 0.8f
+        )
+        updateFightDisplay(player, session)
+    }
+
+    private fun isValidFishingWater(location: org.bukkit.Location): Boolean {
+        val block = location.block
+        return FishingWaterAnalyzer.isWater(block) ||
+            FishingWaterAnalyzer.isWater(block.getRelative(0, -1, 0))
+    }
+
+    private fun surveyWaterBlock(player: Player): org.bukkit.block.Block? =
+        player.rayTraceBlocks(10.0, FluidCollisionMode.ALWAYS)
+            ?.hitBlock
+            ?.takeIf(FishingWaterAnalyzer::isWater)
+
+    private fun advanceFight(playerId: UUID) {
+        val player = Bukkit.getPlayer(playerId)
+        val session = sessions[playerId]
+        if (player == null || session == null || session.phase != Phase.FIGHT) return
+        if (!player.isOnline || !CCSystem.getAPI().isResourceWorld(player.world)) {
+            fail(playerId, "fishing.failed.cancelled")
+            return
+        }
+        if (player.inventory.itemInMainHand.type != Material.FISHING_ROD) {
+            session.rodMissingTicks += settings.minigame.fightIntervalTicks
+            if (session.rodMissingTicks >= 15L) fail(playerId, "fishing.failed.no_rod")
+            return
+        }
+        session.rodMissingTicks = 0L
+        val definition = session.definition ?: return
+        val fisher = fisherContext(player)
+        val stability = fisher.stabilityBonus.coerceAtMost(0.9)
+        val next = session.fightState?.advance(
+            definition.fight,
+            settings.minigame.fightIntervalTicks,
+            stability,
+            settings.minigame.resistanceSmoothing,
+            settings.minigame.lateralSmoothing,
+            random
+        ) ?: return
+        session.fightState = next
+        session.fightElapsedTicks += settings.minigame.fightIntervalTicks
+        updateHookVisual(session, next)
+        val zone = updateFightDisplay(player, session)
+        advanceFightStatus(player, session, zone)
+        if (next.remainingTicks <= 0L) resolveFight(player, session)
+    }
+
+    private fun facingResistanceBonus(
+        player: Player,
+        session: ActiveSession,
+        state: FishingFightState
+    ): Double {
+        if (kotlin.math.abs(state.lateralVelocity) < 0.001) return 1.0
+        val lateral = session.lateralAxis ?: return 1.0
+        val opposite = lateral.clone().multiply(-kotlin.math.sign(state.lateralVelocity))
+        val view = player.location.direction.clone().setY(0.0)
+        if (view.lengthSquared() < 0.0001) return 1.0
+        return if (view.normalize().dot(opposite) >= 0.45) settings.minigame.facingBonusMultiplier else 1.0
+    }
+
+    private fun updateHookVisual(session: ActiveSession, state: FishingFightState) {
+        val origin = session.fightOrigin ?: return
+        val forward = session.forwardAxis ?: return
+        val lateral = session.lateralAxis ?: return
+        if (!session.hook.isValid) return
+        val forwardOffset = ((state.effectiveness - 50.0) / 50.0) * settings.minigame.visualForwardRange
+        val location = origin.clone()
+            .add(forward.clone().multiply(forwardOffset))
+            .add(lateral.clone().multiply(state.lateralOffset * settings.minigame.visualLateralRange))
+        session.hook.teleport(location)
+        session.hook.velocity = Vector()
+        location.world.spawnParticle(Particle.SPLASH, location.clone().add(0.0, 0.08, 0.0), 3, 0.18, 0.04, 0.18, 0.02)
+        location.world.spawnParticle(Particle.BUBBLE, location.clone().subtract(0.0, 0.15, 0.0), 2, 0.12, 0.04, 0.12, 0.01)
+    }
+
+    private fun updateFightDisplay(player: Player, session: ActiveSession): FishingEffectivenessZone {
+        val state = requireNotNull(session.fightState) { "Fishing fight state is required while rendering" }
+        val definition = requireNotNull(session.definition) { "Fish definition is required while rendering" }
+        val zone = state.zone(
+            definition.fight,
+            settings.minigame.greenWidth,
+            settings.minigame.yellowMargin
+        )
+        if (session.lastZone != null && session.lastZone != zone) {
+            player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_CHIME, 0.35f, when (zone) {
+                FishingEffectivenessZone.GREEN -> 1.7f
+                FishingEffectivenessZone.YELLOW -> 1.2f
+                FishingEffectivenessZone.ORANGE -> 0.75f
+            })
+        }
+        session.lastZone = zone
+        session.bossBar?.apply {
+            progress((state.effectiveness / 100.0).toFloat().coerceIn(0.0f, 1.0f))
+            color(when (zone) {
+                FishingEffectivenessZone.GREEN -> BossBar.Color.GREEN
+                FishingEffectivenessZone.YELLOW -> BossBar.Color.YELLOW
+                FishingEffectivenessZone.ORANGE -> BossBar.Color.RED
+            })
+        }
+        player.sendActionBar(Component.text(message(
+            player,
+            if (isBedrockPlayer(player)) "fishing.fight.input_bedrock" else "fishing.fight.input_java"
+        )))
+        return zone
+    }
+
+    private fun advanceFightStatus(
+        player: Player,
+        session: ActiveSession,
+        zone: FishingEffectivenessZone
+    ) {
+        session.statusTicksRemaining -= settings.minigame.fightIntervalTicks
+        if (session.statusTicksRemaining > 0L) return
+        val candidates = FishingFightStatus.candidates(zone)
+        val available = candidates.filterNot { it == session.lastStatus }.ifEmpty { candidates }
+        val next = available[random.nextInt(available.size)]
+        session.lastStatus = next
+        session.statusTicksRemaining = settings.minigame.statusMessageTicks
+        session.bossBar?.name(Component.text(message(player, "fishing.fight.status.${next.messageId}")))
+    }
+
+    private fun resolveFight(player: Player, session: ActiveSession) {
+        val definition = session.definition ?: return
+        val state = session.fightState ?: return
+        val zone = state.zone(definition.fight, settings.minigame.greenWidth, settings.minigame.yellowMargin)
+        if (random.nextDouble() <= zone.successChance) complete(player, session)
+        else fail(player.uniqueId, "fishing.failed.final_roll")
+    }
+
+    private fun complete(player: Player, session: ActiveSession) {
+        val catchData = session.catchData ?: return
+        val before = fishdex.load(player.uniqueId)[catchData.fishId]
+        clearSession(player.uniqueId, removeHook = true)
+        val catchItem = items.createCatch(player, catchData)
+        player.inventory.addItem(catchItem).values.forEach { overflow ->
+            player.world.dropItemNaturally(player.location, overflow)
+        }
+        val fisher = fisherContext(player)
+        if (fisher.active) plugin.getRankManager()?.addProfessionExp(player.uniqueId, catchData.exp)
+        val recorded = fishdex.record(player.uniqueId, catchData)
+        if (items.damageRod(player.inventory.itemInMainHand)) {
+            player.sendMessage(message(player, "fishing.error.rod_broken"))
+            player.playSound(player.location, Sound.ENTITY_ITEM_BREAK, 0.9f, 0.9f)
+        }
+        player.sendMessage(message(player, "fishing.caught"))
+        items.catchInformationLines(player, catchData).forEach(player::sendMessage)
+        player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.4f)
+        if (before?.discovered != true) {
+            player.sendMessage(message(player, "fishing.dictionary.discovered"))
+            player.playSound(player.location, Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.75f, 1.3f)
+        } else if ((before.maximumWeight ?: 0) < (recorded.maximumWeight ?: 0)) {
+            player.playSound(player.location, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.65f, 1.8f)
+        }
+    }
+
+    private fun fail(playerId: UUID, key: String, notify: Boolean = true) {
+        val player = Bukkit.getPlayer(playerId)
+        clearSession(playerId, removeHook = true)
+        if (notify && player?.isOnline == true) {
+            player.sendMessage(message(player, key))
+            player.playSound(player.location, Sound.ENTITY_FISHING_BOBBER_SPLASH, 0.75f, 0.65f)
+        }
+    }
+
+    private fun clearSession(playerId: UUID, removeHook: Boolean) {
+        val session = sessions.remove(playerId) ?: return
+        session.task?.cancel()
+        val player = Bukkit.getPlayer(playerId)
+        session.bossBar?.let { bar -> player?.hideBossBar(bar) }
+        player?.sendActionBar(Component.empty())
+        if (removeHook && session.hook.isValid) session.hook.remove()
+    }
+
     @EventHandler
-    fun onQuit(event: PlayerQuitEvent) = fail(event.player.uniqueId)
+    fun onQuit(event: PlayerQuitEvent) {
+        fail(event.player.uniqueId, "fishing.failed.cancelled", false)
+        searchReady.remove(event.player.uniqueId)
+    }
 
-    fun catalogItems(): List<CatalogItem> = settings.fishes.map { CatalogItem(it.id, it.material) }
+    @EventHandler
+    fun onWorldChange(event: PlayerChangedWorldEvent) {
+        fail(event.player.uniqueId, "fishing.failed.cancelled", false)
+        event.player.sendActionBar(Component.empty())
+        searchReady.remove(event.player.uniqueId)
+    }
 
-    private fun message(player: Player, key: String, vararg placeholders: Pair<String, Any?>): String =
+    fun catalogItems(): List<CatalogItem> = settings.fishes.map { fish ->
+        CatalogItem(
+            fish.id,
+            fish.material,
+            buildList {
+                add(CatalogCondition("fishing.dictionary.condition.biome", localizedValues =
+                    if (fish.biomes.isEmpty()) listOf("fishing.dictionary.condition.anywhere")
+                    else fish.biomes.map { "fishing.dictionary.biome.$it" }))
+                add(CatalogCondition(
+                    "fishing.dictionary.condition.water",
+                    localizedValues = listOf(
+                        if (fish.water.type == FishingWaterType.ANY) {
+                            "fishing.dictionary.condition.anywhere"
+                        } else {
+                            "fishing.dictionary.water.${fish.water.type.id}"
+                        }
+                    )
+                ))
+                add(CatalogCondition("fishing.dictionary.condition.weather", localizedValues =
+                    if (fish.weather.isEmpty()) listOf("fishing.dictionary.condition.anytime")
+                    else fish.weather.map { "fishing.dictionary.weather.${it.name.lowercase()}" }))
+                add(CatalogCondition("fishing.dictionary.condition.time", localizedValues =
+                    if (fish.times.isEmpty()) listOf("fishing.dictionary.condition.anytime")
+                    else fish.times.map { "fishing.dictionary.time.${it.name.lowercase()}" }))
+                add(CatalogCondition("fishing.dictionary.condition.level",
+                    rawValue = fish.minLevel.toString()))
+                if (fish.requiredBaitTags.isNotEmpty()) {
+                    val matchingBaits = settings.baits.filter { it.specialTags.containsAll(fish.requiredBaitTags) }
+                    add(CatalogCondition(
+                        "fishing.dictionary.condition.bait",
+                        localizedValues = matchingBaits.map { "custom_items.fishing.bait_${it.id}.name" }
+                    ))
+                }
+            }
+        )
+    }
+
+    fun getSearchTarget(playerId: UUID): String? {
+        val target = searchStore.get(playerId) ?: return null
+        if (catalogStore.entries(playerId, jp.awabi2048.cccontent.features.catalog.CatalogType.FISHING)[target]?.discovered == true) {
+            return target
+        }
+        searchStore.set(playerId, null)
+        return null
+    }
+
+    fun setSearchTarget(player: Player, fishId: String?) {
+        require(fishId == null || settings.fishes.any { it.id == fishId }) { "Unknown fishing target: $fishId" }
+        require(fishId == null ||
+            catalogStore.entries(player.uniqueId, jp.awabi2048.cccontent.features.catalog.CatalogType.FISHING)[fishId]?.discovered == true
+        ) { "Undiscovered fish cannot be selected: $fishId" }
+        searchStore.set(player.uniqueId, fishId)
+        searchReady.remove(player.uniqueId)
+        player.sendActionBar(Component.empty())
+        player.playSound(
+            player.location,
+            if (fishId == null) Sound.UI_BUTTON_CLICK else Sound.BLOCK_NOTE_BLOCK_BELL,
+            0.7f,
+            if (fishId == null) 0.8f else 1.4f
+        )
+    }
+
+    private fun updateSearchActionBars() {
+        Bukkit.getOnlinePlayers().forEach { player ->
+            if (sessions.containsKey(player.uniqueId) ||
+                player.inventory.itemInMainHand.type != Material.FISHING_ROD) {
+                if (searchReady.remove(player.uniqueId) != null && !sessions.containsKey(player.uniqueId)) {
+                    player.sendActionBar(Component.empty())
+                }
+                return@forEach
+            }
+            val targetId = getSearchTarget(player.uniqueId) ?: run {
+                if (searchReady.remove(player.uniqueId) != null) player.sendActionBar(Component.empty())
+                return@forEach
+            }
+            val target = settings.fishes.firstOrNull { it.id == targetId } ?: return@forEach
+            val bait = items.resolveBait(player.inventory.itemInOffHand)
+            val surveyBlock = surveyWaterBlock(player)
+            val ready = CCSystem.getAPI().isResourceWorld(player.world) &&
+                surveyBlock != null &&
+                target in FishingCatchSelector.candidates(
+                    FishingContext(
+                        player.world,
+                        surveyBlock.location.add(0.5, 0.5, 0.5),
+                        fisherContext(player).level
+                    ),
+                    settings.fishes,
+                    bait
+                )
+            val previous = searchReady.put(player.uniqueId, ready)
+            if (ready) {
+                player.sendActionBar(Component.text("§7" + message(player, "fishing.search.ready")))
+                if (previous != true) {
+                    player.playSound(player.location, Sound.BLOCK_AMETHYST_BLOCK_RESONATE, 0.45f, 1.45f)
+                }
+            } else if (previous == true) {
+                player.sendActionBar(Component.empty())
+            }
+        }
+    }
+
+    private data class FisherContext(
+        val active: Boolean,
+        val level: Int,
+        val hookWindowMultiplier: Double,
+        val durationMultiplier: Double,
+        val stabilityBonus: Double
+    )
+
+    private fun fisherContext(player: Player): FisherContext {
+        val rank = plugin.getRankManager() ?: return FisherContext(false, 1, 1.0, 1.0, 0.0)
+        val profession = rank.getPlayerProfession(player.uniqueId)
+        val active = profession?.profession == Profession.FISHER &&
+            RankReleasePolicy.canAccessProfession(player, Profession.FISHER)
+        if (!active) return FisherContext(false, 1, 1.0, 1.0, 0.0)
+        val skillsAvailable = RankReleasePolicy.canUseSkills(player)
+        val skills = if (skillsAvailable) profession.acquiredSkills else emptySet()
+        return FisherContext(
+            true,
+            rank.getCurrentProfessionLevel(player.uniqueId),
+            if ("patient_cast" in skills) 1.2 else 1.0,
+            if ("master_angler" in skills) 0.85 else 1.0,
+            if ("deep_water" in skills) 0.15 else 0.0
+        )
+    }
+
+    private fun message(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): String =
         CCSystem.getAPI().getI18nString(
             player,
             key,
@@ -182,11 +676,4 @@ class FishingFeature(private val plugin: CCContent, private val catalogStore: Ca
             false
         }
     }
-}
-
-/** 統合版は表示中の左右指示を持たないため、クリックを現在の期待入力へ正規化する。 */
-object FishingInputNormalizer {
-    @JvmStatic
-    fun normalize(leftClick: Boolean, expectedLeft: Boolean, bedrock: Boolean): Boolean =
-        if (bedrock) expectedLeft else leftClick
 }

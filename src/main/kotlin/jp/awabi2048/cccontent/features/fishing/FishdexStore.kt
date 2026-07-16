@@ -9,14 +9,14 @@ class FishdexStore(private val store: CatalogStore) {
     fun load(playerId: UUID): MutableMap<String, FishdexEntry> =
         store.entries(playerId, CatalogType.FISHING).mapValues { (fishId, entry) ->
             FishdexEntry(fishId, entry.discovered, entry.obtainedCount, entry.maximumWeight, entry.minimumWeight,
-                entry.qualityCounts.mapKeys { FishQuality.fromId(it.key) })
+                FishQuality.normalizeStoredCounts(entry.qualityCounts))
         }.toMutableMap()
 
     fun record(playerId: UUID, catch: FishCatch): FishdexEntry {
         val entry = store.record(playerId, CatalogType.FISHING, catch.fishId, catch.quality.id,
-            (catch.quality.ordinal + 1) * 25.0, weight = catch.weightGrams)
+            (catch.quality.ordinal + 1) * 100.0 / FishQuality.entries.size, weight = catch.weightGrams)
         return FishdexEntry(catch.fishId, true, entry.obtainedCount, entry.maximumWeight, entry.minimumWeight,
-            entry.qualityCounts.mapKeys { FishQuality.fromId(it.key) })
+            FishQuality.normalizeStoredCounts(entry.qualityCounts))
     }
 
     fun save(@Suppress("UNUSED_PARAMETER") playerId: UUID, @Suppress("UNUSED_PARAMETER") entries: Map<String, FishdexEntry>) {

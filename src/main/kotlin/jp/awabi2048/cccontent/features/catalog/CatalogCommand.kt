@@ -5,6 +5,7 @@ import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconData
+import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
@@ -25,7 +26,18 @@ import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 import java.util.UUID
 
-data class CatalogItem(val id: String, val material: Material)
+data class CatalogCondition(
+    val labelKey: String,
+    val localizedValues: List<String> = emptyList(),
+    val rawValue: String? = null,
+    val hintKey: String? = null
+)
+
+data class CatalogItem(
+    val id: String,
+    val material: Material,
+    val conditions: List<CatalogCondition> = emptyList()
+)
 
 // 料理・醸造の本文36スロットを基準に、表示ページと要求ページを正規化する。
 fun catalogTotalPages(itemCount: Int, itemsPerPage: Int = 36): Int {
@@ -41,7 +53,9 @@ fun catalogPageFor(requestedPage: Int, totalPages: Int): Int {
 class CatalogCommand(
     private val store: CatalogStore,
     private val items: (CatalogType) -> List<CatalogItem>,
-    private val isAvailable: (CatalogType) -> Boolean
+    private val isAvailable: (CatalogType) -> Boolean,
+    private val fishingSearchTarget: (UUID) -> String? = { null },
+    private val setFishingSearchTarget: (Player, String?) -> Unit = { _, _ -> }
 ) : CommandExecutor, Listener {
     fun open(player: Player, type: CatalogType, requestedPage: Int = 0) {
         if (!isAvailable(type)) {
@@ -90,12 +104,34 @@ class CatalogCommand(
         layoutService.applyStandardFrame(inventory)
         val entries = store.entries(player.uniqueId, CatalogType.FISHING)
         definitions.drop(page * layout.itemsPerPage).take(layout.itemsPerPage).forEachIndexed { index, definition ->
-            inventory.setItem(layout.itemSlots[index], fishingItem(player, definition, entries[definition.id]))
+            val slot = layout.itemSlots[index]
+            holder.itemIdsBySlot[slot] = definition.id
+            inventory.setItem(slot, fishingItem(player, definition, entries[definition.id]))
         }
         val elementService = CCSystem.getAPI().getGuiElementService()
         if (page > 0) inventory.setItem(layout.previousPageSlot, navigationItem(elementService, Material.ARROW, text(player, "fishing.fishdex.previous")))
         if (page + 1 < totalPages) inventory.setItem(layout.nextPageSlot, navigationItem(elementService, Material.ARROW, text(player, "fishing.fishdex.next")))
-        inventory.setItem(layout.actionSlot, navigationItem(elementService, Material.BARRIER, text(player, "catalog.close"), GuiElementRole.CANCEL))
+        val targetId = fishingSearchTarget(player.uniqueId)
+        val targetName = targetId?.let { text(player, "fishing.catalog.item.$it") }
+            ?: text(player, "fishing.dictionary.search.none")
+        inventory.setItem(layout.actionSlot, elementService.menuIcon(GuiMenuIconSpec(
+                material = if (targetId == null) Material.COMPASS else Material.RECOVERY_COMPASS,
+                name = GuiNameSpec.Text(text(player, "fishing.dictionary.search.footer"), GuiNameStyle.DEFAULT),
+                role = GuiElementRole.CONTENT,
+                amount = 1,
+                description = emptyList(),
+                data = listOf(GuiMenuIconData(text(player, "fishing.dictionary.search.current"), targetName, "§f")),
+                options = emptyList(),
+                warnings = emptyList(),
+                dangers = emptyList(),
+                actions = if (targetId == null) emptyList() else listOf(GuiMenuIconAction(
+                    text(player, "fishing.dictionary.search.clear_operation"),
+                    text(player, "fishing.dictionary.search.clear_action"),
+                    text(player, "fishing.dictionary.search.clear_resolved"),
+                    true
+                )),
+                glint = null
+            )))
         player.openInventory(inventory)
     }
 
@@ -144,43 +180,118 @@ class CatalogCommand(
         val discovered = entry?.discovered == true
         val visibleEntry = entry ?: CatalogEntry(definition.id)
         val data = if (discovered) buildList {
+            val qualityCounts = FishQuality.normalizeStoredCounts(visibleEntry.qualityCounts)
             add(GuiMenuIconData(text(player, "fishing.fishdex.total"), visibleEntry.obtainedCount, "§f"))
-            add(GuiMenuIconData(text(player, "fishing.fishdex.maximum"), "${visibleEntry.maximumWeight ?: 0}g", "§f"))
-            add(GuiMenuIconData(text(player, "fishing.fishdex.minimum"), "${visibleEntry.minimumWeight ?: 0}g", "§f"))
-            addAll(FishQuality.entries.map { quality ->
-                GuiMenuIconData(text(player, "fishing.fishdex.quality.${quality.id}"), visibleEntry.qualityCounts[quality.id] ?: 0L, "§f")
-            })
-        } else listOf(GuiMenuIconData(text(player, "fishing.fishdex.total"), 0L, "§f"))
+            val best = FishQuality.entries.lastOrNull { (qualityCounts[it] ?: 0L) > 0L } ?: FishQuality.COMMON
+            add(GuiMenuIconData(text(player, "fishing.fishdex.best_quality"), best.stars, "§f"))
+            val level = definition.conditions.firstOrNull { it.labelKey == "fishing.dictionary.condition.level" }?.rawValue ?: "1"
+            add(GuiMenuIconData(text(player, "fishing.dictionary.condition.level"), level, "§f"))
+        } else emptyList()
+        val selected = fishingSearchTarget(player.uniqueId) == definition.id
         return service.menuIcon(GuiMenuIconSpec(
             material = if (discovered) definition.material else Material.GRAY_DYE,
             name = GuiNameSpec.Text(text(player, "fishing.catalog.item.${definition.id}"), GuiNameStyle.DEFAULT),
             role = GuiElementRole.CONTENT,
             amount = 1,
-            description = listOf(text(player, "fishing.fishdex.description.${definition.id}")),
+            description = if (discovered) listOf(text(player, "fishing.dictionary.description.${definition.id}")) else emptyList(),
             data = data,
             options = emptyList(),
-            warnings = if (discovered) emptyList() else listOf(text(player, "fishing.fishdex.not_caught")),
+            warnings = if (discovered) emptyList() else listOf(text(player, "fishing.dictionary.details_hidden")),
             dangers = emptyList(),
-            actions = emptyList(),
-            glint = null
+            actions = if (discovered) buildList {
+                add(GuiMenuIconAction(
+                    text(player, "fishing.dictionary.detail.operation"),
+                    text(player, "fishing.dictionary.detail.action"),
+                    text(player, "fishing.dictionary.detail.resolved"),
+                    true
+                ))
+                if (!selected) add(GuiMenuIconAction(
+                    text(player, "fishing.dictionary.search.operation"),
+                    text(player, "fishing.dictionary.search.action"),
+                    text(player, "fishing.dictionary.search.resolved"),
+                    true
+                ))
+            } else emptyList(),
+            glint = selected
         ))
+    }
+
+    private fun openFishingDetail(player: Player, fishId: String, returnPage: Int) {
+        val definition = items(CatalogType.FISHING).firstOrNull { it.id == fishId } ?: return
+        val entry = store.entries(player.uniqueId, CatalogType.FISHING)[fishId] ?: return
+        val layoutService = CCSystem.getAPI().getGuiLayoutService()
+        val layout = layoutService.threeChoice45()
+        val holder = FishingDetailHolder(player.uniqueId, returnPage)
+        val inventory = Bukkit.createInventory(holder, layout.size, Component.text(text(player, "fishing.detail.title")))
+        holder.backingInventory = inventory
+        layoutService.applyStandardFrame(inventory)
+        val service = CCSystem.getAPI().getGuiElementService()
+        inventory.setItem(4, service.menuIcon(GuiMenuIconSpec(
+            definition.material, GuiNameSpec.Text(text(player, "fishing.catalog.item.$fishId"), GuiNameStyle.PRIMARY),
+            GuiElementRole.CONTENT, 1, listOf(text(player, "fishing.dictionary.description.$fishId")),
+            emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), null
+        )))
+        val conditions = definition.conditions.map { condition ->
+            GuiMenuIconData(text(player, condition.labelKey),
+                condition.hintKey?.let { text(player, it) }
+                    ?: condition.rawValue
+                    ?: condition.localizedValues.joinToString("、") { text(player, it) }, "§f")
+        }
+        inventory.setItem(layout.leftSlot, service.menuIcon(GuiMenuIconSpec(
+            Material.MAP, GuiNameSpec.Text(text(player, "fishing.detail.conditions"), GuiNameStyle.DEFAULT),
+            GuiElementRole.CONTENT, 1, emptyList(), conditions, emptyList(), emptyList(), emptyList(), emptyList(), null
+        )))
+        val qualityCounts = FishQuality.normalizeStoredCounts(entry.qualityCounts)
+        val records = buildList {
+            add(GuiMenuIconData(text(player, "fishing.fishdex.total"), entry.obtainedCount, "§f"))
+            add(GuiMenuIconData(text(player, "fishing.fishdex.maximum"), "${entry.maximumWeight ?: 0}g", "§f"))
+            add(GuiMenuIconData(text(player, "fishing.fishdex.minimum"), "${entry.minimumWeight ?: 0}g", "§f"))
+            add(GuiMenuIconData(text(player, "fishing.fishdex.quality_breakdown"), "", "§f"))
+            FishQuality.entries.forEach { quality ->
+                add(GuiMenuIconData("  ${quality.stars}", qualityCounts[quality] ?: 0L, "§f"))
+            }
+        }
+        inventory.setItem(layout.centerSlot, service.menuIcon(GuiMenuIconSpec(
+            Material.WRITABLE_BOOK, GuiNameSpec.Text(text(player, "fishing.detail.records"), GuiNameStyle.DEFAULT),
+            GuiElementRole.CONTENT, 1, emptyList(), records, emptyList(), emptyList(), emptyList(), emptyList(), null
+        )))
+        inventory.setItem(layout.rightSlot, service.menuIcon(GuiMenuIconSpec(
+            Material.CRAFTING_TABLE, GuiNameSpec.Text(text(player, "fishing.detail.uses"), GuiNameStyle.DEFAULT),
+            GuiElementRole.CONTENT, 1, emptyList(), emptyList(), emptyList(),
+            listOf(text(player, "fishing.detail.uses_none")), emptyList(), emptyList(), null
+        )))
+        inventory.setItem(layout.backSlot, navigationItem(service, Material.ARROW, text(player, "fishing.detail.back"), GuiElementRole.BACK))
+        player.openInventory(inventory)
     }
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<String>): Boolean {
         val player = sender as? Player ?: return true
         val type = when (label.lowercase()) {
-            "fishdex" -> CatalogType.FISHING
             "cookdex" -> CatalogType.COOKING
             "brewdex" -> CatalogType.BREWERY
             else -> args.firstOrNull()?.lowercase()?.let { value -> CatalogType.entries.firstOrNull { it.id == value } } ?: CatalogType.FISHING
         }
         val pageArg = if (label.equals("catalog", true)) args.getOrNull(1) else args.firstOrNull()
+        if (type == CatalogType.FISHING && !player.hasPermission("cc-content.admin")) {
+            player.sendMessage(Component.text(text(player, "fishing.dictionary.item_required")))
+            return true
+        }
         open(player, type, pageArg?.toIntOrNull()?.coerceAtLeast(1)?.minus(1) ?: 0)
         return true
     }
 
     @EventHandler
     fun onClick(event: InventoryClickEvent) {
+        val detail = event.view.topInventory.holder as? FishingDetailHolder
+        if (detail != null) {
+            event.isCancelled = true
+            val player = event.whoClicked as? Player ?: return
+            if (detail.owner == player.uniqueId &&
+                event.rawSlot == CCSystem.getAPI().getGuiLayoutService().threeChoice45().backSlot) {
+                open(player, CatalogType.FISHING, detail.returnPage)
+            }
+            return
+        }
         val holder = event.view.topInventory.holder as? CatalogHolder ?: return
         event.isCancelled = true
         val player = event.whoClicked as? Player ?: return
@@ -190,7 +301,21 @@ class CatalogCommand(
             when (event.rawSlot) {
                 layout.previousPageSlot -> if (holder.page > 0) open(player, holder.type, holder.page - 1)
                 layout.nextPageSlot -> if (holder.page + 1 < holder.totalPages) open(player, holder.type, holder.page + 1)
-                layout.actionSlot -> player.closeInventory()
+                layout.actionSlot -> if (fishingSearchTarget(player.uniqueId) != null) {
+                    setFishingSearchTarget(player, null)
+                    open(player, holder.type, holder.page)
+                }
+                else -> {
+                    val fishId = holder.itemIdsBySlot[event.rawSlot] ?: return
+                    if (store.entries(player.uniqueId, CatalogType.FISHING)[fishId]?.discovered != true) return
+                    if (event.isRightClick) {
+                        setFishingSearchTarget(player, fishId)
+                        open(player, holder.type, holder.page)
+                    } else if (event.isLeftClick) {
+                        player.playSound(player.location, org.bukkit.Sound.ITEM_BOOK_PAGE_TURN, 0.7f, 1.2f)
+                        openFishingDetail(player, fishId, holder.page)
+                    }
+                }
             }
         } else {
             val layout = CCSystem.getAPI().getGuiLayoutService().pagedList54()
@@ -202,7 +327,8 @@ class CatalogCommand(
 
     @EventHandler
     fun onDrag(event: InventoryDragEvent) {
-        if (event.view.topInventory.holder !is CatalogHolder) return
+        if (event.view.topInventory.holder !is CatalogHolder &&
+            event.view.topInventory.holder !is FishingDetailHolder) return
         event.isCancelled = true
     }
 
@@ -210,7 +336,13 @@ class CatalogCommand(
         CCSystem.getAPI().getI18nString(player, key, placeholders.associate { it.first to (it.second ?: "") }).replace('&', '§')
 }
 
+private class FishingDetailHolder(val owner: UUID, val returnPage: Int) : InventoryHolder {
+    override fun getInventory(): Inventory = backingInventory
+    lateinit var backingInventory: Inventory
+}
+
 private class CatalogHolder(val owner: UUID, val type: CatalogType, val page: Int, val totalPages: Int) : InventoryHolder {
     override fun getInventory(): Inventory = backingInventory
     lateinit var backingInventory: Inventory
+    val itemIdsBySlot: MutableMap<Int, String> = mutableMapOf()
 }
