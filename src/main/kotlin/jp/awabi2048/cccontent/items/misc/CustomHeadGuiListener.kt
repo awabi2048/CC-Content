@@ -4,6 +4,7 @@ package jp.awabi2048.cccontent.items.misc
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.gui.SimpleConfirmationDialog
 import jp.awabi2048.cccontent.items.CustomItemManager
@@ -202,7 +203,7 @@ class CustomHeadGuiListener(private val plugin: JavaPlugin) : Listener {
             if (choice.lore.isNotEmpty()) {
                 meta?.lore(
                     CCSystem.getAPI().getLoreService().render(
-                        GuiLoreSpec.Auto(choice.lore, GuiLoreFrame.NONE)
+                        GuiLoreSpec.Rich(choice.lore.map { GuiLoreLine.Text(it) }, GuiLoreFrame.NONE)
                     )
                 )
             }
@@ -210,8 +211,8 @@ class CustomHeadGuiListener(private val plugin: JavaPlugin) : Listener {
                 meta?.setDisplayName("§c取得失敗: ${choice.hdbId}")
                 meta?.lore(
                     CCSystem.getAPI().getLoreService().render(
-                        GuiLoreSpec.Auto(
-                            listOf("§7HeadDatabaseのIDを確認してください") + choice.lore,
+                        GuiLoreSpec.Rich(
+                            (listOf("HeadDatabaseのIDを確認してください") + choice.lore).map { GuiLoreLine.Text(it) },
                             GuiLoreFrame.NONE
                         )
                     )

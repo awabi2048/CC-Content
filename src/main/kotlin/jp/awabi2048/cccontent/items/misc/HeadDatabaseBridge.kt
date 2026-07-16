@@ -4,6 +4,7 @@ package jp.awabi2048.cccontent.items.misc
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.ItemMeta
@@ -105,11 +106,11 @@ object HeadDatabaseBridge {
         meta?.setDisplayName("§fテストヘッド §7(HDB:$hdbId)")
         meta?.lore(
             CCSystem.getAPI().getLoreService().render(
-                GuiLoreSpec.Auto(
+                GuiLoreSpec.Rich(
                     listOf(
                         "§7HeadDatabase バイパスモード",
                         "§7実ID: $hdbId"
-                    ),
+                    ).map { GuiLoreLine.Text(it) },
                     GuiLoreFrame.NONE
                 )
             )

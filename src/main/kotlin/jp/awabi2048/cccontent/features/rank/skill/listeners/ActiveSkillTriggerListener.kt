@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.rank.skill.listeners
 
 import jp.awabi2048.cccontent.CCContent
+import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillIdentifier
 import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillManager
 import jp.awabi2048.cccontent.features.rank.skill.ActiveTriggerType
@@ -36,6 +37,7 @@ class ActiveSkillTriggerListener : Listener {
         }
 
         val player = event.player
+        if (!RankReleasePolicy.canUseSkills(player)) return
         val mainHandMaterial = player.inventory.itemInMainHand.type
 
         val playerProfession = CCContent.rankManager.getPlayerProfession(player.uniqueId) ?: return

@@ -4,6 +4,7 @@ package jp.awabi2048.cccontent.features.arena
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.economy.ContentEconomyBridge
 import jp.awabi2048.cccontent.gui.GuiMenuItems
@@ -570,7 +571,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
         inventory.setItem(
             ArenaTokenExchangeLayout.INFO_SLOT,
             GuiMenuItems.icon(Material.BOOK, ArenaI18n.text(player, "arena.ui.token_exchange.info_name"), listOf(
-                ArenaI18n.text(player, "arena.ui.token_exchange.info_lore")
+                GuiLoreLine.Text(ArenaI18n.text(player, "arena.ui.token_exchange.info_lore"))
             ))
         )
     }
@@ -606,24 +607,24 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
             )
         )
         if (lines.isNotEmpty()) {
-            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(buildExchangeLore(player, lines), GuiLoreFrame.BOTH)))
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(buildExchangeLore(player, lines), GuiLoreFrame.BOTH)))
         }
         ItemMetaCompat.hideAdditionalTooltip(meta)
         item.itemMeta = meta
         return item
     }
 
-    private fun buildExchangeLore(player: Player, lines: List<TokenExchangeLine>): List<String> {
+    private fun buildExchangeLore(player: Player, lines: List<TokenExchangeLine>): List<GuiLoreLine> {
         return buildList {
-            add("§f❙ §7交換するモブドロップ")
+            add(GuiLoreLine.Text("交換するモブドロップ"))
             lines.take(4).forEach { line ->
                 val name = CustomItemI18n.text(player, "custom_items.arena.mob_token.token_names.${line.categoryId}", line.categoryId)
                     .replace(Regex("§[0-9a-fk-or]", RegexOption.IGNORE_CASE), "")
-                add("§8・§f$name ${formatAcorn(line.unitPrice)} §7× §b${line.amount} 個 §7= ${formatAcorn(line.subtotal)}")
+                add(GuiLoreLine.SubData(name, "${formatAcorn(line.unitPrice)} × ${line.amount} = ${formatAcorn(line.subtotal)}"))
             }
             if (lines.size > 4) {
                 val remaining = lines.drop(4).fold(ZERO) { sum, line -> truncate(sum + line.subtotal) }
-                add("§fその他 ${formatAcorn(remaining)}")
+                add(GuiLoreLine.Data("その他", formatAcorn(remaining), "§f"))
             }
         }
     }

@@ -5,7 +5,9 @@ package jp.awabi2048.cccontent.features.arena.mission
 import jp.awabi2048.cccontent.config.FeatureConfigManager
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import jp.awabi2048.cccontent.features.arena.ArenaAuditLogger
 import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.arena.ArenaMenuItems
@@ -370,7 +372,9 @@ class ArenaMissionService(
             }
 
             val inviteMissionTitle = "${missionDisplayName(mission.missionTypeId)} @ ${themeDisplayName(player, mission.themeId)}"
-            val inviteMissionLore = buildMissionConfirmLore(player, mission)
+            val inviteMissionLore = CCSystem.getAPI().getLoreService()
+                .render(GuiLoreSpec.Rich(buildMissionConfirmLore(player, mission), GuiLoreFrame.NONE))
+                .map(LegacyComponentSerializer.legacySection()::serialize)
 
             // ミッションタイプに基づいてミッション修飾子を決定
             val missionType = ArenaMissionType.fromId(mission.missionTypeId) ?: ArenaMissionType.BARRIER_RESTART
@@ -543,7 +547,7 @@ class ArenaMissionService(
             val theme = selectWeightedTheme(weightedThemes, random)
             val themeId = theme.id
             val missionType = ArenaMissionType.BARRIER_RESTART
-            val promoted = theme.promotedVariant != null && random.nextDouble() < theme.promotionProbability
+            val promoted = arenaManager.selectPromotedDifficulty(theme)
             val variant = theme.variant(promoted)
 
             ArenaMissionEntry(
@@ -741,9 +745,9 @@ class ArenaMissionService(
 
     private fun renderConfirmMenu(player: Player, inventory: Inventory, mission: ArenaMissionEntry) {
         fillConfirmBackground(inventory)
-        inventory.setItem(ArenaMissionLayout.CONFIRM_OK_SLOT, createActionItem(Material.LIME_WOOL, ArenaI18n.text(player, "arena.ui.confirm.ok_name"), ArenaI18n.stringList(player, "arena.ui.confirm.ok_lore")))
+        inventory.setItem(ArenaMissionLayout.CONFIRM_OK_SLOT, createActionItem(Material.LIME_WOOL, ArenaI18n.text(player, "arena.ui.confirm.ok_name"), ArenaI18n.stringList(player, "arena.ui.confirm.ok_lore").map(GuiLoreLine::Text)))
         inventory.setItem(ArenaMissionLayout.CONFIRM_MISSION_SLOT, createMissionSummaryItem(player, mission))
-        inventory.setItem(ArenaMissionLayout.CONFIRM_CANCEL_SLOT, createActionItem(Material.RED_WOOL, ArenaI18n.text(player, "arena.ui.confirm.cancel_name"), ArenaI18n.stringList(player, "arena.ui.confirm.cancel_lore")))
+        inventory.setItem(ArenaMissionLayout.CONFIRM_CANCEL_SLOT, createActionItem(Material.RED_WOOL, ArenaI18n.text(player, "arena.ui.confirm.cancel_name"), ArenaI18n.stringList(player, "arena.ui.confirm.cancel_lore").map(GuiLoreLine::Text)))
     }
 
     private fun openMissionConfirmMenu(player: Player, missionIndex: Int): Boolean {
@@ -779,12 +783,12 @@ class ArenaMissionService(
         return ArenaMenuItems.backgroundPane(material)
     }
 
-    private fun createActionItem(material: Material, name: String, lore: List<String>): ItemStack {
+    private fun createActionItem(material: Material, name: String, lore: List<GuiLoreLine>): ItemStack {
         val item = ItemStack(material)
         val meta = item.itemMeta ?: return item
         meta.setDisplayName(name)
         if (lore.isNotEmpty()) {
-            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(lore, GuiLoreFrame.BOTH)))
+            meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lore, GuiLoreFrame.BOTH)))
         }
         item.itemMeta = meta
         return item
@@ -801,7 +805,7 @@ class ArenaMissionService(
                 ArenaI18n.text(player, "arena.ui.mission.item_name", "mission" to title)
             }
         )
-        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(buildMissionLore(player, mission), GuiLoreFrame.BOTH)))
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(buildMissionLore(player, mission), GuiLoreFrame.BOTH)))
         item.itemMeta = meta
         return item
     }
@@ -823,9 +827,9 @@ class ArenaMissionService(
         val meta = item.itemMeta as? SkullMeta ?: return item
         meta.owningPlayer = player
         meta.setDisplayName(ArenaI18n.text(player, "arena.ui.player.name_format", "player" to player.name))
-        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
-            ArenaI18n.text(player, "arena.ui.player.mob_kills", "count" to playerData.totalMobKillCount),
-            ArenaI18n.text(player, "arena.ui.player.barrier_restarts", "count" to playerData.barrierRestartCount),
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(listOf(
+            GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.player.mob_kills"), playerData.totalMobKillCount, "§e"),
+            GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.player.barrier_restarts"), playerData.barrierRestartCount, "§e"),
         ), GuiLoreFrame.BOTH)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
@@ -843,19 +847,18 @@ class ArenaMissionService(
     private fun createLicenseCardItem(player: Player, playerData: ArenaPlayerMissionData): ItemStack {
         val currentTier = playerData.licenseTier
         val nextTier = currentTier.next()
-        val lore = mutableListOf<String>()
-        lore += ArenaI18n.text(player, "arena.ui.license_card.current_license", "tier" to licenseTierDisplayName(player, currentTier))
-        lore += ArenaI18n.text(player, "arena.ui.license_card.allowed_difficulty", "difficulty" to difficultyDisplay(currentTier.maxDifficultyStar))
-        lore += ""
-        lore += ArenaI18n.text(player, "arena.ui.license_card.next_header")
+        val lore = mutableListOf<GuiLoreLine>()
+        lore += GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.license_card.current_license"), licenseTierDisplayName(player, currentTier), "§e")
+        lore += GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.license_card.allowed_difficulty"), difficultyDisplay(currentTier.maxDifficultyStar), "§c")
+        lore += GuiLoreLine.Spacer
+        lore += GuiLoreLine.Text(ArenaI18n.text(player, "arena.ui.license_card.next_header"))
 
         if (nextTier == null) {
-            lore += ArenaI18n.text(player, "arena.ui.license_card.max_reached")
+            lore += GuiLoreLine.StyledText(ArenaI18n.text(player, "arena.ui.license_card.max_reached"), "§a", false)
         } else {
             val requirement = LICENSE_REQUIREMENTS[nextTier]
                 ?: throw IllegalStateException("ライセンス要件が未定義です: tier=${nextTier.id}")
-            val rows = buildLicenseRequirementLines(player, playerData, requirement)
-            lore += rows
+            lore += buildLicenseRequirementLines(player, playerData, requirement)
         }
 
         return createActionItem(
@@ -865,31 +868,31 @@ class ArenaMissionService(
         )
     }
 
-    private fun buildMissionLore(player: Player, mission: ArenaMissionEntry): List<String> {
+    private fun buildMissionLore(player: Player, mission: ArenaMissionEntry): List<GuiLoreLine> {
         val missionType = ArenaMissionType.fromId(mission.missionTypeId) ?: ArenaMissionType.BARRIER_RESTART
-        val lore = mutableListOf<String>()
-        lore += ArenaI18n.text(player, "arena.ui.mission.mission_title")
-        lore += missionGuideHints(missionType, player)
-        lore += ""
-        lore += ArenaI18n.text(player, "arena.ui.mission.difficulty_inline", "difficulty" to difficultyDisplay(mission.difficultyStar))
+        val lore = mutableListOf<GuiLoreLine>()
+        lore += GuiLoreLine.Text(ArenaI18n.text(player, "arena.ui.mission.mission_title"))
+        lore += missionGuideHints(missionType, player).map(GuiLoreLine::Text)
+        lore += GuiLoreLine.Spacer
+        lore += GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.mission.difficulty_inline"), difficultyDisplay(mission.difficultyStar), "§f")
         return lore
     }
 
-    private fun buildMissionConfirmLore(player: Player, mission: ArenaMissionEntry): List<String> {
+    private fun buildMissionConfirmLore(player: Player, mission: ArenaMissionEntry): List<GuiLoreLine> {
         val missionType = ArenaMissionType.fromId(mission.missionTypeId) ?: ArenaMissionType.BARRIER_RESTART
         val memo = randomMissionMemo(player)
-        val lore = mutableListOf<String>()
-        lore += ArenaI18n.text(player, "arena.ui.mission.mission_title")
-        lore += missionGuideHints(missionType, player)
-        lore += ""
-        lore += ArenaI18n.text(player, "arena.ui.mission.difficulty_inline", "difficulty" to difficultyDisplay(mission.difficultyStar))
-        lore += ArenaI18n.text(player, "arena.ui.mission.memo_inline", "memo" to memo)
+        val lore = mutableListOf<GuiLoreLine>()
+        lore += GuiLoreLine.Text(ArenaI18n.text(player, "arena.ui.mission.mission_title"))
+        lore += missionGuideHints(missionType, player).map(GuiLoreLine::Text)
+        lore += GuiLoreLine.Spacer
+        lore += GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.mission.difficulty_inline"), difficultyDisplay(mission.difficultyStar), "§f")
+        lore += GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.mission.memo_inline"), memo, "§f")
         return lore
     }
 
-    private fun buildInfoLore(): List<String> {
+    private fun buildInfoLore(): List<GuiLoreLine> {
         val lines = ArenaI18n.stringList(null, "arena.ui.info.lines")
-        return lines
+        return lines.map(GuiLoreLine::Text)
     }
 
     private fun playUiClick(player: Player) {
@@ -905,26 +908,26 @@ class ArenaMissionService(
         player: Player,
         playerData: ArenaPlayerMissionData,
         requirement: ArenaLicenseRequirement
-    ): List<String> {
-        val lines = mutableListOf<String>()
+    ): List<GuiLoreLine> {
+        val lines = mutableListOf<GuiLoreLine>()
 
-        lines += ArenaI18n.text(player, "arena.ui.license_card.requirement.mission_clear", "progress" to progressText(playerData.totalMissionClearCount, requirement.requiredMissionClearCount))
+        lines += requirementLine(player, "arena.ui.license_card.requirement.mission_clear", playerData.totalMissionClearCount, requirement.requiredMissionClearCount)
 
         if (requirement.requiredMobKillCount > 0) {
-            lines += ArenaI18n.text(player, "arena.ui.license_card.requirement.mob_kill", "progress" to progressText(playerData.totalMobKillCount, requirement.requiredMobKillCount))
+            lines += requirementLine(player, "arena.ui.license_card.requirement.mob_kill", playerData.totalMobKillCount, requirement.requiredMobKillCount)
         }
 
         if (requirement.requiredStrongEnemyKillCount > 0) {
-            lines += ArenaI18n.text(player, "arena.ui.license_card.requirement.strong_enemy_kill", "progress" to progressText(playerData.totalStrongEnemyKillCount, requirement.requiredStrongEnemyKillCount))
+            lines += requirementLine(player, "arena.ui.license_card.requirement.strong_enemy_kill", playerData.totalStrongEnemyKillCount, requirement.requiredStrongEnemyKillCount)
         }
 
         return lines
     }
 
-    private fun progressText(current: Int, required: Int): String {
+    private fun requirementLine(player: Player, key: String, current: Int, required: Int): GuiLoreLine {
         val cappedCurrent = current.coerceAtLeast(0)
         val color = if (cappedCurrent >= required) "§a" else "§e"
-        return "$color$cappedCurrent§7/$required"
+        return GuiLoreLine.Data(ArenaI18n.text(player, key), "$cappedCurrent/$required", color)
     }
 
     private fun difficultyDisplay(starCount: Int): String {

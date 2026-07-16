@@ -2,14 +2,11 @@
 
 package jp.awabi2048.cccontent.features.sukima_dungeon.gui
 
-import com.awabi2048.ccsystem.CCSystem
-import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
-import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.DungeonTier
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureLoader
 import jp.awabi2048.cccontent.features.sukima_dungeon.LangManager
-import jp.awabi2048.cccontent.features.sukima_dungeon.PlayerDataManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import jp.awabi2048.cccontent.util.ContentLocaleResolver
 import org.bukkit.Bukkit
@@ -18,7 +15,6 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
-import org.bukkit.inventory.meta.ItemMeta
 import org.bukkit.inventory.ItemFlag
 
 class DungeonEntranceGui(private val loader: StructureLoader, val tier: DungeonTier) : InventoryHolder {
@@ -53,12 +49,12 @@ class DungeonEntranceGui(private val loader: StructureLoader, val tier: DungeonT
         // ---------------------------------------------
         // Center: Entrance Button (Slot 22)
         // ---------------------------------------------
-        val entranceItem = createGuiItem(Material.END_CRYSTAL, 
-            "§bダンジョンへのポータルを開く", 
-            "§7クリックしてダンジョンへのポータルを開きます！")
+        val entranceItem = createGuiItem(
+            Material.END_CRYSTAL,
+            MessageManager.getMessage(player, "gui_entrance_open_name"),
+            listOf(singleAction(player, MessageManager.getMessage(player, "gui_entrance_open_action")))
+        )
         inv.setItem(22, entranceItem)
-
-        val bar = "§7§m――――――――――――――――――――――――――――――"
 
         // ---------------------------------------------
         // Slot 38: Play Style Selector
@@ -68,12 +64,14 @@ class DungeonEntranceGui(private val loader: StructureLoader, val tier: DungeonT
         } else {
             MessageManager.getMessage(player, "gui_style_single")
         }
-        val styleItem = createGuiItem(Material.LEATHER_HORSE_ARMOR, 
-            "§6プレイスタイルの選択", 
-            bar,
-            styleLabel,
-            "§7クリックして切り替えます",
-            bar)
+        val styleItem = createGuiItem(
+            Material.LEATHER_HORSE_ARMOR,
+            MessageManager.getMessage(player, "gui_style_name"),
+            listOf(
+                GuiLoreLine.Data(MessageManager.getMessage(player, "gui_current_setting_label"), styleLabel, "§e"),
+                singleAction(player, MessageManager.getMessage(player, "gui_change_action"))
+            )
+        )
         val styleMeta = styleItem.itemMeta as? org.bukkit.inventory.meta.LeatherArmorMeta
         styleMeta?.setColor(org.bukkit.Color.WHITE)
         styleMeta?.addItemFlags(ItemFlag.HIDE_DYE)
@@ -83,12 +81,14 @@ class DungeonEntranceGui(private val loader: StructureLoader, val tier: DungeonT
         val sizeKey = sizes[currentSizeIndex]
         if (sizes.size > 1) {
             val sizeLabel = MessageManager.getMessage(player, "gui_size_$sizeKey")
-            val sizeItem = createGuiItem(Material.DIAMOND_PICKAXE, 
-                "§eサイズの選択",
-                bar,
-                sizeLabel,
-                "§7クリックして切り替えます",
-                bar)
+            val sizeItem = createGuiItem(
+                Material.DIAMOND_PICKAXE,
+                MessageManager.getMessage(player, "gui_size_name"),
+                listOf(
+                    GuiLoreLine.Data(MessageManager.getMessage(player, "gui_current_setting_label"), sizeLabel, "§e"),
+                    singleAction(player, MessageManager.getMessage(player, "gui_change_action"))
+                )
+            )
             val sizeMeta = sizeItem.itemMeta
             sizeMeta?.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
             sizeItem.itemMeta = sizeMeta
@@ -105,33 +105,39 @@ class DungeonEntranceGui(private val loader: StructureLoader, val tier: DungeonT
             
             val randomDisplayName = MessageManager.getMessage(player, "gui_theme_random")
             val baseDisplayName = if (isRandom) randomDisplayName else theme?.getDisplayName(player) ?: themeName
-            val displaySuffix = if (isRandom) "" else "の世界"
-            val fullDisplayName = "$baseDisplayName$displaySuffix"
+            val fullDisplayName = if (isRandom) baseDisplayName else MessageManager.getMessage(
+                player,
+                "gui_theme_world_value",
+                mapOf("theme" to baseDisplayName)
+            )
             
             val themeIcon = if (isRandom) Material.MAP else theme?.icon ?: Material.PAPER
 
-            val themeItem = createGuiItem(themeIcon, 
-                "§dポータルの接続先", 
-                bar,
-                "§f§l| §7現在の設定 §d${fullDisplayName}",
-                "§e§nクリックして変更",
-                bar)
+            val themeItem = createGuiItem(
+                themeIcon,
+                MessageManager.getMessage(player, "gui_theme_name"),
+                listOf(
+                    GuiLoreLine.Data(MessageManager.getMessage(player, "gui_current_setting_label"), fullDisplayName, "§d"),
+                    singleAction(player, MessageManager.getMessage(player, "gui_change_action"))
+                )
+            )
             inv.setItem(43, themeItem)
             
             // ---------------------------------------------
             // Slot 40: Info
             // ---------------------------------------------
             val sizeName = LangManager.getMessage(ContentLocaleResolver.resolve(player), "sizes.$sizeKey")
-            val infoItem = createGuiItem(Material.SPYGLASS, 
-                "§aInfo", 
-                bar,
-                "§f§l| §7ポータルの接続先 §d${fullDisplayName}", 
-                "§f§l| §7サイズ §e${sizeName}",
-                "§7${theme?.getDescription(player) ?: ""}",
-                bar,
-                "§7スキマの世界は非常に不安定です。そのため、ポータルが別の世界に繋がってしまうことがあります。",
-                "§7より上位のしおりを使用すると、望んだ傾向の世界に行きやすくなります。",
-                bar)
+            val infoLines = mutableListOf<GuiLoreLine>(
+                GuiLoreLine.Data(MessageManager.getMessage(player, "gui_info_theme_label"), fullDisplayName, "§d"),
+                GuiLoreLine.Data(MessageManager.getMessage(player, "gui_info_size_label"), sizeName, "§e")
+            )
+            theme?.getDescription(player)?.takeIf { it.isNotBlank() }?.let { infoLines += GuiLoreLine.Text(it) }
+            infoLines += MessageManager.getList(player, "gui_info_warning").map(GuiLoreLine::Warning)
+            val infoItem = createGuiItem(
+                Material.SPYGLASS,
+                MessageManager.getMessage(player, "gui_info_name"),
+                infoLines
+            )
 
             inv.setItem(40, infoItem)
         } else {
@@ -162,8 +168,10 @@ class DungeonEntranceGui(private val loader: StructureLoader, val tier: DungeonT
         return if (themes.isNotEmpty()) themes[currentThemeIndex] else null
     }
 
-    private fun createGuiItem(material: Material, name: String, vararg lore: String): ItemStack {
-        return jp.awabi2048.cccontent.gui.GuiMenuItems.icon(material, name, lore.toList())
+    private fun createGuiItem(material: Material, name: String, lore: List<GuiLoreLine> = emptyList()): ItemStack {
+        return SukimaGuiItems.icon(material, name, lore)
     }
+
+    private fun singleAction(player: Player, action: String) = SukimaGuiItems.singleAction(player, action)
 
 }

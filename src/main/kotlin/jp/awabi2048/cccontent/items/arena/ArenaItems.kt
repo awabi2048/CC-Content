@@ -583,16 +583,16 @@ class ArenaEnchantShardItem : ArenaSimpleItem(
                 ArenaEnchantShardEffectType.CUSTOM_ENCHANT_ATTACH -> "I"
             }
             val description = when (definition.shard.effectType) {
-                ArenaEnchantShardEffectType.LIMIT_BREAKING -> "§f§o限界を超える力を秘めている"
+                ArenaEnchantShardEffectType.LIMIT_BREAKING -> "限界を超える力を秘めている"
                 ArenaEnchantShardEffectType.INCOMPATIBLE_COMBINATION,
                 ArenaEnchantShardEffectType.INVALID_TARGET_ATTACH,
-                ArenaEnchantShardEffectType.CUSTOM_ENCHANT_ATTACH -> "§f§o調和をもたらす力を秘めている"
+                ArenaEnchantShardEffectType.CUSTOM_ENCHANT_ATTACH -> "調和をもたらす力を秘めている"
             }
             return CCSystem.getAPI().getLoreService().render(
                 GuiLoreSpec.Rich(
                     listOf(
-                        GuiLoreLine.Raw("§7Tier $tier"),
-                        GuiLoreLine.Raw(description)
+                        GuiLoreLine.Data("Tier", tier, "§7"),
+                        GuiLoreLine.StyledText(description, "§f", true)
                     ),
                     GuiLoreFrame.NONE
                 )

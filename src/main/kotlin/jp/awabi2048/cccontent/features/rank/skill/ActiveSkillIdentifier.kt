@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.rank.skill
 
 import jp.awabi2048.cccontent.CCContent
+import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
@@ -40,6 +41,7 @@ object ActiveSkillIdentifier {
      * @return スキルIDのリスト
      */
     fun getPlayerActiveSkills(player: Player): List<String> {
+        if (!RankReleasePolicy.canUseSkills(player)) return emptyList()
         val profession = CCContent.rankManager.getPlayerProfession(player.uniqueId)
             ?: return emptyList()
 
@@ -103,6 +105,7 @@ object ActiveSkillIdentifier {
      * Fキー切替対象スキルが1つ以上あるか
      */
     fun hasAnyToggleableSkill(player: Player): Boolean {
+        if (!RankReleasePolicy.canUseSkills(player)) return false
         val profession = CCContent.rankManager.getPlayerProfession(player.uniqueId)
             ?: return false
         return getToggleableSkillsForFKey(profession).isNotEmpty()
@@ -125,6 +128,7 @@ object ActiveSkillIdentifier {
      * プレイヤーが能動スキルを1つ以上取得しているか
      */
     fun hasAnyActiveSkill(player: Player): Boolean {
+        if (!RankReleasePolicy.canUseSkills(player)) return false
         return getPlayerActiveSkills(player).isNotEmpty()
     }
 

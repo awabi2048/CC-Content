@@ -3,6 +3,7 @@
 package jp.awabi2048.cccontent.features.rank.skill.listeners
 
 import jp.awabi2048.cccontent.CCContent
+import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
@@ -145,7 +146,11 @@ class WarriorBowEffectListener : Listener {
                 while (iterator.hasNext()) {
                     val state = iterator.next().value
                     val arrow = state.arrow
-                    if (!arrow.isValid || arrow.isDead || arrow.isOnGround) {
+                    val shooter = arrow.shooter as? Player
+                    if (!arrow.isValid || arrow.isDead || arrow.isOnGround ||
+                        shooter == null || !RankReleasePolicy.canUseSkills(shooter)
+                    ) {
+                        arrow.setGravity(true)
                         iterator.remove()
                         continue
                     }
@@ -182,7 +187,10 @@ class WarriorBowEffectListener : Listener {
                 while (iterator.hasNext()) {
                     val state = iterator.next().value
                     val arrow = state.arrow
-                    if (!arrow.isValid || arrow.isDead || arrow.isOnGround || state.remainingTicks <= 0) {
+                    val shooter = arrow.shooter as? Player
+                    if (!arrow.isValid || arrow.isDead || arrow.isOnGround || state.remainingTicks <= 0 ||
+                        shooter == null || !RankReleasePolicy.canUseSkills(shooter)
+                    ) {
                         iterator.remove()
                         continue
                     }
@@ -959,6 +967,12 @@ class WarriorBowEffectListener : Listener {
         }
 
         val player = event.player
+        if (!RankReleasePolicy.canUseSkills(player)) {
+            bowDrawStartedAtMillis.remove(player.uniqueId)
+            bowDrawAmmoCounts.remove(player.uniqueId)
+            extraChargeStates.remove(player.uniqueId)
+            return
+        }
         val hand = event.hand ?: EquipmentSlot.HAND
         val itemInUsedHand = when (hand) {
             EquipmentSlot.HAND -> player.inventory.itemInMainHand
@@ -986,6 +1000,10 @@ class WarriorBowEffectListener : Listener {
     fun onSneak(event: PlayerToggleSneakEvent) {
         val player = event.player
         val playerUuid = player.uniqueId
+        if (!RankReleasePolicy.canUseSkills(player)) {
+            extraChargeStates.remove(playerUuid)
+            return
+        }
 
         if (!event.isSneaking) {
             if (extraChargeStates.remove(playerUuid) != null) {
@@ -1029,6 +1047,7 @@ class WarriorBowEffectListener : Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     fun onShootBow(event: EntityShootBowEvent) {
         val shooter = event.entity as? Player ?: return
+        if (!RankReleasePolicy.canUseSkills(shooter)) return
         val arrow = event.projectile as? AbstractArrow ?: return
         val bow = event.bow ?: return
 
@@ -1254,6 +1273,13 @@ class WarriorBowEffectListener : Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     fun onArrowDamage(event: EntityDamageByEntityEvent) {
         val arrow = event.damager as? AbstractArrow ?: return
+        val shooter = arrow.shooter as? Player
+        if (shooter == null || !RankReleasePolicy.canUseSkills(shooter)) {
+            arrow.persistentDataContainer.remove(bowPowerDeltaKey)
+            arrow.persistentDataContainer.remove(snipeDamageFactorKey)
+            arrow.persistentDataContainer.remove(threeWaySideDamageMultiplierKey)
+            return
+        }
         val target = event.entity as? LivingEntity
         if (target != null && isThreeWayArrow(arrow)) {
             target.noDamageTicks = 0

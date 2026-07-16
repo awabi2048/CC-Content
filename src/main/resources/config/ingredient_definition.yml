@@ -17,6 +17,9 @@ ingredients:
   berry_note:
     materials:
       - SWEET_BERRIES
+    custom_item_ids:
+      - brewery.garden_fruit_blueberry
+      - brewery.garden_fruit_strawberry
 
   honey_source:
     materials:
@@ -25,6 +28,17 @@ ingredients:
   fruit_apple:
     materials:
       - APPLE
+    custom_item_ids:
+      - brewery.garden_fruit_apple
+
+  fruit_blueberry:
+    custom_item_id: brewery.garden_fruit_blueberry
+
+  fruit_grape:
+    custom_item_id: brewery.garden_fruit_grape
+
+  fruit_strawberry:
+    custom_item_id: brewery.garden_fruit_strawberry
 
   wart_herb:
     materials:

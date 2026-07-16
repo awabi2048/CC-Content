@@ -3,6 +3,7 @@
 package jp.awabi2048.cccontent.features.rank.command
 
 import jp.awabi2048.cccontent.features.rank.RankManager
+import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.listener.ProfessionSelector
 import jp.awabi2048.cccontent.features.rank.listener.TutorialInventoryHelper
 import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
@@ -422,6 +423,10 @@ class RankCommand(
             // 職業未選択の場合は職業選択GUIを開く
             return openProfessionSelectionGui(viewer)
         }
+        if (!RankReleasePolicy.canAccessProfession(viewer, playerProfession.profession)) {
+            viewer.sendMessage(messageProvider.getMessage("release.profession_unavailable"))
+            return false
+        }
 
         val holder = ProfessionMainMenuGuiHolder()
         val inventory = Bukkit.createInventory(
@@ -538,7 +543,7 @@ class RankCommand(
         val description = messageProvider.getMessage("tutorial_rank.${rank.name.lowercase()}.description")
 
         val taskLore = if (loader == null) {
-            listOf(toComponent("§f§l| §c${messageProvider.getMessage("tutorial_rank.task.system_not_initialized")}"))
+            listOf(GuiLoreLine.Danger(messageProvider.getMessage("tutorial_rank.task.system_not_initialized")))
         } else {
             buildTutorialRankTaskLore(viewer, tutorial.taskProgress, requirement, mode)
         }
@@ -546,7 +551,7 @@ class RankCommand(
         val icon = resolveTutorialRankIcon(loader?.getRankIcon(rank.name), rank)
         val name = messageProvider.getMessage("tutorial_rank.${rank.name.lowercase()}.name")
         val blocks = buildList {
-            add(listOf(toComponent("§f§l| §7$description")))
+            add(listOf(GuiLoreLine.Text(description)))
             if (taskLore.isNotEmpty()) {
                 add(taskLore)
             }
@@ -559,23 +564,23 @@ class RankCommand(
         progress: TaskProgress,
         requirement: TaskRequirement,
         mode: TutorialRankTaskDisplayMode
-    ): List<Component> {
+    ): List<GuiLoreLine> {
         if (mode == TutorialRankTaskDisplayMode.NONE) {
             return emptyList()
         }
 
         if (requirement.isEmpty()) {
-            return listOf(toComponent("§f§l| §a${messageProvider.getMessage("tutorial_rank.task.no_requirement")}"))
+            return listOf(GuiLoreLine.StyledText(messageProvider.getMessage("tutorial_rank.task.no_requirement"), "§a", false))
         }
 
-        val lore = mutableListOf<Component>()
+        val lore = mutableListOf<GuiLoreLine>()
         val statusLine = when (mode) {
             TutorialRankTaskDisplayMode.COMPLETED -> "§a§n${messageProvider.getMessage("tutorial_rank.task.status.completed")}"
             TutorialRankTaskDisplayMode.CURRENT -> null
             TutorialRankTaskDisplayMode.FUTURE -> "§c§n${messageProvider.getMessage("tutorial_rank.task.status.future")}"
             TutorialRankTaskDisplayMode.NONE -> null
         }
-        statusLine?.let { lore += toComponent(it) }
+        statusLine?.let { lore += GuiLoreLine.Text(it) }
 
         val defeatSuffix = messageProvider.getMessage("tutorial_rank.task.suffix.defeat")
         val collectSuffix = messageProvider.getMessage("tutorial_rank.task.suffix.collect")
@@ -593,7 +598,7 @@ class RankCommand(
             val done = current >= required
             val lineColor = if (done) "§a" else "§c"
             val numberColor = progressColorCode(current, required)
-            lore += toComponent("${lineColor}§l| §7${playTimeLabel} (§r${numberColor}${formatPlayTime(current)}§7/${formatPlayTime(required)}§7)")
+            lore += GuiLoreLine.Text("$lineColor$playTimeLabel (§r$numberColor${formatPlayTime(current)}§7/${formatPlayTime(required)}§7)")
         }
 
         if (requirement.requiresMyWorldCreated) {
@@ -709,7 +714,7 @@ class RankCommand(
             val done = current >= required
             val lineColor = if (done) "§a" else "§c"
             val numberColor = progressColorCode(current, required)
-            lore += toComponent("${lineColor}§l| §7${expLabel} (§r${numberColor}${current}§7/${required}§7)")
+            lore += GuiLoreLine.Text("$lineColor$expLabel (§r$numberColor$current§7/$required§7)")
         }
 
         requirement.itemsRequired.forEach { (material, required) ->
@@ -730,14 +735,14 @@ class RankCommand(
         return lore.take(TUTORIAL_RANK_TASK_LORE_LIMIT)
     }
 
-    private fun buildTutorialBooleanLine(label: String, done: Boolean): Component {
+    private fun buildTutorialBooleanLine(label: String, done: Boolean): GuiLoreLine {
         val contentColorCode = if (done) "§a" else "§c"
         val status = if (done) {
             messageProvider.getMessage("tutorial_rank.task.status.completed")
         } else {
             messageProvider.getMessage("tutorial_rank.task.status.incomplete")
         }
-        return toComponent("${contentColorCode}§l| §7${label} §8- §r${contentColorCode}${status}")
+        return GuiLoreLine.Data(label, status, contentColorCode)
     }
 
     private fun buildTutorialTargetLine(
@@ -746,12 +751,12 @@ class RankCommand(
         current: Int,
         required: Int,
         suffix: String = ""
-    ): Component {
+    ): GuiLoreLine.ComponentData {
         val contentColorCode = if (done) "§a" else "§c"
         val numberColor = progressColorCode(current.toLong(), required.toLong())
-        return toComponent("${contentColorCode}§l| §r")
-            .append(nameComponent.color(NamedTextColor.GRAY))
+        val value = nameComponent.color(NamedTextColor.GRAY)
             .append(toComponent("§7${suffix} (§r${numberColor}${current}§7/${required}§7)"))
+        return GuiLoreLine.ComponentData("", value, contentColorCode)
     }
 
     private fun resolveEntityNameComponent(entityType: String): Component {
@@ -820,7 +825,7 @@ class RankCommand(
             meta.displayName(withoutItalic(toComponent("§e${viewer.name}")))
             meta.lore(CCSystem.getAPI().getLoreService().render(
                 GuiLoreSpec.Blocks(listOf(GuiLoreBlock(listOf(
-                    GuiLoreLine.Raw("§f§l| §7${messageProvider.getMessage("tutorial_rank.task.page_hint")}")
+                    GuiLoreLine.Text(messageProvider.getMessage("tutorial_rank.task.page_hint"))
                 ))))
             ))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
@@ -885,7 +890,7 @@ class RankCommand(
         val hintItem = createGuiItem(
             Material.BOOK,
             toComponent(messageProvider.getMessage("gui.profession.selection.hint.title")),
-            hintLore.map { toComponent(it) }
+            hintLore.map(GuiLoreLine::Text)
         )
         inventory.setItem(49, hintItem)
         
@@ -904,7 +909,7 @@ class RankCommand(
         row3Professions.take(5).forEachIndexed { index, profession ->
             val slot = row3Slots.getOrNull(index) ?: return@forEachIndexed
             val isCurrent = profession == currentProfession
-            val item = createProfessionItem(profession, isCurrent, currentProfession != null)
+            val item = createProfessionItem(viewer, profession, isCurrent, currentProfession != null)
             inventory.setItem(slot, item)
         }
         
@@ -917,7 +922,7 @@ class RankCommand(
         row4Professions.take(5).forEachIndexed { index, profession ->
             val slot = row4Slots.getOrNull(index) ?: return@forEachIndexed
             val isCurrent = profession == currentProfession
-            val item = createProfessionItem(profession, isCurrent, currentProfession != null)
+            val item = createProfessionItem(viewer, profession, isCurrent, currentProfession != null)
             inventory.setItem(slot, item)
         }
     }
@@ -930,14 +935,14 @@ class RankCommand(
             it.displayName(toComponent("§a§l${player.name}"))
             val playerHeadLore = messageProvider.getMessageList("gui.profession.selection.player_head.lore")
             it.lore(CCSystem.getAPI().getLoreService().render(
-                GuiLoreSpec.Rich(playerHeadLore.map(GuiLoreLine::Raw), GuiLoreFrame.NONE)
+                GuiLoreSpec.Rich(playerHeadLore.map(GuiLoreLine::Text), GuiLoreFrame.NONE)
             ))
             head.itemMeta = it
         }
         return head
     }
     
-    private fun createProfessionItem(profession: Profession, isCurrent: Boolean, hasProfession: Boolean): ItemStack {
+    private fun createProfessionItem(viewer: Player, profession: Profession, isCurrent: Boolean, hasProfession: Boolean): ItemStack {
         val skillTree = SkillTreeRegistry.getSkillTree(profession)
         val startSkill = skillTree?.getStartSkillId()?.let { skillTree.getSkill(it) }
         val icon = startSkill?.icon?.let { Material.matchMaterial(it.uppercase()) } ?: Material.BOOK
@@ -958,23 +963,29 @@ class RankCommand(
                 icon,
                 toComponent("${profession.displayColorCode}§l$professionName ${messageProvider.getMessage("gui.profession.selection.profession_item.selected")}"),
                 listOf(
-                    toComponent("§7$professionDesc"),
-                    toComponent(""),
-                    toComponent(messageProvider.getMessage("gui.profession.selection.profession_item.type_label", "type" to typeName)),
-                    toComponent(""),
-                    toComponent(messageProvider.getMessage("gui.profession.selection.profession_item.current_profession"))
+                    GuiLoreLine.Text(professionDesc),
+                    GuiLoreLine.Spacer,
+                    GuiLoreLine.Data(messageProvider.getMessage("gui.profession.selection.profession_item.type_label_name"), typeName, "§f"),
+                    GuiLoreLine.Spacer,
+                    GuiLoreLine.Text(messageProvider.getMessage("gui.profession.selection.profession_item.current_profession"))
                 )
+            )
+        } else if (!RankReleasePolicy.canAccessProfession(viewer, profession)) {
+            createGuiItem(
+                Material.BARRIER,
+                toComponent(messageProvider.getMessage("release.profession_unavailable")),
+                listOf(GuiLoreLine.Warning(messageProvider.getMessage("release.profession_unavailable_lore")))
             )
         } else if (hasProfession) {
             // 他の職業（既に職業を持っている場合は選択不可）
             val alreadySelectedLore = messageProvider.getMessageList("gui.profession.selection.profession_item.already_selected_lore")
-            val loreList = mutableListOf<Component>()
-            loreList.add(toComponent("§7$professionDesc"))
-            loreList.add(toComponent(""))
-            loreList.add(toComponent(messageProvider.getMessage("gui.profession.selection.profession_item.type_label", "type" to typeName)))
-            loreList.add(toComponent(""))
+            val loreList = mutableListOf<GuiLoreLine>()
+            loreList.add(GuiLoreLine.Text(professionDesc))
+            loreList.add(GuiLoreLine.Spacer)
+            loreList.add(GuiLoreLine.Data(messageProvider.getMessage("gui.profession.selection.profession_item.type_label_name"), typeName, "§f"))
+            loreList.add(GuiLoreLine.Spacer)
             alreadySelectedLore.forEach { lore ->
-                loreList.add(toComponent(lore))
+                loreList.add(GuiLoreLine.Warning(lore))
             }
             createGuiItem(
                 Material.BARRIER,
@@ -987,11 +998,15 @@ class RankCommand(
                 icon,
                 toComponent("${profession.displayColorCode}§l$professionName"),
                 listOf(
-                    toComponent("§7$professionDesc"),
-                    toComponent(""),
-                    toComponent(messageProvider.getMessage("gui.profession.selection.profession_item.type_label", "type" to typeName)),
-                    toComponent(""),
-                    toComponent(messageProvider.getMessage("gui.profession.selection.profession_item.click_to_select"))
+                    GuiLoreLine.Text(professionDesc),
+                    GuiLoreLine.Spacer,
+                    GuiLoreLine.Data(messageProvider.getMessage("gui.profession.selection.profession_item.type_label_name"), typeName, "§f"),
+                    GuiLoreLine.Spacer,
+                    GuiLoreLine.SingleAction(
+                        messageProvider.getMessage("gui.profession.selection.profession_item.click_operation"),
+                        messageProvider.getMessage("gui.profession.selection.profession_item.select_action"),
+                        messageProvider.getMessage("gui.profession.selection.profession_item.click_to_select")
+                    )
                 )
             )
         }
@@ -1014,6 +1029,10 @@ class RankCommand(
     }
     
     private fun executeProfessionSelect(player: Player, profession: Profession) {
+        if (!RankReleasePolicy.canAccessProfession(player, profession)) {
+            player.sendMessage(messageProvider.getMessage("release.profession_unavailable"))
+            return
+        }
         if (rankManager.hasProfession(player.uniqueId)) {
             player.sendMessage(messageProvider.getMessage("gui.profession.error.already_has_profession"))
             return
@@ -1054,7 +1073,7 @@ class RankCommand(
         val skillTreeItem = createGuiBlockItem(
             Material.OAK_SAPLING,
             toComponent(messageProvider.getMessage("rank.gui.tree_button")),
-            listOf(skillTreeLore.map { toComponent(it) })
+            listOf(skillTreeLore.map(GuiLoreLine::Text))
         )
         inventory.setItem(MAIN_MENU_SKILL_TREE_SLOT, skillTreeItem)
 
@@ -1080,10 +1099,10 @@ class RankCommand(
             professionIcon,
             toComponent("§b【$professionName】"),
             listOf(
-                listOf(toComponent("§7$professionDescription")),
+                listOf(GuiLoreLine.Text(professionDescription)),
                 listOf(
-                    toComponent("§f§l| §7Lv. §e§l$currentLevel"),
-                    toComponent("§f§l| §7経験値 §a${String.format("%,d", currentLevelExp)}§7/${String.format("%,d", levelExp)}")
+                    GuiLoreLine.Data("Lv.", currentLevel, "§e"),
+                    GuiLoreLine.Data("経験値", "${String.format("%,d", currentLevelExp)}/${String.format("%,d", levelExp)}", "§a")
                 )
             )
         )
@@ -1093,7 +1112,7 @@ class RankCommand(
         val settingsItem = createGuiBlockItem(
             Material.COMPARATOR,
             toComponent(messageProvider.getMessage("rank.gui.settings_button")),
-            listOf(settingsLore.map { toComponent(it) })
+            listOf(settingsLore.map(GuiLoreLine::Text))
         )
         inventory.setItem(MAIN_MENU_SETTINGS_SLOT, settingsItem)
 
@@ -1104,7 +1123,7 @@ class RankCommand(
             skullMeta.owningPlayer = viewer
             skullMeta.displayName(withoutItalic(toComponent("§e${viewer.name}")))
             skullMeta.lore(CCSystem.getAPI().getLoreService().render(
-                GuiLoreSpec.Blocks(listOf(GuiLoreBlock(settingsLore.map(GuiLoreLine::Raw))))
+                GuiLoreSpec.Blocks(listOf(GuiLoreBlock(settingsLore.map(GuiLoreLine::Text))))
             ))
             skullMeta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
             playerHead.itemMeta = skullMeta
@@ -1116,7 +1135,7 @@ class RankCommand(
         val hintItem = createGuiBlockItem(
             Material.COMPASS,
             toComponent(messageProvider.getMessage("rank.gui.hint_button")),
-            listOf(hintLoreMain.map { toComponent(it) })
+            listOf(hintLoreMain.map(GuiLoreLine::Text))
         )
         inventory.setItem(MAIN_MENU_HINT_SLOT, hintItem)
 
@@ -1172,6 +1191,12 @@ class RankCommand(
         val playerProfession = rankManager.getPlayerProfession(viewer.uniqueId)
         if (playerProfession == null) {
             viewer.sendMessage(messageProvider.getMessage("rank.skill.gui.no_profession"))
+            return false
+        }
+        if (!RankReleasePolicy.canAccessProfession(viewer, playerProfession.profession) ||
+            !RankReleasePolicy.canUseSkills(viewer)
+        ) {
+            viewer.sendMessage(messageProvider.getMessage("release.skill_unavailable"))
             return false
         }
 
@@ -1232,7 +1257,7 @@ class RankCommand(
             messageProvider.getMessage("rank.gui.settings_title")
         )
         holder.backingInventory = inventory
-        renderProfessionSettingsMenu(inventory, playerProfession)
+        renderProfessionSettingsMenu(inventory, playerProfession, viewer)
         viewer.openInventory(inventory)
         viewer.playSound(viewer.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
         return true
@@ -1240,7 +1265,8 @@ class RankCommand(
 
     private fun renderProfessionSettingsMenu(
         inventory: Inventory,
-        playerProfession: jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
+        playerProfession: jp.awabi2048.cccontent.features.rank.profession.PlayerProfession,
+        player: Player
     ) {
         val headerFooterPane = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
         val basePane = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
@@ -1265,8 +1291,8 @@ class RankCommand(
             Material.CLOCK,
             toComponent(messageProvider.getMessage("rank.gui.settings.bossbar.title")),
             listOf(listOf(
-                toComponent("§f§l| §7現在 $bossBarValueColor${bossBarMode.displayName}"),
-                toComponent(messageProvider.getMessage("rank.gui.settings.bossbar.action"))
+                GuiLoreLine.Data(messageProvider.getMessage("rank.gui.settings.current_label"), bossBarMode.displayName, bossBarValueColor),
+                settingsSingleAction(player, messageProvider.getMessage("rank.gui.settings.bossbar.action"))
             ))
         )
         inventory.setItem(SETTINGS_MENU_BOSSBAR_SLOT, bossBarItem)
@@ -1281,18 +1307,28 @@ class RankCommand(
             Material.BELL,
             toComponent(messageProvider.getMessage("rank.gui.settings.level_up.title")),
             listOf(listOf(
-                toComponent("§f§l| §7現在 $levelUpValue"),
-                toComponent(messageProvider.getMessage("rank.gui.settings.level_up.action"))
+                GuiLoreLine.Data(messageProvider.getMessage("rank.gui.settings.current_label"), levelUpValue, "§f"),
+                settingsSingleAction(player, messageProvider.getMessage("rank.gui.settings.level_up.action"))
             ))
         )
         inventory.setItem(SETTINGS_MENU_LEVELUP_NOTIFY_SLOT, levelUpItem)
 
         val backItem = createGuiItem(
             Material.REDSTONE,
-            toComponent("§c戻る"),
+            toComponent(messageProvider.getMessage("rank.gui.settings.back")),
             emptyList()
         )
         inventory.setItem(SETTINGS_MENU_BACK_SLOT, backItem)
+    }
+
+    private fun settingsSingleAction(player: Player, action: String): GuiLoreLine.SingleAction {
+        val operation = CCSystem.getAPI().getI18nString(player, "lore.click.any")
+        val resolved = CCSystem.getAPI().getI18nString(
+            player,
+            "lore.action_single_with_operation",
+            mapOf("operation" to operation, "action" to action)
+        )
+        return GuiLoreLine.SingleAction(operation, action, resolved)
     }
 
     private fun renderSkillTreeGui(inventory: Inventory, skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree, state: SkillTreeGuiState) {
@@ -2089,17 +2125,17 @@ class RankCommand(
         }
 
         val material = resolveSkillIconMaterial(skill.icon)
-        val lore = mutableListOf(
-            toComponent(messageProvider.getSkillDescription(state.profession, skill.skillId)),
-            toComponent(messageProvider.getMessage("rank.skill.gui.lore.required_level", "level" to skill.requiredLevel)),
-            toComponent(messageProvider.getMessage("rank.skill.gui.lore.current_level", "level" to state.currentLevel)),
-            toComponent(messageProvider.getMessage("rank.skill.gui.lore.status", "status" to status))
+        val lore = mutableListOf<GuiLoreLine>(
+            GuiLoreLine.Text(messageProvider.getSkillDescription(state.profession, skill.skillId)),
+            GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.lore.required_level", "level" to skill.requiredLevel)),
+            GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.lore.current_level", "level" to state.currentLevel)),
+            GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.lore.status", "status" to status))
         )
 
         // プレステージアンロック可能な場合、Loreに追加情報を表示
         if (prestigeAvailable) {
-            lore.add(toComponent(""))
-            lore.add(toComponent(messageProvider.getMessage("rank.skill.gui.lore.prestige_available")))
+            lore.add(GuiLoreLine.Spacer)
+            lore.add(GuiLoreLine.Warning(messageProvider.getMessage("rank.skill.gui.lore.prestige_available")))
         }
 
         return createGuiItem(
@@ -2113,7 +2149,7 @@ class RankCommand(
         return createGuiItem(
             material,
             toComponent(messageProvider.getMessage(nameKey)),
-            listOf(toComponent(messageProvider.getMessage(loreKey)))
+            listOf(GuiLoreLine.Text(messageProvider.getMessage(loreKey)))
         )
     }
 
@@ -2213,7 +2249,7 @@ class RankCommand(
             val completeItem = createGuiItem(
                 Material.LIME_STAINED_GLASS_PANE,
                 toComponent(messageProvider.getMessage("rank.tutorial_task_info.complete_title")),
-                listOf(toComponent(messageProvider.getMessage("rank.tutorial_task_info.complete_lore")))
+                listOf(GuiLoreLine.Text(messageProvider.getMessage("rank.tutorial_task_info.complete_lore")))
             )
             inventory.setItem(22, completeItem)
         }
@@ -2233,7 +2269,7 @@ class RankCommand(
             val required = requirement.playTimeMin.toLong()
             val done = progress.playTime >= requirement.playTimeMin
             val lore = listOf(
-                toComponent(
+                GuiLoreLine.Text(
                     messageProvider.getMessage(
                         "rank.tutorial_task_info.line.progress_time",
                         "status" to statusIcon(done),
@@ -2241,7 +2277,7 @@ class RankCommand(
                         "required" to formatPlayTime(required)
                     )
                 ),
-                toComponent(
+                GuiLoreLine.Text(
                     messageProvider.getMessage(
                         "rank.tutorial_task_info.line.percent",
                         "percent" to percent(current, required)
@@ -2256,7 +2292,7 @@ class RankCommand(
         }
 
         if (requirement.mobKills.isNotEmpty() || requirement.bossKills.isNotEmpty()) {
-            val details = mutableListOf<Component>()
+            val details = mutableListOf<GuiLoreLine>()
             var allDone = true
 
             requirement.mobKills.forEach { (mobType, required) ->
@@ -2313,7 +2349,7 @@ class RankCommand(
         }
 
         if (requirement.blockMines.isNotEmpty()) {
-            val details = mutableListOf<Component>()
+            val details = mutableListOf<GuiLoreLine>()
             var allDone = true
             requirement.blockMines.forEach { (blockType, required) ->
                 val current = progress.getBlockMineCount(blockType)
@@ -2353,7 +2389,7 @@ class RankCommand(
             val required = requirement.vanillaExp
             val done = progress.vanillaExp >= required
             val lore = listOf(
-                toComponent(
+                GuiLoreLine.Text(
                     messageProvider.getMessage(
                         "rank.tutorial_task_info.line.progress_exp",
                         "status" to statusIcon(done),
@@ -2361,7 +2397,7 @@ class RankCommand(
                         "required" to required
                     )
                 ),
-                toComponent(
+                GuiLoreLine.Text(
                     messageProvider.getMessage(
                         "rank.tutorial_task_info.line.percent",
                         "percent" to percent(current, required)
@@ -2376,7 +2412,7 @@ class RankCommand(
         }
 
         if (requirement.itemsRequired.isNotEmpty()) {
-            val details = mutableListOf<Component>()
+            val details = mutableListOf<GuiLoreLine>()
             var allDone = true
             requirement.itemsRequired.forEach { (material, required) ->
                 val current = TutorialInventoryHelper.countItemInInventory(targetPlayer, material.uppercase())
@@ -2468,13 +2504,13 @@ class RankCommand(
         return item
     }
 
-    private fun createGuiItem(material: Material, displayName: Component, lore: List<Component>): ItemStack {
+    private fun createGuiItem(material: Material, displayName: Component, lore: List<GuiLoreLine>): ItemStack {
         val item = ItemStack(material)
         val meta = item.itemMeta
         if (meta != null) {
             meta.displayName(withoutItalic(displayName))
             meta.lore(CCSystem.getAPI().getLoreService().render(
-                GuiLoreSpec.Rich(lore.map { GuiLoreLine.Raw(LEGACY_SERIALIZER.serialize(it)) }, GuiLoreFrame.NONE)
+                GuiLoreSpec.Rich(lore, GuiLoreFrame.NONE)
             ))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
             item.itemMeta = meta
@@ -2483,14 +2519,14 @@ class RankCommand(
     }
 
     /** Module code supplies semantic blocks; CC-System renders every boundary separator. */
-    private fun createGuiBlockItem(material: Material, displayName: Component, blocks: List<List<Component>>): ItemStack {
+    private fun createGuiBlockItem(material: Material, displayName: Component, blocks: List<List<GuiLoreLine>>): ItemStack {
         val item = ItemStack(material)
         val meta = item.itemMeta
         if (meta != null) {
             meta.displayName(withoutItalic(displayName))
             meta.lore(CCSystem.getAPI().getLoreService().render(
                 GuiLoreSpec.Blocks(blocks.map { block ->
-                    GuiLoreBlock(block.map { GuiLoreLine.Raw(LEGACY_SERIALIZER.serialize(it)) })
+                    GuiLoreBlock(block)
                 })
             ))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
@@ -2505,11 +2541,12 @@ class RankCommand(
         current: Int,
         required: Int,
         actionSuffix: String
-    ): Component {
+    ): GuiLoreLine.ComponentData {
         val numberColor = progressColorCode(current.toLong(), required.toLong())
-        return toComponent("${statusIcon(done)} ")
+        val value = toComponent("${statusIcon(done)} ")
             .append(nameComponent.color(NamedTextColor.GRAY))
             .append(toComponent("§7${actionSuffix} (§r${numberColor}${current}§7/${required}§7)"))
+        return GuiLoreLine.ComponentData("", value, "")
     }
 
     private fun toComponent(text: String): Component = LEGACY_SERIALIZER.deserialize(text)
@@ -2580,6 +2617,11 @@ class RankCommand(
     private fun onSkillTreeSkillNodeClicked(holder: SkillTreeGuiHolder, skillId: String, viewer: Player) {
         holder.state.lastAction = "skill:$skillId"
         viewer.playSound(viewer.location, "minecraft:ui.button.click", 0.8f, 1.0f)
+
+        if (!RankReleasePolicy.canUseSkills(viewer)) {
+            viewer.sendMessage(messageProvider.getMessage("release.skill_unavailable"))
+            return
+        }
 
         val latestProfession = rankManager.getPlayerProfession(viewer.uniqueId)
         if (latestProfession == null || latestProfession.profession != holder.state.profession) {
@@ -2905,6 +2947,10 @@ class RankCommand(
         when (clickedSlot) {
             MAIN_MENU_SKILL_TREE_SLOT -> {
                 // スキルツリーを開く
+                if (!RankReleasePolicy.canUseSkills(player)) {
+                    player.sendMessage(messageProvider.getMessage("release.skill_unavailable"))
+                    return
+                }
                 player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
                 openSkillTreeGui(player)
             }
@@ -2915,6 +2961,10 @@ class RankCommand(
                 }
             }
             MAIN_MENU_MODE_SWITCH_SLOT -> {
+                if (!RankReleasePolicy.canUseSkills(player)) {
+                    player.sendMessage(messageProvider.getMessage("release.skill_unavailable"))
+                    return
+                }
                 // 能動スキルがない場合は処理しない
                 if (!ActiveSkillIdentifier.hasAnyToggleableSkill(player)) {
                     return
@@ -2967,14 +3017,14 @@ class RankCommand(
                 rankManager.setProfessionBossBarDisplayMode(player.uniqueId, nextMode)
                 rankManager.savePlayerProfession(player.uniqueId)
                 player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
-                renderProfessionSettingsMenu(holder.backingInventory, playerProfession)
+                renderProfessionSettingsMenu(holder.backingInventory, playerProfession, player)
             }
             SETTINGS_MENU_LEVELUP_NOTIFY_SLOT -> {
                 val current = rankManager.isLevelUpNotificationEnabled(player.uniqueId)
                 rankManager.setLevelUpNotificationEnabled(player.uniqueId, !current)
                 rankManager.savePlayerProfession(player.uniqueId)
                 player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
-                renderProfessionSettingsMenu(holder.backingInventory, playerProfession)
+                renderProfessionSettingsMenu(holder.backingInventory, playerProfession, player)
             }
             SETTINGS_MENU_BACK_SLOT -> {
                 player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.0f)
@@ -3165,10 +3215,16 @@ class RankCommand(
             29 to Profession.SWORDSMAN,
             30 to Profession.WARRIOR,
             31 to Profession.GARDENER,
-            32 to Profession.CARPENTER
+            32 to Profession.CARPENTER,
+            33 to Profession.FISHER
         )
         
         val selectedProfession = professionSlots[clickedSlot] ?: return
+
+        if (!RankReleasePolicy.canAccessProfession(player, selectedProfession)) {
+            player.sendMessage(messageProvider.getMessage("release.profession_unavailable"))
+            return
+        }
         
         // 確認ダイアログを表示
         showProfessionConfirmDialog(player, selectedProfession)

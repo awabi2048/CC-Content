@@ -1,0 +1,4 @@
+# かくれんぼ固有設定。鬼はパーティーリーダーが開始前に指定します。
+time_limit_seconds: 300
+hunter_count: 1
+preparation_seconds: 60

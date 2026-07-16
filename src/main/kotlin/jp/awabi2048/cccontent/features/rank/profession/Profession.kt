@@ -59,7 +59,10 @@ enum class Profession(
     /**
      * 大工 - 建築で経験値を獲得
      */
-    CARPENTER("carpenter", "§6", ProfessionType.CREATIVE);
+    CARPENTER("carpenter", "§6", ProfessionType.CREATIVE),
+
+    /** 釣り場の条件に応じた釣果で経験値を得る職業 */
+    FISHER("fisher", "§b", ProfessionType.GATHERING);
     
     companion object {
         /**

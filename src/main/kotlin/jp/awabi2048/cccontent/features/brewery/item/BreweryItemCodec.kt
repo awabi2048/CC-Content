@@ -3,13 +3,16 @@
 package jp.awabi2048.cccontent.features.brewery.item
 
 import com.awabi2048.ccsystem.CCSystem
-import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.features.brewery.BreweryRecipe
+import jp.awabi2048.cccontent.features.brewery.breweryQualityTier
 import jp.awabi2048.cccontent.features.brewery.model.BrewStage
 import org.bukkit.Color
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
+import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataContainer
 import org.bukkit.persistence.PersistentDataType
@@ -17,6 +20,7 @@ import org.bukkit.plugin.java.JavaPlugin
 import kotlin.math.roundToInt
 
 class BreweryItemCodec(private val plugin: JavaPlugin) {
+    private val schemaVersionKey = NamespacedKey(plugin, "brewery_schema_version")
     private val stageKey = NamespacedKey(plugin, "brewery_stage")
     private val recipeIdKey = NamespacedKey(plugin, "brewery_recipe_id")
     private val qualityKey = NamespacedKey(plugin, "brewery_quality")
@@ -29,6 +33,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     private val finalStarsKey = NamespacedKey(plugin, "brewery_final_stars")
     private val filterKey = NamespacedKey(plugin, "brewery_filter_sample")
     private val filterRemainingUsesKey = NamespacedKey(plugin, "brewery_filter_remaining_uses")
+    private val expAwardedKey = NamespacedKey(plugin, "brewery_stage_exp_awarded")
 
     data class BreweryItemState(
         val stage: BrewStage,
@@ -43,34 +48,19 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         val finalStars: Int
     )
 
-    fun createFermentedBottle(recipeId: String, quality: Double, muddy: Boolean, history: String): ItemStack {
-        return createFermentedBottle(recipeId, quality, muddy, history, null)
-    }
-
-    fun createFermentedBottle(recipeId: String, quality: Double, muddy: Boolean, history: String, recipe: BreweryRecipe?): ItemStack {
+    fun createFermentedBottle(recipeId: String, quality: Double, muddy: Boolean, history: String, recipe: BreweryRecipe, player: Player?): ItemStack {
         val item = ItemStack(Material.POTION)
         val meta = item.itemMeta ?: return item
-
-        val displayName = if (recipe != null) {
-            if (muddy) "§7泥状の${recipe.name}" else "§b${recipe.middleOutputName}"
-        } else {
-            if (muddy) "§7泥状の醸造物" else "§b発酵醸造物"
-        }
-        meta.setDisplayName(displayName)
-
-        val loreDesc = if (recipe != null && !muddy) {
-            recipe.middleOutputDescription
-        } else ""
-
-        meta.lore(
-            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOfNotNull(
-                "§7レシピ: ${recipe?.name ?: recipeId}",
-                "§7段階: 発酵",
-                if (loreDesc.isNotEmpty()) "§f$loreDesc" else null
-            ), GuiLoreFrame.NONE))
-        )
-
+        meta.setDisplayName(text(player, if (muddy) "brewery.item.name.muddy" else "brewery.item.name.fermented",
+            "recipe" to text(player, "brewery.recipe.$recipeId.name"),
+            "product" to text(player, "brewery.recipe.$recipeId.middle.name")))
+        meta.lore(renderLore(player, if (muddy) "" else text(player, "brewery.recipe.$recipeId.middle.description"), listOf(
+            "brewery.item.data.recipe" to text(player, "brewery.recipe.$recipeId.name"),
+            "brewery.item.data.stage" to text(player, if (muddy) "brewery.item.stage.failed" else "brewery.item.stage.fermented"),
+            "brewery.item.data.quality" to "%.1f".format(quality)
+        )))
         val pdc = meta.persistentDataContainer
+        pdc.set(schemaVersionKey, PersistentDataType.INTEGER, 2)
         pdc.set(stageKey, PersistentDataType.STRING, if (muddy) BrewStage.FAILED.name else BrewStage.FERMENTED.name)
         pdc.set(recipeIdKey, PersistentDataType.STRING, recipeId)
         pdc.set(qualityKey, PersistentDataType.DOUBLE, quality)
@@ -80,253 +70,152 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         pdc.set(ambiguousKey, PersistentDataType.BYTE, 0)
         pdc.set(historyKey, PersistentDataType.STRING, history)
         pdc.set(finalStarsKey, PersistentDataType.INTEGER, 0)
-
-        if (recipe != null && recipe.middleOutputColor != null && !muddy) {
-            applyPotionColor(meta, recipe.middleOutputColor)
-        }
-
+        if (!muddy) applyPotionColor(meta, recipe.middleOutputColor)
         item.itemMeta = meta
         return item
     }
 
-    private fun getFinalNameByQuality(recipe: BreweryRecipe, quality: Double): String {
-        val index = when {
-            quality < 34 -> 0
-            quality < 67 -> 1
-            else -> 2
-        }
-        return recipe.finalOutputNames.getOrElse(index) { recipe.name }
-    }
-
-    private fun getFinalDescriptionByQuality(recipe: BreweryRecipe, quality: Double): String {
-        val index = when {
-            quality < 34 -> 0
-            quality < 67 -> 1
-            else -> 2
-        }
-        return recipe.finalOutputDescriptions.getOrElse(index) { "" }
-    }
-
-    private fun applyPotionColor(meta: org.bukkit.inventory.meta.ItemMeta, colorHex: String) {
+    private fun applyPotionColor(meta: org.bukkit.inventory.meta.ItemMeta, colorHex: String?) {
         val potionMeta = meta as? org.bukkit.inventory.meta.PotionMeta ?: return
-        try {
-            val color = parseHexColor(colorHex)
-            if (color != null) {
-                potionMeta.setColor(color)
-            }
-        } catch (_: Exception) {
-        }
+        parseHexColor(colorHex)?.let(potionMeta::setColor)
     }
 
-    private fun parseHexColor(hex: String): Color? {
-        val cleanHex = hex.removePrefix("#")
-        if (cleanHex.length != 6) return null
-        return try {
-            val r = cleanHex.substring(0, 2).toInt(16)
-            val g = cleanHex.substring(2, 4).toInt(16)
-            val b = cleanHex.substring(4, 6).toInt(16)
-            Color.fromRGB(r, g, b)
-        } catch (_: Exception) {
-            null
-        }
+    private fun parseHexColor(hex: String?): Color? {
+        val clean = hex?.removePrefix("#") ?: return null
+        if (clean.length != 6) return null
+        return runCatching { Color.fromRGB(clean.substring(0, 2).toInt(16), clean.substring(2, 4).toInt(16), clean.substring(4, 6).toInt(16)) }.getOrNull()
     }
 
     fun parse(item: ItemStack?): BreweryItemState? {
         if (item == null || item.type.isAir) return null
-        val meta = item.itemMeta ?: return null
-        val pdc = meta.persistentDataContainer
-        val stageRaw = pdc.get(stageKey, PersistentDataType.STRING) ?: return null
-        val stage = runCatching { BrewStage.valueOf(stageRaw) }.getOrNull() ?: return null
-        return BreweryItemState(
-            stage = stage,
-            recipeId = pdc.get(recipeIdKey, PersistentDataType.STRING) ?: "unknown",
-            quality = pdc.get(qualityKey, PersistentDataType.DOUBLE) ?: 0.0,
-            alcohol = pdc.get(alcoholKey, PersistentDataType.DOUBLE) ?: 0.0,
-            distillCount = pdc.get(distillCountKey, PersistentDataType.INTEGER) ?: 0,
-            muddy = (pdc.get(muddyKey, PersistentDataType.BYTE)?.toInt() ?: 0) == 1,
-            ambiguous = (pdc.get(ambiguousKey, PersistentDataType.BYTE)?.toInt() ?: 0) == 1,
-            history = pdc.get(historyKey, PersistentDataType.STRING) ?: "",
-            agingStartedAt = pdc.get(agingStartKey, PersistentDataType.LONG) ?: 0L,
-            finalStars = pdc.get(finalStarsKey, PersistentDataType.INTEGER) ?: 0
-        )
+        val pdc = item.itemMeta?.persistentDataContainer ?: return null
+        if (pdc.get(schemaVersionKey, PersistentDataType.INTEGER) != 2) return null
+        val stage = pdc.get(stageKey, PersistentDataType.STRING)?.let { runCatching { BrewStage.valueOf(it) }.getOrNull() } ?: return null
+        val recipeId = pdc.get(recipeIdKey, PersistentDataType.STRING)?.takeIf { it.isNotBlank() } ?: return null
+        return BreweryItemState(stage, recipeId,
+            pdc.get(qualityKey, PersistentDataType.DOUBLE) ?: 0.0,
+            pdc.get(alcoholKey, PersistentDataType.DOUBLE) ?: 0.0,
+            pdc.get(distillCountKey, PersistentDataType.INTEGER) ?: 0,
+            (pdc.get(muddyKey, PersistentDataType.BYTE)?.toInt() ?: 0) == 1,
+            (pdc.get(ambiguousKey, PersistentDataType.BYTE)?.toInt() ?: 0) == 1,
+            pdc.get(historyKey, PersistentDataType.STRING) ?: "",
+            pdc.get(agingStartKey, PersistentDataType.LONG) ?: 0L,
+            pdc.get(finalStarsKey, PersistentDataType.INTEGER) ?: 0)
     }
 
-    fun markDistilled(item: ItemStack, state: BreweryItemState, targetDistillCount: Int, overPenalty: Double) {
-        markDistilled(item, state, targetDistillCount, overPenalty, null)
-    }
-
-    fun markDistilled(item: ItemStack, state: BreweryItemState, targetDistillCount: Int, overPenalty: Double, recipe: BreweryRecipe?) {
+    fun markDistilled(item: ItemStack, state: BreweryItemState, targetDistillCount: Int, overPenalty: Double, recipe: BreweryRecipe, player: Player?) {
         val meta = item.itemMeta ?: return
         val pdc = meta.persistentDataContainer
-        val over = (state.distillCount - targetDistillCount).coerceAtLeast(0)
+        val over = if (targetDistillCount <= 0) 0 else (state.distillCount - targetDistillCount).coerceAtLeast(0)
         val quality = (state.quality - over * overPenalty).coerceIn(0.0, 100.0)
         val ambiguous = state.distillCount != targetDistillCount
         pdc.set(stageKey, PersistentDataType.STRING, BrewStage.DISTILLED.name)
         pdc.set(qualityKey, PersistentDataType.DOUBLE, quality)
         pdc.set(ambiguousKey, PersistentDataType.BYTE, if (ambiguous) 1 else 0)
-
-        val displayName = if (recipe != null) {
-            val name = getFinalNameByQuality(recipe, quality)
-            if (ambiguous) "§e$name（品質低下）" else "§e$name"
-        } else {
-            if (ambiguous) "§e蒸留済み醸造物（品質低下）" else "§e蒸留済み醸造物"
-        }
-        meta.setDisplayName(displayName)
-        val description = if (recipe != null) getFinalDescriptionByQuality(recipe, quality) else ""
-        meta.lore(
-            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOfNotNull(
-                "§7レシピ: ${recipe?.name ?: state.recipeId}",
-                "§7品質: ${"%.1f".format(quality)}",
-                "§7蒸留回数: ${state.distillCount}/$targetDistillCount",
-                "§7アルコール: ${"%.1f".format(state.alcohol)}%",
-                if (description.isNotBlank()) "§f$description" else null
-            ), GuiLoreFrame.NONE))
-        )
-
-        if (recipe != null && recipe.finalOutputColor != null) {
-            applyPotionColor(meta, recipe.finalOutputColor)
-        }
-
+        val tier = breweryQualityTier(quality)
+        val product = text(player, "brewery.recipe.${recipe.id}.final.$tier.name")
+        meta.setDisplayName(text(player, if (ambiguous) "brewery.item.name.distilled_degraded" else "brewery.item.name.distilled", "recipe" to text(player, "brewery.recipe.${recipe.id}.name"), "product" to product))
+        meta.lore(renderLore(player, text(player, "brewery.recipe.${recipe.id}.final.$tier.description"), listOf(
+            "brewery.item.data.recipe" to text(player, "brewery.recipe.${recipe.id}.name"),
+            "brewery.item.data.stage" to text(player, "brewery.item.stage.distilled"),
+            "brewery.item.data.quality" to "%.1f".format(quality),
+            "brewery.item.data.distill_count" to "${state.distillCount}/$targetDistillCount",
+            "brewery.item.data.alcohol" to "%.1f%%".format(state.alcohol)
+        )))
+        applyPotionColor(meta, recipe.finalOutputColor)
         item.itemMeta = meta
     }
 
     fun incrementDistillation(item: ItemStack, targetDistillCount: Int, targetAlcohol: Double) {
         val meta = item.itemMeta ?: return
         val pdc = meta.persistentDataContainer
-        val currentCount = (pdc.get(distillCountKey, PersistentDataType.INTEGER) ?: 0) + 1
-        val currentAlcohol = pdc.get(alcoholKey, PersistentDataType.DOUBLE) ?: 0.0
-        val nextAlcohol = if (currentCount <= targetDistillCount && targetDistillCount > 0) {
-            val gain = targetAlcohol / targetDistillCount.toDouble()
-            currentAlcohol + gain
-        } else {
-            currentAlcohol + 5.0
-        }.coerceIn(0.0, 100.0)
-        pdc.set(distillCountKey, PersistentDataType.INTEGER, currentCount)
-        pdc.set(alcoholKey, PersistentDataType.DOUBLE, nextAlcohol)
+        val count = (pdc.get(distillCountKey, PersistentDataType.INTEGER) ?: 0) + 1
+        val alcohol = pdc.get(alcoholKey, PersistentDataType.DOUBLE) ?: 0.0
+        val next = if (count <= targetDistillCount && targetDistillCount > 0) alcohol + targetAlcohol / targetDistillCount else alcohol + 5.0
+        pdc.set(distillCountKey, PersistentDataType.INTEGER, count)
+        pdc.set(alcoholKey, PersistentDataType.DOUBLE, next.coerceIn(0.0, 100.0))
         item.itemMeta = meta
     }
 
-    fun setAgingStart(item: ItemStack, startedAt: Long) {
-        val meta = item.itemMeta ?: return
-        meta.persistentDataContainer.set(agingStartKey, PersistentDataType.LONG, startedAt)
-        item.itemMeta = meta
-    }
+    fun setAgingStart(item: ItemStack, startedAt: Long) { item.editMeta { it.persistentDataContainer.set(agingStartKey, PersistentDataType.LONG, startedAt) } }
+    fun clearAgingStart(item: ItemStack) { item.editMeta { it.persistentDataContainer.remove(agingStartKey) } }
 
-    fun clearAgingStart(item: ItemStack) {
-        val meta = item.itemMeta ?: return
-        meta.persistentDataContainer.remove(agingStartKey)
-        item.itemMeta = meta
-    }
-
-    fun markAged(item: ItemStack, state: BreweryItemState, finalQuality: Double) {
-        markAged(item, state, finalQuality, null)
-    }
-
-    fun markAged(item: ItemStack, state: BreweryItemState, finalQuality: Double, recipe: BreweryRecipe?) {
+    fun markAged(item: ItemStack, state: BreweryItemState, finalQuality: Double, recipe: BreweryRecipe, player: Player?) {
         val rounded = (finalQuality / 20.0).roundToInt().coerceIn(0, 5) * 20
         val stars = (rounded / 20).coerceIn(1, 5)
         val meta = item.itemMeta ?: return
         val pdc = meta.persistentDataContainer
         pdc.set(stageKey, PersistentDataType.STRING, BrewStage.AGED.name)
         pdc.set(qualityKey, PersistentDataType.DOUBLE, finalQuality.coerceIn(0.0, 100.0))
+        pdc.set(alcoholKey, PersistentDataType.DOUBLE, (recipe.finalOutputAlcohol * finalQuality.coerceIn(0.0, 100.0) / 100.0).coerceIn(0.0, 100.0))
         pdc.set(finalStarsKey, PersistentDataType.INTEGER, stars)
-        
-        val displayName = if (recipe != null) {
-            val name = getFinalNameByQuality(recipe, finalQuality)
-            "§6$name ${"★".repeat(stars)}"
-        } else {
-            "§6熟成酒 ${"★".repeat(stars)}"
-        }
-        meta.setDisplayName(displayName)
-
-        val desc = if (recipe != null) {
-            getFinalDescriptionByQuality(recipe, finalQuality)
-        } else ""
-        
-        meta.lore(
-            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOfNotNull(
-                "§7レシピ: ${recipe?.name ?: state.recipeId}",
-                "§7最終品質: ${"%.1f".format(finalQuality.coerceIn(0.0, 100.0))}",
-                "§7評価: ${"★".repeat(stars)}",
-                "§7アルコール: ${"%.1f".format(state.alcohol)}%",
-                if (desc.isNotEmpty()) "§f$desc" else null
-            ), GuiLoreFrame.NONE))
-        )
-        
-        if (recipe != null && recipe.finalOutputColor != null) {
-            applyPotionColor(meta, recipe.finalOutputColor)
-        }
-        
+        val tier = breweryQualityTier(finalQuality)
+        val product = text(player, "brewery.recipe.${recipe.id}.final.$tier.name")
+        meta.setDisplayName(text(player, "brewery.item.name.aged", "recipe" to text(player, "brewery.recipe.${recipe.id}.name"), "product" to product, "stars" to "★".repeat(stars)))
+        meta.lore(renderLore(player, text(player, "brewery.recipe.${recipe.id}.final.$tier.description"), listOf(
+            "brewery.item.data.recipe" to text(player, "brewery.recipe.${recipe.id}.name"),
+            "brewery.item.data.stage" to text(player, "brewery.item.stage.aged"),
+            "brewery.item.data.final_quality" to "%.1f".format(finalQuality.coerceIn(0.0, 100.0)),
+            "brewery.item.data.rating" to "★".repeat(stars),
+            "brewery.item.data.alcohol" to "%.1f%%".format(state.alcohol)
+        )))
+        applyPotionColor(meta, recipe.finalOutputColor)
         item.itemMeta = meta
     }
 
-    fun isSampleFilter(item: ItemStack?): Boolean {
-        if (item == null || item.type.isAir) return false
-        if (item.type != Material.POISONOUS_POTATO) return false
-        val meta = item.itemMeta ?: return false
-        return meta.persistentDataContainer.has(filterKey, PersistentDataType.BYTE)
+    fun hasStageExpAwarded(item: ItemStack, stage: BrewStage): Boolean =
+        ((item.itemMeta?.persistentDataContainer?.get(expAwardedKey, PersistentDataType.INTEGER) ?: 0) and (1 shl stage.ordinal)) != 0
+
+    fun markStageExpAwarded(item: ItemStack, stage: BrewStage) = item.editMeta {
+        val pdc = it.persistentDataContainer
+        val mask = pdc.get(expAwardedKey, PersistentDataType.INTEGER) ?: 0
+        pdc.set(expAwardedKey, PersistentDataType.INTEGER, mask or (1 shl stage.ordinal))
     }
 
-    fun buildSampleFilterItem(): ItemStack {
+    fun isSampleFilter(item: ItemStack?): Boolean = item?.type == Material.POISONOUS_POTATO && item.itemMeta?.persistentDataContainer?.has(filterKey, PersistentDataType.BYTE) == true
+
+    fun buildSampleFilterItem(player: Player?): ItemStack {
         val item = ItemStack(Material.POISONOUS_POTATO)
         val meta = item.itemMeta ?: return item
         meta.setItemModel(NamespacedKey.minecraft("shears"))
-        meta.setDisplayName("§e蒸留フィルター（試作）")
-        meta.lore(
-            CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(listOf(
-                "§7蒸留時間 -15%",
-                "§7蒸留1回ごとに耐久を1消費"
-            ), GuiLoreFrame.NONE))
-        )
+        meta.setDisplayName(text(player, "brewery.item.filter.name"))
+        val lines = CCSystem.getAPI().getI18nStringList(player, "brewery.item.filter.description")
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(GuiLoreBlock(lines.map(GuiLoreLine::Text))))) )
         meta.persistentDataContainer.set(filterKey, PersistentDataType.BYTE, 1)
         meta.persistentDataContainer.set(filterRemainingUsesKey, PersistentDataType.INTEGER, FILTER_MAX_USES)
         item.itemMeta = meta
         return item
     }
 
-    fun damageFilter(item: ItemStack): Boolean {
-        return damageFilter(item, 1)
-    }
-
-    fun damageFilter(item: ItemStack, amount: Int): Boolean {
+    fun damageFilter(item: ItemStack, amount: Int = 1): Boolean {
         val meta = item.itemMeta ?: return true
         if (item.type == Material.POISONOUS_POTATO) {
-            val remaining = meta.persistentDataContainer.get(filterRemainingUsesKey, PersistentDataType.INTEGER)
-                ?: FILTER_MAX_USES
-            val nextRemaining = remaining - amount.coerceAtLeast(1)
-            if (nextRemaining <= 0) {
-                return true
-            }
-            meta.persistentDataContainer.set(filterRemainingUsesKey, PersistentDataType.INTEGER, nextRemaining)
+            val remaining = meta.persistentDataContainer.get(filterRemainingUsesKey, PersistentDataType.INTEGER) ?: FILTER_MAX_USES
+            val next = remaining - amount.coerceAtLeast(1)
+            if (next <= 0) return true
+            meta.persistentDataContainer.set(filterRemainingUsesKey, PersistentDataType.INTEGER, next)
             item.itemMeta = meta
             return false
         }
         val damageable = meta as? org.bukkit.inventory.meta.Damageable ?: return true
-        damageable.damage = damageable.damage + amount
-        if (damageable.damage >= item.type.maxDurability) {
-            return true
-        }
+        damageable.damage += amount
+        if (damageable.damage >= item.type.maxDurability) return true
         item.itemMeta = damageable
         return false
     }
 
-    fun applyFailureDisplay(item: ItemStack, name: String) {
-        val meta = item.itemMeta ?: return
-        meta.setDisplayName(name)
-        item.itemMeta = meta
+    fun writeHistory(item: ItemStack, history: String) = item.editMeta { it.persistentDataContainer.set(historyKey, PersistentDataType.STRING, history) }
+    fun getHistory(container: PersistentDataContainer): String = container.get(historyKey, PersistentDataType.STRING) ?: ""
+
+    private fun text(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): String =
+        CCSystem.getAPI().getI18nString(player, key, placeholders.associate { it.first to (it.second ?: "") }).replace('&', '§')
+
+    private fun renderLore(player: Player?, description: String, data: List<Pair<String, Any?>>): List<net.kyori.adventure.text.Component> {
+        val blocks = mutableListOf<GuiLoreBlock>()
+        if (description.isNotBlank()) blocks += GuiLoreBlock(listOf(GuiLoreLine.Text(description)))
+        blocks += GuiLoreBlock(data.map { (key, value) -> GuiLoreLine.Data(text(player, key), value, "§f") })
+        return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
     }
 
-    fun writeHistory(item: ItemStack, history: String) {
-        val meta = item.itemMeta ?: return
-        meta.persistentDataContainer.set(historyKey, PersistentDataType.STRING, history)
-        item.itemMeta = meta
-    }
-
-    fun getHistory(container: PersistentDataContainer): String {
-        return container.get(historyKey, PersistentDataType.STRING) ?: ""
-    }
-
-    companion object {
-        private const val FILTER_MAX_USES = 238
-    }
+    companion object { private const val FILTER_MAX_USES = 238 }
 }

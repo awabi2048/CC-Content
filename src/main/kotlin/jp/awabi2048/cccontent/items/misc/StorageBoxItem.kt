@@ -9,6 +9,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
+import jp.awabi2048.cccontent.util.ContentLocaleResolver
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextDecoration
@@ -44,6 +45,33 @@ import java.util.Base64
 import java.util.UUID
 
 private val storageLoreLegacy = LegacyComponentSerializer.legacySection()
+
+private fun storageText(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): String =
+    CCSystem.getAPI().getI18nString(
+        ContentLocaleResolver.resolve(player),
+        "custom_items.misc.storage_box_ui.$key",
+        placeholders.associate { (name, value) -> name to (value ?: "null") }
+    ).replace('&', '§')
+
+private fun commonText(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): String =
+    CCSystem.getAPI().getI18nString(
+        ContentLocaleResolver.resolve(player),
+        key,
+        placeholders.associate { (name, value) -> name to (value ?: "null") }
+    ).replace('&', '§')
+
+private fun storageAction(player: Player, operationKey: String, actionKey: String): GuiLoreLine.Action =
+    GuiLoreLine.Action(commonText(player, "lore.click.$operationKey"), storageText(player, actionKey))
+
+private fun storageSingleAction(player: Player, actionKey: String): GuiLoreLine.SingleAction {
+    val operation = commonText(player, "lore.click.any")
+    val action = storageText(player, actionKey)
+    return GuiLoreLine.SingleAction(
+        operation,
+        action,
+        commonText(player, "lore.action_single_with_operation", "operation" to operation, "action" to action)
+    )
+}
 
 private object StorageBoxKeys {
     val BOX_MARKER = NamespacedKey("cccontent", "storage_box_marker")
@@ -112,7 +140,7 @@ private object StorageBoxCodec {
 
     fun maxItemsPerSlot(): Long = MAX_ITEMS_PER_SLOT
 
-    fun createHoldActionBar(item: ItemStack): Component? {
+    fun createHoldActionBar(item: ItemStack, player: Player?): Component? {
         if (!isStorageBox(item)) return null
 
         val state = loadState(item)
@@ -128,7 +156,7 @@ private object StorageBoxCodec {
             Component.translatable(key)
                 .color(NamedTextColor.WHITE)
                 .decoration(TextDecoration.ITALIC, false)
-        } ?: Component.text("なし", NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false)
+        } ?: Component.text(storageText(player, "none"), NamedTextColor.WHITE).decoration(TextDecoration.ITALIC, false)
 
         val count = selected?.count ?: 0L
         val max = maxItemsPerSlot()
@@ -218,7 +246,7 @@ private object StorageBoxCodec {
         item.itemMeta = meta
     }
 
-    fun applyVisual(item: ItemStack, openedInventory: Boolean): ItemStack {
+    fun applyVisual(item: ItemStack, openedInventory: Boolean, player: Player? = null): ItemStack {
         if (!isStorageBox(item)) return item
 
         val amount = item.amount.coerceAtLeast(1)
@@ -256,18 +284,19 @@ private object StorageBoxCodec {
             val stackBase = (infoEntry?.prototype?.maxStackSize ?: 64).coerceAtLeast(1)
             val stacks = count / stackBase
             val remainder = count % stackBase
-            val autoPickup = if (state.autoStore) "§aオン" else "§cオフ"
+            val autoPickup = storageText(player, if (state.autoStore) "state.on" else "state.off")
+            val autoPickupColor = if (state.autoStore) "§a" else "§c"
             val storedName = infoEntry?.let { getTranslatedItemNameComponent(it.prototype.type) }
-                ?: Component.text("なし").decoration(TextDecoration.ITALIC, false)
+                ?: Component.text(storageText(player, "none")).decoration(TextDecoration.ITALIC, false)
 
-            visualMeta.displayName(Component.text("Storage Box").decoration(TextDecoration.ITALIC, false))
+            visualMeta.displayName(storageLoreLegacy.deserialize(storageText(player, "item_name")).decoration(TextDecoration.ITALIC, false))
             visualMeta.lore(
                 CCSystem.getAPI().getLoreService().render(
                     GuiLoreSpec.Blocks(listOf(GuiLoreBlock(
                         listOf(
-                            GuiLoreLine.Raw(storageLoreLegacy.serialize(Component.text("§f§l| §7収納中 ").append(storedName))),
-                            GuiLoreLine.Raw("§f§l| §7個数 ${countColor}$count§7/$maxCount §7(${stacks}st + $remainder)"),
-                            GuiLoreLine.Raw("§f§l| §7自動回収 $autoPickup")
+                            GuiLoreLine.ComponentData(storageText(player, "data.stored_item"), storedName, "§f"),
+                            GuiLoreLine.Data(storageText(player, "data.count"), "$count/$maxCount (${stacks}st + $remainder)", countColor),
+                            GuiLoreLine.Data(storageText(player, "data.auto_store"), autoPickup, autoPickupColor)
                         )
                     )))
                 )
@@ -290,7 +319,7 @@ private object StorageBoxCodec {
         for (slot in 0 until inv.size) {
             val stack = inv.getItem(slot) ?: continue
             if (!isStorageBox(stack)) continue
-            val updated = applyVisual(stack, openedInventory)
+            val updated = applyVisual(stack, openedInventory, player)
             inv.setItem(slot, updated)
         }
     }
@@ -537,7 +566,7 @@ abstract class BaseStorageBoxItem(
         val item = ItemStack(Material.POISONOUS_POTATO, amount.coerceAtLeast(1))
         StorageBoxCodec.initializeMeta(item, capacity)
         StorageBoxCodec.saveState(item, StorageBoxState(capacity, MutableList(capacity) { null }, 0, false, true, true))
-        return StorageBoxCodec.applyVisual(item, openedInventory = false)
+        return StorageBoxCodec.applyVisual(item, openedInventory = false, player = player)
     }
 
     override fun matches(item: ItemStack): Boolean = StorageBoxCodec.isStorageBox(item)
@@ -609,7 +638,6 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
     private val lastMenuClickSoundAt = mutableMapOf<UUID, Long>()
     private val actionBarVisiblePlayers = mutableSetOf<UUID>()
 
-    private val menuTitle = "§8ストレージボックス"
     private val menuSize = 45
 
     init {
@@ -695,7 +723,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         StorageBoxCodec.moveSelectionToNextNonEmpty(state, forward) ?: return
 
         StorageBoxCodec.saveState(target, state)
-        val updated = StorageBoxCodec.applyVisual(target, openedInventory = isInventoryOpened(player))
+        val updated = StorageBoxCodec.applyVisual(target, openedInventory = isInventoryOpened(player), player = player)
         player.inventory.setItem(event.previousSlot, updated)
 
         player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.9f, 1.8f)
@@ -732,7 +760,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
                 if (player.isSneaking) {
                     StorageBoxCodec.moveSelectedToContainer(targetContainer, state)
                     StorageBoxCodec.saveState(usingItem, state)
-                    val updated = StorageBoxCodec.applyVisual(usingItem, openedInventory = isInventoryOpened(player))
+                    val updated = StorageBoxCodec.applyVisual(usingItem, openedInventory = isInventoryOpened(player), player = player)
                     setSourceItem(player, sourceHand, mainSlot, updated)
                     updateHoldActionBar(player)
                     event.isCancelled = true
@@ -742,7 +770,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
                 if (state.hasTemplate()) {
                     StorageBoxCodec.storeAllFromContainer(targetContainer, state, existingOnly = true)
                     StorageBoxCodec.saveState(usingItem, state)
-                    val updated = StorageBoxCodec.applyVisual(usingItem, openedInventory = isInventoryOpened(player))
+                    val updated = StorageBoxCodec.applyVisual(usingItem, openedInventory = isInventoryOpened(player), player = player)
                     setSourceItem(player, sourceHand, mainSlot, updated)
                     updateHoldActionBar(player)
                 }
@@ -879,7 +907,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
 
             val box = resolveOpenedStorageBox(player, holder) ?: run {
                 player.closeInventory()
-                player.sendMessage("§c手に持っていたストレージボックスが見つかりません")
+                player.sendMessage(storageText(player, "message.box_not_found"))
                 return
             }
 
@@ -951,9 +979,9 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
             }
 
             StorageBoxCodec.saveState(box, state)
-            val updated = StorageBoxCodec.applyVisual(box, openedInventory = true)
+            val updated = StorageBoxCodec.applyVisual(box, openedInventory = true, player = player)
             applyOpenedStorageBox(player, holder, updated)
-            renderMenu(event.view.topInventory, state)
+            renderMenu(player, event.view.topInventory, state)
             return
         }
 
@@ -974,7 +1002,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
 
         val box = resolveOpenedStorageBox(player, holder) ?: run {
             player.closeInventory()
-            player.sendMessage("§c手に持っていたストレージボックスが見つかりません")
+            player.sendMessage(storageText(player, "message.box_not_found"))
             return true
         }
 
@@ -996,7 +1024,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
 
         event.cancelWithDebug("StorageBoxItem.handleBottomInventoryStoreClick: store_click")
         if (stored <= 0) {
-            player.sendMessage("§eこのアイテムは格納できません（種類上限または対象外）")
+            player.sendMessage(storageText(player, "message.cannot_store"))
             return true
         }
 
@@ -1010,9 +1038,9 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         }
 
         StorageBoxCodec.saveState(box, state)
-        val updated = StorageBoxCodec.applyVisual(box, openedInventory = true)
+        val updated = StorageBoxCodec.applyVisual(box, openedInventory = true, player = player)
         applyOpenedStorageBox(player, holder, updated)
-        renderMenu(event.view.topInventory, state)
+        renderMenu(player, event.view.topInventory, state)
         return true
     }
 
@@ -1040,22 +1068,23 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         val target = resolveOpenTarget(player, preferredHand) ?: return
         val box = target.item
         val instanceId = StorageBoxCodec.getInstanceId(box) ?: return
-        val openedVisual = StorageBoxCodec.applyVisual(box, openedInventory = true)
+        val openedVisual = StorageBoxCodec.applyVisual(box, openedInventory = true, player = player)
         when (target.hand) {
             StorageBoxOpenHand.MAIN -> player.inventory.setItem(target.mainSlot, openedVisual)
             StorageBoxOpenHand.OFF -> player.inventory.setItemInOffHand(openedVisual)
         }
 
         val state = StorageBoxCodec.loadState(openedVisual)
+        val menuTitle = storageText(player, "menu.title")
         val holderInventory = Bukkit.createInventory(null as InventoryHolder?, menuSize, menuTitle)
         val holder = StorageBoxMenuHolder(player.uniqueId, target.hand, target.mainSlot, instanceId, holderInventory)
         val inv = Bukkit.createInventory(holder, menuSize, menuTitle)
-        renderMenu(inv, state)
+        renderMenu(player, inv, state)
         player.openInventory(inv)
         player.playSound(player.location, Sound.UI_BUTTON_CLICK, 1.0f, 2.0f)
     }
 
-    private fun renderMenu(inventory: Inventory, state: StorageBoxState) {
+    private fun renderMenu(player: Player, inventory: Inventory, state: StorageBoxState) {
         val blackPane = pane(Material.BLACK_STAINED_GLASS_PANE, " ")
         val darkPane = pane(Material.GRAY_STAINED_GLASS_PANE, " ")
         val emptyPane = pane(Material.WHITE_STAINED_GLASS_PANE, " ")
@@ -1096,10 +1125,18 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
                     GuiLoreSpec.Rich(
                         listOf(
                             GuiLoreLine.Spacer,
-                            GuiLoreLine.Data("格納数:", entry.count, "§f"),
-                            GuiLoreLine.Raw(if (entry.count > 0L) "§7Shift左クリック: 1スタック取り出し" else "§7未格納（この種類を収納対象として指定済み）"),
-                            GuiLoreLine.Raw(if (entry.count > 0L) "§7Shift右クリック: インベントリいっぱいまで取り出し" else "§7この種類をShiftクリックで格納できます"),
-                            GuiLoreLine.Raw(if (idx == state.selectedIndex) "§a現在選択中" else "§8未選択")
+                            GuiLoreLine.Data(storageText(player, "data.stored_count"), entry.count, "§f"),
+                            if (entry.count > 0L) {
+                                storageAction(player, "shift_left", "action.withdraw_stack")
+                            } else {
+                                GuiLoreLine.Text(storageText(player, "description.registered_empty"))
+                            },
+                            if (entry.count > 0L) {
+                                storageAction(player, "shift_right", "action.withdraw_all")
+                            } else {
+                                storageAction(player, "shift_any", "action.store_type")
+                            },
+                            GuiLoreLine.Option(storageText(player, "option.selected"), idx == state.selectedIndex, "§a", "§8")
                         ),
                         GuiLoreFrame.NONE
                     )
@@ -1116,38 +1153,49 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
                 31,
                 button(
                     Material.BOOK,
-                    "§e収納対象を指定してください",
+                    storageText(player, "menu.register.name"),
                     listOf(
-                        "§7中央の白スロットをクリックした状態で",
-                        "§7カーソルに持ったアイテムを種類登録できます",
-                        "§7登録後、Shiftクリックで格納できます"
+                        GuiLoreLine.Text(storageText(player, "menu.register.description_1")),
+                        GuiLoreLine.Text(storageText(player, "menu.register.description_2")),
+                        storageAction(player, "shift_any", "action.register_and_store")
                     )
                 )
             )
         } else {
-            inventory.setItem(37, button(Material.CHEST, "§6インベントリ内一括収納", listOf("§7インベントリ内の対象アイテムを格納")))
+            inventory.setItem(37, button(Material.CHEST, storageText(player, "menu.store_all.name"), listOf(
+                storageSingleAction(player, "action.store_all")
+            )))
             inventory.setItem(
                 39,
                 button(
                     Material.COMPARATOR,
-                    "§b自動収納",
-                    listOf("§7現在: ${if (state.autoStore) "§aON" else "§cOFF"}", "§7クリックで切替")
+                    storageText(player, "menu.auto_store.name"),
+                    listOf(
+                        GuiLoreLine.Data(storageText(player, "data.current"), storageText(player, if (state.autoStore) "state.on" else "state.off"), if (state.autoStore) "§a" else "§c"),
+                        storageSingleAction(player, "action.toggle")
+                    )
                 )
             )
             inventory.setItem(
                 41,
                 button(
                     Material.REDSTONE_BLOCK,
-                    "§dストレージボックスから使用",
-                    listOf("§7現在: ${if (state.useFromBox) "§aON" else "§cOFF"}", "§7クリックで切替")
+                    storageText(player, "menu.use_from_box.name"),
+                    listOf(
+                        GuiLoreLine.Data(storageText(player, "data.current"), storageText(player, if (state.useFromBox) "state.on" else "state.off"), if (state.useFromBox) "§a" else "§c"),
+                        storageSingleAction(player, "action.toggle")
+                    )
                 )
             )
             inventory.setItem(
                 43,
                 button(
                     Material.CHEST_MINECART,
-                    "§aコンテナ連携",
-                    listOf("§7現在: ${if (state.containerIo) "§aON" else "§cOFF"}", "§7クリックで切替")
+                    storageText(player, "menu.container_io.name"),
+                    listOf(
+                        GuiLoreLine.Data(storageText(player, "data.current"), storageText(player, if (state.containerIo) "state.on" else "state.off"), if (state.containerIo) "§a" else "§c"),
+                        storageSingleAction(player, "action.toggle")
+                    )
                 )
             )
         }
@@ -1225,7 +1273,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
             else -> null
         }
 
-        val actionBar = source?.let { StorageBoxCodec.createHoldActionBar(it) }
+        val actionBar = source?.let { StorageBoxCodec.createHoldActionBar(it, player) }
         if (actionBar != null) {
             player.sendActionBar(actionBar)
             actionBarVisiblePlayers.add(uuid)
@@ -1237,11 +1285,11 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         }
     }
 
-    private fun button(material: Material, name: String, lore: List<String>): ItemStack {
+    private fun button(material: Material, name: String, lore: List<GuiLoreLine>): ItemStack {
         val item = ItemStack(material)
         val meta = item.itemMeta
-        meta?.displayName(Component.text(name))
-        meta?.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Auto(lore, GuiLoreFrame.NONE)))
+        meta?.displayName(storageLoreLegacy.deserialize(name).decoration(TextDecoration.ITALIC, false))
+        meta?.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lore, GuiLoreFrame.NONE)))
         item.itemMeta = meta
         return item
     }
@@ -1343,7 +1391,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
             if (moved <= 0) continue
 
             StorageBoxCodec.saveState(stack, state)
-            val updated = StorageBoxCodec.applyVisual(stack, openedInventory = opened)
+            val updated = StorageBoxCodec.applyVisual(stack, openedInventory = opened, player = player)
             inv.setItem(slot, updated)
         }
     }
@@ -1394,7 +1442,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         if (!StorageBoxCodec.decrementSelected(state, 1L)) return false
 
         StorageBoxCodec.saveState(boxStack, state)
-        val updatedBox = StorageBoxCodec.applyVisual(boxStack, openedInventory = isInventoryOpened(player))
+        val updatedBox = StorageBoxCodec.applyVisual(boxStack, openedInventory = isInventoryOpened(player), player = player)
 
         if (located != null && !sameSource) {
             setSourceItem(player, located.hand, located.mainSlot, null)

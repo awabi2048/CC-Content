@@ -54,7 +54,12 @@ public final class ResourceConfigurationValidator {
         validateNpcMenu(configRoot, configs, errors);
         validateCustomItemConfigs(configRoot, configs, errors);
         validateBreweryConfigs(configRoot, configs, errors);
+        validateGardenConfigs(configRoot, configs, errors);
         validateCookingConfigs(configRoot, configs, errors);
+        validatePartyConfigs(configRoot, configs, errors);
+        validateFishingConfigs(configRoot, configs, errors);
+        validateMiniGameConfigs(configRoot, configs, errors);
+        validateResourceCollectionConfigs(configRoot, configs, errors);
         validateSukimaDungeonConfigs(configRoot, configs, errors);
         return errors;
     }
@@ -103,11 +108,25 @@ public final class ResourceConfigurationValidator {
 
         Map<String, Object> contentEnabled = requireMap(root, "content_enabled", file, errors);
         if (contentEnabled != null) {
+            Set<String> knownFeatures = Set.of(
+                "arena", "rank", "brewery", "cooking", "fishing", "resource_collection",
+                "sukima_dungeon", "party", "minigame"
+            );
+            contentEnabled.keySet().stream()
+                .filter(key -> !knownFeatures.contains(key))
+                .sorted()
+                .forEach(key -> errors.add(format(
+                    "unknown config key", file, "content_enabled." + key, "unknown content feature"
+                )));
             requireBoolean(contentEnabled, "arena", file, "content_enabled.arena", errors);
             requireBoolean(contentEnabled, "rank", file, "content_enabled.rank", errors);
             requireBoolean(contentEnabled, "brewery", file, "content_enabled.brewery", errors);
             requireBoolean(contentEnabled, "cooking", file, "content_enabled.cooking", errors);
+            requireBoolean(contentEnabled, "fishing", file, "content_enabled.fishing", errors);
+            requireBoolean(contentEnabled, "resource_collection", file, "content_enabled.resource_collection", errors);
             requireBoolean(contentEnabled, "sukima_dungeon", file, "content_enabled.sukima_dungeon", errors);
+            requireBoolean(contentEnabled, "party", file, "content_enabled.party", errors);
+            requireBoolean(contentEnabled, "minigame", file, "content_enabled.minigame", errors);
         }
         Map<String, Object> persistence = requireMap(root, "persistence", file, errors);
         if (persistence != null) {
@@ -206,8 +225,10 @@ public final class ResourceConfigurationValidator {
             }
             boolean hasMaterial = isNonBlankString(ingredient.get("material"));
             boolean hasMaterials = ingredient.get("materials") instanceof List<?> list && !list.isEmpty();
-            if (!hasMaterial && !hasMaterials) {
-                errors.add(format("missing ingredient materials", file, path, "material or materials is required"));
+            boolean hasCustomItem = isNonBlankString(ingredient.get("custom_item_id"));
+            boolean hasCustomItems = ingredient.get("custom_item_ids") instanceof List<?> list && !list.isEmpty();
+            if (!hasMaterial && !hasMaterials && !hasCustomItem && !hasCustomItems) {
+                errors.add(format("missing ingredient matcher", file, path, "material, materials, custom_item_id, or custom_item_ids is required"));
             }
             if (hasMaterial) {
                 requireMaterial(ingredient.get("material"), file, path + ".material", errors);
@@ -215,6 +236,17 @@ public final class ResourceConfigurationValidator {
             if (ingredient.get("materials") instanceof List<?> list) {
                 for (int i = 0; i < list.size(); i++) {
                     requireMaterial(list.get(i), file, path + ".materials[" + i + "]", errors);
+                }
+            }
+            if (hasCustomItem && !isCustomItemId((String) ingredient.get("custom_item_id"))) {
+                errors.add(format("invalid custom item id", file, path + ".custom_item_id", "feature.id format is required"));
+            }
+            if (ingredient.get("custom_item_ids") instanceof List<?> list) {
+                for (int i = 0; i < list.size(); i++) {
+                    Object value = list.get(i);
+                    if (!(value instanceof String id) || !isCustomItemId(id)) {
+                        errors.add(format("invalid custom item id", file, path + ".custom_item_ids[" + i + "]", "feature.id format is required"));
+                    }
                 }
             }
         }
@@ -536,26 +568,119 @@ public final class ResourceConfigurationValidator {
         Path configFile = configRoot.resolve("brewery/config.yml");
         Map<String, Object> config = rootMap(configs, configFile, errors);
         if (config != null) {
-            requireBoolean(config, "enabled", configFile, "enabled", errors);
-            requireMap(config, "settings", configFile, errors);
+            requirePositiveNumber(config, "schema_version", configFile, "schema_version", errors);
+            requireMap(config, "brewery", configFile, errors);
         }
         Path recipeFile = configRoot.resolve("brewery/recipe.yml");
-        Map<String, Object> recipes = rootMap(configs, recipeFile, errors);
-        if (recipes != null) {
-            requireNonEmpty(recipes, recipeFile, "<root>", errors);
+        Map<String, Object> recipeRoot = rootMap(configs, recipeFile, errors);
+        if (recipeRoot != null) {
+            requirePositiveNumber(recipeRoot, "schema_version", recipeFile, "schema_version", errors);
+            Map<String, Object> recipes = requireMap(recipeRoot, "recipes", recipeFile, errors);
+            if (recipes == null) {
+                return;
+            }
+            requireNonEmpty(recipes, recipeFile, "recipes", errors);
             for (Map.Entry<String, Object> entry : recipes.entrySet()) {
                 Map<String, Object> recipe = asMap(entry.getValue());
-                String path = entry.getKey();
+                String path = "recipes." + entry.getKey();
                 if (recipe == null) {
                     errors.add(format("invalid brewery recipe", recipeFile, path, "recipe must be a section"));
                     continue;
                 }
-                requireString(recipe, "name", recipeFile, path + ".name", errors);
                 requirePositiveNumber(recipe, "required_skill_level", recipeFile, path + ".required_skill_level", errors);
                 requireMap(recipe, "fermentation", recipeFile, errors, path + ".fermentation");
-                requireMap(recipe, "final_output", recipeFile, errors, path + ".final_output");
+                Map<String, Object> finalOutput = requireMap(recipe, "final_output", recipeFile, errors, path + ".final_output");
+                if (finalOutput != null) {
+                    requireNonNegativeNumber(finalOutput, "alcohol", recipeFile, path + ".final_output.alcohol", errors);
+                }
             }
         }
+    }
+
+    private static void validateGardenConfigs(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path file = configRoot.resolve("brewery/garden.yml");
+        Map<String, Object> root = rootMap(configs, file, errors);
+        if (root == null) return;
+        requireSchemaVersion(root, file, errors);
+        Map<String, Object> garden = requireMap(root, "garden", file, errors);
+        if (garden == null) return;
+        requireFiniteNumberRange(garden.get("seed_drop_chance"), 0.0, 1.0, file, "garden.seed_drop_chance", errors);
+        requirePositiveInteger(garden.get("growth_check_interval_seconds"), file, "garden.growth_check_interval_seconds", errors);
+
+        Object sources = garden.get("seed_source_materials");
+        if (!(sources instanceof List<?> sourceList) || sourceList.isEmpty()) {
+            errors.add(format("invalid seed source materials", file, "garden.seed_source_materials", "non-empty material list is required"));
+        } else {
+            for (int i = 0; i < sourceList.size(); i++) {
+                requireMaterial(sourceList.get(i), file, "garden.seed_source_materials[" + i + "]", errors);
+            }
+        }
+
+        Map<String, Object> plants = requireMap(garden, "plants", file, errors, "garden.plants");
+        if (plants == null) return;
+        requireNonEmpty(plants, file, "garden.plants", errors);
+        for (Map.Entry<String, Object> entry : plants.entrySet()) {
+            String plantPath = "garden.plants." + entry.getKey();
+            if (!entry.getKey().matches("[a-z0-9_]+")) {
+                errors.add(format("invalid garden plant id", file, plantPath, "lowercase snake case id is required"));
+            }
+            Map<String, Object> plant = asMap(entry.getValue());
+            if (plant == null) {
+                errors.add(format("invalid garden plant", file, plantPath, "plant must be a section"));
+                continue;
+            }
+            requireString(plant, "seed_language_key", file, plantPath + ".seed_language_key", errors);
+            requireString(plant, "fruit_language_key", file, plantPath + ".fruit_language_key", errors);
+            Map<String, Object> stages = requireMap(plant, "stages", file, errors, plantPath + ".stages");
+            if (stages == null || stages.isEmpty()) {
+                if (stages != null) errors.add(format("missing garden stages", file, plantPath + ".stages", "at least one stage is required"));
+                continue;
+            }
+            List<Integer> stageIds = new ArrayList<>();
+            for (Map.Entry<?, ?> stageEntry : ((Map<?, ?>) stages).entrySet()) {
+                String stageKey = String.valueOf(stageEntry.getKey());
+                Integer stageId;
+                try {
+                    stageId = Integer.valueOf(stageKey);
+                } catch (NumberFormatException exception) {
+                    errors.add(format("invalid garden stage id", file, plantPath + ".stages." + stageKey, "integer stage id is required"));
+                    continue;
+                }
+                stageIds.add(stageId);
+                String stagePath = plantPath + ".stages." + stageKey;
+                Map<String, Object> stage = asMap(stageEntry.getValue());
+                if (stage == null) {
+                    errors.add(format("invalid garden stage", file, stagePath, "stage must be a section"));
+                    continue;
+                }
+                requireMaterial(stage.get("material"), file, stagePath + ".material", errors);
+                requireString(stage, "block_data", file, stagePath + ".block_data", errors);
+                requirePositiveInteger(stage.get("growth_seconds"), file, stagePath + ".growth_seconds", errors);
+            }
+            stageIds.sort(Integer::compareTo);
+            for (int index = 0; index < stageIds.size(); index++) {
+                if (stageIds.get(index) != index) {
+                    errors.add(format("non-contiguous garden stages", file, plantPath + ".stages", "stage ids must start at 0 and be contiguous"));
+                    break;
+                }
+            }
+            Object regrowth = plant.get("regrowth_stage");
+            if (!(regrowth instanceof Number number) || number.doubleValue() != number.intValue() ||
+                number.intValue() < 0 || number.intValue() >= stageIds.size()) {
+                errors.add(format("invalid garden regrowth stage", file, plantPath + ".regrowth_stage", "existing stage id is required"));
+            }
+        }
+    }
+
+    private static void validatePartyConfigs(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path file = configRoot.resolve("party/config.yml");
+        Map<String, Object> root = rootMap(configs, file, errors);
+        if (root == null) return;
+        Map<String, Object> party = requireMap(root, "party", file, errors);
+        if (party == null) return;
+        requireIntegerRange(party.get("default_capacity"), 1, 99, file, "party.default_capacity", errors);
+        requirePositiveInteger(party.get("invite_expiration_seconds"), file, "party.invite_expiration_seconds", errors);
+        requirePositiveInteger(party.get("offline_grace_seconds"), file, "party.offline_grace_seconds", errors);
     }
 
     private static void validateCookingConfigs(Path configRoot, Map<Path, Object> configs, List<String> errors) {
@@ -563,12 +688,123 @@ public final class ResourceConfigurationValidator {
         Map<String, Object> config = rootMap(configs, configFile, errors);
         if (config != null) {
             requireBoolean(config, "enabled", configFile, "enabled", errors);
-            requireMap(config, "settings", configFile, errors);
+            Map<String, Object> settings = requireMap(config, "settings", configFile, errors);
+            if (settings != null) requireRatio(settings.get("minimum_similarity"), configFile, "settings.minimum_similarity", errors);
         }
         Path recipeFile = configRoot.resolve("cooking/recipe.yml");
         Map<String, Object> root = rootMap(configs, recipeFile, errors);
         if (root != null) {
             requireMap(root, "recipes", recipeFile, errors);
+        }
+    }
+
+    private static void validateFishingConfigs(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path file = configRoot.resolve("fishing/fish.yml");
+        Map<String, Object> root = rootMap(configs, file, errors);
+        if (root == null) return;
+        requireSchemaVersion(root, file, errors);
+        requireBoolean(root, "enabled", file, "enabled", errors);
+        Map<String, Object> minigame = requireMap(root, "minigame", file, errors);
+        if (minigame != null) {
+            requirePositiveNumber(minigame, "click_count", file, "minigame.click_count", errors);
+            requirePositiveNumber(minigame, "timeout_ticks", file, "minigame.timeout_ticks", errors);
+        }
+        Map<String, Object> fish = requireMap(root, "fish", file, errors);
+        if (fish != null) {
+            requireNonEmpty(fish, file, "fish", errors);
+            for (Map.Entry<String, Object> entry : fish.entrySet()) {
+                String path = "fish." + entry.getKey();
+                Map<String, Object> definition = asMap(entry.getValue());
+                if (definition == null) {
+                    errors.add(format("invalid fishing definition", file, path, "fish must be a section"));
+                    continue;
+                }
+                requireMaterial(definition.get("material"), file, path + ".material", errors);
+                requirePositiveNumber(definition, "weight", file, path + ".weight", errors);
+                requirePositiveNumber(definition, "min_level", file, path + ".min_level", errors);
+                requirePositiveNumber(definition, "exp", file, path + ".exp", errors);
+                requireMap(definition, "quality", file, errors, path + ".quality");
+                requireMap(definition, "bobber_y", file, errors, path + ".bobber_y");
+                requireMap(definition, "bobber_distance", file, errors, path + ".bobber_distance");
+            }
+        }
+    }
+
+    private static void validateMiniGameConfigs(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path settingsFile = configRoot.resolve("minigame/settings.yml");
+        Map<String, Object> settings = rootMap(configs, settingsFile, errors);
+        if (settings == null) {
+            errors.add(format("missing minigame settings config", settingsFile, "<root>", "settings config is required"));
+        } else {
+            requireAllowedKeys(settings, Set.of("default_game_id", "defaults"), settingsFile, errors);
+            Object defaultGameId = settings.get("default_game_id");
+            if (!(defaultGameId instanceof String gameId) || gameId.isBlank() || !Set.of("race", "hideandseek", "chase", "colosseum", "endergolf").contains(gameId)) {
+                errors.add(format("invalid minigame default", settingsFile, "default_game_id", "supported non-blank game id is required"));
+            }
+            Map<String, Object> defaults = requireMap(settings, "defaults", settingsFile, errors);
+            if (defaults != null) {
+                requireAllowedKeys(defaults, Set.of("time_limit_seconds", "marker_radius"), settingsFile, errors);
+                requireIntegerRange(defaults.get("time_limit_seconds"), 30, 3600, settingsFile, "defaults.time_limit_seconds", errors);
+                requireFiniteNumberRange(defaults.get("marker_radius"), 0.5, 4.0, settingsFile, "defaults.marker_radius", errors);
+            }
+        }
+
+        validateMiniGameFile(configRoot, configs, errors, "hideandseek", Set.of("time_limit_seconds", "hunter_count", "preparation_seconds"), true, false);
+        Map<String, Object> hideAndSeek = rootMap(configs, configRoot.resolve("minigame/hideandseek.yml"), errors);
+        if (hideAndSeek != null) {
+            requireIntegerRange(hideAndSeek.get("preparation_seconds"), 0, 600,
+                configRoot.resolve("minigame/hideandseek.yml"), "preparation_seconds", errors);
+        }
+        validateMiniGameFile(configRoot, configs, errors, "chase", Set.of("time_limit_seconds", "hunter_count"), true, false);
+        validateMiniGameFile(configRoot, configs, errors, "colosseum", Set.of("time_limit_seconds", "first_to"), false, true);
+        validateMiniGameFile(configRoot, configs, errors, "endergolf", Set.of("time_limit_seconds"), false, false);
+    }
+
+    private static void validateMiniGameFile(Path configRoot, Map<Path, Object> configs, List<String> errors,
+                                             String gameId, Set<String> allowed, boolean hunter, boolean firstTo) {
+        Path file = configRoot.resolve("minigame/" + gameId + ".yml");
+        Map<String, Object> root = rootMap(configs, file, errors);
+        if (root == null) {
+            errors.add(format("missing minigame config", file, "<root>", "game config is required"));
+            return;
+        }
+        requireAllowedKeys(root, allowed, file, errors);
+        requireIntegerRange(root.get("time_limit_seconds"), 30, 3600, file, "time_limit_seconds", errors);
+        if (hunter) requireIntegerRange(root.get("hunter_count"), 1, 99, file, "hunter_count", errors);
+        if (firstTo) requireIntegerRange(root.get("first_to"), 1, 99, file, "first_to", errors);
+    }
+
+    private static void validateResourceCollectionConfigs(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path configFile = configRoot.resolve("resource_collection/config.yml");
+        Map<String, Object> config = rootMap(configs, configFile, errors);
+        if (config != null) {
+            requireSchemaVersion(config, configFile, errors);
+            requireBoolean(config, "enabled", configFile, "enabled", errors);
+            Object worlds = config.get("worlds");
+            if (!(worlds instanceof List<?> list) || list.isEmpty() || list.stream().anyMatch(value -> !isNonBlankString(value))) {
+                errors.add(format("invalid world list", configFile, "worlds", "non-empty list of strings is required"));
+            }
+        }
+        Path collectionFile = configRoot.resolve("resource_collection/collection.yml");
+        Map<String, Object> root = rootMap(configs, collectionFile, errors);
+        if (root == null) return;
+        requireSchemaVersion(root, collectionFile, errors);
+        for (String sectionName : List.of("harvest", "craft")) {
+            Map<String, Object> section = requireMap(root, sectionName, collectionFile, errors);
+            if (section == null) continue;
+            requireNonEmpty(section, collectionFile, sectionName, errors);
+            for (Map.Entry<String, Object> entry : section.entrySet()) {
+                String path = sectionName + "." + entry.getKey();
+                Map<String, Object> rule = asMap(entry.getValue());
+                if (rule == null) {
+                    errors.add(format("invalid resource collection rule", collectionFile, path, "rule must be a section"));
+                    continue;
+                }
+                requireMaterial(rule.get("material"), collectionFile, path + ".material", errors);
+                requireString(rule, "profession", collectionFile, path + ".profession", errors);
+                requirePositiveNumber(rule, "experience", collectionFile, path + ".experience", errors);
+                if (rule.containsKey("minimum_age")) requireNonNegativeNumber(rule, "minimum_age", collectionFile, path + ".minimum_age", errors);
+            }
         }
     }
 
@@ -662,6 +898,35 @@ public final class ResourceConfigurationValidator {
         }
     }
 
+    private static void requireAllowedKeys(Map<String, Object> map, Set<String> allowed, Path file, List<String> errors) {
+        map.keySet().stream()
+            .filter(key -> !allowed.contains(key))
+            .sorted()
+            .forEach(key -> errors.add(format("unknown config key", file, key, "unknown minigame config key")));
+    }
+
+    private static void requireIntegerRange(Object value, int minimum, int maximum, Path file, String path, List<String> errors) {
+        if (!(value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long)) {
+            errors.add(format("invalid integer", file, path, "integer value is required"));
+            return;
+        }
+        long number = ((Number) value).longValue();
+        if (number < minimum || number > maximum) {
+            errors.add(format("invalid integer range", file, path, "value must be between " + minimum + " and " + maximum));
+        }
+    }
+
+    private static void requireFiniteNumberRange(Object value, double minimum, double maximum, Path file, String path, List<String> errors) {
+        if (!(value instanceof Number number) || !Double.isFinite(number.doubleValue())) {
+            errors.add(format("invalid finite number", file, path, "finite number is required"));
+            return;
+        }
+        double numberValue = number.doubleValue();
+        if (numberValue < minimum || numberValue > maximum) {
+            errors.add(format("invalid number range", file, path, "value must be between " + minimum + " and " + maximum));
+        }
+    }
+
     private static void requireBoolean(Map<String, Object> map, String key, Path file, String path, List<String> errors) {
         if (!(map.get(key) instanceof Boolean)) {
             errors.add(format("invalid boolean", file, path, "boolean value is required"));
@@ -681,9 +946,26 @@ public final class ResourceConfigurationValidator {
         requirePositiveNumber(map.get(key), file, path, errors);
     }
 
+    private static void requireSchemaVersion(Map<String, Object> map, Path file, List<String> errors) {
+        Object value = map.get("schema_version");
+        if (!(value instanceof Number number) || number.doubleValue() != 1.0) {
+            errors.add(format("invalid schema version", file, "schema_version", "the integer 1 is required"));
+        }
+    }
+
     private static void requirePositiveNumber(Object value, Path file, String path, List<String> errors) {
         if (!(value instanceof Number number) || number.doubleValue() <= 0) {
             errors.add(format("invalid positive number", file, path, "positive number is required"));
+        }
+    }
+
+    private static void requirePositiveInteger(Object value, Path file, String path, List<String> errors) {
+        if (!(value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long)) {
+            errors.add(format("invalid integer", file, path, "positive integer value is required"));
+            return;
+        }
+        if (((Number) value).longValue() <= 0) {
+            errors.add(format("invalid positive integer", file, path, "positive integer is required"));
         }
     }
 

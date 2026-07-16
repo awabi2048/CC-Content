@@ -1,0 +1,3 @@
+# 逃走中固有設定。参加者の先頭を鬼として割り当てます。
+time_limit_seconds: 300
+hunter_count: 1

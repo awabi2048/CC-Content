@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.rank.skill
 
 import jp.awabi2048.cccontent.features.rank.prestige.PrestigeToken
+import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.SkillTree
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
@@ -48,6 +49,10 @@ object SkillEffectEngine {
         prestigeSkills: Set<String> = emptySet(),
         skillActivationStates: Map<String, Boolean> = emptyMap()
     ) {
+        if (!RankReleasePolicy.canUseSkills(playerUuid)) {
+            clearCache(playerUuid)
+            return
+        }
         val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return
         val mutableByType = mutableMapOf<String, MutableList<SkillEffectEntry>>()
 
@@ -167,15 +172,19 @@ object SkillEffectEngine {
     }
 
     fun getCachedEffects(playerUuid: UUID): CompiledEffects? {
+        if (!RankReleasePolicy.canUseSkills(playerUuid)) {
+            clearCache(playerUuid)
+            return null
+        }
         return effectCache[playerUuid]
     }
 
     fun getCachedEffect(playerUuid: UUID, effectType: String): SkillEffectEntry? {
-        return effectCache[playerUuid]?.byType?.get(effectType)?.firstOrNull()
+        return getCachedEffects(playerUuid)?.byType?.get(effectType)?.firstOrNull()
     }
 
     fun getCachedEffectForBlock(playerUuid: UUID, effectType: String, blockType: String): SkillEffectEntry? {
-        val compiled = effectCache[playerUuid] ?: return null
+        val compiled = getCachedEffects(playerUuid) ?: return null
         val targeted = compiled.targetedByType[effectType]
         if (targeted != null) {
             return targeted.byBlockType[blockType] ?: targeted.fallback
@@ -192,10 +201,11 @@ object SkillEffectEngine {
     }
 
     fun hasCachedEffect(playerUuid: UUID, effectType: String): Boolean {
-        return effectCache[playerUuid]?.byType?.get(effectType)?.isNotEmpty() == true
+        return getCachedEffects(playerUuid)?.byType?.get(effectType)?.isNotEmpty() == true
     }
 
     fun applyEffect(player: Player, profession: Profession, skillId: String, effect: SkillEffect, event: Any?): Boolean {
+        if (!RankReleasePolicy.canUseSkills(player)) return false
         val handler = SkillEffectRegistry.getHandler(effect.type) ?: return false
 
         if (!handler.isEnabled()) {
@@ -252,7 +262,9 @@ object SkillEffectEngine {
     }
 
     fun getAllCachedEffects(): Map<UUID, CompiledEffects> {
-        return effectCache.toMap()
+        return effectCache.keys.mapNotNull { uuid ->
+            getCachedEffects(uuid)?.let { uuid to it }
+        }.toMap()
     }
 
     /**

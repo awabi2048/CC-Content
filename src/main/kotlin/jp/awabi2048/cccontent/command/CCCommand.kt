@@ -10,6 +10,21 @@ import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Entity
 import org.bukkit.entity.Player
 import org.bukkit.util.Vector
+import jp.awabi2048.cccontent.featurestate.ContentFeatureCatalog
+import jp.awabi2048.cccontent.featurestate.ContentFeatureState
+import jp.awabi2048.cccontent.featurestate.FeatureStateResultType
+
+enum class ContentOperationalState {
+    ENABLED,
+    DISABLED,
+    WARNING,
+    FAILURE
+}
+
+data class ContentFeatureStatus(
+    val configuredEnabled: Boolean,
+    val operationalState: ContentOperationalState
+)
 
 /**
  * /cc-content メインコマンド
@@ -27,7 +42,9 @@ class CCCommand(
     private val onCompleteOageDaily: ((Player) -> Boolean)? = null,
     private val npcMenuIdsProvider: (() -> Collection<String>)? = null,
     private val onOpenNpcMenu: ((String, Player) -> Boolean)? = null,
-    private val onNpcMenuMaintenance: ((String, String) -> Boolean)? = null
+    private val onNpcMenuMaintenance: ((String, String) -> Boolean)? = null,
+    private val contentStatusProvider: (() -> Map<String, ContentFeatureStatus>)? = null,
+    private val onSetContentEnabled: ((String, Boolean) -> Unit)? = null
 ) : CommandExecutor, TabCompleter {
     
     override fun onCommand(
@@ -45,6 +62,10 @@ class CCCommand(
         // サブコマンド処理
         return when (args[0].lowercase()) {
             "give" -> {
+                if (!hasAdminPermission(sender)) {
+                    sender.sendMessage(ContentManagementI18n.text(sender, "no_permission"))
+                    return true
+                }
                 val subArgs = args.drop(1).toTypedArray()
                 giveCommand.onCommand(sender, cmd, "give", subArgs)
             }
@@ -54,10 +75,17 @@ class CCCommand(
             "restart" -> {
                 handleRestart(sender)
             }
+            "status" -> handleContentStatus(sender)
+            "enable" -> handleContentStateChange(sender, args, true)
+            "disable" -> handleContentStateChange(sender, args, false)
             "summon" -> {
                 handleSummon(sender, args)
             }
             "structure" -> {
+                if (!hasAdminPermission(sender)) {
+                    sender.sendMessage(ContentManagementI18n.text(sender, "no_permission"))
+                    return true
+                }
                 val subArgs = args.drop(1).toTypedArray()
                 structureCommand?.onCommand(sender, subArgs) ?: run {
                     sender.sendMessage("§cStructure command is not available")
@@ -84,6 +112,150 @@ class CCCommand(
             }
         }
     }
+
+    private fun handleContentStatus(sender: CommandSender): Boolean {
+        if (!hasManagementPermission(sender, "status")) {
+            sender.sendMessage(ContentManagementI18n.text(sender, "no_permission"))
+            return true
+        }
+        val statuses = contentStatusProvider?.invoke() ?: run {
+            sender.sendMessage(ContentManagementI18n.text(sender, "save_failed", "reason" to "status provider unavailable"))
+            return true
+        }
+
+        sender.sendMessage(ContentManagementI18n.text(sender, "status_header"))
+        ContentFeatureCatalog.features.forEach { feature ->
+            val state = checkNotNull(statuses[feature.id]) { "Missing runtime status: ${feature.id}" }
+            sender.sendMessage(
+                ContentManagementI18n.text(
+                    sender,
+                    "status_line",
+                    "feature" to featureName(sender, feature.id),
+                    "status" to stateText(sender, state.operationalState)
+                )
+            )
+        }
+        return true
+    }
+
+    private fun handleContentStateChange(sender: CommandSender, args: Array<String>, enabled: Boolean): Boolean {
+        val permission = if (enabled) "enable" else "disable"
+        if (!hasManagementPermission(sender, permission)) {
+            sender.sendMessage(ContentManagementI18n.text(sender, "no_permission"))
+            return true
+        }
+        if (args.size != 2) {
+            sender.sendMessage(ContentManagementI18n.text(sender, "usage"))
+            return true
+        }
+
+        val statuses = contentStatusProvider?.invoke() ?: run {
+            sender.sendMessage(ContentManagementI18n.text(sender, "save_failed", "reason" to "status provider unavailable"))
+            return true
+        }
+        val enabledIds = statuses.filterValues { it.configuredEnabled }.keys
+        val state = ContentFeatureState(enabledIds)
+        val result = if (enabled) state.enable(args[1]) else state.disable(args[1])
+        val featureId = result.featureId
+
+        when (result.resultType) {
+            FeatureStateResultType.UNKNOWN_FEATURE -> {
+                sender.sendMessage(ContentManagementI18n.text(sender, "unknown_feature", "feature" to args[1]))
+            }
+            FeatureStateResultType.NO_CHANGE -> {
+                checkNotNull(featureId)
+                sender.sendMessage(
+                    ContentManagementI18n.text(
+                        sender,
+                        "already_set",
+                        "feature" to featureName(sender, featureId),
+                        "status" to stateText(sender, if (enabled) ContentOperationalState.ENABLED else ContentOperationalState.DISABLED)
+                    )
+                )
+            }
+            FeatureStateResultType.MISSING_DEPENDENCY -> {
+                checkNotNull(featureId)
+                sender.sendMessage(
+                    ContentManagementI18n.text(
+                        sender,
+                        "enable_dependency_required",
+                        "feature" to featureName(sender, featureId),
+                        "dependencies" to featureNames(sender, result.relatedFeatureIds)
+                    )
+                )
+            }
+            FeatureStateResultType.ENABLED_DEPENDENCY -> {
+                checkNotNull(featureId)
+                sender.sendMessage(
+                    ContentManagementI18n.text(
+                        sender,
+                        "disable_dependent_required",
+                        "feature" to featureName(sender, featureId),
+                        "dependents" to featureNames(sender, result.relatedFeatureIds)
+                    )
+                )
+            }
+            FeatureStateResultType.CHANGED -> {
+                checkNotNull(featureId)
+                if (enabled) {
+                    val unavailableDependencies = ContentFeatureCatalog.resolve(featureId)
+                        ?.dependencies
+                        .orEmpty()
+                        .filter { statuses[it]?.operationalState != ContentOperationalState.ENABLED }
+                    if (unavailableDependencies.isNotEmpty()) {
+                        sender.sendMessage(
+                            ContentManagementI18n.text(
+                                sender,
+                                "enable_dependency_unavailable",
+                                "feature" to featureName(sender, featureId),
+                                "dependencies" to featureNames(sender, unavailableDependencies)
+                            )
+                        )
+                        return true
+                    }
+                }
+                val targetState = if (enabled) ContentOperationalState.ENABLED else ContentOperationalState.DISABLED
+                sender.sendMessage(
+                    ContentManagementI18n.text(
+                        sender,
+                        "change_started",
+                        "feature" to featureName(sender, featureId),
+                        "status" to stateText(sender, targetState)
+                    )
+                )
+                try {
+                    checkNotNull(onSetContentEnabled) { "content state writer unavailable" }.invoke(featureId, enabled)
+                    sender.sendMessage(
+                        ContentManagementI18n.text(
+                            sender,
+                            "change_success",
+                            "feature" to featureName(sender, featureId),
+                            "status" to stateText(sender, targetState)
+                        )
+                    )
+                } catch (e: Exception) {
+                    sender.sendMessage(ContentManagementI18n.text(sender, "save_failed", "reason" to (e.message ?: e.javaClass.simpleName)))
+                    e.printStackTrace()
+                }
+            }
+        }
+        return true
+    }
+
+    private fun hasManagementPermission(sender: CommandSender, operation: String): Boolean =
+        sender.hasPermission("cc-content.$operation") || sender.hasPermission("cc-content.admin") || sender.isOp
+
+    private fun hasAdminPermission(sender: CommandSender): Boolean =
+        sender.hasPermission("cc-content.admin") || sender.isOp
+
+    private fun featureName(sender: CommandSender, featureId: String): String =
+        ContentManagementI18n.text(sender, "feature.$featureId")
+
+    private fun featureNames(sender: CommandSender, featureIds: List<String>): String =
+        featureIds.joinToString("、") { featureName(sender, it) }
+
+    private fun stateText(sender: CommandSender, state: ContentOperationalState): String =
+        ContentManagementI18n.text(sender, "state.${state.name.lowercase()}")
 
     private fun handleSummon(sender: CommandSender, args: Array<String>): Boolean {
         if (!sender.hasPermission("cc-content.admin")) {
@@ -399,7 +571,11 @@ class CCCommand(
           // サブコマンド補完（/cc-content [ここ]）
           if (args.size == 1) {
               val prefix = args[0].lowercase()
-               val candidates = mutableListOf("give", "help")
+               val candidates = mutableListOf("help")
+                 if (hasAdminPermission(sender)) candidates.add("give")
+                 if (hasManagementPermission(sender, "status")) candidates.add("status")
+                 if (hasManagementPermission(sender, "enable")) candidates.add("enable")
+                 if (hasManagementPermission(sender, "disable")) candidates.add("disable")
                  if (sender.hasPermission("cc-content.admin")) {
                      candidates.add("reload")
                      candidates.add("restart")
@@ -416,11 +592,29 @@ class CCCommand(
          
          // サブコマンドの引数補完
          return when (args[0].lowercase()) {
+             "enable", "disable" -> {
+                 if (args.size != 2) return emptyList()
+                 val permission = if (args[0].equals("enable", ignoreCase = true)) "enable" else "disable"
+                 if (!hasManagementPermission(sender, permission)) return emptyList()
+                 val statuses = contentStatusProvider?.invoke().orEmpty()
+                 val targetEnabled = args[0].equals("enable", ignoreCase = true)
+                 ContentFeatureCatalog.features
+                     .asSequence()
+                     .filter { feature ->
+                         val enabled = statuses[feature.id]?.configuredEnabled == true
+                         enabled != targetEnabled
+                     }
+                     .map { it.id }
+                     .filter { it.startsWith(args[1], ignoreCase = true) }
+                     .toList()
+             }
              "give" -> {
+                  if (!hasAdminPermission(sender)) return emptyList()
                   val subArgs = args.drop(1).toTypedArray()
                   giveCommand.onTabComplete(sender, cmd, "give", subArgs)
               }
                "debug" -> {
+                   if (!hasAdminPermission(sender)) return emptyList()
                    when (args.size) {
                       2 -> listOf("clear_block_placement_data", "complete_oage_daily").filter { it.startsWith(args[1].lowercase()) }
                      3 -> {
@@ -433,12 +627,14 @@ class CCCommand(
                    }
                }
                "update_day" -> {
+                   if (!hasAdminPermission(sender)) return emptyList()
                    when (args.size) {
                        2 -> listOf("arena").filter { it.startsWith(args[1], ignoreCase = true) }
                        else -> emptyList()
                    }
                }
                "summon" -> {
+                   if (!hasAdminPermission(sender)) return emptyList()
                    when (args.size) {
                       2 -> mobDefinitionIdsProvider?.invoke().orEmpty().sorted().filter { it.startsWith(args[1], ignoreCase = true) }
                       3, 4, 5 -> listOf("~", "~1", "~-1").filter { it.startsWith(args[args.lastIndex]) }
@@ -446,10 +642,12 @@ class CCCommand(
                   }
               }
               "structure" -> {
+                  if (!hasAdminPermission(sender)) return emptyList()
                   val subArgs = args.drop(1).toTypedArray()
                   structureCommand?.onTabComplete(sender, cmd, subArgs).orEmpty()
               }
                "npc-menu" -> {
+                   if (!sender.hasPermission("cc-content.npc.menu.open") && !hasAdminPermission(sender)) return emptyList()
                    when (args.size) {
                        2 -> npcMenuIdsProvider?.invoke().orEmpty().sorted().filter { it.startsWith(args[1], ignoreCase = true) }
                        3 -> (listOf("reset-delivery", "reset-part-time", "reset-shop-daily", "reset-shop-weekly") + Bukkit.getOnlinePlayers().map { it.name }).filter { it.startsWith(args[2], ignoreCase = true) }

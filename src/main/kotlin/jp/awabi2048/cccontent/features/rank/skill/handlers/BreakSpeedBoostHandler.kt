@@ -10,6 +10,7 @@ import java.util.UUID
 class BreakSpeedBoostHandler : SkillEffectHandler {
     companion object {
         const val EFFECT_TYPE = "collect.break_speed_boost"
+        private const val MINING_EFFICIENCY_DEFAULT = 0.0
 
         private val boostedPlayers = mutableSetOf<UUID>()
 
@@ -19,7 +20,7 @@ class BreakSpeedBoostHandler : SkillEffectHandler {
             val player = plugin.server.getPlayer(playerUuid) ?: return
             val miningEfficiency = player.getAttribute(Attribute.MINING_EFFICIENCY) ?: return
             // base値をデフォルト値に戻す
-            miningEfficiency.baseValue = miningEfficiency.defaultValue
+            miningEfficiency.baseValue = MINING_EFFICIENCY_DEFAULT
 
         }
 
@@ -28,7 +29,7 @@ class BreakSpeedBoostHandler : SkillEffectHandler {
             for (playerUuid in boostedPlayers.toSet()) {
                 val player = plugin.server.getPlayer(playerUuid) ?: continue
                 val miningEfficiency = player.getAttribute(Attribute.MINING_EFFICIENCY) ?: continue
-                miningEfficiency.baseValue = miningEfficiency.defaultValue
+                miningEfficiency.baseValue = MINING_EFFICIENCY_DEFAULT
             }
             boostedPlayers.clear()
         }
@@ -43,7 +44,7 @@ class BreakSpeedBoostHandler : SkillEffectHandler {
             }
 
             // base値をデフォルト値にリセット
-            miningEfficiency.baseValue = miningEfficiency.defaultValue
+            miningEfficiency.baseValue = MINING_EFFICIENCY_DEFAULT
 
             // バニラの効率レベルによる速度値: n^2 + 1
             val vanillaSpeed = (vanillaEfficiencyLevel.toDouble() * vanillaEfficiencyLevel.toDouble()) + 1.0
@@ -52,7 +53,7 @@ class BreakSpeedBoostHandler : SkillEffectHandler {
             val totalSpeed = (totalEfficiency.toDouble() * totalEfficiency.toDouble()) + 1.0
             // 差分をbase値に加算
             val diff = totalSpeed - vanillaSpeed
-            miningEfficiency.baseValue = miningEfficiency.defaultValue + diff
+            miningEfficiency.baseValue = MINING_EFFICIENCY_DEFAULT + diff
 
             boostedPlayers.add(player.uniqueId)
 

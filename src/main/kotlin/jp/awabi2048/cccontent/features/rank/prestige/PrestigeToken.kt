@@ -53,7 +53,7 @@ class PrestigeToken {
             // Lore設定
             val lore = CCSystem.getAPI().getLoreService().render(
                 GuiLoreSpec.Blocks(listOf(
-                    GuiLoreBlock(listOf(GuiLoreLine.Raw("§6${professionName}の職を極めた証"))),
+                    GuiLoreBlock(listOf(GuiLoreLine.Text("${professionName}の職を極めた証"))),
                     GuiLoreBlock(listOf(
                         GuiLoreLine.Data("プレステージレベル", prestigeLevel, "§b"),
                         GuiLoreLine.Data("保有者", owner.name, "§6")

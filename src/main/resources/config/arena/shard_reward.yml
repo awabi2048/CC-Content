@@ -1,0 +1,45 @@
+# 難易度ごとに独立した表。別難易度の entries は継ぎ足さない。
+1:
+  entries:
+    - id: sharpness_1
+      tier: 1
+      type: limit_breaking
+      weight: 100
+    - id: smite_1
+      tier: 1
+      type: limit_breaking
+      weight: 80
+2:
+  entries:
+    - id: sharpness_2
+      tier: 2
+      type: limit_breaking
+      weight: 100
+    - id: smite_2
+      tier: 2
+      type: limit_breaking
+      weight: 80
+3:
+  entries:
+    - id: power_2
+      tier: 2
+      type: limit_breaking
+      weight: 100
+    - id: protection_2
+      tier: 2
+      type: limit_breaking
+      weight: 60
+4:
+  entries:
+    - id: fire_aspect_3
+      tier: 3
+      type: limit_breaking
+      weight: 100
+    - id: knockback_3
+      tier: 3
+      type: limit_breaking
+      weight: 60
+    - id: incompatible_combination_damage_smite
+      tier: 1
+      type: incompatible_combination
+      weight: 30

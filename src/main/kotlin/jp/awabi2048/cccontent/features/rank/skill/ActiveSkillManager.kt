@@ -5,6 +5,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.CCContent
+import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
 import net.kyori.adventure.text.Component
@@ -34,6 +35,7 @@ object ActiveSkillManager {
      * @return 新しく選択されたスキルID（nullの場合は対象スキルを所持していない）
      */
     fun rotateActiveSkill(player: Player): String? {
+        if (!RankReleasePolicy.canUseSkills(player)) return null
         val profession = CCContent.rankManager.getPlayerProfession(player.uniqueId)
             ?: return null
 
@@ -75,6 +77,7 @@ object ActiveSkillManager {
      * @return 新しい切替様式
      */
     fun rotateSwitchMode(player: Player): SkillSwitchMode {
+        if (!RankReleasePolicy.canUseSkills(player)) return SkillSwitchMode.MENU_ONLY
         val profession = CCContent.rankManager.getPlayerProfession(player.uniqueId)
             ?: return SkillSwitchMode.MENU_ONLY
 
@@ -97,6 +100,7 @@ object ActiveSkillManager {
      * 指定されたスキルIDが現在アクティブかどうかチェック
      */
     fun isSkillActive(player: Player, skillId: String): Boolean {
+        if (!RankReleasePolicy.canUseSkills(player)) return false
         val profession = CCContent.rankManager.getPlayerProfession(player.uniqueId)
             ?: return false
 
@@ -107,6 +111,7 @@ object ActiveSkillManager {
      * プレイヤーが現在アクティブなスキルを持っているか
      */
     fun hasActiveSkill(player: Player): Boolean {
+        if (!RankReleasePolicy.canUseSkills(player)) return false
         val profession = CCContent.rankManager.getPlayerProfession(player.uniqueId)
             ?: return false
 
@@ -117,6 +122,7 @@ object ActiveSkillManager {
      * 現在アクティブなスキルIDを取得
      */
     fun getCurrentActiveSkillId(player: Player): String? {
+        if (!RankReleasePolicy.canUseSkills(player)) return null
         val profession = CCContent.rankManager.getPlayerProfession(player.uniqueId)
             ?: return null
 
@@ -127,6 +133,7 @@ object ActiveSkillManager {
      * 指定されたスキルIDが現在選択中かどうか（playerUuid版）
      */
     fun isActiveSkillById(playerUuid: UUID, skillId: String): Boolean {
+        if (!RankReleasePolicy.canUseSkills(playerUuid)) return false
         val profession = CCContent.rankManager.getPlayerProfession(playerUuid)
             ?: return false
 
@@ -152,6 +159,7 @@ object ActiveSkillManager {
      * @return トグル結果（true=ON, false=OFF, null=切替不可または対象なし）
      */
     fun toggleCurrentSkillActivation(player: Player): Boolean? {
+        if (!RankReleasePolicy.canUseSkills(player)) return null
         val profession = CCContent.rankManager.getPlayerProfession(player.uniqueId)
             ?: return null
 
@@ -183,6 +191,7 @@ object ActiveSkillManager {
      * 指定スキルが切替可能かどうか判定
      */
     fun isSkillToggleable(player: Player, skillId: String): Boolean {
+        if (!RankReleasePolicy.canUseSkills(player)) return false
         if (isSkillForceAlwaysOn(skillId)) {
             return false
         }
@@ -209,6 +218,7 @@ object ActiveSkillManager {
      * 切替不可スキルは常にtrue
      */
     fun isSkillActivationEnabled(player: Player, skillId: String): Boolean {
+        if (!RankReleasePolicy.canUseSkills(player)) return false
         val profession = CCContent.rankManager.getPlayerProfession(player.uniqueId)
             ?: return true
 
@@ -297,7 +307,7 @@ object ActiveSkillManager {
 
         // 名前
         meta.displayName(
-            Component.text("モード切替")
+            Component.text(CCContent.languageManager.getMessage("active_skill.selector.display"))
                 .color(NamedTextColor.LIGHT_PURPLE)
                 .decoration(TextDecoration.ITALIC, false)
         )
@@ -307,13 +317,13 @@ object ActiveSkillManager {
 
         // 切替対象スキル表示
         if (toggleableSkills.isEmpty()) {
-            lore.add(GuiLoreLine.Text("切替対象のスキルがありません"))
+            lore.add(GuiLoreLine.Text(CCContent.languageManager.getMessage("active_skill.selector.no_targets")))
         } else {
             val skillTree = profession?.profession?.let {
                 SkillTreeRegistry.getSkillTree(it)
             }
 
-            lore.add(GuiLoreLine.Text("切替対象スキル:"))
+            lore.add(GuiLoreLine.Text(CCContent.languageManager.getMessage("active_skill.selector.targets")))
 
             for (skillId in toggleableSkills) {
                 val skillNode = skillTree?.getSkill(skillId)
@@ -325,28 +335,25 @@ object ActiveSkillManager {
                 val isEnabled = profession?.isSkillActivationEnabled(skillId) ?: true
                 val isToggleable = profession != null && isSkillToggleable(player, skillId)
 
-                val prefix = if (isSelected) "▶ " else "  "
-                val stateIndicator = when {
-                    !isToggleable -> ""
-                    isEnabled -> " [ON]"
-                    else -> " [OFF]"
-                }
                 val color = when {
                     isSelected && isEnabled -> "§a"
                     isSelected && !isEnabled -> "§c"
                     else -> "§8"
                 }
 
-                lore.add(GuiLoreLine.Raw("$color$prefix$skillName$stateIndicator"))
+                val label = if (isToggleable) {
+                    "$skillName (${CCContent.languageManager.getMessage(if (isEnabled) "active_skill.selector.enabled" else "active_skill.selector.disabled")})"
+                } else skillName
+                lore.add(GuiLoreLine.Option(label, isSelected, color, "§8"))
             }
 
             lore.add(GuiLoreLine.Spacer)
-            lore.add(GuiLoreLine.Raw("§e切替様式: ${currentMode.displayName}"))
+            lore.add(GuiLoreLine.Data(CCContent.languageManager.getMessage("active_skill.selector.mode"), currentMode.displayName, "§e"))
         }
 
         lore.add(GuiLoreLine.Spacer)
-        lore.add(GuiLoreLine.Action("左クリック", "スキル選択切替"))
-        lore.add(GuiLoreLine.Action("右クリック", "様式変更"))
+        lore.add(GuiLoreLine.Action(CCContent.languageManager.getMessage("active_skill.selector.left_click"), CCContent.languageManager.getMessage("active_skill.selector.select_action")))
+        lore.add(GuiLoreLine.Action(CCContent.languageManager.getMessage("active_skill.selector.right_click"), CCContent.languageManager.getMessage("active_skill.selector.mode_action")))
 
         meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lore, GuiLoreFrame.NONE)))
         button.itemMeta = meta

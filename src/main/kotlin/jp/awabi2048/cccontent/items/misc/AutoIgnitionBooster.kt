@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package jp.awabi2048.cccontent.items.misc
 
 import jp.awabi2048.cccontent.items.CustomItem
@@ -127,7 +125,7 @@ class AutoIgnitionBoosterListener(private val plugin: JavaPlugin) : Listener {
     }
 
     private fun isBoosterEquipped(player: Player): Boolean {
-        val boots = player.inventory.boots ?: return false
+        val boots = player.inventory.boots
         val identified = jp.awabi2048.cccontent.items.CustomItemManager.identify(boots) ?: return false
         return identified.fullId == "misc.auto_ignition_booster"
     }
@@ -145,6 +143,8 @@ class AutoIgnitionBoosterListener(private val plugin: JavaPlugin) : Listener {
         return true
     }
 
+    // Paper 26.1.2 has no non-deprecated ground-state query; preserve the server-provided state.
+    @Suppress("DEPRECATION")
     private fun activateUpwardBoost(player: Player): Boolean {
         if (!player.isOnGround) {
             return false

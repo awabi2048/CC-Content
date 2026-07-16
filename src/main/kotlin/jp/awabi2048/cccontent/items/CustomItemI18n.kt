@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.items
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.util.ContentLocaleResolver
 import net.kyori.adventure.text.Component
@@ -22,7 +23,10 @@ object CustomItemI18n {
 
     fun lore(player: Player?, key: String, fallback: List<String>): List<Component> {
         return CCSystem.getAPI().getLoreService().render(
-            GuiLoreSpec.Auto(list(player, key, fallback), GuiLoreFrame.NONE)
+            GuiLoreSpec.Rich(
+                list(player, key, fallback).map { GuiLoreLine.Text(it) },
+                GuiLoreFrame.NONE
+            )
         )
     }
 

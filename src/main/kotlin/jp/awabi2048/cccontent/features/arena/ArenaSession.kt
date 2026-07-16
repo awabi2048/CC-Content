@@ -112,6 +112,7 @@ data class ArenaSession(
     val difficultyStar: Int,
     val sessionVariance: Double = Random.nextDouble(0.85, 1.15),
     val waves: Int,
+    val startedAtMillis: Long = System.currentTimeMillis(),
     val missionModifiers: ArenaMissionModifiers = ArenaMissionModifiers.NONE,
     var maxParticipants: Int = 6,
     val participants: MutableSet<UUID>,
