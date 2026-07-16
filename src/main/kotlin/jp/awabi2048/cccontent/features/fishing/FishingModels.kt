@@ -3,21 +3,76 @@ package jp.awabi2048.cccontent.features.fishing
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.World
-import java.util.UUID
+import org.bukkit.block.Block
+import org.bukkit.block.data.Waterlogged
+import java.util.Random
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
+import kotlin.math.pow
 
 enum class FishQuality(val id: String, val multiplier: Double) {
     COMMON("common", 1.0),
-    UNCOMMON("uncommon", 1.25),
-    RARE("rare", 1.6),
-    EPIC("epic", 2.2),
-    LEGENDARY("legendary", 3.0);
+    RARE("rare", 1.5),
+    LEGENDARY("legendary", 2.25);
+
+    val stars: String
+        get() {
+            val filled = ordinal + 1
+            val empty = entries.size - filled
+            return "§e" + "★".repeat(filled) +
+                if (empty > 0) "§7" + "☆".repeat(empty) else ""
+        }
 
     companion object {
-        fun fromId(id: String): FishQuality = entries.firstOrNull { it.id.equals(id, true) }
+        fun fromConfigId(id: String): FishQuality = entries.firstOrNull { it.id.equals(id, true) }
             ?: error("Unknown fish quality: $id")
+
+        fun fromStoredId(id: String): FishQuality = when (id.lowercase()) {
+            "common" -> COMMON
+            "uncommon", "rare" -> RARE
+            "epic", "legendary" -> LEGENDARY
+            else -> error("Unknown stored fish quality: $id")
+        }
+
+        fun normalizeStoredCounts(counts: Map<String, Long>): Map<FishQuality, Long> =
+            counts.entries.groupingBy { fromStoredId(it.key) }.fold(0L) { total, entry -> total + entry.value }
     }
+}
+
+enum class FishRarity { COMMON, RARE, SPECIAL }
+
+data class FishFightProfile(
+    val targetCenter: Double,
+    val driftPerStep: Double,
+    val directionPersistence: Double,
+    val durationMultiplier: Double
+)
+
+enum class FishingWaterType(val id: String) {
+    ANY("any"),
+    SHORE("shore"),
+    NARROW("narrow"),
+    OPEN("open"),
+    DEEP_OPEN("deep_open");
+
+    companion object {
+        fun fromConfigId(id: String): FishingWaterType = entries.firstOrNull { it.id.equals(id, true) }
+            ?: error("Unknown fishing water type: $id")
+    }
+}
+
+data class FishingWaterProfile(
+    val depth: Int,
+    val width: Int
+)
+
+data class FishingWaterCondition(
+    val type: FishingWaterType,
+    val depth: IntRange,
+    val width: IntRange
+) {
+    fun matches(profile: FishingWaterProfile): Boolean =
+        profile.depth in depth && profile.width in width
 }
 
 data class FishDefinition(
@@ -28,22 +83,93 @@ data class FishDefinition(
     val biomes: Set<String>,
     val weather: Set<FishingWeather>,
     val times: Set<FishingTime>,
-    val bobberY: IntRange,
-    val bobberDistance: IntRange,
+    val water: FishingWaterCondition,
     val qualities: Map<FishQuality, Int>,
-    val exp: Long
+    val exp: Long,
+    val rarity: FishRarity,
+    val requiredBaitTags: Set<String>,
+    val fight: FishFightProfile
+)
+
+data class BaitDefinition(
+    val id: String,
+    val material: Material,
+    val waitTimeMultiplier: Double,
+    val rareCatchMultiplier: Double,
+    val qualityMultiplier: Double,
+    val specialTags: Set<String>
+)
+
+data class RodDefinition(
+    val id: String,
+    val powerMultiplier: Double,
+    val finesseMultiplier: Double,
+    val maxDurability: Int
 )
 
 data class FishingContext(
     val world: World,
     val bobber: Location,
-    val professionLevel: Int,
-    val randomSeed: Long = 0L
+    val fisherLevel: Int,
+    val waterProfile: FishingWaterProfile? = FishingWaterAnalyzer.analyze(bobber)
 ) {
     val biome: String get() = bobber.block.biome.key.key
     val weather: FishingWeather get() = if (world.hasStorm()) FishingWeather.RAIN else FishingWeather.CLEAR
     val time: FishingTime get() = FishingTime.fromWorldTime(world.time)
-    val distanceFromOrigin: Int get() = bobber.distance(bobber.clone().apply { y = 0.0 }).roundToInt()
+}
+
+object FishingWaterAnalyzer {
+    private const val MAX_DEPTH = 32
+    private const val WIDTH_RADIUS = 16
+    private val waterPlants = setOf(
+        Material.KELP,
+        Material.KELP_PLANT,
+        Material.SEAGRASS,
+        Material.TALL_SEAGRASS,
+        Material.BUBBLE_COLUMN
+    )
+    private val widthAxes = listOf(
+        (1 to 0) to (-1 to 0),
+        (0 to 1) to (0 to -1),
+        (1 to 1) to (-1 to -1),
+        (1 to -1) to (-1 to 1)
+    )
+
+    fun analyze(location: Location): FishingWaterProfile? {
+        val initial = sequenceOf(location.block, location.block.getRelative(0, -1, 0), location.block.getRelative(0, 1, 0))
+            .firstOrNull(::isWater) ?: return null
+        var surface = initial
+        var ascent = 0
+        while (ascent < MAX_DEPTH) {
+            val above = surface.getRelative(0, 1, 0)
+            if (!isWater(above)) break
+            surface = above
+            ascent++
+        }
+        var depth = 0
+        var cursor = surface
+        while (depth < MAX_DEPTH && isWater(cursor)) {
+            depth++
+            cursor = cursor.getRelative(0, -1, 0)
+        }
+        val width = widthAxes.minOf { (positive, negative) ->
+            1 + runLength(surface, positive.first, positive.second) +
+                runLength(surface, negative.first, negative.second)
+        }
+        return FishingWaterProfile(depth, width)
+    }
+
+    private fun runLength(origin: Block, dx: Int, dz: Int): Int {
+        for (distance in 1..WIDTH_RADIUS) {
+            if (!isWater(origin.getRelative(dx * distance, 0, dz * distance))) return distance - 1
+        }
+        return WIDTH_RADIUS
+    }
+
+    fun isWater(block: Block): Boolean =
+        block.type == Material.WATER ||
+            block.type in waterPlants ||
+            (block.blockData as? Waterlogged)?.isWaterlogged == true
 }
 
 enum class FishingWeather { CLEAR, RAIN }
@@ -71,32 +197,143 @@ data class FishCatch(
 )
 
 object FishingCatchSelector {
-    fun select(context: FishingContext, definitions: List<FishDefinition>, random: java.util.Random): FishCatch? {
-        val candidates = definitions.filter { definition ->
-            context.professionLevel >= definition.minLevel &&
-                (definition.biomes.isEmpty() || definition.biomes.any { it.equals(context.biome, true) }) &&
-                (definition.weather.isEmpty() || context.weather in definition.weather) &&
-                (definition.times.isEmpty() || context.time in definition.times) &&
-                context.bobber.blockY in definition.bobberY &&
-                context.distanceFromOrigin in definition.bobberDistance
-        }
-        if (candidates.isEmpty()) return null
-        val selected = weighted(candidates, random) { it.weight }
-        val quality = weighted(selected.qualities.entries.toList(), random) { it.value }.key
-        val size = random.nextInt(41) + 10
-        val weight = (size * (random.nextInt(91) + 80) / 10.0).roundToInt()
-        return FishCatch(selected.id, selected.material, weight, quality, size, (selected.exp * quality.multiplier).roundToLong())
+    fun candidates(
+        context: FishingContext,
+        definitions: List<FishDefinition>,
+        bait: BaitDefinition?,
+        checkWater: Boolean = true
+    ): List<FishDefinition> = definitions.filter { definition ->
+        context.fisherLevel >= definition.minLevel &&
+            (definition.biomes.isEmpty() || definition.biomes.any { it.equals(context.biome, true) }) &&
+            (definition.weather.isEmpty() || context.weather in definition.weather) &&
+            (definition.times.isEmpty() || context.time in definition.times) &&
+            (!checkWater || context.waterProfile?.let(definition.water::matches) == true) &&
+            (definition.requiredBaitTags.isEmpty() ||
+                bait?.specialTags?.containsAll(definition.requiredBaitTags) == true)
     }
 
-    private fun <T> weighted(items: List<T>, random: java.util.Random, weight: (T) -> Int): T {
-        val total = items.sumOf { weight(it).coerceAtLeast(0) }
-        require(total > 0) { "Fishing weights must contain a positive value" }
-        var cursor = random.nextInt(total)
-        for (item in items) {
-            cursor -= weight(item).coerceAtLeast(0)
-            if (cursor < 0) return item
+    fun select(
+        context: FishingContext,
+        definitions: List<FishDefinition>,
+        bait: BaitDefinition?,
+        rod: RodDefinition?,
+        random: Random
+    ): Pair<FishDefinition, FishCatch>? {
+        val candidates = candidates(context, definitions, bait)
+        if (candidates.isEmpty()) return null
+        val rareMultiplier = bait?.rareCatchMultiplier ?: 1.0
+        val selected = weighted(candidates, random) { definition ->
+            definition.weight * when (definition.rarity) {
+                FishRarity.COMMON -> 1.0
+                FishRarity.RARE, FishRarity.SPECIAL -> rareMultiplier
+            }
+        }
+        val qualityMultiplier = (bait?.qualityMultiplier ?: 1.0) * (rod?.finesseMultiplier ?: 1.0)
+        val quality = weighted(selected.qualities.entries.toList(), random) { entry ->
+            entry.value * (1.0 + (qualityMultiplier - 1.0) * entry.key.ordinal)
+        }.key
+        val size = random.nextInt(41) + 10
+        val weight = (size * (random.nextInt(91) + 80) / 10.0).roundToInt()
+        val catch = FishCatch(
+            selected.id,
+            selected.material,
+            weight,
+            quality,
+            size,
+            (selected.exp * quality.multiplier).roundToLong()
+        )
+        return selected to catch
+    }
+
+    private fun <T> weighted(items: List<T>, random: Random, weight: (T) -> Double): T {
+        val weights = items.map { weight(it).coerceAtLeast(0.0) }
+        val total = weights.sum()
+        require(total > 0.0) { "Fishing weights must contain a positive value" }
+        var cursor = random.nextDouble() * total
+        items.forEachIndexed { index, item ->
+            cursor -= weights[index]
+            if (cursor < 0.0) return item
         }
         return items.last()
+    }
+}
+
+enum class FishingEffectivenessZone(val successChance: Double) {
+    GREEN(1.0),
+    YELLOW(0.5),
+    ORANGE(0.3)
+}
+
+enum class FishingFightStatus(val messageId: String) {
+    HOOKED("hooked"),
+    STEADY("steady"),
+    CONTROL("control"),
+    RESISTING("resisting"),
+    FOCUS("focus"),
+    DANGER("danger"),
+    RECOVER("recover");
+
+    companion object {
+        fun candidates(zone: FishingEffectivenessZone): List<FishingFightStatus> = when (zone) {
+            FishingEffectivenessZone.GREEN -> listOf(STEADY, CONTROL)
+            FishingEffectivenessZone.YELLOW -> listOf(RESISTING, FOCUS)
+            FishingEffectivenessZone.ORANGE -> listOf(DANGER, RECOVER)
+        }
+    }
+}
+
+data class FishingFightState(
+    val effectiveness: Double,
+    val remainingTicks: Long,
+    val driftDirection: Int,
+    val driftVelocity: Double,
+    val lateralOffset: Double,
+    val lateralVelocity: Double,
+    val lateralTarget: Double
+) {
+    constructor(effectiveness: Double, remainingTicks: Long, driftDirection: Int) :
+        this(effectiveness, remainingTicks, driftDirection, 0.0, 0.0, 0.0, 0.0)
+
+    fun zone(profile: FishFightProfile, greenWidth: Double, yellowMargin: Double): FishingEffectivenessZone {
+        val distance = kotlin.math.abs(effectiveness - profile.targetCenter)
+        return when {
+            distance <= greenWidth / 2.0 -> FishingEffectivenessZone.GREEN
+            distance <= greenWidth / 2.0 + yellowMargin -> FishingEffectivenessZone.YELLOW
+            else -> FishingEffectivenessZone.ORANGE
+        }
+    }
+
+    fun applyInput(delta: Double): FishingFightState =
+        copy(effectiveness = (effectiveness + delta).coerceIn(0.0, 100.0))
+
+    fun advance(
+        profile: FishFightProfile,
+        intervalTicks: Long,
+        stability: Double,
+        resistanceSmoothing: Double,
+        lateralSmoothing: Double,
+        random: Random
+    ): FishingFightState {
+        val keepDirection = random.nextDouble() < profile.directionPersistence
+        val nextDirection = if (keepDirection) driftDirection else -driftDirection
+        val stepScale = intervalTicks.toDouble() / 5.0
+        val targetDrift = profile.driftPerStep * stepScale *
+            (1.0 - stability.coerceIn(0.0, 0.9)) * nextDirection
+        val resistanceBlend = 1.0 - (1.0 - resistanceSmoothing.coerceIn(0.01, 1.0)).pow(stepScale)
+        val nextDrift = driftVelocity + (targetDrift - driftVelocity) * resistanceBlend
+        val keepLateralTarget = random.nextDouble() < profile.directionPersistence
+        val nextLateralTarget = if (keepLateralTarget) lateralTarget else random.nextDouble() * 2.0 - 1.0
+        val lateralBlend = 1.0 - (1.0 - lateralSmoothing.coerceIn(0.01, 1.0)).pow(stepScale)
+        val nextLateralOffset = lateralOffset + (nextLateralTarget - lateralOffset) * lateralBlend
+        return copy(
+            effectiveness = (effectiveness + nextDrift).coerceIn(0.0, 100.0),
+            remainingTicks = (remainingTicks - intervalTicks).coerceAtLeast(0L),
+            driftDirection = nextDirection,
+            driftVelocity = nextDrift,
+            lateralOffset = nextLateralOffset,
+            lateralVelocity = nextLateralOffset - lateralOffset,
+            lateralTarget = nextLateralTarget
+        )
     }
 }
 
@@ -130,21 +367,5 @@ object FishdexPage {
         val pages = pageCount(entries.size, entriesPerPage)
         val safePage = page.coerceIn(0, pages - 1)
         return entries.drop(safePage * entriesPerPage).take(entriesPerPage)
-    }
-}
-
-enum class FishingInputResult { ACCEPTED, COMPLETE, FAILED }
-
-/** 捕獲中の入力判定をUIイベントから分離し、交互入力の境界を固定する。 */
-data class FishingInputState(
-    val progress: Int,
-    val required: Int,
-    val expectedLeft: Boolean
-) {
-    fun accept(leftClick: Boolean, hasRod: Boolean): Pair<FishingInputResult, FishingInputState> {
-        if (!hasRod || leftClick != expectedLeft) return FishingInputResult.FAILED to this
-        val nextProgress = progress + 1
-        val result = if (nextProgress >= required) FishingInputResult.COMPLETE else FishingInputResult.ACCEPTED
-        return result to copy(progress = nextProgress, expectedLeft = !expectedLeft)
     }
 }

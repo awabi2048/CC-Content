@@ -1,77 +1,131 @@
-minigame:
-  click_count: 5
-  timeout_ticks: 120
-
-schema_version: 1
+schema_version: 9
 enabled: true
+
+wait_time:
+  min_ticks: 100
+  max_ticks: 600
+
+minigame:
+  hook_window_ticks: 30
+  fight_duration_ticks: 200
+  fight_interval_ticks: 1
+  green_width: 10
+  yellow_margin: 20
+  input_step: 3
+  initial_effectiveness: 50
+  status_message_ticks: 60
+  lure_reduction_per_level: 0.2
+  resistance_smoothing: 0.25
+  lateral_smoothing: 0.18
+  visual_forward_range: 2.5
+  visual_lateral_range: 1.6
+  facing_bonus_multiplier: 1.5
+
+rod:
+  standard:
+    power_multiplier: 1.25
+    finesse_multiplier: 1.15
+    max_durability: 128
+
+bait:
+  worm:
+    material: STRING
+    wait_time_multiplier: 0.85
+    rare_catch_multiplier: 1.0
+    quality_multiplier: 1.0
+  lucky_worm:
+    material: GLOW_INK_SAC
+    wait_time_multiplier: 0.95
+    rare_catch_multiplier: 1.6
+    quality_multiplier: 1.35
+  deep_sea_bait:
+    material: NAUTILUS_SHELL
+    wait_time_multiplier: 1.1
+    rare_catch_multiplier: 2.0
+    quality_multiplier: 1.5
+    special_tags: [ancient]
 
 fish:
   cod:
     material: COD
     weight: 55
+    rarity: common
     min_level: 1
-    exp: 5
-    bobber_y:
-      min: 0
-      max: 320
-    bobber_distance:
-      min: 0
-      max: 100000
-    quality:
-      common: 70
-      uncommon: 22
-      rare: 7
-      epic: 1
+    water:
+      type: any
+      depth: { min: 1, max: 32 }
+      width: { min: 1, max: 33 }
+    quality: { common: 75, rare: 23, legendary: 2 }
+    fight:
+      target_center: 50
+      drift_per_step: 10.5
+      direction_persistence: 0.55
+      duration_multiplier: 0.9
   salmon:
     material: SALMON
     weight: 30
+    rarity: common
     min_level: 1
-    exp: 7
     biomes: [river, frozen_river, ocean, cold_ocean]
-    bobber_y:
-      min: 0
-      max: 320
-    bobber_distance:
-      min: 0
-      max: 100000
-    quality:
-      common: 65
-      uncommon: 25
-      rare: 9
-      epic: 1
+    water:
+      type: narrow
+      depth: { min: 1, max: 32 }
+      width: { min: 1, max: 12 }
+    quality: { common: 68, rare: 29, legendary: 3 }
+    fight:
+      target_center: 42
+      drift_per_step: 15
+      direction_persistence: 0.65
+      duration_multiplier: 1.0
   pufferfish:
     material: PUFFERFISH
     weight: 10
+    rarity: rare
     min_level: 5
-    exp: 12
     weather: [clear]
     times: [day, dusk]
-    bobber_y:
-      min: 40
-      max: 320
-    bobber_distance:
-      min: 0
-      max: 100000
-    quality:
-      common: 50
-      uncommon: 30
-      rare: 15
-      epic: 5
+    water:
+      type: shore
+      depth: { min: 1, max: 8 }
+      width: { min: 1, max: 20 }
+    quality: { common: 52, rare: 40, legendary: 8 }
+    fight:
+      target_center: 63
+      drift_per_step: 21
+      direction_persistence: 0.72
+      duration_multiplier: 1.1
   tropical_fish:
     material: TROPICAL_FISH
     weight: 5
+    rarity: rare
     min_level: 10
-    exp: 20
     biomes: [warm_ocean, lukewarm_ocean, deep_lukewarm_ocean]
     weather: [clear]
-    bobber_y:
-      min: 30
-      max: 320
-    bobber_distance:
-      min: 0
-      max: 100000
-    quality:
-      uncommon: 45
-      rare: 35
-      epic: 15
-      legendary: 5
+    water:
+      type: open
+      depth: { min: 2, max: 32 }
+      width: { min: 13, max: 33 }
+    quality: { common: 45, rare: 40, legendary: 15 }
+    fight:
+      target_center: 35
+      drift_per_step: 27
+      direction_persistence: 0.78
+      duration_multiplier: 1.2
+  ancient_coelacanth:
+    material: TROPICAL_FISH
+    weight: 2
+    rarity: special
+    min_level: 15
+    biomes: [deep_ocean, deep_cold_ocean, deep_frozen_ocean, deep_lukewarm_ocean]
+    times: [night, dawn]
+    water:
+      type: deep_open
+      depth: { min: 8, max: 32 }
+      width: { min: 21, max: 33 }
+    required_bait_tags: [ancient]
+    quality: { common: 20, rare: 55, legendary: 25 }
+    fight:
+      target_center: 72
+      drift_per_step: 36
+      direction_persistence: 0.84
+      duration_multiplier: 1.35

@@ -5,54 +5,165 @@ import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 
-data class FishingSettings(val enabled: Boolean, val fishes: List<FishDefinition>, val clickCount: Int, val timeoutTicks: Long) {
+data class FishingMiniGameSettings(
+    val baseHookWindowTicks: Long,
+    val baseFightDurationTicks: Long,
+    val fightIntervalTicks: Long,
+    val greenWidth: Double,
+    val yellowMargin: Double,
+    val inputStep: Double,
+    val initialEffectiveness: Double,
+    val statusMessageTicks: Long,
+    val lureReductionPerLevel: Double,
+    val resistanceSmoothing: Double,
+    val lateralSmoothing: Double,
+    val visualForwardRange: Double,
+    val visualLateralRange: Double,
+    val facingBonusMultiplier: Double,
+    val waitTimeMinTicks: Int,
+    val waitTimeMaxTicks: Int
+)
+
+data class FishingSettings(
+    val enabled: Boolean,
+    val fishes: List<FishDefinition>,
+    val baits: List<BaitDefinition>,
+    val rods: List<RodDefinition>,
+    val minigame: FishingMiniGameSettings
+) {
     companion object {
         fun load(plugin: JavaPlugin): FishingSettings {
-            val file = File(plugin.dataFolder, "config/fishing/fish.yml")
-            if (!file.exists()) {
-                file.parentFile.mkdirs()
-                plugin.saveResource("config/fishing/fish.yml", false)
-            }
+            val file = ensureResource(plugin, "config/fishing/fish.yml")
+            val expFile = ensureResource(plugin, "config/rank/job_exp.yml")
             val config = YamlConfiguration.loadConfiguration(file)
-            require(config.get("schema_version") is Number && config.getInt("schema_version") == 1) { "config/fishing/fish.yml.schema_version must be the integer 1" }
+            val expConfig = YamlConfiguration.loadConfiguration(expFile)
+            require(config.get("schema_version") is Number && config.getInt("schema_version") == 9) {
+                "config/fishing/fish.yml.schema_version must be the integer 9"
+            }
             require(config.get("enabled") is Boolean) { "config/fishing/fish.yml.enabled must be a boolean" }
+            val fisherExp = expConfig.getConfigurationSection("fisher")
+                ?: error("config/rank/job_exp.yml.fisher is required")
             val fishes = config.getConfigurationSection("fish")?.getKeys(false).orEmpty().map { id ->
                 val path = "fish.$id"
                 val qualities = config.getConfigurationSection("$path.quality")?.getKeys(false).orEmpty().associate {
-                    FishQuality.fromId(it) to config.getInt("$path.quality.$it")
+                    FishQuality.fromConfigId(it) to positiveInt(config.get("$path.quality.$it"), "$path.quality.$it")
                 }
+                val fight = FishFightProfile(
+                    targetCenter = finiteRange(config.get("$path.fight.target_center"), 0.0, 100.0, "$path.fight.target_center"),
+                    driftPerStep = finiteRange(config.get("$path.fight.drift_per_step"), 0.0, 100.0, "$path.fight.drift_per_step"),
+                    directionPersistence = finiteRange(config.get("$path.fight.direction_persistence"), 0.0, 1.0, "$path.fight.direction_persistence"),
+                    durationMultiplier = positiveDouble(config.get("$path.fight.duration_multiplier"), "$path.fight.duration_multiplier")
+                )
                 FishDefinition(
                     id = id,
-                    material = Material.matchMaterial(requireString(config.getString("$path.material"), "$path.material")) ?: error("$path.material is invalid"),
-                    weight = requirePositiveInt(config.get("$path.weight"), "$path.weight"),
-                    minLevel = requirePositiveInt(config.get("$path.min_level"), "$path.min_level"),
+                    material = material(config.getString("$path.material"), "$path.material"),
+                    weight = positiveInt(config.get("$path.weight"), "$path.weight"),
+                    minLevel = positiveInt(config.get("$path.min_level"), "$path.min_level"),
                     biomes = config.getStringList("$path.biomes").toSet(),
                     weather = config.getStringList("$path.weather").map { FishingWeather.valueOf(it.uppercase()) }.toSet(),
                     times = config.getStringList("$path.times").map { FishingTime.valueOf(it.uppercase()) }.toSet(),
-                    bobberY = requireRange(config, "$path.bobber_y"),
-                    bobberDistance = requireRange(config, "$path.bobber_distance"),
+                    water = FishingWaterCondition(
+                        type = FishingWaterType.fromConfigId(requireString(config.getString("$path.water.type"), "$path.water.type")),
+                        depth = positiveRange(config, "$path.water.depth"),
+                        width = positiveRange(config, "$path.water.width")
+                    ),
                     qualities = qualities.also { require(it.isNotEmpty()) { "$path.quality must not be empty" } },
-                    exp = requirePositiveLong(config.get("$path.exp"), "$path.exp")
+                    exp = positiveLong(fisherExp.get(id), "config/rank/job_exp.yml.fisher.$id"),
+                    rarity = FishRarity.valueOf(requireString(config.getString("$path.rarity"), "$path.rarity").uppercase()),
+                    requiredBaitTags = config.getStringList("$path.required_bait_tags").toSet(),
+                    fight = fight
                 )
             }
             require(fishes.isNotEmpty()) { "config/fishing/fish.yml に魚定義がありません" }
-            return FishingSettings(
-                config.get("enabled") as Boolean,
-                fishes,
-                requirePositiveInt(config.get("minigame.click_count"), "minigame.click_count"),
-                requirePositiveLong(config.get("minigame.timeout_ticks"), "minigame.timeout_ticks")
+            require(fisherExp.getKeys(false) == fishes.map { it.id }.toSet()) {
+                "config/rank/job_exp.yml.fisher must define exactly the fishing fish ids"
+            }
+            val baits = config.getConfigurationSection("bait")?.getKeys(false).orEmpty().map { id ->
+                val path = "bait.$id"
+                BaitDefinition(
+                    id,
+                    material(config.getString("$path.material"), "$path.material"),
+                    positiveDouble(config.get("$path.wait_time_multiplier"), "$path.wait_time_multiplier"),
+                    positiveDouble(config.get("$path.rare_catch_multiplier"), "$path.rare_catch_multiplier"),
+                    positiveDouble(config.get("$path.quality_multiplier"), "$path.quality_multiplier"),
+                    config.getStringList("$path.special_tags").toSet()
+                )
+            }
+            require(baits.isNotEmpty()) { "config/fishing/fish.yml.bait must not be empty" }
+            val rods = config.getConfigurationSection("rod")?.getKeys(false).orEmpty().map { id ->
+                val path = "rod.$id"
+                RodDefinition(
+                    id,
+                    positiveDouble(config.get("$path.power_multiplier"), "$path.power_multiplier"),
+                    positiveDouble(config.get("$path.finesse_multiplier"), "$path.finesse_multiplier"),
+                    positiveInt(config.get("$path.max_durability"), "$path.max_durability")
+                )
+            }
+            require(rods.isNotEmpty()) { "config/fishing/fish.yml.rod must not be empty" }
+            val minigame = FishingMiniGameSettings(
+                positiveLong(config.get("minigame.hook_window_ticks"), "minigame.hook_window_ticks"),
+                positiveLong(config.get("minigame.fight_duration_ticks"), "minigame.fight_duration_ticks"),
+                positiveLong(config.get("minigame.fight_interval_ticks"), "minigame.fight_interval_ticks"),
+                finiteRange(config.get("minigame.green_width"), 1.0, 100.0, "minigame.green_width"),
+                finiteRange(config.get("minigame.yellow_margin"), 0.0, 100.0, "minigame.yellow_margin"),
+                positiveDouble(config.get("minigame.input_step"), "minigame.input_step"),
+                finiteRange(config.get("minigame.initial_effectiveness"), 0.0, 100.0, "minigame.initial_effectiveness"),
+                positiveLong(config.get("minigame.status_message_ticks"), "minigame.status_message_ticks"),
+                finiteRange(config.get("minigame.lure_reduction_per_level"), 0.0, 0.9, "minigame.lure_reduction_per_level"),
+                finiteRange(config.get("minigame.resistance_smoothing"), 0.01, 1.0, "minigame.resistance_smoothing"),
+                finiteRange(config.get("minigame.lateral_smoothing"), 0.01, 1.0, "minigame.lateral_smoothing"),
+                positiveDouble(config.get("minigame.visual_forward_range"), "minigame.visual_forward_range"),
+                positiveDouble(config.get("minigame.visual_lateral_range"), "minigame.visual_lateral_range"),
+                positiveDouble(config.get("minigame.facing_bonus_multiplier"), "minigame.facing_bonus_multiplier"),
+                positiveInt(config.get("wait_time.min_ticks"), "wait_time.min_ticks"),
+                positiveInt(config.get("wait_time.max_ticks"), "wait_time.max_ticks")
             )
+            require(minigame.waitTimeMinTicks <= minigame.waitTimeMaxTicks) {
+                "wait_time.min_ticks must not exceed wait_time.max_ticks"
+            }
+            return FishingSettings(config.getBoolean("enabled"), fishes, baits, rods, minigame)
         }
 
-        private fun requireString(value: String?, path: String): String = requireNotNull(value) { "$path is required" }.also { require(it.isNotBlank()) { "$path must not be blank" } }
-        private fun requirePositiveInt(value: Any?, path: String): Int = require(value is Number && value.toDouble() == value.toInt().toDouble() && value.toInt() > 0) { "$path must be a positive integer" }.let { value.toInt() }
-        private fun requirePositiveLong(value: Any?, path: String): Long = require(value is Number && value.toDouble() == value.toLong().toDouble() && value.toLong() > 0) { "$path must be a positive integer" }.let { value.toLong() }
-        private fun requireRange(config: YamlConfiguration, path: String): IntRange {
-            val min = requireNonNegativeLong(config.get("$path.min"), "$path.min").toInt()
-            val max = requireNonNegativeLong(config.get("$path.max"), "$path.max").toInt()
+        private fun ensureResource(plugin: JavaPlugin, path: String): File {
+            val file = File(plugin.dataFolder, path)
+            if (!file.exists()) {
+                file.parentFile.mkdirs()
+                plugin.saveResource(path, false)
+            }
+            return file
+        }
+
+        private fun requireString(value: String?, path: String): String =
+            requireNotNull(value) { "$path is required" }.also { require(it.isNotBlank()) { "$path must not be blank" } }
+
+        private fun material(value: String?, path: String): Material =
+            Material.matchMaterial(requireString(value, path)) ?: error("$path is invalid")
+
+        private fun positiveInt(value: Any?, path: String): Int =
+            require(value is Number && value.toDouble() == value.toInt().toDouble() && value.toInt() > 0) {
+                "$path must be a positive integer"
+            }.let { value.toInt() }
+
+        private fun positiveLong(value: Any?, path: String): Long =
+            require(value is Number && value.toDouble() == value.toLong().toDouble() && value.toLong() > 0) {
+                "$path must be a positive integer"
+            }.let { value.toLong() }
+
+        private fun positiveDouble(value: Any?, path: String): Double =
+            require(value is Number && value.toDouble().isFinite() && value.toDouble() > 0.0) {
+                "$path must be a positive finite number"
+            }.let { value.toDouble() }
+
+        private fun finiteRange(value: Any?, min: Double, max: Double, path: String): Double =
+            require(value is Number && value.toDouble().isFinite() && value.toDouble() in min..max) {
+                "$path must be between $min and $max"
+            }.let { value.toDouble() }
+
+        private fun positiveRange(config: YamlConfiguration, path: String): IntRange {
+            val min = positiveInt(config.get("$path.min"), "$path.min")
+            val max = positiveInt(config.get("$path.max"), "$path.max")
             require(min <= max) { "$path.min must not exceed $path.max" }
             return min..max
         }
-        private fun requireNonNegativeLong(value: Any?, path: String): Long = require(value is Number && value.toDouble() == value.toLong().toDouble() && value.toLong() >= 0) { "$path must be a non-negative integer" }.let { value.toLong() }
     }
 }
