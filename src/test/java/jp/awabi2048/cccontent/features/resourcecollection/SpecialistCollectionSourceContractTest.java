@@ -24,6 +24,13 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("ProfessionExperience.SPECIALIST_ACTION"));
         assertTrue(source.contains("event.interactionPoint"));
         assertTrue(source.contains("event.isCancelled = true"));
+        assertTrue(source.contains(".coerceIn(1, 24)"));
+        assertTrue(source.contains("ProfessionExperience.batchExperience(processed)"));
+        assertTrue(source.contains("profile.batchProcessingEnabled"));
+        assertTrue(source.contains("giveResource(player, \"heartwood\", 1)"));
+        assertTrue(source.contains("resource.gathering_guide"));
+        assertTrue(source.contains("resource.gathering_sickle"));
+        assertTrue(source.contains("gatheringTargets[player.uniqueId] = targets"));
         assertFalse(source.contains("Enchantment.FORTUNE"));
         assertFalse(normalRewards.contains("addProfessionExp"));
         assertFalse(normalRewards.contains("CraftItemEvent"));

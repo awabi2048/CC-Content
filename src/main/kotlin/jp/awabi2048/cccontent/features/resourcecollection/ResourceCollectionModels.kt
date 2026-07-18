@@ -35,6 +35,32 @@ object ResourceMaterialPolicy {
         Material.MELON, Material.PUMPKIN, Material.SUGAR_CANE, Material.CACTUS,
         Material.BAMBOO, Material.KELP, Material.KELP_PLANT
     )
+    private val wildVegetation = setOf(
+        Material.SHORT_GRASS,
+        Material.TALL_GRASS,
+        Material.FERN,
+        Material.LARGE_FERN,
+        Material.DANDELION,
+        Material.POPPY,
+        Material.BLUE_ORCHID,
+        Material.ALLIUM,
+        Material.AZURE_BLUET,
+        Material.RED_TULIP,
+        Material.ORANGE_TULIP,
+        Material.WHITE_TULIP,
+        Material.PINK_TULIP,
+        Material.OXEYE_DAISY,
+        Material.CORNFLOWER,
+        Material.LILY_OF_THE_VALLEY,
+        Material.BROWN_MUSHROOM,
+        Material.RED_MUSHROOM,
+        Material.MOSS_BLOCK,
+        Material.VINE,
+        Material.SEAGRASS,
+        Material.TALL_SEAGRASS,
+        Material.KELP,
+        Material.KELP_PLANT
+    )
 
     fun classify(material: Material, blockData: BlockData): ResourceCollectionKind? = when {
         material in ores -> ResourceCollectionKind.MINERAL
@@ -48,6 +74,8 @@ object ResourceMaterialPolicy {
         val ageable = blockData as? Ageable ?: return false
         return ageable.age >= ageable.maximumAge
     }
+
+    fun isWildVegetation(material: Material): Boolean = material in wildVegetation
 }
 
 object NormalResourceBonusPolicy {

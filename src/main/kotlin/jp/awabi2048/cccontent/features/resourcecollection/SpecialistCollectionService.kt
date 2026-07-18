@@ -8,6 +8,7 @@ import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.profile.LumberjackSkillProfile
 import jp.awabi2048.cccontent.features.rank.profession.profile.MinerSkillProfile
+import jp.awabi2048.cccontent.features.rank.profession.profile.FarmerSkillProfile
 import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionExperience
 import jp.awabi2048.cccontent.items.CustomItemManager
 import net.kyori.adventure.text.Component
@@ -27,6 +28,7 @@ import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockDamageEvent
+import org.bukkit.event.block.BlockDropItemEvent
 import org.bukkit.event.player.PlayerChangedWorldEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerItemHeldEvent
@@ -37,7 +39,9 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import org.bukkit.util.Vector
 import java.util.Random
+import java.util.ArrayDeque
 import java.util.UUID
+import java.time.Instant
 
 class SpecialistCollectionService(
     private val plugin: JavaPlugin,
@@ -68,15 +72,32 @@ class SpecialistCollectionService(
 
     private val chiselSessions = mutableMapOf<UUID, ChiselSession>()
     private val occupiedBlocks = mutableMapOf<BlockKey, UUID>()
+    private val gatheringTargets = mutableMapOf<UUID, MutableMap<BlockKey, Pair<String, Instant>>>()
+    private val gatheringCooldowns = mutableMapOf<UUID, Instant>()
 
     fun shutdown() {
         chiselSessions.keys.toList().forEach { cancelChisel(it, null) }
         occupiedBlocks.clear()
+        gatheringTargets.clear()
+        gatheringCooldowns.clear()
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     fun onChiselBlockDamage(event: BlockDamageEvent) {
-        if (CustomItemManager.identify(event.player.inventory.itemInMainHand)?.fullId == "resource.chisel") {
+        val customId = CustomItemManager.identify(event.player.inventory.itemInMainHand)?.fullId
+        val shouldCancel = when (customId) {
+            "resource.chisel" -> true
+            "resource.mining_hammer" ->
+                (rankManager.getTypedProfessionProfile(event.player.uniqueId) as? MinerSkillProfile)
+                    ?.batchProcessingEnabled == true &&
+                    ResourceMaterialPolicy.classify(event.block.type, event.block.blockData) == ResourceCollectionKind.MINERAL
+            "resource.felling_axe" ->
+                (rankManager.getTypedProfessionProfile(event.player.uniqueId) as? LumberjackSkillProfile)
+                    ?.batchProcessingEnabled == true &&
+                    ResourceMaterialPolicy.classify(event.block.type, event.block.blockData) == ResourceCollectionKind.FOREST
+            else -> false
+        }
+        if (shouldCancel) {
             event.isCancelled = true
         }
     }
@@ -90,12 +111,207 @@ class SpecialistCollectionService(
             handleChiselClick(event, block)
             return
         }
+        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.mining_hammer") {
+            handleBatchBreak(event, block, ResourceCollectionKind.MINERAL)
+            return
+        }
+        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.felling_axe") {
+            handleBatchBreak(event, block, ResourceCollectionKind.FOREST)
+            return
+        }
         if (event.action != Action.RIGHT_CLICK_BLOCK || !event.player.isSneaking) return
         when (customId) {
             "resource.woodworking_hatchet" -> processPlacedLog(event, block, precise = false)
             "resource.woodworking_knife" -> processPlacedLog(event, block, precise = true)
+            "resource.gathering_guide" -> inspectVegetation(event, block)
             else -> scheduleBarkReward(event, block)
         }
+    }
+
+    private fun handleBatchBreak(
+        event: PlayerInteractEvent,
+        origin: Block,
+        expectedKind: ResourceCollectionKind
+    ) {
+        val player = event.player
+        val profile = rankManager.getTypedProfessionProfile(player.uniqueId)
+        val enabled = when {
+            expectedKind == ResourceCollectionKind.MINERAL && profile is MinerSkillProfile ->
+                profile.batchProcessingEnabled
+            expectedKind == ResourceCollectionKind.FOREST && profile is LumberjackSkillProfile ->
+                profile.batchProcessingEnabled
+            else -> false
+        }
+        if (!enabled || ResourceMaterialPolicy.classify(origin.type, origin.blockData) != expectedKind) return
+        event.isCancelled = true
+        if (!isReadyNatural(origin)) {
+            player.sendMessage(message(player, "resource_collection.error.natural_resource_required"))
+            return
+        }
+        val originalMaterial = origin.type
+        val treeRoot = expectedKind == ResourceCollectionKind.FOREST && isTreeRoot(origin)
+        val maximum = when (profile) {
+            is MinerSkillProfile -> profile.maximumBatchSize
+            is LumberjackSkillProfile -> profile.maximumBatchSize
+            else -> 1
+        }.coerceIn(1, 24)
+        val targets = collectConnectedNatural(origin, expectedKind, maximum)
+        var processed = 0
+        for (block in targets) {
+            if (!callProtectedBreak(block, player)) continue
+            val tool = if (expectedKind == ResourceCollectionKind.MINERAL) {
+                ItemStack(Material.IRON_PICKAXE)
+            } else {
+                ItemStack(Material.IRON_AXE)
+            }
+            block.breakNaturally(tool, true)
+            processed++
+        }
+        if (processed <= 0) {
+            player.sendMessage(message(player, "resource_collection.error.protected"))
+            return
+        }
+        if (treeRoot) {
+            giveResource(player, "heartwood", 1)
+        }
+        val durabilitySaveChance = when (profile) {
+            is MinerSkillProfile -> profile.durabilitySaveChance
+            is LumberjackSkillProfile -> profile.durabilitySaveChance
+            else -> 0.0
+        }
+        if (player.gameMode != GameMode.CREATIVE) {
+            repeat(processed) {
+                if (random.nextDouble() >= durabilitySaveChance) player.damageItemStack(EquipmentSlot.HAND, 1)
+            }
+        }
+        awardBatch(player, expectedKind, processed, originalMaterial)
+        player.sendMessage(message(player, "resource_collection.batch.completed", "count" to processed))
+        player.playSound(player.location, Sound.BLOCK_DEEPSLATE_BREAK, 0.8f, 1.0f)
+    }
+
+    private fun collectConnectedNatural(
+        origin: Block,
+        kind: ResourceCollectionKind,
+        maximum: Int
+    ): List<Block> {
+        val queue = ArrayDeque<Block>()
+        val visited = mutableSetOf<BlockKey>()
+        val result = mutableListOf<Block>()
+        queue.add(origin)
+        while (queue.isNotEmpty() && result.size < maximum) {
+            val block = queue.removeFirst()
+            if (!visited.add(block.key())) continue
+            if (ResourceMaterialPolicy.classify(block.type, block.blockData) != kind || !isReadyNatural(block)) continue
+            result += block
+            listOf(
+                BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH,
+                BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
+            ).forEach { queue.add(block.getRelative(it)) }
+        }
+        return result
+    }
+
+    private fun isTreeRoot(block: Block): Boolean =
+        ResourceMaterialPolicy.classify(block.getRelative(BlockFace.DOWN).type, block.getRelative(BlockFace.DOWN).blockData) !=
+            ResourceCollectionKind.FOREST
+
+    private fun awardBatch(player: Player, kind: ResourceCollectionKind, processed: Int, material: Material) {
+        val experience = ProfessionExperience.batchExperience(processed)
+        rankManager.addProfessionExp(player.uniqueId, experience)
+        rankManager.recordProfessionCycleAction(player.uniqueId)
+        val actionType = if (kind == ResourceCollectionKind.MINERAL) {
+            ContentActionType.MINERAL_EXTRACTED
+        } else {
+            ContentActionType.TREE_PROCESSED
+        }
+        CCSystem.getAPI().getContentActionDispatcher().publish(
+            ContentAction(
+                actionId = UUID.randomUUID(),
+                schemaVersion = 1,
+                occurredAt = CCSystem.getAPI().getSharedClockService().now().toInstant(),
+                playerId = player.uniqueId,
+                actionType = actionType,
+                amount = processed.toLong(),
+                worldKey = player.world.key,
+                metadata = mapOf(
+                    "material" to material.key.toString(),
+                    "batch" to "true",
+                    "experience" to experience.toString()
+                )
+            )
+        )
+    }
+
+    private fun inspectVegetation(event: PlayerInteractEvent, origin: Block) {
+        event.isCancelled = true
+        val player = event.player
+        val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? FarmerSkillProfile
+        if (profile == null || !profile.expertOperationUnlocked ||
+            !RankReleasePolicy.canAccessProfession(player, Profession.FARMER)) {
+            player.sendMessage(message(player, "resource_collection.error.farmer_required"))
+            return
+        }
+        if (!isReadyWorld(origin) || !ResourceMaterialPolicy.isWildVegetation(origin.type) ||
+            !CCSystem.getAPI().getNaturalOriginRegistry().isNatural(origin)) {
+            player.sendMessage(message(player, "resource_collection.error.natural_vegetation_required"))
+            return
+        }
+        val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
+        val cooldownUntil = gatheringCooldowns[player.uniqueId]
+        if (cooldownUntil != null && cooldownUntil.isAfter(now)) {
+            player.sendMessage(message(player, "resource_collection.gathering.cooldown"))
+            return
+        }
+        val radius = profile.inspectionRadius.coerceAtLeast(2)
+        val expiresAt = now.plusSeconds(60)
+        val resourceId = seasonalPlantResourceId()
+        val targets = mutableMapOf<BlockKey, Pair<String, Instant>>()
+        for (x in -radius..radius) for (y in -2..2) for (z in -radius..radius) {
+            val block = origin.getRelative(x, y, z)
+            if (!ResourceMaterialPolicy.isWildVegetation(block.type)) continue
+            if (!CCSystem.getAPI().getNaturalOriginRegistry().isNatural(block)) continue
+            targets[block.key()] = resourceId to expiresAt
+            player.spawnParticle(
+                Particle.HAPPY_VILLAGER,
+                block.location.add(0.5, 0.7, 0.5),
+                3,
+                0.18,
+                0.15,
+                0.18,
+                0.0
+            )
+        }
+        gatheringTargets[player.uniqueId] = targets
+        val cooldownSeconds = profile.inspectionCooldownSeconds.takeIf { it > 0 } ?: 45
+        gatheringCooldowns[player.uniqueId] = now.plusSeconds(cooldownSeconds.toLong())
+        player.sendMessage(message(player, "resource_collection.gathering.inspected", "count" to targets.size))
+        player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.25f)
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onGatheringDrops(event: BlockDropItemEvent) {
+        val player = event.player
+        if (CustomItemManager.identify(player.inventory.itemInMainHand)?.fullId != "resource.gathering_sickle") return
+        val targets = gatheringTargets[player.uniqueId] ?: return
+        val target = targets.remove(event.block.key()) ?: return
+        val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
+        if (target.second.isBefore(now)) return
+        val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? FarmerSkillProfile ?: return
+        val amount = profile.guaranteedSpecialistPlantYield.coerceAtLeast(1) +
+            if (random.nextDouble() < profile.specialistPlantExtraChance) 1 else 0
+        giveResource(player, target.first, amount)
+        if (player.gameMode != GameMode.CREATIVE && random.nextDouble() >= profile.durabilitySaveChance) {
+            player.damageItemStack(EquipmentSlot.HAND, 1)
+        }
+        awardSpecialist(player, ContentActionType.PLANT_GATHERED, amount > 1, event.blockState.type)
+        player.sendMessage(message(player, "resource_collection.gathering.completed", "amount" to amount))
+    }
+
+    private fun seasonalPlantResourceId(): String = when (CCSystem.getAPI().getSharedClockService().now().monthValue) {
+        in 3..5 -> "mugwort"
+        in 6..8 -> "mint"
+        in 9..11 -> "porcini"
+        else -> "rosehip"
     }
 
     private fun handleChiselClick(event: PlayerInteractEvent, block: Block) {
@@ -344,7 +560,11 @@ class SpecialistCollectionService(
     }
 
     @EventHandler
-    fun onQuit(event: PlayerQuitEvent) = cancelChisel(event.player.uniqueId, null)
+    fun onQuit(event: PlayerQuitEvent) {
+        cancelChisel(event.player.uniqueId, null)
+        gatheringTargets.remove(event.player.uniqueId)
+        gatheringCooldowns.remove(event.player.uniqueId)
+    }
 
     @EventHandler
     fun onWorldChanged(event: PlayerChangedWorldEvent) =
