@@ -29,6 +29,7 @@ import org.bukkit.event.block.Action
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockDamageEvent
 import org.bukkit.event.block.BlockDropItemEvent
+import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.player.PlayerChangedWorldEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerItemHeldEvent
@@ -318,7 +319,18 @@ class SpecialistCollectionService(
             is LumberjackSkillProfile -> profile.maximumBatchSize
             else -> 1
         }.coerceIn(1, 24)
-        val targets = collectConnectedNatural(origin, expectedKind, maximum)
+        val targets = collectConnectedNatural(
+            origin,
+            expectedKind,
+            maximum,
+            includeDiagonalTrunks = profile is LumberjackSkillProfile && profile.multiTrunkRecognitionImproved
+        )
+        val leaves = if (expectedKind == ResourceCollectionKind.FOREST &&
+            profile is LumberjackSkillProfile && profile.leafCleanupEnabled) {
+            collectTreeLeaves(origin, targets, maximum = 256)
+        } else {
+            emptyList()
+        }
         var processed = 0
         for (block in targets) {
             if (!callProtectedBreak(block, player)) continue
@@ -327,15 +339,21 @@ class SpecialistCollectionService(
             } else {
                 ItemStack(Material.IRON_AXE)
             }
-            block.breakNaturally(tool, true)
-            processed++
+            if (block.breakNaturally(tool, true)) processed++
         }
         if (processed <= 0) {
             player.sendMessage(message(player, "resource_collection.error.protected"))
             return
         }
-        if (treeRoot) {
+        val completeTreeBatch = expectedKind == ResourceCollectionKind.FOREST && processed == targets.size
+        if (treeRoot && completeTreeBatch) {
             giveResource(player, "heartwood", 1)
+        }
+        if (completeTreeBatch && profile is LumberjackSkillProfile) {
+            if (profile.leafCleanupEnabled) cleanupTreeLeaves(player, leaves)
+            if (profile.automaticReplantEnabled && treeRoot) {
+                replantTree(player, origin, originalMaterial)
+            }
         }
         val durabilitySaveChance = when (profile) {
             is MinerSkillProfile -> profile.durabilitySaveChance
@@ -355,7 +373,8 @@ class SpecialistCollectionService(
     private fun collectConnectedNatural(
         origin: Block,
         kind: ResourceCollectionKind,
-        maximum: Int
+        maximum: Int,
+        includeDiagonalTrunks: Boolean = false
     ): List<Block> {
         val queue = ArrayDeque<Block>()
         val visited = mutableSetOf<BlockKey>()
@@ -366,12 +385,96 @@ class SpecialistCollectionService(
             if (!visited.add(block.key())) continue
             if (ResourceMaterialPolicy.classify(block.type, block.blockData) != kind || !isReadyNatural(block)) continue
             result += block
+            val faces = listOf(
+                BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH,
+                BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
+            )
+            faces.forEach { queue.add(block.getRelative(it)) }
+            if (includeDiagonalTrunks && kind == ResourceCollectionKind.FOREST) {
+                for (x in -1..1) for (z in -1..1) {
+                    if (x == 0 && z == 0) continue
+                    queue.add(block.getRelative(x, 0, z))
+                }
+            }
+        }
+        return result
+    }
+
+    private fun collectTreeLeaves(origin: Block, trunks: List<Block>, maximum: Int): List<Block> {
+        val result = mutableListOf<Block>()
+        val visited = mutableSetOf<BlockKey>()
+        val queue = ArrayDeque<Block>()
+        trunks.forEach { trunk ->
+            for (x in -1..1) for (y in -1..1) for (z in -1..1) {
+                if (x == 0 && y == 0 && z == 0) continue
+                queue.add(trunk.getRelative(x, y, z))
+            }
+        }
+        while (queue.isNotEmpty() && result.size < maximum) {
+            val block = queue.removeFirst()
+            if (!visited.add(block.key())) continue
+            if (kotlin.math.abs(block.x - origin.x) > 8 ||
+                block.y !in (origin.y - 2)..(origin.y + 18) ||
+                kotlin.math.abs(block.z - origin.z) > 8) continue
+            if (!ResourceMaterialPolicy.isLeaf(block.type) || !isReadyNatural(block)) continue
+            result += block
             listOf(
                 BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH,
                 BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
             ).forEach { queue.add(block.getRelative(it)) }
         }
         return result
+    }
+
+    private fun cleanupTreeLeaves(player: Player, leaves: List<Block>): Int {
+        var processed = 0
+        for (leaf in leaves) {
+            if (!ResourceMaterialPolicy.isLeaf(leaf.type) || !callProtectedBreak(leaf, player)) continue
+            leaf.breakNaturally()
+            processed++
+        }
+        return processed
+    }
+
+    private fun replantTree(player: Player, root: Block, originalMaterial: Material): Boolean {
+        if (!root.type.isAir || !ResourceMaterialPolicy.canPlantTreeOn(root.getRelative(BlockFace.DOWN).type)) return false
+        val sapling = ResourceMaterialPolicy.treeReplantMaterial(originalMaterial) ?: return false
+        if (player.gameMode != GameMode.CREATIVE && !hasItem(player, sapling)) return false
+
+        val replacedState = root.state
+        root.type = sapling
+        val placeEvent = BlockPlaceEvent(
+            root,
+            replacedState,
+            root.getRelative(BlockFace.DOWN),
+            ItemStack(sapling),
+            player,
+            true,
+            EquipmentSlot.HAND
+        )
+        Bukkit.getPluginManager().callEvent(placeEvent)
+        if (placeEvent.isCancelled || !placeEvent.canBuild()) {
+            root.type = Material.AIR
+            return false
+        }
+        if (player.gameMode != GameMode.CREATIVE && !consumeOne(player, sapling)) {
+            root.type = Material.AIR
+            return false
+        }
+        CCSystem.getAPI().getNaturalOriginRegistry().markPlayerPlaced(root)
+        player.playSound(root.location, Sound.BLOCK_ROOTED_DIRT_PLACE, 0.8f, 1.1f)
+        return true
+    }
+
+    private fun hasItem(player: Player, material: Material): Boolean =
+        player.inventory.contents.any { it?.type == material && it.amount > 0 }
+
+    private fun consumeOne(player: Player, material: Material): Boolean {
+        val slot = player.inventory.contents.indexOfFirst { it?.type == material && it.amount > 0 }
+        if (slot < 0) return false
+        val stack = player.inventory.getItem(slot) ?: return false
+        if (stack.amount <= 1) player.inventory.setItem(slot, null) else stack.amount -= 1
+        return true
     }
 
     private fun isTreeRoot(block: Block): Boolean =

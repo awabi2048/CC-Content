@@ -28,6 +28,10 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("ProfessionExperience.batchExperience(processed)"));
         assertTrue(source.contains("profile.batchProcessingEnabled"));
         assertTrue(source.contains("giveResource(player, \"heartwood\", 1)"));
+        assertTrue(source.contains("profile.leafCleanupEnabled"));
+        assertTrue(source.contains("profile.automaticReplantEnabled"));
+        assertTrue(source.contains("BlockPlaceEvent("));
+        assertTrue(source.contains("markPlayerPlaced(root)"));
         assertTrue(source.contains("resource.gathering_guide"));
         assertTrue(source.contains("resource.gathering_sickle"));
         assertTrue(source.contains("gatheringTargets[player.uniqueId] = targets"));

@@ -76,6 +76,38 @@ object ResourceMaterialPolicy {
     }
 
     fun isWildVegetation(material: Material): Boolean = material in wildVegetation
+
+    fun isLeaf(material: Material): Boolean = material.name.endsWith("_LEAVES") ||
+        material == Material.NETHER_WART_BLOCK || material == Material.WARPED_WART_BLOCK
+
+    fun treeReplantMaterial(material: Material): Material? = when (material) {
+        Material.OAK_LOG -> Material.OAK_SAPLING
+        Material.BIRCH_LOG -> Material.BIRCH_SAPLING
+        Material.SPRUCE_LOG -> Material.SPRUCE_SAPLING
+        Material.JUNGLE_LOG -> Material.JUNGLE_SAPLING
+        Material.ACACIA_LOG -> Material.ACACIA_SAPLING
+        Material.DARK_OAK_LOG -> Material.DARK_OAK_SAPLING
+        Material.MANGROVE_LOG -> Material.MANGROVE_PROPAGULE
+        Material.CHERRY_LOG -> Material.CHERRY_SAPLING
+        Material.PALE_OAK_LOG -> Material.PALE_OAK_SAPLING
+        Material.CRIMSON_STEM -> Material.CRIMSON_FUNGUS
+        Material.WARPED_STEM -> Material.WARPED_FUNGUS
+        else -> null
+    }
+
+    fun canPlantTreeOn(material: Material): Boolean = material in setOf(
+        Material.DIRT,
+        Material.GRASS_BLOCK,
+        Material.PODZOL,
+        Material.COARSE_DIRT,
+        Material.ROOTED_DIRT,
+        Material.MOSS_BLOCK,
+        Material.MUD,
+        Material.CLAY,
+        Material.CRIMSON_NYLIUM,
+        Material.WARPED_NYLIUM,
+        Material.SOUL_SOIL
+    )
 }
 
 object NormalResourceBonusPolicy {
