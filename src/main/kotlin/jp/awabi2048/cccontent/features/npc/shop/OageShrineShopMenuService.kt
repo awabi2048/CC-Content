@@ -202,7 +202,7 @@ class OageShrineShopMenuService(
                 GuiLoreBlock(headLore.map(GuiLoreLine::Text)),
                 GuiLoreBlock(buildList {
                     add(GuiLoreLine.Data(text(player, "shop.item.offering_label"), ContentEconomyBridge.formatAcorn(price), "§e"))
-                    if (limit != null) add(GuiLoreLine.Data(text(player, "shop.item.exchange_limit_label"), "$limit", "§b"))
+                    if (limit != null) add(GuiLoreLine.Data(text(player, "shop.item.exchange_limit_label"), "$limit${text(player, "shop.item.exchange_limit_unit")}", "§b"))
                 })
             ))
         )
@@ -213,7 +213,7 @@ class OageShrineShopMenuService(
             Material.LIME_CONCRETE,
             text(player, "confirm.confirm_button.name"),
             list(player, "confirm.confirm_button.lore").map(GuiLoreLine::Text) + listOf(
-                GuiLoreLine.ComponentData(text(player, "shop.item.target_label"), legacy(resolved.displayName), "§f"),
+                GuiLoreLine.Component(legacy(resolved.displayName)),
                 GuiLoreLine.Data(text(player, "shop.item.offering_label"), ContentEconomyBridge.formatAcorn(resolved.item.price), "§e")
             )
         )

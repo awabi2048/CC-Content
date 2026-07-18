@@ -69,7 +69,7 @@ class DungeonEntranceGui(private val loader: StructureLoader, val tier: DungeonT
             MessageManager.getMessage(player, "gui_style_name"),
             listOf(
                 GuiLoreLine.Data(MessageManager.getMessage(player, "gui_current_setting_label"), styleLabel, "§e"),
-                singleAction(player, MessageManager.getMessage(player, "gui_change_action"))
+                singleAction(player, MessageManager.getMessage(player, "gui_style_action"))
             )
         )
         val styleMeta = styleItem.itemMeta as? org.bukkit.inventory.meta.LeatherArmorMeta
@@ -86,7 +86,7 @@ class DungeonEntranceGui(private val loader: StructureLoader, val tier: DungeonT
                 MessageManager.getMessage(player, "gui_size_name"),
                 listOf(
                     GuiLoreLine.Data(MessageManager.getMessage(player, "gui_current_setting_label"), sizeLabel, "§e"),
-                    singleAction(player, MessageManager.getMessage(player, "gui_change_action"))
+                    singleAction(player, MessageManager.getMessage(player, "gui_size_action"))
                 )
             )
             val sizeMeta = sizeItem.itemMeta
@@ -118,7 +118,7 @@ class DungeonEntranceGui(private val loader: StructureLoader, val tier: DungeonT
                 MessageManager.getMessage(player, "gui_theme_name"),
                 listOf(
                     GuiLoreLine.Data(MessageManager.getMessage(player, "gui_current_setting_label"), fullDisplayName, "§d"),
-                    singleAction(player, MessageManager.getMessage(player, "gui_change_action"))
+                    singleAction(player, MessageManager.getMessage(player, "gui_theme_action"))
                 )
             )
             inv.setItem(43, themeItem)

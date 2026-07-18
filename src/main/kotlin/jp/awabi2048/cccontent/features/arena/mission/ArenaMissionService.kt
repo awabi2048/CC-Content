@@ -828,8 +828,8 @@ class ArenaMissionService(
         meta.owningPlayer = player
         meta.setDisplayName(ArenaI18n.text(player, "arena.ui.player.name_format", "player" to player.name))
         meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(listOf(
-            GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.player.mob_kills"), playerData.totalMobKillCount, "§e"),
-            GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.player.barrier_restarts"), playerData.barrierRestartCount, "§e"),
+            GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.player.mob_kills"), "${playerData.totalMobKillCount} ${ArenaI18n.text(player, "arena.ui.player.mob_kills_unit")}", "§e"),
+            GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.player.barrier_restarts"), "${playerData.barrierRestartCount} ${ArenaI18n.text(player, "arena.ui.player.barrier_restarts_unit")}", "§e"),
         ), GuiLoreFrame.BOTH)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
@@ -849,7 +849,7 @@ class ArenaMissionService(
         val nextTier = currentTier.next()
         val lore = mutableListOf<GuiLoreLine>()
         lore += GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.license_card.current_license"), licenseTierDisplayName(player, currentTier), "§e")
-        lore += GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.license_card.allowed_difficulty"), difficultyDisplay(currentTier.maxDifficultyStar), "§c")
+        lore += GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.license_card.allowed_difficulty"), "${difficultyDisplay(currentTier.maxDifficultyStar)} ${ArenaI18n.text(player, "arena.ui.license_card.allowed_difficulty_suffix")}", "§c")
         lore += GuiLoreLine.Spacer
         lore += GuiLoreLine.Text(ArenaI18n.text(player, "arena.ui.license_card.next_header"))
 
