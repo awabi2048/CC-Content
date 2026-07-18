@@ -57,3 +57,22 @@ object NormalResourceBonusPolicy {
         return random.nextDouble() < chance
     }
 }
+
+object ChiselRewardPolicy {
+    fun specialMaterialCount(
+        averageAccuracy: Double,
+        minimumStandardEnabled: Boolean,
+        topEvaluationExtra: Int
+    ): Int {
+        require(averageAccuracy in 0.0..1.0) { "Chisel accuracy must be between 0 and 1" }
+        require(topEvaluationExtra >= 0) { "Chisel top-evaluation bonus must not be negative" }
+        val base = when {
+            averageAccuracy >= 0.90 -> 3
+            averageAccuracy >= 0.70 -> 2
+            averageAccuracy >= 0.40 -> 1
+            minimumStandardEnabled -> 1
+            else -> 0
+        }
+        return base + if (averageAccuracy >= 0.90) topEvaluationExtra else 0
+    }
+}

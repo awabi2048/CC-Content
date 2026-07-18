@@ -8,6 +8,7 @@ import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionExperience
 import jp.awabi2048.cccontent.features.resourcecollection.ResourceCollectionKind
 import jp.awabi2048.cccontent.features.resourcecollection.ResourceMaterialPolicy
+import jp.awabi2048.cccontent.features.resourcecollection.SpecialistCollectionService
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockBreakEvent
@@ -23,6 +24,7 @@ class ProfessionMinerExpListener(
     @EventHandler(ignoreCancelled = true)
     fun onBlockBreak(event: BlockBreakEvent) {
         val player = event.player
+        if (SpecialistCollectionService.isInternalBreak(player.uniqueId, event.block)) return
         val profession = rankManager.getPlayerProfession(player.uniqueId)?.profession ?: return
         val kind = ResourceMaterialPolicy.classify(event.block.type, event.block.blockData) ?: return
         if (kind.profession != profession) return

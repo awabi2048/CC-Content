@@ -13,14 +13,31 @@ import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 
 class ResourceCollectionItems(plugin: JavaPlugin) {
-    private data class Definition(val id: String, val model: Material, val tags: Set<String>)
+    private data class Definition(
+        val id: String,
+        val model: Material,
+        val tags: Set<String> = emptySet(),
+        val base: Material = Material.POISONOUS_POTATO,
+        val stackable: Boolean = true
+    )
 
     private val resourceIdKey = NamespacedKey(plugin, "resource_id")
     private val resourceTagsKey = NamespacedKey(plugin, "resource_tags")
     private val definitions = listOf(
         Definition("mica_flake", Material.AMETHYST_SHARD, setOf("mineral", "insulating")),
+        Definition("rock_salt", Material.QUARTZ, setOf("mineral", "seasoning")),
+        Definition("calcite_fragment", Material.CALCITE, setOf("mineral", "carbonate")),
+        Definition("sulfur", Material.GLOWSTONE_DUST, setOf("mineral", "reactive")),
         Definition("resin", Material.SLIME_BALL, setOf("wood", "resin")),
-        Definition("straw", Material.PAPER, setOf("plant", "fiber"))
+        Definition("straw", Material.PAPER, setOf("plant", "fiber")),
+        Definition("heartwood", Material.STRIPPED_OAK_LOG, setOf("wood", "structural")),
+        Definition("bark", Material.PAPER, setOf("wood", "bark")),
+        Definition("timber_beam", Material.STRIPPED_OAK_LOG, setOf("wood", "processed", "structural")),
+        Definition("chisel", Material.IRON_PICKAXE, base = Material.IRON_PICKAXE, stackable = false),
+        Definition("woodworking_hatchet", Material.IRON_AXE, base = Material.IRON_AXE, stackable = false),
+        Definition("woodworking_knife", Material.SHEARS, base = Material.SHEARS, stackable = false),
+        Definition("gathering_guide", Material.BOOK, base = Material.BOOK, stackable = false),
+        Definition("gathering_sickle", Material.IRON_HOE, base = Material.IRON_HOE, stackable = false)
     )
 
     fun register() {
@@ -38,28 +55,32 @@ class ResourceCollectionItems(plugin: JavaPlugin) {
         override val displayName = definition.id
         override val itemModel = NamespacedKey.minecraft(definition.model.key.key)
         override val canPlace = false
+        override val canStack = definition.stackable
 
         override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
         override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-            val item = ItemStack(Material.POISONOUS_POTATO, amount)
+            val item = ItemStack(definition.base, if (definition.stackable) amount else 1)
             val meta = item.itemMeta
             meta.displayName(Component.text(message(player, "custom_items.resource.${definition.id}.name"))
                 .decoration(TextDecoration.ITALIC, false))
             meta.lore(listOf(Component.text(message(player, "custom_items.resource.${definition.id}.description"))
                 .decoration(TextDecoration.ITALIC, false)))
-            meta.persistentDataContainer.set(resourceIdKey, PersistentDataType.STRING, definition.id)
-            meta.persistentDataContainer.set(
-                resourceTagsKey,
-                PersistentDataType.STRING,
-                definition.tags.sorted().joinToString(",")
-            )
+            if (definition.tags.isNotEmpty()) {
+                meta.persistentDataContainer.set(resourceIdKey, PersistentDataType.STRING, definition.id)
+                meta.persistentDataContainer.set(
+                    resourceTagsKey,
+                    PersistentDataType.STRING,
+                    definition.tags.sorted().joinToString(",")
+                )
+            }
             item.itemMeta = meta
             return item
         }
 
         override fun matches(item: ItemStack): Boolean =
-            item.itemMeta?.persistentDataContainer?.get(resourceIdKey, PersistentDataType.STRING) == definition.id
+            definition.tags.isNotEmpty() &&
+                item.itemMeta?.persistentDataContainer?.get(resourceIdKey, PersistentDataType.STRING) == definition.id
 
         private fun message(player: Player?, key: String): String =
             CCSystem.getAPI().getI18nString(player, key).replace('&', '§')

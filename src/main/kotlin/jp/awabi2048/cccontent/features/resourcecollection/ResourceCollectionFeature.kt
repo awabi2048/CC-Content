@@ -20,6 +20,7 @@ class ResourceCollectionFeature(
 ) : Listener {
     private lateinit var settings: ResourceCollectionSettings
     private lateinit var items: ResourceCollectionItems
+    private lateinit var specialist: SpecialistCollectionService
 
     fun initialize() {
         settings = ResourceCollectionSettings.load(plugin)
@@ -27,11 +28,14 @@ class ResourceCollectionFeature(
         items = ResourceCollectionItems(plugin)
         items.register()
         plugin.server.pluginManager.registerEvents(this, plugin)
+        specialist = SpecialistCollectionService(plugin, rankManager, random)
+        plugin.server.pluginManager.registerEvents(specialist, plugin)
         plugin.logger.info("Resource Collection: normal bonus resources enabled; legacy EXP and craft rules disabled")
     }
 
     fun shutdown() {
         if (::items.isInitialized) items.unregister()
+        if (::specialist.isInitialized) specialist.shutdown()
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
