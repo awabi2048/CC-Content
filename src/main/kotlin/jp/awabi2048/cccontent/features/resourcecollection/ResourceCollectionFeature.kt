@@ -1,55 +1,56 @@
 package jp.awabi2048.cccontent.features.resourcecollection
 
+import com.awabi2048.ccsystem.CCSystem
 import jp.awabi2048.cccontent.features.rank.RankManager
-import jp.awabi2048.cccontent.features.rank.profession.Profession
+import jp.awabi2048.cccontent.features.rank.profession.profile.FarmerSkillProfile
+import jp.awabi2048.cccontent.features.rank.profession.profile.LumberjackSkillProfile
+import jp.awabi2048.cccontent.features.rank.profession.profile.MinerSkillProfile
+import jp.awabi2048.cccontent.items.CustomItemManager
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
-import org.bukkit.event.block.BlockBreakEvent
-import org.bukkit.event.inventory.CraftItemEvent
+import org.bukkit.event.block.BlockDropItemEvent
 import org.bukkit.plugin.java.JavaPlugin
+import java.util.Random
 
 class ResourceCollectionFeature(
     private val plugin: JavaPlugin,
-    private val rankManager: RankManager
+    private val rankManager: RankManager,
+    private val random: Random = Random()
 ) : Listener {
     private lateinit var settings: ResourceCollectionSettings
-    private val rewardGuard = CollectionRewardGuard()
+    private lateinit var items: ResourceCollectionItems
 
     fun initialize() {
         settings = ResourceCollectionSettings.load(plugin)
-        if (settings.enabled) plugin.server.pluginManager.registerEvents(this, plugin)
+        if (!settings.enabled) return
+        items = ResourceCollectionItems(plugin)
+        items.register()
+        plugin.server.pluginManager.registerEvents(this, plugin)
+        plugin.logger.info("Resource Collection: normal bonus resources enabled; legacy EXP and craft rules disabled")
     }
 
-    fun shutdown() = rewardGuard.clear()
+    fun shutdown() {
+        if (::items.isInitialized) items.unregister()
+    }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    fun onHarvest(event: BlockBreakEvent) {
+    fun onBlockDrops(event: BlockDropItemEvent) {
+        val kind = ResourceMaterialPolicy.classify(event.blockState.type, event.blockState.blockData) ?: return
+        if (settings.normalBonusEnabled[kind] != true) return
         val player = event.player
-        if (player.world.name !in settings.worlds) return
-        val rule = settings.harvestRules[event.block.type] ?: return
-        if (rankManager.getPlayerProfession(player.uniqueId)?.profession != rule.profession) return
-        // FarmerのブロックEXPはRank側で付与済みのため、資源収集側では二重付与しない。
-        if (rule.profession == Profession.FARMER) return
-        val age = event.block.blockData.asAgeableOrNull()?.age
-        if (rule.minimumAge != null && age != null && age < rule.minimumAge) return
-        grant(CollectionAction.HARVEST, player.uniqueId.toString(), event, rule)
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    fun onCraft(event: CraftItemEvent) {
-        val player = event.whoClicked as? org.bukkit.entity.Player ?: return
-        if (player.world.name !in settings.worlds) return
-        val rule = settings.craftRules[event.recipe.result.type] ?: return
-        if (rankManager.getPlayerProfession(player.uniqueId)?.profession != rule.profession) return
-        grant(CollectionAction.CRAFT, player.uniqueId.toString(), event, rule)
-    }
-
-    private fun grant(action: CollectionAction, playerId: String, sourceId: Any, rule: CollectionRule) {
-        rewardGuard.tryGrant(CollectionRewardKey(action, playerId, sourceId)) {
-            rankManager.addProfessionExp(java.util.UUID.fromString(playerId), rule.experience)
+        if (rankManager.getPlayerProfession(player.uniqueId)?.profession != kind.profession) return
+        val chance = when (val profile = rankManager.getTypedProfessionProfile(player.uniqueId)) {
+            is MinerSkillProfile -> profile.ordinaryExtraDropChance
+            is LumberjackSkillProfile -> profile.ordinaryExtraDropChance
+            is FarmerSkillProfile -> profile.byproductChance
+            else -> return
         }
+        val natural = CCSystem.getAPI().getNaturalOriginRegistry().isNatural(
+            event.block.world.key, event.block.x, event.block.y, event.block.z
+        )
+        if (!NormalResourceBonusPolicy.succeeds(chance, natural, random)) return
+        val bonus = CustomItemManager.createItemForPlayer("resource.${kind.bonusItemId}", player, 1) ?: return
+        event.block.world.dropItemNaturally(event.block.location.add(0.5, 0.5, 0.5), bonus)
     }
 }
-
-private fun org.bukkit.block.data.BlockData.asAgeableOrNull(): org.bukkit.block.data.Ageable? = this as? org.bukkit.block.data.Ageable

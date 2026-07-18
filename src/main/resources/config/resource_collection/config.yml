@@ -1,7 +1,8 @@
-﻿config_version: 2
+﻿config_version: 3
 enabled: true
 
-# HarderResourceWorld の applied_worlds と同じく、資源収集を許可するワールド名を明示します。
-worlds:
-  - resource
+normal_bonus:
+  mineral: true
+  forest: true
+  crop: true
 

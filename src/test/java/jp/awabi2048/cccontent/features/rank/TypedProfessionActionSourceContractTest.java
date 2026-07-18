@@ -19,10 +19,13 @@ class TypedProfessionActionSourceContractTest {
         assertTrue(source.contains("ContentActionType.MINERAL_EXTRACTED"));
         assertTrue(source.contains("ContentActionType.TREE_PROCESSED"));
         assertTrue(source.contains("ContentActionType.CROP_HARVESTED"));
+        assertTrue(source.contains("getNaturalOriginRegistry().isNatural(event.block)"));
+        assertTrue(source.contains("ResourceMaterialPolicy.classify"));
         assertTrue(source.contains("recordProfessionCycleAction"));
         assertFalse(source.contains("YamlConfiguration"));
         assertFalse(source.contains("job_exp.yml"));
         assertFalse(source.contains("mock_exp"));
+        assertFalse(source.contains("IgnoreBlockStore"));
     }
 
     @Test

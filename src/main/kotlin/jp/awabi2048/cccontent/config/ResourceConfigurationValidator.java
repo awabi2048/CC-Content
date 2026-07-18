@@ -819,29 +819,12 @@ public final class ResourceConfigurationValidator {
         Map<String, Object> config = rootMap(configs, configFile, errors);
         if (config != null) {
             requireBoolean(config, "enabled", configFile, "enabled", errors);
-            Object worlds = config.get("worlds");
-            if (!(worlds instanceof List<?> list) || list.isEmpty() || list.stream().anyMatch(value -> !isNonBlankString(value))) {
-                errors.add(format("invalid world list", configFile, "worlds", "non-empty list of strings is required"));
-            }
-        }
-        Path collectionFile = configRoot.resolve("resource_collection/collection.yml");
-        Map<String, Object> root = rootMap(configs, collectionFile, errors);
-        if (root == null) return;
-        for (String sectionName : List.of("harvest", "craft")) {
-            Map<String, Object> section = requireMap(root, sectionName, collectionFile, errors);
-            if (section == null) continue;
-            requireNonEmpty(section, collectionFile, sectionName, errors);
-            for (Map.Entry<String, Object> entry : section.entrySet()) {
-                String path = sectionName + "." + entry.getKey();
-                Map<String, Object> rule = asMap(entry.getValue());
-                if (rule == null) {
-                    errors.add(format("invalid resource collection rule", collectionFile, path, "rule must be a section"));
-                    continue;
+            Map<String, Object> normalBonus = requireMap(config, "normal_bonus", configFile, errors);
+            if (normalBonus != null) {
+                requireAllowedKeys(normalBonus, Set.of("mineral", "forest", "crop"), configFile, errors);
+                for (String key : List.of("mineral", "forest", "crop")) {
+                    requireBoolean(normalBonus, key, configFile, "normal_bonus." + key, errors);
                 }
-                requireMaterial(rule.get("material"), collectionFile, path + ".material", errors);
-                requireString(rule, "profession", collectionFile, path + ".profession", errors);
-                requirePositiveNumber(rule, "experience", collectionFile, path + ".experience", errors);
-                if (rule.containsKey("minimum_age")) requireNonNegativeNumber(rule, "minimum_age", collectionFile, path + ".minimum_age", errors);
             }
         }
     }

@@ -805,7 +805,7 @@ class CCContent : JavaPlugin(), Listener {
             rankCommand.setTutorialTaskSystem(taskLoader, taskChecker)
 
             // 追加のランク系リスナー登録
-            val minerListener = ProfessionMinerExpListener(rankManager, ignoreBlockStore)
+            val minerListener = ProfessionMinerExpListener(rankManager)
             val combatExpListener = ProfessionCombatExpListener(
                 rankManager,
                 FeatureConfigManager.load(this, FeatureConfigManager.RANK_SETTINGS_PATH)
