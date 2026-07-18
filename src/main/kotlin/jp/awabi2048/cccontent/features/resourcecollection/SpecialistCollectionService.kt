@@ -50,11 +50,15 @@ class SpecialistCollectionService(
 ) : Listener {
     companion object {
         private val internalBreaks = mutableSetOf<String>()
+        private val internalInteractions = mutableSetOf<String>()
 
         fun isInternalBreak(playerId: UUID, block: Block): Boolean =
             internalBreaks.contains(internalBreakKey(playerId, block))
 
         private fun internalBreakKey(playerId: UUID, block: Block): String =
+            "$playerId:${block.world.uid}:${block.x}:${block.y}:${block.z}"
+
+        private fun internalInteractionKey(playerId: UUID, block: Block): String =
             "$playerId:${block.world.uid}:${block.x}:${block.y}:${block.z}"
     }
     private data class BlockKey(val worldId: UUID, val x: Int, val y: Int, val z: Int)
@@ -74,6 +78,7 @@ class SpecialistCollectionService(
     private val occupiedBlocks = mutableMapOf<BlockKey, UUID>()
     private val gatheringTargets = mutableMapOf<UUID, MutableMap<BlockKey, Pair<String, Instant>>>()
     private val gatheringCooldowns = mutableMapOf<UUID, Instant>()
+    private val tillableMaterials = setOf(Material.DIRT, Material.GRASS_BLOCK, Material.DIRT_PATH)
 
     fun shutdown() {
         chiselSessions.keys.toList().forEach { cancelChisel(it, null) }
@@ -95,6 +100,10 @@ class SpecialistCollectionService(
                 (rankManager.getTypedProfessionProfile(event.player.uniqueId) as? LumberjackSkillProfile)
                     ?.batchProcessingEnabled == true &&
                     ResourceMaterialPolicy.classify(event.block.type, event.block.blockData) == ResourceCollectionKind.FOREST
+            "resource.cultivation_hoe" ->
+                (rankManager.getTypedProfessionProfile(event.player.uniqueId) as? FarmerSkillProfile)
+                    ?.areaHarvestEnabled == true &&
+                    ResourceMaterialPolicy.classify(event.block.type, event.block.blockData) == ResourceCollectionKind.CROP
             else -> false
         }
         if (shouldCancel) {
@@ -106,6 +115,7 @@ class SpecialistCollectionService(
     fun onSpecialistInteract(event: PlayerInteractEvent) {
         if (event.hand != EquipmentSlot.HAND) return
         val block = event.clickedBlock ?: return
+        if (internalInteractions.contains(internalInteractionKey(event.player.uniqueId, block))) return
         val customId = CustomItemManager.identify(event.player.inventory.itemInMainHand)?.fullId
         if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.chisel") {
             handleChiselClick(event, block)
@@ -119,12 +129,159 @@ class SpecialistCollectionService(
             handleBatchBreak(event, block, ResourceCollectionKind.FOREST)
             return
         }
+        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.cultivation_hoe") {
+            handleAreaHarvest(event, block)
+            return
+        }
         if (event.action != Action.RIGHT_CLICK_BLOCK || !event.player.isSneaking) return
         when (customId) {
             "resource.woodworking_hatchet" -> processPlacedLog(event, block, precise = false)
             "resource.woodworking_knife" -> processPlacedLog(event, block, precise = true)
             "resource.gathering_guide" -> inspectVegetation(event, block)
+            "resource.cultivation_hoe" -> handleAreaTilling(event, block)
             else -> scheduleBarkReward(event, block)
+        }
+    }
+
+    private fun handleAreaHarvest(event: PlayerInteractEvent, origin: Block) {
+        val player = event.player
+        val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? FarmerSkillProfile ?: return
+        if (!profile.areaHarvestEnabled ||
+            ResourceMaterialPolicy.classify(origin.type, origin.blockData) != ResourceCollectionKind.CROP) return
+        event.isCancelled = true
+        if (!isReadyWorld(origin)) {
+            player.sendMessage(message(player, "resource_collection.error.ready_world_required"))
+            return
+        }
+        val originMaterial = origin.type
+        val radius = profile.operationRadius.coerceIn(1, 3)
+        val candidates = buildList {
+            for (x in -radius..radius) for (z in -radius..radius) {
+                val block = origin.getRelative(x, 0, z)
+                if (ResourceMaterialPolicy.classify(block.type, block.blockData) == ResourceCollectionKind.CROP) {
+                    add(block)
+                }
+            }
+        }
+        var processed = 0
+        for (block in candidates) {
+            val cropType = block.type
+            if (!callProtectedBreak(block, player)) continue
+            block.breakNaturally(ItemStack(Material.IRON_HOE), true)
+            if (profile.automaticReplantEnabled) replantCrop(player, block, cropType, profile)
+            processed++
+        }
+        if (processed <= 0) return
+        damageCultivationTool(player, processed, profile.durabilitySaveChance)
+        awardFarmerArea(player, ContentActionType.CROP_HARVESTED, processed, originMaterial, "harvest")
+        player.sendMessage(message(player, "resource_collection.cultivation.harvested", "count" to processed))
+    }
+
+    private fun handleAreaTilling(event: PlayerInteractEvent, origin: Block) {
+        val player = event.player
+        val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? FarmerSkillProfile ?: return
+        if (!profile.areaTillingEnabled || origin.type !in tillableMaterials) return
+        event.isCancelled = true
+        if (!isReadyWorld(origin)) {
+            player.sendMessage(message(player, "resource_collection.error.ready_world_required"))
+            return
+        }
+        val originMaterial = origin.type
+        val radius = profile.operationRadius.coerceIn(1, 3)
+        plugin.server.scheduler.runTask(plugin, Runnable {
+            if (!player.isOnline ||
+                CustomItemManager.identify(player.inventory.itemInMainHand)?.fullId != "resource.cultivation_hoe") {
+                return@Runnable
+            }
+            var processed = 0
+            for (x in -radius..radius) for (z in -radius..radius) {
+                val block = origin.getRelative(x, 0, z)
+                if (block.type !in tillableMaterials || block.getRelative(BlockFace.UP).type != Material.AIR) continue
+                if (!callProtectedInteract(block, player)) continue
+                block.type = Material.FARMLAND
+                CCSystem.getAPI().getNaturalOriginRegistry().markPlayerPlaced(block)
+                processed++
+            }
+            if (processed <= 0) return@Runnable
+            damageCultivationTool(player, processed, profile.durabilitySaveChance)
+            awardFarmerArea(player, ContentActionType.SOIL_TILLED, processed, originMaterial, "tilling")
+            player.sendMessage(message(player, "resource_collection.cultivation.tilled", "count" to processed))
+        })
+    }
+
+    private fun replantCrop(player: Player, block: Block, cropType: Material, profile: FarmerSkillProfile) {
+        val seed = cropSeed(cropType) ?: return
+        if (!consumeSeedForReplant(player, seed, profile)) return
+        block.type = cropType
+        val data = block.blockData as? org.bukkit.block.data.Ageable ?: return
+        data.age = 0
+        block.blockData = data
+        CCSystem.getAPI().getNaturalOriginRegistry().markPlayerPlaced(block)
+    }
+
+    private fun consumeSeedForReplant(player: Player, seed: Material, profile: FarmerSkillProfile): Boolean {
+        if (player.gameMode == GameMode.CREATIVE) return true
+        val slot = player.inventory.contents.indexOfFirst { it?.type == seed && it.amount > 0 }
+        if (slot < 0) return false
+        val stack = player.inventory.getItem(slot) ?: return false
+        if (profile.seedReserveEnabled && stack.amount <= 1) return false
+        if (random.nextDouble() < profile.seedSaveChance) return true
+        if (stack.amount <= 1) player.inventory.setItem(slot, null) else stack.amount -= 1
+        return true
+    }
+
+    private fun damageCultivationTool(player: Player, count: Int, saveChance: Double) {
+        if (player.gameMode == GameMode.CREATIVE) return
+        repeat(count) {
+            if (random.nextDouble() >= saveChance) player.damageItemStack(EquipmentSlot.HAND, 1)
+        }
+    }
+
+    private fun awardFarmerArea(
+        player: Player,
+        actionType: ContentActionType,
+        processed: Int,
+        material: Material,
+        operation: String
+    ) {
+        val experience = ProfessionExperience.batchExperience(processed)
+        rankManager.addProfessionExp(player.uniqueId, experience)
+        rankManager.recordProfessionCycleAction(player.uniqueId)
+        CCSystem.getAPI().getContentActionDispatcher().publish(
+            ContentAction(
+                actionId = UUID.randomUUID(),
+                schemaVersion = 1,
+                occurredAt = CCSystem.getAPI().getSharedClockService().now().toInstant(),
+                playerId = player.uniqueId,
+                actionType = actionType,
+                amount = processed.toLong(),
+                worldKey = player.world.key,
+                metadata = mapOf(
+                    "material" to material.key.toString(),
+                    "operation" to operation,
+                    "experience" to experience.toString()
+                )
+            )
+        )
+    }
+
+    private fun callProtectedInteract(block: Block, player: Player): Boolean {
+        val key = internalInteractionKey(player.uniqueId, block)
+        internalInteractions.add(key)
+        return try {
+            val event = PlayerInteractEvent(
+                player,
+                Action.RIGHT_CLICK_BLOCK,
+                player.inventory.itemInMainHand,
+                block,
+                BlockFace.UP,
+                EquipmentSlot.HAND
+            )
+            Bukkit.getPluginManager().callEvent(event)
+            event.useInteractedBlock() != Event.Result.DENY &&
+                event.useItemInHand() != Event.Result.DENY
+        } finally {
+            internalInteractions.remove(key)
         }
     }
 
@@ -312,6 +469,16 @@ class SpecialistCollectionService(
         in 6..8 -> "mint"
         in 9..11 -> "porcini"
         else -> "rosehip"
+    }
+
+    private fun cropSeed(crop: Material): Material? = when (crop) {
+        Material.WHEAT -> Material.WHEAT_SEEDS
+        Material.CARROTS -> Material.CARROT
+        Material.POTATOES -> Material.POTATO
+        Material.BEETROOTS -> Material.BEETROOT_SEEDS
+        Material.NETHER_WART -> Material.NETHER_WART
+        Material.SWEET_BERRY_BUSH -> Material.SWEET_BERRIES
+        else -> null
     }
 
     private fun handleChiselClick(event: PlayerInteractEvent, block: Block) {

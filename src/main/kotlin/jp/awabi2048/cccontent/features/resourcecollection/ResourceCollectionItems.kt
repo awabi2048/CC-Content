@@ -43,7 +43,8 @@ class ResourceCollectionItems(plugin: JavaPlugin) {
         Definition("woodworking_hatchet", Material.IRON_AXE, base = Material.IRON_AXE, stackable = false),
         Definition("woodworking_knife", Material.SHEARS, base = Material.SHEARS, stackable = false),
         Definition("gathering_guide", Material.BOOK, base = Material.BOOK, stackable = false),
-        Definition("gathering_sickle", Material.IRON_HOE, base = Material.IRON_HOE, stackable = false)
+        Definition("gathering_sickle", Material.IRON_HOE, base = Material.IRON_HOE, stackable = false),
+        Definition("cultivation_hoe", Material.DIAMOND_HOE, base = Material.DIAMOND_HOE, stackable = false)
     )
 
     fun register() {

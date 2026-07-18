@@ -31,6 +31,13 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("resource.gathering_guide"));
         assertTrue(source.contains("resource.gathering_sickle"));
         assertTrue(source.contains("gatheringTargets[player.uniqueId] = targets"));
+        assertTrue(source.contains("profile.areaTillingEnabled"));
+        assertTrue(source.contains("profile.areaHarvestEnabled"));
+        assertTrue(source.contains("profile.automaticReplantEnabled"));
+        assertTrue(source.contains("profile.seedReserveEnabled"));
+        assertTrue(source.contains("ContentActionType.SOIL_TILLED"));
+        assertTrue(source.contains("callProtectedInteract(block, player)"));
+        assertTrue(source.contains("getNaturalOriginRegistry().markPlayerPlaced(block)"));
         assertFalse(source.contains("Enchantment.FORTUNE"));
         assertFalse(normalRewards.contains("addProfessionExp"));
         assertFalse(normalRewards.contains("CraftItemEvent"));
