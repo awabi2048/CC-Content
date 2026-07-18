@@ -284,7 +284,7 @@ private object StorageBoxCodec {
             val stackBase = (infoEntry?.prototype?.maxStackSize ?: 64).coerceAtLeast(1)
             val stacks = count / stackBase
             val remainder = count % stackBase
-            val autoPickup = storageText(player, if (state.autoStore) "state.on" else "state.off")
+            val autoPickup = storageText(player, if (state.autoStore) "state.item_lore.on" else "state.item_lore.off")
             val autoPickupColor = if (state.autoStore) "§a" else "§c"
             val storedName = infoEntry?.let { getTranslatedItemNameComponent(it.prototype.type) }
                 ?: Component.text(storageText(player, "none")).decoration(TextDecoration.ITALIC, false)
@@ -1136,7 +1136,11 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
                             } else {
                                 storageAction(player, "shift_any", "action.store_type")
                             },
-                            GuiLoreLine.Option(storageText(player, "option.selected"), idx == state.selectedIndex, "§a", "§8")
+                            GuiLoreLine.StyledText(
+                                storageText(player, if (idx == state.selectedIndex) "option.selected" else "option.unselected"),
+                                if (idx == state.selectedIndex) "§a" else "§8",
+                                false
+                            )
                         ),
                         GuiLoreFrame.NONE
                     )
@@ -1157,6 +1161,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
                     listOf(
                         GuiLoreLine.Text(storageText(player, "menu.register.description_1")),
                         GuiLoreLine.Text(storageText(player, "menu.register.description_2")),
+                        GuiLoreLine.Text(storageText(player, "menu.register.description_3")),
                         storageAction(player, "shift_any", "action.register_and_store")
                     )
                 )
@@ -1171,7 +1176,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
                     Material.COMPARATOR,
                     storageText(player, "menu.auto_store.name"),
                     listOf(
-                        GuiLoreLine.Data(storageText(player, "data.current"), storageText(player, if (state.autoStore) "state.on" else "state.off"), if (state.autoStore) "§a" else "§c"),
+                        GuiLoreLine.Data(storageText(player, "data.current"), storageText(player, if (state.autoStore) "state.menu.on" else "state.menu.off"), if (state.autoStore) "§a" else "§c"),
                         storageSingleAction(player, "action.toggle")
                     )
                 )
@@ -1182,7 +1187,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
                     Material.REDSTONE_BLOCK,
                     storageText(player, "menu.use_from_box.name"),
                     listOf(
-                        GuiLoreLine.Data(storageText(player, "data.current"), storageText(player, if (state.useFromBox) "state.on" else "state.off"), if (state.useFromBox) "§a" else "§c"),
+                        GuiLoreLine.Data(storageText(player, "data.current"), storageText(player, if (state.useFromBox) "state.menu.on" else "state.menu.off"), if (state.useFromBox) "§a" else "§c"),
                         storageSingleAction(player, "action.toggle")
                     )
                 )
@@ -1193,7 +1198,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
                     Material.CHEST_MINECART,
                     storageText(player, "menu.container_io.name"),
                     listOf(
-                        GuiLoreLine.Data(storageText(player, "data.current"), storageText(player, if (state.containerIo) "state.on" else "state.off"), if (state.containerIo) "§a" else "§c"),
+                        GuiLoreLine.Data(storageText(player, "data.current"), storageText(player, if (state.containerIo) "state.menu.on" else "state.menu.off"), if (state.containerIo) "§a" else "§c"),
                         storageSingleAction(player, "action.toggle")
                     )
                 )

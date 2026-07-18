@@ -616,15 +616,21 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
 
     private fun buildExchangeLore(player: Player, lines: List<TokenExchangeLine>): List<GuiLoreLine> {
         return buildList {
-            add(GuiLoreLine.Text("交換するモブドロップ"))
+            add(GuiLoreLine.Text(ArenaI18n.text(player, "arena.ui.token_exchange.details_heading")))
             lines.take(4).forEach { line ->
                 val name = CustomItemI18n.text(player, "custom_items.arena.mob_token.token_names.${line.categoryId}", line.categoryId)
                     .replace(Regex("§[0-9a-fk-or]", RegexOption.IGNORE_CASE), "")
-                add(GuiLoreLine.SubData(name, "${formatAcorn(line.unitPrice)} × ${line.amount} = ${formatAcorn(line.subtotal)}"))
+                add(GuiLoreLine.SubData(name, ArenaI18n.text(
+                    player,
+                    "arena.ui.token_exchange.details_line",
+                    "unit_price" to formatAcorn(line.unitPrice),
+                    "amount" to line.amount,
+                    "subtotal" to formatAcorn(line.subtotal)
+                )))
             }
             if (lines.size > 4) {
                 val remaining = lines.drop(4).fold(ZERO) { sum, line -> truncate(sum + line.subtotal) }
-                add(GuiLoreLine.Data("その他", formatAcorn(remaining), "§f"))
+                add(GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.token_exchange.details_other"), formatAcorn(remaining), "§f"))
             }
         }
     }
