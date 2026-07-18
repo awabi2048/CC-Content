@@ -1,10 +1,15 @@
 package jp.awabi2048.cccontent
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.config.ConfigClassification
+import com.awabi2048.ccsystem.api.config.ConfigMigration
+import com.awabi2048.ccsystem.api.config.ManagedConfigSpec
+import com.awabi2048.ccsystem.api.gui.MenuTargetPolicy
+import com.awabi2048.ccsystem.api.gui.PublicMenuDefinition
 import jp.awabi2048.cccontent.command.CCCommand
 import jp.awabi2048.cccontent.command.ContentFeatureStatus
 import jp.awabi2048.cccontent.command.ContentOperationalState
-import jp.awabi2048.cccontent.command.GiveCommand
+import jp.awabi2048.cccontent.command.ContentItemGrantProvider
 import jp.awabi2048.cccontent.command.StructureCommand
 import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.config.FeatureConfigManager
@@ -227,10 +232,8 @@ class CCContent : JavaPlugin(), Listener {
     private fun startPlugin() {
         instance = this
         ensureCCSystemAvailable()
+        CCSystem.getAPI().getMenuCommandService().unregisterOwner("cc-content")
         saveSplitLanguageResources()
-        migrateFishingConfigurationSchema()
-        synchronizeConfigurationResources()
-        validateConfigurationFiles()
         coreConfig = CoreConfigManager.load(this)
         catalogStore = CatalogStore(File(dataFolder, "data/catalog/state.yml"))
         validateAndRegisterLanguageSources()
@@ -405,7 +408,7 @@ class CCContent : JavaPlugin(), Listener {
 
         registerCatalogCommands()
 
-        val giveCommand = GiveCommand()
+        CCSystem.getAPI().getItemGrantService().register(ContentItemGrantProvider())
         val structureCommand = StructureCommand(
             structureService = SchemStructureService(this),
             onArenaStructureSaved = {
@@ -420,7 +423,6 @@ class CCContent : JavaPlugin(), Listener {
             }
         )
         val ccCommand = CCCommand(
-            giveCommand = giveCommand,
             structureCommand = structureCommand,
             onReload = { reloadConfigFiles() },
             onRestart = { restartPlugin() },
@@ -636,6 +638,8 @@ class CCContent : JavaPlugin(), Listener {
     }
 
     override fun onEnable() {
+        synchronizeConfigurationResources()
+        validateConfigurationFiles()
         startPlugin()
     }
 
@@ -808,6 +812,22 @@ class CCContent : JavaPlugin(), Listener {
     }
 
     private fun registerRankCommands(rankCommand: RankCommand) {
+        CCSystem.getAPI().getMenuCommandService().register(
+            PublicMenuDefinition(
+                owner = "cc-content",
+                id = "rank",
+                permission = "cc-content.rank",
+                targetPolicy = MenuTargetPolicy.SELF_ONLY,
+                argumentKeys = setOf("view"),
+                opener = { player, arguments ->
+                    if (arguments["view"].equals("skill", ignoreCase = true)) {
+                        rankCommand.openSkillTreeDirect(player)
+                    } else {
+                        rankCommand.openRankMenu(player)
+                    }
+                }
+            )
+        )
         val rankPluginCommand = getCommand("rank")
         if (rankPluginCommand == null) {
             logger.severe("/rank コマンドの登録に失敗しました（plugin.yml の commands.rank を確認してください）")
@@ -1194,14 +1214,6 @@ class CCContent : JavaPlugin(), Listener {
                         YamlConfiguration.loadConfiguration(InputStreamReader(input, StandardCharsets.UTF_8))
                     }
                     val current = YamlConfiguration.loadConfiguration(target)
-                    val currentSchema = (current.get("schema_version") as? Number)?.toInt()
-                    val defaultSchema = (defaults.get("schema_version") as? Number)?.toInt()
-                    if (entry.name == "config/fishing/fish.yml" &&
-                        (currentSchema != defaultSchema || current.contains("minigame.click_count"))) {
-                        defaults.save(target)
-                        logger.info("[CCContent][Config] スキーマ更新により正本へ同期しました: ${entry.name}")
-                        return@forEach
-                    }
                     val missingKeys = defaults.getKeys(true)
                         .filter { key -> !defaults.isConfigurationSection(key) && !current.contains(key) }
 
@@ -1240,6 +1252,10 @@ class CCContent : JavaPlugin(), Listener {
         logger.info("[CCContent] $reason lifecycle を完了しました")
     }
 
+    private fun synchronizeConfigurationResources() {
+        registerManagedConfigs()
+    }
+
     private fun validateConfigurationFiles() {
         val configRoot = File(dataFolder, "config").toPath()
         val errors = ResourceConfigurationValidator.validateConfigDirectory(configRoot)
@@ -1250,35 +1266,79 @@ class CCContent : JavaPlugin(), Listener {
         }
     }
 
-    /** JARの設定定義から不足ファイルと不足キーだけを補い、運用中の設定値は保持する。 */
-    private fun synchronizeConfigurationResources() {
+    private fun registerManagedConfigs() {
         val codeSource = runCatching { File(javaClass.protectionDomain.codeSource.location.toURI()) }
             .getOrNull() ?: return
         if (!codeSource.isFile) return
 
-        JarFile(codeSource).use { jar ->
+        val paths = JarFile(codeSource).use { jar ->
             jar.entries().asSequence()
                 .filter { !it.isDirectory && it.name.startsWith("config/") && it.name.endsWith(".yml") }
-                .forEach { entry ->
-                    val target = File(dataFolder, entry.name)
-                    if (!target.exists()) {
-                        target.parentFile?.mkdirs()
-                        saveResource(entry.name, false)
-                        return@forEach
+                .map { it.name }
+                .toList()
+        }
+        val bundledMarkers = listOf(
+            "/themes/",
+            "/recipe",
+            "ingredient_definition",
+            "mob_definition",
+            "/mob_type",
+            "/drop",
+            "/reward",
+            "/collection",
+            "/custom_item/",
+            "/npc/menu",
+            "/minigame/",
+            "/job_exp",
+            "/mission",
+            "/loot",
+            "/theme"
+        )
+        val specs = paths.map { resourcePath ->
+            val bundled = getResource(resourcePath)?.use { input ->
+                YamlConfiguration.loadConfiguration(InputStreamReader(input, StandardCharsets.UTF_8))
+            } ?: error("Missing bundled config: $resourcePath")
+            val currentVersion = bundled.getInt("config_version", 1)
+            val classification = if (bundledMarkers.any(resourcePath::contains)) {
+                ConfigClassification.BUNDLED_DEFINITION
+            } else {
+                ConfigClassification.MANAGED_CONFIG
+            }
+            ManagedConfigSpec(
+                owner = "cc-content",
+                sourcePlugin = this,
+                resourcePath = resourcePath,
+                targetPath = File(dataFolder, resourcePath).toPath(),
+                currentVersion = currentVersion,
+                classification = classification,
+                migrations = if (currentVersion > 1) {
+                    (1 until currentVersion).associateWith {
+                        ConfigMigration { configuration ->
+                            configuration.set("schema_version", null)
+                            if (classification == ConfigClassification.BUNDLED_DEFINITION) {
+                                bundled.getKeys(false)
+                                    .filter { key -> key != "config_version" }
+                                    .forEach { key -> configuration.set(key, bundled.get(key)) }
+                            } else {
+                                bundled.getKeys(true)
+                                    .filter { key -> key != "config_version" }
+                                    .filterNot(bundled::isConfigurationSection)
+                                    .filterNot(configuration::contains)
+                                    .forEach { key -> configuration.set(key, bundled.get(key)) }
+                            }
+                        }
                     }
-
-                    val defaults = jar.getInputStream(entry).use { input ->
-                        YamlConfiguration.loadConfiguration(InputStreamReader(input, StandardCharsets.UTF_8))
-                    }
-                    val current = YamlConfiguration.loadConfiguration(target)
-                    val missingKeys = defaults.getKeys(true)
-                        .filter { key -> !defaults.isConfigurationSection(key) && !current.contains(key) }
-                    if (missingKeys.isEmpty()) return@forEach
-
-                    missingKeys.forEach { key -> current.set(key, defaults.get(key)) }
-                    current.save(target)
-                    logger.info("[CCContent][Config] 不足設定を補完しました: ${entry.name} (${missingKeys.size} keys)")
-                }
+                } else {
+                    emptyMap()
+                },
+                validator = com.awabi2048.ccsystem.api.config.ConfigValidator {},
+                reloadAction = { restartPluginLifecycle("cc config reload") }
+            )
+        }
+        CCSystem.getAPI().getConfigSchemaService().register("cc-content", specs)
+        val result = CCSystem.getAPI().getConfigSchemaService().prepare("cc-content")
+        check(result.successful) {
+            "CC-Content Config preparation failed: ${result.statuses.filter { it.message != null }}"
         }
     }
     
@@ -1346,6 +1406,16 @@ class CCContent : JavaPlugin(), Listener {
             fishingSearchTarget = { playerId -> fishingFeature?.getSearchTarget(playerId) },
             setFishingSearchTarget = { player, fishId -> fishingFeature?.setSearchTarget(player, fishId) }
         )
+        CCSystem.getAPI().getMenuCommandService().register(
+            PublicMenuDefinition(
+                owner = "cc-content",
+                id = "catalog",
+                permission = "cc-content.catalog",
+                targetPolicy = MenuTargetPolicy.SELF_ONLY,
+                argumentKeys = setOf("type", "page"),
+                opener = command::openFromPublicRoute
+            )
+        )
         server.pluginManager.registerEvents(command, this)
         listOf("catalog", "cookdex", "brewdex").forEach { name ->
             getCommand(name)?.setExecutor(command)
@@ -1355,17 +1425,6 @@ class CCContent : JavaPlugin(), Listener {
         }
     }
 
-    private fun migrateFishingConfigurationSchema() {
-        val resourcePath = "config/fishing/fish.yml"
-        val target = File(dataFolder, resourcePath)
-        if (!target.exists()) return
-        val current = YamlConfiguration.loadConfiguration(target)
-        val schemaVersion = (current.get("schema_version") as? Number)?.toInt()
-        if (schemaVersion == 9 && !current.contains("minigame.click_count")) return
-        copyResourceFile(resourcePath, target)
-        logger.info("[CCContent][Config] 釣り設定をschema_version 9の正本へ同期しました")
-    }
-    
     /**
      * SukimaDungeon マネージャーを初期化（GitHub版）
      */
@@ -1565,6 +1624,9 @@ class CCContent : JavaPlugin(), Listener {
     
     override fun onDisable() {
         stopPlugin()
+        runCatching { CCSystem.getAPI().getItemGrantService().unregister("cc-content") }
+        runCatching { CCSystem.getAPI().getConfigSchemaService().unregister("cc-content") }
+        runCatching { CCSystem.getAPI().getMenuCommandService().unregisterOwner("cc-content") }
         logger.info("CC-Content v${pluginMeta.version} が無効化されました")
     }
 }

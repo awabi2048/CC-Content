@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 promotion_probability: 0.25
 
 normal:
@@ -644,3 +646,4 @@ promoted:
       bat_venom:
         weight: 2
         stat_multiplier: 1.9
+

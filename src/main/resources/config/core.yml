@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 # CC-Content Root Config
 
 content_enabled:
@@ -13,3 +15,4 @@ content_enabled:
 
 persistence:
   flush_interval_minutes: 1
+

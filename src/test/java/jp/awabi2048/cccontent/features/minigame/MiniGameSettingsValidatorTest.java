@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class MiniGameSettingsValidatorTest {
     private static Map<String, Object> settings() {
         return Map.of(
+            "config_version", 1,
             "default_game_id", "race",
             "defaults", Map.of("time_limit_seconds", 300, "marker_radius", 1.75)
         );

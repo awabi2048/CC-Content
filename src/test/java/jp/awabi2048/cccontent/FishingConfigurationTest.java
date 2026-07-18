@@ -16,7 +16,8 @@ class FishingConfigurationTest {
     @Test
     void definesConditionedCatchesBaitsRodsAndFightGame() {
         var config = YamlConfiguration.loadConfiguration(CONFIG.toFile());
-        assertTrue(config.getInt("schema_version") == 9);
+        assertTrue(config.getInt("config_version") == 2);
+        assertFalse(config.contains("schema_version"));
         assertTrue(config.getLong("minigame.fight_interval_ticks") == 1);
         assertTrue(config.getLong("minigame.hook_window_ticks") > 0);
         assertTrue(config.getLong("minigame.fight_duration_ticks") > 0);

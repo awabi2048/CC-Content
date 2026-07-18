@@ -37,8 +37,8 @@ data class FishingSettings(
             val expFile = ensureResource(plugin, "config/rank/job_exp.yml")
             val config = YamlConfiguration.loadConfiguration(file)
             val expConfig = YamlConfiguration.loadConfiguration(expFile)
-            require(config.get("schema_version") is Number && config.getInt("schema_version") == 9) {
-                "config/fishing/fish.yml.schema_version must be the integer 9"
+            require(config.get("config_version") is Number && config.getInt("config_version") == 2) {
+                "config/fishing/fish.yml.config_version must be the integer 2"
             }
             require(config.get("enabled") is Boolean) { "config/fishing/fish.yml.enabled must be a boolean" }
             val fisherExp = expConfig.getConfigurationSection("fisher")

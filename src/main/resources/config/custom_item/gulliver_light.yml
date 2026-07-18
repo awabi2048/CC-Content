@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 # GulliverLight Configuration
 
 # Maximum scale for Big Light
@@ -23,3 +25,4 @@ sounds:
   limit_sound: "minecraft:block.note_block.bass"
   volume: 1.0
   pitch: 1.0
+

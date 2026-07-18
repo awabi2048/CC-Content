@@ -516,6 +516,13 @@ class MobService(private val plugin: JavaPlugin) {
 
         val loaded = mutableMapOf<String, MobDefinition>()
         for (mobId in section.getKeys(false)) {
+            if (rootPath.isNullOrBlank() && mobId == "config_version") {
+                val version = section.getInt(mobId, -1)
+                if (version != 1) {
+                    plugin.logger.severe("$logPrefix mob_definition.yml の config_version が不正です: $version")
+                }
+                continue
+            }
             val mobSection = section.getConfigurationSection(mobId)
             if (mobSection == null) {
                 plugin.logger.severe("$logPrefix mob_definition.yml の読み込み失敗: $mobId")

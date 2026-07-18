@@ -31,7 +31,6 @@ data class ContentFeatureStatus(
  * サブコマンド処理の分岐を担当
  */
 class CCCommand(
-    private val giveCommand: GiveCommand,
     private val structureCommand: StructureCommand? = null,
     private val onReload: (() -> Unit)? = null,
     private val onRestart: (() -> Unit)? = null,
@@ -61,14 +60,6 @@ class CCCommand(
         
         // サブコマンド処理
         return when (args[0].lowercase()) {
-            "give" -> {
-                if (!hasAdminPermission(sender)) {
-                    sender.sendMessage(ContentManagementI18n.text(sender, "no_permission"))
-                    return true
-                }
-                val subArgs = args.drop(1).toTypedArray()
-                giveCommand.onCommand(sender, cmd, "give", subArgs)
-            }
             "reload" -> {
                 handleReload(sender)
             }
@@ -525,11 +516,8 @@ class CCCommand(
     private fun showHelp(sender: CommandSender) {
          sender.sendMessage("""
               §6§l=== CC-Content コマンド一覧 ===
-              §f/cc-content give <player> <feature.id> [amount]
-              §7  - カスタムアイテムを配布します
-              §7  - 例: /cc-content give @s misc.big_light
-              §7  - 例: /cc-content give @a arena.mob_token#zombie 10
-              §7  - 例: /cc-content give @s sukima_dungeon.talisman
+              §f/cc give <player> <feature.id> [amount]
+              §7  - 登録済みアイテムを統合管理コマンドから付与します
               
                  §f/ccc reload
                  §7  - config 配下の設定を再読込します
@@ -572,7 +560,6 @@ class CCCommand(
           if (args.size == 1) {
               val prefix = args[0].lowercase()
                val candidates = mutableListOf("help")
-                 if (hasAdminPermission(sender)) candidates.add("give")
                  if (hasManagementPermission(sender, "status")) candidates.add("status")
                  if (hasManagementPermission(sender, "enable")) candidates.add("enable")
                  if (hasManagementPermission(sender, "disable")) candidates.add("disable")
@@ -608,11 +595,6 @@ class CCCommand(
                      .filter { it.startsWith(args[1], ignoreCase = true) }
                      .toList()
              }
-             "give" -> {
-                  if (!hasAdminPermission(sender)) return emptyList()
-                  val subArgs = args.drop(1).toTypedArray()
-                  giveCommand.onTabComplete(sender, cmd, "give", subArgs)
-              }
                "debug" -> {
                    if (!hasAdminPermission(sender)) return emptyList()
                    when (args.size) {

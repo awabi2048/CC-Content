@@ -9,7 +9,7 @@ softdepend: [HeadDatabase, Vault, CC-System, MyWorldManager, DeadChest, LuckPerm
 commands:
   cc-content:
     description: CC-Contentメインコマンド
-    usage: /ccc <status|enable|disable|give|reload|restart|summon|structure|debug|update_day|npc-menu|help>
+    usage: /ccc <status|enable|disable|reload|restart|summon|structure|debug|update_day|npc-menu|help>
     aliases: [ccc]
   rank:
     description: ランクシステムコマンド（デバッグ用）
@@ -46,6 +46,18 @@ commands:
     permission: cc-content.party
 
 permissions:
+  cccontent.brewery.barrel.create.small:
+    description: 小型醸造樽の登録を許可する
+    default: true
+  cccontent.brewery.barrel.create.large:
+    description: 大型醸造樽の登録を許可する
+    default: true
+  cccontent.brewery.barrel.use:
+    description: 醸造樽の利用を許可する
+    default: true
+  cccontent.brewery.barrel.break:
+    description: 登録済み醸造樽の破壊を許可する
+    default: true
   cc-content.admin:
     description: CC-Contentの管理コマンドを実行できる
     default: op

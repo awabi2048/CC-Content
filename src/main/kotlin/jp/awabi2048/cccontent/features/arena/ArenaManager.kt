@@ -3863,7 +3863,7 @@ class ArenaManager(
             if (legacyWorld != null) {
                 tryDeleteWorld(legacyWorld)
             } else {
-                queueWorldDeletion(worldName, File(Bukkit.getWorldContainer(), worldName))
+                queueWorldDeletion(worldName, worldFolder(worldName))
             }
             return
         }
@@ -6778,7 +6778,7 @@ class ArenaManager(
     }
 
     private fun createArenaWorld(worldName: String = "arena.${UUID.randomUUID()}"): World? {
-        val creator = WorldCreator(worldName)
+        val creator = WorldCreator(NamespacedKey.minecraft(worldName))
         creator.generator(VoidChunkGenerator())
         val world = creator.createWorld()
         world?.let { configureArenaVoidWorld(it) }
@@ -6863,9 +6863,12 @@ class ArenaManager(
     }
 
     private fun hasDebugVoidWorldOnDisk(): Boolean {
-        return worldContainer().listFiles()?.any { candidate ->
-            candidate.isDirectory && candidate.resolve(DEBUG_VOID_WORLD_MARKER_FILE_NAME).isFile
-        } == true
+        return CCSystem.getAPI()
+            .getWorldDirectoryService()
+            .listByKeyPrefix(NamespacedKey.MINECRAFT, "arena.")
+            .any { candidate ->
+                candidate.directory.resolve(DEBUG_VOID_WORLD_MARKER_FILE_NAME).toFile().isFile
+            }
     }
 
     fun deleteDebugVoidWorld(world: World): Boolean {
@@ -6926,11 +6929,10 @@ class ArenaManager(
     }
 
     private fun worldFolder(worldName: String): File {
-        return File(worldContainer(), worldName)
-    }
-
-    private fun worldContainer(): File {
-        return Bukkit.getWorldContainer()
+        return CCSystem.getAPI()
+            .getWorldDirectoryService()
+            .creationDirectory(NamespacedKey.minecraft(worldName))
+            .toFile()
     }
 
     private fun elapsedMillisSince(startedAtNanos: Long): Long {

@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 miner:
   coal_ore: 1
   deepslate_coal_ore: 2
@@ -128,3 +130,4 @@ fisher:
   pufferfish: 12
   tropical_fish: 20
   ancient_coelacanth: 40
+

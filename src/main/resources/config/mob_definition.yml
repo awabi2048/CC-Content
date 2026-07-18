@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 zombie_normal:
   type: zombie_normal
   health: 18.0
@@ -646,3 +648,4 @@ ender_shooter:
   attack: 6.0
   movement_speed: 0.0
   armor: 4.0
+

@@ -25,7 +25,7 @@ data class GardenPlant(
 }
 
 data class GardenSettings(
-    val schemaVersion: Int,
+    val configVersion: Int,
     val seedDropChance: Double,
     val growthCheckIntervalSeconds: Long,
     val seedSourceMaterials: Set<Material>,
@@ -40,8 +40,8 @@ object GardenSettingsLoader {
     }
 
     fun parse(yaml: YamlConfiguration): GardenSettings {
-        val schema = requiredInt(yaml, "schema_version")
-        require(schema == 1) { "Garden設定のschema_versionが不正です: $schema" }
+        val configVersion = requiredInt(yaml, "config_version")
+        require(configVersion == 2) { "Garden設定のconfig_versionが不正です: $configVersion" }
         val root = requiredSection(yaml, "garden")
         val chance = requiredDouble(root, "seed_drop_chance")
         require(chance in 0.0..1.0) { "garden.seed_drop_chanceは0..1で指定してください" }
@@ -60,7 +60,7 @@ object GardenSettingsLoader {
             require(itemIds.add(plant.itemFruitId)) { "カスタムアイテムIDが重複しています: ${plant.itemFruitId}" }
         }
         require(plants.isNotEmpty()) { "garden.plantsは空にできません" }
-        return GardenSettings(schema, chance, interval, source, plants)
+        return GardenSettings(configVersion, chance, interval, source, plants)
     }
 
     private fun parsePlant(id: String, section: ConfigurationSection): GardenPlant {

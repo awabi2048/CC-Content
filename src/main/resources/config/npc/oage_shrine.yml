@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 tabs:
   seasonal_head:
     purchase_limit_daily: 1
@@ -58,3 +60,4 @@ tabs:
         price: 20.0
         purchase_limit_daily: 1
         item_id: hdb=38764
+

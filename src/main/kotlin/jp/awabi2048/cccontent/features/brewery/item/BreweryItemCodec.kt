@@ -7,6 +7,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.features.brewery.BreweryRecipe
+import jp.awabi2048.cccontent.features.brewery.breweryQualityIndex
 import jp.awabi2048.cccontent.features.brewery.breweryQualityTier
 import jp.awabi2048.cccontent.features.brewery.model.BrewStage
 import org.bukkit.Color
@@ -17,6 +18,8 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataContainer
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
+import io.papermc.paper.datacomponent.DataComponentTypes
+import io.papermc.paper.datacomponent.item.CustomModelData
 import kotlin.math.roundToInt
 
 class BreweryItemCodec(private val plugin: JavaPlugin) {
@@ -147,20 +150,30 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         val pdc = meta.persistentDataContainer
         pdc.set(stageKey, PersistentDataType.STRING, BrewStage.AGED.name)
         pdc.set(qualityKey, PersistentDataType.DOUBLE, finalQuality.coerceIn(0.0, 100.0))
-        pdc.set(alcoholKey, PersistentDataType.DOUBLE, (recipe.finalOutputAlcohol * finalQuality.coerceIn(0.0, 100.0) / 100.0).coerceIn(0.0, 100.0))
+        val correctedAlcohol =
+            jp.awabi2048.cccontent.features.brewery.BreweryIntoxicationMath
+                .qualityCorrectedAlcohol(recipe.finalOutputAlcohol, finalQuality)
+        pdc.set(alcoholKey, PersistentDataType.DOUBLE, correctedAlcohol)
         pdc.set(finalStarsKey, PersistentDataType.INTEGER, stars)
         val tier = breweryQualityTier(finalQuality)
         val product = text(player, "brewery.recipe.${recipe.id}.final.$tier.name")
         meta.setDisplayName(text(player, "brewery.item.name.aged", "recipe" to text(player, "brewery.recipe.${recipe.id}.name"), "product" to product, "stars" to "★".repeat(stars)))
+        meta.setEnchantmentGlintOverride(recipe.finalOutputGlint)
         meta.lore(renderLore(player, text(player, "brewery.recipe.${recipe.id}.final.$tier.description"), listOf(
             "brewery.item.data.recipe" to text(player, "brewery.recipe.${recipe.id}.name"),
             "brewery.item.data.stage" to text(player, "brewery.item.stage.aged"),
             "brewery.item.data.final_quality" to "%.1f".format(finalQuality.coerceIn(0.0, 100.0)),
             "brewery.item.data.rating" to "★".repeat(stars),
-            "brewery.item.data.alcohol" to "%.1f%%".format(state.alcohol)
+            "brewery.item.data.alcohol" to "%.1f%%".format(correctedAlcohol)
         )))
         applyPotionColor(meta, recipe.finalOutputColor)
         item.itemMeta = meta
+        recipe.finalOutputCustomModelData.getOrNull(breweryQualityIndex(finalQuality))?.let { model ->
+            item.setData(
+                DataComponentTypes.CUSTOM_MODEL_DATA,
+                CustomModelData.customModelData().addFloat(model.toFloat()).build()
+            )
+        }
     }
 
     fun hasStageExpAwarded(item: ItemStack, stage: BrewStage): Boolean =

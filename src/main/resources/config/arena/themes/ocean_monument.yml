@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 promotion_probability: 0.25
 
 normal:
@@ -262,3 +264,4 @@ promoted:
       guardian_beam_burst:
         weight: 2
         stat_multiplier: 1.9
+

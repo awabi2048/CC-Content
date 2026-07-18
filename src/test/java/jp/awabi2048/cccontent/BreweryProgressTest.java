@@ -12,6 +12,7 @@ class BreweryProgressTest {
         assertEquals(35.0, BreweryIntoxicationMath.qualityCorrectedAlcohol(70.0, 50.0), 0.0001);
         assertEquals(0.0, BreweryIntoxicationMath.qualityCorrectedAlcohol(70.0, -1.0), 0.0001);
         assertEquals(70.0, BreweryIntoxicationMath.qualityCorrectedAlcohol(70.0, 101.0), 0.0001);
+        assertEquals(-20.0, BreweryIntoxicationMath.qualityCorrectedAlcohol(-40.0, 50.0), 0.0001);
     }
 
     @Test

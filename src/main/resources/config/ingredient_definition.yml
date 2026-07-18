@@ -1,49 +1,91 @@
+config_version: 2
 ingredients:
   grain_wheat:
     material: WHEAT
-    item_name_contains: "麦"
-
+    item_name_contains: 麦
   sweetener:
     materials:
-      - SUGAR
-      - HONEY_BOTTLE
-    item_name_contains: "砂糖"
-
+    - SUGAR
+    - HONEY_BOTTLE
+    item_name_contains: 砂糖
   kelp_base:
     materials:
-      - DRIED_KELP
-      - KELP
-
+    - DRIED_KELP
+    - KELP
   berry_note:
     materials:
-      - SWEET_BERRIES
+    - SWEET_BERRIES
     custom_item_ids:
-      - brewery.garden_fruit_blueberry
-      - brewery.garden_fruit_strawberry
-
+    - brewery.garden_fruit_blueberry
+    - brewery.garden_fruit_strawberry
   honey_source:
     materials:
-      - HONEYCOMB
-
+    - HONEYCOMB
   fruit_apple:
     materials:
-      - APPLE
+    - APPLE
     custom_item_ids:
-      - brewery.garden_fruit_apple
-
+    - brewery.garden_fruit_apple
   fruit_blueberry:
     custom_item_id: brewery.garden_fruit_blueberry
-
   fruit_grape:
     custom_item_id: brewery.garden_fruit_grape
-
   fruit_strawberry:
     custom_item_id: brewery.garden_fruit_strawberry
-
   wart_herb:
     materials:
-      - NETHER_WART
-
+    - NETHER_WART
   blaze_essence:
     materials:
-      - BLAZE_POWDER
+    - BLAZE_POWDER
+  blue-flowers:
+    materials:
+    - CORNFLOWER
+    - BLUE_ORCHID
+  green-herbs:
+    materials:
+    - SHORT_GRASS
+    - VINE
+    - FERN
+  red-herbs:
+    materials:
+    - APPLE
+    - MELON_SLICE
+    - SWEET_BERRIES
+  yellow-herbs:
+    materials:
+    - PUMPKIN
+    - CARROT
+    - GLOW_BERRIES
+  purple-herbs:
+    materials:
+    - CHORUS_FRUIT
+    - NETHER_WART
+    - BEETROOT
+  red-yellow-herbs:
+    materials:
+    - APPLE
+    - MELON_SLICE
+    - SWEET_BERRIES
+    - PUMPKIN
+    - CARROT
+    - GLOW_BERRIES
+    - POTATO
+  red-purple-herbs:
+    materials:
+    - APPLE
+    - MELON_SLICE
+    - SWEET_BERRIES
+    - CHORUS_FRUIT
+    - NETHER_WART
+    - BEETROOT
+    - POTATO
+  yellow-purple-herbs:
+    materials:
+    - PUMPKIN
+    - CARROT
+    - GLOW_BERRIES
+    - CHORUS_FRUIT
+    - NETHER_WART
+    - BEETROOT
+    - POTATO

@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -525,13 +526,11 @@ public final class ResourceConfigurationValidator {
         Path configFile = configRoot.resolve("brewery/config.yml");
         Map<String, Object> config = rootMap(configs, configFile, errors);
         if (config != null) {
-            requirePositiveNumber(config, "schema_version", configFile, "schema_version", errors);
             requireMap(config, "brewery", configFile, errors);
         }
         Path recipeFile = configRoot.resolve("brewery/recipe.yml");
         Map<String, Object> recipeRoot = rootMap(configs, recipeFile, errors);
         if (recipeRoot != null) {
-            requirePositiveNumber(recipeRoot, "schema_version", recipeFile, "schema_version", errors);
             Map<String, Object> recipes = requireMap(recipeRoot, "recipes", recipeFile, errors);
             if (recipes == null) {
                 return;
@@ -548,7 +547,14 @@ public final class ResourceConfigurationValidator {
                 requireMap(recipe, "fermentation", recipeFile, errors, path + ".fermentation");
                 Map<String, Object> finalOutput = requireMap(recipe, "final_output", recipeFile, errors, path + ".final_output");
                 if (finalOutput != null) {
-                    requireNonNegativeNumber(finalOutput, "alcohol", recipeFile, path + ".final_output.alcohol", errors);
+                    requireFiniteNumberRange(
+                        finalOutput.get("alcohol"),
+                        -100.0,
+                        100.0,
+                        recipeFile,
+                        path + ".final_output.alcohol",
+                        errors
+                    );
                 }
             }
         }
@@ -558,7 +564,6 @@ public final class ResourceConfigurationValidator {
         Path file = configRoot.resolve("brewery/garden.yml");
         Map<String, Object> root = rootMap(configs, file, errors);
         if (root == null) return;
-        requireSchemaVersion(root, file, errors);
         Map<String, Object> garden = requireMap(root, "garden", file, errors);
         if (garden == null) return;
         requireFiniteNumberRange(garden.get("seed_drop_chance"), 0.0, 1.0, file, "garden.seed_drop_chance", errors);
@@ -659,10 +664,6 @@ public final class ResourceConfigurationValidator {
         Path file = configRoot.resolve("fishing/fish.yml");
         Map<String, Object> root = rootMap(configs, file, errors);
         if (root == null) return;
-        Object schemaVersion = root.get("schema_version");
-        if (!(schemaVersion instanceof Number number) || number.doubleValue() != 9.0) {
-            errors.add(format("invalid schema version", file, "schema_version", "the integer 9 is required"));
-        }
         requireBoolean(root, "enabled", file, "enabled", errors);
         Map<String, Object> waitTime = requireMap(root, "wait_time", file, errors);
         if (waitTime != null) {
@@ -817,7 +818,6 @@ public final class ResourceConfigurationValidator {
         Path configFile = configRoot.resolve("resource_collection/config.yml");
         Map<String, Object> config = rootMap(configs, configFile, errors);
         if (config != null) {
-            requireSchemaVersion(config, configFile, errors);
             requireBoolean(config, "enabled", configFile, "enabled", errors);
             Object worlds = config.get("worlds");
             if (!(worlds instanceof List<?> list) || list.isEmpty() || list.stream().anyMatch(value -> !isNonBlankString(value))) {
@@ -827,7 +827,6 @@ public final class ResourceConfigurationValidator {
         Path collectionFile = configRoot.resolve("resource_collection/collection.yml");
         Map<String, Object> root = rootMap(configs, collectionFile, errors);
         if (root == null) return;
-        requireSchemaVersion(root, collectionFile, errors);
         for (String sectionName : List.of("harvest", "craft")) {
             Map<String, Object> section = requireMap(root, sectionName, collectionFile, errors);
             if (section == null) continue;
@@ -905,7 +904,9 @@ public final class ResourceConfigurationValidator {
             return null;
         }
         if (root instanceof Map<?, ?> map) {
-            return (Map<String, Object>) map;
+            Map<String, Object> copy = new LinkedHashMap<>((Map<String, Object>) map);
+            copy.remove("config_version");
+            return copy;
         }
         errors.add(format("invalid config root", file, "<root>", "root must be a section"));
         return null;
@@ -983,13 +984,6 @@ public final class ResourceConfigurationValidator {
             return;
         }
         requirePositiveNumber(map.get(key), file, path, errors);
-    }
-
-    private static void requireSchemaVersion(Map<String, Object> map, Path file, List<String> errors) {
-        Object value = map.get("schema_version");
-        if (!(value instanceof Number number) || number.doubleValue() != 1.0) {
-            errors.add(format("invalid schema version", file, "schema_version", "the integer 1 is required"));
-        }
     }
 
     private static void requirePositiveNumber(Object value, Path file, String path, List<String> errors) {

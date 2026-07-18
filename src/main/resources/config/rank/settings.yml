@@ -1,2 +1,5 @@
+﻿config_version: 1
+
 combat_exp:
   health_multiplier: 0.1
+

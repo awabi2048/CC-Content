@@ -1,4 +1,4 @@
-schema_version: 9
+﻿config_version: 2
 enabled: true
 
 wait_time:
@@ -129,3 +129,4 @@ fish:
       drift_per_step: 36
       direction_persistence: 0.84
       duration_multiplier: 1.35
+

@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 rates:
   skeleton: 0.09
   zombie: 0.10
@@ -22,3 +24,4 @@ rates:
   bat: 14.65
   creeper: 28.98
   boomerang: 0.05
+

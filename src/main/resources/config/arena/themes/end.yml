@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 promotion_probability: 0.25
 
 normal:
@@ -213,3 +215,4 @@ promoted:
       ender_eye_beam:
         weight: 1
         stat_multiplier: 2.6
+

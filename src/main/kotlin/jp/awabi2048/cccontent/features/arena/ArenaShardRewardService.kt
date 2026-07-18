@@ -46,7 +46,12 @@ class ArenaShardRewardService private constructor(
         ): ArenaShardRewardService {
             val definitionsByKey = definitions.associateBy { it.key }
             require(definitionsByKey.size == definitions.size) { "Arenaシャード定義に重複IDがあります" }
-            val rootKeys = config.getKeys(false)
+            config.get("config_version")?.let { version ->
+                require(version is Int && version == 1) {
+                    "Arenaシャード報酬表のconfig_versionが不正です"
+                }
+            }
+            val rootKeys = config.getKeys(false) - "config_version"
             require(rootKeys.isNotEmpty()) { "Arenaシャード報酬表が空です" }
             val tables = mutableMapOf<Int, List<ArenaShardRewardEntry>>()
             val assignedDifficultyByShard = mutableMapOf<String, Int>()
