@@ -73,9 +73,10 @@ class FishingItems(
         return settings.baits.firstOrNull { it.id == id }
     }
 
-    fun consumeBait(player: Player): BaitDefinition? {
+    fun consumeBait(player: Player, consume: Boolean = true): BaitDefinition? {
         val item = player.inventory.itemInOffHand
         val bait = resolveBait(item) ?: return null
+        if (!consume) return bait
         if (item.amount <= 1) player.inventory.setItemInOffHand(ItemStack(Material.AIR))
         else item.amount -= 1
         player.playSound(player.location, Sound.ENTITY_GENERIC_EAT, 0.45f, 1.65f)

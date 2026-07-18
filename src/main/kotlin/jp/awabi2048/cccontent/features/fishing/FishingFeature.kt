@@ -4,14 +4,16 @@ import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.action.ContentAction
+import com.awabi2048.ccsystem.api.action.ContentActionType
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.catalog.CatalogCondition
 import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.profession.Profession
-import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
-import jp.awabi2048.cccontent.features.rank.skill.handlers.FisherBonusHandler
+import jp.awabi2048.cccontent.features.rank.profession.profile.FisherSkillProfile
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionExperience
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import jp.awabi2048.cccontent.integration.myworld.MyWorldBridge
 import net.kyori.adventure.bossbar.BossBar
@@ -24,6 +26,7 @@ import org.bukkit.Sound
 import org.bukkit.FluidCollisionMode
 import org.bukkit.enchantments.Enchantment
 import org.bukkit.entity.FishHook
+import org.bukkit.entity.Item
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -66,7 +69,8 @@ class FishingFeature(
         var lateralAxis: Vector? = null,
         var fightElapsedTicks: Long = 0L,
         var rodMissingTicks: Long = 0L,
-        var lastInputTick: Int = -1
+        var lastInputTick: Int = -1,
+        var ignoredInstabilityEventsRemaining: Int = 0
     )
 
     private lateinit var settings: FishingSettings
@@ -98,7 +102,7 @@ class FishingFeature(
     private fun showLocalFishingHint(player: Player, event: PlayerInteractEvent) {
         event.isCancelled = true
         val block = surveyWaterBlock(player)
-        if (block == null || !CCSystem.getAPI().isResourceWorld(player.world)) {
+        if (block == null || !isReadyResourceWorld(player)) {
             player.sendMessage(message(player, "fishing.dictionary.hint.not_water"))
             return
         }
@@ -151,6 +155,8 @@ class FishingFeature(
                         }
                         else -> Unit
                     }
+                } else if (event.state == PlayerFishEvent.State.CAUGHT_FISH) {
+                    handleVanillaCatch(player, event.caught as? Item)
                 }
             }
             PlayerFishEvent.State.REEL_IN -> {
@@ -189,7 +195,7 @@ class FishingFeature(
         clearSession(player.uniqueId, removeHook = false)
         val rodItem = player.inventory.itemInMainHand
         if (rodItem.type != Material.FISHING_ROD) return
-        if (!CCSystem.getAPI().isResourceWorld(player.world)) {
+        if (!isReadyResourceWorld(player)) {
             return
         }
         if (!items.isUsableRod(rodItem)) {
@@ -198,11 +204,14 @@ class FishingFeature(
             player.playSound(player.location, Sound.ENTITY_ITEM_BREAK, 0.9f, 0.8f)
             return
         }
-        val bait = items.consumeBait(player)
+        val fisher = fisherContext(player)
+        val preserveBait = fisher.active && random.nextDouble() < fisher.baitSaveChance
+        val bait = items.consumeBait(player, consume = !preserveBait)
         val rod = items.resolveRod(rodItem)
         val lureLevel = rodItem.getEnchantmentLevel(Enchantment.LURE)
         val lureMultiplier = (1.0 - settings.minigame.lureReductionPerLevel * lureLevel).coerceAtLeast(0.2)
-        val waitMultiplier = (bait?.waitTimeMultiplier ?: 1.0) * lureMultiplier
+        val skillWaitMultiplier = (1.0 - fisher.waitTimeReduction).coerceAtLeast(0.8)
+        val waitMultiplier = (bait?.waitTimeMultiplier ?: 1.0) * lureMultiplier * skillWaitMultiplier
         event.hook.setApplyLure(false)
         event.hook.setWaitTime(
             (settings.minigame.waitTimeMinTicks * waitMultiplier).roundToLong().toInt().coerceAtLeast(1),
@@ -309,6 +318,7 @@ class FishingFeature(
             duration,
             if (random.nextBoolean()) 1 else -1
         )
+        session.ignoredInstabilityEventsRemaining = fisher.ignoredInstabilityEvents
         session.bossBar = BossBar.bossBar(
             Component.text(message(player, "fishing.fight.status.${FishingFightStatus.HOOKED.messageId}")),
             (settings.minigame.initialEffectiveness / 100.0).toFloat(),
@@ -372,7 +382,7 @@ class FishingFeature(
         val player = Bukkit.getPlayer(playerId)
         val session = sessions[playerId]
         if (player == null || session == null || session.phase != Phase.FIGHT) return
-        if (!player.isOnline || !CCSystem.getAPI().isResourceWorld(player.world)) {
+        if (!player.isOnline || !isReadyResourceWorld(player)) {
             fail(playerId, "fishing.failed.cancelled")
             return
         }
@@ -385,14 +395,22 @@ class FishingFeature(
         val definition = session.definition ?: return
         val fisher = fisherContext(player)
         val stability = fisher.stabilityBonus.coerceAtMost(0.9)
-        val next = session.fightState?.advance(
+        val current = session.fightState ?: return
+        var next = current.advance(
             definition.fight,
             settings.minigame.fightIntervalTicks,
             stability,
             settings.minigame.resistanceSmoothing,
             settings.minigame.lateralSmoothing,
             random
-        ) ?: return
+        )
+        if (session.ignoredInstabilityEventsRemaining > 0 && next.driftDirection != current.driftDirection) {
+            next = next.copy(
+                driftDirection = current.driftDirection,
+                driftVelocity = current.driftVelocity
+            )
+            session.ignoredInstabilityEventsRemaining--
+        }
         session.fightState = next
         session.fightElapsedTicks += settings.minigame.fightIntervalTicks
         updateHookVisual(session, next)
@@ -492,9 +510,16 @@ class FishingFeature(
             player.world.dropItemNaturally(player.location, overflow)
         }
         val fisher = fisherContext(player)
-        if (fisher.active) plugin.getRankManager()?.addProfessionExp(player.uniqueId, catchData.exp)
         val recorded = fishdex.record(player.uniqueId, catchData)
-        if (items.damageRod(player.inventory.itemInMainHand)) {
+        if (fisher.active) {
+            val experience = ProfessionExperience.NORMAL_ACTION +
+                (if (before?.discovered != true) ProfessionExperience.FIRST_DISCOVERY_BONUS else 0L) +
+                (if (catchData.quality != FishQuality.COMMON) ProfessionExperience.HIGH_QUALITY_BONUS else 0L)
+            plugin.getRankManager()?.addProfessionExp(player.uniqueId, experience)
+        }
+        publishCatchAction(player, catchData, before?.discovered != true)
+        val preserveDurability = fisher.active && random.nextDouble() < fisher.durabilitySaveChance
+        if (!preserveDurability && items.damageRod(player.inventory.itemInMainHand)) {
             player.sendMessage(message(player, "fishing.error.rod_broken"))
             player.playSound(player.location, Sound.ENTITY_ITEM_BREAK, 0.9f, 0.9f)
         }
@@ -618,7 +643,7 @@ class FishingFeature(
             val target = settings.fishes.firstOrNull { it.id == targetId } ?: return@forEach
             val bait = items.resolveBait(player.inventory.itemInOffHand)
             val surveyBlock = surveyWaterBlock(player)
-            val ready = CCSystem.getAPI().isResourceWorld(player.world) &&
+            val ready = isReadyResourceWorld(player) &&
                 surveyBlock != null &&
                 target in FishingCatchSelector.candidates(
                     FishingContext(
@@ -646,41 +671,80 @@ class FishingFeature(
         val level: Int,
         val hookWindowMultiplier: Double,
         val durationMultiplier: Double,
-        val stabilityBonus: Double
+        val stabilityBonus: Double,
+        val waitTimeReduction: Double,
+        val baitSaveChance: Double,
+        val durabilitySaveChance: Double,
+        val vanillaExtraCatchChance: Double,
+        val ignoredInstabilityEvents: Int
     )
 
     private fun fisherContext(player: Player): FisherContext {
-        val rank = plugin.getRankManager() ?: return FisherContext(false, 1, 1.0, 1.0, 0.0)
+        val inactive = FisherContext(false, 0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0)
+        val rank = plugin.getRankManager() ?: return inactive
         val profession = rank.getPlayerProfession(player.uniqueId)
         val active = profession?.profession == Profession.FISHER &&
             RankReleasePolicy.canAccessProfession(player, Profession.FISHER)
-        if (!active) return FisherContext(false, 1, 1.0, 1.0, 0.0)
-        val skillsAvailable = RankReleasePolicy.canUseSkills(player)
-        if (!skillsAvailable) return FisherContext(true, rank.getCurrentProfessionLevel(player.uniqueId), 1.0, 1.0, 0.0)
-        val playerId = player.uniqueId
+        if (!active) return inactive
+        val profile = rank.getTypedProfessionProfile(player.uniqueId) as? FisherSkillProfile
+            ?: return inactive.copy(active = true, level = rank.getCurrentProfessionLevel(player.uniqueId))
         return FisherContext(
             true,
-            rank.getCurrentProfessionLevel(playerId),
-            SkillEffectEngine.getCachedEffectValue(
-                playerId,
-                FisherBonusHandler.HOOK_WINDOW_EFFECT,
-                "multiplier",
-                1.0
-            ).coerceAtLeast(1.0),
-            SkillEffectEngine.getCachedEffectValue(
-                playerId,
-                FisherBonusHandler.DURATION_EFFECT,
-                "multiplier",
-                1.0
-            ).coerceIn(0.1, 1.0),
-            SkillEffectEngine.getCachedEffectValue(
-                playerId,
-                FisherBonusHandler.STABILITY_EFFECT,
-                "bonus",
-                0.0
-            ).coerceIn(0.0, 0.9)
+            profile.level,
+            (1.0 + profile.hookWindowBonus).coerceAtLeast(1.0),
+            (1.0 - profile.fightDurationReduction).coerceIn(0.1, 1.0),
+            profile.fightStabilityBonus.coerceIn(0.0, 0.9),
+            profile.waitTimeReduction.coerceIn(0.0, 0.2),
+            profile.baitSaveChance.coerceIn(0.0, 1.0),
+            profile.durabilitySaveChance.coerceIn(0.0, 1.0),
+            profile.vanillaExtraCatchChance.coerceIn(0.0, 1.0),
+            profile.ignoredInstabilityEvents.coerceAtLeast(0)
         )
     }
+
+    private fun handleVanillaCatch(player: Player, caught: Item?) {
+        val fisher = fisherContext(player)
+        if (fisher.active) {
+            plugin.getRankManager()?.addProfessionExp(player.uniqueId, ProfessionExperience.NORMAL_ACTION)
+            if (caught != null && random.nextDouble() < fisher.vanillaExtraCatchChance) {
+                val extra = caught.itemStack.clone().apply { amount = 1 }
+                player.inventory.addItem(extra).values.forEach { player.world.dropItemNaturally(player.location, it) }
+            }
+        }
+        CCSystem.getAPI().getContentActionDispatcher().publish(
+            ContentAction(
+                actionId = UUID.randomUUID(),
+                schemaVersion = 1,
+                occurredAt = CCSystem.getAPI().getSharedClockService().now().toInstant(),
+                playerId = player.uniqueId,
+                actionType = ContentActionType.VANILLA_FISH_CAUGHT,
+                amount = 1L,
+                worldKey = player.world.key
+            )
+        )
+    }
+
+    private fun publishCatchAction(player: Player, catch: FishCatch, firstDiscovery: Boolean) {
+        CCSystem.getAPI().getContentActionDispatcher().publish(
+            ContentAction(
+                actionId = UUID.randomUUID(),
+                schemaVersion = 1,
+                occurredAt = CCSystem.getAPI().getSharedClockService().now().toInstant(),
+                playerId = player.uniqueId,
+                actionType = ContentActionType.FISH_CAUGHT,
+                amount = 1L,
+                worldKey = player.world.key,
+                metadata = mapOf(
+                    "fishId" to catch.fishId,
+                    "quality" to catch.quality.id,
+                    "firstDiscovery" to firstDiscovery.toString()
+                )
+            )
+        )
+    }
+
+    private fun isReadyResourceWorld(player: Player): Boolean =
+        CCSystem.getAPI().getResourceWorldLifecycleService().isReady(player.world.key)
 
     private fun message(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): String =
         CCSystem.getAPI().getI18nString(

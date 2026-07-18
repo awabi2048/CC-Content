@@ -10,17 +10,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FishingSkillSourceContractTest {
     @Test
-    void fishingUsesRegisteredSkillEffectsInsteadOfSkillIds() throws Exception {
+    void fishingUsesTypedProfileForEveryProfessionAbility() throws Exception {
         String source = Files.readString(Path.of(
             "src/main/kotlin/jp/awabi2048/cccontent/features/fishing/FishingFeature.kt"
         ));
 
-        assertTrue(source.contains("FisherBonusHandler.HOOK_WINDOW_EFFECT"));
-        assertTrue(source.contains("FisherBonusHandler.STABILITY_EFFECT"));
-        assertTrue(source.contains("FisherBonusHandler.DURATION_EFFECT"));
+        assertTrue(source.contains("as? FisherSkillProfile"));
         assertTrue(source.contains("settings.minigame.baseHookWindowTicks * fisher.hookWindowMultiplier"));
-        assertFalse(source.contains("\"patient_cast\" in skills"));
-        assertFalse(source.contains("\"deep_water\" in skills"));
-        assertFalse(source.contains("\"master_angler\" in skills"));
+        assertTrue(source.contains("fisher.waitTimeReduction"));
+        assertTrue(source.contains("fisher.baitSaveChance"));
+        assertTrue(source.contains("fisher.durabilitySaveChance"));
+        assertTrue(source.contains("fisher.vanillaExtraCatchChance"));
+        assertTrue(source.contains("fisher.ignoredInstabilityEvents"));
+        assertTrue(source.contains("ContentActionType.FISH_CAUGHT"));
+        assertTrue(source.contains("ContentActionType.VANILLA_FISH_CAUGHT"));
+        assertTrue(source.contains("ProfessionExperience.FIRST_DISCOVERY_BONUS"));
+        assertFalse(source.contains("SkillEffectEngine"));
+        assertFalse(source.contains("FisherBonusHandler"));
+        assertFalse(source.contains("catchData.exp"));
     }
 }

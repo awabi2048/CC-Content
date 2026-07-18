@@ -15,14 +15,15 @@ class FishingWorldBoundarySourceContractTest {
     );
 
     @Test
-    void nonResourceWorldLeavesVanillaFishingUntouched() throws Exception {
+    void nonReadyResourceWorldLeavesVanillaFishingUntouched() throws Exception {
         String source = readSource();
 
         assertTrue(source.contains(
-            "if (!CCSystem.getAPI().isResourceWorld(player.world)) {\n" +
+            "if (!isReadyResourceWorld(player)) {\n" +
                 "            return\n" +
                 "        }"
         ));
+        assertTrue(source.contains("getResourceWorldLifecycleService().isReady(player.world.key)"));
         assertFalse(source.contains("fishing.error.resource_world_only"));
     }
 
