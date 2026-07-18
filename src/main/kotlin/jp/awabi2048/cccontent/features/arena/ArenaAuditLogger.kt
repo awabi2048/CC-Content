@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.CCSystem
+
 import jp.awabi2048.cccontent.util.ItemMetaCompat
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
@@ -9,14 +11,13 @@ import org.bukkit.util.io.BukkitObjectOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.time.OffsetDateTime
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Base64
 import java.util.UUID
 
 class ArenaAuditLogger(private val plugin: JavaPlugin) {
     private val logFile = File(plugin.dataFolder, "data/arena/audit.jsonl")
-    private val zoneId = ZoneId.of("Asia/Tokyo")
+    private val zoneId get() = CCSystem.getAPI().getSharedClockService().zoneId
 
     fun logMissionUpdate(missions: List<Map<String, Any?>>) {
         append(

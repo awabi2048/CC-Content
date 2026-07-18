@@ -43,7 +43,6 @@ import org.bukkit.inventory.meta.SkullMeta
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 import java.time.LocalDate
-import java.time.ZoneId
 import java.util.UUID
 import jp.awabi2048.cccontent.integration.myworld.MyWorldBridge
 import jp.awabi2048.cccontent.integration.myworld.WorldPointGrantResult
@@ -1124,7 +1123,7 @@ class NpcMenuService(
         return definitions.first()
     }
 
-    private fun oageBoxDailySeed(): Long = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
+    private fun oageBoxDailySeed(): Long = CCSystem.getAPI().getSharedClockService().currentDate().toEpochDay()
 
     private fun OageBoxReward.icon(player: Player): ItemStack = when (this) {
         is OageBoxReward.CustomItem -> CustomItemManager.createItemForPlayer(itemId, player, amount)

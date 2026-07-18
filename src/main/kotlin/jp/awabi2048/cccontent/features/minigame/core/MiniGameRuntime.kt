@@ -47,7 +47,6 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import java.util.UUID
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import jp.awabi2048.cccontent.integration.myworld.MyWorldBridge
 
@@ -892,6 +891,6 @@ class MiniGameAdminMenu(
 
     private companion object {
         val HISTORY_DATE_FORMATTER: DateTimeFormatter =
-            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm").withZone(ZoneId.systemDefault())
+            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm").withZone(CCSystem.getAPI().getSharedClockService().zoneId)
     }
 }
