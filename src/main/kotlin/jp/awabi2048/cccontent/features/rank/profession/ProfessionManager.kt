@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.rank.profession
 
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionFeatureToggles
+import jp.awabi2048.cccontent.features.rank.profession.profile.TypedProfessionProfile
 import java.util.UUID
 
 /**
@@ -81,6 +83,17 @@ interface ProfessionManager {
      * デバッグ用: 職業レベルを直接設定
      */
     fun setLevel(playerUuid: UUID, level: Int): Boolean
+
+    /** Lv15以降の再設計職業で、未選択の分岐を一度だけ確定する。 */
+    fun selectSpecialization(playerUuid: UUID, specializationId: String): Boolean
+
+    fun getSpecializationId(playerUuid: UUID): String?
+
+    fun getTypedProfile(playerUuid: UUID): TypedProfessionProfile?
+
+    fun getFeatureToggles(playerUuid: UUID): ProfessionFeatureToggles?
+
+    fun updateFeatureToggles(playerUuid: UUID, toggles: ProfessionFeatureToggles): Boolean
     
     /**
      * 職業をリセット（デバッグ用）

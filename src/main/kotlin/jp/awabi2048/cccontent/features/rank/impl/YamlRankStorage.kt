@@ -6,9 +6,17 @@ import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
 import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.BossBarDisplayMode
+import jp.awabi2048.cccontent.features.rank.profession.profile.FishingInformationMode
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionCycleStatistics
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionFeatureToggles
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionPrestigeRecord
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionSpecialization
 import jp.awabi2048.cccontent.features.rank.skill.SkillSwitchMode
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.time.Instant
 import java.util.UUID
 import java.util.logging.Logger
 
@@ -20,70 +28,59 @@ class YamlRankStorage(
     private val dataDirectory: File
 ) : RankStorage {
 
+    companion object {
+        private const val PROFESSION_SCHEMA_VERSION = 2
+        private const val SCHEMA_MARKER_FILE = "rank-profession-schema-v2.applied"
+    }
+
     private val logger = Logger.getLogger("CC-Content")
     
     private val playerdataDirectory = File(dataDirectory, "playerdata").apply { mkdirs() }
     
     override fun init() {
         playerdataDirectory.mkdirs()
-        migrateOldProfessionData()
+        discardLegacyProfessionDataOnce()
     }
-    
-    /**
-     * 旧形式の職業データを移行
-     * profession/<profession>/<uuid>.yml から playerdata/<uuid>.yml へ
-     */
-    private fun migrateOldProfessionData() {
-        val professionDir = File(dataDirectory, "profession")
-        if (!professionDir.exists()) return
-        
-        val migratedCount = mutableListOf<String>()
-        
-        for (professionFile in professionDir.listFiles() ?: emptyArray()) {
-            if (!professionFile.isDirectory) continue
-            
-            val professionId = professionFile.name
-            for (playerFile in professionDir.listFiles() ?: emptyArray()) {
-                if (playerFile.extension != "yml") continue
-                
-                val uuidString = playerFile.nameWithoutExtension
-                val uuid = try {
-                    UUID.fromString(uuidString)
-                } catch (e: IllegalArgumentException) {
-                    continue
-                }
-                
-                val targetFile = File(playerdataDirectory, "$uuidString.yml")
-                if (targetFile.exists()) continue
-                
-                try {
-                    val oldConfig = YamlConfiguration.loadConfiguration(playerFile)
-                    val newConfig = if (targetFile.exists()) YamlConfiguration.loadConfiguration(targetFile) else YamlConfiguration()
-                    
-                    val professionSection = newConfig.createSection("rank.profession")
-                    professionSection.set("profession", professionId)
-                    professionSection.set("acquiredSkills", oldConfig.getStringList("acquiredSkills"))
-                    professionSection.set("prestigeSkills", oldConfig.getStringList("prestigeSkills"))
-                    professionSection.set("currentExp", oldConfig.getLong("currentExp", 0L))
-                    professionSection.set("lastUpdated", oldConfig.getLong("lastUpdated", System.currentTimeMillis()))
-                    professionSection.set("bossBarEnabled", oldConfig.getBoolean("bossBarEnabled", true))
-                    
-                    newConfig.save(targetFile)
-                    playerFile.delete()
-                    migratedCount += "$uuidString"
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-            
-            if (professionFile.listFiles()?.isEmpty() == true) {
-                professionFile.delete()
-            }
+
+    private fun discardLegacyProfessionDataOnce() {
+        val marker = File(dataDirectory, SCHEMA_MARKER_FILE)
+        if (marker.exists()) return
+
+        val timestamp = Instant.now().toEpochMilli()
+        val backupDirectory = File(dataDirectory, "discarded/rank-profession-$timestamp")
+        var discardedPlayers = 0
+
+        for (playerFile in playerdataDirectory.listFiles { file -> file.isFile && file.extension == "yml" }.orEmpty()) {
+            val config = YamlConfiguration.loadConfiguration(playerFile)
+            if (!config.isConfigurationSection("rank.profession")) continue
+
+            backupDirectory.mkdirs()
+            Files.copy(
+                playerFile.toPath(),
+                File(backupDirectory, playerFile.name).toPath(),
+                StandardCopyOption.REPLACE_EXISTING
+            )
+            config.set("rank.profession", null)
+            config.save(playerFile)
+            discardedPlayers++
         }
-        
-        if (migratedCount.isNotEmpty()) {
-            java.util.logging.Logger.getLogger("CC-Content").info("[YamlRankStorage] 旧職業データを ${migratedCount.size} 件移行しました")
+
+        val oldProfessionDirectory = File(dataDirectory, "profession")
+        if (oldProfessionDirectory.exists()) {
+            backupDirectory.mkdirs()
+            Files.move(
+                oldProfessionDirectory.toPath(),
+                File(backupDirectory, "profession").toPath(),
+                StandardCopyOption.REPLACE_EXISTING
+            )
         }
+
+        marker.parentFile?.mkdirs()
+        Files.writeString(
+            marker.toPath(),
+            "schemaVersion=$PROFESSION_SCHEMA_VERSION\nappliedAt=$timestamp\ndiscardedPlayers=$discardedPlayers\n"
+        )
+        logger.info("[YamlRankStorage] 旧職業データを $discardedPlayers 件退避し、新スキーマを適用しました")
     }
     
     override fun cleanup() {
@@ -225,22 +222,38 @@ class YamlRankStorage(
 
         val professionSection = config.getConfigurationSection("rank.profession")
             ?: config.createSection("rank.profession")
+        professionSection.set("schemaVersion", PROFESSION_SCHEMA_VERSION)
         professionSection.set("profession", profession.profession.id)
-        professionSection.set("acquiredSkills", profession.acquiredSkills.toList())
-        professionSection.set("prestigeSkills", profession.prestigeSkills.toList())
         professionSection.set("currentExp", profession.currentExp)
         professionSection.set("lastUpdated", profession.lastUpdated)
-        professionSection.set("bossBarEnabled", profession.bossBarEnabled)
         professionSection.set("bossBarDisplayMode", profession.bossBarDisplayMode.id)
         professionSection.set("levelUpNotificationEnabled", profession.levelUpNotificationEnabled)
-        professionSection.set("activeSkillId", profession.activeSkillId)
-        professionSection.set("skillSwitchMode", profession.skillSwitchMode.id)
 
-        // スキル発動状態を保存
-        professionSection.set("skillActivationStates", null) // 古いデータをクリア
-        profession.skillActivationStates.forEach { (skillId, enabled) ->
-            professionSection.set("skillActivationStates.$skillId", enabled)
+        if (profession.profession.usesTypedProfile) {
+            clearLegacyProfessionFields(professionSection)
+            professionSection.set("specializationId", profession.specializationId)
+            professionSection.set("featureToggles.batchProcessingEnabled", profession.featureToggles.batchProcessingEnabled)
+            professionSection.set("featureToggles.leafCleanupEnabled", profession.featureToggles.leafCleanupEnabled)
+            professionSection.set("featureToggles.automaticReplantEnabled", profession.featureToggles.automaticReplantEnabled)
+            professionSection.set("featureToggles.areaTillingEnabled", profession.featureToggles.areaTillingEnabled)
+            professionSection.set("featureToggles.areaHarvestEnabled", profession.featureToggles.areaHarvestEnabled)
+            professionSection.set("featureToggles.fishingInformationMode", profession.featureToggles.fishingInformationMode.name)
+            professionSection.set("cycleStatistics.validActions", profession.cycleStatistics.validActions)
+            professionSection.set("cycleStatistics.specialistActions", profession.cycleStatistics.specialistActions)
+            professionSection.set("cycleStatistics.highQualityActions", profession.cycleStatistics.highQualityActions)
+            professionSection.set("cycleStatistics.firstDiscoveries", profession.cycleStatistics.firstDiscoveries)
+        } else {
+            clearTypedProfessionFields(professionSection)
+            professionSection.set("acquiredSkills", profession.acquiredSkills.toList())
+            professionSection.set("prestigeSkills", profession.prestigeSkills.toList())
+            professionSection.set("activeSkillId", profession.activeSkillId)
+            professionSection.set("skillSwitchMode", profession.skillSwitchMode.id)
+            professionSection.set("skillActivationStates", null)
+            profession.skillActivationStates.forEach { (skillId, enabled) ->
+                professionSection.set("skillActivationStates.$skillId", enabled)
+            }
         }
+        savePrestigeRecords(config, profession.prestigeRecords)
 
         try {
             config.save(file)
@@ -257,33 +270,50 @@ class YamlRankStorage(
             val config = YamlConfiguration.loadConfiguration(file)
             val professionSection = config.getConfigurationSection("rank.profession") ?: return null
 
+            if (professionSection.getInt("schemaVersion", -1) != PROFESSION_SCHEMA_VERSION) {
+                throw IllegalStateException("Unsupported profession schema for player $playerUuid")
+            }
+
             val professionId = professionSection.getString("profession") ?: return null
             val profession = Profession.fromId(professionId) ?: return null
 
-            val acquiredSkills = professionSection.getStringList("acquiredSkills").toMutableSet()
-            val prestigeSkills = professionSection.getStringList("prestigeSkills").toMutableSet()
             val currentExp = professionSection.getLong("currentExp", 0L)
             val lastUpdated = professionSection.getLong("lastUpdated", System.currentTimeMillis())
-            val bossBarEnabled = professionSection.getBoolean("bossBarEnabled", true)
             val bossBarDisplayModeId = professionSection.getString("bossBarDisplayMode")
-            val bossBarDisplayMode = when {
-                bossBarDisplayModeId != null -> BossBarDisplayMode.fromId(bossBarDisplayModeId) ?: BossBarDisplayMode.SHORT
-                bossBarEnabled -> BossBarDisplayMode.SHORT
-                else -> BossBarDisplayMode.HIDDEN
-            }
+            val bossBarDisplayMode = BossBarDisplayMode.fromId(bossBarDisplayModeId ?: BossBarDisplayMode.SHORT.id)
+                ?: throw IllegalStateException("Unknown bossBarDisplayMode '$bossBarDisplayModeId' for player $playerUuid")
             val levelUpNotificationEnabled = professionSection.getBoolean("levelUpNotificationEnabled", true)
             val effectiveBossBarEnabled = bossBarDisplayMode.visible
 
-            // 後方互換性：既存データにフィールドがない場合はデフォルト値を使用
-            val activeSkillId = professionSection.getString("activeSkillId")
-            val skillSwitchModeId = professionSection.getString("skillSwitchMode") ?: SkillSwitchMode.MENU_ONLY.id
-            val skillSwitchMode = SkillSwitchMode.fromId(skillSwitchModeId) ?: SkillSwitchMode.MENU_ONLY
-
-            // スキル発動状態を読み込み（未設定時は空Map）
-            val skillActivationStates = mutableMapOf<String, Boolean>()
-            professionSection.getConfigurationSection("skillActivationStates")?.getKeys(false)?.forEach { skillId ->
-                skillActivationStates[skillId] = professionSection.getBoolean("skillActivationStates.$skillId", true)
+            val acquiredSkills = if (profession.usesTypedProfile) mutableSetOf() else professionSection.getStringList("acquiredSkills").toMutableSet()
+            val prestigeSkills = if (profession.usesTypedProfile) mutableSetOf() else professionSection.getStringList("prestigeSkills").toMutableSet()
+            val activeSkillId = if (profession.usesTypedProfile) null else professionSection.getString("activeSkillId")
+            val skillSwitchMode = if (profession.usesTypedProfile) {
+                SkillSwitchMode.MENU_ONLY
+            } else {
+                val id = professionSection.getString("skillSwitchMode") ?: SkillSwitchMode.MENU_ONLY.id
+                SkillSwitchMode.fromId(id) ?: throw IllegalStateException("Unknown skillSwitchMode '$id' for player $playerUuid")
             }
+            val skillActivationStates = if (profession.usesTypedProfile) mutableMapOf() else loadSkillActivationStates(professionSection)
+
+            val specializationId = professionSection.getString("specializationId")
+            if (profession.usesTypedProfile && specializationId != null &&
+                ProfessionSpecialization.fromId(profession, specializationId) == null
+            ) {
+                throw IllegalStateException("Unknown specialization '$specializationId' for ${profession.id}")
+            }
+            val featureToggles = if (profession.usesTypedProfile) {
+                loadFeatureToggles(professionSection, profession)
+            } else {
+                ProfessionFeatureToggles.defaultsFor(profession)
+            }
+            val cycleStatistics = ProfessionCycleStatistics(
+                validActions = professionSection.getLong("cycleStatistics.validActions", 0L),
+                specialistActions = professionSection.getLong("cycleStatistics.specialistActions", 0L),
+                highQualityActions = professionSection.getLong("cycleStatistics.highQualityActions", 0L),
+                firstDiscoveries = professionSection.getLong("cycleStatistics.firstDiscoveries", 0L)
+            )
+            val prestigeRecords = loadPrestigeRecords(config)
 
             PlayerProfession(
                 playerUuid,
@@ -297,7 +327,11 @@ class YamlRankStorage(
                 prestigeSkills,
                 activeSkillId,
                 skillSwitchMode,
-                skillActivationStates
+                skillActivationStates,
+                specializationId,
+                featureToggles,
+                cycleStatistics,
+                prestigeRecords
             )
         } catch (e: Exception) {
             e.printStackTrace()
@@ -317,4 +351,85 @@ class YamlRankStorage(
             }
         }
     }
+
+    private fun clearLegacyProfessionFields(section: org.bukkit.configuration.ConfigurationSection) {
+        listOf(
+            "acquiredSkills",
+            "prestigeSkills",
+            "activeSkillId",
+            "skillSwitchMode",
+            "skillActivationStates",
+            "bossBarEnabled"
+        ).forEach { section.set(it, null) }
+    }
+
+    private fun clearTypedProfessionFields(section: org.bukkit.configuration.ConfigurationSection) {
+        listOf(
+            "specializationId",
+            "featureToggles",
+            "cycleStatistics",
+            "bossBarEnabled"
+        ).forEach { section.set(it, null) }
+    }
+
+    private fun loadSkillActivationStates(
+        section: org.bukkit.configuration.ConfigurationSection
+    ): MutableMap<String, Boolean> = mutableMapOf<String, Boolean>().also { states ->
+        section.getConfigurationSection("skillActivationStates")?.getKeys(false)?.forEach { skillId ->
+            states[skillId] = section.getBoolean("skillActivationStates.$skillId", true)
+        }
+    }
+
+    private fun loadFeatureToggles(
+        section: org.bukkit.configuration.ConfigurationSection,
+        profession: Profession
+    ): ProfessionFeatureToggles {
+        val defaults = ProfessionFeatureToggles.defaultsFor(profession)
+        val informationModeName = section.getString(
+            "featureToggles.fishingInformationMode",
+            defaults.fishingInformationMode.name
+        ) ?: defaults.fishingInformationMode.name
+        val informationMode = FishingInformationMode.entries.firstOrNull { it.name == informationModeName }
+            ?: throw IllegalStateException("Unknown fishingInformationMode '$informationModeName'")
+        return ProfessionFeatureToggles(
+            batchProcessingEnabled = section.getBoolean("featureToggles.batchProcessingEnabled", defaults.batchProcessingEnabled),
+            leafCleanupEnabled = section.getBoolean("featureToggles.leafCleanupEnabled", defaults.leafCleanupEnabled),
+            automaticReplantEnabled = section.getBoolean("featureToggles.automaticReplantEnabled", defaults.automaticReplantEnabled),
+            areaTillingEnabled = section.getBoolean("featureToggles.areaTillingEnabled", defaults.areaTillingEnabled),
+            areaHarvestEnabled = section.getBoolean("featureToggles.areaHarvestEnabled", defaults.areaHarvestEnabled),
+            fishingInformationMode = informationMode
+        )
+    }
+
+    private fun savePrestigeRecords(config: YamlConfiguration, records: List<ProfessionPrestigeRecord>) {
+        if (records.isEmpty()) return
+        config.set("rank.professionPrestige", null)
+        records.forEachIndexed { index, record ->
+            val path = "rank.professionPrestige.$index"
+            config.set("$path.professionId", record.professionId)
+            config.set("$path.specializationId", record.specializationId)
+            config.set("$path.completedAtEpochMillis", record.completedAtEpochMillis)
+            config.set("$path.cycleNumber", record.cycleNumber)
+            config.set("$path.representativeStatistic", record.representativeStatistic)
+        }
+    }
+
+    private fun loadPrestigeRecords(
+        section: org.bukkit.configuration.ConfigurationSection
+    ): MutableList<ProfessionPrestigeRecord> = section
+        .getConfigurationSection("rank.professionPrestige")
+        ?.getKeys(false)
+        ?.sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
+        ?.map { index ->
+            val path = "rank.professionPrestige.$index"
+            ProfessionPrestigeRecord(
+                professionId = requireNotNull(section.getString("$path.professionId")),
+                specializationId = section.getString("$path.specializationId"),
+                completedAtEpochMillis = section.getLong("$path.completedAtEpochMillis"),
+                cycleNumber = section.getInt("$path.cycleNumber"),
+                representativeStatistic = section.getLong("$path.representativeStatistic")
+            )
+        }
+        ?.toMutableList()
+        ?: mutableListOf()
 }

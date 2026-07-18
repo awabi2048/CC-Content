@@ -5,6 +5,8 @@ import jp.awabi2048.cccontent.features.rank.tutorial.PlayerTutorialRank
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
 import jp.awabi2048.cccontent.features.rank.profession.BossBarDisplayMode
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionFeatureToggles
+import jp.awabi2048.cccontent.features.rank.profession.profile.TypedProfessionProfile
 import java.util.UUID
 
 /**
@@ -99,6 +101,16 @@ interface RankManager {
      * デバッグ用: 職業レベルを直接設定
      */
     fun setProfessionLevel(playerUuid: UUID, level: Int): Boolean
+
+    fun selectProfessionSpecialization(playerUuid: UUID, specializationId: String): Boolean
+
+    fun getProfessionSpecializationId(playerUuid: UUID): String?
+
+    fun getTypedProfessionProfile(playerUuid: UUID): TypedProfessionProfile?
+
+    fun getProfessionFeatureToggles(playerUuid: UUID): ProfessionFeatureToggles?
+
+    fun updateProfessionFeatureToggles(playerUuid: UUID, toggles: ProfessionFeatureToggles): Boolean
     
     /**
      * 職業をリセット（デバッグ用）
