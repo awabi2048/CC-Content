@@ -14,6 +14,7 @@ import jp.awabi2048.cccontent.command.StructureCommand
 import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.config.ResourceConfigurationValidator
+import jp.awabi2048.cccontent.config.ContentConfigScope
 import jp.awabi2048.cccontent.featurestate.ContentFeatureCatalog
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemInteractionListener
@@ -193,6 +194,8 @@ class CCContent : JavaPlugin(), Listener {
     private var arenaFeatureReady: Boolean = false
     private var arenaFeatureFailureReason: String? = null
     private var customItemsLanguageAvailable: Boolean = true
+    private val configurationFailuresByFeature = linkedMapOf<String, MutableList<String>>()
+    private val registeredConfigOwners = linkedSetOf<String>()
 
     private class FeatureUnavailableCommand(private val featureId: String) : CommandExecutor, TabCompleter {
         override fun onCommand(
@@ -284,19 +287,33 @@ class CCContent : JavaPlugin(), Listener {
             featureInitLogger.setStatus("Minigame", FeatureInitializationLogger.Status.SUCCESS)
         }
 
-        GulliverConfig.initialize(this)
-        AutoIgnitionBoosterConfig.initialize(this)
-        AirCannonConfig.initialize(this)
-        CustomHeadConfigRegistry.initialize(this)
+        if (isFeatureConfigurationAvailable("custom_items")) {
+            runCatching {
+                GulliverConfig.initialize(this)
+                AutoIgnitionBoosterConfig.initialize(this)
+                AirCannonConfig.initialize(this)
+                CustomHeadConfigRegistry.initialize(this)
+            }.onFailure { failure ->
+                recordConfigurationFailure("custom_items", "カスタムアイテム設定の読込失敗: ${failure.message}")
+                logger.warning("[CustomItems] 設定の読込に失敗したため無効化しました: ${failure.message}")
+            }
+        }
         sharedMobService = MobService(this)
-        sharedMobService.reloadDefinitions()
-        sharedMobService.startTickTask()
+        if (isFeatureConfigurationAvailable("shared")) {
+            runCatching {
+                sharedMobService.reloadDefinitions()
+                sharedMobService.startTickTask()
+            }.onFailure { failure ->
+                recordConfigurationFailure("shared", "共通Mob定義の読込失敗: ${failure.message}")
+                logger.warning("[SharedDefinitions] 読込に失敗しました: ${failure.message}")
+            }
+        }
 
         adminMarkerToolService = AdminMarkerToolService(this)
         server.pluginManager.registerEvents(adminMarkerToolService, this)
         adminMarkerToolService.start()
 
-        if (customItemsLanguageAvailable) {
+        if (customItemsLanguageAvailable && isFeatureConfigurationAvailable("custom_items")) {
             registerCustomItems()
         } else {
             logger.warning("[CustomItems] 言語ファイル検証エラーによりカスタムアイテム登録をスキップします")
@@ -304,7 +321,7 @@ class CCContent : JavaPlugin(), Listener {
         }
         if (minigameRuntime != null) registerMiniGameItems()
 
-        try {
+        if (isFeatureConfigurationAvailable("oage_shrine")) try {
             val menuService = NpcMenuService(
                 plugin = this,
                 professionProvider = { playerId -> temporaryBrewerProfessionByLuckPerms(playerId) }
@@ -317,6 +334,12 @@ class CCContent : JavaPlugin(), Listener {
             featureInitLogger.setStatus("Oage Shrine", FeatureInitializationLogger.Status.FAILURE)
             featureInitLogger.addDetailMessage("Oage Shrine", "[Oage Shrine] 初期化失敗: ${e.message}")
             logger.warning("[Oage Shrine] 初期化に失敗しました: ${e.message}")
+        } else {
+            featureInitLogger.setStatus("Oage Shrine", FeatureInitializationLogger.Status.FAILURE)
+            featureInitLogger.addSummaryMessage("Oage Shrine", "設定検証エラーにより無効化")
+            configurationFailuresFor("oage_shrine").forEach { failure ->
+                featureInitLogger.addDetailMessage("Oage Shrine", "[Oage Shrine][Config] $failure")
+            }
         }
 
         initializeFeatureIfEnabled("Rank System", "rank") {
@@ -408,7 +431,13 @@ class CCContent : JavaPlugin(), Listener {
 
         registerCatalogCommands()
 
-        CCSystem.getAPI().getItemGrantService().register(ContentItemGrantProvider())
+        runCatching {
+            CCSystem.getAPI().getItemGrantService().register(ContentItemGrantProvider())
+        }.onFailure { failure ->
+            runCatching { CCSystem.getAPI().getItemGrantService().unregister("cc-content") }
+            recordConfigurationFailure("custom_items", "ItemGrant登録失敗: ${failure.message}")
+            logger.warning("[CustomItems] ItemGrant登録に失敗しました。プラグインの他featureは継続します: ${failure.message}")
+        }
         val structureCommand = StructureCommand(
             structureService = SchemStructureService(this),
             onArenaStructureSaved = {
@@ -514,8 +543,19 @@ class CCContent : JavaPlugin(), Listener {
             initializeSukimaDungeon()
         }
 
-        server.pluginManager.registerEvents(GulliverItemListener(this), this)
-        server.pluginManager.registerEvents(AutoIgnitionBoosterListener(this), this)
+        if (isFeatureConfigurationAvailable("custom_items")) {
+            server.pluginManager.registerEvents(GulliverItemListener(this), this)
+            server.pluginManager.registerEvents(AutoIgnitionBoosterListener(this), this)
+            server.pluginManager.registerEvents(CustomHeadGuiListener(this), this)
+            server.pluginManager.registerEvents(LargeExperienceBottleListener(), this)
+            server.pluginManager.registerEvents(FireproofListener(), this)
+            server.pluginManager.registerEvents(StorageBoxGuiListener(this), this)
+            server.pluginManager.registerEvents(TransparentItemFrameListener(this), this)
+            CustomItemManager.getItem("misc.stopwatch")?.let { item ->
+                if (item is StopwatchItem) server.pluginManager.registerEvents(item, this)
+            }
+            server.scheduler.runTaskTimer(this, GulliverScaleManager(), 0L, 1L)
+        }
         server.pluginManager.registerEvents(MobEventListener(sharedMobService), this)
         if (isContentEnabled("arena") && arenaFeatureReady && ::arenaManager.isInitialized) {
             server.pluginManager.registerEvents(ArenaItemListener(), this)
@@ -533,22 +573,10 @@ class CCContent : JavaPlugin(), Listener {
                 server.pluginManager.registerEvents(it, this)
             }
         }
-        server.pluginManager.registerEvents(CustomHeadGuiListener(this), this)
         server.pluginManager.registerEvents(CustomItemInteractionListener(), this)
-        server.pluginManager.registerEvents(LargeExperienceBottleListener(), this)
-        server.pluginManager.registerEvents(FireproofListener(), this)
         if (::npcMenuService.isInitialized) {
             server.pluginManager.registerEvents(npcMenuService, this)
         }
-        server.pluginManager.registerEvents(StorageBoxGuiListener(this), this)
-        server.pluginManager.registerEvents(TransparentItemFrameListener(this), this)
-        CustomItemManager.getItem("misc.stopwatch")?.let { item ->
-            if (item is StopwatchItem) {
-                server.pluginManager.registerEvents(item, this)
-            }
-        }
-
-        server.scheduler.runTaskTimer(this, GulliverScaleManager(), 0L, 1L)
 
         featureInitLogger.printSummary()
 
@@ -703,6 +731,17 @@ class CCContent : JavaPlugin(), Listener {
             featureInitLogger.setStatus(featureName, FeatureInitializationLogger.Status.WARNING)
             featureInitLogger.addSummaryMessage(featureName, "configで無効化(content_enabled.$contentKey=false)")
             logger.info("[$featureName] content_enabled.$contentKey=false のため無効化されています")
+            return
+        }
+        val configFailures = configurationFailuresFor(contentKey)
+        if (configFailures.isNotEmpty()) {
+            closeFeatureEntryPointsAfterFailure(contentKey)
+            featureInitLogger.setStatus(featureName, FeatureInitializationLogger.Status.FAILURE)
+            featureInitLogger.addSummaryMessage(featureName, "設定検証エラーにより無効化")
+            configFailures.forEach { failure ->
+                featureInitLogger.addDetailMessage(featureName, "[$featureName][Config] $failure")
+                logger.warning("[$featureName][Config] $failure")
+            }
             return
         }
 
@@ -1259,14 +1298,20 @@ class CCContent : JavaPlugin(), Listener {
     private fun validateConfigurationFiles() {
         val configRoot = File(dataFolder, "config").toPath()
         val errors = ResourceConfigurationValidator.validateConfigDirectory(configRoot)
-        if (errors.isNotEmpty()) {
-            throw IllegalStateException(
-                "CC-Content設定の検証に失敗しました (${errors.size}件):\n${errors.joinToString("\n")}"
-            )
+        errors.forEach { error ->
+            recordConfigurationFailure(ContentConfigScope.featureIdFromValidationError(error), error)
+        }
+        configurationFailuresByFeature["core"]?.takeIf { it.isNotEmpty() }?.let { coreErrors ->
+            throw IllegalStateException("CC-Content core設定の検証に失敗しました (${coreErrors.size}件):\n${coreErrors.joinToString("\n")}")
         }
     }
 
     private fun registerManagedConfigs() {
+        configurationFailuresByFeature.clear()
+        registeredConfigOwners.toList().forEach {
+            CCSystem.getAPI().getConfigSchemaService().unregister(it)
+        }
+        registeredConfigOwners.clear()
         val codeSource = runCatching { File(javaClass.protectionDomain.codeSource.location.toURI()) }
             .getOrNull() ?: return
         if (!codeSource.isFile) return
@@ -1294,7 +1339,9 @@ class CCContent : JavaPlugin(), Listener {
             "/loot",
             "/theme"
         )
-        val specs = paths.map { resourcePath ->
+        val specsByFeature = paths.groupBy(ContentConfigScope::featureIdForResource).mapValues { (featureId, featurePaths) ->
+            val owner = configOwner(featureId)
+            featurePaths.map { resourcePath ->
             val bundled = getResource(resourcePath)?.use { input ->
                 YamlConfiguration.loadConfiguration(InputStreamReader(input, StandardCharsets.UTF_8))
             } ?: error("Missing bundled config: $resourcePath")
@@ -1305,7 +1352,7 @@ class CCContent : JavaPlugin(), Listener {
                 ConfigClassification.MANAGED_CONFIG
             }
             ManagedConfigSpec(
-                owner = "cc-content",
+                owner = owner,
                 sourcePlugin = this,
                 resourcePath = resourcePath,
                 targetPath = File(dataFolder, resourcePath).toPath(),
@@ -1334,12 +1381,39 @@ class CCContent : JavaPlugin(), Listener {
                 validator = com.awabi2048.ccsystem.api.config.ConfigValidator {},
                 reloadAction = { restartPluginLifecycle("cc config reload") }
             )
+            }
         }
-        CCSystem.getAPI().getConfigSchemaService().register("cc-content", specs)
-        val result = CCSystem.getAPI().getConfigSchemaService().prepare("cc-content")
-        check(result.successful) {
-            "CC-Content Config preparation failed: ${result.statuses.filter { it.message != null }}"
+        specsByFeature.forEach { (featureId, specs) ->
+            val owner = configOwner(featureId)
+            CCSystem.getAPI().getConfigSchemaService().register(owner, specs)
+            registeredConfigOwners += owner
+            val result = CCSystem.getAPI().getConfigSchemaService().prepare(owner)
+            if (!result.successful) {
+                result.statuses.filter { it.message != null }.forEach { status ->
+                    recordConfigurationFailure(featureId, "${status.resourcePath}: ${status.message}")
+                }
+            }
         }
+        configurationFailuresByFeature["core"]?.takeIf { it.isNotEmpty() }?.let { failures ->
+            error("CC-Content core Config preparation failed: $failures")
+        }
+    }
+
+    private fun configOwner(featureId: String): String = "cc-content:$featureId"
+
+    private fun recordConfigurationFailure(featureId: String, message: String) {
+        configurationFailuresByFeature.getOrPut(featureId) { mutableListOf() }.add(message)
+    }
+
+    private fun isFeatureConfigurationAvailable(featureId: String): Boolean =
+        configurationFailuresFor(featureId).isEmpty()
+
+    private fun configurationFailuresFor(featureId: String): List<String> {
+        val failures = configurationFailuresByFeature[featureId].orEmpty().toMutableList()
+        if (featureId in setOf("arena", "brewery", "cooking", "sukima_dungeon")) {
+            failures += configurationFailuresByFeature["shared"].orEmpty()
+        }
+        return failures.distinct()
     }
     
     /**
@@ -1625,7 +1699,10 @@ class CCContent : JavaPlugin(), Listener {
     override fun onDisable() {
         stopPlugin()
         runCatching { CCSystem.getAPI().getItemGrantService().unregister("cc-content") }
-        runCatching { CCSystem.getAPI().getConfigSchemaService().unregister("cc-content") }
+        registeredConfigOwners.toList().forEach { owner ->
+            runCatching { CCSystem.getAPI().getConfigSchemaService().unregister(owner) }
+        }
+        registeredConfigOwners.clear()
         runCatching { CCSystem.getAPI().getMenuCommandService().unregisterOwner("cc-content") }
         logger.info("CC-Content v${pluginMeta.version} が無効化されました")
     }
