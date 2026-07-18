@@ -49,11 +49,13 @@ import java.util.UUID
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import jp.awabi2048.cccontent.integration.myworld.MyWorldBridge
 
 /** ミニゲームのBukkit接続とセッション単一性を管理する実行サービス。 */
 class MiniGameRuntime(
     private val plugin: JavaPlugin,
-    private val partyService: PartyService? = null
+    private val partyService: PartyService? = null,
+    private val myWorldBridge: MyWorldBridge
 ) : Listener {
     companion object {
         var current: MiniGameRuntime? = null
@@ -74,7 +76,7 @@ class MiniGameRuntime(
 
     private val pdc = MiniGamePdc(plugin)
     private val settings = MiniGameSettings(plugin)
-    private val accessPolicy = MiniGameAccessPolicy()
+    private val accessPolicy = MiniGameAccessPolicy(myWorldBridge::findMyWorldByUuid)
     private val markerService = MiniGameMarkerService(plugin, pdc, accessPolicy, settings, ::isRunning)
     private val persistence = MiniGamePersistence(plugin)
     private val active = linkedMapOf<MiniGameId, ActiveGame>()

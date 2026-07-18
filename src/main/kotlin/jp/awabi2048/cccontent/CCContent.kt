@@ -15,6 +15,8 @@ import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.config.ResourceConfigurationValidator
 import jp.awabi2048.cccontent.config.ContentConfigScope
+import jp.awabi2048.cccontent.integration.myworld.DefaultMyWorldBridge
+import jp.awabi2048.cccontent.integration.myworld.MyWorldBridge
 import jp.awabi2048.cccontent.featurestate.ContentFeatureCatalog
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemInteractionListener
@@ -196,6 +198,7 @@ class CCContent : JavaPlugin(), Listener {
     private var customItemsLanguageAvailable: Boolean = true
     private val configurationFailuresByFeature = linkedMapOf<String, MutableList<String>>()
     private val registeredConfigOwners = linkedSetOf<String>()
+    private lateinit var myWorldBridge: MyWorldBridge
 
     private class FeatureUnavailableCommand(private val featureId: String) : CommandExecutor, TabCompleter {
         override fun onCommand(
@@ -235,6 +238,7 @@ class CCContent : JavaPlugin(), Listener {
     private fun startPlugin() {
         instance = this
         ensureCCSystemAvailable()
+        myWorldBridge = DefaultMyWorldBridge()
         CCSystem.getAPI().getMenuCommandService().unregisterOwner("cc-content")
         saveSplitLanguageResources()
         coreConfig = CoreConfigManager.load(this)
@@ -281,7 +285,7 @@ class CCContent : JavaPlugin(), Listener {
             }
             val controller = checkNotNull(partyController) { "Minigame requires the Party feature" }
             // 参加者を確定するPartyServiceを必ず注入し、全員自動参加へ戻さない。
-            val runtime = MiniGameRuntime(this, controller.service)
+            val runtime = MiniGameRuntime(this, controller.service, myWorldBridge)
             minigameRuntime = runtime
             runtime.initialize()
             featureInitLogger.setStatus("Minigame", FeatureInitializationLogger.Status.SUCCESS)
@@ -324,7 +328,8 @@ class CCContent : JavaPlugin(), Listener {
         if (isFeatureConfigurationAvailable("oage_shrine")) try {
             val menuService = NpcMenuService(
                 plugin = this,
-                professionProvider = { playerId -> temporaryBrewerProfessionByLuckPerms(playerId) }
+                professionProvider = { playerId -> temporaryBrewerProfessionByLuckPerms(playerId) },
+                myWorldBridge = myWorldBridge
             )
             menuService.initialize()
             npcMenuService = menuService
@@ -412,10 +417,7 @@ class CCContent : JavaPlugin(), Listener {
         }
 
         initializeFeatureIfEnabled("Fishing", "fishing") {
-            if (rankManagerInstance == null) {
-                throw IllegalStateException("Fishing requires the Rank System")
-            }
-            val feature = FishingFeature(this, catalogStore)
+            val feature = FishingFeature(this, catalogStore, myWorldBridge)
             fishingFeature = feature
             feature.initialize(featureInitLogger)
         }

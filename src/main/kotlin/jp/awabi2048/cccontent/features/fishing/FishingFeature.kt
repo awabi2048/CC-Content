@@ -13,7 +13,7 @@ import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.skill.SkillEffectEngine
 import jp.awabi2048.cccontent.features.rank.skill.handlers.FisherBonusHandler
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
-import me.awabi2048.myworldmanager.api.MyWorldManagerApi
+import jp.awabi2048.cccontent.integration.myworld.MyWorldBridge
 import net.kyori.adventure.bossbar.BossBar
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.title.Title
@@ -43,7 +43,8 @@ import kotlin.math.roundToLong
 
 class FishingFeature(
     private val plugin: CCContent,
-    private val catalogStore: CatalogStore
+    private val catalogStore: CatalogStore,
+    private val myWorldBridge: MyWorldBridge
 ) : Listener {
     private enum class Phase { WAITING, HOOK_WINDOW, FIGHT }
 
@@ -689,11 +690,6 @@ class FishingFeature(
         ).replace('&', '§')
 
     private fun isBedrockPlayer(player: Player): Boolean {
-        if (!Bukkit.getPluginManager().isPluginEnabled("MyWorldManager")) return false
-        return try {
-            MyWorldManagerApi.getBedrockFormService()?.isBedrock(player) == true
-        } catch (_: Throwable) {
-            false
-        }
+        return myWorldBridge.isBedrock(player)
     }
 }

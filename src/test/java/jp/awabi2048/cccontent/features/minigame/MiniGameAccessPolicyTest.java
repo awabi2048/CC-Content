@@ -14,7 +14,7 @@ class MiniGameAccessPolicyTest {
 
     @Test
     void refusesAllEditingWhenMwmRepositoryIsUnavailable() {
-        MiniGameAccessPolicy policy = new MiniGameAccessPolicy(() -> null);
+        MiniGameAccessPolicy policy = new MiniGameAccessPolicy(worldUuid -> null);
 
         assertFalse(policy.canEdit(OPERATOR, WORLD, OWNER));
         assertFalse(policy.canView(OPERATOR, WORLD));
@@ -22,7 +22,7 @@ class MiniGameAccessPolicyTest {
 
     @Test
     void refusesTheUnsetPdcOwnerBeforeConsultingMwm() {
-        MiniGameAccessPolicy policy = new MiniGameAccessPolicy(() -> {
+        MiniGameAccessPolicy policy = new MiniGameAccessPolicy(worldUuid -> {
             throw new AssertionError("zero PDC owner must be rejected locally");
         });
 
