@@ -46,6 +46,7 @@ import java.time.Instant
 class SpecialistCollectionService(
     private val plugin: JavaPlugin,
     private val rankManager: RankManager,
+    private val seasonalPlants: SeasonalPlantRegistry,
     private val random: Random = Random()
 ) : Listener {
     companion object {
@@ -73,10 +74,15 @@ class SpecialistCollectionService(
         var scoreTotal: Double = 0.0,
         var timeout: BukkitTask? = null
     )
+    private data class GatheringTarget(
+        val customItemId: String,
+        val definitionId: String,
+        val expiresAt: Instant
+    )
 
     private val chiselSessions = mutableMapOf<UUID, ChiselSession>()
     private val occupiedBlocks = mutableMapOf<BlockKey, UUID>()
-    private val gatheringTargets = mutableMapOf<UUID, MutableMap<BlockKey, Pair<String, Instant>>>()
+    private val gatheringTargets = mutableMapOf<UUID, MutableMap<BlockKey, GatheringTarget>>()
     private val gatheringCooldowns = mutableMapOf<UUID, Instant>()
     private val tillableMaterials = setOf(Material.DIRT, Material.GRASS_BLOCK, Material.DIRT_PATH)
 
@@ -421,13 +427,26 @@ class SpecialistCollectionService(
         }
         val radius = profile.inspectionRadius.coerceAtLeast(2)
         val expiresAt = now.plusSeconds(60)
-        val resourceId = seasonalPlantResourceId()
-        val targets = mutableMapOf<BlockKey, Pair<String, Instant>>()
+        val season = CCSystem.getAPI().getSeasonService().currentSeason()
+        val targets = mutableMapOf<BlockKey, GatheringTarget>()
         for (x in -radius..radius) for (y in -2..2) for (z in -radius..radius) {
             val block = origin.getRelative(x, y, z)
             if (!ResourceMaterialPolicy.isWildVegetation(block.type)) continue
             if (!CCSystem.getAPI().getNaturalOriginRegistry().isNatural(block)) continue
-            targets[block.key()] = resourceId to expiresAt
+            val definition = seasonalPlants.select(
+                season,
+                block.type,
+                block.biome.key.toString(),
+                block.y,
+                random
+            ) ?: continue
+            if (CustomItemManager.getItem(definition.customItemId) == null) {
+                plugin.logger.warning(
+                    "[Resource Collection] 存在しない季節植物アイテムを無視しました: ${definition.customItemId}"
+                )
+                continue
+            }
+            targets[block.key()] = GatheringTarget(definition.customItemId, definition.id, expiresAt)
             player.spawnParticle(
                 Particle.HAPPY_VILLAGER,
                 block.location.add(0.5, 0.7, 0.5),
@@ -441,7 +460,12 @@ class SpecialistCollectionService(
         gatheringTargets[player.uniqueId] = targets
         val cooldownSeconds = profile.inspectionCooldownSeconds.takeIf { it > 0 } ?: 45
         gatheringCooldowns[player.uniqueId] = now.plusSeconds(cooldownSeconds.toLong())
-        player.sendMessage(message(player, "resource_collection.gathering.inspected", "count" to targets.size))
+        val messageKey = if (targets.isEmpty()) {
+            "resource_collection.gathering.no_discoveries"
+        } else {
+            "resource_collection.gathering.inspected"
+        }
+        player.sendMessage(message(player, messageKey, "count" to targets.size))
         player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.25f)
     }
 
@@ -452,23 +476,22 @@ class SpecialistCollectionService(
         val targets = gatheringTargets[player.uniqueId] ?: return
         val target = targets.remove(event.block.key()) ?: return
         val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
-        if (target.second.isBefore(now)) return
+        if (target.expiresAt.isBefore(now)) return
         val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? FarmerSkillProfile ?: return
         val amount = profile.guaranteedSpecialistPlantYield.coerceAtLeast(1) +
             if (random.nextDouble() < profile.specialistPlantExtraChance) 1 else 0
-        giveResource(player, target.first, amount)
+        giveCustomItem(player, target.customItemId, amount)
         if (player.gameMode != GameMode.CREATIVE && random.nextDouble() >= profile.durabilitySaveChance) {
             player.damageItemStack(EquipmentSlot.HAND, 1)
         }
-        awardSpecialist(player, ContentActionType.PLANT_GATHERED, amount > 1, event.blockState.type)
+        awardSpecialist(
+            player,
+            ContentActionType.PLANT_GATHERED,
+            amount > 1,
+            event.blockState.type,
+            mapOf("seasonal_plant_definition" to target.definitionId)
+        )
         player.sendMessage(message(player, "resource_collection.gathering.completed", "amount" to amount))
-    }
-
-    private fun seasonalPlantResourceId(): String = when (CCSystem.getAPI().getSharedClockService().now().monthValue) {
-        in 3..5 -> "mugwort"
-        in 6..8 -> "mint"
-        in 9..11 -> "porcini"
-        else -> "rosehip"
     }
 
     private fun cropSeed(crop: Material): Material? = when (crop) {
@@ -661,7 +684,8 @@ class SpecialistCollectionService(
         player: Player,
         actionType: ContentActionType,
         highQuality: Boolean,
-        material: Material
+        material: Material,
+        additionalMetadata: Map<String, String> = emptyMap()
     ) {
         val experience = ProfessionExperience.SPECIALIST_ACTION +
             if (highQuality) ProfessionExperience.HIGH_QUALITY_BONUS else 0L
@@ -676,7 +700,7 @@ class SpecialistCollectionService(
                 actionType = actionType,
                 amount = 1L,
                 worldKey = player.world.key,
-                metadata = mapOf("material" to material.key.toString(), "specialist" to "true")
+                metadata = mapOf("material" to material.key.toString(), "specialist" to "true") + additionalMetadata
             )
         )
     }
@@ -695,8 +719,12 @@ class SpecialistCollectionService(
     }
 
     private fun giveResource(player: Player, id: String, amount: Int) {
+        giveCustomItem(player, "resource.$id", amount)
+    }
+
+    private fun giveCustomItem(player: Player, fullId: String, amount: Int) {
         if (amount <= 0) return
-        val item = CustomItemManager.createItemForPlayer("resource.$id", player, amount) ?: return
+        val item = CustomItemManager.createItemForPlayer(fullId, player, amount) ?: return
         player.inventory.addItem(item).values.forEach { player.world.dropItemNaturally(player.location, it) }
     }
 

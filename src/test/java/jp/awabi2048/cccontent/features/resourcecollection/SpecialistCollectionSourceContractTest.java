@@ -31,6 +31,8 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("resource.gathering_guide"));
         assertTrue(source.contains("resource.gathering_sickle"));
         assertTrue(source.contains("gatheringTargets[player.uniqueId] = targets"));
+        assertTrue(source.contains("getSeasonService().currentSeason()"));
+        assertFalse(source.contains("now().monthValue"));
         assertTrue(source.contains("profile.areaTillingEnabled"));
         assertTrue(source.contains("profile.areaHarvestEnabled"));
         assertTrue(source.contains("profile.automaticReplantEnabled"));
