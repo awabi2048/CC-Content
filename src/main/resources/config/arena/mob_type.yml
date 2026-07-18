@@ -1,2 +1,5 @@
+﻿config_version: 1
+
 # 廃止: モブ種別単位の設定は利用しません。
 # モブスポーン設定は config/arena/themes/<theme_id>.yml の各テーマに移行してください。
+

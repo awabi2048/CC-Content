@@ -1,3 +1,6 @@
+﻿config_version: 1
+
 # Colosseum is a best-of-rounds duel. A match ends when either player reaches this score.
 time_limit_seconds: 600
 first_to: 3
+

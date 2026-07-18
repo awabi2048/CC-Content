@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 settings:
   test_mode_without_hdb: false
 
@@ -103,3 +105,4 @@ variants:
         name: "&6おばけミニランタン"
         lore:
           - "&7小物装飾向け"
+

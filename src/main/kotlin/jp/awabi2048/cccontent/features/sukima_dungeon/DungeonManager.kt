@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
+import com.awabi2048.ccsystem.CCSystem
 import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.CCContent
@@ -9,6 +10,7 @@ import org.bukkit.Bukkit
 import org.bukkit.GameRules
 import org.bukkit.World
 import org.bukkit.WorldCreator
+import org.bukkit.NamespacedKey
 import java.util.UUID
 
 object DungeonManager {
@@ -34,7 +36,7 @@ object DungeonManager {
     }
 
     private fun createOrLoadWorld(worldName: String, themeId: String? = null): World? {
-        val creator = WorldCreator(worldName)
+        val creator = WorldCreator(NamespacedKey.minecraft(worldName))
         creator.generator(VoidChunkGenerator())
         
         // TODO: バイオーム設定は一時的にコメントアウト
@@ -71,7 +73,11 @@ object DungeonManager {
         PortalManager.onDungeonClose(world.name)
         Bukkit.unloadWorld(world, false)
         
-        val worldFolder = world.worldFolder
+        val worldFolder = CCSystem.getAPI()
+            .getWorldDirectoryService()
+            .existingDirectory(world.key)
+            ?.toFile()
+            ?: world.worldFolder
         deleteDirectory(worldFolder)
         Bukkit.getLogger().info("Deleted dungeon world: ${world.name}")
         worldThemes.remove(world.name)

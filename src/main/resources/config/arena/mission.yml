@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 mission:
   generate_count: 14
 
@@ -39,3 +41,4 @@ mission_charactor_config:
     mob_stats_multiplier:
       health: 1.5
       attack: 1.5
+

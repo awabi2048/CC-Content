@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.rank.command
 
+import com.awabi2048.ccsystem.CCSystem
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
@@ -23,10 +24,16 @@ class RankMenuCommand(
             return false
         }
 
-        if (args.isNotEmpty() && args[0].equals("skill", ignoreCase = true)) {
-            return rankCommand.openSkillTreeDirect(sender)
+        val arguments = if (args.firstOrNull().equals("skill", ignoreCase = true)) {
+            mapOf("view" to "skill")
+        } else {
+            emptyMap()
         }
-
-        return rankCommand.openRankMenu(sender)
+        return CCSystem.getAPI().getMenuCommandService().open(
+            sender,
+            sender,
+            "cc-content:rank",
+            arguments
+        )
     }
 }

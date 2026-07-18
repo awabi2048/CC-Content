@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 promotion_probability: 0.25
 
 normal:
@@ -266,3 +268,4 @@ promoted:
       ashen_spirit:
         weight: 2
         stat_multiplier: 2.6
+

@@ -57,6 +57,20 @@ class CatalogCommand(
     private val fishingSearchTarget: (UUID) -> String? = { null },
     private val setFishingSearchTarget: (Player, String?) -> Unit = { _, _ -> }
 ) : CommandExecutor, Listener {
+    fun openFromPublicRoute(player: Player, arguments: Map<String, String>): Boolean {
+        val type = arguments["type"]
+            ?.lowercase()
+            ?.let { value -> CatalogType.entries.firstOrNull { it.id == value } }
+            ?: CatalogType.FISHING
+        val page = arguments["page"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+        if (type == CatalogType.FISHING && !player.hasPermission("cc-content.admin")) {
+            player.sendMessage(Component.text(text(player, "fishing.dictionary.item_required")))
+            return false
+        }
+        open(player, type, page)
+        return true
+    }
+
     fun open(player: Player, type: CatalogType, requestedPage: Int = 0) {
         if (!isAvailable(type)) {
             val featureId = type.id
@@ -272,11 +286,16 @@ class CatalogCommand(
             else -> args.firstOrNull()?.lowercase()?.let { value -> CatalogType.entries.firstOrNull { it.id == value } } ?: CatalogType.FISHING
         }
         val pageArg = if (label.equals("catalog", true)) args.getOrNull(1) else args.firstOrNull()
-        if (type == CatalogType.FISHING && !player.hasPermission("cc-content.admin")) {
-            player.sendMessage(Component.text(text(player, "fishing.dictionary.item_required")))
-            return true
-        }
-        open(player, type, pageArg?.toIntOrNull()?.coerceAtLeast(1)?.minus(1) ?: 0)
+        val routeArguments = mapOf(
+            "type" to type.id,
+            "page" to (pageArg?.toIntOrNull()?.coerceAtLeast(1)?.minus(1) ?: 0).toString()
+        )
+        CCSystem.getAPI().getMenuCommandService().open(
+            player,
+            player,
+            "cc-content:catalog",
+            routeArguments
+        )
         return true
     }
 

@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 zombie_normal:
   base_exp: 3
   items:
@@ -625,3 +627,4 @@ ender_ghost:
 ender_shooter:
   base_exp: 5
   items: []
+

@@ -1,3 +1,5 @@
+config_version: 4
+
 oage_box:
   rewards:
     item:
@@ -39,3 +41,4 @@ oage_box:
         weight: 2
       - amount: 20
         weight: 1
+

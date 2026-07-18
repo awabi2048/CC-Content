@@ -191,7 +191,10 @@ object MiniGameSettingsValidator {
     }
 
     private fun requireKeys(root: Map<String, Any?>, allowed: Set<String>, source: String) {
-        require(root.keys.all { it in allowed }) { "unknown key in $source" }
+        root["config_version"]?.let { version ->
+            require(version is Int && version == 1) { "invalid config_version in $source" }
+        }
+        require(root.keys.all { it == "config_version" || it in allowed }) { "unknown key in $source" }
     }
 
     private fun requireMap(root: Map<String, Any?>, key: String, source: String): Map<String, Any?> =

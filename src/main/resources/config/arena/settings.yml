@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 bgm:
   target_state_switch_threshold_seconds: 10
   normal:
@@ -68,3 +70,4 @@ world_settings:
   view_distance: 6
   simulation_distance: 4
   send_view_distance: -1
+

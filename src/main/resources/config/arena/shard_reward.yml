@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 # 難易度ごとに独立した表。別難易度の entries は継ぎ足さない。
 1:
   entries:
@@ -43,3 +45,4 @@
       tier: 1
       type: incompatible_combination
       weight: 30
+

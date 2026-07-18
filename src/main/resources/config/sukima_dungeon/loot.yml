@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 items:
   rotten_flesh:
     material: ROTTEN_FLESH
@@ -30,3 +32,4 @@ items:
     weight: 20
     enchantments:
       sharpness: 1
+

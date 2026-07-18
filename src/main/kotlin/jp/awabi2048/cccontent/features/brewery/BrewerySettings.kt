@@ -49,7 +49,9 @@ data class BreweryRecipe(
     val middleOutputColor: String?,
     val finalOutputAlcohol: Double,
     val finalOutputColor: String?,
-    val finalOutputEffects: List<BreweryEffectDefinition>
+    val finalOutputEffects: List<BreweryEffectDefinition>,
+    val finalOutputGlint: Boolean,
+    val finalOutputCustomModelData: List<Int>
 )
 
 fun breweryQualityIndex(quality: Double): Int = when {
@@ -103,7 +105,7 @@ data class RecipeMatchResult(
 }
 
 data class BrewerySettings(
-    val schemaVersion: Int,
+    val configVersion: Int,
     val mismatchFirePenaltyPer30Seconds: Double,
     val distillationOverPenalty: Double,
     val fuelSecondsPerItem: Int,
@@ -111,6 +113,14 @@ data class BrewerySettings(
     val angelSharePercentPerYear: Double,
     val agingRealSecondsPerYear: Long,
     val smallBarrelSpeedMultiplier: Double,
+    val requireKeywordOnSigns: Boolean,
+    val ageInMinecraftBarrels: Boolean,
+    val maxBrewsInMinecraftBarrels: Int,
+    val openLargeBarrelEverywhere: Boolean,
+    val barrelInventoryRowsLarge: Int,
+    val barrelInventoryRowsSmall: Int,
+    val countDifferencePenalty: Double,
+    val unmatchedItemPenalty: Double,
     val allowedMediumFireMaterials: Set<Material>,
     val qualityDebugLog: Boolean,
     val nauseaThreshold: Double,
@@ -130,14 +140,14 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
     fun loadSettings(): BrewerySettings {
         val file = File(plugin.dataFolder, "config/brewery/config.yml")
         val yml = YamlConfiguration.loadConfiguration(file)
-        val schemaVersion = yml.getInt("schema_version", -1)
-        require(schemaVersion == 2) { "Brewery設定のschema_versionが2ではありません: $schemaVersion" }
+        val configVersion = yml.getInt("config_version", -1)
+        require(configVersion == 2) { "Brewery設定のconfig_versionが2ではありません: $configVersion" }
         val root = yml.getConfigurationSection("brewery")
             ?: error("Brewery設定にbreweryセクションがありません")
         val mediumRaw = root.getStringList("fire.medium_materials")
         val mediumMaterials = mediumRaw.mapNotNull { runCatching { Material.valueOf(it) }.getOrNull() }.toSet()
         return BrewerySettings(
-            schemaVersion = schemaVersion,
+            configVersion = configVersion,
             mismatchFirePenaltyPer30Seconds = root.getDouble("quality.penalty_per_30s_mismatch_fire", 2.0),
             distillationOverPenalty = root.getDouble("quality.penalty_per_over_distillation", 5.0),
             fuelSecondsPerItem = root.getInt("fire.fuel_seconds_per_item", 30).coerceAtLeast(1),
@@ -145,6 +155,18 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
             angelSharePercentPerYear = root.getDouble("aging.angel_share_percent_per_year", 2.0).coerceAtLeast(0.0),
             agingRealSecondsPerYear = root.getLong("aging.real_seconds_per_year", 1200L).coerceAtLeast(1L),
             smallBarrelSpeedMultiplier = root.getDouble("aging.small_barrel_speed_multiplier", 1.25).coerceAtLeast(0.1),
+            requireKeywordOnSigns = root.getBoolean("barrel.require_keyword_on_signs", true),
+            ageInMinecraftBarrels = root.getBoolean("barrel.age_in_minecraft_barrels", true),
+            maxBrewsInMinecraftBarrels = root.getInt("barrel.max_brews_in_minecraft_barrels", 6).coerceIn(1, 27),
+            openLargeBarrelEverywhere = root.getBoolean("barrel.open_large_everywhere", true),
+            barrelInventoryRowsLarge = root.getInt("barrel.inventory_rows_large", 3).also {
+                require(it in 1..6) { "barrel.inventory_rows_large must be between 1 and 6" }
+            },
+            barrelInventoryRowsSmall = root.getInt("barrel.inventory_rows_small", 1).also {
+                require(it in 1..6) { "barrel.inventory_rows_small must be between 1 and 6" }
+            },
+            countDifferencePenalty = root.getDouble("quality.count_difference_penalty", 5.0).coerceAtLeast(0.0),
+            unmatchedItemPenalty = root.getDouble("quality.unmatched_item_penalty", 10.0).coerceAtLeast(0.0),
             allowedMediumFireMaterials = mediumMaterials,
             qualityDebugLog = root.getBoolean("debug.quality_log", true),
             nauseaThreshold = root.getDouble("intoxication.nausea_threshold", 25.0).coerceAtLeast(0.0),
@@ -162,7 +184,7 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
     fun loadRecipes(): Map<String, BreweryRecipe> {
         val file = File(plugin.dataFolder, "config/brewery/recipe.yml")
         val yml = YamlConfiguration.loadConfiguration(file)
-        require(yml.getInt("schema_version", -1) == 2) { "Breweryレシピ設定のschema_versionが2ではありません" }
+        require(yml.getInt("config_version", -1) == 2) { "Breweryレシピ設定のconfig_versionが2ではありません" }
         val recipeSection = yml.getConfigurationSection("recipes")
             ?: error("Breweryレシピ設定にrecipesセクションがありません")
         val recipes = mutableMapOf<String, BreweryRecipe>()
@@ -199,10 +221,18 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
         val distillationSection = node.getConfigurationSection("distillation")
         val distillationTime = distillationSection?.getInt("time_seconds", 45)?.coerceAtLeast(1) ?: 45
         val distillationFilterConsumption = distillationSection?.getInt("filter_consumption", 1)?.coerceAtLeast(1) ?: 1
-        val distillationRuns = distillationSection?.getInt("runs", 3)?.coerceAtLeast(1) ?: 3
+        val distillationRuns = if (distillationSection?.contains("runs") == true) {
+            distillationSection.getInt("runs").coerceAtLeast(0)
+        } else {
+            0
+        }
 
         val agingSection = node.getConfigurationSection("aging")
-        val agingTimeDays = agingSection?.getInt("time_days", 1)?.coerceAtLeast(1) ?: 1
+        val agingTimeDays = if (agingSection?.contains("time_days") == true) {
+            agingSection.getInt("time_days").coerceAtLeast(0)
+        } else {
+            0
+        }
         val barrelTypes = parseBarrelTypes(agingSection)
 
         val middleOutputSection = node.getConfigurationSection("middle_output") ?: return null
@@ -210,9 +240,10 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
 
         val finalOutputSection = node.getConfigurationSection("final_output") ?: return null
         require(finalOutputSection.contains("alcohol")) { "レシピ$id のfinal_output.alcoholがありません" }
-        val alcohol = finalOutputSection.getDouble("alcohol").coerceIn(0.0, 100.0)
+        val alcohol = finalOutputSection.getDouble("alcohol").coerceIn(-100.0, 100.0)
         val color = finalOutputSection.getString("color")
         val effects = finalOutputSection.getStringList("effects").map { parseEffect(id, it) }
+        val customModelData = finalOutputSection.getIntegerList("custom_model_data")
 
         return BreweryRecipe(
             id = id,
@@ -230,7 +261,9 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
             middleOutputColor = middleOutputColor,
             finalOutputAlcohol = alcohol,
             finalOutputColor = color,
-            finalOutputEffects = effects
+            finalOutputEffects = effects,
+            finalOutputGlint = finalOutputSection.getBoolean("glint", false),
+            finalOutputCustomModelData = customModelData
         )
     }
 
@@ -317,26 +350,44 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
         return runCatching { Material.valueOf(raw.uppercase()) }.getOrNull()
     }
 
-    fun findBestRecipe(recipes: Map<String, BreweryRecipe>, inputItems: List<ItemStack>): RecipeMatchResult? {
+    fun findBestRecipe(
+        recipes: Map<String, BreweryRecipe>,
+        inputItems: List<ItemStack>,
+        countDifferencePenalty: Double = 5.0,
+        unmatchedItemPenalty: Double = 10.0
+    ): RecipeMatchResult? {
         if (inputItems.isEmpty()) return null
 
         var bestMatch: RecipeMatchResult? = null
         for (recipe in recipes.values) {
-            val match = matchRecipe(recipe, inputItems) ?: continue
+            val match = matchRecipe(
+                recipe,
+                inputItems,
+                countDifferencePenalty.coerceAtLeast(0.0),
+                unmatchedItemPenalty.coerceAtLeast(0.0)
+            ) ?: continue
             if (bestMatch == null) {
                 bestMatch = match
                 continue
             }
             if (match.typeMatchCount > bestMatch.typeMatchCount) {
                 bestMatch = match
-            } else if (match.typeMatchCount == bestMatch.typeMatchCount && match.countDifferenceScore < bestMatch.countDifferenceScore) {
+            } else if (match.typeMatchCount == bestMatch.typeMatchCount &&
+                (match.countDifferenceScore < bestMatch.countDifferenceScore ||
+                    (match.countDifferenceScore == bestMatch.countDifferenceScore && match.recipe.id < bestMatch.recipe.id))
+            ) {
                 bestMatch = match
             }
         }
         return bestMatch
     }
 
-    private fun matchRecipe(recipe: BreweryRecipe, inputItems: List<ItemStack>): RecipeMatchResult? {
+    private fun matchRecipe(
+        recipe: BreweryRecipe,
+        inputItems: List<ItemStack>,
+        countDifferencePenalty: Double,
+        unmatchedItemPenalty: Double
+    ): RecipeMatchResult? {
         val counts = recipe.fermentationIngredients.keys.associateWith { 0 }.toMutableMap()
         var unmatchedAmount = 0
 
@@ -350,14 +401,14 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
         }
 
         val typeMatchCount = recipe.fermentationIngredients.keys.count { (counts[it] ?: 0) > 0 }
-        if (typeMatchCount <= 0) return null
+        if (typeMatchCount != recipe.fermentationIngredients.size) return null
 
         var countDiffScore = 0.0
         for ((ingredientKey, requiredCount) in recipe.fermentationIngredients) {
             val actual = counts[ingredientKey] ?: 0
-            countDiffScore += abs(actual - requiredCount) * 5.0
+            countDiffScore += abs(actual - requiredCount) * countDifferencePenalty
         }
-        countDiffScore += unmatchedAmount * 10.0
+        countDiffScore += unmatchedAmount * unmatchedItemPenalty
 
         return RecipeMatchResult(
             recipe = recipe,

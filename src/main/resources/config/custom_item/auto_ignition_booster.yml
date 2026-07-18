@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 # 自動点火ブースター設定
 
 glide:
@@ -12,3 +14,4 @@ upward:
   boost_power: 1.0
   # 非滑空時のY速度上限
   velocity_cap: 1.8
+

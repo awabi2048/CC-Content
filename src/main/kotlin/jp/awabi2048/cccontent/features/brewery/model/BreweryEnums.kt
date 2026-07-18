@@ -15,5 +15,6 @@ enum class FirePower {
 
 enum class BarrelSize {
     SMALL,
-    BIG
+    BIG,
+    MINECRAFT
 }

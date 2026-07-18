@@ -19,16 +19,26 @@ class BreweryConfigurationTest {
         var config = YamlConfiguration.loadConfiguration(CONFIG.toFile());
         var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
 
-        assertEquals(2, config.getInt("schema_version"));
+        assertEquals(2, config.getInt("config_version"));
+        assertFalse(config.contains("schema_version"));
         assertTrue(config.isConfigurationSection("brewery"));
         assertFalse(config.contains("settings"));
-        assertEquals(2, recipes.getInt("schema_version"));
+        assertEquals(2, recipes.getInt("config_version"));
+        assertFalse(recipes.contains("schema_version"));
         assertTrue(recipes.isConfigurationSection("recipes"));
-        assertTrue(recipes.getConfigurationSection("recipes").getKeys(false).size() >= 5);
+        assertEquals(35, recipes.getConfigurationSection("recipes").getKeys(false).size());
 
         for (String key : recipes.getKeys(true)) {
             assertFalse(key.toLowerCase().endsWith("alchol"), "legacy alcohol typo remains: " + key);
         }
+    }
+
+    @Test
+    void recipesPreserveZeroStepRequirements() {
+        var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
+        assertEquals(0, recipes.getInt("recipes.wheatbeer.distillation.runs"));
+        assertEquals(0, recipes.getInt("recipes.vodka.aging.time_days"));
+        assertTrue(recipes.getInt("recipes.whisky.distillation.runs") > 0);
     }
 
     @Test

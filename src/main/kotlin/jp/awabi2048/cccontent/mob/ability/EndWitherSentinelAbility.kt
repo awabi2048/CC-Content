@@ -6,6 +6,7 @@ import jp.awabi2048.cccontent.mob.MobDamagedContext
 import jp.awabi2048.cccontent.mob.MobDeathContext
 import jp.awabi2048.cccontent.mob.MobRuntimeContext
 import jp.awabi2048.cccontent.mob.MobSpawnContext
+import jp.awabi2048.cccontent.platform.paper26.WitherBossBarVisibilityAdapter
 import org.bukkit.Bukkit
 import org.bukkit.FluidCollisionMode
 import org.bukkit.GameMode
@@ -325,38 +326,7 @@ class EndWitherSentinelAbility(
     }
 
     private fun hideBossBar(wither: Wither) {
-        // Keep the NMS reflection local here so the rest of the mob system stays free from version-locked server internals.
-        val methodNames = listOf("setShouldDrawBossBar", "setBossBarVisible", "setShowBossBar")
-        methodNames.forEach { name ->
-            runCatching {
-                val method = wither.javaClass.methods.firstOrNull { it.name == name && it.parameterCount == 1 }
-                method?.invoke(wither, false)
-            }
-        }
-
-        runCatching {
-            val handle = wither.javaClass.getMethod("getHandle").invoke(wither) ?: return@runCatching
-            val bossEvent = findBossEvent(handle) ?: return@runCatching
-            bossEvent.javaClass.methods.firstOrNull { it.name == "setVisible" && it.parameterCount == 1 }
-                ?.invoke(bossEvent, false)
-        }
-    }
-
-    private fun findBossEvent(instance: Any): Any? {
-        var current: Class<*>? = instance.javaClass
-        while (current != null && current != Any::class.java) {
-            current.declaredFields.forEach { field ->
-                runCatching {
-                    field.isAccessible = true
-                    val value = field.get(instance) ?: return@runCatching
-                    if (value.javaClass.name.endsWith("ServerBossEvent")) {
-                        return value
-                    }
-                }
-            }
-            current = current.superclass
-        }
-        return null
+        WitherBossBarVisibilityAdapter.hide(wither)
     }
 
     private fun removeDisplay(entityId: UUID) {

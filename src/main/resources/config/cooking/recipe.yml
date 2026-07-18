@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 ingredients:
   potato:
     material: POTATO
@@ -59,3 +61,4 @@ recipes:
       item_model: kota_server:custom_item/cooking/carrot_cookie
     exp: 12
     completion_seconds: 2
+

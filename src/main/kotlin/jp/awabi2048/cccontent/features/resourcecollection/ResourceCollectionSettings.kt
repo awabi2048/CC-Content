@@ -22,15 +22,15 @@ data class ResourceCollectionSettings(
             val config = YamlConfiguration.loadConfiguration(configFile)
             val collection = YamlConfiguration.loadConfiguration(collectionFile)
 
-            require(config.get("schema_version") is Number && config.getInt("schema_version") == 1) {
-                "$CONFIG_PATH.schema_version must be the integer 1"
+            require(config.get("config_version") is Number && config.getInt("config_version") == 2) {
+                "$CONFIG_PATH.config_version must be the integer 2"
             }
             val enabled = requireBoolean(config, "enabled", CONFIG_PATH)
             val worlds = requireStringList(config, "worlds", CONFIG_PATH).toSet()
             require(worlds.isNotEmpty()) { "$CONFIG_PATH.worlds must not be empty" }
 
-            require(collection.get("schema_version") is Number && collection.getInt("schema_version") == 1) {
-                "$COLLECTION_PATH.schema_version must be the integer 1"
+            require(collection.get("config_version") is Number && collection.getInt("config_version") == 2) {
+                "$COLLECTION_PATH.config_version must be the integer 2"
             }
             return ResourceCollectionSettings(
                 enabled = enabled,

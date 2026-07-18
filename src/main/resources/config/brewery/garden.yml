@@ -1,5 +1,4 @@
-schema_version: 1
-
+﻿config_version: 2
 garden:
   seed_drop_chance: 0.05
   growth_check_interval_seconds: 1
@@ -75,3 +74,4 @@ garden:
           material: SWEET_BERRY_BUSH
           block_data: '[age=3]'
           growth_seconds: 180
+

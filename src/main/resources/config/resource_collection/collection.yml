@@ -1,5 +1,4 @@
-schema_version: 1
-
+﻿config_version: 2
 # 資源ワールドで未加工素材を採取したときの職業経験値です。
 harvest:
   wheat:
@@ -48,3 +47,4 @@ craft:
     material: SUGAR
     profession: brewer
     experience: 2
+

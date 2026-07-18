@@ -1,3 +1,5 @@
+﻿config_version: 1
+
 sizes:
   small:
     tiles: 3
@@ -84,3 +86,4 @@ world_settings:
   view_distance: 6
   simulation_distance: 4
   send_view_distance: -1
+
