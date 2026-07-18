@@ -281,6 +281,23 @@ class ProfessionManagerImpl(
         return true
     }
 
+    override fun recordCycleAction(
+        playerUuid: UUID,
+        specialist: Boolean,
+        highQuality: Boolean,
+        firstDiscovery: Boolean
+    ): Boolean {
+        val prof = getPlayerProfession(playerUuid) ?: return false
+        if (!prof.profession.usesTypedProfile) return false
+        prof.cycleStatistics.validActions++
+        if (specialist) prof.cycleStatistics.specialistActions++
+        if (highQuality) prof.cycleStatistics.highQualityActions++
+        if (firstDiscovery) prof.cycleStatistics.firstDiscoveries++
+        prof.lastUpdated = System.currentTimeMillis()
+        storage.saveProfession(prof)
+        return true
+    }
+
     override fun resetProfession(playerUuid: UUID): Boolean {
         if (getPlayerProfession(playerUuid) == null) {
             return false

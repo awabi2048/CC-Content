@@ -7,7 +7,6 @@ import org.bukkit.block.Block
 import org.bukkit.block.data.Waterlogged
 import java.util.Random
 import kotlin.math.roundToInt
-import kotlin.math.roundToLong
 import kotlin.math.pow
 
 enum class FishQuality(val id: String, val multiplier: Double) {
@@ -85,7 +84,6 @@ data class FishDefinition(
     val times: Set<FishingTime>,
     val water: FishingWaterCondition,
     val qualities: Map<FishQuality, Int>,
-    val exp: Long,
     val rarity: FishRarity,
     val requiredBaitTags: Set<String>,
     val fight: FishFightProfile
@@ -192,8 +190,7 @@ data class FishCatch(
     val material: Material,
     val weightGrams: Int,
     val quality: FishQuality,
-    val sizeCm: Int,
-    val exp: Long
+    val sizeCm: Int
 )
 
 object FishingCatchSelector {
@@ -239,8 +236,7 @@ object FishingCatchSelector {
             selected.material,
             weight,
             quality,
-            size,
-            (selected.exp * quality.multiplier).roundToLong()
+            size
         )
         return selected to catch
     }

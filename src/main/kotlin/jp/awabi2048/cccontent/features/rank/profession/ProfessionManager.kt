@@ -94,6 +94,13 @@ interface ProfessionManager {
     fun getFeatureToggles(playerUuid: UUID): ProfessionFeatureToggles?
 
     fun updateFeatureToggles(playerUuid: UUID, toggles: ProfessionFeatureToggles): Boolean
+
+    fun recordCycleAction(
+        playerUuid: UUID,
+        specialist: Boolean = false,
+        highQuality: Boolean = false,
+        firstDiscovery: Boolean = false
+    ): Boolean
     
     /**
      * 職業をリセット（デバッグ用）

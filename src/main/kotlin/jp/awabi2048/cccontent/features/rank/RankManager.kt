@@ -111,6 +111,13 @@ interface RankManager {
     fun getProfessionFeatureToggles(playerUuid: UUID): ProfessionFeatureToggles?
 
     fun updateProfessionFeatureToggles(playerUuid: UUID, toggles: ProfessionFeatureToggles): Boolean
+
+    fun recordProfessionCycleAction(
+        playerUuid: UUID,
+        specialist: Boolean = false,
+        highQuality: Boolean = false,
+        firstDiscovery: Boolean = false
+    ): Boolean
     
     /**
      * 職業をリセット（デバッグ用）

@@ -37,8 +37,8 @@ class FishingModelTest {
 
     @Test
     void fishdexStatsAreRecordedPerFish() {
-        var first = new FishCatch("cod", Material.COD, 120, FishQuality.COMMON, 20, 5);
-        var second = new FishCatch("cod", Material.COD, 80, FishQuality.RARE, 15, 8);
+        var first = new FishCatch("cod", Material.COD, 120, FishQuality.COMMON, 20);
+        var second = new FishCatch("cod", Material.COD, 80, FishQuality.RARE, 15);
         var entry = new FishdexEntry("cod", false, 0L, null, null, Map.of()).record(first).record(second);
 
         assertTrue(entry.getDiscovered());

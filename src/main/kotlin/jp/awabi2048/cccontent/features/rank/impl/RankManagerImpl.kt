@@ -134,6 +134,18 @@ class RankManagerImpl(
         playerUuid: UUID,
         toggles: ProfessionFeatureToggles
     ): Boolean = getProfessionManager().updateFeatureToggles(playerUuid, toggles)
+
+    override fun recordProfessionCycleAction(
+        playerUuid: UUID,
+        specialist: Boolean,
+        highQuality: Boolean,
+        firstDiscovery: Boolean
+    ): Boolean = getProfessionManager().recordCycleAction(
+        playerUuid,
+        specialist,
+        highQuality,
+        firstDiscovery
+    )
     
     override fun resetProfession(playerUuid: UUID): Boolean {
         return getProfessionManager().resetProfession(playerUuid)

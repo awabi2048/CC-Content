@@ -805,7 +805,7 @@ class CCContent : JavaPlugin(), Listener {
             rankCommand.setTutorialTaskSystem(taskLoader, taskChecker)
 
             // 追加のランク系リスナー登録
-            val minerListener = ProfessionMinerExpListener(this, rankManager, ignoreBlockStore)
+            val minerListener = ProfessionMinerExpListener(rankManager, ignoreBlockStore)
             val combatExpListener = ProfessionCombatExpListener(
                 rankManager,
                 FeatureConfigManager.load(this, FeatureConfigManager.RANK_SETTINGS_PATH)
@@ -891,26 +891,6 @@ class CCContent : JavaPlugin(), Listener {
       */
     private fun initializeSkillEffectSystem(rankManager: RankManager, ignoreBlockStore: IgnoreBlockStore) {
         try {
-            val blastMineHandler = BlastMineHandler()
-
-            SkillEffectRegistry.register(BreakSpeedBoostHandler())
-            SkillEffectRegistry.register(DropBonusHandler())
-            SkillEffectRegistry.register(DurabilitySaveChanceHandler())
-            SkillEffectRegistry.register(UnlockBatchBreakHandler(ignoreBlockStore))
-            SkillEffectRegistry.register(ReplaceLootTableHandler())
-            SkillEffectRegistry.register(blastMineHandler)
-            SkillEffectRegistry.register(WindGustHandler())
-            SkillEffectRegistry.register(ReplantHandler())
-            SkillEffectRegistry.register(FarmerAreaTillingHandler())
-            SkillEffectRegistry.register(FarmerAreaHarvestingHandler(this, rankManager, ignoreBlockStore))
-            SkillEffectRegistry.register(FarmerAutoReplantingHandler())
-
-            SkillEffectRegistry.register(UnlockSystemHandler())
-            SkillEffectRegistry.register(UnlockRecipeHandler())
-            SkillEffectRegistry.register(WorkSpeedBonusMockHandler())
-            SkillEffectRegistry.register(SuccessRateBonusMockHandler())
-            FisherBonusHandler.all().forEach(SkillEffectRegistry::register)
-
             SkillEffectRegistry.register(UnlockItemTokenHandler())
 
             // 戦闘系スキルハンドラー
@@ -929,12 +909,8 @@ class CCContent : JavaPlugin(), Listener {
             SkillEffectRegistry.register(SwordsmanUnderdogBuffHandler())
 
             server.pluginManager.registerEvents(SkillEffectCacheListener(rankManager, this), this)
-            server.pluginManager.registerEvents(BlockBreakEffectListener(ignoreBlockStore), this)
-            server.pluginManager.registerEvents(FarmerInteractEffectListener(), this)
-            server.pluginManager.registerEvents(BatchBreakPreviewListener(), this)
             server.pluginManager.registerEvents(ActiveSkillTriggerListener(), this)
             server.pluginManager.registerEvents(ActiveSkillKeyListener(), this)
-            server.pluginManager.registerEvents(CraftEffectListener(), this)
             server.pluginManager.registerEvents(CombatEffectListener(), this)
             server.pluginManager.registerEvents(WarriorBowEffectListener(), this)
             server.pluginManager.registerEvents(SwordsmanDrainListener(), this)
@@ -1017,7 +993,7 @@ class CCContent : JavaPlugin(), Listener {
             }
         }
 
-        for (profession in Profession.values()) {
+        for (profession in Profession.values().filterNot { it.usesTypedProfile }) {
             try {
                 val skillTree = CodeDefinedSkillTree.create(profession)
                 skillTree.getAllSkills().values.mapNotNull { it.effect?.type }.distinct().forEach { effectType ->

@@ -28,5 +28,11 @@ class FishingSkillSourceContractTest {
         assertFalse(source.contains("SkillEffectEngine"));
         assertFalse(source.contains("FisherBonusHandler"));
         assertFalse(source.contains("catchData.exp"));
+
+        String settings = Files.readString(Path.of(
+            "src/main/kotlin/jp/awabi2048/cccontent/features/fishing/FishingSettings.kt"
+        ));
+        assertFalse(settings.contains("job_exp.yml"));
+        assertFalse(settings.contains("fisherExp"));
     }
 }

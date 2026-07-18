@@ -34,15 +34,11 @@ data class FishingSettings(
     companion object {
         fun load(plugin: JavaPlugin): FishingSettings {
             val file = ensureResource(plugin, "config/fishing/fish.yml")
-            val expFile = ensureResource(plugin, "config/rank/job_exp.yml")
             val config = YamlConfiguration.loadConfiguration(file)
-            val expConfig = YamlConfiguration.loadConfiguration(expFile)
             require(config.get("config_version") is Number && config.getInt("config_version") == 2) {
                 "config/fishing/fish.yml.config_version must be the integer 2"
             }
             require(config.get("enabled") is Boolean) { "config/fishing/fish.yml.enabled must be a boolean" }
-            val fisherExp = expConfig.getConfigurationSection("fisher")
-                ?: error("config/rank/job_exp.yml.fisher is required")
             val fishes = config.getConfigurationSection("fish")?.getKeys(false).orEmpty().map { id ->
                 val path = "fish.$id"
                 val qualities = config.getConfigurationSection("$path.quality")?.getKeys(false).orEmpty().associate {
@@ -68,16 +64,12 @@ data class FishingSettings(
                         width = positiveRange(config, "$path.water.width")
                     ),
                     qualities = qualities.also { require(it.isNotEmpty()) { "$path.quality must not be empty" } },
-                    exp = positiveLong(fisherExp.get(id), "config/rank/job_exp.yml.fisher.$id"),
                     rarity = FishRarity.valueOf(requireString(config.getString("$path.rarity"), "$path.rarity").uppercase()),
                     requiredBaitTags = config.getStringList("$path.required_bait_tags").toSet(),
                     fight = fight
                 )
             }
             require(fishes.isNotEmpty()) { "config/fishing/fish.yml に魚定義がありません" }
-            require(fisherExp.getKeys(false) == fishes.map { it.id }.toSet()) {
-                "config/rank/job_exp.yml.fisher must define exactly the fishing fish ids"
-            }
             val baits = config.getConfigurationSection("bait")?.getKeys(false).orEmpty().map { id ->
                 val path = "bait.$id"
                 BaitDefinition(

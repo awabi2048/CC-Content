@@ -516,6 +516,11 @@ class FishingFeature(
                 (if (before?.discovered != true) ProfessionExperience.FIRST_DISCOVERY_BONUS else 0L) +
                 (if (catchData.quality != FishQuality.COMMON) ProfessionExperience.HIGH_QUALITY_BONUS else 0L)
             plugin.getRankManager()?.addProfessionExp(player.uniqueId, experience)
+            plugin.getRankManager()?.recordProfessionCycleAction(
+                player.uniqueId,
+                highQuality = catchData.quality != FishQuality.COMMON,
+                firstDiscovery = before?.discovered != true
+            )
         }
         publishCatchAction(player, catchData, before?.discovered != true)
         val preserveDurability = fisher.active && random.nextDouble() < fisher.durabilitySaveChance
@@ -706,6 +711,7 @@ class FishingFeature(
         val fisher = fisherContext(player)
         if (fisher.active) {
             plugin.getRankManager()?.addProfessionExp(player.uniqueId, ProfessionExperience.NORMAL_ACTION)
+            plugin.getRankManager()?.recordProfessionCycleAction(player.uniqueId)
             if (caught != null && random.nextDouble() < fisher.vanillaExtraCatchChance) {
                 val extra = caught.itemStack.clone().apply { amount = 1 }
                 player.inventory.addItem(extra).values.forEach { player.world.dropItemNaturally(player.location, it) }
