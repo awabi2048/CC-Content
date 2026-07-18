@@ -53,7 +53,7 @@ class FishingFeature(
 
     private data class ActiveSession(
         val hook: FishHook,
-        val bait: BaitDefinition?,
+        var bait: BaitDefinition?,
         val rod: RodDefinition?,
         var phase: Phase = Phase.WAITING,
         var definition: FishDefinition? = null,
@@ -70,7 +70,8 @@ class FishingFeature(
         var fightElapsedTicks: Long = 0L,
         var rodMissingTicks: Long = 0L,
         var lastInputTick: Int = -1,
-        var ignoredInstabilityEventsRemaining: Int = 0
+        var ignoredInstabilityEventsRemaining: Int = 0,
+        var fightScore: FishingFightScore = FishingFightScore()
     )
 
     private lateinit var settings: FishingSettings
@@ -205,8 +206,7 @@ class FishingFeature(
             return
         }
         val fisher = fisherContext(player)
-        val preserveBait = fisher.active && random.nextDouble() < fisher.baitSaveChance
-        val bait = items.consumeBait(player, consume = !preserveBait)
+        val bait = items.resolveBait(player.inventory.itemInOffHand)
         val rod = items.resolveRod(rodItem)
         val lureLevel = rodItem.getEnchantmentLevel(Enchantment.LURE)
         val lureMultiplier = (1.0 - settings.minigame.lureReductionPerLevel * lureLevel).coerceAtLeast(0.2)
@@ -225,10 +225,11 @@ class FishingFeature(
         val session = sessions[player.uniqueId] ?: return
         if (session.hook.uniqueId != event.hook.uniqueId || session.phase != Phase.WAITING) return
         val fisher = fisherContext(player)
+        val bait = items.resolveBait(player.inventory.itemInOffHand)
         val selected = FishingCatchSelector.select(
             FishingContext(player.world, event.hook.location, fisher.level),
             settings.fishes,
-            session.bait,
+            bait,
             session.rod,
             random
         )
@@ -239,12 +240,15 @@ class FishingFeature(
             clearSession(player.uniqueId, removeHook = true)
             return
         }
+        val preserveBait = fisher.active && random.nextDouble() < fisher.baitSaveChance
+        if (bait != null) items.consumeBait(player, consume = !preserveBait)
+        session.bait = bait
         session.phase = Phase.HOOK_WINDOW
         session.definition = selected.first
         session.catchData = selected.second
         player.showTitle(Title.title(
             Component.empty(),
-            Component.text("§6HIT!"),
+            Component.text(message(player, "fishing.fight.hit_title")),
             Title.Times.times(Duration.ZERO, Duration.ofMillis(500), Duration.ofMillis(200))
         ))
         player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 2.0f)
@@ -415,6 +419,11 @@ class FishingFeature(
         session.fightElapsedTicks += settings.minigame.fightIntervalTicks
         updateHookVisual(session, next)
         val zone = updateFightDisplay(player, session)
+        session.fightScore = session.fightScore.record(
+            zone,
+            next.effectiveness,
+            settings.minigame.fightIntervalTicks
+        )
         advanceFightStatus(player, session, zone)
         if (next.remainingTicks <= 0L) resolveFight(player, session)
     }
@@ -495,9 +504,8 @@ class FishingFeature(
 
     private fun resolveFight(player: Player, session: ActiveSession) {
         val definition = session.definition ?: return
-        val state = session.fightState ?: return
-        val zone = state.zone(definition.fight, settings.minigame.greenWidth, settings.minigame.yellowMargin)
-        if (random.nextDouble() <= zone.successChance) complete(player, session)
+        val successProbability = session.fightScore.successProbability(definition.rarity)
+        if (random.nextDouble() <= successProbability) complete(player, session)
         else fail(player.uniqueId, "fishing.failed.final_roll")
     }
 
@@ -524,7 +532,7 @@ class FishingFeature(
         }
         publishCatchAction(player, catchData, before?.discovered != true)
         val preserveDurability = fisher.active && random.nextDouble() < fisher.durabilitySaveChance
-        if (!preserveDurability && items.damageRod(player.inventory.itemInMainHand)) {
+        if (!preserveDurability && items.damageRod(player)) {
             player.sendMessage(message(player, "fishing.error.rod_broken"))
             player.playSound(player.location, Sound.ENTITY_ITEM_BREAK, 0.9f, 0.9f)
         }

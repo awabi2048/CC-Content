@@ -4,6 +4,8 @@ import org.bukkit.Material
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 data class FishingMiniGameSettings(
     val baseHookWindowTicks: Long,
@@ -34,9 +36,10 @@ data class FishingSettings(
     companion object {
         fun load(plugin: JavaPlugin): FishingSettings {
             val file = ensureResource(plugin, "config/fishing/fish.yml")
+            migrateIfRequired(plugin, file)
             val config = YamlConfiguration.loadConfiguration(file)
-            require(config.get("config_version") is Number && config.getInt("config_version") == 2) {
-                "config/fishing/fish.yml.config_version must be the integer 2"
+            require(config.get("config_version") is Number && config.getInt("config_version") == 3) {
+                "config/fishing/fish.yml.config_version must be the integer 3"
             }
             require(config.get("enabled") is Boolean) { "config/fishing/fish.yml.enabled must be a boolean" }
             val fishes = config.getConfigurationSection("fish")?.getKeys(false).orEmpty().map { id ->
@@ -63,6 +66,8 @@ data class FishingSettings(
                         depth = positiveRange(config, "$path.water.depth"),
                         width = positiveRange(config, "$path.water.width")
                     ),
+                    sizeCm = positiveRange(config, "$path.size_cm"),
+                    weightGrams = positiveRange(config, "$path.weight_grams"),
                     qualities = qualities.also { require(it.isNotEmpty()) { "$path.quality must not be empty" } },
                     rarity = FishRarity.valueOf(requireString(config.getString("$path.rarity"), "$path.rarity").uppercase()),
                     requiredBaitTags = config.getStringList("$path.required_bait_tags").toSet(),
@@ -125,6 +130,39 @@ data class FishingSettings(
             return file
         }
 
+        private fun migrateIfRequired(plugin: JavaPlugin, file: File) {
+            val config = YamlConfiguration.loadConfiguration(file)
+            val version = config.getInt("config_version", -1)
+            if (version == 3) return
+            require(version == 2) { "Unsupported fishing config version: $version" }
+            val defaults = plugin.getResource("config/fishing/fish.yml")?.bufferedReader()?.use {
+                YamlConfiguration.loadConfiguration(it)
+            } ?: error("Bundled fishing config is missing")
+            val migrated = YamlConfiguration.loadConfiguration(file)
+            FishingConfigMigration.migrateVersion2(migrated, defaults)
+
+            val backup = File(file.parentFile, "${file.name}.bak-v2")
+            if (!backup.exists()) Files.copy(file.toPath(), backup.toPath())
+            val temporary = File(file.parentFile, "${file.name}.migrating")
+            runCatching {
+                migrated.save(temporary)
+                runCatching {
+                    Files.move(
+                        temporary.toPath(),
+                        file.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE,
+                        StandardCopyOption.REPLACE_EXISTING
+                    )
+                }.getOrElse {
+                    Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+            }.onFailure {
+                temporary.delete()
+                throw IllegalStateException("Fishing config migration failed; original file was preserved", it)
+            }
+            plugin.logger.info("Fishing config migrated from version 2 to 3; backup=${backup.name}")
+        }
+
         private fun requireString(value: String?, path: String): String =
             requireNotNull(value) { "$path is required" }.also { require(it.isNotBlank()) { "$path must not be blank" } }
 
@@ -156,6 +194,32 @@ data class FishingSettings(
             val max = positiveInt(config.get("$path.max"), "$path.max")
             require(min <= max) { "$path.min must not exceed $path.max" }
             return min..max
+        }
+    }
+}
+
+object FishingConfigMigration {
+    fun migrateVersion2(target: YamlConfiguration, defaults: YamlConfiguration) {
+        require(target.getInt("config_version", -1) == 2) { "Fishing config must be version 2" }
+        target.getConfigurationSection("fish")?.getKeys(false).orEmpty().forEach { fishId ->
+            val path = "fish.$fishId"
+            copyRangeIfMissing(target, defaults, "$path.size_cm", 1..100)
+            copyRangeIfMissing(target, defaults, "$path.weight_grams", 1..1000)
+        }
+        target.set("config_version", 3)
+    }
+
+    private fun copyRangeIfMissing(
+        target: YamlConfiguration,
+        defaults: YamlConfiguration,
+        path: String,
+        fallback: IntRange
+    ) {
+        if (!target.contains("$path.min")) {
+            target.set("$path.min", defaults.get("$path.min") ?: fallback.first)
+        }
+        if (!target.contains("$path.max")) {
+            target.set("$path.max", defaults.get("$path.max") ?: fallback.last)
         }
     }
 }

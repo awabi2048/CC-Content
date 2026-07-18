@@ -69,6 +69,28 @@ class FishingWorldBoundarySourceContractTest {
         assertTrue(source.contains("if (candidates.isEmpty()) return"));
     }
 
+    @Test
+    void baitIsConsumedOnlyAfterAValidCandidateIsSelected() throws Exception {
+        String source = readSource();
+        String startCast = source.substring(source.indexOf("private fun startCast"), source.indexOf("private fun onBite"));
+        String onBite = source.substring(source.indexOf("private fun onBite"), source.indexOf("@EventHandler\n    fun onRodClick"));
+
+        assertTrue(startCast.contains("items.resolveBait(player.inventory.itemInOffHand)"));
+        assertFalse(startCast.contains("consumeBait"));
+        assertTrue(onBite.indexOf("if (selected == null)") < onBite.indexOf("items.consumeBait"));
+    }
+
+    @Test
+    void fightUsesCumulativeScoreAndLocalizedHitTitle() throws Exception {
+        String source = readSource();
+
+        assertTrue(source.contains("session.fightScore = session.fightScore.record("));
+        assertTrue(source.contains("session.fightScore.successProbability(definition.rarity)"));
+        assertTrue(source.contains("message(player, \"fishing.fight.hit_title\")"));
+        assertFalse(source.contains("Component.text(\"§6HIT!\")"));
+        assertFalse(source.contains("zone.successChance"));
+    }
+
     private static String readSource() throws Exception {
         return Files.readString(SOURCE, StandardCharsets.UTF_8).replace("\r\n", "\n");
     }

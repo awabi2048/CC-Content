@@ -14,7 +14,9 @@ import org.bukkit.NamespacedKey
 import org.bukkit.Sound
 import org.bukkit.entity.Player
 import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
+import org.bukkit.inventory.meta.Damageable
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 
@@ -27,7 +29,6 @@ class FishingItems(
     private val fishQuality = NamespacedKey(plugin, "fish_quality")
     private val fishSize = NamespacedKey(plugin, "fish_size_cm")
     private val rodType = NamespacedKey(plugin, "fishing_rod_type")
-    private val rodDamage = NamespacedKey(plugin, "fishing_rod_damage")
 
     fun registerBaseItems() {
         CustomItemManager.unregisterByPrefix("fishing.")
@@ -52,18 +53,20 @@ class FishingItems(
     fun isUsableRod(item: ItemStack): Boolean {
         if (item.type != Material.FISHING_ROD) return false
         val rod = resolveRod(item) ?: return true
-        val damage = item.itemMeta?.persistentDataContainer?.get(rodDamage, PersistentDataType.INTEGER) ?: 0
+        val damage = (item.itemMeta as? Damageable)?.damage ?: return false
         return damage < rod.maxDurability
     }
 
-    fun damageRod(item: ItemStack): Boolean {
+    fun damageRod(player: Player): Boolean {
+        val item = player.inventory.itemInMainHand
         val rod = resolveRod(item) ?: return false
-        val meta = item.itemMeta ?: return false
-        val damage = (meta.persistentDataContainer.get(rodDamage, PersistentDataType.INTEGER) ?: 0) + 1
-        meta.persistentDataContainer.set(rodDamage, PersistentDataType.INTEGER, damage)
-        meta.lore(rodLore(null, rod, damage))
-        item.itemMeta = meta
-        return damage >= rod.maxDurability
+        player.damageItemStack(EquipmentSlot.HAND, 1)
+        val damaged = player.inventory.itemInMainHand
+        if (damaged.type == Material.AIR || resolveRod(damaged) == null) return true
+        val meta = damaged.itemMeta as? Damageable ?: return true
+        meta.lore(rodLore(player, rod, meta.damage))
+        damaged.itemMeta = meta
+        return false
     }
 
     fun resolveBait(item: ItemStack): BaitDefinition? {
@@ -156,11 +159,12 @@ class FishingItems(
 
         override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
             val item = ItemStack(Material.FISHING_ROD, 1)
-            val meta = item.itemMeta
+            val meta = item.itemMeta as Damageable
             meta.displayName(Component.text(message(player, "custom_items.fishing.rod_${definition.id}.name")))
             meta.lore(rodLore(player, definition, 0))
+            meta.setMaxDamage(definition.maxDurability)
+            meta.damage = 0
             meta.persistentDataContainer.set(rodType, PersistentDataType.STRING, definition.id)
-            meta.persistentDataContainer.set(rodDamage, PersistentDataType.INTEGER, 0)
             item.itemMeta = meta
             return item
         }
@@ -170,10 +174,10 @@ class FishingItems(
                 item.itemMeta?.persistentDataContainer?.get(rodType, PersistentDataType.STRING) == definition.id
 
         override fun updateLocalization(item: ItemStack, player: Player?) {
-            val damage = item.itemMeta?.persistentDataContainer?.get(rodDamage, PersistentDataType.INTEGER) ?: 0
+            val damage = (item.itemMeta as? Damageable)?.damage ?: 0
             val localized = createItemForPlayer(player, 1)
-            val meta = localized.itemMeta
-            meta.persistentDataContainer.set(rodDamage, PersistentDataType.INTEGER, damage)
+            val meta = localized.itemMeta as Damageable
+            meta.damage = damage.coerceAtMost(definition.maxDurability)
             meta.lore(rodLore(player, definition, damage))
             item.itemMeta = meta
         }

@@ -23,4 +23,15 @@ class FishingItemSourceContractTest {
         assertTrue(source.contains("CustomItemI18n.text("));
         assertFalse(source.contains("private fun baitLore"));
     }
+
+    @Test
+    void rodDurabilityUsesOnlyTheStandardDamageableState() throws Exception {
+        String source = Files.readString(SOURCE, StandardCharsets.UTF_8);
+
+        assertTrue(source.contains("item.itemMeta as Damageable"));
+        assertTrue(source.contains("meta.setMaxDamage(definition.maxDurability)"));
+        assertTrue(source.contains("player.damageItemStack(EquipmentSlot.HAND, 1)"));
+        assertFalse(source.contains("rodDamage"));
+        assertFalse(source.contains("fishing_rod_damage"));
+    }
 }

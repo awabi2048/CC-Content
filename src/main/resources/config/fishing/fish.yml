@@ -1,4 +1,4 @@
-﻿config_version: 2
+﻿config_version: 3
 enabled: true
 
 wait_time:
@@ -51,6 +51,9 @@ fish:
     weight: 55
     rarity: common
     min_level: 1
+    biomes: [ocean, cold_ocean, deep_ocean, deep_cold_ocean, river]
+    size_cm: { min: 30, max: 100 }
+    weight_grams: { min: 300, max: 15000 }
     water:
       type: any
       depth: { min: 1, max: 32 }
@@ -67,6 +70,8 @@ fish:
     rarity: common
     min_level: 1
     biomes: [river, frozen_river, ocean, cold_ocean]
+    size_cm: { min: 40, max: 150 }
+    weight_grams: { min: 1000, max: 30000 }
     water:
       type: narrow
       depth: { min: 1, max: 32 }
@@ -82,8 +87,11 @@ fish:
     weight: 10
     rarity: rare
     min_level: 5
+    biomes: [warm_ocean, lukewarm_ocean]
     weather: [clear]
     times: [day, dusk]
+    size_cm: { min: 15, max: 50 }
+    weight_grams: { min: 200, max: 3000 }
     water:
       type: shore
       depth: { min: 1, max: 8 }
@@ -101,6 +109,8 @@ fish:
     min_level: 10
     biomes: [warm_ocean, lukewarm_ocean, deep_lukewarm_ocean]
     weather: [clear]
+    size_cm: { min: 5, max: 35 }
+    weight_grams: { min: 20, max: 1500 }
     water:
       type: open
       depth: { min: 2, max: 32 }
@@ -118,6 +128,8 @@ fish:
     min_level: 15
     biomes: [deep_ocean, deep_cold_ocean, deep_frozen_ocean, deep_lukewarm_ocean]
     times: [night, dawn]
+    size_cm: { min: 120, max: 250 }
+    weight_grams: { min: 30000, max: 120000 }
     water:
       type: deep_open
       depth: { min: 8, max: 32 }

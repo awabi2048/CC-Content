@@ -7,7 +7,9 @@ import jp.awabi2048.cccontent.features.fishing.FishdexPage;
 import jp.awabi2048.cccontent.features.fishing.FishFightProfile;
 import jp.awabi2048.cccontent.features.fishing.FishingEffectivenessZone;
 import jp.awabi2048.cccontent.features.fishing.FishingFightStatus;
+import jp.awabi2048.cccontent.features.fishing.FishingFightScore;
 import jp.awabi2048.cccontent.features.fishing.FishingFightState;
+import jp.awabi2048.cccontent.features.fishing.FishRarity;
 import jp.awabi2048.cccontent.features.fishing.FishingWaterCondition;
 import jp.awabi2048.cccontent.features.fishing.FishingWaterProfile;
 import jp.awabi2048.cccontent.features.fishing.FishingWaterType;
@@ -19,6 +21,7 @@ import java.util.Map;
 import java.util.Random;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FishingModelTest {
@@ -115,21 +118,49 @@ class FishingModelTest {
     }
 
     @Test
-    void fishQualityUsesThreeTiersAndAggregatesLegacyRecords() {
+    void fishQualityUsesOnlyCanonicalStoredIds() {
         assertEquals(3, FishQuality.values().length);
         assertEquals("§e★§7☆☆", FishQuality.COMMON.getStars());
         assertEquals("§e★★§7☆", FishQuality.RARE.getStars());
         assertEquals("§e★★★", FishQuality.LEGENDARY.getStars());
-        var normalized = FishQuality.Companion.normalizeStoredCounts(Map.of(
-            "common", 1L,
-            "uncommon", 2L,
-            "rare", 3L,
-            "epic", 4L,
-            "legendary", 5L
-        ));
+        assertEquals(FishQuality.COMMON, FishQuality.Companion.fromStoredId("common"));
+        assertEquals(FishQuality.RARE, FishQuality.Companion.fromStoredId("rare"));
+        assertEquals(FishQuality.LEGENDARY, FishQuality.Companion.fromStoredId("legendary"));
+        assertThrows(IllegalStateException.class, () -> FishQuality.Companion.fromStoredId("uncommon"));
+        assertThrows(IllegalStateException.class, () -> FishQuality.Companion.fromStoredId("epic"));
+    }
 
-        assertEquals(1L, normalized.get(FishQuality.COMMON));
-        assertEquals(5L, normalized.get(FishQuality.RARE));
-        assertEquals(9L, normalized.get(FishQuality.LEGENDARY));
+    @Test
+    void fightScoreUsesTheWholeFightInsteadOfTheLastTick() {
+        var mostlyGreen = new FishingFightScore();
+        for (int i = 0; i < 99; i++) {
+            mostlyGreen = mostlyGreen.record(FishingEffectivenessZone.GREEN, 50.0, 1);
+        }
+        mostlyGreen = mostlyGreen.record(FishingEffectivenessZone.ORANGE, 0.0, 1);
+
+        var mostlyDanger = new FishingFightScore();
+        for (int i = 0; i < 99; i++) {
+            mostlyDanger = mostlyDanger.record(FishingEffectivenessZone.ORANGE, 0.0, 1);
+        }
+        mostlyDanger = mostlyDanger.record(FishingEffectivenessZone.GREEN, 50.0, 1);
+
+        assertTrue(mostlyGreen.normalizedScore() > 0.98);
+        assertTrue(mostlyDanger.normalizedScore() < 0.02);
+        assertTrue(mostlyGreen.successProbability(FishRarity.COMMON) >
+            mostlyDanger.successProbability(FishRarity.COMMON));
+    }
+
+    @Test
+    void fightScoreIsNormalizedAcrossDifferentFightDurations() {
+        var shortFight = new FishingFightScore()
+            .record(FishingEffectivenessZone.GREEN, 50.0, 10)
+            .record(FishingEffectivenessZone.YELLOW, 70.0, 10);
+        var longFight = new FishingFightScore()
+            .record(FishingEffectivenessZone.GREEN, 50.0, 100)
+            .record(FishingEffectivenessZone.YELLOW, 70.0, 100);
+
+        assertEquals(shortFight.normalizedScore(), longFight.normalizedScore(), 0.000001);
+        assertTrue(shortFight.successProbability(FishRarity.COMMON) >
+            shortFight.successProbability(FishRarity.SPECIAL));
     }
 }

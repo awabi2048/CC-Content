@@ -1,9 +1,11 @@
 package jp.awabi2048.cccontent;
 
+import jp.awabi2048.cccontent.features.fishing.FishingConfigMigration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
+import java.io.StringReader;
 import java.util.Map;
 import java.util.Set;
 
@@ -16,7 +18,7 @@ class FishingConfigurationTest {
     @Test
     void definesConditionedCatchesBaitsRodsAndFightGame() {
         var config = YamlConfiguration.loadConfiguration(CONFIG.toFile());
-        assertTrue(config.getInt("config_version") == 2);
+        assertTrue(config.getInt("config_version") == 3);
         assertFalse(config.contains("schema_version"));
         assertTrue(config.getLong("minigame.fight_interval_ticks") == 1);
         assertTrue(config.getLong("minigame.hook_window_ticks") > 0);
@@ -50,10 +52,50 @@ class FishingConfigurationTest {
             assertTrue(config.contains("fish." + fish + ".water.depth.max"));
             assertTrue(config.contains("fish." + fish + ".water.width.min"));
             assertTrue(config.contains("fish." + fish + ".water.width.max"));
+            int minimumSize = config.getInt("fish." + fish + ".size_cm.min");
+            int maximumSize = config.getInt("fish." + fish + ".size_cm.max");
+            int minimumWeight = config.getInt("fish." + fish + ".weight_grams.min");
+            int maximumWeight = config.getInt("fish." + fish + ".weight_grams.max");
+            assertTrue(minimumSize > 0 && minimumSize <= maximumSize);
+            assertTrue(minimumWeight > 0 && minimumWeight <= maximumWeight);
             assertFalse(config.contains("fish." + fish + ".bobber_y"));
             assertFalse(config.contains("fish." + fish + ".origin_distance"));
             assertTrue(config.contains("fish." + fish + ".fight.target_center"));
             assertTrue(config.getDouble("fish." + fish + ".fight.drift_per_step") == expectedResistance.get(fish));
         }
+        assertTrue(Set.copyOf(config.getStringList("fish.cod.biomes")).equals(
+            Set.of("ocean", "cold_ocean", "deep_ocean", "deep_cold_ocean", "river")
+        ));
+        assertTrue(Set.copyOf(config.getStringList("fish.pufferfish.biomes")).equals(
+            Set.of("warm_ocean", "lukewarm_ocean")
+        ));
+        assertTrue(config.getInt("fish.ancient_coelacanth.size_cm.min") >
+            config.getInt("fish.tropical_fish.size_cm.max"));
+        assertTrue(config.getInt("fish.ancient_coelacanth.weight_grams.min") >
+            config.getInt("fish.tropical_fish.weight_grams.max"));
+    }
+
+    @Test
+    void migrationPreservesCustomFishValuesAndAddsOnlyMissingRanges() {
+        var target = YamlConfiguration.loadConfiguration(new StringReader("""
+            config_version: 2
+            fish:
+              cod:
+                custom_multiplier: 7.5
+                weight_grams: { min: 777, max: 888 }
+              custom_fish:
+                custom_key: keep-me
+            """));
+        var defaults = YamlConfiguration.loadConfiguration(CONFIG.toFile());
+
+        FishingConfigMigration.INSTANCE.migrateVersion2(target, defaults);
+
+        assertTrue(target.getInt("config_version") == 3);
+        assertTrue(target.getDouble("fish.cod.custom_multiplier") == 7.5);
+        assertTrue(target.getInt("fish.cod.weight_grams.min") == 777);
+        assertTrue(target.getInt("fish.cod.size_cm.min") == defaults.getInt("fish.cod.size_cm.min"));
+        assertTrue(target.getString("fish.custom_fish.custom_key").equals("keep-me"));
+        assertTrue(target.getInt("fish.custom_fish.size_cm.min") == 1);
+        assertTrue(target.getInt("fish.custom_fish.weight_grams.max") == 1000);
     }
 }
