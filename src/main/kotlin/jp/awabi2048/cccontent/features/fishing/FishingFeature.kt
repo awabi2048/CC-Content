@@ -35,6 +35,7 @@ import org.bukkit.event.player.PlayerChangedWorldEvent
 import org.bukkit.event.player.PlayerFishEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerQuitEvent
+import org.bukkit.event.world.WorldUnloadEvent
 import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.scheduler.BukkitTask
 import org.bukkit.util.Vector
@@ -71,13 +72,15 @@ class FishingFeature(
         var rodMissingTicks: Long = 0L,
         var lastInputTick: Int = -1,
         var ignoredInstabilityEventsRemaining: Int = 0,
-        var fightScore: FishingFightScore = FishingFightScore()
+        var fightScore: FishingFightScore = FishingFightScore(),
+        var naturalFishingGround: Boolean = false
     )
 
     private lateinit var settings: FishingSettings
     private lateinit var items: FishingItems
     private lateinit var fishdex: FishdexStore
     private lateinit var searchStore: FishingSearchStore
+    private lateinit var naturalFishingGrounds: NaturalFishingGroundService
     private val sessions = mutableMapOf<UUID, ActiveSession>()
     private val searchReady = mutableMapOf<UUID, Boolean>()
     private var searchTask: BukkitTask? = null
@@ -90,6 +93,12 @@ class FishingFeature(
         items.registerBaseItems()
         fishdex = FishdexStore(catalogStore)
         searchStore = FishingSearchStore(File(plugin.dataFolder, "data/fishing/search.yml"))
+        naturalFishingGrounds = NaturalFishingGroundService(
+            plugin,
+            settings.naturalFishingGround,
+            isFisher = { fisherContext(it).active },
+            random = random
+        ).also(NaturalFishingGroundService::start)
         plugin.server.pluginManager.registerEvents(this, plugin)
         searchTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable { updateSearchActionBars() }, 10L, 10L)
         logger.setStatus("Fishing", FeatureInitializationLogger.Status.SUCCESS)
@@ -98,6 +107,12 @@ class FishingFeature(
 
     fun registerDictionary(opener: (Player) -> Unit) {
         items.registerDictionary(opener) { player, event -> showLocalFishingHint(player, event) }
+    }
+
+    fun clearNaturalFishingGrounds(): Boolean {
+        if (!::naturalFishingGrounds.isInitialized) return false
+        naturalFishingGrounds.clearAll()
+        return true
     }
 
     private fun showLocalFishingHint(player: Player, event: PlayerInteractEvent) {
@@ -150,6 +165,7 @@ class FishingFeature(
         }
         searchReady.clear()
         if (::searchStore.isInitialized) searchStore.save()
+        if (::naturalFishingGrounds.isInitialized) naturalFishingGrounds.stop()
         if (::items.isInitialized) items.unregister()
     }
 
@@ -228,11 +244,28 @@ class FishingFeature(
         val skillWaitMultiplier = (1.0 - fisher.waitTimeReduction).coerceAtLeast(0.8)
         val waitMultiplier = (bait?.waitTimeMultiplier ?: 1.0) * lureMultiplier * skillWaitMultiplier
         event.hook.setApplyLure(false)
-        event.hook.setWaitTime(
-            (settings.minigame.waitTimeMinTicks * waitMultiplier).roundToLong().toInt().coerceAtLeast(1),
-            (settings.minigame.waitTimeMaxTicks * waitMultiplier).roundToLong().toInt().coerceAtLeast(1)
-        )
+        val minimumWaitTicks = (settings.minigame.waitTimeMinTicks * waitMultiplier)
+            .roundToLong().toInt().coerceAtLeast(1)
+        val maximumWaitTicks = (settings.minigame.waitTimeMaxTicks * waitMultiplier)
+            .roundToLong().toInt().coerceAtLeast(1)
+        event.hook.setWaitTime(minimumWaitTicks, maximumWaitTicks)
         sessions[player.uniqueId] = ActiveSession(event.hook, bait, rod)
+        plugin.server.scheduler.runTaskLater(plugin, Runnable {
+            val session = sessions[player.uniqueId] ?: return@Runnable
+            if (session.hook.uniqueId != event.hook.uniqueId ||
+                session.phase != Phase.WAITING ||
+                !naturalFishingGrounds.contains(session.hook.location)
+            ) {
+                return@Runnable
+            }
+            session.naturalFishingGround = true
+            session.hook.setWaitTime(
+                (minimumWaitTicks * settings.naturalFishingGround.waitTimeMultiplier)
+                    .roundToLong().toInt().coerceAtLeast(1),
+                (maximumWaitTicks * settings.naturalFishingGround.waitTimeMultiplier)
+                    .roundToLong().toInt().coerceAtLeast(1)
+            )
+        }, 10L)
         player.playSound(player.location, Sound.ENTITY_FISHING_BOBBER_THROW, 0.7f, 1.0f)
     }
 
@@ -267,14 +300,25 @@ class FishingFeature(
         session.bait = bait
         session.phase = Phase.HOOK_WINDOW
         session.definition = selected.first
-        session.catchData = selected.second
+        session.naturalFishingGround =
+            session.naturalFishingGround || naturalFishingGrounds.contains(event.hook.location)
+        session.catchData = if (session.naturalFishingGround) {
+            val sizeShift = ((selected.first.sizeCm.last - selected.first.sizeCm.first) *
+                settings.naturalFishingGround.sizeProfileShift).roundToLong().toInt()
+            selected.second.copy(sizeCm = (selected.second.sizeCm + sizeShift).coerceAtMost(selected.first.sizeCm.last))
+        } else {
+            selected.second
+        }
+        naturalFishingGrounds.tryGenerate(player)
         player.showTitle(Title.title(
             Component.empty(),
             Component.text(message(player, "fishing.fight.hit_title")),
             Title.Times.times(Duration.ZERO, Duration.ofMillis(500), Duration.ofMillis(200))
         ))
         player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 2.0f)
-        val hookTicks = (settings.minigame.baseHookWindowTicks * fisher.hookWindowMultiplier)
+        val groundHookMultiplier =
+            if (session.naturalFishingGround) settings.naturalFishingGround.hookWindowMultiplier else 1.0
+        val hookTicks = (settings.minigame.baseHookWindowTicks * fisher.hookWindowMultiplier * groundHookMultiplier)
             .roundToLong()
             .coerceAtLeast(1L)
         session.task = plugin.server.scheduler.runTaskLater(
@@ -745,6 +789,13 @@ class FishingFeature(
             profile.vanillaExtraCatchChance.coerceIn(0.0, 1.0),
             profile.ignoredInstabilityEvents.coerceAtLeast(0)
         )
+    }
+
+    @EventHandler
+    fun onWorldUnload(event: WorldUnloadEvent) {
+        if (::naturalFishingGrounds.isInitialized) {
+            naturalFishingGrounds.clearWorld(event.world.uid)
+        }
     }
 
     private fun handleVanillaCatch(player: Player, caught: Item?) {

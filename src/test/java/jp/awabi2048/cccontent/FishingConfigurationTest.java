@@ -25,6 +25,18 @@ class FishingConfigurationTest {
         assertTrue(config.getDouble("minigame.input_step") == 3.0);
         assertTrue(config.getDouble("minigame.resistance_smoothing") > 0);
         assertTrue(config.getDouble("minigame.lateral_smoothing") > 0);
+        assertTrue(config.getDouble("natural_fishing_ground.base_chance") == 0.04);
+        assertTrue(config.getDouble("natural_fishing_ground.fisher_multiplier") == 2.0);
+        assertTrue(config.getLong("natural_fishing_ground.roll_cooldown_seconds") == 300);
+        assertTrue(config.getLong("natural_fishing_ground.success_cooldown_seconds") == 3600);
+        assertTrue(config.getLong("natural_fishing_ground.duration_seconds") == 1800);
+        assertTrue(config.getInt("natural_fishing_ground.distance_chunks.min") == 3);
+        assertTrue(config.getInt("natural_fishing_ground.distance_chunks.max") == 6);
+        assertTrue(config.getInt("natural_fishing_ground.radius.min") == 3);
+        assertTrue(config.getInt("natural_fishing_ground.radius.max") == 6);
+        assertTrue(config.getInt("natural_fishing_ground.exclusion_range_chunks") == 8);
+        assertTrue(config.getDouble("natural_fishing_ground.wait_time_multiplier") == 0.70);
+        assertTrue(config.getDouble("natural_fishing_ground.hook_window_multiplier") == 1.10);
         for (String rod : config.getConfigurationSection("rod").getKeys(false)) {
             assertTrue(config.contains("rod." + rod + ".power_multiplier"));
             assertTrue(config.contains("rod." + rod + ".finesse_multiplier"));

@@ -37,6 +37,7 @@ class CCCommand(
     private val onClearBlockPlacementData: (() -> Unit)? = null,
     private val placementRecordingEnabledProvider: (() -> Boolean)? = null,
     private val onSetPlacementRecordingEnabled: ((Boolean, CommandSender) -> Unit)? = null,
+    private val onClearFishingGrounds: (() -> Boolean)? = null,
     private val mobDefinitionIdsProvider: (() -> Collection<String>)? = null,
     private val onSummonMob: ((String, Location) -> Entity?)? = null,
     private val onUpdateDay: ((String?) -> Boolean)? = null,
@@ -314,12 +315,26 @@ class CCCommand(
         return when (mode) {
             "clear_block_placement_data" -> handleClearBlockPlacementData(sender, args)
             "placement_recording" -> handlePlacementRecording(sender, args)
+            "clear_fishing_grounds" -> handleClearFishingGrounds(sender, args)
             "complete_oage_daily" -> handleCompleteOageDaily(sender, args)
             else -> {
                 sender.sendMessage(ContentManagementI18n.text(sender, "debug.unknown_mode", "mode" to mode))
                 false
             }
         }
+    }
+
+    private fun handleClearFishingGrounds(sender: CommandSender, args: Array<String>): Boolean {
+        if (args.size != 2) {
+            sender.sendMessage(ContentManagementI18n.text(sender, "debug.fishing_ground.usage"))
+            return false
+        }
+        if (onClearFishingGrounds?.invoke() != true) {
+            sender.sendMessage(ContentManagementI18n.text(sender, "debug.fishing_ground.unavailable"))
+            return false
+        }
+        sender.sendMessage(ContentManagementI18n.text(sender, "debug.fishing_ground.cleared"))
+        return true
     }
 
     private fun handlePlacementRecording(sender: CommandSender, args: Array<String>): Boolean {
@@ -649,7 +664,12 @@ class CCCommand(
                "debug" -> {
                    if (!hasAdminPermission(sender)) return emptyList()
                    when (args.size) {
-                      2 -> listOf("clear_block_placement_data", "placement_recording", "complete_oage_daily")
+                      2 -> listOf(
+                          "clear_block_placement_data",
+                          "placement_recording",
+                          "clear_fishing_grounds",
+                          "complete_oage_daily"
+                      )
                           .filter { it.startsWith(args[1].lowercase()) }
                       3 -> {
                           when (args[1].lowercase()) {

@@ -25,13 +25,31 @@ data class FishingMiniGameSettings(
     val waitTimeMaxTicks: Int
 )
 
+data class NaturalFishingGroundSettings(
+    val enabled: Boolean,
+    val baseChance: Double,
+    val fisherMultiplier: Double,
+    val rollCooldownSeconds: Long,
+    val successCooldownSeconds: Long,
+    val durationSeconds: Long,
+    val minimumDistanceChunks: Int,
+    val maximumDistanceChunks: Int,
+    val minimumRadius: Int,
+    val maximumRadius: Int,
+    val exclusionRangeChunks: Int,
+    val waitTimeMultiplier: Double,
+    val hookWindowMultiplier: Double,
+    val sizeProfileShift: Double
+)
+
 data class FishingSettings(
     val enabled: Boolean,
     val consumeBaitOnValidSession: Boolean,
     val fishes: List<FishDefinition>,
     val baits: List<BaitDefinition>,
     val rods: List<RodDefinition>,
-    val minigame: FishingMiniGameSettings
+    val minigame: FishingMiniGameSettings,
+    val naturalFishingGround: NaturalFishingGroundSettings
 ) {
     companion object {
         fun load(plugin: JavaPlugin): FishingSettings {
@@ -138,13 +156,36 @@ data class FishingSettings(
             require(minigame.waitTimeMinTicks <= minigame.waitTimeMaxTicks) {
                 "wait_time.min_ticks must not exceed wait_time.max_ticks"
             }
+            val naturalFishingGround = NaturalFishingGroundSettings(
+                enabled = requireBoolean(config.get("natural_fishing_ground.enabled"), "natural_fishing_ground.enabled"),
+                baseChance = finiteRange(config.get("natural_fishing_ground.base_chance"), 0.0, 1.0, "natural_fishing_ground.base_chance"),
+                fisherMultiplier = positiveDouble(config.get("natural_fishing_ground.fisher_multiplier"), "natural_fishing_ground.fisher_multiplier"),
+                rollCooldownSeconds = positiveLong(config.get("natural_fishing_ground.roll_cooldown_seconds"), "natural_fishing_ground.roll_cooldown_seconds"),
+                successCooldownSeconds = positiveLong(config.get("natural_fishing_ground.success_cooldown_seconds"), "natural_fishing_ground.success_cooldown_seconds"),
+                durationSeconds = positiveLong(config.get("natural_fishing_ground.duration_seconds"), "natural_fishing_ground.duration_seconds"),
+                minimumDistanceChunks = positiveInt(config.get("natural_fishing_ground.distance_chunks.min"), "natural_fishing_ground.distance_chunks.min"),
+                maximumDistanceChunks = positiveInt(config.get("natural_fishing_ground.distance_chunks.max"), "natural_fishing_ground.distance_chunks.max"),
+                minimumRadius = positiveInt(config.get("natural_fishing_ground.radius.min"), "natural_fishing_ground.radius.min"),
+                maximumRadius = positiveInt(config.get("natural_fishing_ground.radius.max"), "natural_fishing_ground.radius.max"),
+                exclusionRangeChunks = positiveInt(config.get("natural_fishing_ground.exclusion_range_chunks"), "natural_fishing_ground.exclusion_range_chunks"),
+                waitTimeMultiplier = finiteRange(config.get("natural_fishing_ground.wait_time_multiplier"), 0.01, 1.0, "natural_fishing_ground.wait_time_multiplier"),
+                hookWindowMultiplier = positiveDouble(config.get("natural_fishing_ground.hook_window_multiplier"), "natural_fishing_ground.hook_window_multiplier"),
+                sizeProfileShift = finiteRange(config.get("natural_fishing_ground.size_profile_shift"), 0.0, 1.0, "natural_fishing_ground.size_profile_shift")
+            )
+            require(naturalFishingGround.minimumDistanceChunks <= naturalFishingGround.maximumDistanceChunks) {
+                "natural_fishing_ground.distance_chunks.min must not exceed max"
+            }
+            require(naturalFishingGround.minimumRadius <= naturalFishingGround.maximumRadius) {
+                "natural_fishing_ground.radius.min must not exceed max"
+            }
             return FishingSettings(
                 config.getBoolean("enabled"),
                 config.getBoolean("bait.consume_on_valid_session"),
                 fishes,
                 baits,
                 rods,
-                minigame
+                minigame,
+                naturalFishingGround
             )
         }
 
@@ -167,6 +208,9 @@ data class FishingSettings(
             require(value is Number && value.toDouble() == value.toInt().toDouble() && value.toInt() > 0) {
                 "$path must be a positive integer"
             }.let { value.toInt() }
+
+        private fun requireBoolean(value: Any?, path: String): Boolean =
+            require(value is Boolean) { "$path must be a boolean" }.let { value }
 
         private fun positiveLong(value: Any?, path: String): Long =
             require(value is Number && value.toDouble() == value.toLong().toDouble() && value.toLong() > 0) {

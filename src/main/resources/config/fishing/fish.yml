@@ -27,6 +27,20 @@ rod:
     finesse_multiplier: 1.15
     max_durability: 128
 
+natural_fishing_ground:
+  enabled: true
+  base_chance: 0.04
+  fisher_multiplier: 2.0
+  roll_cooldown_seconds: 300
+  success_cooldown_seconds: 3600
+  duration_seconds: 1800
+  distance_chunks: { min: 3, max: 6 }
+  radius: { min: 3, max: 6 }
+  exclusion_range_chunks: 8
+  wait_time_multiplier: 0.70
+  hook_window_multiplier: 1.10
+  size_profile_shift: 0.03
+
 bait:
   consume_on_valid_session: true
   definitions:

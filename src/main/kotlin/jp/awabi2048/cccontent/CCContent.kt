@@ -478,6 +478,9 @@ class CCContent : JavaPlugin(), Listener {
                         "actor=${sender.name}"
                 )
             },
+            onClearFishingGrounds = {
+                fishingFeature?.clearNaturalFishingGrounds() == true
+            },
             mobDefinitionIdsProvider = { sharedMobService.getDefinitionIds() },
             onSummonMob = { definitionId, location -> summonConfiguredMob(definitionId, location) },
             onUpdateDay = { target ->
