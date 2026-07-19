@@ -72,6 +72,9 @@ import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
 import org.bukkit.util.Vector
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.util.UUID
 import kotlin.random.Random
@@ -1191,6 +1194,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
     }
 
     private fun tickFermentation() {
+        validateRegisteredMachines()
         val now = System.currentTimeMillis()
         for (state in fermentationStates.values) {
             if (!state.running) {
@@ -1920,7 +1924,22 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             yml.set("$base.faintUntilMillis", state.faintUntilMillis)
         }
         stateFile.parentFile?.mkdirs()
-        yml.save(stateFile)
+        saveAtomically(yml, stateFile)
+    }
+
+    private fun saveAtomically(yml: YamlConfiguration, target: File) {
+        val temporary = File(target.parentFile, "${target.name}.tmp")
+        yml.save(temporary)
+        try {
+            Files.move(
+                temporary.toPath(),
+                target.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
     }
 
     private fun flushNow() {
@@ -2135,6 +2154,22 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
 
     private fun copyInventoryContents(source: Inventory, target: Inventory) {
         for (slot in 0 until minOf(source.size, target.size)) target.setItem(slot, source.getItem(slot))
+    }
+
+    private fun validateRegisteredMachines() {
+        registeredFermentationBarrels.toList().forEach { key ->
+            val block = key.toLocation()?.block
+            if (block == null || block.state !is Barrel || fermentationBarrelFor(block) == null) {
+                invalidateAt(key)
+            }
+        }
+        distillationStates.keys.toList().forEach { key ->
+            if (key.toLocation()?.block?.state !is BrewingStand) invalidateAt(key)
+        }
+        agingStates.values.toList().forEach { state ->
+            val barrel = barrelRegistry.findById(state.barrelId)
+            if (barrel == null || barrel.origin != state.locationKey) invalidateAt(state.locationKey)
+        }
     }
 
     private fun publishBrewingAction(
