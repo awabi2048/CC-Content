@@ -8,6 +8,9 @@ import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.PlayerProfession
 import jp.awabi2048.cccontent.features.rank.profession.ProfessionBossBarManager
 import jp.awabi2048.cccontent.features.rank.profession.BossBarDisplayMode
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionFeatureToggles
+import jp.awabi2048.cccontent.features.rank.profession.profile.TypedProfessionLevelCurve
+import jp.awabi2048.cccontent.features.rank.profession.profile.TypedProfessionProfile
 import org.bukkit.Bukkit
 import org.bukkit.plugin.java.JavaPlugin
 import java.util.UUID
@@ -114,6 +117,35 @@ class RankManagerImpl(
     override fun setProfessionLevel(playerUuid: UUID, level: Int): Boolean {
         return getProfessionManager().setLevel(playerUuid, level)
     }
+
+    override fun selectProfessionSpecialization(playerUuid: UUID, specializationId: String): Boolean =
+        getProfessionManager().selectSpecialization(playerUuid, specializationId)
+
+    override fun getProfessionSpecializationId(playerUuid: UUID): String? =
+        getProfessionManager().getSpecializationId(playerUuid)
+
+    override fun getTypedProfessionProfile(playerUuid: UUID): TypedProfessionProfile? =
+        getProfessionManager().getTypedProfile(playerUuid)
+
+    override fun getProfessionFeatureToggles(playerUuid: UUID): ProfessionFeatureToggles? =
+        getProfessionManager().getFeatureToggles(playerUuid)
+
+    override fun updateProfessionFeatureToggles(
+        playerUuid: UUID,
+        toggles: ProfessionFeatureToggles
+    ): Boolean = getProfessionManager().updateFeatureToggles(playerUuid, toggles)
+
+    override fun recordProfessionCycleAction(
+        playerUuid: UUID,
+        specialist: Boolean,
+        highQuality: Boolean,
+        firstDiscovery: Boolean
+    ): Boolean = getProfessionManager().recordCycleAction(
+        playerUuid,
+        specialist,
+        highQuality,
+        firstDiscovery
+    )
     
     override fun resetProfession(playerUuid: UUID): Boolean {
         return getProfessionManager().resetProfession(playerUuid)
@@ -187,6 +219,9 @@ class RankManagerImpl(
 
     override fun isMaxProfessionLevel(playerUuid: UUID): Boolean {
         val playerProf = getProfessionManager().getPlayerProfession(playerUuid) ?: return false
+        if (playerProf.profession.usesTypedProfile) {
+            return getProfessionManager().getCurrentLevel(playerUuid) >= TypedProfessionLevelCurve.MAX_LEVEL
+        }
         val skillTree = jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry.getSkillTree(playerProf.profession) ?: return false
         return playerProf.isMaxLevel(skillTree)
     }

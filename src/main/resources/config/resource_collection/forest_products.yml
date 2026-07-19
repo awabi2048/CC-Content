@@ -1,0 +1,9 @@
+schema_version: 2
+enabled: true
+
+# ワールドシード・樹木の根元座標・樹種から算出する固定判定の閾値。
+base_discovery_chance: 0.35
+maximum_discovery_bonus: 0.10
+
+# 林産物が存在し、かつ仕様上の特殊森林にある場合の上書き率。
+burl_override_chance: 0.05

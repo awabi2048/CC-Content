@@ -8,6 +8,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.items.CustomItemManager as GlobalCustomItemManager
+import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
@@ -170,17 +171,11 @@ object CustomItemManager {
         item.itemMeta = meta
     }
 
-    fun applyWorldSproutMetadata(item: ItemStack) {
+    fun applyWorldSproutMetadata(item: ItemStack, player: Player?) {
         val meta = item.itemMeta ?: return
-        val bar = MessageManager.getMessage(null, "common_bar")
 
-        meta.setDisplayName("§dワールドの芽")
-        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(listOf(
-            bar,
-            "§7スキマダンジョンで刈り取ってきた、ワールドの芽。",
-            "§7おあげちゃんに渡すと、アイテムと交換してもらえる。",
-            bar
-        ).map { GuiLoreLine.Text(it) }, GuiLoreFrame.NONE)))
+        meta.setDisplayName(MessageManager.getMessage(player, "item_world_sprout_name"))
+        meta.lore(MessageManager.getList(player, "item_world_sprout_lore").map(Component::text))
         meta.setEnchantmentGlintOverride(true)
         meta.persistentDataContainer.set(ITEM_TYPE_KEY, PersistentDataType.STRING, "world_sprout")
         item.itemMeta = meta
@@ -209,19 +204,15 @@ object CustomItemManager {
         cooldownComponent.setCooldownGroup(cooldownGroup)
         meta.setUseCooldown(cooldownComponent)
 
-        val bar = MessageManager.getMessage(player, "common_bar")
         meta.setMaxStackSize(1)
-        meta.setDisplayName("§bワールドの芽コンパス [Tier $normalizedTier]")
-        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(listOf(
-            bar,
-            "§7スキマダンジョン内で§bShiftを長押し§7ことで、近くにある",
-            "§aワールドの芽§7の場所を知ることができます！",
-            "",
-            "§7探知半径: §b${radius.toInt()} block",
-            "§7最大展開: §b${time} 秒",
-            "§7クールタイム: §b${cooldown} 秒",
-            bar
-        ).map { GuiLoreLine.Text(it) }, GuiLoreFrame.NONE)))
+        val params = mapOf(
+            "tier" to normalizedTier.toString(),
+            "radius" to radius.toInt().toString(),
+            "time" to time.toString(),
+            "cooldown" to cooldown.toString()
+        )
+        meta.setDisplayName(MessageManager.getMessage(player, "item_compass_name", params))
+        meta.lore(MessageManager.getList(player, "item_compass_lore", params).map(Component::text))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
         meta.persistentDataContainer.set(ITEM_TYPE_KEY, PersistentDataType.STRING, "compass")
         meta.persistentDataContainer.set(COMPASS_RADIUS_KEY, PersistentDataType.DOUBLE, radius)

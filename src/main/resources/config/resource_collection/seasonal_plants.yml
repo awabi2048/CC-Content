@@ -1,0 +1,6 @@
+schema_version: 1
+
+# 具体的な季節植物は未確定です。承認済み定義を追加するまで無効のまま運用します。
+enabled: false
+surface_recovery_seconds: 86400
+definitions: []

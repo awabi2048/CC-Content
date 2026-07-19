@@ -1,4 +1,4 @@
-﻿config_version: 2
+﻿config_version: 4
 enabled: true
 
 wait_time:
@@ -27,23 +27,39 @@ rod:
     finesse_multiplier: 1.15
     max_durability: 128
 
+natural_fishing_ground:
+  enabled: true
+  base_chance: 0.04
+  fisher_multiplier: 2.0
+  roll_cooldown_seconds: 300
+  success_cooldown_seconds: 3600
+  duration_seconds: 1800
+  distance_chunks: { min: 3, max: 6 }
+  radius: { min: 3, max: 6 }
+  exclusion_range_chunks: 8
+  wait_time_multiplier: 0.70
+  hook_window_multiplier: 1.10
+  size_profile_shift: 0.03
+
 bait:
-  worm:
-    material: STRING
-    wait_time_multiplier: 0.85
-    rare_catch_multiplier: 1.0
-    quality_multiplier: 1.0
-  lucky_worm:
-    material: GLOW_INK_SAC
-    wait_time_multiplier: 0.95
-    rare_catch_multiplier: 1.6
-    quality_multiplier: 1.35
-  deep_sea_bait:
-    material: NAUTILUS_SHELL
-    wait_time_multiplier: 1.1
-    rare_catch_multiplier: 2.0
-    quality_multiplier: 1.5
-    special_tags: [ancient]
+  consume_on_valid_session: true
+  definitions:
+    worm:
+      material: STRING
+      wait_time_multiplier: 0.85
+      rare_catch_multiplier: 1.0
+      quality_multiplier: 1.0
+    lucky_worm:
+      material: GLOW_INK_SAC
+      wait_time_multiplier: 0.95
+      rare_catch_multiplier: 1.6
+      quality_multiplier: 1.35
+    deep_sea_bait:
+      material: NAUTILUS_SHELL
+      wait_time_multiplier: 1.1
+      rare_catch_multiplier: 2.0
+      quality_multiplier: 1.5
+      special_tags: [ancient]
 
 fish:
   cod:
@@ -51,6 +67,11 @@ fish:
     weight: 55
     rarity: common
     min_level: 1
+    biomes: [ocean, cold_ocean, deep_ocean, deep_cold_ocean, river]
+    preferred_seasons: [winter]
+    preferred_environments: [rocky_deep]
+    size_cm: { min: 30, max: 100 }
+    weight_grams: { min: 300, max: 15000 }
     water:
       type: any
       depth: { min: 1, max: 32 }
@@ -67,6 +88,11 @@ fish:
     rarity: common
     min_level: 1
     biomes: [river, frozen_river, ocean, cold_ocean]
+    preferred_seasons: [autumn]
+    excluded_seasons: [spring]
+    preferred_environments: [estuary]
+    size_cm: { min: 40, max: 150 }
+    weight_grams: { min: 1000, max: 30000 }
     water:
       type: narrow
       depth: { min: 1, max: 32 }
@@ -77,13 +103,274 @@ fish:
       drift_per_step: 15
       direction_persistence: 0.65
       duration_multiplier: 1.0
+  crucian_carp:
+    material: COD
+    weight: 38
+    rarity: common
+    min_level: 1
+    biomes: [river]
+    preferred_seasons: [spring, autumn]
+    size_cm: { min: 10, max: 45 }
+    weight_grams: { min: 50, max: 2500 }
+    water:
+      type: narrow
+      depth: { min: 1, max: 12 }
+      width: { min: 1, max: 14 }
+    quality: { common: 75, rare: 23, legendary: 2 }
+    fight: { target_center: 48, drift_per_step: 9, direction_persistence: 0.82, duration_multiplier: 0.85 }
+  carp:
+    material: SALMON
+    weight: 25
+    rarity: common
+    min_level: 3
+    biomes: [river]
+    weather: [rain]
+    size_cm: { min: 25, max: 110 }
+    weight_grams: { min: 1000, max: 30000 }
+    water:
+      type: narrow
+      depth: { min: 2, max: 20 }
+      width: { min: 2, max: 16 }
+    quality: { common: 70, rare: 27, legendary: 3 }
+    fight: { target_center: 58, drift_per_step: 19, direction_persistence: 0.74, duration_multiplier: 1.15 }
+  trout:
+    material: SALMON
+    weight: 28
+    rarity: common
+    min_level: 2
+    biomes: [river, frozen_river]
+    weather: [clear]
+    times: [dawn, day]
+    size_cm: { min: 20, max: 80 }
+    weight_grams: { min: 150, max: 9000 }
+    water:
+      type: narrow
+      depth: { min: 1, max: 16 }
+      width: { min: 2, max: 14 }
+    quality: { common: 70, rare: 27, legendary: 3 }
+    fight: { target_center: 43, drift_per_step: 20, direction_persistence: 0.42, duration_multiplier: 1.0 }
+  ayu:
+    material: SALMON
+    weight: 22
+    rarity: rare
+    min_level: 4
+    biomes: [river]
+    preferred_seasons: [summer]
+    excluded_seasons: [winter]
+    weather: [clear]
+    times: [day, dusk]
+    size_cm: { min: 12, max: 35 }
+    weight_grams: { min: 30, max: 500 }
+    water:
+      type: narrow
+      depth: { min: 1, max: 8 }
+      width: { min: 2, max: 12 }
+    quality: { common: 62, rare: 34, legendary: 4 }
+    fight: { target_center: 38, drift_per_step: 22, direction_persistence: 0.38, duration_multiplier: 0.9 }
+  catfish:
+    material: COD
+    weight: 14
+    rarity: rare
+    min_level: 6
+    biomes: [river]
+    preferred_seasons: [summer]
+    weather: [rain]
+    times: [dusk, night]
+    size_cm: { min: 35, max: 150 }
+    weight_grams: { min: 500, max: 45000 }
+    water:
+      type: narrow
+      depth: { min: 3, max: 24 }
+      width: { min: 3, max: 18 }
+    quality: { common: 58, rare: 36, legendary: 6 }
+    fight: { target_center: 68, drift_per_step: 25, direction_persistence: 0.78, duration_multiplier: 1.25 }
+  eel:
+    material: COD
+    weight: 12
+    rarity: rare
+    min_level: 7
+    biomes: [river, ocean, lukewarm_ocean]
+    preferred_seasons: [summer]
+    preferred_environments: [estuary]
+    weather: [rain]
+    times: [dusk, night]
+    size_cm: { min: 35, max: 130 }
+    weight_grams: { min: 150, max: 8000 }
+    water:
+      type: any
+      depth: { min: 1, max: 20 }
+      width: { min: 1, max: 24 }
+    quality: { common: 55, rare: 38, legendary: 7 }
+    fight: { target_center: 61, drift_per_step: 23, direction_persistence: 0.48, duration_multiplier: 1.1 }
+  smelt:
+    material: COD
+    weight: 18
+    rarity: common
+    min_level: 3
+    biomes: [frozen_river, cold_ocean]
+    preferred_seasons: [winter]
+    excluded_seasons: [summer]
+    times: [dawn, day]
+    size_cm: { min: 6, max: 22 }
+    weight_grams: { min: 5, max: 180 }
+    water:
+      type: narrow
+      depth: { min: 1, max: 12 }
+      width: { min: 1, max: 14 }
+    quality: { common: 72, rare: 26, legendary: 2 }
+    fight: { target_center: 46, drift_per_step: 16, direction_persistence: 0.4, duration_multiplier: 0.8 }
+  sardine:
+    material: COD
+    weight: 45
+    rarity: common
+    min_level: 1
+    biomes: [ocean, lukewarm_ocean, warm_ocean]
+    preferred_environments: [aquatic_vegetation]
+    size_cm: { min: 10, max: 35 }
+    weight_grams: { min: 20, max: 500 }
+    water:
+      type: shore
+      depth: { min: 1, max: 10 }
+      width: { min: 4, max: 20 }
+    quality: { common: 76, rare: 22, legendary: 2 }
+    fight: { target_center: 40, drift_per_step: 17, direction_persistence: 0.38, duration_multiplier: 0.8 }
+  horse_mackerel:
+    material: COD
+    weight: 35
+    rarity: common
+    min_level: 2
+    biomes: [ocean, lukewarm_ocean, warm_ocean]
+    preferred_seasons: [summer, autumn]
+    preferred_environments: [aquatic_vegetation]
+    times: [dawn, dusk]
+    size_cm: { min: 12, max: 55 }
+    weight_grams: { min: 30, max: 2500 }
+    water:
+      type: open
+      depth: { min: 2, max: 20 }
+      width: { min: 13, max: 33 }
+    quality: { common: 72, rare: 25, legendary: 3 }
+    fight: { target_center: 35, drift_per_step: 24, direction_persistence: 0.34, duration_multiplier: 0.9 }
+  mackerel:
+    material: COD
+    weight: 28
+    rarity: common
+    min_level: 4
+    biomes: [ocean, cold_ocean, lukewarm_ocean]
+    preferred_environments: [aquatic_vegetation]
+    size_cm: { min: 20, max: 65 }
+    weight_grams: { min: 120, max: 4500 }
+    water:
+      type: open
+      depth: { min: 3, max: 24 }
+      width: { min: 13, max: 33 }
+    quality: { common: 68, rare: 28, legendary: 4 }
+    fight: { target_center: 42, drift_per_step: 27, direction_persistence: 0.32, duration_multiplier: 1.0 }
+  sea_bass:
+    material: COD
+    weight: 18
+    rarity: rare
+    min_level: 6
+    biomes: [river, ocean, lukewarm_ocean]
+    preferred_environments: [estuary]
+    weather: [rain]
+    times: [dusk, night]
+    size_cm: { min: 30, max: 120 }
+    weight_grams: { min: 300, max: 18000 }
+    water:
+      type: shore
+      depth: { min: 2, max: 16 }
+      width: { min: 4, max: 22 }
+    quality: { common: 58, rare: 36, legendary: 6 }
+    fight: { target_center: 57, drift_per_step: 21, direction_persistence: 0.62, duration_multiplier: 1.1 }
+  flounder:
+    material: COD
+    weight: 16
+    rarity: rare
+    min_level: 7
+    biomes: [ocean, cold_ocean, lukewarm_ocean]
+    preferred_seasons: [spring, winter]
+    preferred_environments: [sand_bottom]
+    size_cm: { min: 20, max: 105 }
+    weight_grams: { min: 150, max: 14000 }
+    water:
+      type: shore
+      depth: { min: 2, max: 14 }
+      width: { min: 5, max: 22 }
+    quality: { common: 60, rare: 35, legendary: 5 }
+    fight: { target_center: 52, drift_per_step: 11, direction_persistence: 0.84, duration_multiplier: 1.05 }
+  sea_bream:
+    material: SALMON
+    weight: 12
+    rarity: rare
+    min_level: 8
+    biomes: [ocean, lukewarm_ocean, warm_ocean]
+    weather: [clear]
+    times: [day, dusk]
+    size_cm: { min: 20, max: 90 }
+    weight_grams: { min: 200, max: 12000 }
+    water:
+      type: shore
+      depth: { min: 3, max: 18 }
+      width: { min: 6, max: 24 }
+    quality: { common: 52, rare: 40, legendary: 8 }
+    fight: { target_center: 49, drift_per_step: 12, direction_persistence: 0.8, duration_multiplier: 1.1 }
+  tuna:
+    material: SALMON
+    weight: 5
+    rarity: special
+    min_level: 12
+    biomes: [ocean, deep_ocean, lukewarm_ocean, deep_lukewarm_ocean, warm_ocean]
+    size_cm: { min: 80, max: 300 }
+    weight_grams: { min: 8000, max: 300000 }
+    water:
+      type: deep_open
+      depth: { min: 6, max: 32 }
+      width: { min: 21, max: 33 }
+    quality: { common: 35, rare: 48, legendary: 17 }
+    fight: { target_center: 70, drift_per_step: 34, direction_persistence: 0.8, duration_multiplier: 1.4 }
+  grouper:
+    material: COD
+    weight: 9
+    rarity: rare
+    min_level: 9
+    biomes: [warm_ocean, lukewarm_ocean, deep_lukewarm_ocean]
+    preferred_environments: [rocky_deep]
+    times: [day, dusk]
+    size_cm: { min: 25, max: 160 }
+    weight_grams: { min: 400, max: 70000 }
+    water:
+      type: open
+      depth: { min: 4, max: 28 }
+      width: { min: 13, max: 33 }
+    quality: { common: 48, rare: 43, legendary: 9 }
+    fight: { target_center: 64, drift_per_step: 24, direction_persistence: 0.7, duration_multiplier: 1.2 }
+  anglerfish:
+    material: COD
+    weight: 4
+    rarity: special
+    min_level: 14
+    biomes: [deep_ocean, deep_cold_ocean, deep_frozen_ocean, deep_lukewarm_ocean]
+    preferred_environments: [rocky_deep]
+    times: [night, dawn]
+    size_cm: { min: 25, max: 140 }
+    weight_grams: { min: 500, max: 45000 }
+    water:
+      type: deep_open
+      depth: { min: 10, max: 32 }
+      width: { min: 21, max: 33 }
+    quality: { common: 30, rare: 52, legendary: 18 }
+    fight: { target_center: 74, drift_per_step: 18, direction_persistence: 0.76, duration_multiplier: 1.3 }
   pufferfish:
     material: PUFFERFISH
     weight: 10
     rarity: rare
     min_level: 5
+    biomes: [warm_ocean, lukewarm_ocean]
     weather: [clear]
     times: [day, dusk]
+    size_cm: { min: 15, max: 50 }
+    weight_grams: { min: 200, max: 3000 }
     water:
       type: shore
       depth: { min: 1, max: 8 }
@@ -101,6 +388,8 @@ fish:
     min_level: 10
     biomes: [warm_ocean, lukewarm_ocean, deep_lukewarm_ocean]
     weather: [clear]
+    size_cm: { min: 5, max: 35 }
+    weight_grams: { min: 20, max: 1500 }
     water:
       type: open
       depth: { min: 2, max: 32 }
@@ -117,7 +406,10 @@ fish:
     rarity: special
     min_level: 15
     biomes: [deep_ocean, deep_cold_ocean, deep_frozen_ocean, deep_lukewarm_ocean]
+    preferred_environments: [rocky_deep]
     times: [night, dawn]
+    size_cm: { min: 120, max: 250 }
+    weight_grams: { min: 30000, max: 120000 }
     water:
       type: deep_open
       depth: { min: 8, max: 32 }

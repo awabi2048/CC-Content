@@ -1,190 +1,58 @@
 package jp.awabi2048.cccontent.features.rank.job
 
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.action.ContentAction
+import com.awabi2048.ccsystem.api.action.ContentActionType
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.profession.Profession
-import org.bukkit.Material.BREWING_STAND
-import org.bukkit.Material
-import org.bukkit.block.Block
-import org.bukkit.block.data.Ageable
-import org.bukkit.configuration.file.YamlConfiguration
-import org.bukkit.event.block.Action
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionExperience
+import jp.awabi2048.cccontent.features.resourcecollection.ResourceCollectionKind
+import jp.awabi2048.cccontent.features.resourcecollection.ResourceMaterialPolicy
+import jp.awabi2048.cccontent.features.resourcecollection.SpecialistCollectionService
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockBreakEvent
-import org.bukkit.event.block.BlockPlaceEvent
-import org.bukkit.event.player.PlayerInteractEvent
-import org.bukkit.inventory.EquipmentSlot
-import org.bukkit.plugin.java.JavaPlugin
-import java.io.File
 import java.util.UUID
 
+/**
+ * 再設計された採集職の通常作業をコード定義で記録する。
+ * バニラの破壊、ドロップ、経験値オーブ、耐久処理には介入しない。
+ */
 class ProfessionMinerExpListener(
-    private val plugin: JavaPlugin,
-    private val rankManager: RankManager,
-    private val ignoreBlockStore: IgnoreBlockStore
+    private val rankManager: RankManager
 ) : Listener {
-    companion object {
-        private val FARMER_PLACED_CHECK_MATERIALS: Set<Material> = setOf(
-            Material.MELON,
-            Material.PUMPKIN,
-            Material.SUGAR_CANE,
-            Material.CACTUS,
-            Material.BAMBOO,
-            Material.KELP,
-            Material.KELP_PLANT
-        )
-    }
-
-    private val minerExpMap: Map<Material, Long>
-    private val lumberjackExpMap: Map<Material, Long>
-    private val farmerExpMap: Map<Material, Long>
-    private val brewerMockExp: Long
-    private val brewerCooldownMillis = 1000L
-    private val brewerLastGainAt: MutableMap<UUID, Long> = mutableMapOf()
-
-    init {
-        val rankDir = File(plugin.dataFolder, "config/rank").apply { mkdirs() }
-        val expFile = File(rankDir, "job_exp.yml")
-
-        val config = if (expFile.exists()) YamlConfiguration.loadConfiguration(expFile) else YamlConfiguration()
-        if (!expFile.exists()) {
-            plugin.logger.warning("config/rank/job_exp.yml が見つからないため、職業経験値付与を無効化します")
-        }
-        
-        minerExpMap = loadBlockExpMap(config, "miner")
-        lumberjackExpMap = loadBlockExpMap(config, "lumberjack")
-        farmerExpMap = loadBlockExpMap(config, "farmer")
-        brewerMockExp = config.getLong("brewer.mock_exp", 0L)
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    fun onBlockPlace(event: BlockPlaceEvent) {
-        val block = event.blockPlaced
-        val packedPosition = BlockPositionCodec.pack(block.x, block.y, block.z)
-        ignoreBlockStore.add(block.world.uid, packedPosition)
-    }
-
     @EventHandler(ignoreCancelled = true)
     fun onBlockBreak(event: BlockBreakEvent) {
         val player = event.player
-        val uuid = player.uniqueId
-
-        val playerProfession = rankManager.getPlayerProfession(uuid) ?: return
-
-        when (playerProfession.profession) {
-            Profession.MINER -> {
-                addBreakExpIfEligible(uuid, event.block, minerExpMap)
-            }
-            Profession.LUMBERJACK -> {
-                addBreakExpIfEligible(uuid, event.block, lumberjackExpMap)
-            }
-            Profession.FARMER -> {
-                addFarmerBreakExpIfEligible(uuid, event.block)
-            }
-            else -> {
-                return
-            }
-        }
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    fun onBrewerMockInteract(event: PlayerInteractEvent) {
-        if (event.action != Action.RIGHT_CLICK_BLOCK) {
-            return
-        }
-
-        if (event.hand != EquipmentSlot.HAND) {
-            return
-        }
-
-        val clickedBlock = event.clickedBlock ?: return
-        if (clickedBlock.type != BREWING_STAND) {
-            return
-        }
-
-        val player = event.player
-        val uuid = player.uniqueId
-
-        val profession = rankManager.getPlayerProfession(uuid)?.profession ?: return
-        if (profession != Profession.BREWER) {
-            return
-        }
-
-        if (brewerMockExp <= 0L) {
-            return
-        }
-
-        val now = System.currentTimeMillis()
-        val lastGain = brewerLastGainAt[uuid] ?: 0L
-        if (now - lastGain < brewerCooldownMillis) {
-            return
-        }
-        brewerLastGainAt[uuid] = now
-
-        rankManager.addProfessionExp(uuid, brewerMockExp)
-    }
-
-    private fun addBreakExpIfEligible(uuid: UUID, block: org.bukkit.block.Block, expMap: Map<Material, Long>) {
-        val expAmount = expMap[block.type] ?: return
-        
-        if (expAmount <= 0L) {
-            return
-        }
-        
-        val packedPosition = BlockPositionCodec.pack(block.x, block.y, block.z)
-        if (ignoreBlockStore.contains(block.world.uid, packedPosition)) {
-            return
-        }
-        
-        // 経験値付与後、破壊した位置を記録（同じ位置での再破壊による経験値獲得を防止）
-        ignoreBlockStore.add(block.world.uid, packedPosition)
-        rankManager.addProfessionExp(uuid, expAmount)
-    }
-
-    private fun addFarmerBreakExpIfEligible(uuid: UUID, block: Block) {
-        val expAmount = farmerExpMap[block.type] ?: return
-
-        if (expAmount <= 0L) {
-            return
-        }
-
-        if (requiresPlacedCheckForFarmer(block.type)) {
-            val packedPosition = BlockPositionCodec.pack(block.x, block.y, block.z)
-            if (ignoreBlockStore.contains(block.world.uid, packedPosition)) {
-                return
-            }
-            rankManager.addProfessionExp(uuid, expAmount)
-            return
-        }
-
-        if (!isFullyGrownAgeable(block)) {
-            return
-        }
-
-        rankManager.addProfessionExp(uuid, expAmount)
-    }
-
-    private fun requiresPlacedCheckForFarmer(type: Material): Boolean {
-        return type in FARMER_PLACED_CHECK_MATERIALS
-    }
-
-    private fun isFullyGrownAgeable(block: Block): Boolean {
-        val ageable = block.blockData as? Ageable ?: return false
-        return ageable.age >= ageable.maximumAge
-    }
-
-    private fun loadBlockExpMap(config: YamlConfiguration, path: String): Map<Material, Long> {
-        val section = config.getConfigurationSection(path) ?: return emptyMap()
-
-        val result = mutableMapOf<Material, Long>()
-        for (blockKey in section.getKeys(false)) {
-            val material = Material.matchMaterial(blockKey.uppercase()) ?: continue
-            val exp = section.getLong(blockKey, 0L)
-            if (exp > 0L) {
-                result[material] = exp
+        if (SpecialistCollectionService.isInternalBreak(player.uniqueId, event.block)) return
+        val profession = rankManager.getPlayerProfession(player.uniqueId)?.profession ?: return
+        val kind = ResourceMaterialPolicy.classify(event.block.type, event.block.blockData) ?: return
+        if (kind.profession != profession) return
+        val actionType = when (kind) {
+            ResourceCollectionKind.MINERAL -> ContentActionType.MINERAL_EXTRACTED
+            ResourceCollectionKind.FOREST -> ContentActionType.TREE_PROCESSED
+            ResourceCollectionKind.CROP -> if (event.block.blockData is org.bukkit.block.data.Ageable) {
+                ContentActionType.CROP_HARVESTED
+            } else {
+                ContentActionType.PLANT_GATHERED
             }
         }
 
-        return result
+        if (!CCSystem.getAPI().getNaturalOriginRegistry().isNatural(event.block)) return
+        rankManager.addProfessionExp(player.uniqueId, ProfessionExperience.NORMAL_ACTION)
+        rankManager.recordProfessionCycleAction(player.uniqueId)
+        CCSystem.getAPI().getContentActionDispatcher().publish(
+            ContentAction(
+                actionId = UUID.randomUUID(),
+                schemaVersion = 1,
+                occurredAt = CCSystem.getAPI().getSharedClockService().now().toInstant(),
+                playerId = player.uniqueId,
+                actionType = actionType,
+                amount = 1L,
+                worldKey = event.block.world.key,
+                metadata = mapOf("material" to event.block.type.key.toString())
+            )
+        )
     }
+
 }

@@ -49,6 +49,7 @@ class CCContentReloadLifecycleTest {
         assertTrue(stop.contains("cookingFeature?.shutdown()"));
         assertTrue(stop.contains("fishingFeature?.shutdown()"));
         assertTrue(stop.contains("resourceCollectionFeature?.shutdown()"));
+        assertTrue(stop.contains("seasonalFeature?.shutdown()"));
         assertTrue(stop.contains("partyController?.close()"));
         assertTrue(start.contains("catalogStore = CatalogStore"));
         assertTrue(start.contains("registerCatalogCommands()"));

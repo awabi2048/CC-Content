@@ -373,7 +373,7 @@ class SukimaWorldSproutItem : CustomItem {
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
         val item = createSukimaItem(amount)
-        SukimaCustomItemManager.applyWorldSproutMetadata(item)
+        SukimaCustomItemManager.applyWorldSproutMetadata(item, player)
         return item
     }
 

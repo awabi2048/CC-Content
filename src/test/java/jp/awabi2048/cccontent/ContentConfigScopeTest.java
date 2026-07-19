@@ -10,6 +10,7 @@ class ContentConfigScopeTest {
     void classifiesConfigResourcesByFailureBoundary() {
         assertEquals("core", ContentConfigScope.featureIdForResource("config/core.yml"));
         assertEquals("arena", ContentConfigScope.featureIdForResource("config/arena/settings.yml"));
+        assertEquals("seasonal", ContentConfigScope.featureIdForResource("config/seasonal/events.yml"));
         assertEquals("custom_items", ContentConfigScope.featureIdForResource("config/custom_item/gulliver_light.yml"));
         assertEquals("oage_shrine", ContentConfigScope.featureIdForResource("config/npc/oage_shrine.yml"));
         assertEquals("shared", ContentConfigScope.featureIdForResource("config/mob_definition.yml"));

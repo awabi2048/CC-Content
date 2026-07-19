@@ -1,0 +1,7 @@
+config_version: 1
+
+# 具体的なイベント内容は未確定です。承認済み定義を追加するまで無効のまま運用します。
+enabled: false
+timezone: Asia/Tokyo
+upcoming_window_seconds: 604800
+definitions: []

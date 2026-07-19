@@ -8,6 +8,7 @@ import jp.awabi2048.cccontent.features.rank.skill.listeners.BlockBreakEffectList
 import org.bukkit.Material
 import org.bukkit.Sound
 import org.bukkit.block.Block
+import org.bukkit.entity.Player
 
 class ReplantHandler : SkillEffectHandler {
     companion object {
@@ -59,6 +60,36 @@ class ReplantHandler : SkillEffectHandler {
 
         fun clearAllProcessed() {
             processedBlocks.clear()
+        }
+
+        fun replantBatch(player: Player, block: Block, originalMaterial: Material): Boolean {
+            if (!block.type.isAir || block.getRelative(0, -1, 0).type !in PLANTABLE_BLOCKS) {
+                return false
+            }
+            val saplingMaterial = LOG_TO_SAPLING[originalMaterial.name]
+                ?.let(Material::matchMaterial)
+                ?: return false
+            if (!consumeOneSapling(player, saplingMaterial)) return false
+            block.type = saplingMaterial
+            markAsProcessed(player.uniqueId)
+            player.world.playSound(block.location, Sound.BLOCK_ROOTED_DIRT_PLACE, 1.0f, 1.0f)
+            return true
+        }
+
+        private fun consumeOneSapling(player: Player, saplingMaterial: Material): Boolean {
+            val inventory = player.inventory
+            val slotIndex = inventory.contents.indexOfFirst { stack ->
+                stack != null && stack.type == saplingMaterial && stack.amount > 0
+            }
+            if (slotIndex < 0) return false
+            val stack = inventory.getItem(slotIndex) ?: return false
+            stack.amount -= 1
+            if (stack.amount <= 0) {
+                inventory.setItem(slotIndex, null)
+            } else {
+                inventory.setItem(slotIndex, stack)
+            }
+            return true
         }
     }
 
@@ -130,25 +161,6 @@ class ReplantHandler : SkillEffectHandler {
 
     private fun isValidPlantPosition(block: Block): Boolean {
         return block.type.isAir
-    }
-
-    private fun consumeOneSapling(player: org.bukkit.entity.Player, saplingMaterial: Material): Boolean {
-        val inventory = player.inventory
-        val slotIndex = inventory.contents.indexOfFirst { stack ->
-            stack != null && stack.type == saplingMaterial && stack.amount > 0
-        }
-        if (slotIndex < 0) {
-            return false
-        }
-
-        val stack = inventory.getItem(slotIndex) ?: return false
-        stack.amount -= 1
-        if (stack.amount <= 0) {
-            inventory.setItem(slotIndex, null)
-        } else {
-            inventory.setItem(slotIndex, stack)
-        }
-        return true
     }
 
     override fun calculateStrength(skillEffect: SkillEffect): Double {

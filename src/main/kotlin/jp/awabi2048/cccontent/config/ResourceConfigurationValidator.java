@@ -110,7 +110,7 @@ public final class ResourceConfigurationValidator {
         if (contentEnabled != null) {
             Set<String> knownFeatures = Set.of(
                 "arena", "rank", "brewery", "cooking", "fishing", "resource_collection",
-                "sukima_dungeon", "party", "minigame"
+                "seasonal", "sukima_dungeon", "party", "minigame"
             );
             contentEnabled.keySet().stream()
                 .filter(key -> !knownFeatures.contains(key))
@@ -124,6 +124,7 @@ public final class ResourceConfigurationValidator {
             requireBoolean(contentEnabled, "cooking", file, "content_enabled.cooking", errors);
             requireBoolean(contentEnabled, "fishing", file, "content_enabled.fishing", errors);
             requireBoolean(contentEnabled, "resource_collection", file, "content_enabled.resource_collection", errors);
+            requireBoolean(contentEnabled, "seasonal", file, "content_enabled.seasonal", errors);
             requireBoolean(contentEnabled, "sukima_dungeon", file, "content_enabled.sukima_dungeon", errors);
             requireBoolean(contentEnabled, "party", file, "content_enabled.party", errors);
             requireBoolean(contentEnabled, "minigame", file, "content_enabled.minigame", errors);
@@ -702,9 +703,12 @@ public final class ResourceConfigurationValidator {
         }
         Map<String, Object> bait = requireMap(root, "bait", file, errors);
         if (bait != null) {
-            requireNonEmpty(bait, file, "bait", errors);
-            for (Map.Entry<String, Object> entry : bait.entrySet()) {
-                String path = "bait." + entry.getKey();
+            requireBoolean(bait, "consume_on_valid_session", file, "bait.consume_on_valid_session", errors);
+            Map<String, Object> definitions = requireMap(bait, "definitions", file, errors, "bait.definitions");
+            if (definitions == null) return;
+            requireNonEmpty(definitions, file, "bait.definitions", errors);
+            for (Map.Entry<String, Object> entry : definitions.entrySet()) {
+                String path = "bait.definitions." + entry.getKey();
                 Map<String, Object> definition = asMap(entry.getValue());
                 if (definition == null) {
                     errors.add(format("invalid fishing bait", file, path, "bait must be a section"));
@@ -819,30 +823,105 @@ public final class ResourceConfigurationValidator {
         Map<String, Object> config = rootMap(configs, configFile, errors);
         if (config != null) {
             requireBoolean(config, "enabled", configFile, "enabled", errors);
-            Object worlds = config.get("worlds");
-            if (!(worlds instanceof List<?> list) || list.isEmpty() || list.stream().anyMatch(value -> !isNonBlankString(value))) {
-                errors.add(format("invalid world list", configFile, "worlds", "non-empty list of strings is required"));
+            Map<String, Object> chisel = requireMap(config, "chisel", configFile, errors);
+            if (chisel != null) {
+                requireAllowedKeys(
+                    chisel,
+                    Set.of("target_count", "target_timeout_ticks", "particle_count"),
+                    configFile,
+                    errors
+                );
+                requirePositiveInteger(chisel.get("target_count"), configFile, "chisel.target_count", errors);
+                requirePositiveInteger(
+                    chisel.get("target_timeout_ticks"),
+                    configFile,
+                    "chisel.target_timeout_ticks",
+                    errors
+                );
+                requirePositiveInteger(chisel.get("particle_count"), configFile, "chisel.particle_count", errors);
             }
+            validateResourceFeatureSection(
+                config, "mineral",
+                Set.of("enabled", "normal_bonus_drop", "work_speed", "inspection", "chisel_game"),
+                configFile, errors
+            );
+            validateResourceFeatureSection(
+                config, "forest",
+                Set.of(
+                    "enabled", "normal_bonus_drop", "work_speed", "heartwood", "bark",
+                    "timber_processing", "forest_products", "leaf_cleanup", "automatic_replant"
+                ),
+                configFile, errors
+            );
+            validateResourceFeatureSection(
+                config, "crop",
+                Set.of(
+                    "enabled", "normal_bonus_drop", "work_speed", "wild_gathering", "surface_gathering",
+                    "area_tilling", "area_harvest", "automatic_replant"
+                ),
+                configFile, errors
+            );
         }
-        Path collectionFile = configRoot.resolve("resource_collection/collection.yml");
-        Map<String, Object> root = rootMap(configs, collectionFile, errors);
-        if (root == null) return;
-        for (String sectionName : List.of("harvest", "craft")) {
-            Map<String, Object> section = requireMap(root, sectionName, collectionFile, errors);
-            if (section == null) continue;
-            requireNonEmpty(section, collectionFile, sectionName, errors);
-            for (Map.Entry<String, Object> entry : section.entrySet()) {
-                String path = sectionName + "." + entry.getKey();
-                Map<String, Object> rule = asMap(entry.getValue());
-                if (rule == null) {
-                    errors.add(format("invalid resource collection rule", collectionFile, path, "rule must be a section"));
-                    continue;
-                }
-                requireMaterial(rule.get("material"), collectionFile, path + ".material", errors);
-                requireString(rule, "profession", collectionFile, path + ".profession", errors);
-                requirePositiveNumber(rule, "experience", collectionFile, path + ".experience", errors);
-                if (rule.containsKey("minimum_age")) requireNonNegativeNumber(rule, "minimum_age", collectionFile, path + ".minimum_age", errors);
-            }
+        Path forestProductsFile = configRoot.resolve("resource_collection/forest_products.yml");
+        Map<String, Object> forestProducts = rootMap(configs, forestProductsFile, errors);
+        if (forestProducts != null) {
+            requireAllowedKeys(
+                forestProducts,
+                Set.of(
+                    "schema_version", "enabled", "base_discovery_chance",
+                    "maximum_discovery_bonus", "burl_override_chance"
+                ),
+                forestProductsFile,
+                errors
+            );
+            requireIntegerRange(
+                forestProducts.get("schema_version"),
+                2,
+                2,
+                forestProductsFile,
+                "schema_version",
+                errors
+            );
+            requireBoolean(forestProducts, "enabled", forestProductsFile, "enabled", errors);
+            requireFiniteNumberRange(
+                forestProducts.get("base_discovery_chance"),
+                0.0,
+                1.0,
+                forestProductsFile,
+                "base_discovery_chance",
+                errors
+            );
+            requireFiniteNumberRange(
+                forestProducts.get("maximum_discovery_bonus"),
+                0.0,
+                1.0,
+                forestProductsFile,
+                "maximum_discovery_bonus",
+                errors
+            );
+            requireFiniteNumberRange(
+                forestProducts.get("burl_override_chance"),
+                0.0,
+                1.0,
+                forestProductsFile,
+                "burl_override_chance",
+                errors
+            );
+        }
+    }
+
+    private static void validateResourceFeatureSection(
+        Map<String, Object> config,
+        String sectionName,
+        Set<String> allowedKeys,
+        Path configFile,
+        List<String> errors
+    ) {
+        Map<String, Object> section = requireMap(config, sectionName, configFile, errors);
+        if (section == null) return;
+        requireAllowedKeys(section, allowedKeys, configFile, errors);
+        for (String key : allowedKeys) {
+            requireBoolean(section, key, configFile, sectionName + "." + key, errors);
         }
     }
 

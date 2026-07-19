@@ -1,6 +1,9 @@
 package jp.awabi2048.cccontent.features.rank.profession
 
 import jp.awabi2048.cccontent.features.rank.skill.SkillSwitchMode
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionCycleStatistics
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionFeatureToggles
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionPrestigeRecord
 import java.util.UUID
 
 /**
@@ -39,7 +42,15 @@ data class PlayerProfession(
      * スキルごとの発動ON/OFF状態（skillId -> enabled）
      * 未設定のスキルはON扱い
      */
-    var skillActivationStates: MutableMap<String, Boolean> = mutableMapOf()
+    var skillActivationStates: MutableMap<String, Boolean> = mutableMapOf(),
+
+    var specializationId: String? = null,
+
+    var featureToggles: ProfessionFeatureToggles = ProfessionFeatureToggles.defaultsFor(profession),
+
+    var cycleStatistics: ProfessionCycleStatistics = ProfessionCycleStatistics(),
+
+    var prestigeRecords: MutableList<ProfessionPrestigeRecord> = mutableListOf()
 ) {
     fun getCurrentLevel(skillTree: SkillTree): Int {
         return skillTree.calculateLevelByExp(currentExp)

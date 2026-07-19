@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.fishing
 
+import com.awabi2048.ccsystem.api.time.Season
 import org.bukkit.Material
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
@@ -24,25 +25,43 @@ data class FishingMiniGameSettings(
     val waitTimeMaxTicks: Int
 )
 
+data class NaturalFishingGroundSettings(
+    val enabled: Boolean,
+    val baseChance: Double,
+    val fisherMultiplier: Double,
+    val rollCooldownSeconds: Long,
+    val successCooldownSeconds: Long,
+    val durationSeconds: Long,
+    val minimumDistanceChunks: Int,
+    val maximumDistanceChunks: Int,
+    val minimumRadius: Int,
+    val maximumRadius: Int,
+    val exclusionRangeChunks: Int,
+    val waitTimeMultiplier: Double,
+    val hookWindowMultiplier: Double,
+    val sizeProfileShift: Double
+)
+
 data class FishingSettings(
     val enabled: Boolean,
+    val consumeBaitOnValidSession: Boolean,
     val fishes: List<FishDefinition>,
     val baits: List<BaitDefinition>,
     val rods: List<RodDefinition>,
-    val minigame: FishingMiniGameSettings
+    val minigame: FishingMiniGameSettings,
+    val naturalFishingGround: NaturalFishingGroundSettings
 ) {
     companion object {
         fun load(plugin: JavaPlugin): FishingSettings {
             val file = ensureResource(plugin, "config/fishing/fish.yml")
-            val expFile = ensureResource(plugin, "config/rank/job_exp.yml")
             val config = YamlConfiguration.loadConfiguration(file)
-            val expConfig = YamlConfiguration.loadConfiguration(expFile)
-            require(config.get("config_version") is Number && config.getInt("config_version") == 2) {
-                "config/fishing/fish.yml.config_version must be the integer 2"
+            require(config.get("config_version") is Number && config.getInt("config_version") == 4) {
+                "config/fishing/fish.yml.config_version must be the integer 4"
             }
             require(config.get("enabled") is Boolean) { "config/fishing/fish.yml.enabled must be a boolean" }
-            val fisherExp = expConfig.getConfigurationSection("fisher")
-                ?: error("config/rank/job_exp.yml.fisher is required")
+            require(config.get("bait.consume_on_valid_session") is Boolean) {
+                "config/fishing/fish.yml.bait.consume_on_valid_session must be a boolean"
+            }
             val fishes = config.getConfigurationSection("fish")?.getKeys(false).orEmpty().map { id ->
                 val path = "fish.$id"
                 val qualities = config.getConfigurationSection("$path.quality")?.getKeys(false).orEmpty().associate {
@@ -62,24 +81,40 @@ data class FishingSettings(
                     biomes = config.getStringList("$path.biomes").toSet(),
                     weather = config.getStringList("$path.weather").map { FishingWeather.valueOf(it.uppercase()) }.toSet(),
                     times = config.getStringList("$path.times").map { FishingTime.valueOf(it.uppercase()) }.toSet(),
+                    preferredSeasons = config.getStringList("$path.preferred_seasons")
+                        .map { Season.valueOf(it.uppercase()) }
+                        .toSet(),
+                    excludedSeasons = config.getStringList("$path.excluded_seasons")
+                        .map { Season.valueOf(it.uppercase()) }
+                        .toSet()
+                        .also { excluded ->
+                            require(excluded.intersect(
+                                config.getStringList("$path.preferred_seasons")
+                                    .map { Season.valueOf(it.uppercase()) }
+                                    .toSet()
+                            ).isEmpty()) {
+                                "$path.preferred_seasons and $path.excluded_seasons must not overlap"
+                            }
+                        },
+                    preferredEnvironments = config.getStringList("$path.preferred_environments")
+                        .map(FishingEnvironment::fromConfigId)
+                        .toSet(),
                     water = FishingWaterCondition(
                         type = FishingWaterType.fromConfigId(requireString(config.getString("$path.water.type"), "$path.water.type")),
                         depth = positiveRange(config, "$path.water.depth"),
                         width = positiveRange(config, "$path.water.width")
                     ),
+                    sizeCm = positiveRange(config, "$path.size_cm"),
+                    weightGrams = positiveRange(config, "$path.weight_grams"),
                     qualities = qualities.also { require(it.isNotEmpty()) { "$path.quality must not be empty" } },
-                    exp = positiveLong(fisherExp.get(id), "config/rank/job_exp.yml.fisher.$id"),
                     rarity = FishRarity.valueOf(requireString(config.getString("$path.rarity"), "$path.rarity").uppercase()),
                     requiredBaitTags = config.getStringList("$path.required_bait_tags").toSet(),
                     fight = fight
                 )
             }
             require(fishes.isNotEmpty()) { "config/fishing/fish.yml に魚定義がありません" }
-            require(fisherExp.getKeys(false) == fishes.map { it.id }.toSet()) {
-                "config/rank/job_exp.yml.fisher must define exactly the fishing fish ids"
-            }
-            val baits = config.getConfigurationSection("bait")?.getKeys(false).orEmpty().map { id ->
-                val path = "bait.$id"
+            val baits = config.getConfigurationSection("bait.definitions")?.getKeys(false).orEmpty().map { id ->
+                val path = "bait.definitions.$id"
                 BaitDefinition(
                     id,
                     material(config.getString("$path.material"), "$path.material"),
@@ -89,7 +124,7 @@ data class FishingSettings(
                     config.getStringList("$path.special_tags").toSet()
                 )
             }
-            require(baits.isNotEmpty()) { "config/fishing/fish.yml.bait must not be empty" }
+            require(baits.isNotEmpty()) { "config/fishing/fish.yml.bait.definitions must not be empty" }
             val rods = config.getConfigurationSection("rod")?.getKeys(false).orEmpty().map { id ->
                 val path = "rod.$id"
                 RodDefinition(
@@ -121,7 +156,37 @@ data class FishingSettings(
             require(minigame.waitTimeMinTicks <= minigame.waitTimeMaxTicks) {
                 "wait_time.min_ticks must not exceed wait_time.max_ticks"
             }
-            return FishingSettings(config.getBoolean("enabled"), fishes, baits, rods, minigame)
+            val naturalFishingGround = NaturalFishingGroundSettings(
+                enabled = requireBoolean(config.get("natural_fishing_ground.enabled"), "natural_fishing_ground.enabled"),
+                baseChance = finiteRange(config.get("natural_fishing_ground.base_chance"), 0.0, 1.0, "natural_fishing_ground.base_chance"),
+                fisherMultiplier = positiveDouble(config.get("natural_fishing_ground.fisher_multiplier"), "natural_fishing_ground.fisher_multiplier"),
+                rollCooldownSeconds = positiveLong(config.get("natural_fishing_ground.roll_cooldown_seconds"), "natural_fishing_ground.roll_cooldown_seconds"),
+                successCooldownSeconds = positiveLong(config.get("natural_fishing_ground.success_cooldown_seconds"), "natural_fishing_ground.success_cooldown_seconds"),
+                durationSeconds = positiveLong(config.get("natural_fishing_ground.duration_seconds"), "natural_fishing_ground.duration_seconds"),
+                minimumDistanceChunks = positiveInt(config.get("natural_fishing_ground.distance_chunks.min"), "natural_fishing_ground.distance_chunks.min"),
+                maximumDistanceChunks = positiveInt(config.get("natural_fishing_ground.distance_chunks.max"), "natural_fishing_ground.distance_chunks.max"),
+                minimumRadius = positiveInt(config.get("natural_fishing_ground.radius.min"), "natural_fishing_ground.radius.min"),
+                maximumRadius = positiveInt(config.get("natural_fishing_ground.radius.max"), "natural_fishing_ground.radius.max"),
+                exclusionRangeChunks = positiveInt(config.get("natural_fishing_ground.exclusion_range_chunks"), "natural_fishing_ground.exclusion_range_chunks"),
+                waitTimeMultiplier = finiteRange(config.get("natural_fishing_ground.wait_time_multiplier"), 0.01, 1.0, "natural_fishing_ground.wait_time_multiplier"),
+                hookWindowMultiplier = positiveDouble(config.get("natural_fishing_ground.hook_window_multiplier"), "natural_fishing_ground.hook_window_multiplier"),
+                sizeProfileShift = finiteRange(config.get("natural_fishing_ground.size_profile_shift"), 0.0, 1.0, "natural_fishing_ground.size_profile_shift")
+            )
+            require(naturalFishingGround.minimumDistanceChunks <= naturalFishingGround.maximumDistanceChunks) {
+                "natural_fishing_ground.distance_chunks.min must not exceed max"
+            }
+            require(naturalFishingGround.minimumRadius <= naturalFishingGround.maximumRadius) {
+                "natural_fishing_ground.radius.min must not exceed max"
+            }
+            return FishingSettings(
+                config.getBoolean("enabled"),
+                config.getBoolean("bait.consume_on_valid_session"),
+                fishes,
+                baits,
+                rods,
+                minigame,
+                naturalFishingGround
+            )
         }
 
         private fun ensureResource(plugin: JavaPlugin, path: String): File {
@@ -143,6 +208,9 @@ data class FishingSettings(
             require(value is Number && value.toDouble() == value.toInt().toDouble() && value.toInt() > 0) {
                 "$path must be a positive integer"
             }.let { value.toInt() }
+
+        private fun requireBoolean(value: Any?, path: String): Boolean =
+            require(value is Boolean) { "$path must be a boolean" }.let { value }
 
         private fun positiveLong(value: Any?, path: String): Long =
             require(value is Number && value.toDouble() == value.toLong().toDouble() && value.toLong() > 0) {

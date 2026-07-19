@@ -15,14 +15,15 @@ class FishingWorldBoundarySourceContractTest {
     );
 
     @Test
-    void nonResourceWorldLeavesVanillaFishingUntouched() throws Exception {
+    void nonReadyResourceWorldLeavesVanillaFishingUntouched() throws Exception {
         String source = readSource();
 
         assertTrue(source.contains(
-            "if (!CCSystem.getAPI().isResourceWorld(player.world)) {\n" +
+            "if (!isReadyResourceWorld(player)) {\n" +
                 "            return\n" +
                 "        }"
         ));
+        assertTrue(source.contains("getResourceWorldLifecycleService().isReady(player.world.key)"));
         assertFalse(source.contains("fishing.error.resource_world_only"));
     }
 
@@ -61,11 +62,53 @@ class FishingWorldBoundarySourceContractTest {
     @Test
     void dictionaryAndSearchUseTheSameTenBlockWaterSurvey() throws Exception {
         String source = readSource();
+        String dictionaryHint = source.substring(
+            source.indexOf("private fun showLocalFishingHint"),
+            source.indexOf("fun shutdown()")
+        );
 
         assertTrue(source.contains("player.rayTraceBlocks(10.0, FluidCollisionMode.ALWAYS)"));
         assertTrue(source.contains("val block = surveyWaterBlock(player)"));
         assertTrue(source.contains("val surveyBlock = surveyWaterBlock(player)"));
-        assertTrue(source.contains("if (candidates.isEmpty()) return"));
+        assertTrue(source.contains("if (candidateNames.isEmpty())"));
+        assertTrue(source.contains("message(player, \"fishing.dictionary.hint.none\")"));
+        assertTrue(source.contains(
+            "player.sendMessage(message(player, \"fishing.dictionary.hint.none\"))\n" +
+                "            player.playSound"
+        ));
+        assertTrue(
+            dictionaryHint.indexOf("if (candidateNames.isEmpty())") <
+                dictionaryHint.indexOf(".render(GuiLoreSpec.Blocks")
+        );
+        assertTrue(dictionaryHint.contains("if (block == null) return"));
+        assertFalse(dictionaryHint.contains("fishing.dictionary.hint.not_water"));
+        assertTrue(dictionaryHint.contains("if (!isReadyResourceWorld(player)) return"));
+        assertTrue(
+            dictionaryHint.indexOf("if (block == null)") <
+                dictionaryHint.indexOf("if (!isReadyResourceWorld(player)) return")
+        );
+    }
+
+    @Test
+    void baitIsConsumedOnlyAfterAValidCandidateIsSelected() throws Exception {
+        String source = readSource();
+        String startCast = source.substring(source.indexOf("private fun startCast"), source.indexOf("private fun onBite"));
+        String onBite = source.substring(source.indexOf("private fun onBite"), source.indexOf("@EventHandler\n    fun onRodClick"));
+
+        assertTrue(startCast.contains("items.resolveBait(player.inventory.itemInOffHand)"));
+        assertFalse(startCast.contains("consumeBait"));
+        assertTrue(onBite.indexOf("if (selected == null)") < onBite.indexOf("items.consumeBait"));
+    }
+
+    @Test
+    void fightUsesCumulativeScoreAndLocalizedHitTitle() throws Exception {
+        String source = readSource();
+
+        assertTrue(source.contains("session.fightScore = session.fightScore.record("));
+        assertTrue(source.contains("session.fightScore.successProbability(definition.rarity)"));
+        assertTrue(source.contains("message(player, \"fishing.fight.hit_title\")"));
+        assertFalse(source.contains("Component.text(\"§6HIT!\")"));
+        assertFalse(source.contains("zone.successChance"));
     }
 
     private static String readSource() throws Exception {

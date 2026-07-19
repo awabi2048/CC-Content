@@ -1,7 +1,35 @@
-﻿config_version: 2
+config_version: 7
 enabled: true
 
-# HarderResourceWorld の applied_worlds と同じく、資源収集を許可するワールド名を明示します。
-worlds:
-  - resource
+chisel:
+  target_count: 3
+  target_timeout_ticks: 50
+  particle_count: 5
 
+mineral:
+  enabled: true
+  normal_bonus_drop: true
+  work_speed: true
+  inspection: true
+  chisel_game: true
+
+forest:
+  enabled: true
+  normal_bonus_drop: true
+  work_speed: true
+  heartwood: true
+  bark: true
+  timber_processing: true
+  forest_products: true
+  leaf_cleanup: true
+  automatic_replant: true
+
+crop:
+  enabled: true
+  normal_bonus_drop: true
+  work_speed: true
+  wild_gathering: true
+  surface_gathering: true
+  area_tilling: true
+  area_harvest: true
+  automatic_replant: true

@@ -1,13 +1,13 @@
 package jp.awabi2048.cccontent.features.fishing
 
+import com.awabi2048.ccsystem.api.time.Season
 import org.bukkit.Location
+import org.bukkit.HeightMap
 import org.bukkit.Material
 import org.bukkit.World
 import org.bukkit.block.Block
 import org.bukkit.block.data.Waterlogged
 import java.util.Random
-import kotlin.math.roundToInt
-import kotlin.math.roundToLong
 import kotlin.math.pow
 
 enum class FishQuality(val id: String, val multiplier: Double) {
@@ -27,12 +27,8 @@ enum class FishQuality(val id: String, val multiplier: Double) {
         fun fromConfigId(id: String): FishQuality = entries.firstOrNull { it.id.equals(id, true) }
             ?: error("Unknown fish quality: $id")
 
-        fun fromStoredId(id: String): FishQuality = when (id.lowercase()) {
-            "common" -> COMMON
-            "uncommon", "rare" -> RARE
-            "epic", "legendary" -> LEGENDARY
-            else -> error("Unknown stored fish quality: $id")
-        }
+        fun fromStoredId(id: String): FishQuality = entries.firstOrNull { it.id == id }
+            ?: error("Unknown stored fish quality: $id")
 
         fun normalizeStoredCounts(counts: Map<String, Long>): Map<FishQuality, Long> =
             counts.entries.groupingBy { fromStoredId(it.key) }.fold(0L) { total, entry -> total + entry.value }
@@ -63,8 +59,22 @@ enum class FishingWaterType(val id: String) {
 
 data class FishingWaterProfile(
     val depth: Int,
-    val width: Int
+    val width: Int,
+    val environments: Set<FishingEnvironment> = emptySet()
 )
+
+enum class FishingEnvironment(val id: String) {
+    ESTUARY("estuary"),
+    SAND_BOTTOM("sand_bottom"),
+    AQUATIC_VEGETATION("aquatic_vegetation"),
+    ROCKY_DEEP("rocky_deep");
+
+    companion object {
+        fun fromConfigId(id: String): FishingEnvironment =
+            entries.firstOrNull { it.id.equals(id, true) }
+                ?: error("Unknown fishing environment: $id")
+    }
+}
 
 data class FishingWaterCondition(
     val type: FishingWaterType,
@@ -83,9 +93,13 @@ data class FishDefinition(
     val biomes: Set<String>,
     val weather: Set<FishingWeather>,
     val times: Set<FishingTime>,
+    val preferredSeasons: Set<Season>,
+    val excludedSeasons: Set<Season>,
+    val preferredEnvironments: Set<FishingEnvironment>,
     val water: FishingWaterCondition,
+    val sizeCm: IntRange,
+    val weightGrams: IntRange,
     val qualities: Map<FishQuality, Int>,
-    val exp: Long,
     val rarity: FishRarity,
     val requiredBaitTags: Set<String>,
     val fight: FishFightProfile
@@ -111,11 +125,35 @@ data class FishingContext(
     val world: World,
     val bobber: Location,
     val fisherLevel: Int,
+    val season: Season,
     val waterProfile: FishingWaterProfile? = FishingWaterAnalyzer.analyze(bobber)
 ) {
     val biome: String get() = bobber.block.biome.key.key
-    val weather: FishingWeather get() = if (world.hasStorm()) FishingWeather.RAIN else FishingWeather.CLEAR
+    val weather: FishingWeather get() = if (FishingWeatherResolver.isRaining(world, bobber)) {
+        FishingWeather.RAIN
+    } else {
+        FishingWeather.CLEAR
+    }
     val time: FishingTime get() = FishingTime.fromWorldTime(world.time)
+}
+
+object FishingWeatherResolver {
+    private val dryBiomes = setOf(
+        "desert",
+        "savanna",
+        "savanna_plateau",
+        "windswept_savanna",
+        "badlands",
+        "eroded_badlands",
+        "wooded_badlands"
+    )
+
+    fun isRaining(world: World, location: Location): Boolean {
+        if (!world.hasStorm()) return false
+        if (location.block.biome.key.key in dryBiomes) return false
+        val highestY = world.getHighestBlockYAt(location.blockX, location.blockZ, HeightMap.MOTION_BLOCKING)
+        return highestY <= location.blockY + 1
+    }
 }
 
 object FishingWaterAnalyzer {
@@ -127,6 +165,16 @@ object FishingWaterAnalyzer {
         Material.SEAGRASS,
         Material.TALL_SEAGRASS,
         Material.BUBBLE_COLUMN
+    )
+    private val sandBottoms = setOf(Material.SAND, Material.RED_SAND, Material.SUSPICIOUS_SAND)
+    private val rockyBottoms = setOf(
+        Material.STONE,
+        Material.DEEPSLATE,
+        Material.ANDESITE,
+        Material.DIORITE,
+        Material.GRANITE,
+        Material.TUFF,
+        Material.GRAVEL
     )
     private val widthAxes = listOf(
         (1 to 0) to (-1 to 0),
@@ -156,7 +204,41 @@ object FishingWaterAnalyzer {
             1 + runLength(surface, positive.first, positive.second) +
                 runLength(surface, negative.first, negative.second)
         }
-        return FishingWaterProfile(depth, width)
+        return FishingWaterProfile(depth, width, analyzeEnvironment(surface, cursor, depth))
+    }
+
+    private fun analyzeEnvironment(surface: Block, bottom: Block, depth: Int): Set<FishingEnvironment> =
+        buildSet {
+            if (bottom.type in sandBottoms) add(FishingEnvironment.SAND_BOTTOM)
+            if (depth >= 8 && bottom.type in rockyBottoms) add(FishingEnvironment.ROCKY_DEEP)
+            if (hasAquaticVegetation(surface)) add(FishingEnvironment.AQUATIC_VEGETATION)
+            if (isEstuary(surface)) add(FishingEnvironment.ESTUARY)
+        }
+
+    private fun hasAquaticVegetation(surface: Block): Boolean =
+        (-4..4).any { dx ->
+            (-4..4).any { dz ->
+                (0 until minOf(6, surface.y - surface.world.minHeight + 1)).any { depth ->
+                    surface.getRelative(dx, -depth, dz).type in waterPlants
+                }
+            }
+        }
+
+    private fun isEstuary(surface: Block): Boolean {
+        var riverFound = false
+        var oceanFound = false
+        for (dx in -32..32 step 4) {
+            for (dz in -32..32 step 4) {
+                val x = surface.x + dx
+                val z = surface.z + dz
+                if (!surface.world.isChunkLoaded(Math.floorDiv(x, 16), Math.floorDiv(z, 16))) continue
+                val biome = surface.world.getBiome(x, surface.y, z).key.key
+                riverFound = riverFound || biome == "river" || biome == "frozen_river"
+                oceanFound = oceanFound || biome.endsWith("ocean")
+                if (riverFound && oceanFound) return true
+            }
+        }
+        return false
     }
 
     private fun runLength(origin: Block, dx: Int, dz: Int): Int {
@@ -192,8 +274,7 @@ data class FishCatch(
     val material: Material,
     val weightGrams: Int,
     val quality: FishQuality,
-    val sizeCm: Int,
-    val exp: Long
+    val sizeCm: Int
 )
 
 object FishingCatchSelector {
@@ -205,8 +286,7 @@ object FishingCatchSelector {
     ): List<FishDefinition> = definitions.filter { definition ->
         context.fisherLevel >= definition.minLevel &&
             (definition.biomes.isEmpty() || definition.biomes.any { it.equals(context.biome, true) }) &&
-            (definition.weather.isEmpty() || context.weather in definition.weather) &&
-            (definition.times.isEmpty() || context.time in definition.times) &&
+            context.season !in definition.excludedSeasons &&
             (!checkWater || context.waterProfile?.let(definition.water::matches) == true) &&
             (definition.requiredBaitTags.isEmpty() ||
                 bait?.specialTags?.containsAll(definition.requiredBaitTags) == true)
@@ -223,7 +303,7 @@ object FishingCatchSelector {
         if (candidates.isEmpty()) return null
         val rareMultiplier = bait?.rareCatchMultiplier ?: 1.0
         val selected = weighted(candidates, random) { definition ->
-            definition.weight * when (definition.rarity) {
+            definition.weight * preferenceMultiplier(definition, context) * when (definition.rarity) {
                 FishRarity.COMMON -> 1.0
                 FishRarity.RARE, FishRarity.SPECIAL -> rareMultiplier
             }
@@ -232,17 +312,66 @@ object FishingCatchSelector {
         val quality = weighted(selected.qualities.entries.toList(), random) { entry ->
             entry.value * (1.0 + (qualityMultiplier - 1.0) * entry.key.ordinal)
         }.key
-        val size = random.nextInt(41) + 10
-        val weight = (size * (random.nextInt(91) + 80) / 10.0).roundToInt()
+        val size = selected.sizeCm.random(random)
+        val weight = selected.weightGrams.random(random)
         val catch = FishCatch(
             selected.id,
             selected.material,
             weight,
             quality,
-            size,
-            (selected.exp * quality.multiplier).roundToLong()
+            size
         )
         return selected to catch
+    }
+
+    @JvmStatic
+    fun preferenceMultiplier(
+        definition: FishDefinition,
+        context: FishingContext
+    ): Double {
+        val conditionMultiplier = preferenceMultiplier(
+            definition.weather,
+            definition.times,
+            definition.preferredSeasons,
+            definition.excludedSeasons,
+            context.weather,
+            context.time,
+            context.season
+        )
+        val environmentMultiplier = environmentPreferenceMultiplier(
+            definition.preferredEnvironments,
+            context.waterProfile?.environments.orEmpty()
+        )
+        return conditionMultiplier * environmentMultiplier
+    }
+
+    @JvmStatic
+    fun environmentPreferenceMultiplier(
+        preferredEnvironments: Set<FishingEnvironment>,
+        actualEnvironments: Set<FishingEnvironment>
+    ): Double =
+        if (preferredEnvironments.isEmpty() || preferredEnvironments.any(actualEnvironments::contains)) 1.0 else 0.8
+
+    @JvmStatic
+    fun preferenceMultiplier(
+        preferredWeather: Set<FishingWeather>,
+        preferredTimes: Set<FishingTime>,
+        preferredSeasons: Set<Season>,
+        excludedSeasons: Set<Season>,
+        actualWeather: FishingWeather,
+        actualTime: FishingTime,
+        actualSeason: Season
+    ): Double {
+        val weatherMultiplier =
+            if (preferredWeather.isEmpty() || actualWeather in preferredWeather) 1.0 else 0.75
+        val timeMultiplier =
+            if (preferredTimes.isEmpty() || actualTime in preferredTimes) 1.0 else 0.8
+        val seasonMultiplier = when {
+            preferredSeasons.isEmpty() || actualSeason in preferredSeasons -> 1.0
+            excludedSeasons.isNotEmpty() -> 0.35
+            else -> 0.8
+        }
+        return weatherMultiplier * timeMultiplier * seasonMultiplier
     }
 
     private fun <T> weighted(items: List<T>, random: Random, weight: (T) -> Double): T {
@@ -256,12 +385,46 @@ object FishingCatchSelector {
         }
         return items.last()
     }
+
+    private fun IntRange.random(random: Random): Int =
+        first + random.nextInt(last - first + 1)
 }
 
-enum class FishingEffectivenessZone(val successChance: Double) {
-    GREEN(1.0),
-    YELLOW(0.5),
-    ORANGE(0.3)
+enum class FishingEffectivenessZone {
+    GREEN,
+    YELLOW,
+    ORANGE
+}
+
+data class FishingFightScore(
+    val greenTicks: Long = 0L,
+    val yellowTicks: Long = 0L,
+    val orangeTicks: Long = 0L,
+    val dangerTicks: Long = 0L
+) {
+    fun record(zone: FishingEffectivenessZone, effectiveness: Double, ticks: Long): FishingFightScore {
+        require(ticks > 0L) { "Fishing fight score ticks must be positive" }
+        val danger = effectiveness <= 5.0 || effectiveness >= 95.0
+        if (danger) return copy(dangerTicks = dangerTicks + ticks)
+        return when (zone) {
+            FishingEffectivenessZone.GREEN -> copy(greenTicks = greenTicks + ticks)
+            FishingEffectivenessZone.YELLOW -> copy(yellowTicks = yellowTicks + ticks)
+            FishingEffectivenessZone.ORANGE -> copy(orangeTicks = orangeTicks + ticks)
+        }
+    }
+
+    fun normalizedScore(): Double {
+        val total = greenTicks + yellowTicks + orangeTicks + dangerTicks
+        if (total <= 0L) return 0.0
+        return (greenTicks + yellowTicks * 0.6 + orangeTicks * 0.25) / total.toDouble()
+    }
+
+    fun successProbability(rarity: FishRarity): Double =
+        (normalizedScore() * when (rarity) {
+            FishRarity.COMMON -> 1.0
+            FishRarity.RARE -> 0.9
+            FishRarity.SPECIAL -> 0.75
+        }).coerceIn(0.0, 1.0)
 }
 
 enum class FishingFightStatus(val messageId: String) {

@@ -68,6 +68,11 @@ class BlockBreakEffectListener(
         BlockBreakEffectListener.setBlockTypeForPlayer(playerUuid, event.block.type.name)
 
         if (!UnlockBatchBreakHandler.isInternalBreakInProgress(playerUuid) && !BlastMineHandler.isInternalBreakInProgress(playerUuid)) {
+            val typedProfile = CCContent.rankManager.getTypedProfessionProfile(playerUuid)
+            if (typedProfile != null && !isPlacedBlock) {
+                UnlockBatchBreakHandler.applyTypedProfile(event, typedProfile)
+                return
+            }
             val compiledEffects = getOrRebuildCompiledEffects(event.player)
             val debugMode = UnlockBatchBreakHandler.BatchBreakMode.fromTool(event.player.inventory.itemInMainHand.type)
             var debugApplied = false

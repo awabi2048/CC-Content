@@ -2,23 +2,20 @@ package jp.awabi2048.cccontent.features.rank;
 
 import jp.awabi2048.cccontent.features.rank.profession.Profession;
 import jp.awabi2048.cccontent.features.rank.profession.ProfessionType;
-import jp.awabi2048.cccontent.features.rank.profession.SkillNode;
 import jp.awabi2048.cccontent.features.rank.profession.SkillTree;
 import jp.awabi2048.cccontent.features.rank.profession.skilltree.CodeDefinedSkillTree;
-import jp.awabi2048.cccontent.features.rank.skill.handlers.FisherBonusHandler;
 import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CodeDefinedSkillTreeTest {
     @Test
     void allProfessionTreesAreConnectedAndWithinTheirLevelCap() {
-        for (Profession profession : Profession.values()) {
+        for (Profession profession : legacyProfessions()) {
             SkillTree tree = CodeDefinedSkillTree.Companion.create(profession);
             Set<String> visited = new HashSet<>();
             visit(tree, tree.getStartSkillId(), visited);
@@ -31,7 +28,7 @@ class CodeDefinedSkillTreeTest {
 
     @Test
     void onlyCreativeProfessionsUseTheLevel25Cap() {
-        for (Profession profession : Profession.values()) {
+        for (Profession profession : legacyProfessions()) {
             int maxLevel = CodeDefinedSkillTree.Companion.create(profession).getMaxLevel();
             if (profession.getType() == ProfessionType.CREATIVE) {
                 assertEquals(25, maxLevel, profession.getId());
@@ -42,19 +39,22 @@ class CodeDefinedSkillTreeTest {
     }
 
     @Test
-    void fisherTreeUsesFishingSystemEffects() {
-        SkillTree tree = CodeDefinedSkillTree.Companion.create(Profession.FISHER);
-        assertEquals(50, tree.getMaxLevel());
-        assertEffect(tree, "patient_cast", FisherBonusHandler.HOOK_WINDOW_EFFECT);
-        assertEffect(tree, "deep_water", FisherBonusHandler.STABILITY_EFFECT);
-        assertEffect(tree, "master_angler", FisherBonusHandler.DURATION_EFFECT);
+    void typedProfessionsCannotCreateLegacySkillTrees() {
+        for (Profession profession : Profession.values()) {
+            if (profession.getUsesTypedProfile()) {
+                org.junit.jupiter.api.Assertions.assertThrows(
+                    IllegalArgumentException.class,
+                    () -> CodeDefinedSkillTree.Companion.create(profession),
+                    profession.getId()
+                );
+            }
+        }
     }
 
-    private static void assertEffect(SkillTree tree, String skillId, String expectedType) {
-        SkillNode skill = tree.getSkill(skillId);
-        assertNotNull(skill);
-        assertNotNull(skill.getEffect());
-        assertEquals(expectedType, skill.getEffect().getType());
+    private static java.util.List<Profession> legacyProfessions() {
+        return java.util.Arrays.stream(Profession.values())
+            .filter(profession -> !profession.getUsesTypedProfile())
+            .toList();
     }
 
     private static void visit(SkillTree tree, String skillId, Set<String> visited) {

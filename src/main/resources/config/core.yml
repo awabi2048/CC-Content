@@ -1,4 +1,4 @@
-﻿config_version: 1
+config_version: 2
 
 # CC-Content Root Config
 
@@ -9,10 +9,10 @@ content_enabled:
   cooking: true
   fishing: true
   resource_collection: true
+  seasonal: true
   sukima_dungeon: true
   party: true
   minigame: true
 
 persistence:
   flush_interval_minutes: 1
-

@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.CCSystem
+
 import org.bukkit.Bukkit
 import org.bukkit.command.Command
 import org.bukkit.command.CommandExecutor
@@ -15,7 +17,6 @@ import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.event.HoverEvent
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -30,7 +31,7 @@ class ArenaCommand(
 ) : CommandExecutor, TabCompleter {
     private val legacySerializer = LegacyComponentSerializer.legacySection()
     private val statusTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.JAPAN)
-        .withZone(ZoneId.systemDefault())
+        .withZone(CCSystem.getAPI().getSharedClockService().zoneId)
     // barrier_restart 以外は、構造・クリア条件が揃うまでコマンド起動対象から外す。
     private val startCommandMissionTypes = listOf(ArenaMissionType.BARRIER_RESTART)
 

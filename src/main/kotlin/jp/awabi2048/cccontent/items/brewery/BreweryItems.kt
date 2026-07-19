@@ -71,14 +71,14 @@ class BreweryMockClockItem(private val plugin: JavaPlugin) : CustomItem {
     }
 }
 
-class BreweryMockYeastItem(private val plugin: JavaPlugin) : CustomItem {
+class BreweryCulturedYeastItem(private val plugin: JavaPlugin) : CustomItem {
     override val feature: String = "brewery"
-    override val id: String = "mock_yeast"
-    override val displayName: String = "§a培養済み酵母（モック）"
-    override val lore: List<String> = listOf("§7発酵GUIの酵母スロット用（効果なし）")
+    override val id: String = "cultured_yeast"
+    override val displayName: String = "§a培養済み酵母"
+    override val lore: List<String> = listOf("§7醸造原液を発酵させるための酵母")
     override val itemModel: NamespacedKey = NamespacedKey.minecraft("honey_bottle")
 
-    private val key = NamespacedKey(plugin, "brewery_mock_yeast")
+    private val key = NamespacedKey(plugin, "brewery_cultured_yeast")
 
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 

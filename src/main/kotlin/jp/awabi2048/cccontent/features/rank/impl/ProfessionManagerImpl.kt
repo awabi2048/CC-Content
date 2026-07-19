@@ -16,6 +16,11 @@ import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.ProfessionManager
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
 import jp.awabi2048.cccontent.features.rank.profession.BossBarDisplayMode
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionFeatureToggles
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionSpecialization
+import jp.awabi2048.cccontent.features.rank.profession.profile.TypedProfessionLevelCurve
+import jp.awabi2048.cccontent.features.rank.profession.profile.TypedProfessionProfile
+import jp.awabi2048.cccontent.features.rank.profession.profile.TypedProfessionProfileResolver
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.format.NamedTextColor
@@ -57,19 +62,7 @@ class ProfessionManagerImpl(
             return false
         }
 
-        val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return false
-        val startSkillId = skillTree.getStartSkillId()
-
-        // 開始スキルと requiredLevel = 0 のスキルを自動習得
-        val acquiredSkills = mutableSetOf(startSkillId)
-        acquiredSkills.addAll(collectLevel0Skills(skillTree, acquiredSkills))
-
-        val playerProf = PlayerProfession(
-            playerUuid = playerUuid,
-            profession = profession,
-            acquiredSkills = acquiredSkills,
-            currentExp = 0L
-        )
+        val playerProf = createInitialProfession(playerUuid, profession) ?: return false
 
         professionCache[playerUuid] = playerProf
         storage.saveProfession(playerProf)
@@ -90,19 +83,7 @@ class ProfessionManagerImpl(
             return false
         }
 
-        val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return false
-        val startSkillId = skillTree.getStartSkillId()
-
-        // 開始スキルと requiredLevel = 0 のスキルを自動習得
-        val acquiredSkills = mutableSetOf(startSkillId)
-        acquiredSkills.addAll(collectLevel0Skills(skillTree, acquiredSkills))
-
-        val newProf = PlayerProfession(
-            playerUuid = playerUuid,
-            profession = profession,
-            acquiredSkills = acquiredSkills,
-            currentExp = 0L
-        )
+        val newProf = createInitialProfession(playerUuid, profession) ?: return false
 
         professionCache[playerUuid] = newProf
         storage.saveProfession(newProf)
@@ -125,11 +106,12 @@ class ProfessionManagerImpl(
         if (!RankReleasePolicy.canAccessProfession(playerUuid, prof.profession)) {
             return false
         }
-        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
-        val oldLevel = skillTree.calculateLevelByExp(prof.currentExp)
+        val skillTree = if (prof.profession.usesTypedProfile) null else SkillTreeRegistry.getSkillTree(prof.profession)
+        if (!prof.profession.usesTypedProfile && skillTree == null) return false
+        val oldLevel = calculateLevel(prof)
 
         prof.addExperience(amount)
-        val newLevel = skillTree.calculateLevelByExp(prof.currentExp)
+        val newLevel = calculateLevel(prof)
         val levelUp = newLevel > oldLevel
         saveProfessionByExpPolicy(playerUuid, prof, force = levelUp)
 
@@ -140,14 +122,18 @@ class ProfessionManagerImpl(
 
             if (levelUp) {
                 val gainedLevel = newLevel - oldLevel
-                val availableBefore = skillTree.getAvailableSkills(prof.acquiredSkills, oldLevel).toSet()
-                val availableAfter = skillTree.getAvailableSkills(prof.acquiredSkills, newLevel).toSet()
-                val newlyUnlockedSkills = (availableAfter - availableBefore).mapNotNull { skillTree.getSkill(it) }
+                val newlyUnlockedSkills = if (skillTree == null) {
+                    emptyList()
+                } else {
+                    val availableBefore = skillTree.getAvailableSkills(prof.acquiredSkills, oldLevel).toSet()
+                    val availableAfter = skillTree.getAvailableSkills(prof.acquiredSkills, newLevel).toSet()
+                    (availableAfter - availableBefore).mapNotNull { skillTree.getSkill(it) }
+                }
 
                 if (prof.levelUpNotificationEnabled) {
                     player.sendMessage(
                         messageProvider.getMessage(
-                            "rank.profession.level_up",
+                            "profession.level_up",
                             "profession" to messageProvider.getProfessionName(prof.profession),
                             "old" to oldLevel,
                             "new" to newLevel,
@@ -162,7 +148,7 @@ class ProfessionManagerImpl(
                         }
                         val message = Component.text(
                             messageProvider.getMessage(
-                                "rank.profession.new_unlock",
+                                "profession.new_unlock",
                                 "count" to newlyUnlockedSkills.size,
                                 "skills" to unlockedNames
                             )
@@ -184,6 +170,7 @@ class ProfessionManagerImpl(
 
     override fun acquireSkill(playerUuid: UUID, skillId: String): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
+        if (prof.profession.usesTypedProfile) return false
         if (!RankReleasePolicy.canUseSkills(playerUuid)) {
             return false
         }
@@ -221,6 +208,7 @@ class ProfessionManagerImpl(
     override fun getAvailableSkills(playerUuid: UUID): List<String> {
         if (!RankReleasePolicy.canUseSkills(playerUuid)) return emptyList()
         val prof = getPlayerProfession(playerUuid) ?: return emptyList()
+        if (prof.profession.usesTypedProfile) return emptyList()
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return emptyList()
         val currentLevel = skillTree.calculateLevelByExp(prof.currentExp)
         return skillTree.getAvailableSkills(prof.acquiredSkills, currentLevel)
@@ -228,7 +216,9 @@ class ProfessionManagerImpl(
 
     override fun getAcquiredSkills(playerUuid: UUID): Set<String> {
         if (!RankReleasePolicy.canUseSkills(playerUuid)) return emptySet()
-        return getPlayerProfession(playerUuid)?.acquiredSkills?.toSet() ?: emptySet()
+        val profession = getPlayerProfession(playerUuid) ?: return emptySet()
+        if (profession.profession.usesTypedProfile) return emptySet()
+        return profession.acquiredSkills.toSet()
     }
 
     override fun getCurrentExp(playerUuid: UUID): Long {
@@ -236,17 +226,73 @@ class ProfessionManagerImpl(
     }
 
     override fun getCurrentLevel(playerUuid: UUID): Int {
-        val prof = getPlayerProfession(playerUuid) ?: return 1
-        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return 1
-        return skillTree.calculateLevelByExp(prof.currentExp)
+        val prof = getPlayerProfession(playerUuid) ?: return 0
+        return calculateLevel(prof)
     }
 
     override fun setLevel(playerUuid: UUID, level: Int): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
-        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
+        prof.currentExp = if (prof.profession.usesTypedProfile) {
+            TypedProfessionLevelCurve.requiredTotalExp(prof.profession, level.coerceIn(0, TypedProfessionLevelCurve.MAX_LEVEL))
+        } else {
+            val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
+            val clampedLevel = level.coerceIn(1, skillTree.getMaxLevel())
+            skillTree.getRequiredTotalExpForLevel(clampedLevel)
+        }
+        prof.lastUpdated = System.currentTimeMillis()
+        storage.saveProfession(prof)
+        return true
+    }
 
-        val clampedLevel = level.coerceIn(1, skillTree.getMaxLevel())
-        prof.currentExp = skillTree.getRequiredTotalExpForLevel(clampedLevel)
+    override fun selectSpecialization(playerUuid: UUID, specializationId: String): Boolean {
+        val prof = getPlayerProfession(playerUuid) ?: return false
+        if (!prof.profession.usesTypedProfile || prof.specializationId != null) return false
+        if (calculateLevel(prof) < ProfessionSpecialization.UNLOCK_LEVEL) return false
+        val specialization = ProfessionSpecialization.fromId(prof.profession, specializationId) ?: return false
+        prof.specializationId = specialization.id
+        prof.lastUpdated = System.currentTimeMillis()
+        storage.saveProfession(prof)
+        return true
+    }
+
+    override fun getSpecializationId(playerUuid: UUID): String? =
+        getPlayerProfession(playerUuid)?.specializationId
+
+    override fun getTypedProfile(playerUuid: UUID): TypedProfessionProfile? {
+        val prof = getPlayerProfession(playerUuid) ?: return null
+        if (!prof.profession.usesTypedProfile) return null
+        return TypedProfessionProfileResolver.resolve(
+            prof.profession,
+            calculateLevel(prof),
+            prof.specializationId,
+            prof.featureToggles
+        )
+    }
+
+    override fun getFeatureToggles(playerUuid: UUID): ProfessionFeatureToggles? =
+        getPlayerProfession(playerUuid)?.takeIf { it.profession.usesTypedProfile }?.featureToggles?.copy()
+
+    override fun updateFeatureToggles(playerUuid: UUID, toggles: ProfessionFeatureToggles): Boolean {
+        val prof = getPlayerProfession(playerUuid) ?: return false
+        if (!prof.profession.usesTypedProfile) return false
+        prof.featureToggles = toggles.copy()
+        prof.lastUpdated = System.currentTimeMillis()
+        storage.saveProfession(prof)
+        return true
+    }
+
+    override fun recordCycleAction(
+        playerUuid: UUID,
+        specialist: Boolean,
+        highQuality: Boolean,
+        firstDiscovery: Boolean
+    ): Boolean {
+        val prof = getPlayerProfession(playerUuid) ?: return false
+        if (!prof.profession.usesTypedProfile) return false
+        prof.cycleStatistics.validActions++
+        if (specialist) prof.cycleStatistics.specialistActions++
+        if (highQuality) prof.cycleStatistics.highQualityActions++
+        if (firstDiscovery) prof.cycleStatistics.firstDiscoveries++
         prof.lastUpdated = System.currentTimeMillis()
         storage.saveProfession(prof)
         return true
@@ -305,18 +351,25 @@ class ProfessionManagerImpl(
 
     override fun getPrestigeLevel(playerUuid: UUID): Int {
         val prof = getPlayerProfession(playerUuid) ?: return 0
+        if (prof.profession.usesTypedProfile) {
+            return prof.prestigeRecords.count { it.professionId == prof.profession.id }
+        }
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return 0
         return prof.getPrestigeLevel(skillTree)
     }
 
     override fun canPrestige(playerUuid: UUID): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
+        if (prof.profession.usesTypedProfile) {
+            return calculateLevel(prof) >= TypedProfessionLevelCurve.MAX_LEVEL
+        }
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
         return prof.canPrestige(skillTree)
     }
 
     override fun acquirePrestigeSkill(playerUuid: UUID, skillId: String): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
+        if (prof.profession.usesTypedProfile) return false
         if (!RankReleasePolicy.canUseSkills(playerUuid)) {
             return false
         }
@@ -347,20 +400,26 @@ class ProfessionManagerImpl(
 
     override fun getAvailablePrestigeSkills(playerUuid: UUID): List<String> {
         val prof = getPlayerProfession(playerUuid) ?: return emptyList()
+        if (prof.profession.usesTypedProfile) return emptyList()
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return emptyList()
         return prof.getNextPrestigeSkillOptions(skillTree)
     }
 
     override fun getAcquiredPrestigeSkills(playerUuid: UUID): Set<String> {
-        return getPlayerProfession(playerUuid)?.prestigeSkills?.toSet() ?: emptySet()
+        val prof = getPlayerProfession(playerUuid) ?: return emptySet()
+        if (prof.profession.usesTypedProfile) return emptySet()
+        return prof.prestigeSkills.toSet()
     }
 
     override fun hasPrestigeSkill(playerUuid: UUID, skillId: String): Boolean {
-        return getPlayerProfession(playerUuid)?.hasPrestigeSkillUnlocked(skillId) ?: false
+        val prof = getPlayerProfession(playerUuid) ?: return false
+        if (prof.profession.usesTypedProfile) return false
+        return prof.hasPrestigeSkillUnlocked(skillId)
     }
 
     override fun executePrestige(playerUuid: UUID): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
+        if (prof.profession.usesTypedProfile) return executeTypedPrestige(playerUuid, prof)
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
 
         if (!prof.canPrestige(skillTree)) {
@@ -398,7 +457,7 @@ class ProfessionManagerImpl(
 
             player.sendMessage(
                 messageProvider.getMessage(
-                    "rank.profession.prestige.executed",
+                    "profession.prestige.executed",
                     "profession" to messageProvider.getProfessionName(prof.profession),
                     "level" to prestigeLevel
                 )
@@ -426,6 +485,86 @@ class ProfessionManagerImpl(
     private fun resolveSkillId(knownSkillIds: Set<String>, skillId: String): String {
         val trimmed = skillId.trim()
         return knownSkillIds.firstOrNull { it.equals(trimmed, ignoreCase = true) } ?: trimmed
+    }
+
+    private fun createInitialProfession(playerUuid: UUID, profession: Profession): PlayerProfession? {
+        val acquiredSkills = if (profession.usesTypedProfile) {
+            mutableSetOf()
+        } else {
+            val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return null
+            mutableSetOf(skillTree.getStartSkillId()).also {
+                it.addAll(collectLevel0Skills(skillTree, it))
+            }
+        }
+        return PlayerProfession(
+            playerUuid = playerUuid,
+            profession = profession,
+            acquiredSkills = acquiredSkills,
+            currentExp = 0L,
+            featureToggles = ProfessionFeatureToggles.defaultsFor(profession)
+        )
+    }
+
+    private fun calculateLevel(profession: PlayerProfession): Int =
+        if (profession.profession.usesTypedProfile) {
+            TypedProfessionLevelCurve.calculateLevel(profession.profession, profession.currentExp)
+        } else {
+            SkillTreeRegistry.getSkillTree(profession.profession)?.calculateLevelByExp(profession.currentExp) ?: 1
+        }
+
+    private fun executeTypedPrestige(playerUuid: UUID, profession: PlayerProfession): Boolean {
+        if (calculateLevel(profession) < TypedProfessionLevelCurve.MAX_LEVEL) return false
+        val player = Bukkit.getPlayer(playerUuid)
+        val cycleNumber = profession.prestigeRecords.count { it.professionId == profession.profession.id } + 1
+        val representativeStatistic = maxOf(
+            profession.cycleStatistics.validActions,
+            profession.cycleStatistics.specialistActions,
+            profession.cycleStatistics.highQualityActions,
+            profession.cycleStatistics.firstDiscoveries
+        )
+        val completedAt = System.currentTimeMillis()
+        profession.prestigeRecords += jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionPrestigeRecord(
+            professionId = profession.profession.id,
+            specializationId = profession.specializationId,
+            completedAtEpochMillis = completedAt,
+            cycleNumber = cycleNumber,
+            representativeStatistic = representativeStatistic
+        )
+        storage.saveProfession(profession)
+
+        if (player != null) {
+            val token = PrestigeToken.create(
+                profession = profession.profession,
+                cycleNumber = cycleNumber,
+                owner = player,
+                messageProvider = messageProvider,
+                specializationId = profession.specializationId,
+                completedAtEpochMillis = completedAt,
+                representativeStatistic = representativeStatistic
+            )
+            val leftover = player.inventory.addItem(token)
+            leftover.values.forEach { player.world.dropItem(player.location, it) }
+        }
+
+        professionCache.remove(playerUuid)
+        pendingExpSaveCounts.remove(playerUuid)
+        lastExpSaveAt.remove(playerUuid)
+        storage.deleteProfession(playerUuid)
+
+        if (player != null) {
+            Bukkit.getPluginManager().callEvent(
+                PrestigeExecutedEvent(player, profession.profession, cycleNumber, false)
+            )
+            player.sendMessage(
+                messageProvider.getMessage(
+                    "profession.prestige.executed",
+                    "profession" to messageProvider.getProfessionName(profession.profession),
+                    "level" to cycleNumber
+                )
+            )
+            player.playSound(player.location, "minecraft:ui.toast.challenge_complete", 1.0f, 1.0f)
+        }
+        return true
     }
 
     private fun playSkillAcquireSounds(player: Player) {

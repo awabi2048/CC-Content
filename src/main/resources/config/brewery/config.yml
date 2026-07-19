@@ -26,9 +26,9 @@ brewery:
     angel_share_percent_per_year: 2.0
     small_barrel_speed_multiplier: 1.25
   barrel:
-    require_keyword_on_signs: true
-    age_in_minecraft_barrels: true
-    max_brews_in_minecraft_barrels: 6
+    fermentation_sign_keyword: "[ferment]"
+    aging_sign_keyword: "barrel"
+    fermentation_capacity: 3
     open_large_everywhere: true
     inventory_rows_large: 3
     inventory_rows_small: 1
@@ -44,6 +44,3 @@ brewery:
     fermentation: 10
     distillation: 20
     aging: 30
-  debug:
-    quality_log: true
-

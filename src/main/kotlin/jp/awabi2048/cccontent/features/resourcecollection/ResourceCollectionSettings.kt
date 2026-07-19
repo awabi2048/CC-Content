@@ -1,73 +1,55 @@
 package jp.awabi2048.cccontent.features.resourcecollection
 
-import jp.awabi2048.cccontent.features.rank.profession.Profession
-import org.bukkit.Material
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 
+data class ChiselSettings(
+    val targetCount: Int,
+    val targetTimeoutTicks: Long,
+    val particleCount: Int
+)
+
 data class ResourceCollectionSettings(
     val enabled: Boolean,
-    val worlds: Set<String>,
-    val harvestRules: Map<Material, CollectionRule>,
-    val craftRules: Map<Material, CollectionRule>
+    val chisel: ChiselSettings,
+    private val professionEnabled: Map<ResourceCollectionKind, Boolean>,
+    val normalBonusEnabled: Map<ResourceCollectionKind, Boolean>,
+    private val operations: Map<ResourceOperation, Boolean>
 ) {
+    fun isProfessionEnabled(kind: ResourceCollectionKind): Boolean =
+        professionEnabled[kind] == true
+
+    fun isOperationEnabled(operation: ResourceOperation): Boolean =
+        isProfessionEnabled(operation.kind) && operations[operation] == true
+
     companion object {
         private const val CONFIG_PATH = "config/resource_collection/config.yml"
-        private const val COLLECTION_PATH = "config/resource_collection/collection.yml"
+        private const val CONFIG_VERSION = 7
 
         fun load(plugin: JavaPlugin): ResourceCollectionSettings {
-            val configFile = ensureFile(plugin, CONFIG_PATH)
-            val collectionFile = ensureFile(plugin, COLLECTION_PATH)
-            val config = YamlConfiguration.loadConfiguration(configFile)
-            val collection = YamlConfiguration.loadConfiguration(collectionFile)
-
-            require(config.get("config_version") is Number && config.getInt("config_version") == 2) {
-                "$CONFIG_PATH.config_version must be the integer 2"
-            }
-            val enabled = requireBoolean(config, "enabled", CONFIG_PATH)
-            val worlds = requireStringList(config, "worlds", CONFIG_PATH).toSet()
-            require(worlds.isNotEmpty()) { "$CONFIG_PATH.worlds must not be empty" }
-
-            require(collection.get("config_version") is Number && collection.getInt("config_version") == 2) {
-                "$COLLECTION_PATH.config_version must be the integer 2"
+            val file = ensureFile(plugin, CONFIG_PATH)
+            val config = YamlConfiguration.loadConfiguration(file)
+            require(config.get("config_version") is Number && config.getInt("config_version") == CONFIG_VERSION) {
+                "$CONFIG_PATH.config_version must be the integer $CONFIG_VERSION"
             }
             return ResourceCollectionSettings(
-                enabled = enabled,
-                worlds = worlds,
-                harvestRules = loadRules(collection, "harvest", COLLECTION_PATH),
-                craftRules = loadRules(collection, "craft", COLLECTION_PATH)
-            ).also {
-                require(it.harvestRules.isNotEmpty()) { "$COLLECTION_PATH.harvest must not be empty" }
-                require(it.craftRules.isNotEmpty()) { "$COLLECTION_PATH.craft must not be empty" }
-            }
-        }
-
-        private fun loadRules(config: YamlConfiguration, section: String, path: String): Map<Material, CollectionRule> {
-            val root = config.getConfigurationSection(section)
-                ?: error("$path.$section is required and must be a section")
-            require(root.getKeys(false).isNotEmpty()) { "$path.$section must not be empty" }
-            return root.getKeys(false).associate { id ->
-                val entry = root.getConfigurationSection(id)
-                    ?: error("$path.$section.$id must be a section")
-                val materialName = requireString(entry, "material", "$path.$section.$id")
-                val material = Material.matchMaterial(materialName.uppercase())
-                    ?: error("$path.$section.$id.material is not a valid Bukkit material: $materialName")
-                val professionId = requireString(entry, "profession", "$path.$section.$id")
-                val profession = Profession.fromId(professionId)
-                    ?: error("$path.$section.$id.profession is not a valid profession: $professionId")
-                val experienceValue = entry.get("experience")
-                require(experienceValue is Number && experienceValue.toLong() > 0 && experienceValue.toDouble() == experienceValue.toLong().toDouble()) {
-                    "$path.$section.$id.experience must be a positive integer"
+                requireBoolean(config, "enabled"),
+                ChiselSettings(
+                    requirePositiveInt(config, "chisel.target_count"),
+                    requirePositiveLong(config, "chisel.target_timeout_ticks"),
+                    requirePositiveInt(config, "chisel.particle_count")
+                ),
+                ResourceCollectionKind.entries.associateWith { kind ->
+                    requireBoolean(config, "${kind.configSection}.enabled")
+                },
+                ResourceCollectionKind.entries.associateWith { kind ->
+                    requireBoolean(config, "${kind.configSection}.normal_bonus_drop")
+                },
+                ResourceOperation.entries.associateWith { operation ->
+                    requireBoolean(config, operation.configPath)
                 }
-                val minimumAge = entry.get("minimum_age")?.let { value ->
-                    require(value is Number && value.toInt() in 0..7 && value.toDouble() == value.toInt().toDouble()) {
-                        "$path.$section.$id.minimum_age must be an integer from 0 to 7"
-                    }
-                    value.toInt()
-                }
-                material to CollectionRule(id, material, profession, experienceValue.toLong(), minimumAge)
-            }
+            )
         }
 
         private fun ensureFile(plugin: JavaPlugin, path: String): File {
@@ -80,23 +62,51 @@ data class ResourceCollectionSettings(
             return file
         }
 
-        private fun requireBoolean(config: YamlConfiguration, key: String, path: String): Boolean {
+        private fun requireBoolean(config: YamlConfiguration, key: String): Boolean {
             val value = config.get(key)
-            require(value is Boolean) { "$path.$key must be a boolean" }
+            require(value is Boolean) { "$CONFIG_PATH.$key must be a boolean" }
             return value
         }
 
-        private fun requireString(config: org.bukkit.configuration.ConfigurationSection, key: String, path: String): String {
+        private fun requirePositiveInt(config: YamlConfiguration, key: String): Int {
             val value = config.get(key)
-            require(value is String && value.isNotBlank()) { "$path.$key must be a non-blank string" }
-            return value
+            require(value is Number && value.toDouble() == value.toInt().toDouble() && value.toInt() > 0) {
+                "$CONFIG_PATH.$key must be a positive integer"
+            }
+            return value.toInt()
         }
 
-        private fun requireStringList(config: YamlConfiguration, key: String, path: String): List<String> {
+        private fun requirePositiveLong(config: YamlConfiguration, key: String): Long {
             val value = config.get(key)
-            require(value is List<*>) { "$path.$key must be a list of strings" }
-            require(value.all { it is String && it.isNotBlank() }) { "$path.$key must be a list of non-blank strings" }
-            return value.filterIsInstance<String>()
+            require(value is Number && value.toDouble() == value.toLong().toDouble() && value.toLong() > 0L) {
+                "$CONFIG_PATH.$key must be a positive integer"
+            }
+            return value.toLong()
         }
     }
+}
+
+private val ResourceCollectionKind.configSection: String
+    get() = name.lowercase()
+
+enum class ResourceOperation(
+    val kind: ResourceCollectionKind,
+    val configPath: String
+) {
+    MINER_INSPECTION(ResourceCollectionKind.MINERAL, "mineral.inspection"),
+    MINER_WORK_SPEED(ResourceCollectionKind.MINERAL, "mineral.work_speed"),
+    MINER_CHISEL(ResourceCollectionKind.MINERAL, "mineral.chisel_game"),
+    LUMBERJACK_WORK_SPEED(ResourceCollectionKind.FOREST, "forest.work_speed"),
+    LUMBERJACK_HEARTWOOD(ResourceCollectionKind.FOREST, "forest.heartwood"),
+    LUMBERJACK_BARK(ResourceCollectionKind.FOREST, "forest.bark"),
+    LUMBERJACK_TIMBER_PROCESSING(ResourceCollectionKind.FOREST, "forest.timber_processing"),
+    LUMBERJACK_FOREST_PRODUCTS(ResourceCollectionKind.FOREST, "forest.forest_products"),
+    LUMBERJACK_LEAF_CLEANUP(ResourceCollectionKind.FOREST, "forest.leaf_cleanup"),
+    LUMBERJACK_AUTOMATIC_REPLANT(ResourceCollectionKind.FOREST, "forest.automatic_replant"),
+    FARMER_WILD_GATHERING(ResourceCollectionKind.CROP, "crop.wild_gathering"),
+    FARMER_WORK_SPEED(ResourceCollectionKind.CROP, "crop.work_speed"),
+    FARMER_SURFACE_GATHERING(ResourceCollectionKind.CROP, "crop.surface_gathering"),
+    FARMER_AREA_TILLING(ResourceCollectionKind.CROP, "crop.area_tilling"),
+    FARMER_AREA_HARVEST(ResourceCollectionKind.CROP, "crop.area_harvest"),
+    FARMER_AUTOMATIC_REPLANT(ResourceCollectionKind.CROP, "crop.automatic_replant")
 }

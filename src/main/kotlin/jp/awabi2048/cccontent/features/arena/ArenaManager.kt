@@ -110,7 +110,6 @@ import org.bukkit.scoreboard.DisplaySlot
 import org.bukkit.util.Vector
 import java.io.File
 import java.time.LocalDate
-import java.time.ZoneId
 import java.util.Locale
 import java.util.UUID
 import java.util.logging.Level
@@ -280,6 +279,7 @@ class ArenaManager(
     private val plugin: JavaPlugin,
     private val mobService: MobService = MobService(plugin)
 ) {
+    private fun sharedClock() = CCSystem.getAPI().getSharedClockService()
     val confusionManager = ConfusionManager(plugin)
     private val structureService = SchemStructureService(plugin)
 
@@ -783,7 +783,7 @@ class ArenaManager(
         val participantPlayers = (listOf(target) + initialParticipants)
             .distinctBy { it.uniqueId }
 
-        if (participantPlayers.any { dailyEntryStore.lastEntryDate(it.uniqueId) == LocalDate.now(ZoneId.systemDefault()) }) {
+        if (participantPlayers.any { dailyEntryStore.lastEntryDate(it.uniqueId) == sharedClock().currentDate() }) {
             return completed(ArenaStartResult.Error("arena.messages.mission.start_cancelled"))
         }
 
@@ -1398,19 +1398,19 @@ class ArenaManager(
         val selectedStar = demandModel.selectDifficulty(
             listOf(theme.normalConfig.variant.difficultyStar, promotedStar),
             historyStore.all(),
-            LocalDate.now(ZoneId.systemDefault()),
+            sharedClock().currentDate(),
             random
         )
         return selectedStar == promotedStar
     }
 
     private fun reserveDailyEntry(playerIds: Collection<UUID>): Boolean {
-        val today = LocalDate.now(ZoneId.systemDefault())
+        val today = sharedClock().currentDate()
         return dailyEntryStore.tryReserveAll(playerIds, today)
     }
 
     private fun recordSuccessfulHistory(session: ArenaSession) {
-        val date = LocalDate.now(ZoneId.systemDefault())
+        val date = sharedClock().currentDate()
         val durationSeconds = ((System.currentTimeMillis() - session.startedAtMillis) / 1000L).coerceAtLeast(0L)
         val participantIds = dailyEntryParticipantsByWorld.remove(session.worldName).orEmpty()
         participantIds.forEach { playerId ->
@@ -7386,7 +7386,7 @@ class ArenaManager(
             .filter { !playerToSessionWorld.containsKey(it.uniqueId) || playerToSessionWorld[it.uniqueId] == session.worldName }
             .toList()
 
-        val today = LocalDate.now(ZoneId.systemDefault())
+        val today = sharedClock().currentDate()
         val availableParticipants = participants.filter { dailyEntryStore.lastEntryDate(it.uniqueId) != today }
         if (availableParticipants.none { it.uniqueId == session.ownerPlayerId } ||
             !reserveDailyEntry(availableParticipants.map { it.uniqueId })) {

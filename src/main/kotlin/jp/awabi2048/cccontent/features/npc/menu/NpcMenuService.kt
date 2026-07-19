@@ -43,13 +43,15 @@ import org.bukkit.inventory.meta.SkullMeta
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 import java.time.LocalDate
-import java.time.ZoneId
 import java.util.UUID
+import jp.awabi2048.cccontent.integration.myworld.MyWorldBridge
+import jp.awabi2048.cccontent.integration.myworld.WorldPointGrantResult
 import kotlin.random.Random
 
 class NpcMenuService(
     private val plugin: JavaPlugin,
-    private val professionProvider: (UUID) -> Profession? = { null }
+    private val professionProvider: (UUID) -> Profession? = { null },
+    private val myWorldBridge: MyWorldBridge
 ) : Listener {
     private companion object {
         const val CONFIG_PATH = "config/npc/menu.yml"
@@ -839,21 +841,17 @@ class NpcMenuService(
     }
 
     private fun grantWorldPoint(playerId: UUID, amount: Int): Int? {
-        return runCatching {
-            val myWorldManager = Bukkit.getPluginManager().getPlugin("MyWorldManager") ?: return null
-            val apiClass = Class.forName("me.awabi2048.myworldmanager.api.MyWorldManagerApi", true, myWorldManager.javaClass.classLoader)
-            val available = apiClass.getMethod("isWorldPointServiceAvailable").invoke(null) as? Boolean ?: false
-            if (!available) null else apiClass.getMethod("addWorldPoint", UUID::class.java, Int::class.javaPrimitiveType).invoke(null, playerId, amount) as? Int
-        }.getOrNull()
+        return when (val result = myWorldBridge.grantWorldPoints(playerId, amount)) {
+            is WorldPointGrantResult.Success -> result.balance
+            is WorldPointGrantResult.Unavailable -> null
+            is WorldPointGrantResult.Failure -> {
+                plugin.logger.warning("[Oage Shrine] ワールドポイント付与に失敗しました: ${result.message}")
+                null
+            }
+        }
     }
 
-    private fun isWorldPointAvailable(): Boolean {
-        return runCatching {
-            val myWorldManager = Bukkit.getPluginManager().getPlugin("MyWorldManager") ?: return false
-            val apiClass = Class.forName("me.awabi2048.myworldmanager.api.MyWorldManagerApi", true, myWorldManager.javaClass.classLoader)
-            apiClass.getMethod("isWorldPointServiceAvailable").invoke(null) as? Boolean ?: false
-        }.getOrDefault(false)
-    }
+    private fun isWorldPointAvailable(): Boolean = myWorldBridge.isWorldPointCapabilityEnabled()
 
     private fun handlePartTimeClick(player: Player) {
         if (isPartTimeOpened(player.uniqueId) || !isPartTimeTaskCompleted(player.uniqueId, PART_TIME_TASK_ARENA)) return
@@ -1125,7 +1123,7 @@ class NpcMenuService(
         return definitions.first()
     }
 
-    private fun oageBoxDailySeed(): Long = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
+    private fun oageBoxDailySeed(): Long = CCSystem.getAPI().getSharedClockService().currentDate().toEpochDay()
 
     private fun OageBoxReward.icon(player: Player): ItemStack = when (this) {
         is OageBoxReward.CustomItem -> CustomItemManager.createItemForPlayer(itemId, player, amount)

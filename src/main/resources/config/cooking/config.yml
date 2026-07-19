@@ -3,7 +3,6 @@
 enabled: true
 
 settings:
-  station: CAMPFIRE
   minimum_similarity: 0.5
   ingredient_slots_by_level:
     1: 1

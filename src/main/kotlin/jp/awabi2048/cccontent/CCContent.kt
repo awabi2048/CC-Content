@@ -15,6 +15,8 @@ import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.config.ResourceConfigurationValidator
 import jp.awabi2048.cccontent.config.ContentConfigScope
+import jp.awabi2048.cccontent.integration.myworld.DefaultMyWorldBridge
+import jp.awabi2048.cccontent.integration.myworld.MyWorldBridge
 import jp.awabi2048.cccontent.featurestate.ContentFeatureCatalog
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemInteractionListener
@@ -66,7 +68,7 @@ import jp.awabi2048.cccontent.items.misc.AirTriggerItem
 import jp.awabi2048.cccontent.items.misc.DecentBowItem
 import jp.awabi2048.cccontent.items.sukima.*
 import jp.awabi2048.cccontent.items.brewery.BreweryMockClockItem
-import jp.awabi2048.cccontent.items.brewery.BreweryMockYeastItem
+import jp.awabi2048.cccontent.items.brewery.BreweryCulturedYeastItem
 import jp.awabi2048.cccontent.items.brewery.BrewerySampleFilterItem
 import jp.awabi2048.cccontent.items.arena.*
 import jp.awabi2048.cccontent.features.arena.ArenaCommand
@@ -85,6 +87,7 @@ import jp.awabi2048.cccontent.features.catalog.CatalogCommand
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import jp.awabi2048.cccontent.features.catalog.CatalogType
 import jp.awabi2048.cccontent.features.resourcecollection.ResourceCollectionFeature
+import jp.awabi2048.cccontent.features.seasonal.SeasonalFeature
 import jp.awabi2048.cccontent.features.party.PartyCommand
 import jp.awabi2048.cccontent.features.party.PartyController
 import jp.awabi2048.cccontent.features.party.PartyListener
@@ -185,6 +188,7 @@ class CCContent : JavaPlugin(), Listener {
     private var fishingFeature: FishingFeature? = null
     private lateinit var catalogStore: CatalogStore
     private var resourceCollectionFeature: ResourceCollectionFeature? = null
+    private var seasonalFeature: SeasonalFeature? = null
     private var partyController: PartyController? = null
     private var minigameRuntime: MiniGameRuntime? = null
     private lateinit var npcMenuService: NpcMenuService
@@ -196,6 +200,7 @@ class CCContent : JavaPlugin(), Listener {
     private var customItemsLanguageAvailable: Boolean = true
     private val configurationFailuresByFeature = linkedMapOf<String, MutableList<String>>()
     private val registeredConfigOwners = linkedSetOf<String>()
+    private lateinit var myWorldBridge: MyWorldBridge
 
     private class FeatureUnavailableCommand(private val featureId: String) : CommandExecutor, TabCompleter {
         override fun onCommand(
@@ -235,6 +240,7 @@ class CCContent : JavaPlugin(), Listener {
     private fun startPlugin() {
         instance = this
         ensureCCSystemAvailable()
+        myWorldBridge = DefaultMyWorldBridge()
         CCSystem.getAPI().getMenuCommandService().unregisterOwner("cc-content")
         saveSplitLanguageResources()
         coreConfig = CoreConfigManager.load(this)
@@ -250,6 +256,7 @@ class CCContent : JavaPlugin(), Listener {
         featureInitLogger.registerFeature("Cooking")
         featureInitLogger.registerFeature("Fishing")
         featureInitLogger.registerFeature("Resource Collection")
+        featureInitLogger.registerFeature("Seasonal")
         featureInitLogger.registerFeature("Arena")
         featureInitLogger.registerFeature("SukimaDungeon")
         featureInitLogger.registerFeature("Party")
@@ -281,7 +288,7 @@ class CCContent : JavaPlugin(), Listener {
             }
             val controller = checkNotNull(partyController) { "Minigame requires the Party feature" }
             // 参加者を確定するPartyServiceを必ず注入し、全員自動参加へ戻さない。
-            val runtime = MiniGameRuntime(this, controller.service)
+            val runtime = MiniGameRuntime(this, controller.service, myWorldBridge)
             minigameRuntime = runtime
             runtime.initialize()
             featureInitLogger.setStatus("Minigame", FeatureInitializationLogger.Status.SUCCESS)
@@ -324,7 +331,8 @@ class CCContent : JavaPlugin(), Listener {
         if (isFeatureConfigurationAvailable("oage_shrine")) try {
             val menuService = NpcMenuService(
                 plugin = this,
-                professionProvider = { playerId -> temporaryBrewerProfessionByLuckPerms(playerId) }
+                professionProvider = { playerId -> temporaryBrewerProfessionByLuckPerms(playerId) },
+                myWorldBridge = myWorldBridge
             )
             menuService.initialize()
             npcMenuService = menuService
@@ -412,10 +420,7 @@ class CCContent : JavaPlugin(), Listener {
         }
 
         initializeFeatureIfEnabled("Fishing", "fishing") {
-            if (rankManagerInstance == null) {
-                throw IllegalStateException("Fishing requires the Rank System")
-            }
-            val feature = FishingFeature(this, catalogStore)
+            val feature = FishingFeature(this, catalogStore, myWorldBridge)
             fishingFeature = feature
             feature.initialize(featureInitLogger)
         }
@@ -427,6 +432,13 @@ class CCContent : JavaPlugin(), Listener {
             resourceCollectionFeature = feature
             feature.initialize()
             featureInitLogger.setStatus("Resource Collection", FeatureInitializationLogger.Status.SUCCESS)
+        }
+
+        initializeFeatureIfEnabled("Seasonal", "seasonal") {
+            val feature = SeasonalFeature(this)
+            seasonalFeature = feature
+            feature.initialize()
+            featureInitLogger.setStatus("Seasonal", FeatureInitializationLogger.Status.SUCCESS)
         }
 
         registerCatalogCommands()
@@ -456,6 +468,19 @@ class CCContent : JavaPlugin(), Listener {
             onReload = { reloadConfigFiles() },
             onRestart = { restartPlugin() },
             onClearBlockPlacementData = { clearBlockPlacementData() },
+            placementRecordingEnabledProvider = {
+                CCSystem.getAPI().getNaturalOriginRegistry().isPlacementRecordingEnabled()
+            },
+            onSetPlacementRecordingEnabled = { enabled, sender ->
+                CCSystem.getAPI().getNaturalOriginRegistry().setPlacementRecordingEnabled(enabled)
+                logger.info(
+                    "[ResourceCollectionAudit] placement_recording=${if (enabled) "enabled" else "disabled"} " +
+                        "actor=${sender.name}"
+                )
+            },
+            onClearFishingGrounds = {
+                fishingFeature?.clearNaturalFishingGrounds() == true
+            },
             mobDefinitionIdsProvider = { sharedMobService.getDefinitionIds() },
             onSummonMob = { definitionId, location -> summonConfiguredMob(definitionId, location) },
             onUpdateDay = { target ->
@@ -620,6 +645,8 @@ class CCContent : JavaPlugin(), Listener {
         fishingFeature = null
         cleanup("resource collection") { resourceCollectionFeature?.shutdown() }
         resourceCollectionFeature = null
+        cleanup("seasonal") { seasonalFeature?.shutdown() }
+        seasonalFeature = null
         cleanup("party") { partyController?.close() }
         partyController = null
         cleanup("arena mission") { arenaMissionService?.shutdown() }
@@ -705,6 +732,7 @@ class CCContent : JavaPlugin(), Listener {
             "cooking" to "Cooking",
             "fishing" to "Fishing",
             "resource_collection" to "Resource Collection",
+            "seasonal" to "Seasonal",
             "sukima_dungeon" to "SukimaDungeon",
             "party" to "Party",
             "minigame" to "Minigame"
@@ -803,7 +831,7 @@ class CCContent : JavaPlugin(), Listener {
             rankCommand.setTutorialTaskSystem(taskLoader, taskChecker)
 
             // 追加のランク系リスナー登録
-            val minerListener = ProfessionMinerExpListener(this, rankManager, ignoreBlockStore)
+            val minerListener = ProfessionMinerExpListener(rankManager)
             val combatExpListener = ProfessionCombatExpListener(
                 rankManager,
                 FeatureConfigManager.load(this, FeatureConfigManager.RANK_SETTINGS_PATH)
@@ -889,26 +917,6 @@ class CCContent : JavaPlugin(), Listener {
       */
     private fun initializeSkillEffectSystem(rankManager: RankManager, ignoreBlockStore: IgnoreBlockStore) {
         try {
-            val blastMineHandler = BlastMineHandler()
-
-            SkillEffectRegistry.register(BreakSpeedBoostHandler())
-            SkillEffectRegistry.register(DropBonusHandler())
-            SkillEffectRegistry.register(DurabilitySaveChanceHandler())
-            SkillEffectRegistry.register(UnlockBatchBreakHandler(ignoreBlockStore))
-            SkillEffectRegistry.register(ReplaceLootTableHandler())
-            SkillEffectRegistry.register(blastMineHandler)
-            SkillEffectRegistry.register(WindGustHandler())
-            SkillEffectRegistry.register(ReplantHandler())
-            SkillEffectRegistry.register(FarmerAreaTillingHandler())
-            SkillEffectRegistry.register(FarmerAreaHarvestingHandler(this, rankManager, ignoreBlockStore))
-            SkillEffectRegistry.register(FarmerAutoReplantingHandler())
-
-            SkillEffectRegistry.register(UnlockSystemHandler())
-            SkillEffectRegistry.register(UnlockRecipeHandler())
-            SkillEffectRegistry.register(WorkSpeedBonusMockHandler())
-            SkillEffectRegistry.register(SuccessRateBonusMockHandler())
-            FisherBonusHandler.all().forEach(SkillEffectRegistry::register)
-
             SkillEffectRegistry.register(UnlockItemTokenHandler())
 
             // 戦闘系スキルハンドラー
@@ -927,12 +935,8 @@ class CCContent : JavaPlugin(), Listener {
             SkillEffectRegistry.register(SwordsmanUnderdogBuffHandler())
 
             server.pluginManager.registerEvents(SkillEffectCacheListener(rankManager, this), this)
-            server.pluginManager.registerEvents(BlockBreakEffectListener(ignoreBlockStore), this)
-            server.pluginManager.registerEvents(FarmerInteractEffectListener(), this)
-            server.pluginManager.registerEvents(BatchBreakPreviewListener(), this)
             server.pluginManager.registerEvents(ActiveSkillTriggerListener(), this)
             server.pluginManager.registerEvents(ActiveSkillKeyListener(), this)
-            server.pluginManager.registerEvents(CraftEffectListener(), this)
             server.pluginManager.registerEvents(CombatEffectListener(), this)
             server.pluginManager.registerEvents(WarriorBowEffectListener(), this)
             server.pluginManager.registerEvents(SwordsmanDrainListener(), this)
@@ -1015,7 +1019,7 @@ class CCContent : JavaPlugin(), Listener {
             }
         }
 
-        for (profession in Profession.values()) {
+        for (profession in Profession.values().filterNot { it.usesTypedProfile }) {
             try {
                 val skillTree = CodeDefinedSkillTree.create(profession)
                 skillTree.getAllSkills().values.mapNotNull { it.effect?.type }.distinct().forEach { effectType ->
@@ -1084,7 +1088,7 @@ class CCContent : JavaPlugin(), Listener {
         if (isContentEnabled("brewery")) {
             CustomItemManager.register(BrewerySampleFilterItem(this))
             CustomItemManager.register(BreweryMockClockItem(this))
-            CustomItemManager.register(BreweryMockYeastItem(this))
+            CustomItemManager.register(BreweryCulturedYeastItem(this))
         }
 
         if (isContentEnabled("arena")) {

@@ -7,18 +7,27 @@ import jp.awabi2048.cccontent.features.fishing.FishdexPage;
 import jp.awabi2048.cccontent.features.fishing.FishFightProfile;
 import jp.awabi2048.cccontent.features.fishing.FishingEffectivenessZone;
 import jp.awabi2048.cccontent.features.fishing.FishingFightStatus;
+import jp.awabi2048.cccontent.features.fishing.FishingFightScore;
 import jp.awabi2048.cccontent.features.fishing.FishingFightState;
+import jp.awabi2048.cccontent.features.fishing.FishingCatchSelector;
+import jp.awabi2048.cccontent.features.fishing.FishingTime;
+import jp.awabi2048.cccontent.features.fishing.FishingWeather;
+import com.awabi2048.ccsystem.api.time.Season;
+import jp.awabi2048.cccontent.features.fishing.FishRarity;
 import jp.awabi2048.cccontent.features.fishing.FishingWaterCondition;
 import jp.awabi2048.cccontent.features.fishing.FishingWaterProfile;
 import jp.awabi2048.cccontent.features.fishing.FishingWaterType;
+import jp.awabi2048.cccontent.features.fishing.FishingEnvironment;
 import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FishingModelTest {
@@ -30,15 +39,15 @@ class FishingModelTest {
             new kotlin.ranges.IntRange(21, 33)
         );
 
-        assertTrue(offshore.matches(new FishingWaterProfile(12, 25)));
-        assertTrue(!offshore.matches(new FishingWaterProfile(4, 25)));
-        assertTrue(!offshore.matches(new FishingWaterProfile(12, 10)));
+        assertTrue(offshore.matches(new FishingWaterProfile(12, 25, Set.of(FishingEnvironment.ROCKY_DEEP))));
+        assertTrue(!offshore.matches(new FishingWaterProfile(4, 25, Set.of())));
+        assertTrue(!offshore.matches(new FishingWaterProfile(12, 10, Set.of())));
     }
 
     @Test
     void fishdexStatsAreRecordedPerFish() {
-        var first = new FishCatch("cod", Material.COD, 120, FishQuality.COMMON, 20, 5);
-        var second = new FishCatch("cod", Material.COD, 80, FishQuality.RARE, 15, 8);
+        var first = new FishCatch("cod", Material.COD, 120, FishQuality.COMMON, 20);
+        var second = new FishCatch("cod", Material.COD, 80, FishQuality.RARE, 15);
         var entry = new FishdexEntry("cod", false, 0L, null, null, Map.of()).record(first).record(second);
 
         assertTrue(entry.getDiscovered());
@@ -115,21 +124,92 @@ class FishingModelTest {
     }
 
     @Test
-    void fishQualityUsesThreeTiersAndAggregatesLegacyRecords() {
+    void fishQualityUsesOnlyCanonicalStoredIds() {
         assertEquals(3, FishQuality.values().length);
         assertEquals("§e★§7☆☆", FishQuality.COMMON.getStars());
         assertEquals("§e★★§7☆", FishQuality.RARE.getStars());
         assertEquals("§e★★★", FishQuality.LEGENDARY.getStars());
-        var normalized = FishQuality.Companion.normalizeStoredCounts(Map.of(
-            "common", 1L,
-            "uncommon", 2L,
-            "rare", 3L,
-            "epic", 4L,
-            "legendary", 5L
-        ));
+        assertEquals(FishQuality.COMMON, FishQuality.Companion.fromStoredId("common"));
+        assertEquals(FishQuality.RARE, FishQuality.Companion.fromStoredId("rare"));
+        assertEquals(FishQuality.LEGENDARY, FishQuality.Companion.fromStoredId("legendary"));
+        assertThrows(IllegalStateException.class, () -> FishQuality.Companion.fromStoredId("uncommon"));
+        assertThrows(IllegalStateException.class, () -> FishQuality.Companion.fromStoredId("epic"));
+    }
 
-        assertEquals(1L, normalized.get(FishQuality.COMMON));
-        assertEquals(5L, normalized.get(FishQuality.RARE));
-        assertEquals(9L, normalized.get(FishQuality.LEGENDARY));
+    @Test
+    void weatherTimeAndSeasonPreferencesAdjustWeightWithoutExcludingTheFish() {
+        assertEquals(1.0, FishingCatchSelector.preferenceMultiplier(
+            Set.of(FishingWeather.RAIN),
+            Set.of(FishingTime.NIGHT),
+            Set.of(Season.SUMMER),
+            Set.of(),
+            FishingWeather.RAIN,
+            FishingTime.NIGHT,
+            Season.SUMMER
+        ));
+        assertEquals(0.75 * 0.8 * 0.8, FishingCatchSelector.preferenceMultiplier(
+            Set.of(FishingWeather.RAIN),
+            Set.of(FishingTime.NIGHT),
+            Set.of(Season.SUMMER),
+            Set.of(),
+            FishingWeather.CLEAR,
+            FishingTime.DAY,
+            Season.WINTER
+        ), 0.000001);
+        assertTrue(FishingCatchSelector.preferenceMultiplier(
+            Set.of(FishingWeather.RAIN),
+            Set.of(FishingTime.NIGHT),
+            Set.of(Season.SUMMER),
+            Set.of(Season.WINTER),
+            FishingWeather.CLEAR,
+            FishingTime.DAY,
+            Season.SPRING
+        ) > 0.0);
+    }
+
+    @Test
+    void localEnvironmentPreferencesAdjustWeightWithoutExcludingTheFish() {
+        assertEquals(1.0, FishingCatchSelector.environmentPreferenceMultiplier(
+            Set.of(FishingEnvironment.ESTUARY),
+            Set.of(FishingEnvironment.ESTUARY, FishingEnvironment.SAND_BOTTOM)
+        ));
+        assertEquals(0.8, FishingCatchSelector.environmentPreferenceMultiplier(
+            Set.of(FishingEnvironment.ESTUARY),
+            Set.of(FishingEnvironment.ROCKY_DEEP)
+        ));
+    }
+
+    @Test
+    void fightScoreUsesTheWholeFightInsteadOfTheLastTick() {
+        var mostlyGreen = new FishingFightScore();
+        for (int i = 0; i < 99; i++) {
+            mostlyGreen = mostlyGreen.record(FishingEffectivenessZone.GREEN, 50.0, 1);
+        }
+        mostlyGreen = mostlyGreen.record(FishingEffectivenessZone.ORANGE, 0.0, 1);
+
+        var mostlyDanger = new FishingFightScore();
+        for (int i = 0; i < 99; i++) {
+            mostlyDanger = mostlyDanger.record(FishingEffectivenessZone.ORANGE, 0.0, 1);
+        }
+        mostlyDanger = mostlyDanger.record(FishingEffectivenessZone.GREEN, 50.0, 1);
+
+        assertTrue(mostlyGreen.normalizedScore() > 0.98);
+        assertTrue(mostlyDanger.normalizedScore() < 0.02);
+        assertTrue(mostlyGreen.successProbability(FishRarity.COMMON) >
+            mostlyDanger.successProbability(FishRarity.COMMON));
+    }
+
+    @Test
+    void fightScoreIsNormalizedAcrossDifferentFightDurations() {
+        var shortFight = new FishingFightScore()
+            .record(FishingEffectivenessZone.GREEN, 50.0, 10)
+            .record(FishingEffectivenessZone.YELLOW, 70.0, 10);
+        var longFight = new FishingFightScore()
+            .record(FishingEffectivenessZone.GREEN, 50.0, 100)
+            .record(FishingEffectivenessZone.YELLOW, 70.0, 100);
+
+        assertEquals(shortFight.normalizedScore(), longFight.normalizedScore(), 0.000001);
+        assertTrue(shortFight.successProbability(FishRarity.COMMON) >
+            shortFight.successProbability(FishRarity.SPECIAL));
     }
 }

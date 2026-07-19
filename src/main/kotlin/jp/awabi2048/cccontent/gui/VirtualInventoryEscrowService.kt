@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.gui
 
+import com.awabi2048.ccsystem.CCSystem
+
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
@@ -7,7 +9,6 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.time.OffsetDateTime
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
@@ -27,7 +28,7 @@ data class PendingVirtualItem(
 class VirtualInventoryEscrowService(private val plugin: JavaPlugin) {
     private val file = File(plugin.dataFolder, "data/virtual_inventory/pending_returns.yml")
     private val records = linkedMapOf<String, PendingVirtualItem>()
-    private val zoneId = ZoneId.of("Asia/Tokyo")
+    private val zoneId get() = CCSystem.getAPI().getSharedClockService().zoneId
 
     fun initialize() {
         records.clear()
