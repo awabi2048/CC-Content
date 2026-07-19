@@ -237,12 +237,10 @@ class SpecialistCollectionService(
         val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? MinerSkillProfile
         if (profile == null || !profile.expertOperationUnlocked ||
             !RankReleasePolicy.canAccessProfession(player, Profession.MINER)) {
-            player.sendMessage(message(player, "resource_collection.error.miner_required"))
             return
         }
         if (!isReadyNatural(block) ||
             ResourceMaterialPolicy.classify(block.type, block.blockData) != ResourceCollectionKind.MINERAL) {
-            player.sendMessage(message(player, "resource_collection.error.natural_resource_required"))
             return
         }
         val result = MineralCompanionPolicy.inspect(
@@ -290,7 +288,6 @@ class SpecialistCollectionService(
             ResourceMaterialPolicy.classify(origin.type, origin.blockData) != ResourceCollectionKind.CROP) return
         event.isCancelled = true
         if (!isReadyWorld(origin)) {
-            player.sendMessage(message(player, "resource_collection.error.ready_world_required"))
             return
         }
         val originMaterial = origin.type
@@ -327,7 +324,6 @@ class SpecialistCollectionService(
         if (!profile.areaTillingEnabled || origin.type !in tillableMaterials) return
         event.isCancelled = true
         if (!isReadyWorld(origin)) {
-            player.sendMessage(message(player, "resource_collection.error.ready_world_required"))
             return
         }
         val originMaterial = origin.type
@@ -447,7 +443,6 @@ class SpecialistCollectionService(
         if (!enabled || ResourceMaterialPolicy.classify(origin.type, origin.blockData) != expectedKind) return
         event.isCancelled = true
         if (!isReadyNatural(origin)) {
-            player.sendMessage(message(player, "resource_collection.error.natural_resource_required"))
             return
         }
         val originalMaterial = origin.type
@@ -685,20 +680,17 @@ class SpecialistCollectionService(
         val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? FarmerSkillProfile
         if (profile == null || !profile.expertOperationUnlocked ||
             !RankReleasePolicy.canAccessProfession(player, Profession.FARMER)) {
-            player.sendMessage(message(player, "resource_collection.error.farmer_required"))
             return
         }
         if (!isReadyWorld(origin) ||
             (!ResourceMaterialPolicy.isWildVegetation(origin.type) &&
                 !ResourceMaterialPolicy.isVegetationBase(origin.type)) ||
             !CCSystem.getAPI().getNaturalOriginRegistry().isNatural(origin)) {
-            player.sendMessage(message(player, "resource_collection.error.natural_vegetation_required"))
             return
         }
         val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
         val cooldownUntil = gatheringCooldowns[player.uniqueId]
         if (cooldownUntil != null && cooldownUntil.isAfter(now)) {
-            player.sendMessage(message(player, "resource_collection.gathering.cooldown"))
             return
         }
         val radius = profile.inspectionRadius.coerceAtLeast(2)
@@ -888,12 +880,10 @@ class SpecialistCollectionService(
         val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? LumberjackSkillProfile
         if (profile == null || profile.inspectionRadius <= 0 ||
             !RankReleasePolicy.canAccessProfession(player, Profession.LUMBERJACK)) {
-            player.sendMessage(message(player, "resource_collection.error.lumberjack_required"))
             return
         }
         val species = TreeSpecies.fromTrunk(origin.type)
         if (!isReadyNatural(origin) || species == null) {
-            player.sendMessage(message(player, "resource_collection.error.natural_tree_required"))
             return
         }
         val treeBlocks = collectTreeTrunks(origin, species)
@@ -923,7 +913,6 @@ class SpecialistCollectionService(
         }
         val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
         if (forestCooldowns[player.uniqueId]?.isAfter(now) == true) {
-            player.sendMessage(message(player, "resource_collection.forest.cooldown"))
             return
         }
         val expiresAt = now.plusSeconds(60)
@@ -1146,12 +1135,10 @@ class SpecialistCollectionService(
         val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? MinerSkillProfile
         if (profile == null || !profile.expertOperationUnlocked ||
             !RankReleasePolicy.canAccessProfession(player, Profession.MINER)) {
-            player.sendMessage(message(player, "resource_collection.error.miner_required"))
             return
         }
         if (ResourceMaterialPolicy.classify(block.type, block.blockData) != ResourceCollectionKind.MINERAL ||
             !isReadyNatural(block)) {
-            player.sendMessage(message(player, "resource_collection.error.natural_resource_required"))
             return
         }
         val key = block.key()
@@ -1347,11 +1334,9 @@ class SpecialistCollectionService(
         val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? LumberjackSkillProfile
         if (profile == null || !profile.expertOperationUnlocked ||
             !RankReleasePolicy.canAccessProfession(player, Profession.LUMBERJACK)) {
-            player.sendMessage(message(player, "resource_collection.error.lumberjack_required"))
             return
         }
         if (!isReadyWorld(block) || CCSystem.getAPI().getNaturalOriginRegistry().isNatural(block)) {
-            player.sendMessage(message(player, "resource_collection.error.placed_log_required"))
             return
         }
         val planks = plankType(block.type) ?: run {

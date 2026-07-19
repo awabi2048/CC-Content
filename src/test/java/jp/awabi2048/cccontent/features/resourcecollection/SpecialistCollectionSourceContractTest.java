@@ -84,6 +84,16 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("resource_collection.display.data.collectible_items"));
         assertFalse(source.contains("resource_collection.inspection.basic"));
         assertFalse(source.contains("resource_collection.inspection.detailed"));
+        assertFalse(source.contains("resource_collection.error.miner_required"));
+        assertFalse(source.contains("resource_collection.error.lumberjack_required"));
+        assertFalse(source.contains("resource_collection.error.farmer_required"));
+        assertFalse(source.contains("resource_collection.error.natural_resource_required"));
+        assertFalse(source.contains("resource_collection.error.placed_log_required"));
+        assertFalse(source.contains("resource_collection.error.natural_vegetation_required"));
+        assertFalse(source.contains("resource_collection.error.natural_tree_required"));
+        assertFalse(source.contains("resource_collection.error.ready_world_required"));
+        assertFalse(source.contains("resource_collection.gathering.cooldown"));
+        assertFalse(source.contains("resource_collection.forest.cooldown"));
         assertTrue(source.contains("definition.useNameKey"));
         assertTrue(source.contains("definition.vegetationGroupNameKey"));
         assertFalse(source.contains("now().monthValue"));
