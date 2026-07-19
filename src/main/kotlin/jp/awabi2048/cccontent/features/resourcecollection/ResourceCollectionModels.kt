@@ -5,6 +5,7 @@ import org.bukkit.Material
 import org.bukkit.block.data.Ageable
 import org.bukkit.block.data.BlockData
 import java.util.Random
+import org.bukkit.World
 
 enum class ResourceCollectionKind(val profession: Profession, val bonusItemId: String) {
     MINERAL(Profession.MINER, "mica_flake"),
@@ -134,5 +135,58 @@ object ChiselRewardPolicy {
             else -> 0
         }
         return base + if (averageAccuracy >= 0.90) topEvaluationExtra else 0
+    }
+}
+
+enum class MineralAltitudeBand {
+    HIGH,
+    SHALLOW,
+    MIDDLE,
+    DEEP
+}
+
+enum class MineralBiomeBand {
+    TEMPERATE,
+    COLD,
+    DRY,
+    WET,
+    MOUNTAIN,
+    NETHER
+}
+
+data class MineralInspectionResult(
+    val altitude: MineralAltitudeBand,
+    val biome: MineralBiomeBand,
+    val resourceId: String
+)
+
+object MineralCompanionPolicy {
+    fun inspect(environment: World.Environment, biomeKey: String, y: Int): MineralInspectionResult {
+        val altitude = when {
+            y >= 96 -> MineralAltitudeBand.HIGH
+            y >= 32 -> MineralAltitudeBand.SHALLOW
+            y >= 0 -> MineralAltitudeBand.MIDDLE
+            else -> MineralAltitudeBand.DEEP
+        }
+        val biome = biomeBand(environment, biomeKey)
+        val resourceId = when {
+            biome == MineralBiomeBand.NETHER -> "sulfur"
+            altitude == MineralAltitudeBand.DEEP -> "calcite_fragment"
+            biome == MineralBiomeBand.DRY -> "rock_salt"
+            else -> "mica_flake"
+        }
+        return MineralInspectionResult(altitude, biome, resourceId)
+    }
+
+    private fun biomeBand(environment: World.Environment, biomeKey: String): MineralBiomeBand {
+        if (environment == World.Environment.NETHER) return MineralBiomeBand.NETHER
+        val key = biomeKey.lowercase()
+        return when {
+            listOf("frozen", "snow", "ice", "cold", "grove").any(key::contains) -> MineralBiomeBand.COLD
+            listOf("desert", "badlands", "savanna").any(key::contains) -> MineralBiomeBand.DRY
+            listOf("swamp", "mangrove", "jungle", "river", "ocean").any(key::contains) -> MineralBiomeBand.WET
+            listOf("mountain", "peak", "slope", "windswept", "stony").any(key::contains) -> MineralBiomeBand.MOUNTAIN
+            else -> MineralBiomeBand.TEMPERATE
+        }
     }
 }

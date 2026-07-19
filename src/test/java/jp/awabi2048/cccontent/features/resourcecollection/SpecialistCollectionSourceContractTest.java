@@ -23,6 +23,9 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("BlockBreakEvent(block, player)"));
         assertTrue(source.contains("ProfessionExperience.SPECIALIST_ACTION"));
         assertTrue(source.contains("event.interactionPoint"));
+        assertTrue(source.contains("resource.geology_guide"));
+        assertTrue(source.contains("inspectMineralVein"));
+        assertTrue(source.contains("MineralCompanionPolicy.inspect"));
         assertTrue(source.contains("event.isCancelled = true"));
         assertTrue(source.contains(".coerceIn(1, 24)"));
         assertTrue(source.contains("ProfessionExperience.batchExperience(processed)"));

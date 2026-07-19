@@ -152,6 +152,7 @@ class SpecialistCollectionService(
         }
         if (event.action != Action.RIGHT_CLICK_BLOCK || !event.player.isSneaking) return
         when (customId) {
+            "resource.geology_guide" -> inspectMineralVein(event, block)
             "resource.woodworking_hatchet" -> processPlacedLog(event, block, precise = false)
             "resource.woodworking_knife" -> processPlacedLog(event, block, precise = true)
             "resource.forest_guide" -> inspectForestProducts(event, block)
@@ -160,6 +161,45 @@ class SpecialistCollectionService(
             else -> scheduleBarkReward(event, block)
         }
     }
+
+    private fun inspectMineralVein(event: PlayerInteractEvent, block: Block) {
+        event.isCancelled = true
+        val player = event.player
+        val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? MinerSkillProfile
+        if (profile == null || !profile.expertOperationUnlocked ||
+            !RankReleasePolicy.canAccessProfession(player, Profession.MINER)) {
+            player.sendMessage(message(player, "resource_collection.error.miner_required"))
+            return
+        }
+        if (!isReadyNatural(block) ||
+            ResourceMaterialPolicy.classify(block.type, block.blockData) != ResourceCollectionKind.MINERAL) {
+            player.sendMessage(message(player, "resource_collection.error.natural_resource_required"))
+            return
+        }
+        val result = MineralCompanionPolicy.inspect(
+            block.world.environment,
+            block.biome.key.toString(),
+            block.y
+        )
+        val placeholders = arrayOf<Pair<String, Any>>(
+            "altitude" to localizedEnum(player, "resource_collection.inspection.altitude", result.altitude.name),
+            "biome" to localizedEnum(player, "resource_collection.inspection.biome", result.biome.name),
+            "material" to CCSystem.getAPI().getI18nString(
+                player,
+                "custom_items.resource.${result.resourceId}.name"
+            )
+        )
+        val messageKey = if (profile.detailedInspectionEnabled) {
+            "resource_collection.inspection.detailed"
+        } else {
+            "resource_collection.inspection.basic"
+        }
+        player.sendMessage(message(player, messageKey, *placeholders))
+        player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.75f, 0.9f)
+    }
+
+    private fun localizedEnum(player: Player, prefix: String, value: String): String =
+        CCSystem.getAPI().getI18nString(player, "$prefix.${value.lowercase()}")
 
     private fun handleAreaHarvest(event: PlayerInteractEvent, origin: Block) {
         val player = event.player
@@ -792,7 +832,14 @@ class SpecialistCollectionService(
         occupiedBlocks.remove(session.blockKey)
         block.breakNaturally(ItemStack(Material.IRON_PICKAXE), true)
         if (player.gameMode != GameMode.CREATIVE) player.damageItemStack(EquipmentSlot.HAND, 1)
-        if (specialAmount > 0) giveResource(player, mineralResourceId(block, session.originalMaterial), specialAmount)
+        if (specialAmount > 0) {
+            val result = MineralCompanionPolicy.inspect(
+                block.world.environment,
+                block.biome.key.toString(),
+                block.y
+            )
+            giveResource(player, result.resourceId, specialAmount)
+        }
         awardSpecialist(player, ContentActionType.MINERAL_EXTRACTED, average >= 0.90, session.originalMaterial)
         player.sendMessage(message(player, "resource_collection.chisel.completed", "amount" to specialAmount))
         player.playSound(player.location, Sound.BLOCK_AMETHYST_BLOCK_BREAK, 0.9f, 1.2f)
@@ -933,13 +980,6 @@ class SpecialistCollectionService(
         if (amount <= 0) return
         val item = CustomItemManager.createItemForPlayer(fullId, player, amount) ?: return
         player.inventory.addItem(item).values.forEach { player.world.dropItemNaturally(player.location, it) }
-    }
-
-    private fun mineralResourceId(block: Block, original: Material): String = when {
-        block.world.environment == org.bukkit.World.Environment.NETHER -> "sulfur"
-        block.y < 0 -> "calcite_fragment"
-        original == Material.COAL_ORE || original == Material.DEEPSLATE_COAL_ORE -> "rock_salt"
-        else -> "mica_flake"
     }
 
     private fun isReadyNatural(block: Block): Boolean =

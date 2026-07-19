@@ -34,6 +34,7 @@ class ResourceCollectionItems(plugin: JavaPlugin) {
         Definition("bark", Material.PAPER, setOf("wood", "bark")),
         Definition("timber_beam", Material.STRIPPED_OAK_LOG, setOf("wood", "processed", "structural")),
         Definition("chisel", Material.IRON_PICKAXE, base = Material.IRON_PICKAXE, stackable = false),
+        Definition("geology_guide", Material.KNOWLEDGE_BOOK, base = Material.KNOWLEDGE_BOOK, stackable = false),
         Definition("mining_hammer", Material.IRON_PICKAXE, base = Material.IRON_PICKAXE, stackable = false),
         Definition("felling_axe", Material.IRON_AXE, base = Material.IRON_AXE, stackable = false),
         Definition("woodworking_hatchet", Material.IRON_AXE, base = Material.IRON_AXE, stackable = false),
