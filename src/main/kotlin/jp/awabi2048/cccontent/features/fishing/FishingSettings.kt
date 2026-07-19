@@ -4,8 +4,6 @@ import org.bukkit.Material
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 
 data class FishingMiniGameSettings(
     val baseHookWindowTicks: Long,
@@ -28,6 +26,7 @@ data class FishingMiniGameSettings(
 
 data class FishingSettings(
     val enabled: Boolean,
+    val consumeBaitOnValidSession: Boolean,
     val fishes: List<FishDefinition>,
     val baits: List<BaitDefinition>,
     val rods: List<RodDefinition>,
@@ -36,12 +35,14 @@ data class FishingSettings(
     companion object {
         fun load(plugin: JavaPlugin): FishingSettings {
             val file = ensureResource(plugin, "config/fishing/fish.yml")
-            migrateIfRequired(plugin, file)
             val config = YamlConfiguration.loadConfiguration(file)
-            require(config.get("config_version") is Number && config.getInt("config_version") == 3) {
-                "config/fishing/fish.yml.config_version must be the integer 3"
+            require(config.get("config_version") is Number && config.getInt("config_version") == 4) {
+                "config/fishing/fish.yml.config_version must be the integer 4"
             }
             require(config.get("enabled") is Boolean) { "config/fishing/fish.yml.enabled must be a boolean" }
+            require(config.get("bait.consume_on_valid_session") is Boolean) {
+                "config/fishing/fish.yml.bait.consume_on_valid_session must be a boolean"
+            }
             val fishes = config.getConfigurationSection("fish")?.getKeys(false).orEmpty().map { id ->
                 val path = "fish.$id"
                 val qualities = config.getConfigurationSection("$path.quality")?.getKeys(false).orEmpty().associate {
@@ -75,8 +76,8 @@ data class FishingSettings(
                 )
             }
             require(fishes.isNotEmpty()) { "config/fishing/fish.yml に魚定義がありません" }
-            val baits = config.getConfigurationSection("bait")?.getKeys(false).orEmpty().map { id ->
-                val path = "bait.$id"
+            val baits = config.getConfigurationSection("bait.definitions")?.getKeys(false).orEmpty().map { id ->
+                val path = "bait.definitions.$id"
                 BaitDefinition(
                     id,
                     material(config.getString("$path.material"), "$path.material"),
@@ -86,7 +87,7 @@ data class FishingSettings(
                     config.getStringList("$path.special_tags").toSet()
                 )
             }
-            require(baits.isNotEmpty()) { "config/fishing/fish.yml.bait must not be empty" }
+            require(baits.isNotEmpty()) { "config/fishing/fish.yml.bait.definitions must not be empty" }
             val rods = config.getConfigurationSection("rod")?.getKeys(false).orEmpty().map { id ->
                 val path = "rod.$id"
                 RodDefinition(
@@ -118,7 +119,14 @@ data class FishingSettings(
             require(minigame.waitTimeMinTicks <= minigame.waitTimeMaxTicks) {
                 "wait_time.min_ticks must not exceed wait_time.max_ticks"
             }
-            return FishingSettings(config.getBoolean("enabled"), fishes, baits, rods, minigame)
+            return FishingSettings(
+                config.getBoolean("enabled"),
+                config.getBoolean("bait.consume_on_valid_session"),
+                fishes,
+                baits,
+                rods,
+                minigame
+            )
         }
 
         private fun ensureResource(plugin: JavaPlugin, path: String): File {
@@ -128,39 +136,6 @@ data class FishingSettings(
                 plugin.saveResource(path, false)
             }
             return file
-        }
-
-        private fun migrateIfRequired(plugin: JavaPlugin, file: File) {
-            val config = YamlConfiguration.loadConfiguration(file)
-            val version = config.getInt("config_version", -1)
-            if (version == 3) return
-            require(version == 2) { "Unsupported fishing config version: $version" }
-            val defaults = plugin.getResource("config/fishing/fish.yml")?.bufferedReader()?.use {
-                YamlConfiguration.loadConfiguration(it)
-            } ?: error("Bundled fishing config is missing")
-            val migrated = YamlConfiguration.loadConfiguration(file)
-            FishingConfigMigration.migrateVersion2(migrated, defaults)
-
-            val backup = File(file.parentFile, "${file.name}.bak-v2")
-            if (!backup.exists()) Files.copy(file.toPath(), backup.toPath())
-            val temporary = File(file.parentFile, "${file.name}.migrating")
-            runCatching {
-                migrated.save(temporary)
-                runCatching {
-                    Files.move(
-                        temporary.toPath(),
-                        file.toPath(),
-                        StandardCopyOption.ATOMIC_MOVE,
-                        StandardCopyOption.REPLACE_EXISTING
-                    )
-                }.getOrElse {
-                    Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                }
-            }.onFailure {
-                temporary.delete()
-                throw IllegalStateException("Fishing config migration failed; original file was preserved", it)
-            }
-            plugin.logger.info("Fishing config migrated from version 2 to 3; backup=${backup.name}")
         }
 
         private fun requireString(value: String?, path: String): String =
@@ -194,32 +169,6 @@ data class FishingSettings(
             val max = positiveInt(config.get("$path.max"), "$path.max")
             require(min <= max) { "$path.min must not exceed $path.max" }
             return min..max
-        }
-    }
-}
-
-object FishingConfigMigration {
-    fun migrateVersion2(target: YamlConfiguration, defaults: YamlConfiguration) {
-        require(target.getInt("config_version", -1) == 2) { "Fishing config must be version 2" }
-        target.getConfigurationSection("fish")?.getKeys(false).orEmpty().forEach { fishId ->
-            val path = "fish.$fishId"
-            copyRangeIfMissing(target, defaults, "$path.size_cm", 1..100)
-            copyRangeIfMissing(target, defaults, "$path.weight_grams", 1..1000)
-        }
-        target.set("config_version", 3)
-    }
-
-    private fun copyRangeIfMissing(
-        target: YamlConfiguration,
-        defaults: YamlConfiguration,
-        path: String,
-        fallback: IntRange
-    ) {
-        if (!target.contains("$path.min")) {
-            target.set("$path.min", defaults.get("$path.min") ?: fallback.first)
-        }
-        if (!target.contains("$path.max")) {
-            target.set("$path.max", defaults.get("$path.max") ?: fallback.last)
         }
     }
 }

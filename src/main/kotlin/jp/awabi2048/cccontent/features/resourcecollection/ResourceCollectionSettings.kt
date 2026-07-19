@@ -3,11 +3,16 @@ package jp.awabi2048.cccontent.features.resourcecollection
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
+
+data class ChiselSettings(
+    val targetCount: Int,
+    val targetTimeoutTicks: Long,
+    val particleCount: Int
+)
 
 data class ResourceCollectionSettings(
     val enabled: Boolean,
+    val chisel: ChiselSettings,
     private val professionEnabled: Map<ResourceCollectionKind, Boolean>,
     val normalBonusEnabled: Map<ResourceCollectionKind, Boolean>,
     private val operations: Map<ResourceOperation, Boolean>
@@ -20,19 +25,21 @@ data class ResourceCollectionSettings(
 
     companion object {
         private const val CONFIG_PATH = "config/resource_collection/config.yml"
-        private const val CONFIG_VERSION = 5
+        private const val CONFIG_VERSION = 6
 
         fun load(plugin: JavaPlugin): ResourceCollectionSettings {
             val file = ensureFile(plugin, CONFIG_PATH)
-            migrateIfRequired(plugin, file)
-            removeLegacyWorldSetting(plugin, file)
-            archiveLegacyCollectionRules(plugin, file.parentFile)
             val config = YamlConfiguration.loadConfiguration(file)
             require(config.get("config_version") is Number && config.getInt("config_version") == CONFIG_VERSION) {
                 "$CONFIG_PATH.config_version must be the integer $CONFIG_VERSION"
             }
             return ResourceCollectionSettings(
                 requireBoolean(config, "enabled"),
+                ChiselSettings(
+                    requirePositiveInt(config, "chisel.target_count"),
+                    requirePositiveLong(config, "chisel.target_timeout_ticks"),
+                    requirePositiveInt(config, "chisel.particle_count")
+                ),
                 ResourceCollectionKind.entries.associateWith { kind ->
                     requireBoolean(config, "${kind.configSection}.enabled")
                 },
@@ -42,94 +49,6 @@ data class ResourceCollectionSettings(
                 ResourceOperation.entries.associateWith { operation ->
                     requireBoolean(config, operation.configPath)
                 }
-            )
-        }
-
-        private fun migrateIfRequired(plugin: JavaPlugin, file: File) {
-            val existing = YamlConfiguration.loadConfiguration(file)
-            val version = existing.getInt("config_version", -1)
-            if (version == CONFIG_VERSION) return
-            require(version in 2..4) {
-                "Unsupported resource collection config version: $version"
-            }
-            val migrated = YamlConfiguration.loadConfiguration(file)
-            migrated.set("config_version", CONFIG_VERSION)
-            migrated.set("worlds", null)
-            if (version <= 3) {
-                ResourceCollectionKind.entries.forEach { kind ->
-                    migrated.set("${kind.configSection}.enabled", true)
-                    migrated.set(
-                        "${kind.configSection}.normal_bonus_drop",
-                        existing.getBoolean("normal_bonus.${kind.configSection}", true)
-                    )
-                }
-                migrated.set("normal_bonus", null)
-                ResourceOperation.entries.forEach { operation ->
-                    migrated.set(operation.configPath, true)
-                }
-            } else {
-                migrated.set(ResourceOperation.MINER_WORK_SPEED.configPath, true)
-                migrated.set(ResourceOperation.LUMBERJACK_WORK_SPEED.configPath, true)
-                migrated.set(ResourceOperation.FARMER_WORK_SPEED.configPath, true)
-            }
-            val backup = File(file.parentFile, "${file.name}.bak-v$version")
-            if (!backup.exists()) Files.copy(file.toPath(), backup.toPath())
-            val temporary = File(file.parentFile, "${file.name}.migrating")
-            runCatching {
-                migrated.save(temporary)
-                runCatching {
-                    Files.move(
-                        temporary.toPath(), file.toPath(),
-                        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING
-                    )
-                }.getOrElse {
-                    Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                }
-            }.onFailure {
-                temporary.delete()
-                throw IllegalStateException("Resource collection config migration failed; original was preserved", it)
-            }
-            plugin.logger.info(
-                "Resource collection config migrated from version $version to $CONFIG_VERSION; backup=${backup.name}"
-            )
-        }
-
-        private fun archiveLegacyCollectionRules(plugin: JavaPlugin, directory: File) {
-            val legacy = File(directory, "collection.yml")
-            if (!legacy.exists()) return
-            var backup = File(directory, "collection.yml.bak-v2")
-            var suffix = 1
-            while (backup.exists()) {
-                backup = File(directory, "collection.yml.bak-v2-$suffix")
-                suffix++
-            }
-            Files.move(legacy.toPath(), backup.toPath())
-            plugin.logger.info("Legacy resource collection EXP and craft rules were archived as ${backup.name}")
-        }
-
-        private fun removeLegacyWorldSetting(plugin: JavaPlugin, file: File) {
-            val config = YamlConfiguration.loadConfiguration(file)
-            if (!config.contains("worlds")) return
-            val backup = File(file.parentFile, "${file.name}.bak-worlds")
-            if (!backup.exists()) Files.copy(file.toPath(), backup.toPath())
-            config.set("worlds", null)
-            val temporary = File(file.parentFile, "${file.name}.cleanup")
-            runCatching {
-                config.save(temporary)
-                runCatching {
-                    Files.move(
-                        temporary.toPath(), file.toPath(),
-                        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING
-                    )
-                }.getOrElse {
-                    Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                }
-            }.onFailure {
-                temporary.delete()
-                throw IllegalStateException("Legacy resource collection world setting cleanup failed", it)
-            }
-            plugin.logger.info(
-                "Legacy resource collection worlds setting was removed; backup=${backup.name}"
             )
         }
 
@@ -147,6 +66,22 @@ data class ResourceCollectionSettings(
             val value = config.get(key)
             require(value is Boolean) { "$CONFIG_PATH.$key must be a boolean" }
             return value
+        }
+
+        private fun requirePositiveInt(config: YamlConfiguration, key: String): Int {
+            val value = config.get(key)
+            require(value is Number && value.toDouble() == value.toInt().toDouble() && value.toInt() > 0) {
+                "$CONFIG_PATH.$key must be a positive integer"
+            }
+            return value.toInt()
+        }
+
+        private fun requirePositiveLong(config: YamlConfiguration, key: String): Long {
+            val value = config.get(key)
+            require(value is Number && value.toDouble() == value.toLong().toDouble() && value.toLong() > 0L) {
+                "$CONFIG_PATH.$key must be a positive integer"
+            }
+            return value.toLong()
         }
     }
 }

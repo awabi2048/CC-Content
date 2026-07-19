@@ -1,4 +1,4 @@
-﻿config_version: 3
+﻿config_version: 4
 enabled: true
 
 wait_time:
@@ -28,22 +28,24 @@ rod:
     max_durability: 128
 
 bait:
-  worm:
-    material: STRING
-    wait_time_multiplier: 0.85
-    rare_catch_multiplier: 1.0
-    quality_multiplier: 1.0
-  lucky_worm:
-    material: GLOW_INK_SAC
-    wait_time_multiplier: 0.95
-    rare_catch_multiplier: 1.6
-    quality_multiplier: 1.35
-  deep_sea_bait:
-    material: NAUTILUS_SHELL
-    wait_time_multiplier: 1.1
-    rare_catch_multiplier: 2.0
-    quality_multiplier: 1.5
-    special_tags: [ancient]
+  consume_on_valid_session: true
+  definitions:
+    worm:
+      material: STRING
+      wait_time_multiplier: 0.85
+      rare_catch_multiplier: 1.0
+      quality_multiplier: 1.0
+    lucky_worm:
+      material: GLOW_INK_SAC
+      wait_time_multiplier: 0.95
+      rare_catch_multiplier: 1.6
+      quality_multiplier: 1.35
+    deep_sea_bait:
+      material: NAUTILUS_SHELL
+      wait_time_multiplier: 1.1
+      rare_catch_multiplier: 2.0
+      quality_multiplier: 1.5
+      special_tags: [ancient]
 
 fish:
   cod:

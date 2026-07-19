@@ -5,9 +5,6 @@ import org.junit.jupiter.api.Test;
 import java.util.EnumMap;
 import java.util.Map;
 import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -20,21 +17,13 @@ class ResourceCollectionSettingsTest {
             new File("src/main/resources/config/resource_collection/config.yml")
         );
 
-        assertTrue(yaml.getInt("config_version") == 5);
+        assertTrue(yaml.getInt("config_version") == 6);
+        assertTrue(yaml.getInt("chisel.target_count") == 3);
+        assertTrue(yaml.getLong("chisel.target_timeout_ticks") == 50L);
+        assertTrue(yaml.getInt("chisel.particle_count") == 5);
         for (ResourceOperation operation : ResourceOperation.values()) {
             assertTrue(yaml.get(operation.getConfigPath()) instanceof Boolean, operation.getConfigPath());
         }
-    }
-
-    @Test
-    void settingsLoaderContainsPostMigrationLegacyWorldCleanup() throws Exception {
-        String source = Files.readString(Path.of(
-            "src/main/kotlin/jp/awabi2048/cccontent/features/resourcecollection/ResourceCollectionSettings.kt"
-        ));
-
-        assertTrue(source.contains("removeLegacyWorldSetting(plugin, file)"));
-        assertTrue(source.contains("config.set(\"worlds\", null)"));
-        assertTrue(source.contains(".bak-worlds"));
     }
 
     @Test
@@ -64,7 +53,13 @@ class ResourceCollectionSettingsTest {
         Map<ResourceCollectionKind, Boolean> professions,
         Map<ResourceOperation, Boolean> operations
     ) {
-        return new ResourceCollectionSettings(true, professions, enabledProfessions(), operations);
+        return new ResourceCollectionSettings(
+            true,
+            new ChiselSettings(3, 50L, 5),
+            professions,
+            enabledProfessions(),
+            operations
+        );
     }
 
     private static Map<ResourceCollectionKind, Boolean> enabledProfessions() {

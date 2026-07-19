@@ -980,7 +980,7 @@ class SpecialistCollectionService(
             current.attempts++
         }
         current.timeout?.cancel()
-        if (current.attempts >= 3) {
+        if (current.attempts >= settings.chisel.targetCount) {
             completeChisel(player, current, profile)
         } else {
             current.target = randomTarget(block, current.face)
@@ -1045,12 +1045,20 @@ class SpecialistCollectionService(
         session.timeout = plugin.server.scheduler.runTaskLater(
             plugin,
             Runnable { cancelChisel(session.playerId, "resource_collection.chisel.timeout") },
-            50L
+            settings.chisel.targetTimeoutTicks
         )
     }
 
     private fun showChiselTarget(player: Player, session: ChiselSession) {
-        player.spawnParticle(Particle.END_ROD, session.target, 5, 0.025, 0.025, 0.025, 0.0)
+        player.spawnParticle(
+            Particle.END_ROD,
+            session.target,
+            settings.chisel.particleCount,
+            0.025,
+            0.025,
+            0.025,
+            0.0
+        )
         player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BELL, 0.55f, 1.65f)
     }
 

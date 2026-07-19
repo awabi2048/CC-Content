@@ -241,7 +241,9 @@ class FishingFeature(
             return
         }
         val preserveBait = fisher.active && random.nextDouble() < fisher.baitSaveChance
-        if (bait != null) items.consumeBait(player, consume = !preserveBait)
+        if (bait != null && settings.consumeBaitOnValidSession) {
+            items.consumeBait(player, consume = !preserveBait)
+        }
         session.bait = bait
         session.phase = Phase.HOOK_WINDOW
         session.definition = selected.first

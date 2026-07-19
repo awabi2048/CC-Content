@@ -1,5 +1,10 @@
-config_version: 5
+config_version: 6
 enabled: true
+
+chisel:
+  target_count: 3
+  target_timeout_ticks: 50
+  particle_count: 5
 
 mineral:
   enabled: true

@@ -703,9 +703,12 @@ public final class ResourceConfigurationValidator {
         }
         Map<String, Object> bait = requireMap(root, "bait", file, errors);
         if (bait != null) {
-            requireNonEmpty(bait, file, "bait", errors);
-            for (Map.Entry<String, Object> entry : bait.entrySet()) {
-                String path = "bait." + entry.getKey();
+            requireBoolean(bait, "consume_on_valid_session", file, "bait.consume_on_valid_session", errors);
+            Map<String, Object> definitions = requireMap(bait, "definitions", file, errors, "bait.definitions");
+            if (definitions == null) return;
+            requireNonEmpty(definitions, file, "bait.definitions", errors);
+            for (Map.Entry<String, Object> entry : definitions.entrySet()) {
+                String path = "bait.definitions." + entry.getKey();
                 Map<String, Object> definition = asMap(entry.getValue());
                 if (definition == null) {
                     errors.add(format("invalid fishing bait", file, path, "bait must be a section"));
@@ -820,6 +823,23 @@ public final class ResourceConfigurationValidator {
         Map<String, Object> config = rootMap(configs, configFile, errors);
         if (config != null) {
             requireBoolean(config, "enabled", configFile, "enabled", errors);
+            Map<String, Object> chisel = requireMap(config, "chisel", configFile, errors);
+            if (chisel != null) {
+                requireAllowedKeys(
+                    chisel,
+                    Set.of("target_count", "target_timeout_ticks", "particle_count"),
+                    configFile,
+                    errors
+                );
+                requirePositiveInteger(chisel.get("target_count"), configFile, "chisel.target_count", errors);
+                requirePositiveInteger(
+                    chisel.get("target_timeout_ticks"),
+                    configFile,
+                    "chisel.target_timeout_ticks",
+                    errors
+                );
+                requirePositiveInteger(chisel.get("particle_count"), configFile, "chisel.particle_count", errors);
+            }
             validateResourceFeatureSection(
                 config, "mineral",
                 Set.of("enabled", "normal_bonus_drop", "work_speed", "inspection", "chisel_game", "batch_mining"),
