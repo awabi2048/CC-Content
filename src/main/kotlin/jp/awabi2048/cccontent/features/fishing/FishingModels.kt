@@ -223,8 +223,6 @@ object FishingCatchSelector {
     ): List<FishDefinition> = definitions.filter { definition ->
         context.fisherLevel >= definition.minLevel &&
             (definition.biomes.isEmpty() || definition.biomes.any { it.equals(context.biome, true) }) &&
-            (definition.weather.isEmpty() || context.weather in definition.weather) &&
-            (definition.times.isEmpty() || context.time in definition.times) &&
             (!checkWater || context.waterProfile?.let(definition.water::matches) == true) &&
             (definition.requiredBaitTags.isEmpty() ||
                 bait?.specialTags?.containsAll(definition.requiredBaitTags) == true)
@@ -241,7 +239,7 @@ object FishingCatchSelector {
         if (candidates.isEmpty()) return null
         val rareMultiplier = bait?.rareCatchMultiplier ?: 1.0
         val selected = weighted(candidates, random) { definition ->
-            definition.weight * when (definition.rarity) {
+            definition.weight * preferenceMultiplier(definition, context) * when (definition.rarity) {
                 FishRarity.COMMON -> 1.0
                 FishRarity.RARE, FishRarity.SPECIAL -> rareMultiplier
             }
@@ -260,6 +258,26 @@ object FishingCatchSelector {
             size
         )
         return selected to catch
+    }
+
+    @JvmStatic
+    fun preferenceMultiplier(
+        definition: FishDefinition,
+        context: FishingContext
+    ): Double = preferenceMultiplier(definition.weather, definition.times, context.weather, context.time)
+
+    @JvmStatic
+    fun preferenceMultiplier(
+        preferredWeather: Set<FishingWeather>,
+        preferredTimes: Set<FishingTime>,
+        actualWeather: FishingWeather,
+        actualTime: FishingTime
+    ): Double {
+        val weatherMultiplier =
+            if (preferredWeather.isEmpty() || actualWeather in preferredWeather) 1.0 else 0.75
+        val timeMultiplier =
+            if (preferredTimes.isEmpty() || actualTime in preferredTimes) 1.0 else 0.8
+        return weatherMultiplier * timeMultiplier
     }
 
     private fun <T> weighted(items: List<T>, random: Random, weight: (T) -> Double): T {

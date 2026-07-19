@@ -9,6 +9,9 @@ import jp.awabi2048.cccontent.features.fishing.FishingEffectivenessZone;
 import jp.awabi2048.cccontent.features.fishing.FishingFightStatus;
 import jp.awabi2048.cccontent.features.fishing.FishingFightScore;
 import jp.awabi2048.cccontent.features.fishing.FishingFightState;
+import jp.awabi2048.cccontent.features.fishing.FishingCatchSelector;
+import jp.awabi2048.cccontent.features.fishing.FishingTime;
+import jp.awabi2048.cccontent.features.fishing.FishingWeather;
 import jp.awabi2048.cccontent.features.fishing.FishRarity;
 import jp.awabi2048.cccontent.features.fishing.FishingWaterCondition;
 import jp.awabi2048.cccontent.features.fishing.FishingWaterProfile;
@@ -19,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -128,6 +132,28 @@ class FishingModelTest {
         assertEquals(FishQuality.LEGENDARY, FishQuality.Companion.fromStoredId("legendary"));
         assertThrows(IllegalStateException.class, () -> FishQuality.Companion.fromStoredId("uncommon"));
         assertThrows(IllegalStateException.class, () -> FishQuality.Companion.fromStoredId("epic"));
+    }
+
+    @Test
+    void weatherAndTimePreferencesAdjustWeightWithoutExcludingTheFish() {
+        assertEquals(1.0, FishingCatchSelector.preferenceMultiplier(
+            Set.of(FishingWeather.RAIN),
+            Set.of(FishingTime.NIGHT),
+            FishingWeather.RAIN,
+            FishingTime.NIGHT
+        ));
+        assertEquals(0.75 * 0.8, FishingCatchSelector.preferenceMultiplier(
+            Set.of(FishingWeather.RAIN),
+            Set.of(FishingTime.NIGHT),
+            FishingWeather.CLEAR,
+            FishingTime.DAY
+        ), 0.000001);
+        assertTrue(FishingCatchSelector.preferenceMultiplier(
+            Set.of(FishingWeather.RAIN),
+            Set.of(FishingTime.NIGHT),
+            FishingWeather.CLEAR,
+            FishingTime.DAY
+        ) > 0.0);
     }
 
     @Test
