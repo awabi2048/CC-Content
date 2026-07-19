@@ -55,6 +55,9 @@ import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import java.io.File
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 import kotlin.math.ceil
 import kotlin.math.roundToInt
@@ -240,6 +243,10 @@ private class CookingController(
         HIGH
     }
 
+    private companion object {
+        const val CURRENT_STATE_SCHEMA_VERSION = 2
+    }
+
     fun initialize() {
         stateFile.parentFile.mkdirs()
         loadDefinitions()
@@ -334,6 +341,7 @@ private class CookingController(
         pending.clear()
         pendingLiquids.clear()
         active.clear()
+        if (stateFile.exists() && state.getInt("schema_version", -1) != CURRENT_STATE_SCHEMA_VERSION) return
         state.getConfigurationSection("pending")?.getKeys(false)?.forEach { pathKey ->
             val serialized = state.getString("pending.$pathKey.station") ?: return@forEach
             val station = CookingStationKey.deserialize(serialized) ?: return@forEach
@@ -382,6 +390,7 @@ private class CookingController(
 
     private fun saveState() {
         val output = YamlConfiguration()
+        output.set("schema_version", CURRENT_STATE_SCHEMA_VERSION)
         pending.forEach { (station, items) ->
             val path = "pending.${station.pathKey()}"
             output.set("$path.station", station.serialize())
@@ -410,7 +419,22 @@ private class CookingController(
             output.set("$path.container", liquid.container.name)
             output.set("$path.recipe_id", liquid.recipeId)
         }
-        output.save(stateFile)
+        saveAtomically(output, stateFile)
+    }
+
+    private fun saveAtomically(output: YamlConfiguration, target: File) {
+        val temporary = File(target.parentFile, "${target.name}.tmp")
+        output.save(temporary)
+        try {
+            Files.move(
+                temporary.toPath(),
+                target.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
     }
 
     private fun savePreparation(output: YamlConfiguration, path: String, preparation: BreweryPreparation) {
