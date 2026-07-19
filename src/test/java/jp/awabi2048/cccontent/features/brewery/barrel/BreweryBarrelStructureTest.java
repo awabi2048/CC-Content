@@ -12,7 +12,6 @@ class BreweryBarrelStructureTest {
     void smallAndLargeStructuresHaveFixedIndependentShapes() {
         assertEquals(8, BreweryBarrelStructure.INSTANCE.cells(BarrelSize.SMALL).size());
         assertEquals(40, BreweryBarrelStructure.INSTANCE.cells(BarrelSize.BIG).size());
-        assertTrue(BreweryBarrelStructure.INSTANCE.cells(BarrelSize.MINECRAFT).isEmpty());
     }
 
     @Test

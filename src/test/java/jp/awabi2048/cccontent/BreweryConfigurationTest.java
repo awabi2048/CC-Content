@@ -98,4 +98,24 @@ class BreweryConfigurationTest {
         assertTrue(start >= 0 && end > start);
         assertFalse(source.substring(start, end).contains("dropItemNaturally"));
     }
+
+    @Test
+    void fermentationAndAgingUseDistinctBarrelTypes() throws Exception {
+        var config = YamlConfiguration.loadConfiguration(CONFIG.toFile());
+        assertEquals("[ferment]", config.getString("brewery.barrel.fermentation_sign_keyword"));
+        assertEquals("barrel", config.getString("brewery.barrel.aging_sign_keyword"));
+        assertEquals(3, config.getInt("brewery.barrel.fermentation_capacity"));
+        assertFalse(config.contains("brewery.barrel.age_in_minecraft_barrels"));
+        assertFalse(config.contains("brewery.barrel.max_brews_in_minecraft_barrels"));
+
+        String source = Files.readString(Path.of(
+            "src/main/kotlin/jp/awabi2048/cccontent/features/brewery/BreweryController.kt"));
+        assertTrue(source.contains("fermentationBarrelFor(block)"));
+        assertTrue(source.contains("attachedVanillaBarrel(event.block)"));
+        assertTrue(source.contains("state.startedAtEpochMillis = System.currentTimeMillis()"));
+        assertTrue(source.contains("now - state.startedAtEpochMillis"));
+        assertFalse(source.contains("isFermentationCauldron"));
+        assertFalse(source.contains("BarrelSize.MINECRAFT"));
+        assertFalse(source.contains("FERMENT_FUEL_SLOT"));
+    }
 }

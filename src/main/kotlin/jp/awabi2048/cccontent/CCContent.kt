@@ -68,7 +68,7 @@ import jp.awabi2048.cccontent.items.misc.AirTriggerItem
 import jp.awabi2048.cccontent.items.misc.DecentBowItem
 import jp.awabi2048.cccontent.items.sukima.*
 import jp.awabi2048.cccontent.items.brewery.BreweryMockClockItem
-import jp.awabi2048.cccontent.items.brewery.BreweryMockYeastItem
+import jp.awabi2048.cccontent.items.brewery.BreweryCulturedYeastItem
 import jp.awabi2048.cccontent.items.brewery.BrewerySampleFilterItem
 import jp.awabi2048.cccontent.items.arena.*
 import jp.awabi2048.cccontent.features.arena.ArenaCommand
@@ -1075,7 +1075,7 @@ class CCContent : JavaPlugin(), Listener {
         if (isContentEnabled("brewery")) {
             CustomItemManager.register(BrewerySampleFilterItem(this))
             CustomItemManager.register(BreweryMockClockItem(this))
-            CustomItemManager.register(BreweryMockYeastItem(this))
+            CustomItemManager.register(BreweryCulturedYeastItem(this))
         }
 
         if (isContentEnabled("arena")) {

@@ -111,8 +111,14 @@ class CookingFeature(
 }
 
 private data class CookingIngredient(val id: String, val material: Material, val pdcId: String?)
+private enum class CookingEquipment {
+    PAN,
+    CAULDRON
+}
+
 private data class CookingRecipe(
     val id: String,
+    val equipment: CookingEquipment,
     val ingredients: Map<String, Int>,
     val seasonings: Map<String, Int>,
     val resultMaterial: Material,
@@ -218,9 +224,13 @@ private class CookingController(
                 ?: error("cooking recipe $id has invalid result material")
             val model = NamespacedKey.fromString(requireNotNull(section.getString("result.item_model")) { "cooking recipe $id result.item_model is required" })
                 ?: error("cooking recipe $id has invalid item_model")
+            val equipment = section.getString("equipment")
+                ?.uppercase()
+                ?.let { runCatching { CookingEquipment.valueOf(it) }.getOrNull() }
+                ?: error("cooking recipe $id has invalid equipment")
             require(ingredientMap.isNotEmpty()) { "cooking recipe $id has no ingredients" }
             recipes += CookingRecipe(
-                id, ingredientMap, seasoningMap, material, model,
+                id, equipment, ingredientMap, seasoningMap, material, model,
                 positiveLong(section.get("exp"), "cooking recipe $id exp"),
                 positiveLong(section.get("completion_seconds"), "cooking recipe $id completion_seconds") * 20L,
                 section.getDouble("weight", 1.0).also { require(it >= 0.0) { "cooking recipe $id weight must be non-negative" } }
@@ -303,12 +313,11 @@ private class CookingController(
 
     @EventHandler
     fun onStationClick(event: PlayerInteractEvent) {
-        if (event.action != Action.RIGHT_CLICK_BLOCK ||
-            event.clickedBlock?.type !in setOf(Material.CAMPFIRE, Material.SOUL_CAMPFIRE) ||
-            !event.player.isSneaking
-        ) return
+        if (event.action != Action.RIGHT_CLICK_BLOCK || !event.player.isSneaking) return
+        val block = event.clickedBlock ?: return
+        val equipment = equipmentAt(block) ?: return
         event.isCancelled = true
-        open(event.player, CookingStationKey.from(event.clickedBlock!!))
+        open(event.player, CookingStationKey.from(block), equipment)
     }
 
     @EventHandler
@@ -325,7 +334,7 @@ private class CookingController(
         }
         if (slot == CookingHolder.START) {
             event.isCancelled = true
-            if (cookingStartClickAllowed(event.click)) start(player, event.view.topInventory, holder.station)
+            if (cookingStartClickAllowed(event.click)) start(player, event.view.topInventory, holder.station, holder.equipment)
             return
         }
         if (slot == CookingHolder.CANCEL) {
@@ -353,7 +362,7 @@ private class CookingController(
         returnInputs(player, event.inventory, holder)
     }
 
-    private fun open(player: Player, station: CookingStationKey) {
+    private fun open(player: Player, station: CookingStationKey, equipment: CookingEquipment) {
         if (active.containsKey(station)) {
             player.sendMessage(message(player, "cooking.error.in_progress")); return
         }
@@ -376,7 +385,7 @@ private class CookingController(
             saveState()
         }
         val title = message(player, "cooking.ui.title")
-        val holder = CookingHolder(player.uniqueId, station)
+        val holder = CookingHolder(player.uniqueId, station, equipment)
         val inventory = Bukkit.createInventory(holder, 54, Component.text(title))
         holder.backingInventory = inventory
         render(inventory, player)
@@ -397,11 +406,21 @@ private class CookingController(
         inventory.setItem(CookingHolder.INFO, infoItem(player))
     }
 
-    private fun start(player: Player, inventory: Inventory, station: CookingStationKey) {
+    private fun start(
+        player: Player,
+        inventory: Inventory,
+        station: CookingStationKey,
+        equipment: CookingEquipment
+    ) {
+        val stationBlock = station.blockIfLoaded()
+        if (stationBlock == null || !hasActiveHeat(stationBlock, equipment)) {
+            player.sendMessage(message(player, "cooking.error.no_heat"))
+            return
+        }
         val ingredientItems = CookingHolder.INGREDIENT_SLOTS.mapNotNull(inventory::getItem).filter(::isRealItem)
         val seasoningItems = CookingHolder.SEASONING_SLOTS.mapNotNull(inventory::getItem).filter(::isRealItem)
         if (ingredientItems.isEmpty()) { player.sendMessage(message(player, "cooking.error.no_ingredients")); return }
-        val match = findBestMatch(ingredientItems, seasoningItems)
+        val match = findBestMatch(ingredientItems, seasoningItems, equipment)
         if (match == null || match.score < minimumSimilarity) { player.sendMessage(message(player, "cooking.error.recipe_not_found")); return }
         if (!consumeInputs(inventory, match.recipe)) {
             player.sendMessage(message(player, "cooking.error.recipe_not_found")); return
@@ -454,12 +473,11 @@ private class CookingController(
             tickCounter++
             active.entries.toList().forEach { (station, session) ->
                 val block = station.blockIfLoaded() ?: return@forEach
-                if (block.type !in setOf(Material.CAMPFIRE, Material.SOUL_CAMPFIRE)) {
+                if (equipmentAt(block) != session.recipe.equipment) {
                     invalidateStation(station)
                     return@forEach
                 }
-                val campfire = block.blockData as? org.bukkit.block.data.type.Campfire ?: return@forEach
-                if (!campfire.isLit) return@forEach
+                if (!hasActiveHeat(block, session.recipe.equipment)) return@forEach
                 session.remainingTicks--
                 if (session.remainingTicks <= 0L) complete(station)
             }
@@ -567,10 +585,14 @@ private class CookingController(
 
     fun catalogItems(): List<CatalogItem> = recipes.map { CatalogItem(it.id, it.resultMaterial) }
 
-    private fun findBestMatch(items: List<ItemStack>, seasonings: List<ItemStack>): CookingMatch? {
+    private fun findBestMatch(
+        items: List<ItemStack>,
+        seasonings: List<ItemStack>,
+        equipment: CookingEquipment
+    ): CookingMatch? {
         val actual = items.groupingBy(::itemId).fold(0) { total, item -> total + item.amount }
         val actualSeasonings = seasonings.groupingBy(::itemId).fold(0) { total, item -> total + item.amount }
-        return recipes.map { recipe ->
+        return recipes.asSequence().filter { it.equipment == equipment }.map { recipe ->
             val expectedWeight = recipe.ingredients.values.sum().coerceAtLeast(1).toDouble()
             val matched = recipe.ingredients.entries.sumOf { (id, amount) -> minOf(actual[id] ?: 0, amount).toDouble() / amount * amount }
             val missing = (expectedWeight - matched) / expectedWeight
@@ -580,6 +602,21 @@ private class CookingController(
             val seasoningScore = if (recipe.seasonings.isEmpty()) 1.0 else seasoningMatched / seasoningExpected
             CookingMatch(recipe, (matched / expectedWeight * 0.8 + seasoningScore * 0.2 - missing * 0.15 - extra * 0.2).coerceIn(0.0, 1.0))
         }.maxByOrNull { it.score }
+    }
+
+    private fun equipmentAt(block: org.bukkit.block.Block): CookingEquipment? = when {
+        block.type in setOf(Material.CAMPFIRE, Material.SOUL_CAMPFIRE) -> CookingEquipment.PAN
+        block.type == Material.WATER_CAULDRON -> CookingEquipment.CAULDRON
+        else -> null
+    }
+
+    private fun hasActiveHeat(block: org.bukkit.block.Block, equipment: CookingEquipment): Boolean {
+        val heatBlock = when (equipment) {
+            CookingEquipment.PAN -> block
+            CookingEquipment.CAULDRON -> block.getRelative(org.bukkit.block.BlockFace.DOWN)
+        }
+        if (heatBlock.type !in setOf(Material.CAMPFIRE, Material.SOUL_CAMPFIRE)) return false
+        return (heatBlock.blockData as? org.bukkit.block.data.type.Campfire)?.isLit == true
     }
 
     private fun itemId(item: ItemStack): String {
@@ -632,7 +669,11 @@ private class CookingController(
     private fun message(player: Player, key: String, placeholders: Map<String, Any> = emptyMap()): String = CCSystem.getAPI().getI18nString(player, key, placeholders)
 }
 
-private class CookingHolder(val owner: UUID, val station: CookingStationKey) : InventoryHolder {
+private class CookingHolder(
+    val owner: UUID,
+    val station: CookingStationKey,
+    val equipment: CookingEquipment
+) : InventoryHolder {
     lateinit var backingInventory: Inventory
     var returned: Boolean = false
     override fun getInventory(): Inventory = backingInventory

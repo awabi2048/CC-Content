@@ -82,7 +82,7 @@ class CookingConfigurationTest {
         assertTrue(source.contains("mutableMapOf<CookingStationKey, ActiveCooking>()"));
         assertTrue(source.contains("mutableMapOf<CookingStationKey, List<ItemStack>>()"));
         assertTrue(source.contains("station.blockIfLoaded()"));
-        assertTrue(source.contains("if (!campfire.isLit)"));
+        assertTrue(source.contains("hasActiveHeat(block, session.recipe.equipment)"));
         assertTrue(source.contains("invalidateStation(CookingStationKey.from(event.block))"));
         assertFalse(source.contains("dropItemNaturally"));
         assertFalse(source.contains("completionAt"));
@@ -105,6 +105,8 @@ class CookingConfigurationTest {
         assertNotNull(section);
         assertEquals(4, section.getKeys(false).size());
         for (var id : section.getKeys(false)) {
+            assertTrue(java.util.Set.of("PAN", "CAULDRON")
+                .contains(recipes.getString("recipes." + id + ".equipment")));
             var model = recipes.getString("recipes." + id + ".result.item_model");
             assertNotNull(model);
             assertTrue(model.startsWith("kota_server:custom_item/cooking/"));
@@ -116,6 +118,22 @@ class CookingConfigurationTest {
                 ).contains(material),
                 "non-vanilla-use custom result must use POISONOUS_POTATO: " + id);
         }
+    }
+
+    @Test
+    void panAndCauldronUseSeparateEquipmentPaths() throws Exception {
+        var config = YamlConfiguration.loadConfiguration(ROOT.resolve("config.yml").toFile());
+        assertFalse(config.contains("settings.station"));
+
+        var recipes = YamlConfiguration.loadConfiguration(ROOT.resolve("recipe.yml").toFile());
+        assertEquals("CAULDRON", recipes.getString("recipes.rustic_stew.equipment"));
+        assertEquals("PAN", recipes.getString("recipes.grilled_cod.equipment"));
+
+        var source = java.nio.file.Files.readString(Path.of(
+            "src/main/kotlin/jp/awabi2048/cccontent/features/cooking/CookingFeature.kt"));
+        assertTrue(source.contains("block.type == Material.WATER_CAULDRON"));
+        assertTrue(source.contains("block.getRelative(org.bukkit.block.BlockFace.DOWN)"));
+        assertTrue(source.contains("Material.CAMPFIRE, Material.SOUL_CAMPFIRE"));
     }
 
     @Test

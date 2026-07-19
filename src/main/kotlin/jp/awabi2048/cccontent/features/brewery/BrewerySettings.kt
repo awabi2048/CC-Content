@@ -113,9 +113,9 @@ data class BrewerySettings(
     val angelSharePercentPerYear: Double,
     val agingRealSecondsPerYear: Long,
     val smallBarrelSpeedMultiplier: Double,
-    val requireKeywordOnSigns: Boolean,
-    val ageInMinecraftBarrels: Boolean,
-    val maxBrewsInMinecraftBarrels: Int,
+    val fermentationSignKeyword: String,
+    val agingSignKeyword: String,
+    val fermentationCapacity: Int,
     val openLargeBarrelEverywhere: Boolean,
     val barrelInventoryRowsLarge: Int,
     val barrelInventoryRowsSmall: Int,
@@ -154,9 +154,17 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
             angelSharePercentPerYear = root.getDouble("aging.angel_share_percent_per_year", 2.0).coerceAtLeast(0.0),
             agingRealSecondsPerYear = root.getLong("aging.real_seconds_per_year", 1200L).coerceAtLeast(1L),
             smallBarrelSpeedMultiplier = root.getDouble("aging.small_barrel_speed_multiplier", 1.25).coerceAtLeast(0.1),
-            requireKeywordOnSigns = root.getBoolean("barrel.require_keyword_on_signs", true),
-            ageInMinecraftBarrels = root.getBoolean("barrel.age_in_minecraft_barrels", true),
-            maxBrewsInMinecraftBarrels = root.getInt("barrel.max_brews_in_minecraft_barrels", 6).coerceIn(1, 27),
+            fermentationSignKeyword = root.getString("barrel.fermentation_sign_keyword")
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+                ?: error("brewery.barrel.fermentation_sign_keyword is required"),
+            agingSignKeyword = root.getString("barrel.aging_sign_keyword")
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+                ?: error("brewery.barrel.aging_sign_keyword is required"),
+            fermentationCapacity = root.getInt("barrel.fermentation_capacity", 3).also {
+                require(it in 1..5) { "brewery.barrel.fermentation_capacity must be between 1 and 5" }
+            },
             openLargeBarrelEverywhere = root.getBoolean("barrel.open_large_everywhere", true),
             barrelInventoryRowsLarge = root.getInt("barrel.inventory_rows_large", 3).also {
                 require(it in 1..6) { "barrel.inventory_rows_large must be between 1 and 6" }

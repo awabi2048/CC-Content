@@ -66,7 +66,6 @@ object BreweryBarrelStructure {
                 }
             }
         }
-        BarrelSize.MINECRAFT -> emptyList()
     }
 
     fun material(woodType: String, role: BarrelBlockRole): Material? {

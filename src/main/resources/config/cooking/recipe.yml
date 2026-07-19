@@ -18,6 +18,7 @@ ingredients:
 
 recipes:
   rustic_stew:
+    equipment: CAULDRON
     ingredients:
       potato: 2
       carrot: 1
@@ -30,6 +31,7 @@ recipes:
     exp: 18
     completion_seconds: 4
   sweet_bread:
+    equipment: PAN
     ingredients:
       wheat: 3
       sugar: 1
@@ -41,6 +43,7 @@ recipes:
     exp: 15
     completion_seconds: 3
   grilled_cod:
+    equipment: PAN
     ingredients:
       cod: 2
       potato: 1
@@ -52,6 +55,7 @@ recipes:
     exp: 16
     completion_seconds: 3
   carrot_cookie:
+    equipment: PAN
     ingredients:
       carrot: 2
       wheat: 1
