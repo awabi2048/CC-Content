@@ -44,6 +44,3 @@ brewery:
     fermentation: 10
     distillation: 20
     aging: 30
-  debug:
-    quality_log: true
-

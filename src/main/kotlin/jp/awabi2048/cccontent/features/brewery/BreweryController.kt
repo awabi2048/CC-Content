@@ -994,12 +994,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             return
         }
 
-        if (settings.qualityDebugLog) {
-            plugin.logger.info(
-                "[BreweryDebug] fermentation match: player=${player.name}, recipe=${recipe.id}, typeMatch=${matchResult.typeMatchCount}, countDiff=${"%.2f".format(matchResult.countDifferenceScore)}, quality=${"%.2f".format(matchResult.quality)}, unmatched=${matchResult.unmatchedItemAmount}"
-            )
-        }
-
         val ingredientMap = mutableMapOf<Material, Int>()
         inputItems.forEach { item ->
             ingredientMap[item.type] = (ingredientMap[item.type] ?: 0) + item.amount
@@ -1287,9 +1281,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
                 val recipe = recipes[state.recipeId]
                 if (recipe != null && state.currentFirePower != recipe.fermentationIdealFirePower) {
                     state.mismatchPenaltyStepCount += 1
-                    if (settings.qualityDebugLog) {
-                        plugin.logger.info("[BreweryDebug] fermentation fire mismatch: recipe=${recipe.id}, step=${state.mismatchPenaltyStepCount}, fire=${state.currentFirePower}, ideal=${recipe.fermentationIdealFirePower}")
-                    }
                 }
             }
             spawnFermentationParticle(state)
@@ -1345,7 +1336,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
                 state.inventory.setItem(slot, item)
                 val afterParsed = codec.parse(item)
                 if (afterParsed != null) {
-                    debugQuality("distillation-step", parsed.recipeId, before, afterParsed.quality, "sessionRuns=${state.sessionDistillationRuns}")
                 }
             }
 
@@ -1375,7 +1365,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val previous = state.lastCalculatedQuality
         state.lastCalculatedQuality = final
         if (previous != final) {
-            debugQuality("fermentation", state.recipeId, previous, final, "base=${"%.2f".format(base)},time=${"%.2f".format(timeScore)},mismatch=${"%.2f".format(mismatchPenalty)}")
         }
         return final
     }
@@ -1766,7 +1755,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             }
         }
         val after = afterState?.quality ?: before
-        debugQuality("distillation-finalize", parsed.recipeId, before, after, "targetRuns=$target,actualRuns=${parsed.distillCount}")
     }
 
     private fun applyBlackFrame(inventory: Inventory, protectedSlots: Set<Int>) {
@@ -1798,7 +1786,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         player?.let {
             recordCatalog(it.uniqueId, parsed.recipeId, finalQuality, drunk = false, obtained = true)
         }
-        debugQuality("aging", parsed.recipeId, parsed.quality, finalQuality, "years=${"%.2f".format(years)},targetYears=$targetYears")
     }
 
     private fun agingInputSlots(holder: AgingHolder): List<Int> {
@@ -1903,14 +1890,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         } catch (_: Exception) {
             null
         }
-    }
-
-    private fun debugQuality(stage: String, recipeId: String, before: Double, after: Double, reason: String) {
-        if (!settings.qualityDebugLog) return
-        if (before == after) return
-        plugin.logger.info(
-            "[BreweryDebug] quality change: stage=$stage, recipe=$recipeId, before=${"%.2f".format(before)}, after=${"%.2f".format(after)}, delta=${"%.2f".format(after - before)}, reason=$reason"
-        )
     }
 
     private fun firePowerFor(material: Material?): FirePower? {
