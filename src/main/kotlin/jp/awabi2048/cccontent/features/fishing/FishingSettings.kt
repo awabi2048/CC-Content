@@ -78,6 +78,9 @@ data class FishingSettings(
                                 "$path.preferred_seasons and $path.excluded_seasons must not overlap"
                             }
                         },
+                    preferredEnvironments = config.getStringList("$path.preferred_environments")
+                        .map(FishingEnvironment::fromConfigId)
+                        .toSet(),
                     water = FishingWaterCondition(
                         type = FishingWaterType.fromConfigId(requireString(config.getString("$path.water.type"), "$path.water.type")),
                         depth = positiveRange(config, "$path.water.depth"),

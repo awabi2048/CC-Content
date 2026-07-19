@@ -626,6 +626,13 @@ class FishingFeature(
                 add(CatalogCondition("fishing.dictionary.condition.season", localizedValues =
                     if (fish.preferredSeasons.isEmpty()) listOf("fishing.dictionary.condition.year_round")
                     else fish.preferredSeasons.map { "fishing.dictionary.season.${it.name.lowercase()}" }))
+                if (fish.preferredEnvironments.isNotEmpty()) {
+                    add(CatalogCondition(
+                        "fishing.dictionary.condition.environment",
+                        localizedValues = fish.preferredEnvironments
+                            .map { "fishing.dictionary.environment.${it.id}" }
+                    ))
+                }
                 add(CatalogCondition("fishing.dictionary.condition.level",
                     rawValue = fish.minLevel.toString()))
                 if (fish.requiredBaitTags.isNotEmpty()) {

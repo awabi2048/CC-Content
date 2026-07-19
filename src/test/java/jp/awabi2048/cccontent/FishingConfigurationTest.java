@@ -65,6 +65,8 @@ class FishingConfigurationTest {
             var preferredSeasons = Set.copyOf(config.getStringList("fish." + fish + ".preferred_seasons"));
             var excludedSeasons = Set.copyOf(config.getStringList("fish." + fish + ".excluded_seasons"));
             assertTrue(java.util.Collections.disjoint(preferredSeasons, excludedSeasons));
+            assertTrue(Set.of("estuary", "sand_bottom", "aquatic_vegetation", "rocky_deep")
+                .containsAll(config.getStringList("fish." + fish + ".preferred_environments")));
         }
         assertTrue(Set.copyOf(config.getStringList("fish.cod.biomes")).equals(
             Set.of("ocean", "cold_ocean", "deep_ocean", "deep_cold_ocean", "river")
@@ -84,5 +86,9 @@ class FishingConfigurationTest {
         assertTrue(Set.copyOf(config.getStringList("fish.ayu.excluded_seasons")).equals(Set.of("winter")));
         assertTrue(Set.copyOf(config.getStringList("fish.salmon.excluded_seasons")).equals(Set.of("spring")));
         assertTrue(Set.copyOf(config.getStringList("fish.smelt.excluded_seasons")).equals(Set.of("summer")));
+        assertTrue(Set.copyOf(config.getStringList("fish.flounder.preferred_environments"))
+            .equals(Set.of("sand_bottom")));
+        assertTrue(Set.copyOf(config.getStringList("fish.sea_bass.preferred_environments"))
+            .equals(Set.of("estuary")));
     }
 }

@@ -59,8 +59,22 @@ enum class FishingWaterType(val id: String) {
 
 data class FishingWaterProfile(
     val depth: Int,
-    val width: Int
+    val width: Int,
+    val environments: Set<FishingEnvironment> = emptySet()
 )
+
+enum class FishingEnvironment(val id: String) {
+    ESTUARY("estuary"),
+    SAND_BOTTOM("sand_bottom"),
+    AQUATIC_VEGETATION("aquatic_vegetation"),
+    ROCKY_DEEP("rocky_deep");
+
+    companion object {
+        fun fromConfigId(id: String): FishingEnvironment =
+            entries.firstOrNull { it.id.equals(id, true) }
+                ?: error("Unknown fishing environment: $id")
+    }
+}
 
 data class FishingWaterCondition(
     val type: FishingWaterType,
@@ -81,6 +95,7 @@ data class FishDefinition(
     val times: Set<FishingTime>,
     val preferredSeasons: Set<Season>,
     val excludedSeasons: Set<Season>,
+    val preferredEnvironments: Set<FishingEnvironment>,
     val water: FishingWaterCondition,
     val sizeCm: IntRange,
     val weightGrams: IntRange,
@@ -151,6 +166,16 @@ object FishingWaterAnalyzer {
         Material.TALL_SEAGRASS,
         Material.BUBBLE_COLUMN
     )
+    private val sandBottoms = setOf(Material.SAND, Material.RED_SAND, Material.SUSPICIOUS_SAND)
+    private val rockyBottoms = setOf(
+        Material.STONE,
+        Material.DEEPSLATE,
+        Material.ANDESITE,
+        Material.DIORITE,
+        Material.GRANITE,
+        Material.TUFF,
+        Material.GRAVEL
+    )
     private val widthAxes = listOf(
         (1 to 0) to (-1 to 0),
         (0 to 1) to (0 to -1),
@@ -179,7 +204,41 @@ object FishingWaterAnalyzer {
             1 + runLength(surface, positive.first, positive.second) +
                 runLength(surface, negative.first, negative.second)
         }
-        return FishingWaterProfile(depth, width)
+        return FishingWaterProfile(depth, width, analyzeEnvironment(surface, cursor, depth))
+    }
+
+    private fun analyzeEnvironment(surface: Block, bottom: Block, depth: Int): Set<FishingEnvironment> =
+        buildSet {
+            if (bottom.type in sandBottoms) add(FishingEnvironment.SAND_BOTTOM)
+            if (depth >= 8 && bottom.type in rockyBottoms) add(FishingEnvironment.ROCKY_DEEP)
+            if (hasAquaticVegetation(surface)) add(FishingEnvironment.AQUATIC_VEGETATION)
+            if (isEstuary(surface)) add(FishingEnvironment.ESTUARY)
+        }
+
+    private fun hasAquaticVegetation(surface: Block): Boolean =
+        (-4..4).any { dx ->
+            (-4..4).any { dz ->
+                (0 until minOf(6, surface.y - surface.world.minHeight + 1)).any { depth ->
+                    surface.getRelative(dx, -depth, dz).type in waterPlants
+                }
+            }
+        }
+
+    private fun isEstuary(surface: Block): Boolean {
+        var riverFound = false
+        var oceanFound = false
+        for (dx in -32..32 step 4) {
+            for (dz in -32..32 step 4) {
+                val x = surface.x + dx
+                val z = surface.z + dz
+                if (!surface.world.isChunkLoaded(Math.floorDiv(x, 16), Math.floorDiv(z, 16))) continue
+                val biome = surface.world.getBiome(x, surface.y, z).key.key
+                riverFound = riverFound || biome == "river" || biome == "frozen_river"
+                oceanFound = oceanFound || biome.endsWith("ocean")
+                if (riverFound && oceanFound) return true
+            }
+        }
+        return false
     }
 
     private fun runLength(origin: Block, dx: Int, dz: Int): Int {
@@ -269,15 +328,29 @@ object FishingCatchSelector {
     fun preferenceMultiplier(
         definition: FishDefinition,
         context: FishingContext
-    ): Double = preferenceMultiplier(
-        definition.weather,
-        definition.times,
-        definition.preferredSeasons,
-        definition.excludedSeasons,
-        context.weather,
-        context.time,
-        context.season
-    )
+    ): Double {
+        val conditionMultiplier = preferenceMultiplier(
+            definition.weather,
+            definition.times,
+            definition.preferredSeasons,
+            definition.excludedSeasons,
+            context.weather,
+            context.time,
+            context.season
+        )
+        val environmentMultiplier = environmentPreferenceMultiplier(
+            definition.preferredEnvironments,
+            context.waterProfile?.environments.orEmpty()
+        )
+        return conditionMultiplier * environmentMultiplier
+    }
+
+    @JvmStatic
+    fun environmentPreferenceMultiplier(
+        preferredEnvironments: Set<FishingEnvironment>,
+        actualEnvironments: Set<FishingEnvironment>
+    ): Double =
+        if (preferredEnvironments.isEmpty() || preferredEnvironments.any(actualEnvironments::contains)) 1.0 else 0.8
 
     @JvmStatic
     fun preferenceMultiplier(

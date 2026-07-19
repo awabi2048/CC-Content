@@ -17,6 +17,7 @@ import jp.awabi2048.cccontent.features.fishing.FishRarity;
 import jp.awabi2048.cccontent.features.fishing.FishingWaterCondition;
 import jp.awabi2048.cccontent.features.fishing.FishingWaterProfile;
 import jp.awabi2048.cccontent.features.fishing.FishingWaterType;
+import jp.awabi2048.cccontent.features.fishing.FishingEnvironment;
 import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
 
@@ -38,9 +39,9 @@ class FishingModelTest {
             new kotlin.ranges.IntRange(21, 33)
         );
 
-        assertTrue(offshore.matches(new FishingWaterProfile(12, 25)));
-        assertTrue(!offshore.matches(new FishingWaterProfile(4, 25)));
-        assertTrue(!offshore.matches(new FishingWaterProfile(12, 10)));
+        assertTrue(offshore.matches(new FishingWaterProfile(12, 25, Set.of(FishingEnvironment.ROCKY_DEEP))));
+        assertTrue(!offshore.matches(new FishingWaterProfile(4, 25, Set.of())));
+        assertTrue(!offshore.matches(new FishingWaterProfile(12, 10, Set.of())));
     }
 
     @Test
@@ -164,6 +165,18 @@ class FishingModelTest {
             FishingTime.DAY,
             Season.SPRING
         ) > 0.0);
+    }
+
+    @Test
+    void localEnvironmentPreferencesAdjustWeightWithoutExcludingTheFish() {
+        assertEquals(1.0, FishingCatchSelector.environmentPreferenceMultiplier(
+            Set.of(FishingEnvironment.ESTUARY),
+            Set.of(FishingEnvironment.ESTUARY, FishingEnvironment.SAND_BOTTOM)
+        ));
+        assertEquals(0.8, FishingCatchSelector.environmentPreferenceMultiplier(
+            Set.of(FishingEnvironment.ESTUARY),
+            Set.of(FishingEnvironment.ROCKY_DEEP)
+        ));
     }
 
     @Test

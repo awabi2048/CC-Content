@@ -55,6 +55,7 @@ fish:
     min_level: 1
     biomes: [ocean, cold_ocean, deep_ocean, deep_cold_ocean, river]
     preferred_seasons: [winter]
+    preferred_environments: [rocky_deep]
     size_cm: { min: 30, max: 100 }
     weight_grams: { min: 300, max: 15000 }
     water:
@@ -75,6 +76,7 @@ fish:
     biomes: [river, frozen_river, ocean, cold_ocean]
     preferred_seasons: [autumn]
     excluded_seasons: [spring]
+    preferred_environments: [estuary]
     size_cm: { min: 40, max: 150 }
     weight_grams: { min: 1000, max: 30000 }
     water:
@@ -175,6 +177,7 @@ fish:
     min_level: 7
     biomes: [river, ocean, lukewarm_ocean]
     preferred_seasons: [summer]
+    preferred_environments: [estuary]
     weather: [rain]
     times: [dusk, night]
     size_cm: { min: 35, max: 130 }
@@ -208,6 +211,7 @@ fish:
     rarity: common
     min_level: 1
     biomes: [ocean, lukewarm_ocean, warm_ocean]
+    preferred_environments: [aquatic_vegetation]
     size_cm: { min: 10, max: 35 }
     weight_grams: { min: 20, max: 500 }
     water:
@@ -223,6 +227,7 @@ fish:
     min_level: 2
     biomes: [ocean, lukewarm_ocean, warm_ocean]
     preferred_seasons: [summer, autumn]
+    preferred_environments: [aquatic_vegetation]
     times: [dawn, dusk]
     size_cm: { min: 12, max: 55 }
     weight_grams: { min: 30, max: 2500 }
@@ -238,6 +243,7 @@ fish:
     rarity: common
     min_level: 4
     biomes: [ocean, cold_ocean, lukewarm_ocean]
+    preferred_environments: [aquatic_vegetation]
     size_cm: { min: 20, max: 65 }
     weight_grams: { min: 120, max: 4500 }
     water:
@@ -252,6 +258,7 @@ fish:
     rarity: rare
     min_level: 6
     biomes: [river, ocean, lukewarm_ocean]
+    preferred_environments: [estuary]
     weather: [rain]
     times: [dusk, night]
     size_cm: { min: 30, max: 120 }
@@ -269,6 +276,7 @@ fish:
     min_level: 7
     biomes: [ocean, cold_ocean, lukewarm_ocean]
     preferred_seasons: [spring, winter]
+    preferred_environments: [sand_bottom]
     size_cm: { min: 20, max: 105 }
     weight_grams: { min: 150, max: 14000 }
     water:
@@ -313,6 +321,7 @@ fish:
     rarity: rare
     min_level: 9
     biomes: [warm_ocean, lukewarm_ocean, deep_lukewarm_ocean]
+    preferred_environments: [rocky_deep]
     times: [day, dusk]
     size_cm: { min: 25, max: 160 }
     weight_grams: { min: 400, max: 70000 }
@@ -328,6 +337,7 @@ fish:
     rarity: special
     min_level: 14
     biomes: [deep_ocean, deep_cold_ocean, deep_frozen_ocean, deep_lukewarm_ocean]
+    preferred_environments: [rocky_deep]
     times: [night, dawn]
     size_cm: { min: 25, max: 140 }
     weight_grams: { min: 500, max: 45000 }
@@ -382,6 +392,7 @@ fish:
     rarity: special
     min_level: 15
     biomes: [deep_ocean, deep_cold_ocean, deep_frozen_ocean, deep_lukewarm_ocean]
+    preferred_environments: [rocky_deep]
     times: [night, dawn]
     size_cm: { min: 120, max: 250 }
     weight_grams: { min: 30000, max: 120000 }
