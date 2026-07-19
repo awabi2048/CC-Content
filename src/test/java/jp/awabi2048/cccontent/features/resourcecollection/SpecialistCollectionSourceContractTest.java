@@ -65,8 +65,11 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("surfaceGatheringStore.claim"));
         assertTrue(source.contains("\"surface_gathering\" to target.surface.toString()"));
         assertTrue(source.contains("resource.forest_guide"));
-        assertTrue(source.contains("resource.forest_knife"));
+        assertTrue(source.contains("resource.woodworking_knife"));
         assertTrue(source.contains("forestTargets[player.uniqueId] = targets"));
+        assertTrue(source.contains("ForestProductHarvestStore"));
+        assertTrue(source.contains("forestProducts.resolve"));
+        assertTrue(source.contains("block.type = stripped"));
         assertTrue(source.contains("gatheringTargets[player.uniqueId] = targets"));
         assertTrue(source.contains("getSeasonService().currentSeason()"));
         assertTrue(source.contains("profile.detailedInspectionEnabled"));

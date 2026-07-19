@@ -862,6 +862,52 @@ public final class ResourceConfigurationValidator {
                 configFile, errors
             );
         }
+        Path forestProductsFile = configRoot.resolve("resource_collection/forest_products.yml");
+        Map<String, Object> forestProducts = rootMap(configs, forestProductsFile, errors);
+        if (forestProducts != null) {
+            requireAllowedKeys(
+                forestProducts,
+                Set.of(
+                    "schema_version", "enabled", "base_discovery_chance",
+                    "maximum_discovery_bonus", "burl_override_chance"
+                ),
+                forestProductsFile,
+                errors
+            );
+            requireIntegerRange(
+                forestProducts.get("schema_version"),
+                2,
+                2,
+                forestProductsFile,
+                "schema_version",
+                errors
+            );
+            requireBoolean(forestProducts, "enabled", forestProductsFile, "enabled", errors);
+            requireFiniteNumberRange(
+                forestProducts.get("base_discovery_chance"),
+                0.0,
+                1.0,
+                forestProductsFile,
+                "base_discovery_chance",
+                errors
+            );
+            requireFiniteNumberRange(
+                forestProducts.get("maximum_discovery_bonus"),
+                0.0,
+                1.0,
+                forestProductsFile,
+                "maximum_discovery_bonus",
+                errors
+            );
+            requireFiniteNumberRange(
+                forestProducts.get("burl_override_chance"),
+                0.0,
+                1.0,
+                forestProductsFile,
+                "burl_override_chance",
+                errors
+            );
+        }
     }
 
     private static void validateResourceFeatureSection(

@@ -89,7 +89,10 @@ class SpecialistCollectionService(
     private data class ForestProductTarget(
         val customItemId: String,
         val definitionId: String,
-        val expiresAt: Instant
+        val expiresAt: Instant,
+        val root: BlockKey,
+        val species: TreeSpecies,
+        val targetKind: ForestProductTargetKind
     )
 
     private val chiselSessions = mutableMapOf<UUID, ChiselSession>()
@@ -102,6 +105,9 @@ class SpecialistCollectionService(
     private val surfaceGatheringStore = SurfaceGatheringStore(
         plugin.dataFolder.resolve("data/resource_collection/surface_gathering.yml")
     )
+    private val forestProductHarvestStore = ForestProductHarvestStore(
+        plugin.dataFolder.resolve("data/resource_collection/forest_product_harvests.yml")
+    )
 
     fun shutdown() {
         chiselSessions.keys.toList().forEach { cancelChisel(it, null) }
@@ -111,6 +117,7 @@ class SpecialistCollectionService(
         forestTargets.clear()
         forestCooldowns.clear()
         surfaceGatheringStore.save()
+        forestProductHarvestStore.save()
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
@@ -199,8 +206,10 @@ class SpecialistCollectionService(
                     processPlacedLog(event, block, precise = false)
                 }
             "resource.woodworking_knife" ->
-                ifEnabled(ResourceOperation.LUMBERJACK_TIMBER_PROCESSING) {
-                    processPlacedLog(event, block, precise = true)
+                if (!tryHarvestForestProduct(event, block)) {
+                    ifEnabled(ResourceOperation.LUMBERJACK_TIMBER_PROCESSING) {
+                        processPlacedLog(event, block, precise = true)
+                    }
                 }
             "resource.forest_guide" ->
                 ifEnabled(ResourceOperation.LUMBERJACK_FOREST_PRODUCTS) { inspectForestProducts(event, block) }
@@ -830,9 +839,18 @@ class SpecialistCollectionService(
             player.sendMessage(message(player, "resource_collection.error.lumberjack_required"))
             return
         }
-        if (!isReadyNatural(origin) ||
-            ResourceMaterialPolicy.classify(origin.type, origin.blockData) != ResourceCollectionKind.FOREST) {
+        val species = TreeSpecies.fromTrunk(origin.type)
+        if (!isReadyNatural(origin) || species == null) {
             player.sendMessage(message(player, "resource_collection.error.natural_tree_required"))
+            return
+        }
+        val treeBlocks = collectTreeTrunks(origin, species)
+        val root = treeBlocks.minWithOrNull(
+            compareBy<Block>({ it.y }, { it.location.distanceSquared(origin.location) }, { it.x }, { it.z })
+        )
+        if (root == null || isAzaleaTree(species, treeBlocks) ||
+            forestProductHarvestStore.isHarvested(root, species)) {
+            player.sendMessage(message(player, "resource_collection.forest.no_discoveries"))
             return
         }
         val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
@@ -843,34 +861,53 @@ class SpecialistCollectionService(
         val expiresAt = now.plusSeconds(60)
         val targets = mutableMapOf<BlockKey, ForestProductTarget>()
         val discoveredNames = linkedSetOf<String>()
-        val radius = profile.inspectionRadius.coerceIn(2, 8)
-        for (x in -radius..radius) for (y in -radius..radius) for (z in -radius..radius) {
-            val block = origin.getRelative(x, y, z)
-            if (!isReadyNatural(block)) continue
-            val definition = forestProducts.select(
-                origin.type,
-                block.type,
-                block.biome.key.toString(),
-                profile.discoveryChanceBonus,
-                random
-            ) ?: continue
-            if (CustomItemManager.getItem(definition.customItemId) == null) {
+        val resolution = forestProducts.resolve(
+            species,
+            root.biome.key.toString(),
+            root.world.seed,
+            root.x,
+            root.y,
+            root.z,
+            profile.discoveryChanceBonus
+        )
+        if (resolution != null) {
+            val targetBlock = selectForestProductTarget(root, species, treeBlocks, resolution.type)
+            if (targetBlock != null && CustomItemManager.getItem(resolution.type.itemId) == null) {
                 plugin.logger.warning(
-                    "[Resource Collection] 存在しない林産物アイテムを無視しました: ${definition.customItemId}"
+                    "[Resource Collection] 存在しない林産物アイテムを無視しました: ${resolution.type.itemId}"
                 )
-                continue
             }
-            if (!CCSystem.getAPI().hasI18nKey(definition.displayNameKey)) {
+            if (targetBlock != null && !CCSystem.getAPI().hasI18nKey(resolution.type.displayNameKey)) {
                 plugin.logger.warning(
-                    "[Resource Collection] 存在しない林産物言語キーを無視しました: ${definition.displayNameKey}"
+                    "[Resource Collection] 存在しない林産物言語キーを無視しました: ${resolution.type.displayNameKey}"
                 )
-                continue
             }
-            targets[block.key()] = ForestProductTarget(definition.customItemId, definition.id, expiresAt)
-            if (profile.exactMaterialInspectionEnabled) {
-                discoveredNames.add(CCSystem.getAPI().getI18nString(player, definition.displayNameKey))
+            if (targetBlock != null &&
+                CustomItemManager.getItem(resolution.type.itemId) != null &&
+                CCSystem.getAPI().hasI18nKey(resolution.type.displayNameKey)) {
+                targets[targetBlock.key()] = ForestProductTarget(
+                    resolution.type.itemId,
+                    resolution.type.name.lowercase(),
+                    expiresAt,
+                    root.key(),
+                    species,
+                    resolution.type.targetKind
+                )
+                if (profile.exactMaterialInspectionEnabled) {
+                    discoveredNames.add(
+                        CCSystem.getAPI().getI18nString(player, resolution.type.displayNameKey)
+                    )
+                }
+                player.spawnParticle(
+                    Particle.WAX_ON,
+                    targetBlock.location.add(0.5, 0.6, 0.5),
+                    3,
+                    0.16,
+                    0.15,
+                    0.16,
+                    0.0
+                )
             }
-            player.spawnParticle(Particle.WAX_ON, block.location.add(0.5, 0.6, 0.5), 3, 0.16, 0.15, 0.16, 0.0)
         }
         forestTargets[player.uniqueId] = targets
         forestCooldowns[player.uniqueId] = now.plusSeconds(profile.inspectionCooldownSeconds.coerceAtLeast(1).toLong())
@@ -890,29 +927,125 @@ class SpecialistCollectionService(
         player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.05f)
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    fun onForestProductDrops(event: BlockDropItemEvent) {
-        if (!settings.isOperationEnabled(ResourceOperation.LUMBERJACK_FOREST_PRODUCTS)) return
+    private fun tryHarvestForestProduct(event: PlayerInteractEvent, block: Block): Boolean {
+        if (!settings.isOperationEnabled(ResourceOperation.LUMBERJACK_FOREST_PRODUCTS)) return false
         val player = event.player
-        if (CustomItemManager.identify(player.inventory.itemInMainHand)?.fullId != "resource.forest_knife") return
-        val targets = forestTargets[player.uniqueId] ?: return
-        val target = targets.remove(event.block.key()) ?: return
+        val targets = forestTargets[player.uniqueId] ?: return false
+        val target = targets.remove(block.key()) ?: return false
+        event.isCancelled = true
         val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
-        if (target.expiresAt.isBefore(now)) return
-        val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? LumberjackSkillProfile ?: return
-        val amount = 1 + if (random.nextDouble() < profile.extraForestProductChance) 1 else 0
-        giveCustomItem(player, target.customItemId, amount)
+        if (target.expiresAt.isBefore(now)) return true
+        val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? LumberjackSkillProfile ?: return true
+        val root = target.root.resolve() ?: return true
+        val validTarget = when (target.targetKind) {
+            ForestProductTargetKind.LOG -> block.type == target.species.log
+            ForestProductTargetKind.LEAF -> block.type == target.species.leaves
+        }
+        if (!validTarget || !isReadyNatural(block) ||
+            forestProductHarvestStore.isHarvested(root, target.species)) {
+            player.sendMessage(message(player, "resource_collection.forest.no_discoveries"))
+            return true
+        }
+        val allowed = when (target.targetKind) {
+            ForestProductTargetKind.LOG -> callProtectedInteract(block, player)
+            ForestProductTargetKind.LEAF -> callProtectedBreak(block, player)
+        }
+        if (!allowed) {
+            player.sendMessage(message(player, "resource_collection.error.protected"))
+            return true
+        }
+        if (!forestProductHarvestStore.claim(root, target.species)) return true
+        val originalMaterial = block.type
+        when (target.targetKind) {
+            ForestProductTargetKind.LOG -> {
+                val stripped = strippedType(block.type) ?: return true
+                block.type = stripped
+            }
+            ForestProductTargetKind.LEAF -> block.breakNaturally(player.inventory.itemInMainHand, true)
+        }
+        giveCustomItem(player, target.customItemId, 1)
         if (player.gameMode != GameMode.CREATIVE && random.nextDouble() >= profile.durabilitySaveChance) {
             player.damageItemStack(EquipmentSlot.HAND, 1)
         }
         awardSpecialist(
             player,
             ContentActionType.TREE_PROCESSED,
-            amount > 1,
-            event.blockState.type,
+            false,
+            originalMaterial,
             mapOf("forest_product_definition" to target.definitionId)
         )
-        player.sendMessage(message(player, "resource_collection.forest.completed", "amount" to amount))
+        player.sendMessage(message(player, "resource_collection.forest.completed", "amount" to 1))
+        return true
+    }
+
+    private fun collectTreeTrunks(origin: Block, species: TreeSpecies): List<Block> {
+        val queue = ArrayDeque<Block>()
+        val visited = mutableSetOf<BlockKey>()
+        val result = mutableListOf<Block>()
+        queue.add(origin)
+        while (queue.isNotEmpty() && result.size < 256) {
+            val block = queue.removeFirst()
+            if (!visited.add(block.key()) || !species.isTrunk(block.type) || !isReadyNatural(block)) continue
+            result.add(block)
+            for (x in -1..1) for (y in -1..1) for (z in -1..1) {
+                if (x == 0 && y == 0 && z == 0) continue
+                queue.add(block.getRelative(x, y, z))
+            }
+        }
+        return result
+    }
+
+    private fun isAzaleaTree(species: TreeSpecies, trunks: List<Block>): Boolean =
+        species == TreeSpecies.OAK && trunks.any { trunk ->
+            (-2..2).any { x -> (-2..2).any { y -> (-2..2).any { z ->
+                trunk.getRelative(x, y, z).type in setOf(
+                    Material.AZALEA_LEAVES,
+                    Material.FLOWERING_AZALEA_LEAVES
+                )
+            } } }
+        }
+
+    private fun selectForestProductTarget(
+        root: Block,
+        species: TreeSpecies,
+        trunks: List<Block>,
+        product: ForestProductType
+    ): Block? {
+        if (product.targetKind == ForestProductTargetKind.LEAF) {
+            val leaves = linkedMapOf<BlockKey, Block>()
+            trunks.forEach { trunk ->
+                for (x in -2..2) for (y in -2..2) for (z in -2..2) {
+                    val candidate = trunk.getRelative(x, y, z)
+                    if (candidate.type == species.leaves && isReadyNatural(candidate)) {
+                        leaves.putIfAbsent(candidate.key(), candidate)
+                    }
+                }
+            }
+            return stableTarget(leaves.values.toList(), root, species)
+        }
+        val unstripped = trunks.filter { it.type == species.log }
+        val preferredHeight = unstripped.filter { it.y - root.y in 1..3 }
+        val exposed = unstripped.filter(::isExposedTrunk)
+        val nonRoot = unstripped.filter { it.key() != root.key() }
+        return stableTarget(
+            preferredHeight.ifEmpty { exposed }.ifEmpty { nonRoot }.ifEmpty { unstripped },
+            root,
+            species
+        )
+    }
+
+    private fun isExposedTrunk(block: Block): Boolean =
+        listOf(BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST)
+            .map(block::getRelative)
+            .any { it.type.isAir || ResourceMaterialPolicy.isLeaf(it.type) }
+
+    private fun stableTarget(candidates: List<Block>, root: Block, species: TreeSpecies): Block? {
+        if (candidates.isEmpty()) return null
+        val sorted = candidates.sortedWith(compareBy<Block>({ it.y }, { it.x }, { it.z }))
+        var value = root.world.seed xor root.x.toLong().shl(32) xor root.y.toLong().shl(16) xor
+            root.z.toLong() xor species.ordinal.toLong()
+        value = value xor (value ushr 33)
+        return sorted[Math.floorMod(value, sorted.size.toLong()).toInt()]
     }
 
     private fun cropSeed(crop: Material): Material? = when (crop) {

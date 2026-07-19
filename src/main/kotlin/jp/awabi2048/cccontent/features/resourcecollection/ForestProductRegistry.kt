@@ -4,47 +4,92 @@ import org.bukkit.Material
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
-import java.util.Locale
-import java.util.Random
+import kotlin.math.abs
 
-data class ForestProductDefinition(
-    val id: String,
-    val customItemId: String,
-    val displayNameKey: String,
-    val treeMaterials: Set<Material>,
-    val targetMaterials: Set<Material>,
-    val biomeKeys: Set<String>,
-    val discoveryChance: Double,
-    val weight: Int
+enum class TreeSpecies(
+    val log: Material,
+    val strippedLog: Material,
+    val leaves: Material
 ) {
-    fun matches(tree: Material, target: Material, biomeKey: String): Boolean =
-        tree in treeMaterials && target in targetMaterials &&
-            (biomeKeys.isEmpty() || biomeKey in biomeKeys)
+    OAK(Material.OAK_LOG, Material.STRIPPED_OAK_LOG, Material.OAK_LEAVES),
+    SPRUCE(Material.SPRUCE_LOG, Material.STRIPPED_SPRUCE_LOG, Material.SPRUCE_LEAVES),
+    BIRCH(Material.BIRCH_LOG, Material.STRIPPED_BIRCH_LOG, Material.BIRCH_LEAVES),
+    JUNGLE(Material.JUNGLE_LOG, Material.STRIPPED_JUNGLE_LOG, Material.JUNGLE_LEAVES),
+    ACACIA(Material.ACACIA_LOG, Material.STRIPPED_ACACIA_LOG, Material.ACACIA_LEAVES),
+    DARK_OAK(Material.DARK_OAK_LOG, Material.STRIPPED_DARK_OAK_LOG, Material.DARK_OAK_LEAVES),
+    MANGROVE(Material.MANGROVE_LOG, Material.STRIPPED_MANGROVE_LOG, Material.MANGROVE_LEAVES),
+    CHERRY(Material.CHERRY_LOG, Material.STRIPPED_CHERRY_LOG, Material.CHERRY_LEAVES),
+    PALE_OAK(Material.PALE_OAK_LOG, Material.STRIPPED_PALE_OAK_LOG, Material.PALE_OAK_LEAVES);
+
+    fun isTrunk(material: Material): Boolean = material == log || material == strippedLog
+
+    companion object {
+        fun fromTrunk(material: Material): TreeSpecies? = entries.firstOrNull { it.isTrunk(material) }
+    }
 }
 
-class ForestProductRegistry private constructor(
-    private val enabled: Boolean,
-    private val definitions: List<ForestProductDefinition>
+enum class ForestProductTargetKind {
+    LOG,
+    LEAF
+}
+
+enum class ForestProductType(
+    val itemId: String,
+    val targetKind: ForestProductTargetKind
 ) {
-    fun select(
-        tree: Material,
-        target: Material,
+    PINE_CONE("resource.pine_cone", ForestProductTargetKind.LEAF),
+    TREE_RESIN("resource.tree_resin", ForestProductTargetKind.LOG),
+    BIRCH_OUTER_BARK("resource.birch_outer_bark", ForestProductTargetKind.LOG),
+    TANNIN_BARK("resource.tannin_bark", ForestProductTargetKind.LOG),
+    TINDER_FUNGUS("resource.tinder_fungus", ForestProductTargetKind.LOG),
+    ACACIA_GUM("resource.acacia_gum", ForestProductTargetKind.LOG),
+    AROMATIC_WOOD_CHIP("resource.aromatic_wood_chip", ForestProductTargetKind.LOG),
+    BURL_WOOD("resource.burl_wood", ForestProductTargetKind.LOG);
+
+    val displayNameKey: String
+        get() = "custom_items.resource.${itemId.substringAfter('.')}.name"
+}
+
+data class ForestProductSettings(
+    val enabled: Boolean,
+    val baseDiscoveryChance: Double,
+    val maximumDiscoveryBonus: Double,
+    val burlOverrideChance: Double
+)
+
+data class ForestProductResolution(
+    val type: ForestProductType,
+    val fixedValue: Double
+)
+
+class ForestProductRegistry private constructor(
+    val settings: ForestProductSettings
+) {
+    fun resolve(
+        species: TreeSpecies,
         biomeKey: String,
-        chanceBonus: Double,
-        random: Random
-    ): ForestProductDefinition? {
-        if (!enabled) return null
-        val candidates = definitions.filter { it.matches(tree, target, biomeKey) }
-        val totalWeight = candidates.sumOf(ForestProductDefinition::weight)
-        if (totalWeight <= 0) return null
-        var cursor = random.nextInt(totalWeight)
-        val selected = candidates.firstOrNull { candidate ->
-            cursor -= candidate.weight
-            cursor < 0
-        } ?: return null
-        return selected.takeIf {
-            random.nextDouble() < (selected.discoveryChance + chanceBonus).coerceIn(0.0, 1.0)
+        worldSeed: Long,
+        rootX: Int,
+        rootY: Int,
+        rootZ: Int,
+        discoveryBonus: Double
+    ): ForestProductResolution? {
+        if (!settings.enabled) return null
+        val base = resolveBaseProduct(species, biomeKey) ?: return null
+        val fixedValue = stableValue(worldSeed, rootX, rootY, rootZ, species, 0x4650524f44554354L)
+        val threshold = settings.baseDiscoveryChance +
+            discoveryBonus.coerceIn(0.0, settings.maximumDiscoveryBonus)
+        if (fixedValue >= threshold) return null
+        val product = if (
+            isBurlEnvironment(species, biomeKey) &&
+            stableValue(worldSeed, rootX, rootY, rootZ, species, 0x4255524c574f4f44L) <
+            settings.burlOverrideChance
+        ) {
+            ForestProductType.BURL_WOOD
+        } else {
+            base
         }
+        return ForestProductResolution(product, fixedValue)
     }
 
     companion object {
@@ -53,64 +98,102 @@ class ForestProductRegistry private constructor(
         fun load(plugin: JavaPlugin): ForestProductRegistry {
             val file = ensureFile(plugin)
             val config = YamlConfiguration.loadConfiguration(file)
-            require(config.get("schema_version") is Number && config.getInt("schema_version") == 1) {
-                "$CONFIG_PATH.schema_version must be the integer 1"
+            require(config.get("schema_version") is Number && config.getInt("schema_version") == 2) {
+                "$CONFIG_PATH.schema_version must be the integer 2"
             }
-            val enabled = config.get("enabled") as? Boolean
-                ?: throw IllegalArgumentException("$CONFIG_PATH.enabled must be a boolean")
-            val definitions = config.getMapList("definitions").mapIndexed(::parseDefinition)
-            val duplicates = definitions.groupingBy(ForestProductDefinition::id).eachCount()
-                .filterValues { it > 1 }.keys
-            require(duplicates.isEmpty()) { "$CONFIG_PATH contains duplicate ids: ${duplicates.sorted()}" }
+            val settings = ForestProductSettings(
+                enabled = config.boolean("enabled"),
+                baseDiscoveryChance = config.chance("base_discovery_chance"),
+                maximumDiscoveryBonus = config.chance("maximum_discovery_bonus"),
+                burlOverrideChance = config.chance("burl_override_chance")
+            )
             plugin.logger.info(
-                "Resource Collection: forest product registry enabled=$enabled definitions=${definitions.size}"
+                "Resource Collection: forest products enabled=${settings.enabled} " +
+                    "base=${settings.baseDiscoveryChance} bonus=${settings.maximumDiscoveryBonus} " +
+                    "burl=${settings.burlOverrideChance}"
             )
-            return ForestProductRegistry(enabled, definitions)
+            return ForestProductRegistry(settings)
         }
 
-        fun of(enabled: Boolean, definitions: List<ForestProductDefinition>): ForestProductRegistry =
-            ForestProductRegistry(enabled, definitions)
+        fun of(settings: ForestProductSettings): ForestProductRegistry = ForestProductRegistry(settings)
 
-        private fun parseDefinition(index: Int, raw: Map<*, *>): ForestProductDefinition {
-            val path = "$CONFIG_PATH.definitions[$index]"
-            val id = string(raw, "id", path)
-            require(id.matches(Regex("[a-z0-9_]+"))) { "$path.id must use lowercase snake_case" }
-            val customItemId = string(raw, "custom_item_id", path)
-            val displayNameKey = string(raw, "display_name_key", path)
-            val treeMaterials = materials(raw, "tree_materials", path)
-            val targetMaterials = materials(raw, "target_materials", path)
-            val biomeKeys = stringList(raw, "biome_keys", path, optional = true)
-                .map { it.lowercase(Locale.ROOT) }.toSet()
-            biomeKeys.forEach { key ->
-                require(key.matches(Regex("[a-z0-9_.-]+:[a-z0-9_./-]+"))) { "$path.biome_keys contains invalid key: $key" }
+        fun resolveBaseProduct(species: TreeSpecies, biomeKey: String): ForestProductType? {
+            val biome = biomeKey.substringAfter(':').lowercase()
+            return when (species) {
+                TreeSpecies.SPRUCE -> when (biome) {
+                    "old_growth_pine_taiga", "old_growth_spruce_taiga" -> ForestProductType.TREE_RESIN
+                    else -> ForestProductType.PINE_CONE
+                }
+                TreeSpecies.BIRCH -> when (biome) {
+                    "old_growth_birch_forest" -> ForestProductType.TINDER_FUNGUS
+                    else -> ForestProductType.BIRCH_OUTER_BARK
+                }
+                TreeSpecies.OAK -> when (biome) {
+                    "swamp" -> ForestProductType.TINDER_FUNGUS
+                    else -> ForestProductType.TANNIN_BARK
+                }
+                TreeSpecies.DARK_OAK -> ForestProductType.TANNIN_BARK
+                TreeSpecies.PALE_OAK -> when (biome) {
+                    "pale_garden" -> ForestProductType.TINDER_FUNGUS
+                    else -> null
+                }
+                TreeSpecies.JUNGLE -> ForestProductType.AROMATIC_WOOD_CHIP
+                TreeSpecies.ACACIA -> ForestProductType.ACACIA_GUM
+                TreeSpecies.MANGROVE -> when (biome) {
+                    "mangrove_swamp" -> ForestProductType.TANNIN_BARK
+                    else -> null
+                }
+                TreeSpecies.CHERRY -> when (biome) {
+                    "cherry_grove" -> ForestProductType.AROMATIC_WOOD_CHIP
+                    else -> null
+                }
             }
-            val chance = (raw["discovery_chance"] as? Number)?.toDouble()
-                ?: throw IllegalArgumentException("$path.discovery_chance must be a number")
-            require(chance in 0.0..1.0) { "$path.discovery_chance must be between 0 and 1" }
-            val weight = (raw["weight"] as? Number)?.toInt()
-                ?: throw IllegalArgumentException("$path.weight must be an integer")
-            require(weight > 0) { "$path.weight must be positive" }
-            return ForestProductDefinition(
-                id, customItemId, displayNameKey, treeMaterials, targetMaterials, biomeKeys, chance, weight
-            )
         }
 
-        private fun materials(raw: Map<*, *>, key: String, path: String): Set<Material> =
-            stringList(raw, key, path).map { value ->
-                runCatching { Material.valueOf(value.uppercase(Locale.ROOT)) }
-                    .getOrElse { throw IllegalArgumentException("$path.$key contains invalid material: $value") }
-            }.toSet().also { require(it.isNotEmpty()) { "$path.$key must not be empty" } }
-
-        private fun string(raw: Map<*, *>, key: String, path: String): String =
-            (raw[key] as? String)?.takeIf { it.isNotBlank() }
-                ?: throw IllegalArgumentException("$path.$key must be a non-empty string")
-
-        private fun stringList(raw: Map<*, *>, key: String, path: String, optional: Boolean = false): List<String> {
-            if (optional && key !in raw) return emptyList()
-            val list = raw[key] as? List<*> ?: throw IllegalArgumentException("$path.$key must be a list")
-            require(list.all { it is String && it.isNotBlank() }) { "$path.$key must contain strings" }
-            return list.filterIsInstance<String>()
+        fun isBurlEnvironment(species: TreeSpecies, biomeKey: String): Boolean {
+            val biome = biomeKey.substringAfter(':').lowercase()
+            return when (biome) {
+                "old_growth_pine_taiga", "old_growth_spruce_taiga" -> species == TreeSpecies.SPRUCE
+                "old_growth_birch_forest" -> species == TreeSpecies.BIRCH
+                "dark_forest" -> species == TreeSpecies.DARK_OAK || species == TreeSpecies.OAK
+                "jungle", "sparse_jungle", "bamboo_jungle" -> species == TreeSpecies.JUNGLE
+                "eroded_savanna" -> species == TreeSpecies.ACACIA
+                "cherry_grove" -> species == TreeSpecies.CHERRY
+                else -> false
+            }
         }
+
+        private fun stableValue(
+            worldSeed: Long,
+            x: Int,
+            y: Int,
+            z: Int,
+            species: TreeSpecies,
+            salt: Long
+        ): Double {
+            var value = worldSeed xor salt
+            value = mix(value xor x.toLong() * -7046029254386353131L)
+            value = mix(value xor y.toLong() * -4417276706812531889L)
+            value = mix(value xor z.toLong() * 1609587929392839161L)
+            value = mix(value xor species.ordinal.toLong() * -7723592293110705685L)
+            return (abs(value ushr 11).toDouble() / (1L shl 53).toDouble()).coerceIn(0.0, 1.0)
+        }
+
+        private fun mix(input: Long): Long {
+            var value = input
+            value = (value xor (value ushr 30)) * -4658895280553007687L
+            value = (value xor (value ushr 27)) * -7723592293110705685L
+            return value xor (value ushr 31)
+        }
+
+        private fun YamlConfiguration.boolean(path: String): Boolean =
+            get(path) as? Boolean
+                ?: throw IllegalArgumentException("$CONFIG_PATH.$path must be a boolean")
+
+        private fun YamlConfiguration.chance(path: String): Double =
+            ((get(path) as? Number)?.toDouble()
+                ?: throw IllegalArgumentException("$CONFIG_PATH.$path must be a number"))
+                .also { require(it in 0.0..1.0) { "$CONFIG_PATH.$path must be between 0 and 1" } }
 
         private fun ensureFile(plugin: JavaPlugin): File {
             val file = File(plugin.dataFolder, CONFIG_PATH)

@@ -9,7 +9,7 @@ import org.bukkit.World
 
 enum class ResourceCollectionKind(val profession: Profession, val bonusItemId: String) {
     MINERAL(Profession.MINER, "mica_flake"),
-    FOREST(Profession.LUMBERJACK, "resin"),
+    FOREST(Profession.LUMBERJACK, "tree_resin"),
     CROP(Profession.FARMER, "straw")
 }
 
@@ -26,7 +26,12 @@ object ResourceMaterialPolicy {
     private val logs = setOf(
         Material.OAK_LOG, Material.BIRCH_LOG, Material.SPRUCE_LOG, Material.JUNGLE_LOG,
         Material.ACACIA_LOG, Material.DARK_OAK_LOG, Material.MANGROVE_LOG, Material.CHERRY_LOG,
-        Material.PALE_OAK_LOG, Material.CRIMSON_STEM, Material.WARPED_STEM
+        Material.PALE_OAK_LOG,
+        Material.STRIPPED_OAK_LOG, Material.STRIPPED_BIRCH_LOG, Material.STRIPPED_SPRUCE_LOG,
+        Material.STRIPPED_JUNGLE_LOG, Material.STRIPPED_ACACIA_LOG, Material.STRIPPED_DARK_OAK_LOG,
+        Material.STRIPPED_MANGROVE_LOG, Material.STRIPPED_CHERRY_LOG, Material.STRIPPED_PALE_OAK_LOG,
+        Material.CRIMSON_STEM, Material.WARPED_STEM,
+        Material.STRIPPED_CRIMSON_STEM, Material.STRIPPED_WARPED_STEM
     )
     private val ageableCrops = setOf(
         Material.WHEAT, Material.CARROTS, Material.POTATOES, Material.BEETROOTS,
@@ -84,17 +89,17 @@ object ResourceMaterialPolicy {
         material == Material.NETHER_WART_BLOCK || material == Material.WARPED_WART_BLOCK
 
     fun treeReplantMaterial(material: Material): Material? = when (material) {
-        Material.OAK_LOG -> Material.OAK_SAPLING
-        Material.BIRCH_LOG -> Material.BIRCH_SAPLING
-        Material.SPRUCE_LOG -> Material.SPRUCE_SAPLING
-        Material.JUNGLE_LOG -> Material.JUNGLE_SAPLING
-        Material.ACACIA_LOG -> Material.ACACIA_SAPLING
-        Material.DARK_OAK_LOG -> Material.DARK_OAK_SAPLING
-        Material.MANGROVE_LOG -> Material.MANGROVE_PROPAGULE
-        Material.CHERRY_LOG -> Material.CHERRY_SAPLING
-        Material.PALE_OAK_LOG -> Material.PALE_OAK_SAPLING
-        Material.CRIMSON_STEM -> Material.CRIMSON_FUNGUS
-        Material.WARPED_STEM -> Material.WARPED_FUNGUS
+        Material.OAK_LOG, Material.STRIPPED_OAK_LOG -> Material.OAK_SAPLING
+        Material.BIRCH_LOG, Material.STRIPPED_BIRCH_LOG -> Material.BIRCH_SAPLING
+        Material.SPRUCE_LOG, Material.STRIPPED_SPRUCE_LOG -> Material.SPRUCE_SAPLING
+        Material.JUNGLE_LOG, Material.STRIPPED_JUNGLE_LOG -> Material.JUNGLE_SAPLING
+        Material.ACACIA_LOG, Material.STRIPPED_ACACIA_LOG -> Material.ACACIA_SAPLING
+        Material.DARK_OAK_LOG, Material.STRIPPED_DARK_OAK_LOG -> Material.DARK_OAK_SAPLING
+        Material.MANGROVE_LOG, Material.STRIPPED_MANGROVE_LOG -> Material.MANGROVE_PROPAGULE
+        Material.CHERRY_LOG, Material.STRIPPED_CHERRY_LOG -> Material.CHERRY_SAPLING
+        Material.PALE_OAK_LOG, Material.STRIPPED_PALE_OAK_LOG -> Material.PALE_OAK_SAPLING
+        Material.CRIMSON_STEM, Material.STRIPPED_CRIMSON_STEM -> Material.CRIMSON_FUNGUS
+        Material.WARPED_STEM, Material.STRIPPED_WARPED_STEM -> Material.WARPED_FUNGUS
         else -> null
     }
 

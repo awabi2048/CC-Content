@@ -14,7 +14,8 @@ class TreePostProcessingPolicyTest {
         assertEquals(Material.OAK_SAPLING, ResourceMaterialPolicy.INSTANCE.treeReplantMaterial(Material.OAK_LOG));
         assertEquals(Material.MANGROVE_PROPAGULE, ResourceMaterialPolicy.INSTANCE.treeReplantMaterial(Material.MANGROVE_LOG));
         assertEquals(Material.CRIMSON_FUNGUS, ResourceMaterialPolicy.INSTANCE.treeReplantMaterial(Material.CRIMSON_STEM));
-        assertNull(ResourceMaterialPolicy.INSTANCE.treeReplantMaterial(Material.STRIPPED_OAK_LOG));
+        assertEquals(Material.OAK_SAPLING,
+            ResourceMaterialPolicy.INSTANCE.treeReplantMaterial(Material.STRIPPED_OAK_LOG));
     }
 
     @Test
