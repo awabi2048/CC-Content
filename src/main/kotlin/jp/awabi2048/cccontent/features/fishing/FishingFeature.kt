@@ -118,10 +118,7 @@ class FishingFeature(
     private fun showLocalFishingHint(player: Player, event: PlayerInteractEvent) {
         event.isCancelled = true
         val block = surveyWaterBlock(player)
-        if (block == null) {
-            player.sendMessage(message(player, "fishing.dictionary.hint.not_water"))
-            return
-        }
+        if (block == null) return
         if (!isReadyResourceWorld(player)) return
         val bait = items.resolveBait(player.inventory.itemInOffHand)
         val candidates = FishingCatchSelector.candidates(
@@ -237,8 +234,6 @@ class FishingFeature(
         }
         if (!items.isUsableRod(rodItem)) {
             event.isCancelled = true
-            player.sendMessage(message(player, "fishing.error.rod_broken"))
-            player.playSound(player.location, Sound.ENTITY_ITEM_BREAK, 0.9f, 0.8f)
             return
         }
         val fisher = fisherContext(player)

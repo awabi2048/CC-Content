@@ -15,7 +15,6 @@ import org.bukkit.NamespacedKey
 import org.bukkit.Sound
 import org.bukkit.entity.Player
 import org.bukkit.event.player.PlayerInteractEvent
-import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.Damageable
 import org.bukkit.persistence.PersistentDataType
@@ -61,13 +60,12 @@ class FishingItems(
     fun damageRod(player: Player): Boolean {
         val item = player.inventory.itemInMainHand
         val rod = resolveRod(item) ?: return false
-        player.damageItemStack(EquipmentSlot.HAND, 1)
-        val damaged = player.inventory.itemInMainHand
-        if (damaged.type == Material.AIR || resolveRod(damaged) == null) return true
-        val meta = damaged.itemMeta as? Damageable ?: return true
+        val meta = item.itemMeta as? Damageable ?: return false
+        val broken = meta.damage + 1 >= rod.maxDurability
+        meta.damage = (meta.damage + 1).coerceAtMost(rod.maxDurability)
         meta.lore(rodLore(player, rod, meta.damage))
-        damaged.itemMeta = meta
-        return false
+        item.itemMeta = meta
+        return broken
     }
 
     fun resolveBait(item: ItemStack): BaitDefinition? {

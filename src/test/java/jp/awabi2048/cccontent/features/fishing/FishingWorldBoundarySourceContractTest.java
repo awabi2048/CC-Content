@@ -80,12 +80,8 @@ class FishingWorldBoundarySourceContractTest {
             dictionaryHint.indexOf("if (candidateNames.isEmpty())") <
                 dictionaryHint.indexOf(".render(GuiLoreSpec.Blocks")
         );
-        assertTrue(dictionaryHint.contains(
-            "if (block == null) {\n" +
-                "            player.sendMessage(message(player, \"fishing.dictionary.hint.not_water\"))\n" +
-                "            return\n" +
-                "        }"
-        ));
+        assertTrue(dictionaryHint.contains("if (block == null) return"));
+        assertFalse(dictionaryHint.contains("fishing.dictionary.hint.not_water"));
         assertTrue(dictionaryHint.contains("if (!isReadyResourceWorld(player)) return"));
         assertTrue(
             dictionaryHint.indexOf("if (block == null)") <
