@@ -66,7 +66,8 @@ class FishingWorldBoundarySourceContractTest {
         assertTrue(source.contains("player.rayTraceBlocks(10.0, FluidCollisionMode.ALWAYS)"));
         assertTrue(source.contains("val block = surveyWaterBlock(player)"));
         assertTrue(source.contains("val surveyBlock = surveyWaterBlock(player)"));
-        assertTrue(source.contains("if (candidates.isEmpty()) return"));
+        assertTrue(source.contains("candidateNames.takeIf(List<String>::isNotEmpty)"));
+        assertTrue(source.contains("message(player, \"fishing.dictionary.hint.none\")"));
     }
 
     @Test

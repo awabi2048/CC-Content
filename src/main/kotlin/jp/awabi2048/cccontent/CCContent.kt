@@ -468,6 +468,16 @@ class CCContent : JavaPlugin(), Listener {
             onReload = { reloadConfigFiles() },
             onRestart = { restartPlugin() },
             onClearBlockPlacementData = { clearBlockPlacementData() },
+            placementRecordingEnabledProvider = {
+                CCSystem.getAPI().getNaturalOriginRegistry().isPlacementRecordingEnabled()
+            },
+            onSetPlacementRecordingEnabled = { enabled, sender ->
+                CCSystem.getAPI().getNaturalOriginRegistry().setPlacementRecordingEnabled(enabled)
+                logger.info(
+                    "[ResourceCollectionAudit] placement_recording=${if (enabled) "enabled" else "disabled"} " +
+                        "actor=${sender.name}"
+                )
+            },
             mobDefinitionIdsProvider = { sharedMobService.getDefinitionIds() },
             onSummonMob = { definitionId, location -> summonConfiguredMob(definitionId, location) },
             onUpdateDay = { target ->

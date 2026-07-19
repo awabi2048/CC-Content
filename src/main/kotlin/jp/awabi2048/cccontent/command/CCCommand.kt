@@ -35,6 +35,8 @@ class CCCommand(
     private val onReload: (() -> Unit)? = null,
     private val onRestart: (() -> Unit)? = null,
     private val onClearBlockPlacementData: (() -> Unit)? = null,
+    private val placementRecordingEnabledProvider: (() -> Boolean)? = null,
+    private val onSetPlacementRecordingEnabled: ((Boolean, CommandSender) -> Unit)? = null,
     private val mobDefinitionIdsProvider: (() -> Collection<String>)? = null,
     private val onSummonMob: ((String, Location) -> Entity?)? = null,
     private val onUpdateDay: ((String?) -> Boolean)? = null,
@@ -303,7 +305,7 @@ class CCCommand(
         }
 
         if (args.size < 2) {
-            sender.sendMessage("§c使用法: /ccc debug <clear_block_placement_data|complete_oage_daily> ...")
+            sender.sendMessage(ContentManagementI18n.text(sender, "debug.usage"))
             return false
         }
 
@@ -311,13 +313,62 @@ class CCCommand(
 
         return when (mode) {
             "clear_block_placement_data" -> handleClearBlockPlacementData(sender, args)
+            "placement_recording" -> handlePlacementRecording(sender, args)
             "complete_oage_daily" -> handleCompleteOageDaily(sender, args)
             else -> {
-                sender.sendMessage("§cmodeは clear_block_placement_data または complete_oage_daily を指定してください")
+                sender.sendMessage(ContentManagementI18n.text(sender, "debug.unknown_mode", "mode" to mode))
                 false
             }
         }
     }
+
+    private fun handlePlacementRecording(sender: CommandSender, args: Array<String>): Boolean {
+        if (args.size != 3) {
+            sender.sendMessage(ContentManagementI18n.text(sender, "debug.placement_recording.usage"))
+            return false
+        }
+        val provider = placementRecordingEnabledProvider
+        val setter = onSetPlacementRecordingEnabled
+        if (provider == null || setter == null) {
+            sender.sendMessage(ContentManagementI18n.text(sender, "debug.placement_recording.unavailable"))
+            return false
+        }
+
+        return when (args[2].lowercase()) {
+            "status" -> {
+                sender.sendMessage(
+                    ContentManagementI18n.text(
+                        sender,
+                        "debug.placement_recording.status",
+                        "status" to placementRecordingStateText(sender, provider.invoke())
+                    )
+                )
+                true
+            }
+            "enable", "disable" -> {
+                val enabled = args[2].equals("enable", ignoreCase = true)
+                setter.invoke(enabled, sender)
+                sender.sendMessage(
+                    ContentManagementI18n.text(
+                        sender,
+                        "debug.placement_recording.changed",
+                        "status" to placementRecordingStateText(sender, enabled)
+                    )
+                )
+                true
+            }
+            else -> {
+                sender.sendMessage(ContentManagementI18n.text(sender, "debug.placement_recording.usage"))
+                false
+            }
+        }
+    }
+
+    private fun placementRecordingStateText(sender: CommandSender, enabled: Boolean): String =
+        ContentManagementI18n.text(
+            sender,
+            "debug.placement_recording.state.${if (enabled) "enabled" else "disabled"}"
+        )
 
     private fun handleCompleteOageDaily(sender: CommandSender, args: Array<String>): Boolean {
         if (!sender.hasPermission("cc-content.admin")) {
@@ -598,10 +649,13 @@ class CCCommand(
                "debug" -> {
                    if (!hasAdminPermission(sender)) return emptyList()
                    when (args.size) {
-                      2 -> listOf("clear_block_placement_data", "complete_oage_daily").filter { it.startsWith(args[1].lowercase()) }
-                     3 -> {
-                         when (args[1].lowercase()) {
-                             "complete_oage_daily" -> Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[2], ignoreCase = true) }
+                      2 -> listOf("clear_block_placement_data", "placement_recording", "complete_oage_daily")
+                          .filter { it.startsWith(args[1].lowercase()) }
+                      3 -> {
+                          when (args[1].lowercase()) {
+                              "placement_recording" -> listOf("enable", "disable", "status")
+                                  .filter { it.startsWith(args[2].lowercase()) }
+                              "complete_oage_daily" -> Bukkit.getOnlinePlayers().map { it.name }.filter { it.startsWith(args[2], ignoreCase = true) }
                              else -> emptyList()
                          }
                      }
