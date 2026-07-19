@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.brewery.model
 
 enum class BrewStage {
+    WORT,
     FERMENTED,
     DISTILLED,
     AGED,

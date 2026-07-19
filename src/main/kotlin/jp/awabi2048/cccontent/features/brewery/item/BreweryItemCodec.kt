@@ -21,6 +21,7 @@ import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import io.papermc.paper.datacomponent.DataComponentTypes
 import io.papermc.paper.datacomponent.item.CustomModelData
+import java.util.UUID
 import kotlin.math.roundToInt
 
 class BreweryItemCodec(private val plugin: JavaPlugin) {
@@ -39,6 +40,8 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     private val filterRemainingUsesKey = NamespacedKey(plugin, "brewery_filter_remaining_uses")
     private val expAwardedKey = NamespacedKey(plugin, "brewery_stage_exp_awarded")
     private val customItemIdKey = NamespacedKey("cccontent", "custom_item_id")
+    private val batchCountKey = NamespacedKey(plugin, "brewery_batch_count")
+    private val batchIdKey = NamespacedKey(plugin, "brewery_batch_id")
 
     data class BreweryItemState(
         val stage: BrewStage,
@@ -50,8 +53,53 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         val ambiguous: Boolean,
         val history: String,
         val agingStartedAt: Long,
-        val finalStars: Int
+        val finalStars: Int,
+        val batchCount: Int,
+        val batchId: UUID?
     )
+
+    fun createWortBottle(
+        recipeId: String,
+        quality: Double,
+        batches: Int,
+        recipe: BreweryRecipe,
+        player: Player?,
+        failed: Boolean
+    ): ItemStack {
+        val item = ItemStack(Material.POTION)
+        val meta = item.itemMeta ?: return item
+        meta.displayName(Component.text(text(
+            player,
+            if (failed) "brewery.item.name.muddy" else "brewery.item.name.wort",
+            "recipe" to text(player, "brewery.recipe.$recipeId.name")
+        )))
+        meta.lore(renderLore(player, text(player, "brewery.recipe.$recipeId.middle.description"), listOf(
+            "brewery.item.data.recipe" to text(player, "brewery.recipe.$recipeId.name"),
+            "brewery.item.data.stage" to text(player, if (failed) "brewery.item.stage.failed" else "brewery.item.stage.wort"),
+            "brewery.item.data.quality" to "%.1f".format(if (failed) 0.0 else quality),
+            "brewery.item.data.next_stage" to text(
+                player,
+                if (failed) "brewery.item.next_stage.none" else "brewery.item.next_stage.fermentation"
+            )
+        )))
+        val pdc = meta.persistentDataContainer
+        pdc.set(schemaVersionKey, PersistentDataType.INTEGER, CURRENT_SCHEMA_VERSION)
+        pdc.set(stageKey, PersistentDataType.STRING, if (failed) BrewStage.FAILED.name else BrewStage.WORT.name)
+        pdc.set(recipeIdKey, PersistentDataType.STRING, recipeId)
+        pdc.set(qualityKey, PersistentDataType.DOUBLE, if (failed) 0.0 else quality.coerceIn(0.0, 100.0))
+        pdc.set(batchCountKey, PersistentDataType.INTEGER, batches.coerceAtLeast(1))
+        pdc.set(batchIdKey, PersistentDataType.STRING, UUID.randomUUID().toString())
+        pdc.set(alcoholKey, PersistentDataType.DOUBLE, 0.0)
+        pdc.set(distillCountKey, PersistentDataType.INTEGER, 0)
+        pdc.set(muddyKey, PersistentDataType.BYTE, if (failed) 1 else 0)
+        pdc.set(ambiguousKey, PersistentDataType.BYTE, 0)
+        pdc.set(historyKey, PersistentDataType.STRING, "preparation")
+        pdc.set(finalStarsKey, PersistentDataType.INTEGER, 0)
+        pdc.set(customItemIdKey, PersistentDataType.STRING, "brewery.wort.$recipeId")
+        applyPotionColor(meta, recipe.middleOutputColor)
+        item.itemMeta = meta
+        return item
+    }
 
     fun createFermentedBottle(recipeId: String, quality: Double, muddy: Boolean, history: String, recipe: BreweryRecipe, player: Player?): ItemStack {
         val item = ItemStack(Material.POTION)
@@ -65,7 +113,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
             "brewery.item.data.quality" to "%.1f".format(quality)
         )))
         val pdc = meta.persistentDataContainer
-        pdc.set(schemaVersionKey, PersistentDataType.INTEGER, 2)
+        pdc.set(schemaVersionKey, PersistentDataType.INTEGER, CURRENT_SCHEMA_VERSION)
         pdc.set(stageKey, PersistentDataType.STRING, if (muddy) BrewStage.FAILED.name else BrewStage.FERMENTED.name)
         pdc.set(recipeIdKey, PersistentDataType.STRING, recipeId)
         pdc.set(qualityKey, PersistentDataType.DOUBLE, quality)
@@ -95,7 +143,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     fun parse(item: ItemStack?): BreweryItemState? {
         if (item == null || item.type.isAir) return null
         val pdc = item.itemMeta?.persistentDataContainer ?: return null
-        if (pdc.get(schemaVersionKey, PersistentDataType.INTEGER) != 2) return null
+        if (pdc.get(schemaVersionKey, PersistentDataType.INTEGER) != CURRENT_SCHEMA_VERSION) return null
         val stage = pdc.get(stageKey, PersistentDataType.STRING)?.let { runCatching { BrewStage.valueOf(it) }.getOrNull() } ?: return null
         val recipeId = pdc.get(recipeIdKey, PersistentDataType.STRING)?.takeIf { it.isNotBlank() } ?: return null
         return BreweryItemState(stage, recipeId,
@@ -106,7 +154,9 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
             (pdc.get(ambiguousKey, PersistentDataType.BYTE)?.toInt() ?: 0) == 1,
             pdc.get(historyKey, PersistentDataType.STRING) ?: "",
             pdc.get(agingStartKey, PersistentDataType.LONG) ?: 0L,
-            pdc.get(finalStarsKey, PersistentDataType.INTEGER) ?: 0)
+            pdc.get(finalStarsKey, PersistentDataType.INTEGER) ?: 0,
+            (pdc.get(batchCountKey, PersistentDataType.INTEGER) ?: 1).coerceAtLeast(1),
+            pdc.get(batchIdKey, PersistentDataType.STRING)?.let { runCatching { UUID.fromString(it) }.getOrNull() })
     }
 
     fun markDistilled(item: ItemStack, state: BreweryItemState, targetDistillCount: Int, overPenalty: Double, recipe: BreweryRecipe, player: Player?) {
@@ -233,5 +283,8 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         return CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(blocks))
     }
 
-    companion object { private const val FILTER_MAX_USES = 238 }
+    companion object {
+        private const val FILTER_MAX_USES = 238
+        private const val CURRENT_SCHEMA_VERSION = 3
+    }
 }

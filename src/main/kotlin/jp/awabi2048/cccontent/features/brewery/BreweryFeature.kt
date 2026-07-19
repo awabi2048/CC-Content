@@ -6,14 +6,22 @@ import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
+import jp.awabi2048.cccontent.features.brewery.item.BreweryItemCodec
 
 class BreweryFeature(private val plugin: JavaPlugin, private val catalogStore: CatalogStore) {
     private var controller: BreweryController? = null
     private var gardenController: GardenController? = null
+    private var preparationGateway: BreweryPreparationGateway? = null
 
     fun initialize(featureInitLogger: FeatureInitializationLogger? = null) {
         try {
             ensureResources()
+            val loader = BrewerySettingsLoader(plugin)
+            preparationGateway = DefaultBreweryPreparationGateway(
+                loader,
+                loader.loadRecipes(),
+                BreweryItemCodec(plugin)
+            )
             controller = BreweryController(plugin, catalogStore).also { it.initialize() }
             gardenController = GardenController(plugin).also { it.initialize() }
             featureInitLogger?.apply {
@@ -30,6 +38,7 @@ class BreweryFeature(private val plugin: JavaPlugin, private val catalogStore: C
             gardenController = null
             runCatching { controller?.shutdown() }
             controller = null
+            preparationGateway = null
             throw e
         }
     }
@@ -48,6 +57,7 @@ class BreweryFeature(private val plugin: JavaPlugin, private val catalogStore: C
         gardenController = null
         controller?.shutdown()
         controller = null
+        preparationGateway = null
     }
 
     fun flushDirty() {
@@ -56,6 +66,8 @@ class BreweryFeature(private val plugin: JavaPlugin, private val catalogStore: C
     }
 
     fun catalogItems(): List<CatalogItem> = controller?.catalogItems().orEmpty()
+
+    fun preparationGateway(): BreweryPreparationGateway? = preparationGateway
 
     private fun ensureResources() {
         ensureFile("config/brewery/config.yml")

@@ -1463,7 +1463,12 @@ class CCContent : JavaPlugin(), Listener {
     }
 
     private fun initializeCooking() {
-        val feature = CookingFeature(this, { rankManagerInstance }, catalogStore)
+        val feature = CookingFeature(
+            this,
+            { rankManagerInstance },
+            catalogStore,
+            { breweryFeature?.preparationGateway() }
+        )
         cookingFeature = feature
         feature.initialize(featureInitLogger)
     }

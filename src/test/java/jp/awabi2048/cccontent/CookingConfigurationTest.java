@@ -82,7 +82,8 @@ class CookingConfigurationTest {
         assertTrue(source.contains("mutableMapOf<CookingStationKey, ActiveCooking>()"));
         assertTrue(source.contains("mutableMapOf<CookingStationKey, List<ItemStack>>()"));
         assertTrue(source.contains("station.blockIfLoaded()"));
-        assertTrue(source.contains("hasActiveHeat(block, session.recipe.equipment)"));
+        assertTrue(source.contains("currentFirePower(block) != session.startedFirePower"));
+        assertTrue(source.contains("mutableMapOf<CookingStationKey, PendingLiquid>()"));
         assertTrue(source.contains("invalidateStation(CookingStationKey.from(event.block))"));
         assertFalse(source.contains("dropItemNaturally"));
         assertFalse(source.contains("completionAt"));

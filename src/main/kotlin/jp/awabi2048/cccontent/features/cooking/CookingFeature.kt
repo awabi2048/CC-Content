@@ -13,6 +13,10 @@ import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.profession.profile.CookSkillProfile
+import jp.awabi2048.cccontent.features.rank.profession.profile.BrewerSkillProfile
+import jp.awabi2048.cccontent.features.brewery.BreweryPreparation
+import jp.awabi2048.cccontent.features.brewery.BreweryPreparationGateway
+import jp.awabi2048.cccontent.features.brewery.model.FirePower
 import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import jp.awabi2048.cccontent.features.catalog.CatalogType
@@ -59,7 +63,8 @@ import kotlin.math.roundToInt
 class CookingFeature(
     private val plugin: JavaPlugin,
     private val rankManagerProvider: () -> RankManager?,
-    private val catalogStore: CatalogStore
+    private val catalogStore: CatalogStore,
+    private val breweryPreparationGateway: () -> BreweryPreparationGateway?
 ) {
     private var controller: CookingController? = null
 
@@ -72,7 +77,8 @@ class CookingFeature(
                 featureInitLogger?.setStatus("Cooking", FeatureInitializationLogger.Status.SUCCESS)
                 return
             }
-            controller = CookingController(plugin, rankManagerProvider, catalogStore).also { it.initialize() }
+            controller = CookingController(plugin, rankManagerProvider, catalogStore, breweryPreparationGateway)
+                .also { it.initialize() }
             featureInitLogger?.setStatus("Cooking", FeatureInitializationLogger.Status.SUCCESS)
         } catch (e: Exception) {
             featureInitLogger?.apply {
@@ -92,7 +98,10 @@ class CookingFeature(
             controller = null
             return
         }
-        controller?.reload() ?: run { controller = CookingController(plugin, rankManagerProvider, catalogStore).also { it.initialize() } }
+        controller?.reload() ?: run {
+            controller = CookingController(plugin, rankManagerProvider, catalogStore, breweryPreparationGateway)
+                .also { it.initialize() }
+        }
     }
 
     fun shutdown() { controller?.shutdown() }
@@ -133,7 +142,7 @@ private data class CookingRecipe(
 )
 private data class CookingMatch(val recipe: CookingRecipe, val score: Double)
 
-private data class CookProfileSnapshot(
+private data class ProcessingProfileSnapshot(
     val processingTimeReduction: Double,
     val minimumCompletion: Int,
     val ingredientSlots: Int,
@@ -144,7 +153,7 @@ private data class CookProfileSnapshot(
     val exactMatchCompletionBonus: Int
 ) {
     companion object {
-        fun from(profile: CookSkillProfile): CookProfileSnapshot = CookProfileSnapshot(
+        fun from(profile: CookSkillProfile): ProcessingProfileSnapshot = ProcessingProfileSnapshot(
             profile.processingTimeReduction,
             profile.minimumCompletion,
             profile.ingredientSlots,
@@ -153,6 +162,17 @@ private data class CookProfileSnapshot(
             profile.extraCompletionChance,
             profile.seasoningEffectMultiplier,
             profile.exactMatchCompletionBonus
+        )
+
+        fun from(profile: BrewerSkillProfile): ProcessingProfileSnapshot = ProcessingProfileSnapshot(
+            profile.processingTimeReduction,
+            profile.minimumQuality,
+            5,
+            profile.failurePenaltyReduction,
+            profile.materialLossReduction,
+            0.0,
+            1.0,
+            profile.exactConditionQualityBonus
         )
     }
 }
@@ -172,7 +192,8 @@ internal fun cookingInputRemainders(inputAmounts: Map<String, Int>, required: Ma
 private class CookingController(
     private val plugin: JavaPlugin,
     private val rankManagerProvider: () -> RankManager?,
-    private val catalogStore: CatalogStore
+    private val catalogStore: CatalogStore,
+    private val breweryPreparationGateway: () -> BreweryPreparationGateway?
 ) : Listener {
     private val configFile get() = File(plugin.dataFolder, "config/cooking/config.yml")
     private val recipeFile get() = File(plugin.dataFolder, "config/cooking/recipe.yml")
@@ -185,6 +206,7 @@ private class CookingController(
     private var minimumSimilarity = 0.5
     private var ingredientSlotsByLevel: Map<Int, Int> = emptyMap()
     private val pending = mutableMapOf<CookingStationKey, List<ItemStack>>()
+    private val pendingLiquids = mutableMapOf<CookingStationKey, PendingLiquid>()
     private val active = mutableMapOf<CookingStationKey, ActiveCooking>()
     private val stationLocks = mutableMapOf<CookingStationKey, UUID>()
     private var progressTask: BukkitTask? = null
@@ -197,11 +219,26 @@ private class CookingController(
         val score: Int,
         val seasoningIds: List<String>,
         val starterId: UUID,
-        val profile: CookProfileSnapshot,
+        val profile: ProcessingProfileSnapshot,
         val savedIngredient: ItemStack?,
         val extraResult: Boolean,
+        val preparation: BreweryPreparation? = null,
+        val startedFirePower: CookingFirePower = CookingFirePower.NORMAL,
+        val fireMismatch: Boolean = false,
         var settled: Boolean = false
     )
+
+    private data class PendingLiquid(
+        val prototype: ItemStack,
+        var remaining: Int,
+        val container: Material,
+        val recipeId: String
+    )
+
+    private enum class CookingFirePower {
+        NORMAL,
+        HIGH
+    }
 
     fun initialize() {
         stateFile.parentFile.mkdirs()
@@ -295,6 +332,7 @@ private class CookingController(
     private fun loadState() {
         state = if (stateFile.exists()) YamlConfiguration.loadConfiguration(stateFile) else YamlConfiguration()
         pending.clear()
+        pendingLiquids.clear()
         active.clear()
         state.getConfigurationSection("pending")?.getKeys(false)?.forEach { pathKey ->
             val serialized = state.getString("pending.$pathKey.station") ?: return@forEach
@@ -304,7 +342,10 @@ private class CookingController(
         state.getConfigurationSection("active")?.getKeys(false)?.forEach { pathKey ->
             val path = "active.$pathKey"
             val station = CookingStationKey.deserialize(state.getString("$path.station") ?: return@forEach) ?: return@forEach
-            val recipe = recipes.firstOrNull { it.id == state.getString("$path.recipe") } ?: return@forEach
+            val preparation = loadPreparation(state, "$path.preparation")
+            val recipe = recipes.firstOrNull { it.id == state.getString("$path.recipe") }
+                ?: preparation?.let(::preparationRecipe)
+                ?: return@forEach
             val starterId = state.getString("$path.starter")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                 ?: return@forEach
             val profile = loadProfile(state, "$path.profile") ?: return@forEach
@@ -316,7 +357,25 @@ private class CookingController(
                 starterId,
                 profile,
                 state.getItemStack("$path.saved_ingredient"),
-                state.getBoolean("$path.extra_result")
+                state.getBoolean("$path.extra_result"),
+                preparation,
+                runCatching {
+                    CookingFirePower.valueOf(state.getString("$path.started_fire_power") ?: "")
+                }.getOrDefault(CookingFirePower.NORMAL),
+                state.getBoolean("$path.fire_mismatch")
+            )
+        }
+        state.getConfigurationSection("liquids")?.getKeys(false)?.forEach { pathKey ->
+            val path = "liquids.$pathKey"
+            val station = CookingStationKey.deserialize(state.getString("$path.station") ?: return@forEach)
+                ?: return@forEach
+            val prototype = state.getItemStack("$path.prototype") ?: return@forEach
+            val container = Material.matchMaterial(state.getString("$path.container") ?: "") ?: return@forEach
+            pendingLiquids[station] = PendingLiquid(
+                prototype,
+                state.getInt("$path.remaining").coerceIn(1, 3),
+                container,
+                state.getString("$path.recipe_id") ?: return@forEach
             )
         }
     }
@@ -339,11 +398,56 @@ private class CookingController(
             saveProfile(output, "$path.profile", session.profile)
             output.set("$path.saved_ingredient", session.savedIngredient)
             output.set("$path.extra_result", session.extraResult)
+            output.set("$path.started_fire_power", session.startedFirePower.name)
+            output.set("$path.fire_mismatch", session.fireMismatch)
+            session.preparation?.let { savePreparation(output, "$path.preparation", it) }
+        }
+        pendingLiquids.forEach { (station, liquid) ->
+            val path = "liquids.${station.pathKey()}"
+            output.set("$path.station", station.serialize())
+            output.set("$path.prototype", liquid.prototype)
+            output.set("$path.remaining", liquid.remaining)
+            output.set("$path.container", liquid.container.name)
+            output.set("$path.recipe_id", liquid.recipeId)
         }
         output.save(stateFile)
     }
 
-    private fun saveProfile(output: YamlConfiguration, path: String, profile: CookProfileSnapshot) {
+    private fun savePreparation(output: YamlConfiguration, path: String, preparation: BreweryPreparation) {
+        output.set("$path.recipe_id", preparation.recipeId)
+        output.set("$path.quality", preparation.quality)
+        output.set("$path.batches", preparation.batches)
+        output.set("$path.fire_power", preparation.requiredFirePower.name)
+        output.set("$path.processing_seconds", preparation.processingSeconds)
+    }
+
+    private fun loadPreparation(input: YamlConfiguration, path: String): BreweryPreparation? {
+        val recipeId = input.getString("$path.recipe_id") ?: return null
+        val firePower = runCatching {
+            FirePower.valueOf(input.getString("$path.fire_power") ?: "")
+        }.getOrNull() ?: return null
+        return BreweryPreparation(
+            recipeId,
+            input.getDouble("$path.quality").coerceIn(0.0, 100.0),
+            input.getInt("$path.batches").coerceIn(1, 3),
+            firePower,
+            input.getInt("$path.processing_seconds").coerceAtLeast(1)
+        )
+    }
+
+    private fun preparationRecipe(preparation: BreweryPreparation): CookingRecipe = CookingRecipe(
+        preparation.recipeId,
+        CookingEquipment.CAULDRON,
+        emptyMap(),
+        emptyMap(),
+        Material.POTION,
+        NamespacedKey.minecraft("potion"),
+        0L,
+        preparation.processingSeconds * 20L,
+        1.0
+    )
+
+    private fun saveProfile(output: YamlConfiguration, path: String, profile: ProcessingProfileSnapshot) {
         output.set("$path.processing_time_reduction", profile.processingTimeReduction)
         output.set("$path.minimum_completion", profile.minimumCompletion)
         output.set("$path.ingredient_slots", profile.ingredientSlots)
@@ -354,9 +458,9 @@ private class CookingController(
         output.set("$path.exact_match_completion_bonus", profile.exactMatchCompletionBonus)
     }
 
-    private fun loadProfile(input: YamlConfiguration, path: String): CookProfileSnapshot? {
+    private fun loadProfile(input: YamlConfiguration, path: String): ProcessingProfileSnapshot? {
         if (!input.isConfigurationSection(path)) return null
-        return CookProfileSnapshot(
+        return ProcessingProfileSnapshot(
             input.getDouble("$path.processing_time_reduction").coerceIn(0.0, 1.0),
             input.getInt("$path.minimum_completion").coerceIn(0, 100),
             input.getInt("$path.ingredient_slots").coerceIn(1, 5),
@@ -404,6 +508,11 @@ private class CookingController(
             player.closeInventory()
             return
         }
+        if (slot in CookingHolder.LIQUID_SLOTS && pendingLiquids.containsKey(holder.station)) {
+            event.isCancelled = true
+            collectLiquid(player, event, holder.station)
+            return
+        }
         if (slot in CookingHolder.INGREDIENT_SLOTS && slot !in unlockedSlots(player)) event.isCancelled = true
         if (slot in 0 until event.view.topInventory.size && slot !in CookingHolder.INPUT_SLOTS) event.isCancelled = true
     }
@@ -412,6 +521,10 @@ private class CookingController(
     fun onDrag(event: InventoryDragEvent) {
         val holder = event.view.topInventory.holder as? CookingHolder ?: return
         val player = event.whoClicked as? Player ?: return
+        if (pendingLiquids.containsKey(holder.station)) {
+            if (event.rawSlots.any { it < event.view.topInventory.size }) event.isCancelled = true
+            return
+        }
         if (event.rawSlots.any { it !in unlockedSlots(player) && it !in CookingHolder.SEASONING_SLOTS }) event.isCancelled = true
     }
 
@@ -420,7 +533,7 @@ private class CookingController(
         val holder = event.inventory.holder as? CookingHolder ?: return
         val player = event.player as? Player ?: return
         stationLocks.remove(holder.station, player.uniqueId)
-        if (active.containsKey(holder.station)) return
+        if (active.containsKey(holder.station) || pendingLiquids.containsKey(holder.station)) return
         returnInputs(player, event.inventory, holder)
     }
 
@@ -449,7 +562,7 @@ private class CookingController(
         val holder = CookingHolder(player.uniqueId, station, equipment)
         val inventory = Bukkit.createInventory(holder, 54, Component.text(title))
         holder.backingInventory = inventory
-        render(inventory, player)
+        if (pendingLiquids.containsKey(station)) renderLiquid(inventory, player, station) else render(inventory, player)
         player.openInventory(inventory)
     }
 
@@ -473,8 +586,10 @@ private class CookingController(
         station: CookingStationKey,
         equipment: CookingEquipment
     ) {
+        if (pendingLiquids.containsKey(station)) return
         val stationBlock = station.blockIfLoaded()
-        if (stationBlock == null || !hasActiveHeat(stationBlock, equipment)) {
+        val startedFirePower = stationBlock?.let(::currentFirePower)
+        if (stationBlock == null || startedFirePower == null) {
             player.sendMessage(message(player, "cooking.error.no_heat"))
             return
         }
@@ -482,11 +597,26 @@ private class CookingController(
         val seasoningItems = CookingHolder.SEASONING_SLOTS.mapNotNull(inventory::getItem).filter(::isRealItem)
         if (ingredientItems.isEmpty()) { player.sendMessage(message(player, "cooking.error.no_ingredients")); return }
         val match = findBestMatch(ingredientItems, seasoningItems, equipment)
-        if (match == null || match.score < minimumSimilarity) { player.sendMessage(message(player, "cooking.error.recipe_not_found")); return }
-        val profile = rankManagerProvider()?.getTypedProfessionProfile(player.uniqueId) as? CookSkillProfile
-            ?: return player.sendMessage(message(player, "cooking.error.recipe_not_found"))
-        val snapshot = CookProfileSnapshot.from(profile)
-        if (match.recipe.ingredients.size > snapshot.ingredientSlots) {
+        val preparation = if ((match == null || match.score < minimumSimilarity) && equipment == CookingEquipment.CAULDRON) {
+            breweryPreparationGateway()?.match(ingredientItems + seasoningItems, 3)
+        } else null
+        if ((match == null || match.score < minimumSimilarity) && preparation == null) {
+            player.sendMessage(message(player, "cooking.error.recipe_not_found"))
+            return
+        }
+        val typedProfile = rankManagerProvider()?.getTypedProfessionProfile(player.uniqueId)
+        val snapshot = when {
+            preparation != null -> (typedProfile as? BrewerSkillProfile)?.let(ProcessingProfileSnapshot::from)
+            else -> (typedProfile as? CookSkillProfile)?.let(ProcessingProfileSnapshot::from)
+        } ?: return player.sendMessage(message(player, "cooking.error.recipe_not_found"))
+        if (preparation != null) {
+            val waterLevel = (stationBlock.blockData as? org.bukkit.block.data.Levelled)?.level ?: 0
+            if (waterLevel < preparation.batches) {
+                player.sendMessage(message(player, "cooking.error.recipe_not_found"))
+                return
+            }
+        }
+        if (match != null && match.recipe.ingredients.size > snapshot.ingredientSlots) {
             player.sendMessage(message(player, "cooking.error.recipe_not_found"))
             return
         }
@@ -495,40 +625,67 @@ private class CookingController(
         } else {
             null
         }
-        if (!consumeInputs(inventory, match.recipe)) {
+        if (match != null && !consumeInputs(inventory, match.recipe)) {
             player.sendMessage(message(player, "cooking.error.recipe_not_found")); return
         }
         CookingHolder.INPUT_SLOTS.forEach { inventory.setItem(it, null) }
         val seasoningIds = seasoningItems.flatMap { item -> ingredients.keys.filter { it == itemId(item) } }
-        val baseScore = (match.score * 100.0).roundToInt()
+        val baseScore = preparation?.quality?.roundToInt() ?: (match!!.score * 100.0).roundToInt()
         val mismatchRecovered = ((100 - baseScore) * snapshot.mismatchPenaltyReduction).roundToInt()
         val exactBonus = if (baseScore == 100) snapshot.exactMatchCompletionBonus else 0
         val score = (baseScore + mismatchRecovered + exactBonus)
             .coerceAtLeast(snapshot.minimumCompletion)
             .coerceIn(0, 100)
-        val duration = ceil(match.recipe.completionTicks * (1.0 - snapshot.processingTimeReduction))
+        val recipe = match?.recipe ?: preparationRecipe(preparation!!)
+        val duration = ceil(recipe.completionTicks * (1.0 - snapshot.processingTimeReduction))
             .toLong()
             .coerceAtLeast(1L)
         active[station] = ActiveCooking(
-            match.recipe,
+            recipe,
             duration,
             score,
             seasoningIds,
             player.uniqueId,
             snapshot,
             savedIngredient,
-            Math.random() < snapshot.extraCompletionChance
+            Math.random() < snapshot.extraCompletionChance,
+            preparation,
+            startedFirePower,
+            preparation?.let { requiredFirePower(it.requiredFirePower) != startedFirePower } ?: false
         )
         returnInputs(player, inventory, inventory.holder as? CookingHolder)
         saveState()
         player.closeInventory()
-        player.sendMessage(message(player, "cooking.process.started", mapOf("recipe" to message(player, "cooking.recipe.${match.recipe.id}"))))
+        if (preparation == null) {
+            player.sendMessage(message(player, "cooking.process.started", mapOf(
+                "recipe" to message(player, "cooking.recipe.${recipe.id}")
+            )))
+        } else {
+            player.sendMessage(message(player, "brewery.process.preparation_started", mapOf(
+                "recipe" to message(player, "brewery.recipe.${preparation.recipeId}.name")
+            )))
+        }
     }
 
     private fun complete(station: CookingStationKey) {
         val session = active[station] ?: return
         if (session.settled || session.remainingTicks > 0) return
         session.settled = true
+        if (session.preparation != null) {
+            val prototype = breweryPreparationGateway()
+                ?.createWort(session.preparation, null, session.fireMismatch)
+                ?: return
+            pendingLiquids[station] = PendingLiquid(
+                prototype,
+                session.preparation.batches.coerceIn(1, 3),
+                Material.GLASS_BOTTLE,
+                session.preparation.recipeId
+            )
+            publishBrewingPreparationAction(session)
+            active.remove(station)
+            saveState()
+            return
+        }
         val result = ItemStack(session.recipe.resultMaterial)
         result.amount = if (session.extraResult) 2 else 1
         result.editMeta { meta ->
@@ -569,6 +726,22 @@ private class CookingController(
         )
     }
 
+    private fun publishBrewingPreparationAction(session: ActiveCooking) {
+        val preparation = session.preparation ?: return
+        CCSystem.getAPI().getContentActionDispatcher().publish(
+            ContentAction(
+                actionId = UUID.randomUUID(),
+                schemaVersion = 1,
+                occurredAt = CCSystem.getAPI().getSharedClockService().now().toInstant(),
+                playerId = session.starterId,
+                actionType = ContentActionType.BREWING_STAGE_COMPLETED,
+                amount = preparation.batches.toLong(),
+                worldKey = null,
+                metadata = mapOf("recipeId" to preparation.recipeId, "stage" to "preparation")
+            )
+        )
+    }
+
     private fun startProgressTask() {
         progressTask?.cancel()
         progressTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
@@ -579,7 +752,7 @@ private class CookingController(
                     invalidateStation(station)
                     return@forEach
                 }
-                if (!hasActiveHeat(block, session.recipe.equipment)) return@forEach
+                if (currentFirePower(block) != session.startedFirePower) return@forEach
                 session.remainingTicks--
                 if (session.remainingTicks <= 0L) complete(station)
             }
@@ -653,7 +826,9 @@ private class CookingController(
     }
 
     private fun invalidateStation(station: CookingStationKey) {
-        val changed = active.remove(station) != null || pending.remove(station) != null
+        val changed = active.remove(station) != null ||
+            pending.remove(station) != null ||
+            pendingLiquids.remove(station) != null
         stationLocks.remove(station)?.let { Bukkit.getPlayer(it)?.closeInventory() }
         if (changed) saveState()
     }
@@ -709,6 +884,82 @@ private class CookingController(
         }
         if (heatBlock.type !in setOf(Material.CAMPFIRE, Material.SOUL_CAMPFIRE)) return false
         return (heatBlock.blockData as? org.bukkit.block.data.type.Campfire)?.isLit == true
+    }
+
+    private fun currentFirePower(block: org.bukkit.block.Block): CookingFirePower? {
+        val equipment = equipmentAt(block) ?: return null
+        val heatBlock = when (equipment) {
+            CookingEquipment.PAN -> block
+            CookingEquipment.CAULDRON -> block.getRelative(org.bukkit.block.BlockFace.DOWN)
+        }
+        val campfire = heatBlock.blockData as? org.bukkit.block.data.type.Campfire ?: return null
+        if (!campfire.isLit) return null
+        return if (heatBlock.type == Material.SOUL_CAMPFIRE) CookingFirePower.HIGH else CookingFirePower.NORMAL
+    }
+
+    private fun requiredFirePower(firePower: FirePower): CookingFirePower = when (firePower) {
+        FirePower.HIGH -> CookingFirePower.HIGH
+        FirePower.LOW, FirePower.MEDIUM -> CookingFirePower.NORMAL
+    }
+
+    private fun renderLiquid(inventory: Inventory, player: Player, station: CookingStationKey) {
+        render(inventory, player)
+        val liquid = pendingLiquids[station] ?: return
+        val filled = when (liquid.remaining) {
+            3 -> CookingHolder.LIQUID_SLOTS.toSet()
+            2 -> setOf(21, 22, 23)
+            else -> setOf(22)
+        }
+        CookingHolder.LIQUID_SLOTS.forEach { slot ->
+            inventory.setItem(
+                slot,
+                GuiMenuItems.backgroundPane(
+                    if (slot in filled) Material.LIGHT_BLUE_STAINED_GLASS_PANE
+                    else Material.GRAY_STAINED_GLASS_PANE
+                )
+            )
+        }
+    }
+
+    private fun collectLiquid(player: Player, event: InventoryClickEvent, station: CookingStationKey) {
+        if (event.click != ClickType.LEFT) return
+        val liquid = pendingLiquids[station] ?: return
+        val cursor = event.cursor
+        if (cursor.type != liquid.container || cursor.amount <= 0) return
+        val result = liquid.prototype.clone().apply { amount = 1 }
+        if (cursor.amount == 1) {
+            player.setItemOnCursor(result)
+        } else {
+            if (player.inventory.firstEmpty() < 0) return
+            cursor.amount -= 1
+            player.setItemOnCursor(cursor)
+            val leftovers = player.inventory.addItem(result)
+            if (leftovers.isNotEmpty()) {
+                cursor.amount += 1
+                player.setItemOnCursor(cursor)
+                return
+            }
+        }
+        liquid.remaining -= 1
+        lowerCauldronLevel(station)
+        if (liquid.remaining <= 0) pendingLiquids.remove(station)
+        if (pendingLiquids.containsKey(station)) {
+            renderLiquid(event.view.topInventory, player, station)
+        } else {
+            render(event.view.topInventory, player)
+        }
+        saveState()
+    }
+
+    private fun lowerCauldronLevel(station: CookingStationKey) {
+        val block = station.blockIfLoaded() ?: return
+        val levelled = block.blockData as? org.bukkit.block.data.Levelled ?: return
+        if (levelled.level <= 1) {
+            block.type = Material.CAULDRON
+        } else {
+            levelled.level -= 1
+            block.blockData = levelled
+        }
     }
 
     private fun itemId(item: ItemStack): String {
@@ -775,6 +1026,7 @@ private class CookingHolder(
         val INGREDIENT_SLOTS = listOf(20, 21, 22, 23, 24)
         val SEASONING_SLOTS = listOf(30, 31, 32)
         val INPUT_SLOTS = INGREDIENT_SLOTS + SEASONING_SLOTS
+        val LIQUID_SLOTS = INGREDIENT_SLOTS
         val FRAME_SLOTS = (0..8).toList() + (45..53).toList()
     }
 }
