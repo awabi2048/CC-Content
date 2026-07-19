@@ -434,5 +434,18 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
         return item.type == material
     }
 
+    fun resolveIngredientAmounts(
+        ingredientKeys: Set<String>,
+        inputItems: List<ItemStack>
+    ): Map<String, Int> {
+        val amounts = mutableMapOf<String, Int>()
+        inputItems.forEach { item ->
+            val key = ingredientKeys.sorted().firstOrNull { matchesIngredientKey(it, item) }
+                ?: "__unmatched__:${CustomItemManager.identify(item)?.fullId ?: item.type.key}"
+            amounts[key] = (amounts[key] ?: 0) + item.amount
+        }
+        return amounts
+    }
+
     fun getFinalQualityIndex(quality: Double): Int = breweryQualityIndex(quality)
 }

@@ -41,7 +41,8 @@ data class RecipeCandidate(
     val batches: Int,
     val ratioDistance: Double,
     val unmatchedAmount: Int,
-    val consumedAmounts: Map<String, Int>
+    val consumedAmounts: Map<String, Int>,
+    val fireMismatch: Boolean = false
 ) {
     val score: Double = ratioDistance + unmatchedAmount.toDouble()
 }
@@ -72,12 +73,36 @@ object ProcessingRecipeMatcher {
         if (inputAmounts.isEmpty() || inputAmounts.values.any { it <= 0 }) {
             return RecipeMatchResult.NoMatch
         }
+        return matchInternal(recipes, process, actualFirePower, inputAmounts, policy, false)
+    }
+
+    fun matchAllowingFireMismatch(
+        recipes: Collection<ProcessingRecipe>,
+        process: String,
+        actualFirePower: ProcessingFirePower,
+        inputAmounts: Map<String, Int>,
+        policy: RecipeMatchPolicy
+    ): RecipeMatchResult = matchInternal(recipes, process, actualFirePower, inputAmounts, policy, true)
+
+    private fun matchInternal(
+        recipes: Collection<ProcessingRecipe>,
+        process: String,
+        actualFirePower: ProcessingFirePower,
+        inputAmounts: Map<String, Int>,
+        policy: RecipeMatchPolicy,
+        allowFireMismatch: Boolean
+    ): RecipeMatchResult {
+        if (inputAmounts.isEmpty() || inputAmounts.values.any { it <= 0 }) {
+            return RecipeMatchResult.NoMatch
+        }
         val candidates = recipes.asSequence()
-            .filter { it.process == process && it.firePower == actualFirePower }
+            .filter { it.process == process && (allowFireMismatch || it.firePower == actualFirePower) }
             .mapNotNull { candidate(it, inputAmounts, policy) }
+            .map { it.copy(fireMismatch = it.recipe.firePower != actualFirePower) }
             .sortedWith(
                 compareBy<RecipeCandidate>(
                     { it.recipe.ingredients.keys != inputAmounts.keys },
+                    RecipeCandidate::fireMismatch,
                     RecipeCandidate::ratioDistance,
                     RecipeCandidate::unmatchedAmount,
                     { it.recipe.id }

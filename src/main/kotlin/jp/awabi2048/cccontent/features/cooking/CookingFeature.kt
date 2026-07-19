@@ -17,6 +17,11 @@ import jp.awabi2048.cccontent.features.rank.profession.profile.BrewerSkillProfil
 import jp.awabi2048.cccontent.features.brewery.BreweryPreparation
 import jp.awabi2048.cccontent.features.brewery.BreweryPreparationGateway
 import jp.awabi2048.cccontent.features.brewery.model.FirePower
+import jp.awabi2048.cccontent.features.processing.ProcessingFirePower
+import jp.awabi2048.cccontent.features.processing.ProcessingRecipe
+import jp.awabi2048.cccontent.features.processing.ProcessingRecipeMatcher
+import jp.awabi2048.cccontent.features.processing.RecipeMatchPolicy
+import jp.awabi2048.cccontent.features.processing.RecipeMatchResult
 import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import jp.awabi2048.cccontent.features.catalog.CatalogType
@@ -131,6 +136,7 @@ private enum class CookingEquipment {
     PAN,
     CAULDRON
 }
+private enum class CookingRecipeGroup { BASIC, BULK, PRESERVED, HERBAL, SEAFOOD, WILD, SPECIAL }
 
 private data class CookingRecipe(
     val id: String,
@@ -141,7 +147,8 @@ private data class CookingRecipe(
     val resultModel: NamespacedKey,
     val exp: Long,
     val completionTicks: Long,
-    val weight: Double
+    val weight: Double,
+    val group: CookingRecipeGroup
 )
 private data class CookingMatch(val recipe: CookingRecipe, val score: Double)
 
@@ -307,10 +314,14 @@ private class CookingController(
                 id, equipment, ingredientMap, seasoningMap, material, model,
                 positiveLong(section.get("exp"), "cooking recipe $id exp"),
                 positiveLong(section.get("completion_seconds"), "cooking recipe $id completion_seconds") * 20L,
-                section.getDouble("weight", 1.0).also { require(it >= 0.0) { "cooking recipe $id weight must be non-negative" } }
+                section.getDouble("weight", 1.0).also { require(it >= 0.0) { "cooking recipe $id weight must be non-negative" } },
+                runCatching {
+                    CookingRecipeGroup.valueOf(section.getString("group", "BASIC")!!.uppercase())
+                }.getOrElse { error("cooking recipe $id has invalid group") }
             )
         }
         require(recipes.isNotEmpty()) { "cooking recipes are empty" }
+        ProcessingRecipeMatcher.validateNoConflicts(recipes.map { it.processingRecipe(ProcessingFirePower.NORMAL) })
     }
 
     private fun loadIngredientSlots(settings: ConfigurationSection): Map<Int, Int> {
@@ -468,7 +479,8 @@ private class CookingController(
         NamespacedKey.minecraft("potion"),
         0L,
         preparation.processingSeconds * 20L,
-        1.0
+        1.0,
+        CookingRecipeGroup.BASIC
     )
 
     private fun saveProfile(output: YamlConfiguration, path: String, profile: ProcessingProfileSnapshot) {
@@ -620,9 +632,13 @@ private class CookingController(
         val ingredientItems = CookingHolder.INGREDIENT_SLOTS.mapNotNull(inventory::getItem).filter(::isRealItem)
         val seasoningItems = CookingHolder.SEASONING_SLOTS.mapNotNull(inventory::getItem).filter(::isRealItem)
         if (ingredientItems.isEmpty()) { player.sendMessage(message(player, "cooking.error.no_ingredients")); return }
-        val match = findBestMatch(ingredientItems, seasoningItems, equipment)
+        val match = findBestMatch(ingredientItems, seasoningItems, equipment, startedFirePower)
         val preparation = if ((match == null || match.score < minimumSimilarity) && equipment == CookingEquipment.CAULDRON) {
-            breweryPreparationGateway()?.match(ingredientItems + seasoningItems, 3)
+            breweryPreparationGateway()?.match(
+                ingredientItems + seasoningItems,
+                3,
+                if (startedFirePower == CookingFirePower.HIGH) FirePower.HIGH else FirePower.MEDIUM
+            )
         } else null
         if ((match == null || match.score < minimumSimilarity) && preparation == null) {
             player.sendMessage(message(player, "cooking.error.recipe_not_found"))
@@ -633,6 +649,10 @@ private class CookingController(
             preparation != null -> (typedProfile as? BrewerSkillProfile)?.let(ProcessingProfileSnapshot::from)
             else -> (typedProfile as? CookSkillProfile)?.let(ProcessingProfileSnapshot::from)
         } ?: return player.sendMessage(message(player, "cooking.error.recipe_not_found"))
+        if (match != null && !isRecipeUnlocked(match.recipe.group, typedProfile as CookSkillProfile)) {
+            player.sendMessage(message(player, "cooking.error.recipe_not_found"))
+            return
+        }
         if (preparation != null) {
             val waterLevel = (stationBlock.blockData as? org.bukkit.block.data.Levelled)?.level ?: 0
             if (waterLevel < preparation.batches) {
@@ -879,20 +899,45 @@ private class CookingController(
     private fun findBestMatch(
         items: List<ItemStack>,
         seasonings: List<ItemStack>,
-        equipment: CookingEquipment
+        equipment: CookingEquipment,
+        firePower: CookingFirePower
     ): CookingMatch? {
-        val actual = items.groupingBy(::itemId).fold(0) { total, item -> total + item.amount }
-        val actualSeasonings = seasonings.groupingBy(::itemId).fold(0) { total, item -> total + item.amount }
-        return recipes.asSequence().filter { it.equipment == equipment }.map { recipe ->
-            val expectedWeight = recipe.ingredients.values.sum().coerceAtLeast(1).toDouble()
-            val matched = recipe.ingredients.entries.sumOf { (id, amount) -> minOf(actual[id] ?: 0, amount).toDouble() / amount * amount }
-            val missing = (expectedWeight - matched) / expectedWeight
-            val extra = (actual.values.sum() - recipe.ingredients.values.sum()).coerceAtLeast(0).toDouble() / expectedWeight
-            val seasoningExpected = recipe.seasonings.values.sum().coerceAtLeast(1).toDouble()
-            val seasoningMatched = recipe.seasonings.entries.sumOf { (id, amount) -> minOf(actualSeasonings[id] ?: 0, amount).toDouble() / amount * amount }
-            val seasoningScore = if (recipe.seasonings.isEmpty()) 1.0 else seasoningMatched / seasoningExpected
-            CookingMatch(recipe, (matched / expectedWeight * 0.8 + seasoningScore * 0.2 - missing * 0.15 - extra * 0.2).coerceIn(0.0, 1.0))
-        }.maxByOrNull { it.score }
+        val actual = (items + seasonings).groupingBy(::itemId).fold(0) { total, item -> total + item.amount }
+        val candidates = recipes.filter { it.equipment == equipment }
+        val result = ProcessingRecipeMatcher.match(
+            candidates.map { it.processingRecipe(firePower.toProcessingFirePower()) },
+            equipment.name.lowercase(),
+            firePower.toProcessingFirePower(),
+            actual,
+            RecipeMatchPolicy(3, 1.0 - minimumSimilarity, 1, 0.01)
+        )
+        val candidate = (result as? RecipeMatchResult.Matched)?.candidate ?: return null
+        val recipe = candidates.firstOrNull { it.id == candidate.recipe.id } ?: return null
+        val score = (1.0 - candidate.ratioDistance / 2.0 - candidate.unmatchedAmount * 0.1)
+            .coerceIn(0.0, 1.0)
+        return CookingMatch(recipe, score)
+    }
+
+    private fun CookingRecipe.processingRecipe(firePower: ProcessingFirePower) = ProcessingRecipe(
+        id,
+        equipment.name.lowercase(),
+        firePower,
+        ingredients + seasonings
+    )
+
+    private fun CookingFirePower.toProcessingFirePower(): ProcessingFirePower = when (this) {
+        CookingFirePower.NORMAL -> ProcessingFirePower.NORMAL
+        CookingFirePower.HIGH -> ProcessingFirePower.HIGH
+    }
+
+    private fun isRecipeUnlocked(group: CookingRecipeGroup, profile: CookSkillProfile): Boolean = when (group) {
+        CookingRecipeGroup.BASIC -> profile.basicRecipeUnlocked
+        CookingRecipeGroup.BULK,
+        CookingRecipeGroup.PRESERVED -> profile.intermediateRecipeUnlocked
+        CookingRecipeGroup.HERBAL,
+        CookingRecipeGroup.SEAFOOD,
+        CookingRecipeGroup.WILD -> profile.advancedRecipeUnlocked
+        CookingRecipeGroup.SPECIAL -> profile.topRecipeUnlocked
     }
 
     private fun equipmentAt(block: org.bukkit.block.Block): CookingEquipment? = when {
