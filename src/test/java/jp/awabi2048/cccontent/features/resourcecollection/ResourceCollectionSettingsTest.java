@@ -17,7 +17,7 @@ class ResourceCollectionSettingsTest {
             new File("src/main/resources/config/resource_collection/config.yml")
         );
 
-        assertTrue(yaml.getInt("config_version") == 6);
+        assertTrue(yaml.getInt("config_version") == 7);
         assertTrue(yaml.getInt("chisel.target_count") == 3);
         assertTrue(yaml.getLong("chisel.target_timeout_ticks") == 50L);
         assertTrue(yaml.getInt("chisel.particle_count") == 5);
@@ -32,7 +32,6 @@ class ResourceCollectionSettingsTest {
         professions.put(ResourceCollectionKind.FOREST, false);
         ResourceCollectionSettings settings = settings(professions, enabledOperations());
 
-        assertFalse(settings.isOperationEnabled(ResourceOperation.LUMBERJACK_BATCH));
         assertFalse(settings.isOperationEnabled(ResourceOperation.LUMBERJACK_BARK));
         assertTrue(settings.isOperationEnabled(ResourceOperation.MINER_CHISEL));
         assertTrue(settings.isOperationEnabled(ResourceOperation.FARMER_AREA_HARVEST));

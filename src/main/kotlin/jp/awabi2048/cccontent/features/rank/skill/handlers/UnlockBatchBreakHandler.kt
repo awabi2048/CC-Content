@@ -4,6 +4,9 @@ import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.rank.job.BlockPositionCodec
 import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
 import jp.awabi2048.cccontent.features.rank.profession.Profession
+import jp.awabi2048.cccontent.features.rank.profession.profile.LumberjackSkillProfile
+import jp.awabi2048.cccontent.features.rank.profession.profile.MinerSkillProfile
+import jp.awabi2048.cccontent.features.rank.profession.profile.TypedProfessionProfile
 import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillManager
 import jp.awabi2048.cccontent.features.rank.skill.ActiveTriggerType
 import jp.awabi2048.cccontent.features.rank.skill.EffectContext
@@ -88,6 +91,9 @@ class UnlockBatchBreakHandler(
         fun previewForPlayer(player: Player, block: Block) {
             activeInstance?.previewOnLeftClick(player, block)
         }
+
+        fun applyTypedProfile(event: BlockBreakEvent, profile: TypedProfessionProfile): Boolean =
+            activeInstance?.applyTypedProfileInternal(event, profile) ?: false
 
         data class DebugOverride(
             val delayTicks: Int,
@@ -236,7 +242,8 @@ class UnlockBatchBreakHandler(
             mode: BatchBreakMode,
             matchLevel: MatchLevel,
             targetBlocks: Set<Material>,
-            ignoreBlockStore: IgnoreBlockStore
+            ignoreBlockStore: IgnoreBlockStore,
+            optimizedTraversal: Boolean = false
         ): List<Block> {
             val world = origin.world
             val baseType = origin.type
@@ -270,16 +277,17 @@ class UnlockBatchBreakHandler(
                     break
                 }
 
-                for ((dx, dy, dz) in OFFSETS_26) {
-                    val nx = current.x + dx
-                    val ny = current.y + dy
-                    val nz = current.z + dz
-                    val packed = BlockPositionCodec.pack(nx, ny, nz)
+                val neighbors = OFFSETS_26
+                    .map { (dx, dy, dz) -> world.getBlockAt(current.x + dx, current.y + dy, current.z + dz) }
+                    .let { blocks ->
+                        if (optimizedTraversal) blocks.sortedBy { if (it.type == baseType) 0 else 1 } else blocks
+                    }
+                for (next in neighbors) {
+                    val packed = BlockPositionCodec.pack(next.x, next.y, next.z)
                     if (!visited.add(packed)) {
                         continue
                     }
 
-                    val next = world.getBlockAt(nx, ny, nz)
                     if (isMaterialMatched(baseType, next.type, matchLevel)
                         && isModeTargetMaterial(mode, next.type)
                         && (targetBlocks.isEmpty() || next.type in targetBlocks)
@@ -325,7 +333,10 @@ class UnlockBatchBreakHandler(
         val autoCollect: Boolean,
         val visualizeTargets: Boolean,
         val matchLevel: MatchLevel,
-        val targetBlocks: Set<Material>
+        val targetBlocks: Set<Material>,
+        val leafCleanup: Boolean = false,
+        val autoReplant: Boolean = false,
+        val optimizedTraversal: Boolean = false
     )
 
     enum class MatchLevel {
@@ -395,7 +406,87 @@ class UnlockBatchBreakHandler(
             lowestBreakPositions[playerUuid] = lowestBlock
         }
 
-        scheduleBatchBreak(player, playerUuid, options, connectedTargets, player.inventory.heldItemSlot)
+        scheduleBatchBreak(
+            player, playerUuid, options, event.block, connectedTargets, player.inventory.heldItemSlot
+        )
+        return true
+    }
+
+    private fun applyTypedProfileInternal(
+        event: BlockBreakEvent,
+        profile: TypedProfessionProfile
+    ): Boolean {
+        val options = resolveTypedOptions(profile) ?: return false
+        return startBatchBreak(event, options)
+    }
+
+    private fun resolveTypedOptions(profile: TypedProfessionProfile): BatchBreakRuntimeOptions? =
+        when (profile) {
+            is MinerSkillProfile -> {
+                if (!profile.batchProcessingEnabled) return null
+                BatchBreakRuntimeOptions(
+                    mode = BatchBreakMode.MINE_ALL,
+                    maxChainCount = (profile.maximumBatchSize - 1).coerceAtLeast(1),
+                    delayTicks = DEFAULT_DELAY_TICKS,
+                    instantBreak = false,
+                    autoCollect = profile.automaticCollectionEnabled,
+                    visualizeTargets = true,
+                    matchLevel = MatchLevel.FAMILY,
+                    targetBlocks = emptySet(),
+                    optimizedTraversal = profile.optimizedSearchEnabled
+                )
+            }
+            is LumberjackSkillProfile -> {
+                if (!profile.batchProcessingEnabled) return null
+                BatchBreakRuntimeOptions(
+                    mode = BatchBreakMode.CUT_ALL,
+                    maxChainCount = (profile.maximumBatchSize - 1).coerceAtLeast(1),
+                    delayTicks = DEFAULT_DELAY_TICKS,
+                    instantBreak = false,
+                    autoCollect = false,
+                    visualizeTargets = true,
+                    matchLevel = MatchLevel.EXACT,
+                    targetBlocks = emptySet(),
+                    leafCleanup = profile.leafCleanupEnabled,
+                    autoReplant = profile.automaticReplantEnabled
+                )
+            }
+            else -> null
+        }
+
+    private fun startBatchBreak(event: BlockBreakEvent, options: BatchBreakRuntimeOptions): Boolean {
+        val player = event.player
+        val playerUuid = player.uniqueId
+        if (isInternalBreakInProgress(playerUuid) ||
+            BatchBreakMode.fromTool(player.inventory.itemInMainHand.type) != options.mode ||
+            !isModeTargetMaterial(options.mode, event.block.type)) {
+            return false
+        }
+
+        stopForPlayer(playerUuid)
+        val connectedTargets = collectConnectedBlocks(
+            event.block,
+            options.maxChainCount,
+            options.mode,
+            options.matchLevel,
+            options.targetBlocks,
+            ignoreBlockStore,
+            options.optimizedTraversal
+        )
+        if (connectedTargets.isEmpty()) return false
+
+        showTargetVisuals(player, options, listOf(event.block) + connectedTargets)
+        CCContent.instance.server.scheduler.runTask(CCContent.instance, Runnable {
+            clearIndicators(playerUuid)
+        })
+
+        if (options.mode == BatchBreakMode.CUT_ALL) {
+            lowestBreakPositions[playerUuid] =
+                (listOf(event.block) + connectedTargets).minByOrNull { it.y }
+        }
+        scheduleBatchBreak(
+            player, playerUuid, options, event.block, connectedTargets, player.inventory.heldItemSlot
+        )
         return true
     }
 
@@ -413,6 +504,27 @@ class UnlockBatchBreakHandler(
         val compiledEffects = SkillEffectEngine.getCachedEffects(playerUuid)
         val heldMode = BatchBreakMode.fromTool(player.inventory.itemInMainHand.type) ?: run {
             clearIndicators(playerUuid)
+            return
+        }
+
+        val typedOptions = CCContent.rankManager.getTypedProfessionProfile(playerUuid)
+            ?.let(::resolveTypedOptions)
+        if (typedOptions != null) {
+            if (heldMode != typedOptions.mode || !isModeTargetMaterial(typedOptions.mode, block.type)) {
+                clearIndicators(playerUuid)
+                return
+            }
+            val connectedTargets = collectConnectedBlocks(
+                block,
+                typedOptions.maxChainCount,
+                typedOptions.mode,
+                typedOptions.matchLevel,
+                typedOptions.targetBlocks,
+                ignoreBlockStore,
+                typedOptions.optimizedTraversal
+            )
+            showTargetVisuals(player, typedOptions, listOf(block) + connectedTargets)
+            schedulePreviewAutoClear(playerUuid, DEFAULT_PREVIEW_TTL_TICKS)
             return
         }
 
@@ -552,12 +664,28 @@ class UnlockBatchBreakHandler(
         player: Player,
         playerUuid: UUID,
         options: BatchBreakRuntimeOptions,
+        origin: Block,
         blocks: List<Block>,
         originHeldSlot: Int
     ) {
-        player.sendActionBar(net.kyori.adventure.text.Component.text(
-            "${if (options.mode == BatchBreakMode.MINE_ALL) "MineAll" else "CutAll"}: ${blocks.size} blocks"
-        ))
+        val originalMaterial = origin.type
+        val replantPosition = if (options.mode == BatchBreakMode.CUT_ALL) {
+            (listOf(origin) + blocks).minByOrNull { it.y }
+        } else {
+            null
+        }
+        val leaves = if (options.leafCleanup) collectNearbyLeaves(origin, blocks) else emptyList()
+        val finishLumberjackOptions = {
+            if (options.leafCleanup) {
+                for (leaf in leaves) {
+                    if (!leaf.type.name.endsWith("_LEAVES") || isPlayerPlaced(ignoreBlockStore, leaf)) continue
+                    breakWithOriginalContext(player, originHeldSlot, leaf, preserveDurability = true)
+                }
+            }
+            if (options.autoReplant && replantPosition != null) {
+                ReplantHandler.replantBatch(player, replantPosition, originalMaterial)
+            }
+        }
 
         if (options.instantBreak) {
             val plugin = CCContent.instance
@@ -577,6 +705,7 @@ class UnlockBatchBreakHandler(
                             }
                         }
                     }
+                    finishLumberjackOptions()
                 } finally {
                     internalBreakPlayers.remove(playerUuid)
                     stopForPlayer(playerUuid)
@@ -603,6 +732,7 @@ class UnlockBatchBreakHandler(
             }
 
             if (!iterator.hasNext()) {
+                finishLumberjackOptions()
                 finalizeBatch()
                 return@Runnable
             }
@@ -626,6 +756,7 @@ class UnlockBatchBreakHandler(
                     }
                 }
                 if (!iterator.hasNext()) {
+                    finishLumberjackOptions()
                     finalizeBatch()
                 }
             } finally {
@@ -634,6 +765,33 @@ class UnlockBatchBreakHandler(
         }, options.delayTicks, options.delayTicks)
 
         activeTasks[playerUuid] = task
+    }
+
+    private fun collectNearbyLeaves(origin: Block, trunks: List<Block>): List<Block> {
+        val queue = ArrayDeque<Block>()
+        val visited = mutableSetOf<Long>()
+        val result = mutableListOf<Block>()
+        (listOf(origin) + trunks).forEach { trunk ->
+            for ((dx, dy, dz) in OFFSETS_26) {
+                queue.add(trunk.getRelative(dx, dy, dz))
+            }
+        }
+        while (queue.isNotEmpty() && result.size < 256) {
+            val block = queue.removeFirst()
+            val packed = BlockPositionCodec.pack(block.x, block.y, block.z)
+            if (!visited.add(packed) ||
+                kotlin.math.abs(block.x - origin.x) > 8 ||
+                block.y !in (origin.y - 2)..(origin.y + 18) ||
+                kotlin.math.abs(block.z - origin.z) > 8 ||
+                !block.type.name.endsWith("_LEAVES")) {
+                continue
+            }
+            result.add(block)
+            for ((dx, dy, dz) in OFFSETS_26) {
+                queue.add(block.getRelative(dx, dy, dz))
+            }
+        }
+        return result
     }
 
     private fun breakWithOriginalContext(player: Player, originHeldSlot: Int, target: Block, preserveDurability: Boolean): Boolean {

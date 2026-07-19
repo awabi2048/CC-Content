@@ -1,4 +1,4 @@
-config_version: 6
+config_version: 7
 enabled: true
 
 chisel:
@@ -12,13 +12,11 @@ mineral:
   work_speed: true
   inspection: true
   chisel_game: true
-  batch_mining: true
 
 forest:
   enabled: true
   normal_bonus_drop: true
   work_speed: true
-  batch_felling: true
   heartwood: true
   bark: true
   timber_processing: true

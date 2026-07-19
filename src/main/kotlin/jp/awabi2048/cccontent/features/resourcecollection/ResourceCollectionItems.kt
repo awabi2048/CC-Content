@@ -46,14 +46,11 @@ class ResourceCollectionItems(plugin: JavaPlugin) {
         Definition("timber_beam", Material.STRIPPED_OAK_LOG, setOf("wood", "processed", "structural")),
         Definition("chisel", Material.IRON_PICKAXE, stackable = false),
         Definition("geology_guide", Material.KNOWLEDGE_BOOK, stackable = false),
-        Definition("mining_hammer", Material.IRON_PICKAXE, stackable = false),
-        Definition("felling_axe", Material.IRON_AXE, stackable = false),
         Definition("woodworking_hatchet", Material.IRON_AXE, stackable = false),
         Definition("woodworking_knife", Material.SHEARS, stackable = false),
         Definition("forest_guide", Material.WRITABLE_BOOK, stackable = false),
         Definition("gathering_guide", Material.BOOK, stackable = false),
-        Definition("gathering_sickle", Material.IRON_HOE, stackable = false),
-        Definition("cultivation_hoe", Material.DIAMOND_HOE, stackable = false)
+        Definition("gathering_sickle", Material.IRON_HOE, stackable = false)
     )
 
     fun register() {

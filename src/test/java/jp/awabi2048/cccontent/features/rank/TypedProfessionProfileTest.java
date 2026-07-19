@@ -5,6 +5,8 @@ import jp.awabi2048.cccontent.features.rank.profession.ProfessionProgressionMode
 import jp.awabi2048.cccontent.features.rank.profession.profile.CookSkillProfile;
 import jp.awabi2048.cccontent.features.rank.profession.profile.FisherSkillProfile;
 import jp.awabi2048.cccontent.features.rank.profession.profile.MinerSkillProfile;
+import jp.awabi2048.cccontent.features.rank.profession.profile.LumberjackSkillProfile;
+import jp.awabi2048.cccontent.features.rank.profession.profile.FarmerSkillProfile;
 import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionExperience;
 import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionFeatureToggles;
 import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionSpecialization;
@@ -97,6 +99,67 @@ class TypedProfessionProfileTest {
         );
         assertEquals(0.88, precision.getTopEvaluationThreshold());
         assertEquals(1, precision.getIgnoredMinorFailures());
+    }
+
+    @Test
+    void riskyCollectionOperationsUnlockAtLevelFiveForEitherBranch() {
+        ProfessionFeatureToggles minerToggles = ProfessionFeatureToggles.Companion.defaultsFor(Profession.MINER);
+        minerToggles.setBatchProcessingEnabled(true);
+        MinerSkillProfile commonMiner = (MinerSkillProfile) TypedProfessionProfileResolver.INSTANCE.resolve(
+            Profession.MINER, 5, null, minerToggles
+        );
+        MinerSkillProfile precisionMiner = (MinerSkillProfile) TypedProfessionProfileResolver.INSTANCE.resolve(
+            Profession.MINER, 15, ProfessionSpecialization.PRECISION_MINING.getId(), minerToggles
+        );
+        assertTrue(commonMiner.getBatchProcessingEnabled());
+        assertEquals(8, commonMiner.getMaximumBatchSize());
+        assertTrue(precisionMiner.getBatchProcessingEnabled());
+        assertEquals(8, precisionMiner.getMaximumBatchSize());
+
+        ProfessionFeatureToggles lumberjackToggles =
+            ProfessionFeatureToggles.Companion.defaultsFor(Profession.LUMBERJACK);
+        lumberjackToggles.setBatchProcessingEnabled(true);
+        LumberjackSkillProfile utilization =
+            (LumberjackSkillProfile) TypedProfessionProfileResolver.INSTANCE.resolve(
+                Profession.LUMBERJACK,
+                15,
+                ProfessionSpecialization.WOOD_UTILIZATION.getId(),
+                lumberjackToggles
+            );
+        assertTrue(utilization.getBatchProcessingEnabled());
+        assertEquals(8, utilization.getMaximumBatchSize());
+
+        ProfessionFeatureToggles farmerToggles =
+            ProfessionFeatureToggles.Companion.defaultsFor(Profession.FARMER);
+        farmerToggles.setAreaTillingEnabled(true);
+        farmerToggles.setAreaHarvestEnabled(true);
+        FarmerSkillProfile commonFarmer =
+            (FarmerSkillProfile) TypedProfessionProfileResolver.INSTANCE.resolve(
+                Profession.FARMER, 5, null, farmerToggles
+            );
+        assertTrue(commonFarmer.getAreaTillingEnabled());
+        assertTrue(commonFarmer.getAreaHarvestEnabled());
+        assertTrue(commonFarmer.getAutomaticReplantEnabled());
+        assertEquals(1, commonFarmer.getOperationRadius());
+    }
+
+    @Test
+    void riskyCollectionOperationTogglesRemainOffByDefault() {
+        MinerSkillProfile miner = (MinerSkillProfile) TypedProfessionProfileResolver.INSTANCE.resolve(
+            Profession.MINER,
+            50,
+            ProfessionSpecialization.TUNNEL_MINING.getId(),
+            ProfessionFeatureToggles.Companion.defaultsFor(Profession.MINER)
+        );
+        LumberjackSkillProfile lumberjack =
+            (LumberjackSkillProfile) TypedProfessionProfileResolver.INSTANCE.resolve(
+                Profession.LUMBERJACK,
+                50,
+                ProfessionSpecialization.FELLING.getId(),
+                ProfessionFeatureToggles.Companion.defaultsFor(Profession.LUMBERJACK)
+            );
+        assertFalse(miner.getBatchProcessingEnabled());
+        assertFalse(lumberjack.getBatchProcessingEnabled());
     }
 
     @Test

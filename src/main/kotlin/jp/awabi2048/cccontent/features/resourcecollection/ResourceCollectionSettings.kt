@@ -25,7 +25,7 @@ data class ResourceCollectionSettings(
 
     companion object {
         private const val CONFIG_PATH = "config/resource_collection/config.yml"
-        private const val CONFIG_VERSION = 6
+        private const val CONFIG_VERSION = 7
 
         fun load(plugin: JavaPlugin): ResourceCollectionSettings {
             val file = ensureFile(plugin, CONFIG_PATH)
@@ -96,8 +96,6 @@ enum class ResourceOperation(
     MINER_INSPECTION(ResourceCollectionKind.MINERAL, "mineral.inspection"),
     MINER_WORK_SPEED(ResourceCollectionKind.MINERAL, "mineral.work_speed"),
     MINER_CHISEL(ResourceCollectionKind.MINERAL, "mineral.chisel_game"),
-    MINER_BATCH(ResourceCollectionKind.MINERAL, "mineral.batch_mining"),
-    LUMBERJACK_BATCH(ResourceCollectionKind.FOREST, "forest.batch_felling"),
     LUMBERJACK_WORK_SPEED(ResourceCollectionKind.FOREST, "forest.work_speed"),
     LUMBERJACK_HEARTWOOD(ResourceCollectionKind.FOREST, "forest.heartwood"),
     LUMBERJACK_BARK(ResourceCollectionKind.FOREST, "forest.bark"),

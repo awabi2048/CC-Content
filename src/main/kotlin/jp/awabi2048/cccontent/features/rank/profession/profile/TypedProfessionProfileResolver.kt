@@ -44,7 +44,7 @@ object TypedProfessionProfileResolver {
             level = level,
             specialization = spec,
             expertOperationUnlocked = level >= 5,
-            batchProcessingEnabled = tunnel && level >= 15 && toggles.batchProcessingEnabled,
+            batchProcessingEnabled = level >= 5 && toggles.batchProcessingEnabled,
             maximumBatchSize = when {
                 !tunnel -> if (level >= 5) 8 else 1
                 level >= 45 -> 24
@@ -73,7 +73,7 @@ object TypedProfessionProfileResolver {
             level = level,
             specialization = spec,
             expertOperationUnlocked = level >= 5,
-            batchProcessingEnabled = felling && level >= 15 && toggles.batchProcessingEnabled,
+            batchProcessingEnabled = level >= 5 && toggles.batchProcessingEnabled,
             maximumBatchSize = when {
                 !felling -> if (level >= 5) 8 else 1
                 level >= 45 -> 24
@@ -107,10 +107,15 @@ object TypedProfessionProfileResolver {
             byproductChance = stepped(level, 0 to 0.05, 35 to 0.10, 50 to 0.15),
             workSpeedLevel = if (level >= 5) 1 else 0,
             durabilitySaveChance = stepped(level, 25 to 0.10, 50 to 0.20),
-            areaTillingEnabled = cultivation && level >= 15 && toggles.areaTillingEnabled,
-            areaHarvestEnabled = cultivation && level >= 15 && toggles.areaHarvestEnabled,
-            automaticReplantEnabled = cultivation && level >= 25 && toggles.automaticReplantEnabled,
-            operationRadius = if (!cultivation) 0 else if (level >= 45) 3 else 2,
+            areaTillingEnabled = level >= 5 && toggles.areaTillingEnabled,
+            areaHarvestEnabled = level >= 5 && toggles.areaHarvestEnabled,
+            automaticReplantEnabled = level >= 5 && toggles.automaticReplantEnabled,
+            operationRadius = when {
+                cultivation && level >= 45 -> 3
+                cultivation && level >= 15 -> 2
+                level >= 5 -> 1
+                else -> 0
+            },
             seedReserveEnabled = cultivation && level >= 25,
             matureCropSelectionEnabled = cultivation && level >= 35,
             batchExperiencePenaltyReduced = cultivation && level >= 35,

@@ -28,15 +28,15 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("ResourceOperation.MINER_INSPECTION"));
         assertTrue(source.contains("ResourceOperation.MINER_WORK_SPEED"));
         assertTrue(source.contains("ResourceOperation.MINER_CHISEL"));
-        assertTrue(source.contains("ResourceOperation.MINER_BATCH"));
-        assertTrue(source.contains("ResourceOperation.LUMBERJACK_BATCH"));
+        assertFalse(source.contains("ResourceOperation.MINER_BATCH"));
+        assertFalse(source.contains("ResourceOperation.LUMBERJACK_BATCH"));
+        assertFalse(source.contains("resource.mining_hammer"));
+        assertFalse(source.contains("resource.felling_axe"));
+        assertFalse(source.contains("resource.cultivation_hoe"));
         assertTrue(source.contains("ResourceOperation.LUMBERJACK_WORK_SPEED"));
-        assertTrue(source.contains("ResourceOperation.LUMBERJACK_HEARTWOOD"));
         assertTrue(source.contains("ResourceOperation.LUMBERJACK_BARK"));
         assertTrue(source.contains("ResourceOperation.LUMBERJACK_TIMBER_PROCESSING"));
         assertTrue(source.contains("ResourceOperation.LUMBERJACK_FOREST_PRODUCTS"));
-        assertTrue(source.contains("ResourceOperation.LUMBERJACK_LEAF_CLEANUP"));
-        assertTrue(source.contains("ResourceOperation.LUMBERJACK_AUTOMATIC_REPLANT"));
         assertTrue(source.contains("ResourceOperation.FARMER_WILD_GATHERING"));
         assertTrue(source.contains("ResourceOperation.FARMER_WORK_SPEED"));
         assertTrue(source.contains("ResourceOperation.FARMER_SURFACE_GATHERING"));
@@ -45,24 +45,15 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("ResourceOperation.FARMER_AUTOMATIC_REPLANT"));
         assertTrue(source.contains("MineralCompanionPolicy.inspect"));
         assertTrue(source.contains("event.isCancelled = true"));
-        assertTrue(source.contains(".coerceIn(1, 24)"));
         assertTrue(source.contains("ProfessionExperience.batchExperience(processed)"));
-        assertTrue(source.contains("profile.batchProcessingEnabled"));
-        assertTrue(source.contains("profile.automaticCollectionEnabled"));
-        assertTrue(source.contains("profile.optimizedSearchEnabled"));
         assertTrue(source.contains("ChiselAttemptPolicy.evaluate"));
         assertTrue(source.contains("profile.topEvaluationThreshold"));
         assertTrue(source.contains("PotionEffectType.HASTE"));
         assertTrue(source.contains("getPotionEffect(PotionEffectType.HASTE) != null"));
-        assertTrue(source.contains("dropResourceNaturally(player, \"heartwood\", 1, origin.location)"));
         assertTrue(source.contains("dropCustomItemNaturally"));
         assertTrue(source.contains("dropItemNaturally"));
         assertTrue(source.contains("Particle.BLOCK"));
         assertTrue(source.contains("blockData.soundGroup"));
-        assertTrue(source.contains("profile.leafCleanupEnabled"));
-        assertTrue(source.contains("profile.automaticReplantEnabled"));
-        assertTrue(source.contains("BlockPlaceEvent("));
-        assertTrue(source.contains("markPlayerPlaced(root)"));
         assertTrue(source.contains("resource.gathering_guide"));
         assertTrue(source.contains("resource.gathering_sickle"));
         assertTrue(source.contains("handleSurfaceGathering"));
@@ -123,6 +114,33 @@ class SpecialistCollectionSourceContractTest {
         assertFalse(source.contains("Enchantment.FORTUNE"));
         assertFalse(normalRewards.contains("addProfessionExp"));
         assertFalse(normalRewards.contains("CraftItemEvent"));
+    }
+
+    @Test
+    void batchBreakingBelongsToTheRankSkillHandler() throws Exception {
+        String handler = Files.readString(Path.of(
+            "src/main/kotlin/jp/awabi2048/cccontent/features/rank/skill/handlers/UnlockBatchBreakHandler.kt"
+        ));
+        String listener = Files.readString(Path.of(
+            "src/main/kotlin/jp/awabi2048/cccontent/features/rank/skill/listeners/BlockBreakEffectListener.kt"
+        ));
+        String items = Files.readString(Path.of(
+            "src/main/kotlin/jp/awabi2048/cccontent/features/resourcecollection/ResourceCollectionItems.kt"
+        ));
+
+        assertTrue(listener.contains("UnlockBatchBreakHandler.applyTypedProfile(event, typedProfile)"));
+        assertTrue(handler.contains("profile.batchProcessingEnabled"));
+        assertTrue(handler.contains("profile.maximumBatchSize"));
+        assertTrue(handler.contains("profile.automaticCollectionEnabled"));
+        assertTrue(handler.contains("profile.leafCleanupEnabled"));
+        assertTrue(handler.contains("profile.automaticReplantEnabled"));
+        assertTrue(handler.contains("ReplantHandler.replantBatch"));
+        assertTrue(handler.contains("BatchBreakMode.fromTool(player.inventory.itemInMainHand.type)"));
+        assertFalse(handler.contains("MineAll:"));
+        assertFalse(handler.contains("CutAll:"));
+        assertFalse(items.contains("Definition(\"mining_hammer\""));
+        assertFalse(items.contains("Definition(\"felling_axe\""));
+        assertFalse(items.contains("Definition(\"cultivation_hoe\""));
     }
 
     @Test

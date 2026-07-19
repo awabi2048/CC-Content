@@ -33,7 +33,6 @@ import org.bukkit.event.block.Action
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockDamageEvent
 import org.bukkit.event.block.BlockDropItemEvent
-import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.player.PlayerChangedWorldEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerItemHeldEvent
@@ -153,25 +152,8 @@ class SpecialistCollectionService(
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     fun onChiselBlockDamage(event: BlockDamageEvent) {
         val customId = CustomItemManager.identify(event.player.inventory.itemInMainHand)?.fullId
-        val shouldCancel = when (customId) {
-            "resource.chisel" -> settings.isOperationEnabled(ResourceOperation.MINER_CHISEL)
-            "resource.mining_hammer" ->
-                settings.isOperationEnabled(ResourceOperation.MINER_BATCH) &&
-                (rankManager.getTypedProfessionProfile(event.player.uniqueId) as? MinerSkillProfile)
-                    ?.batchProcessingEnabled == true &&
-                    ResourceMaterialPolicy.classify(event.block.type, event.block.blockData) == ResourceCollectionKind.MINERAL
-            "resource.felling_axe" ->
-                settings.isOperationEnabled(ResourceOperation.LUMBERJACK_BATCH) &&
-                (rankManager.getTypedProfessionProfile(event.player.uniqueId) as? LumberjackSkillProfile)
-                    ?.batchProcessingEnabled == true &&
-                    ResourceMaterialPolicy.classify(event.block.type, event.block.blockData) == ResourceCollectionKind.FOREST
-            "resource.cultivation_hoe" ->
-                settings.isOperationEnabled(ResourceOperation.FARMER_AREA_HARVEST) &&
-                (rankManager.getTypedProfessionProfile(event.player.uniqueId) as? FarmerSkillProfile)
-                    ?.areaHarvestEnabled == true &&
-                    ResourceMaterialPolicy.classify(event.block.type, event.block.blockData) == ResourceCollectionKind.CROP
-            else -> false
-        }
+        val shouldCancel = customId == "resource.chisel" &&
+            settings.isOperationEnabled(ResourceOperation.MINER_CHISEL)
         if (shouldCancel) {
             event.isCancelled = true
         }
@@ -186,21 +168,6 @@ class SpecialistCollectionService(
         if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.chisel" &&
             settings.isOperationEnabled(ResourceOperation.MINER_CHISEL)) {
             handleChiselClick(event, block)
-            return
-        }
-        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.mining_hammer" &&
-            settings.isOperationEnabled(ResourceOperation.MINER_BATCH)) {
-            handleBatchBreak(event, block, ResourceCollectionKind.MINERAL)
-            return
-        }
-        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.felling_axe" &&
-            settings.isOperationEnabled(ResourceOperation.LUMBERJACK_BATCH)) {
-            handleBatchBreak(event, block, ResourceCollectionKind.FOREST)
-            return
-        }
-        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.cultivation_hoe" &&
-            settings.isOperationEnabled(ResourceOperation.FARMER_AREA_HARVEST)) {
-            handleAreaHarvest(event, block)
             return
         }
         if (event.action != Action.RIGHT_CLICK_BLOCK || !event.player.isSneaking) return
@@ -223,8 +190,6 @@ class SpecialistCollectionService(
                 ifEnabled(ResourceOperation.FARMER_WILD_GATHERING) { inspectVegetation(event, block) }
             "resource.gathering_sickle" ->
                 ifEnabled(ResourceOperation.FARMER_SURFACE_GATHERING) { handleSurfaceGathering(event, block) }
-            "resource.cultivation_hoe" ->
-                ifEnabled(ResourceOperation.FARMER_AREA_TILLING) { handleAreaTilling(event, block) }
             else -> ifEnabled(ResourceOperation.LUMBERJACK_BARK) { scheduleBarkReward(event, block) }
         }
     }
@@ -283,12 +248,15 @@ class SpecialistCollectionService(
     private fun localizedEnum(player: Player, prefix: String, value: String): String =
         CCSystem.getAPI().getI18nString(player, "$prefix.${value.lowercase()}")
 
-    private fun handleAreaHarvest(event: PlayerInteractEvent, origin: Block) {
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    fun onAreaHarvest(event: BlockBreakEvent) {
         val player = event.player
+        val origin = event.block
         val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? FarmerSkillProfile ?: return
         if (!profile.areaHarvestEnabled ||
+            !settings.isOperationEnabled(ResourceOperation.FARMER_AREA_HARVEST) ||
+            !player.inventory.itemInMainHand.type.name.endsWith("_HOE") ||
             ResourceMaterialPolicy.classify(origin.type, origin.blockData) != ResourceCollectionKind.CROP) return
-        event.isCancelled = true
         if (!isReadyWorld(origin)) {
             return
         }
@@ -297,7 +265,8 @@ class SpecialistCollectionService(
         val candidates = buildList {
             for (x in -radius..radius) for (z in -radius..radius) {
                 val block = origin.getRelative(x, 0, z)
-                if (ResourceMaterialPolicy.classify(block.type, block.blockData) == ResourceCollectionKind.CROP) {
+                if (block != origin &&
+                    ResourceMaterialPolicy.classify(block.type, block.blockData) == ResourceCollectionKind.CROP) {
                     add(block)
                 }
             }
@@ -315,22 +284,20 @@ class SpecialistCollectionService(
             processed++
         }
         if (processed <= 0) return
-        player.swingMainHand()
         damageCultivationTool(player, processed, profile.durabilitySaveChance)
         awardFarmerArea(player, ContentActionType.CROP_HARVESTED, processed, originMaterial, "harvest")
-        sendCountCollectionResult(
-            player,
-            "resource_collection.cultivation.harvested",
-            "resource_collection.display.heading.harvest_result",
-            processed
-        )
     }
 
-    private fun handleAreaTilling(event: PlayerInteractEvent, origin: Block) {
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onAreaTilling(event: PlayerInteractEvent) {
+        if (event.hand != EquipmentSlot.HAND || event.action != Action.RIGHT_CLICK_BLOCK) return
+        val origin = event.clickedBlock ?: return
         val player = event.player
         val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? FarmerSkillProfile ?: return
-        if (!profile.areaTillingEnabled || origin.type !in tillableMaterials) return
-        event.isCancelled = true
+        if (!profile.areaTillingEnabled ||
+            !settings.isOperationEnabled(ResourceOperation.FARMER_AREA_TILLING) ||
+            !player.inventory.itemInMainHand.type.name.endsWith("_HOE") ||
+            origin.type !in tillableMaterials) return
         if (!isReadyWorld(origin)) {
             return
         }
@@ -338,12 +305,13 @@ class SpecialistCollectionService(
         val radius = profile.operationRadius.coerceIn(1, 3)
         plugin.server.scheduler.runTask(plugin, Runnable {
             if (!player.isOnline ||
-                CustomItemManager.identify(player.inventory.itemInMainHand)?.fullId != "resource.cultivation_hoe") {
+                !player.inventory.itemInMainHand.type.name.endsWith("_HOE")) {
                 return@Runnable
             }
             var processed = 0
             for (x in -radius..radius) for (z in -radius..radius) {
                 val block = origin.getRelative(x, 0, z)
+                if (block == origin) continue
                 if (block.type !in tillableMaterials || block.getRelative(BlockFace.UP).type != Material.AIR) continue
                 if (!callProtectedInteract(block, player)) continue
                 playNaturalBreakEffect(block, particleCount = 4)
@@ -355,12 +323,6 @@ class SpecialistCollectionService(
             player.swingMainHand()
             damageCultivationTool(player, processed, profile.durabilitySaveChance)
             awardFarmerArea(player, ContentActionType.SOIL_TILLED, processed, originMaterial, "tilling")
-            sendCountCollectionResult(
-                player,
-                "resource_collection.cultivation.tilled",
-                "resource_collection.display.heading.tilling_result",
-                processed
-            )
         })
     }
 
@@ -438,263 +400,6 @@ class SpecialistCollectionService(
         } finally {
             internalInteractions.remove(key)
         }
-    }
-
-    private fun handleBatchBreak(
-        event: PlayerInteractEvent,
-        origin: Block,
-        expectedKind: ResourceCollectionKind
-    ) {
-        val player = event.player
-        val profile = rankManager.getTypedProfessionProfile(player.uniqueId)
-        val enabled = when {
-            expectedKind == ResourceCollectionKind.MINERAL && profile is MinerSkillProfile ->
-                profile.batchProcessingEnabled
-            expectedKind == ResourceCollectionKind.FOREST && profile is LumberjackSkillProfile ->
-                profile.batchProcessingEnabled
-            else -> false
-        }
-        if (!enabled || ResourceMaterialPolicy.classify(origin.type, origin.blockData) != expectedKind) return
-        event.isCancelled = true
-        if (!isReadyNatural(origin)) {
-            return
-        }
-        val originalMaterial = origin.type
-        val treeRoot = expectedKind == ResourceCollectionKind.FOREST && isTreeRoot(origin)
-        val maximum = when (profile) {
-            is MinerSkillProfile -> profile.maximumBatchSize
-            is LumberjackSkillProfile -> profile.maximumBatchSize
-            else -> 1
-        }.coerceIn(1, 24)
-        val targets = collectConnectedNatural(
-            origin,
-            expectedKind,
-            maximum,
-            includeDiagonalTrunks = profile is LumberjackSkillProfile && profile.multiTrunkRecognitionImproved,
-            optimizedSearch = profile is MinerSkillProfile && profile.optimizedSearchEnabled
-        )
-        val leaves = if (expectedKind == ResourceCollectionKind.FOREST &&
-            settings.isOperationEnabled(ResourceOperation.LUMBERJACK_LEAF_CLEANUP) &&
-            profile is LumberjackSkillProfile && profile.leafCleanupEnabled) {
-            collectTreeLeaves(origin, targets, maximum = 256)
-        } else {
-            emptyList()
-        }
-        var processed = 0
-        for (block in targets) {
-            if (!callProtectedBreak(block, player)) continue
-            val tool = if (expectedKind == ResourceCollectionKind.MINERAL) {
-                ItemStack(Material.IRON_PICKAXE)
-            } else {
-                ItemStack(Material.IRON_AXE)
-            }
-            val automaticCollection = profile is MinerSkillProfile && profile.automaticCollectionEnabled
-            if (breakBatchBlock(block, tool, player, automaticCollection)) processed++
-        }
-        if (processed <= 0) {
-            return
-        }
-        player.swingMainHand()
-        val completeTreeBatch = expectedKind == ResourceCollectionKind.FOREST && processed == targets.size
-        if (treeRoot && completeTreeBatch &&
-            settings.isOperationEnabled(ResourceOperation.LUMBERJACK_HEARTWOOD)) {
-            dropResourceNaturally(player, "heartwood", 1, origin.location)
-        }
-        if (completeTreeBatch && profile is LumberjackSkillProfile) {
-            if (settings.isOperationEnabled(ResourceOperation.LUMBERJACK_LEAF_CLEANUP) &&
-                profile.leafCleanupEnabled) {
-                cleanupTreeLeaves(player, leaves)
-            }
-            if (settings.isOperationEnabled(ResourceOperation.LUMBERJACK_AUTOMATIC_REPLANT) &&
-                profile.automaticReplantEnabled && treeRoot) {
-                replantTree(player, origin, originalMaterial)
-            }
-        }
-        val durabilitySaveChance = when (profile) {
-            is MinerSkillProfile -> profile.durabilitySaveChance
-            is LumberjackSkillProfile -> profile.durabilitySaveChance
-            else -> 0.0
-        }
-        if (player.gameMode != GameMode.CREATIVE) {
-            repeat(processed) {
-                if (random.nextDouble() >= durabilitySaveChance) player.damageItemStack(EquipmentSlot.HAND, 1)
-            }
-        }
-        awardBatch(player, expectedKind, processed, originalMaterial)
-        sendCountCollectionResult(
-            player,
-            "resource_collection.batch.completed",
-            if (expectedKind == ResourceCollectionKind.MINERAL) {
-                "resource_collection.display.heading.mineral_batch_result"
-            } else {
-                "resource_collection.display.heading.forest_batch_result"
-            },
-            processed
-        )
-    }
-
-    private fun breakBatchBlock(
-        block: Block,
-        tool: ItemStack,
-        player: Player,
-        automaticCollection: Boolean
-    ): Boolean {
-        playNaturalBreakEffect(block)
-        if (!automaticCollection) return block.breakNaturally(tool, true)
-        val drops = block.getDrops(tool, player).map(ItemStack::clone)
-        block.type = Material.AIR
-        drops.forEach { item ->
-            player.inventory.addItem(item).values.forEach { overflow ->
-                player.world.dropItemNaturally(player.location, overflow)
-            }
-        }
-        return true
-    }
-
-    private fun collectConnectedNatural(
-        origin: Block,
-        kind: ResourceCollectionKind,
-        maximum: Int,
-        includeDiagonalTrunks: Boolean = false,
-        optimizedSearch: Boolean = false
-    ): List<Block> {
-        val queue = ArrayDeque<Block>()
-        val visited = mutableSetOf<BlockKey>()
-        val result = mutableListOf<Block>()
-        queue.add(origin)
-        while (queue.isNotEmpty() && result.size < maximum) {
-            val block = queue.removeFirst()
-            if (!visited.add(block.key())) continue
-            if (ResourceMaterialPolicy.classify(block.type, block.blockData) != kind || !isReadyNatural(block)) continue
-            result += block
-            val faces = listOf(
-                BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH,
-                BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
-            )
-            val neighbors = faces.map(block::getRelative)
-            val orderedNeighbors = if (optimizedSearch) {
-                neighbors.sortedBy { neighbor -> if (neighbor.type == origin.type) 0 else 1 }
-            } else {
-                neighbors
-            }
-            orderedNeighbors.forEach(queue::add)
-            if (includeDiagonalTrunks && kind == ResourceCollectionKind.FOREST) {
-                for (x in -1..1) for (z in -1..1) {
-                    if (x == 0 && z == 0) continue
-                    queue.add(block.getRelative(x, 0, z))
-                }
-            }
-        }
-        return result
-    }
-
-    private fun collectTreeLeaves(origin: Block, trunks: List<Block>, maximum: Int): List<Block> {
-        val result = mutableListOf<Block>()
-        val visited = mutableSetOf<BlockKey>()
-        val queue = ArrayDeque<Block>()
-        trunks.forEach { trunk ->
-            for (x in -1..1) for (y in -1..1) for (z in -1..1) {
-                if (x == 0 && y == 0 && z == 0) continue
-                queue.add(trunk.getRelative(x, y, z))
-            }
-        }
-        while (queue.isNotEmpty() && result.size < maximum) {
-            val block = queue.removeFirst()
-            if (!visited.add(block.key())) continue
-            if (kotlin.math.abs(block.x - origin.x) > 8 ||
-                block.y !in (origin.y - 2)..(origin.y + 18) ||
-                kotlin.math.abs(block.z - origin.z) > 8) continue
-            if (!ResourceMaterialPolicy.isLeaf(block.type) || !isReadyNatural(block)) continue
-            result += block
-            listOf(
-                BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH,
-                BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
-            ).forEach { queue.add(block.getRelative(it)) }
-        }
-        return result
-    }
-
-    private fun cleanupTreeLeaves(player: Player, leaves: List<Block>): Int {
-        var processed = 0
-        for (leaf in leaves) {
-            if (!ResourceMaterialPolicy.isLeaf(leaf.type) || !callProtectedBreak(leaf, player)) continue
-            playNaturalBreakEffect(leaf, particleCount = 6)
-            leaf.breakNaturally()
-            processed++
-        }
-        return processed
-    }
-
-    private fun replantTree(player: Player, root: Block, originalMaterial: Material): Boolean {
-        if (!root.type.isAir || !ResourceMaterialPolicy.canPlantTreeOn(root.getRelative(BlockFace.DOWN).type)) return false
-        val sapling = ResourceMaterialPolicy.treeReplantMaterial(originalMaterial) ?: return false
-        if (player.gameMode != GameMode.CREATIVE && !hasItem(player, sapling)) return false
-
-        val replacedState = root.state
-        root.type = sapling
-        val placeEvent = BlockPlaceEvent(
-            root,
-            replacedState,
-            root.getRelative(BlockFace.DOWN),
-            ItemStack(sapling),
-            player,
-            true,
-            EquipmentSlot.HAND
-        )
-        Bukkit.getPluginManager().callEvent(placeEvent)
-        if (placeEvent.isCancelled || !placeEvent.canBuild()) {
-            root.type = Material.AIR
-            return false
-        }
-        if (player.gameMode != GameMode.CREATIVE && !consumeOne(player, sapling)) {
-            root.type = Material.AIR
-            return false
-        }
-        CCSystem.getAPI().getNaturalOriginRegistry().markPlayerPlaced(root)
-        player.playSound(root.location, Sound.BLOCK_ROOTED_DIRT_PLACE, 0.8f, 1.1f)
-        return true
-    }
-
-    private fun hasItem(player: Player, material: Material): Boolean =
-        player.inventory.contents.any { it?.type == material && it.amount > 0 }
-
-    private fun consumeOne(player: Player, material: Material): Boolean {
-        val slot = player.inventory.contents.indexOfFirst { it?.type == material && it.amount > 0 }
-        if (slot < 0) return false
-        val stack = player.inventory.getItem(slot) ?: return false
-        if (stack.amount <= 1) player.inventory.setItem(slot, null) else stack.amount -= 1
-        return true
-    }
-
-    private fun isTreeRoot(block: Block): Boolean =
-        ResourceMaterialPolicy.classify(block.getRelative(BlockFace.DOWN).type, block.getRelative(BlockFace.DOWN).blockData) !=
-            ResourceCollectionKind.FOREST
-
-    private fun awardBatch(player: Player, kind: ResourceCollectionKind, processed: Int, material: Material) {
-        val experience = ProfessionExperience.batchExperience(processed)
-        rankManager.addProfessionExp(player.uniqueId, experience)
-        rankManager.recordProfessionCycleAction(player.uniqueId)
-        val actionType = if (kind == ResourceCollectionKind.MINERAL) {
-            ContentActionType.MINERAL_EXTRACTED
-        } else {
-            ContentActionType.TREE_PROCESSED
-        }
-        CCSystem.getAPI().getContentActionDispatcher().publish(
-            ContentAction(
-                actionId = UUID.randomUUID(),
-                schemaVersion = 1,
-                occurredAt = CCSystem.getAPI().getSharedClockService().now().toInstant(),
-                playerId = player.uniqueId,
-                actionType = actionType,
-                amount = processed.toLong(),
-                worldKey = player.world.key,
-                metadata = mapOf(
-                    "material" to material.key.toString(),
-                    "batch" to "true",
-                    "experience" to experience.toString()
-                )
-            )
-        )
     }
 
     private fun inspectVegetation(event: PlayerInteractEvent, origin: Block) {
