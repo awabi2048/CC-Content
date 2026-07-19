@@ -382,20 +382,20 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             event.isCancelled = true
             return
         }
-        invalidateAt(key, event.block.location)
+        invalidateAt(key)
     }
 
     @EventHandler(ignoreCancelled = true)
     fun onBlockExplode(event: BlockExplodeEvent) {
         event.blockList().map { BreweryLocationKey.fromBlock(it) }.distinct().forEach {
-            invalidateAt(it, event.block.location)
+            invalidateAt(it)
         }
     }
 
     @EventHandler(ignoreCancelled = true)
     fun onEntityExplode(event: EntityExplodeEvent) {
         event.blockList().map { BreweryLocationKey.fromBlock(it) }.distinct().forEach {
-            invalidateAt(it, event.location)
+            invalidateAt(it)
         }
     }
 
@@ -1719,7 +1719,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             key in agingStates ||
             barrelRegistry.findByBlock(key) != null
 
-    private fun invalidateAt(key: BreweryLocationKey, dropLocation: org.bukkit.Location) {
+    private fun invalidateAt(key: BreweryLocationKey) {
         val registered = barrelRegistry.findByBlock(key)
         val canonicalKey = registered?.origin ?: key
         val inventories = buildList {
@@ -1734,20 +1734,11 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         machineLocks.remove(canonicalKey)
         inventories.forEach { inventory ->
             inventory.viewers.toList().forEach { it.closeInventory() }
-            dropInventoryContents(inventory, dropLocation)
             inventory.clear()
         }
         if (inventories.isNotEmpty() || registered != null) {
             markDirty()
         }
-    }
-
-    private fun dropInventoryContents(inventory: Inventory, location: org.bukkit.Location?) {
-        if (location?.world == null) return
-        inventory.contents
-            .filterNotNull()
-            .filterNot { it.type.isAir || isUiPlaceholderItem(it) }
-            .forEach { location.world.dropItemNaturally(location, it) }
     }
 
     private fun finalizeDistilledItem(item: ItemStack, player: Player?) {
@@ -2034,7 +2025,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             loadInventory(yml, "fermentation.$rawKey.inventory", inv)
             val block = key.toLocation()?.block
             if (block == null || !isFermentationCauldron(block.type) || !hasCampfireBelow(block.location)) {
-                dropInventoryContents(inv, key.toLocation())
+                inv.clear()
                 plugin.logger.warning("[Brewery] 存在しない発酵設備の状態を除外しました: $rawKey")
                 return@forEach
             }
@@ -2070,7 +2061,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             holder.backingInventory = inv
             loadInventory(yml, "distillation.$rawKey.inventory", inv)
             if (key.toLocation()?.block?.state !is BrewingStand) {
-                dropInventoryContents(inv, key.toLocation())
+                inv.clear()
                 plugin.logger.warning("[Brewery] 存在しない蒸留設備の状態を除外しました: $rawKey")
                 return@forEach
             }
@@ -2102,7 +2093,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
                 BarrelSize.BIG -> barrelRegistry.findById(barrelId)?.origin == key
             }
             if (!validStructure) {
-                dropInventoryContents(inv, key.toLocation())
+                inv.clear()
                 plugin.logger.warning("[Brewery] 存在しない熟成設備の状態を除外しました: $rawId")
                 return@forEach
             }

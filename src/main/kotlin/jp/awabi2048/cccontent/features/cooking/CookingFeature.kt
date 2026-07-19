@@ -2,6 +2,9 @@ package jp.awabi2048.cccontent.features.cooking
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconData
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
@@ -23,18 +26,27 @@ import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
+import org.bukkit.event.block.BlockBreakEvent
+import org.bukkit.event.block.BlockBurnEvent
+import org.bukkit.event.block.BlockExplodeEvent
+import org.bukkit.event.block.BlockPistonExtendEvent
+import org.bukkit.event.block.BlockPistonRetractEvent
+import org.bukkit.event.entity.EntityExplodeEvent
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryCloseEvent
 import org.bukkit.event.inventory.InventoryDragEvent
 import org.bukkit.event.inventory.ClickType
 import org.bukkit.event.inventory.InventoryAction
 import org.bukkit.event.player.PlayerInteractEvent
-import org.bukkit.event.player.PlayerJoinEvent
+import org.bukkit.event.player.PlayerQuitEvent
+import org.bukkit.event.player.PlayerTeleportEvent
+import org.bukkit.event.entity.PlayerDeathEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.scheduler.BukkitTask
 import java.io.File
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -134,19 +146,24 @@ private class CookingController(
     private val itemIdKey = NamespacedKey("cccontent", "cooking_item_id")
     private val recipeKey = NamespacedKey("cccontent", "cooking_recipe_id")
     private val completionKey = NamespacedKey("cccontent", "cooking_completion")
+    private val customItemIdKey = NamespacedKey("cccontent", "custom_item_id")
     private val recipes = mutableListOf<CookingRecipe>()
     private val ingredients = mutableMapOf<String, CookingIngredient>()
     private var minimumSimilarity = 0.5
     private var ingredientSlotsByLevel: Map<Int, Int> = emptyMap()
-    private val pending = mutableMapOf<UUID, List<ItemStack>>()
-    private val active = mutableMapOf<UUID, ActiveCooking>()
+    private val pending = mutableMapOf<CookingStationKey, List<ItemStack>>()
+    private val active = mutableMapOf<CookingStationKey, ActiveCooking>()
+    private val stationLocks = mutableMapOf<CookingStationKey, UUID>()
+    private var progressTask: BukkitTask? = null
+    private var tickCounter = 0L
     private var state = YamlConfiguration()
 
     private data class ActiveCooking(
         val recipe: CookingRecipe,
-        val completionAt: Long,
+        var remainingTicks: Long,
         val score: Int,
         val seasoningIds: List<String>,
+        val starterId: UUID,
         var settled: Boolean = false
     )
 
@@ -155,13 +172,13 @@ private class CookingController(
         loadDefinitions()
         loadState()
         Bukkit.getPluginManager().registerEvents(this, plugin)
-        Bukkit.getOnlinePlayers().forEach { scheduleIfReady(it) }
+        startProgressTask()
     }
 
     fun reload() {
         loadDefinitions()
         loadState()
-        Bukkit.getOnlinePlayers().forEach { scheduleIfReady(it) }
+        startProgressTask()
     }
 
     fun shutdown() {
@@ -170,12 +187,9 @@ private class CookingController(
             returnInputs(player, player.openInventory.topInventory, holder)
             player.closeInventory()
         }
-        pending.entries.toList().forEach { (uuid, items) ->
-            val player = Bukkit.getPlayer(uuid) ?: return@forEach
-            if (!player.isOnline) return@forEach
-            pending.remove(uuid)
-            items.forEach { item -> player.inventory.addItem(item.clone()).values.forEach { player.world.dropItem(player.location, it) } }
-        }
+        progressTask?.cancel()
+        progressTask = null
+        stationLocks.clear()
         saveState()
     }
 
@@ -242,32 +256,42 @@ private class CookingController(
         state = if (stateFile.exists()) YamlConfiguration.loadConfiguration(stateFile) else YamlConfiguration()
         pending.clear()
         active.clear()
-        state.getConfigurationSection("pending")?.getKeys(false)?.forEach { rawUuid ->
-            val uuid = runCatching { UUID.fromString(rawUuid) }.getOrNull() ?: return@forEach
-            pending[uuid] = loadItems(state.getList("pending.$rawUuid.items").orEmpty())
+        state.getConfigurationSection("pending")?.getKeys(false)?.forEach { pathKey ->
+            val serialized = state.getString("pending.$pathKey.station") ?: return@forEach
+            val station = CookingStationKey.deserialize(serialized) ?: return@forEach
+            pending[station] = loadItems(state.getList("pending.$pathKey.items").orEmpty())
         }
-        state.getConfigurationSection("active")?.getKeys(false)?.forEach { rawUuid ->
-            val uuid = runCatching { UUID.fromString(rawUuid) }.getOrNull() ?: return@forEach
-            val path = "active.$rawUuid"
+        state.getConfigurationSection("active")?.getKeys(false)?.forEach { pathKey ->
+            val path = "active.$pathKey"
+            val station = CookingStationKey.deserialize(state.getString("$path.station") ?: return@forEach) ?: return@forEach
             val recipe = recipes.firstOrNull { it.id == state.getString("$path.recipe") } ?: return@forEach
-            active[uuid] = ActiveCooking(
+            val starterId = state.getString("$path.starter")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                ?: return@forEach
+            active[station] = ActiveCooking(
                 recipe,
-                state.getLong("$path.completion_at"),
+                state.getLong("$path.remaining_ticks").coerceAtLeast(1L),
                 state.getInt("$path.score").coerceIn(0, 100),
-                state.getStringList("$path.seasonings")
+                state.getStringList("$path.seasonings"),
+                starterId
             )
         }
     }
 
     private fun saveState() {
         val output = YamlConfiguration()
-        pending.forEach { (uuid, items) -> output.set("pending.$uuid.items", items.map { it.serialize() }) }
-        active.forEach { (uuid, session) ->
-            val path = "active.$uuid"
+        pending.forEach { (station, items) ->
+            val path = "pending.${station.pathKey()}"
+            output.set("$path.station", station.serialize())
+            output.set("$path.items", items.map { it.serialize() })
+        }
+        active.forEach { (station, session) ->
+            val path = "active.${station.pathKey()}"
+            output.set("$path.station", station.serialize())
             output.set("$path.recipe", session.recipe.id)
-            output.set("$path.completion_at", session.completionAt)
+            output.set("$path.remaining_ticks", session.remainingTicks)
             output.set("$path.score", session.score)
             output.set("$path.seasonings", session.seasoningIds)
+            output.set("$path.starter", session.starterId.toString())
         }
         output.save(stateFile)
     }
@@ -277,15 +301,14 @@ private class CookingController(
         (it as? Map<String, Any>)?.let(ItemStack::deserialize)
     }
 
-    @EventHandler fun onJoin(event: PlayerJoinEvent) {
-        scheduleIfReady(event.player)
-    }
-
     @EventHandler
     fun onStationClick(event: PlayerInteractEvent) {
-        if (event.action != Action.RIGHT_CLICK_BLOCK || event.clickedBlock?.type != Material.CAMPFIRE || !event.player.isSneaking) return
+        if (event.action != Action.RIGHT_CLICK_BLOCK ||
+            event.clickedBlock?.type !in setOf(Material.CAMPFIRE, Material.SOUL_CAMPFIRE) ||
+            !event.player.isSneaking
+        ) return
         event.isCancelled = true
-        open(event.player)
+        open(event.player, CookingStationKey.from(event.clickedBlock!!))
     }
 
     @EventHandler
@@ -302,7 +325,7 @@ private class CookingController(
         }
         if (slot == CookingHolder.START) {
             event.isCancelled = true
-            if (cookingStartClickAllowed(event.click)) start(player, event.view.topInventory)
+            if (cookingStartClickAllowed(event.click)) start(player, event.view.topInventory, holder.station)
             return
         }
         if (slot == CookingHolder.CANCEL) {
@@ -325,23 +348,38 @@ private class CookingController(
     fun onClose(event: InventoryCloseEvent) {
         val holder = event.inventory.holder as? CookingHolder ?: return
         val player = event.player as? Player ?: return
-        if (active.containsKey(player.uniqueId)) return
+        stationLocks.remove(holder.station, player.uniqueId)
+        if (active.containsKey(holder.station)) return
         returnInputs(player, event.inventory, holder)
     }
 
-    private fun open(player: Player) {
-        if (active.containsKey(player.uniqueId)) {
+    private fun open(player: Player, station: CookingStationKey) {
+        if (active.containsKey(station)) {
             player.sendMessage(message(player, "cooking.error.in_progress")); return
         }
+        val lockOwner = stationLocks[station]
+        if (lockOwner != null && lockOwner != player.uniqueId) {
+            player.sendMessage(message(player, "cooking.error.in_use"))
+            return
+        }
+        stationLocks[station] = player.uniqueId
+        pending.remove(station)?.let { results ->
+            results.forEach { item ->
+                localizeResult(item, player)
+                player.inventory.addItem(item).values.forEach { player.world.dropItem(player.location, it) }
+                item.itemMeta?.persistentDataContainer?.get(recipeKey, PersistentDataType.STRING)?.let { recipeId ->
+                    val completion = item.itemMeta?.persistentDataContainer?.get(completionKey, PersistentDataType.INTEGER)
+                    catalogStore.record(player.uniqueId, CatalogType.COOKING, recipeId, completion = completion)
+                    player.sendMessage(message(player, "cooking.process.collected", mapOf("recipe" to message(player, "cooking.recipe.$recipeId"))))
+                }
+            }
+            saveState()
+        }
         val title = message(player, "cooking.ui.title")
-        val holder = CookingHolder(player.uniqueId)
+        val holder = CookingHolder(player.uniqueId, station)
         val inventory = Bukkit.createInventory(holder, 54, Component.text(title))
         holder.backingInventory = inventory
         render(inventory, player)
-        pending.remove(player.uniqueId).orEmpty().forEachIndexed { index, item ->
-            val slot = CookingHolder.INGREDIENT_SLOTS.getOrNull(index) ?: CookingHolder.SEASONING_SLOTS.getOrNull(index - 5) ?: return@forEachIndexed
-            inventory.setItem(slot, item)
-        }
         player.openInventory(inventory)
     }
 
@@ -359,7 +397,7 @@ private class CookingController(
         inventory.setItem(CookingHolder.INFO, infoItem(player))
     }
 
-    private fun start(player: Player, inventory: Inventory) {
+    private fun start(player: Player, inventory: Inventory, station: CookingStationKey) {
         val ingredientItems = CookingHolder.INGREDIENT_SLOTS.mapNotNull(inventory::getItem).filter(::isRealItem)
         val seasoningItems = CookingHolder.SEASONING_SLOTS.mapNotNull(inventory::getItem).filter(::isRealItem)
         if (ingredientItems.isEmpty()) { player.sendMessage(message(player, "cooking.error.no_ingredients")); return }
@@ -368,50 +406,146 @@ private class CookingController(
         if (!consumeInputs(inventory, match.recipe)) {
             player.sendMessage(message(player, "cooking.error.recipe_not_found")); return
         }
+        CookingHolder.INPUT_SLOTS.forEach { inventory.setItem(it, null) }
         val seasoningIds = seasoningItems.flatMap { item -> ingredients.keys.filter { it == itemId(item) } }
         val score = (match.score * 100.0).roundToInt().coerceIn(0, 100)
-        val now = System.currentTimeMillis()
-        active[player.uniqueId] = ActiveCooking(match.recipe, now + match.recipe.completionTicks * 50L, score, seasoningIds)
+        active[station] = ActiveCooking(
+            match.recipe,
+            match.recipe.completionTicks,
+            score,
+            seasoningIds,
+            player.uniqueId
+        )
         returnInputs(player, inventory, inventory.holder as? CookingHolder)
-        pending.remove(player.uniqueId)
         saveState()
         player.closeInventory()
         player.sendMessage(message(player, "cooking.process.started", mapOf("recipe" to message(player, "cooking.recipe.${match.recipe.id}"))))
-        scheduleIfReady(player)
     }
 
-    private fun scheduleIfReady(player: Player) {
-        val session = active[player.uniqueId] ?: return
-        val delay = ((session.completionAt - System.currentTimeMillis()) / 50L).coerceAtLeast(1L)
-        Bukkit.getScheduler().runTaskLater(plugin, Runnable { complete(player.uniqueId) }, delay)
-    }
-
-    private fun complete(uuid: UUID) {
-        val session = active[uuid] ?: return
-        if (session.settled || session.completionAt > System.currentTimeMillis()) { scheduleIfReady(Bukkit.getPlayer(uuid) ?: return); return }
-        val player = Bukkit.getPlayer(uuid)
-        if (player == null || !player.isOnline) {
-            saveState()
-            return
-        }
+    private fun complete(station: CookingStationKey) {
+        val session = active[station] ?: return
+        if (session.settled || session.remainingTicks > 0) return
         session.settled = true
         val result = ItemStack(session.recipe.resultMaterial)
         result.amount = 1
         result.editMeta { meta ->
             meta.setItemModel(session.recipe.resultModel)
-            meta.displayName(Component.text(message(player, "cooking.recipe.${session.recipe.id}")))
             meta.persistentDataContainer.set(itemIdKey, PersistentDataType.STRING, "dish_${session.recipe.id}")
+            meta.persistentDataContainer.set(customItemIdKey, PersistentDataType.STRING, "cooking.dish_${session.recipe.id}")
             meta.persistentDataContainer.set(recipeKey, PersistentDataType.STRING, session.recipe.id)
+            meta.persistentDataContainer.set(completionKey, PersistentDataType.INTEGER, session.score)
         }
-        player.inventory.addItem(result).values.forEach { player.world.dropItem(player.location, it) }
-        if (rankManagerProvider()?.getPlayerProfession(uuid)?.profession == jp.awabi2048.cccontent.features.rank.profession.Profession.COOK) {
-            rankManagerProvider()?.addProfessionExp(uuid, session.recipe.exp)
+        pending[station] = listOf(result)
+        if (rankManagerProvider()?.getPlayerProfession(session.starterId)?.profession == jp.awabi2048.cccontent.features.rank.profession.Profession.COOK) {
+            rankManagerProvider()?.addProfessionExp(session.starterId, session.recipe.exp)
         }
-        catalogStore.record(uuid, CatalogType.COOKING, session.recipe.id, completion = session.score)
-        player.sendMessage(message(player, "cooking.process.completed", mapOf("recipe" to message(player, "cooking.recipe.${session.recipe.id}"), "score" to session.score)))
-        player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 0.7f, 1.4f)
-        active.remove(uuid)
+        catalogStore.record(session.starterId, CatalogType.COOKING, session.recipe.id, completion = session.score, obtained = false)
+        Bukkit.getPlayer(session.starterId)?.takeIf(Player::isOnline)?.let { player ->
+            player.sendMessage(message(player, "cooking.process.completed", mapOf("recipe" to message(player, "cooking.recipe.${session.recipe.id}"), "score" to session.score)))
+            player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 0.7f, 1.4f)
+        }
+        active.remove(station)
         saveState()
+    }
+
+    private fun startProgressTask() {
+        progressTask?.cancel()
+        progressTask = Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
+            tickCounter++
+            active.entries.toList().forEach { (station, session) ->
+                val block = station.blockIfLoaded() ?: return@forEach
+                if (block.type !in setOf(Material.CAMPFIRE, Material.SOUL_CAMPFIRE)) {
+                    invalidateStation(station)
+                    return@forEach
+                }
+                val campfire = block.blockData as? org.bukkit.block.data.type.Campfire ?: return@forEach
+                if (!campfire.isLit) return@forEach
+                session.remainingTicks--
+                if (session.remainingTicks <= 0L) complete(station)
+            }
+            if (tickCounter % 100L == 0L && active.isNotEmpty()) saveState()
+        }, 1L, 1L)
+    }
+
+    private fun localizeResult(item: ItemStack, player: Player) {
+        val recipeId = item.itemMeta?.persistentDataContainer?.get(recipeKey, PersistentDataType.STRING) ?: return
+        val completion = item.itemMeta?.persistentDataContainer?.get(completionKey, PersistentDataType.INTEGER) ?: 0
+        item.editMeta {
+            it.displayName(Component.text(message(player, "cooking.recipe.$recipeId")))
+            it.lore(
+                CCSystem.getAPI().getLoreService().render(
+                    GuiLoreSpec.Blocks(
+                        listOf(
+                            GuiLoreBlock(listOf(GuiLoreLine.Text(message(player, "cooking.recipe_description.$recipeId")))),
+                            GuiLoreBlock(
+                                listOf(
+                                    GuiLoreLine.Data(
+                                        message(player, "cooking.item.data.completion"),
+                                        "$completion%",
+                                        "§f"
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onStationBreak(event: BlockBreakEvent) {
+        invalidateStation(CookingStationKey.from(event.block))
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onStationBurn(event: BlockBurnEvent) {
+        invalidateStation(CookingStationKey.from(event.block))
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onStationExplode(event: BlockExplodeEvent) {
+        event.blockList().forEach { invalidateStation(CookingStationKey.from(it)) }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onStationExplode(event: EntityExplodeEvent) {
+        event.blockList().forEach { invalidateStation(CookingStationKey.from(it)) }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onStationMove(event: BlockPistonExtendEvent) {
+        event.blocks.forEach { invalidateStation(CookingStationKey.from(it)) }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onStationMove(event: BlockPistonRetractEvent) {
+        event.blocks.forEach { invalidateStation(CookingStationKey.from(it)) }
+    }
+
+    @EventHandler
+    fun onPlayerQuit(event: PlayerQuitEvent) {
+        closeCookingInventory(event.player)
+    }
+
+    @EventHandler
+    fun onPlayerTeleport(event: PlayerTeleportEvent) {
+        closeCookingInventory(event.player)
+    }
+
+    @EventHandler
+    fun onPlayerDeath(event: PlayerDeathEvent) {
+        closeCookingInventory(event.player)
+    }
+
+    private fun closeCookingInventory(player: Player) {
+        if (player.openInventory.topInventory.holder is CookingHolder) player.closeInventory()
+    }
+
+    private fun invalidateStation(station: CookingStationKey) {
+        val changed = active.remove(station) != null || pending.remove(station) != null
+        stationLocks.remove(station)?.let { Bukkit.getPlayer(it)?.closeInventory() }
+        if (changed) saveState()
     }
 
     private fun consumeInputs(inventory: Inventory, recipe: CookingRecipe): Boolean {
@@ -470,7 +604,6 @@ private class CookingController(
         holder?.returned = true
         val items = CookingHolder.INPUT_SLOTS.filterNot(excludedSlots::contains).mapNotNull(inventory::getItem).filter(::isRealItem).map(ItemStack::clone)
         CookingHolder.INPUT_SLOTS.forEach { inventory.setItem(it, null) }
-        pending.remove(player.uniqueId)
         items.forEach { item -> player.inventory.addItem(item).values.forEach { player.world.dropItem(player.location, it) } }
         saveState()
     }
@@ -499,7 +632,7 @@ private class CookingController(
     private fun message(player: Player, key: String, placeholders: Map<String, Any> = emptyMap()): String = CCSystem.getAPI().getI18nString(player, key, placeholders)
 }
 
-private class CookingHolder(val owner: UUID) : InventoryHolder {
+private class CookingHolder(val owner: UUID, val station: CookingStationKey) : InventoryHolder {
     lateinit var backingInventory: Inventory
     var returned: Boolean = false
     override fun getInventory(): Inventory = backingInventory

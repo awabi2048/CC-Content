@@ -76,6 +76,29 @@ class CookingConfigurationTest {
     }
 
     @Test
+    void cookingRuntimeIsOwnedByTheStationAndDestroyedWithoutDrops() throws Exception {
+        var source = java.nio.file.Files.readString(Path.of(
+            "src/main/kotlin/jp/awabi2048/cccontent/features/cooking/CookingFeature.kt"));
+        assertTrue(source.contains("mutableMapOf<CookingStationKey, ActiveCooking>()"));
+        assertTrue(source.contains("mutableMapOf<CookingStationKey, List<ItemStack>>()"));
+        assertTrue(source.contains("station.blockIfLoaded()"));
+        assertTrue(source.contains("if (!campfire.isLit)"));
+        assertTrue(source.contains("invalidateStation(CookingStationKey.from(event.block))"));
+        assertFalse(source.contains("dropItemNaturally"));
+        assertFalse(source.contains("completionAt"));
+    }
+
+    @Test
+    void cookingStartConsumesTheWholeAcceptedInputBatch() throws Exception {
+        var source = java.nio.file.Files.readString(Path.of(
+            "src/main/kotlin/jp/awabi2048/cccontent/features/cooking/CookingFeature.kt"));
+        assertTrue(source.contains("CookingHolder.INPUT_SLOTS.forEach { inventory.setItem(it, null) }"));
+        assertTrue(source.contains("val starterId: UUID"));
+        assertTrue(source.contains("catalogStore.record(session.starterId"));
+        assertTrue(source.contains("catalogStore.record(player.uniqueId"));
+    }
+
+    @Test
     void sampleRecipesUseFormalItemModels() {
         var recipes = YamlConfiguration.loadConfiguration(ROOT.resolve("recipe.yml").toFile());
         var section = recipes.getConfigurationSection("recipes");
@@ -86,6 +109,30 @@ class CookingConfigurationTest {
             assertNotNull(model);
             assertTrue(model.startsWith("kota_server:custom_item/cooking/"));
             assertTrue(recipes.getInt("recipes." + id + ".exp") > 0);
+            var material = recipes.getString("recipes." + id + ".result.material");
+            assertNotNull(material);
+            assertTrue(java.util.Set.of(
+                    "POISONOUS_POTATO", "BAKED_POTATO", "BREAD", "COOKED_COD", "COOKIE"
+                ).contains(material),
+                "non-vanilla-use custom result must use POISONOUS_POTATO: " + id);
+        }
+    }
+
+    @Test
+    void cookingResultsUseLocalizedStructuredNameAndLore() throws Exception {
+        var source = java.nio.file.Files.readString(Path.of(
+            "src/main/kotlin/jp/awabi2048/cccontent/features/cooking/CookingFeature.kt"));
+        assertTrue(source.contains("GuiLoreSpec.Blocks"));
+        assertTrue(source.contains("cooking.recipe_description.$recipeId"));
+        assertTrue(source.contains("cooking.item.data.completion"));
+
+        var ja = YamlConfiguration.loadConfiguration(LANG_ROOT.resolve("ja_jp/content/cooking.yml").toFile());
+        var en = YamlConfiguration.loadConfiguration(LANG_ROOT.resolve("en_us/content/cooking.yml").toFile());
+        for (String id : java.util.List.of("rustic_stew", "sweet_bread", "grilled_cod", "carrot_cookie")) {
+            assertTrue(ja.isString("cooking.recipe." + id));
+            assertTrue(en.isString("cooking.recipe." + id));
+            assertTrue(ja.isString("cooking.recipe_description." + id));
+            assertTrue(en.isString("cooking.recipe_description." + id));
         }
     }
 }

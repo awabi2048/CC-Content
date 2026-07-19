@@ -10,6 +10,7 @@ import jp.awabi2048.cccontent.features.brewery.BreweryRecipe
 import jp.awabi2048.cccontent.features.brewery.breweryQualityIndex
 import jp.awabi2048.cccontent.features.brewery.breweryQualityTier
 import jp.awabi2048.cccontent.features.brewery.model.BrewStage
+import net.kyori.adventure.text.Component
 import org.bukkit.Color
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -37,6 +38,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     private val filterKey = NamespacedKey(plugin, "brewery_filter_sample")
     private val filterRemainingUsesKey = NamespacedKey(plugin, "brewery_filter_remaining_uses")
     private val expAwardedKey = NamespacedKey(plugin, "brewery_stage_exp_awarded")
+    private val customItemIdKey = NamespacedKey("cccontent", "custom_item_id")
 
     data class BreweryItemState(
         val stage: BrewStage,
@@ -54,9 +56,9 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     fun createFermentedBottle(recipeId: String, quality: Double, muddy: Boolean, history: String, recipe: BreweryRecipe, player: Player?): ItemStack {
         val item = ItemStack(Material.POTION)
         val meta = item.itemMeta ?: return item
-        meta.setDisplayName(text(player, if (muddy) "brewery.item.name.muddy" else "brewery.item.name.fermented",
+        meta.displayName(Component.text(text(player, if (muddy) "brewery.item.name.muddy" else "brewery.item.name.fermented",
             "recipe" to text(player, "brewery.recipe.$recipeId.name"),
-            "product" to text(player, "brewery.recipe.$recipeId.middle.name")))
+            "product" to text(player, "brewery.recipe.$recipeId.middle.name"))))
         meta.lore(renderLore(player, if (muddy) "" else text(player, "brewery.recipe.$recipeId.middle.description"), listOf(
             "brewery.item.data.recipe" to text(player, "brewery.recipe.$recipeId.name"),
             "brewery.item.data.stage" to text(player, if (muddy) "brewery.item.stage.failed" else "brewery.item.stage.fermented"),
@@ -73,6 +75,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         pdc.set(ambiguousKey, PersistentDataType.BYTE, 0)
         pdc.set(historyKey, PersistentDataType.STRING, history)
         pdc.set(finalStarsKey, PersistentDataType.INTEGER, 0)
+        pdc.set(customItemIdKey, PersistentDataType.STRING, "brewery.product.$recipeId")
         if (!muddy) applyPotionColor(meta, recipe.middleOutputColor)
         item.itemMeta = meta
         return item
@@ -117,7 +120,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         pdc.set(ambiguousKey, PersistentDataType.BYTE, if (ambiguous) 1 else 0)
         val tier = breweryQualityTier(quality)
         val product = text(player, "brewery.recipe.${recipe.id}.final.$tier.name")
-        meta.setDisplayName(text(player, if (ambiguous) "brewery.item.name.distilled_degraded" else "brewery.item.name.distilled", "recipe" to text(player, "brewery.recipe.${recipe.id}.name"), "product" to product))
+        meta.displayName(Component.text(text(player, if (ambiguous) "brewery.item.name.distilled_degraded" else "brewery.item.name.distilled", "recipe" to text(player, "brewery.recipe.${recipe.id}.name"), "product" to product)))
         meta.lore(renderLore(player, text(player, "brewery.recipe.${recipe.id}.final.$tier.description"), listOf(
             "brewery.item.data.recipe" to text(player, "brewery.recipe.${recipe.id}.name"),
             "brewery.item.data.stage" to text(player, "brewery.item.stage.distilled"),
@@ -157,7 +160,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         pdc.set(finalStarsKey, PersistentDataType.INTEGER, stars)
         val tier = breweryQualityTier(finalQuality)
         val product = text(player, "brewery.recipe.${recipe.id}.final.$tier.name")
-        meta.setDisplayName(text(player, "brewery.item.name.aged", "recipe" to text(player, "brewery.recipe.${recipe.id}.name"), "product" to product, "stars" to "★".repeat(stars)))
+        meta.displayName(Component.text(text(player, "brewery.item.name.aged", "recipe" to text(player, "brewery.recipe.${recipe.id}.name"), "product" to product, "stars" to "★".repeat(stars))))
         meta.setEnchantmentGlintOverride(recipe.finalOutputGlint)
         meta.lore(renderLore(player, text(player, "brewery.recipe.${recipe.id}.final.$tier.description"), listOf(
             "brewery.item.data.recipe" to text(player, "brewery.recipe.${recipe.id}.name"),
@@ -191,7 +194,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         val item = ItemStack(Material.POISONOUS_POTATO)
         val meta = item.itemMeta ?: return item
         meta.setItemModel(NamespacedKey.minecraft("shears"))
-        meta.setDisplayName(text(player, "brewery.item.filter.name"))
+        meta.displayName(Component.text(text(player, "brewery.item.filter.name")))
         val lines = CCSystem.getAPI().getI18nStringList(player, "brewery.item.filter.description")
         meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(GuiLoreBlock(lines.map(GuiLoreLine::Text))))) )
         meta.persistentDataContainer.set(filterKey, PersistentDataType.BYTE, 1)
