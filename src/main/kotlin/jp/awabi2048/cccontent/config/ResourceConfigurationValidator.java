@@ -110,7 +110,7 @@ public final class ResourceConfigurationValidator {
         if (contentEnabled != null) {
             Set<String> knownFeatures = Set.of(
                 "arena", "rank", "brewery", "cooking", "fishing", "resource_collection",
-                "sukima_dungeon", "party", "minigame"
+                "seasonal", "sukima_dungeon", "party", "minigame"
             );
             contentEnabled.keySet().stream()
                 .filter(key -> !knownFeatures.contains(key))
@@ -124,6 +124,7 @@ public final class ResourceConfigurationValidator {
             requireBoolean(contentEnabled, "cooking", file, "content_enabled.cooking", errors);
             requireBoolean(contentEnabled, "fishing", file, "content_enabled.fishing", errors);
             requireBoolean(contentEnabled, "resource_collection", file, "content_enabled.resource_collection", errors);
+            requireBoolean(contentEnabled, "seasonal", file, "content_enabled.seasonal", errors);
             requireBoolean(contentEnabled, "sukima_dungeon", file, "content_enabled.sukima_dungeon", errors);
             requireBoolean(contentEnabled, "party", file, "content_enabled.party", errors);
             requireBoolean(contentEnabled, "minigame", file, "content_enabled.minigame", errors);

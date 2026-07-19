@@ -17,6 +17,7 @@ object ContentFeatureCatalog {
         ContentFeature("cooking", "Cooking"),
         ContentFeature("fishing", "Fishing", listOf("rank")),
         ContentFeature("resource_collection", "Resource Collection", listOf("rank")),
+        ContentFeature("seasonal", "Seasonal"),
         ContentFeature("sukima_dungeon", "Sukima Dungeon"),
         ContentFeature("party", "Party"),
         ContentFeature("minigame", "Minigame", listOf("party"))

@@ -87,6 +87,7 @@ import jp.awabi2048.cccontent.features.catalog.CatalogCommand
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import jp.awabi2048.cccontent.features.catalog.CatalogType
 import jp.awabi2048.cccontent.features.resourcecollection.ResourceCollectionFeature
+import jp.awabi2048.cccontent.features.seasonal.SeasonalFeature
 import jp.awabi2048.cccontent.features.party.PartyCommand
 import jp.awabi2048.cccontent.features.party.PartyController
 import jp.awabi2048.cccontent.features.party.PartyListener
@@ -187,6 +188,7 @@ class CCContent : JavaPlugin(), Listener {
     private var fishingFeature: FishingFeature? = null
     private lateinit var catalogStore: CatalogStore
     private var resourceCollectionFeature: ResourceCollectionFeature? = null
+    private var seasonalFeature: SeasonalFeature? = null
     private var partyController: PartyController? = null
     private var minigameRuntime: MiniGameRuntime? = null
     private lateinit var npcMenuService: NpcMenuService
@@ -254,6 +256,7 @@ class CCContent : JavaPlugin(), Listener {
         featureInitLogger.registerFeature("Cooking")
         featureInitLogger.registerFeature("Fishing")
         featureInitLogger.registerFeature("Resource Collection")
+        featureInitLogger.registerFeature("Seasonal")
         featureInitLogger.registerFeature("Arena")
         featureInitLogger.registerFeature("SukimaDungeon")
         featureInitLogger.registerFeature("Party")
@@ -429,6 +432,13 @@ class CCContent : JavaPlugin(), Listener {
             resourceCollectionFeature = feature
             feature.initialize()
             featureInitLogger.setStatus("Resource Collection", FeatureInitializationLogger.Status.SUCCESS)
+        }
+
+        initializeFeatureIfEnabled("Seasonal", "seasonal") {
+            val feature = SeasonalFeature(this)
+            seasonalFeature = feature
+            feature.initialize()
+            featureInitLogger.setStatus("Seasonal", FeatureInitializationLogger.Status.SUCCESS)
         }
 
         registerCatalogCommands()
@@ -622,6 +632,8 @@ class CCContent : JavaPlugin(), Listener {
         fishingFeature = null
         cleanup("resource collection") { resourceCollectionFeature?.shutdown() }
         resourceCollectionFeature = null
+        cleanup("seasonal") { seasonalFeature?.shutdown() }
+        seasonalFeature = null
         cleanup("party") { partyController?.close() }
         partyController = null
         cleanup("arena mission") { arenaMissionService?.shutdown() }
@@ -707,6 +719,7 @@ class CCContent : JavaPlugin(), Listener {
             "cooking" to "Cooking",
             "fishing" to "Fishing",
             "resource_collection" to "Resource Collection",
+            "seasonal" to "Seasonal",
             "sukima_dungeon" to "SukimaDungeon",
             "party" to "Party",
             "minigame" to "Minigame"
