@@ -79,7 +79,8 @@ class SpecialistCollectionService(
     private data class GatheringTarget(
         val customItemId: String,
         val definitionId: String,
-        val expiresAt: Instant
+        val expiresAt: Instant,
+        val surface: Boolean
     )
     private data class ForestProductTarget(
         val customItemId: String,
@@ -94,6 +95,9 @@ class SpecialistCollectionService(
     private val forestTargets = mutableMapOf<UUID, MutableMap<BlockKey, ForestProductTarget>>()
     private val forestCooldowns = mutableMapOf<UUID, Instant>()
     private val tillableMaterials = setOf(Material.DIRT, Material.GRASS_BLOCK, Material.DIRT_PATH)
+    private val surfaceGatheringStore = SurfaceGatheringStore(
+        plugin.dataFolder.resolve("data/resource_collection/surface_gathering.yml")
+    )
 
     fun shutdown() {
         chiselSessions.keys.toList().forEach { cancelChisel(it, null) }
@@ -102,6 +106,7 @@ class SpecialistCollectionService(
         gatheringCooldowns.clear()
         forestTargets.clear()
         forestCooldowns.clear()
+        surfaceGatheringStore.save()
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -157,6 +162,7 @@ class SpecialistCollectionService(
             "resource.woodworking_knife" -> processPlacedLog(event, block, precise = true)
             "resource.forest_guide" -> inspectForestProducts(event, block)
             "resource.gathering_guide" -> inspectVegetation(event, block)
+            "resource.gathering_sickle" -> handleSurfaceGathering(event, block)
             "resource.cultivation_hoe" -> handleAreaTilling(event, block)
             else -> scheduleBarkReward(event, block)
         }
@@ -568,7 +574,9 @@ class SpecialistCollectionService(
             player.sendMessage(message(player, "resource_collection.error.farmer_required"))
             return
         }
-        if (!isReadyWorld(origin) || !ResourceMaterialPolicy.isWildVegetation(origin.type) ||
+        if (!isReadyWorld(origin) ||
+            (!ResourceMaterialPolicy.isWildVegetation(origin.type) &&
+                !ResourceMaterialPolicy.isVegetationBase(origin.type)) ||
             !CCSystem.getAPI().getNaturalOriginRegistry().isNatural(origin)) {
             player.sendMessage(message(player, "resource_collection.error.natural_vegetation_required"))
             return
@@ -600,7 +608,7 @@ class SpecialistCollectionService(
                 )
                 continue
             }
-            targets[block.key()] = GatheringTarget(definition.customItemId, definition.id, expiresAt)
+            targets[block.key()] = GatheringTarget(definition.customItemId, definition.id, expiresAt, surface = false)
             player.spawnParticle(
                 Particle.HAPPY_VILLAGER,
                 block.location.add(0.5, 0.7, 0.5),
@@ -610,6 +618,33 @@ class SpecialistCollectionService(
                 0.18,
                 0.0
             )
+        }
+        if (targets.isEmpty() && ResourceMaterialPolicy.isVegetationBase(origin.type) &&
+            surfaceGatheringStore.isAvailable(origin, now)) {
+            val definition = seasonalPlants.select(
+                season,
+                origin.type,
+                origin.biome.key.toString(),
+                origin.y,
+                random
+            )
+            if (definition != null && CustomItemManager.getItem(definition.customItemId) != null) {
+                targets[origin.key()] = GatheringTarget(
+                    definition.customItemId,
+                    definition.id,
+                    expiresAt,
+                    surface = true
+                )
+                player.spawnParticle(
+                    Particle.HAPPY_VILLAGER,
+                    origin.location.add(0.5, 1.05, 0.5),
+                    3,
+                    0.18,
+                    0.08,
+                    0.18,
+                    0.0
+                )
+            }
         }
         gatheringTargets[player.uniqueId] = targets
         val cooldownSeconds = profile.inspectionCooldownSeconds.takeIf { it > 0 } ?: 45
@@ -629,9 +664,40 @@ class SpecialistCollectionService(
         if (CustomItemManager.identify(player.inventory.itemInMainHand)?.fullId != "resource.gathering_sickle") return
         val targets = gatheringTargets[player.uniqueId] ?: return
         val target = targets.remove(event.block.key()) ?: return
+        if (target.surface) return
         val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
         if (target.expiresAt.isBefore(now)) return
         val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? FarmerSkillProfile ?: return
+        completePlantGathering(player, target, profile, event.blockState.type)
+    }
+
+    private fun handleSurfaceGathering(event: PlayerInteractEvent, block: Block) {
+        val player = event.player
+        val targets = gatheringTargets[player.uniqueId] ?: return
+        val target = targets[block.key()]?.takeIf(GatheringTarget::surface) ?: return
+        val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
+        if (target.expiresAt.isBefore(now)) {
+            targets.remove(block.key())
+            return
+        }
+        val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? FarmerSkillProfile ?: return
+        if (!isReadyNatural(block) || !ResourceMaterialPolicy.isVegetationBase(block.type)) return
+        event.isCancelled = true
+        if (!surfaceGatheringStore.claim(block, now, seasonalPlants.surfaceRecoverySeconds)) {
+            targets.remove(block.key())
+            player.sendMessage(message(player, "resource_collection.gathering.surface_depleted"))
+            return
+        }
+        targets.remove(block.key())
+        completePlantGathering(player, target, profile, block.type)
+    }
+
+    private fun completePlantGathering(
+        player: Player,
+        target: GatheringTarget,
+        profile: FarmerSkillProfile,
+        sourceMaterial: Material
+    ) {
         val amount = profile.guaranteedSpecialistPlantYield.coerceAtLeast(1) +
             if (random.nextDouble() < profile.specialistPlantExtraChance) 1 else 0
         giveCustomItem(player, target.customItemId, amount)
@@ -642,8 +708,11 @@ class SpecialistCollectionService(
             player,
             ContentActionType.PLANT_GATHERED,
             amount > 1,
-            event.blockState.type,
-            mapOf("seasonal_plant_definition" to target.definitionId)
+            sourceMaterial,
+            mapOf(
+                "seasonal_plant_definition" to target.definitionId,
+                "surface_gathering" to target.surface.toString()
+            )
         )
         player.sendMessage(message(player, "resource_collection.gathering.completed", "amount" to amount))
     }

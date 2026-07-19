@@ -37,6 +37,9 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("markPlayerPlaced(root)"));
         assertTrue(source.contains("resource.gathering_guide"));
         assertTrue(source.contains("resource.gathering_sickle"));
+        assertTrue(source.contains("handleSurfaceGathering"));
+        assertTrue(source.contains("surfaceGatheringStore.claim"));
+        assertTrue(source.contains("\"surface_gathering\" to target.surface.toString()"));
         assertTrue(source.contains("resource.forest_guide"));
         assertTrue(source.contains("resource.forest_knife"));
         assertTrue(source.contains("forestTargets[player.uniqueId] = targets"));

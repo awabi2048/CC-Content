@@ -78,6 +78,8 @@ object ResourceMaterialPolicy {
 
     fun isWildVegetation(material: Material): Boolean = material in wildVegetation
 
+    fun isVegetationBase(material: Material): Boolean = material == Material.GRASS_BLOCK
+
     fun isLeaf(material: Material): Boolean = material.name.endsWith("_LEAVES") ||
         material == Material.NETHER_WART_BLOCK || material == Material.WARPED_WART_BLOCK
 

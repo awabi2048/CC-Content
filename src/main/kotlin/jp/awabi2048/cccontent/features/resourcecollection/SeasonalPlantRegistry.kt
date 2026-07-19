@@ -27,7 +27,8 @@ data class SeasonalPlantDefinition(
 
 class SeasonalPlantRegistry private constructor(
     private val enabled: Boolean,
-    private val definitions: List<SeasonalPlantDefinition>
+    private val definitions: List<SeasonalPlantDefinition>,
+    val surfaceRecoverySeconds: Long
 ) {
     fun select(
         season: Season,
@@ -60,6 +61,10 @@ class SeasonalPlantRegistry private constructor(
                 "$CONFIG_PATH.schema_version must be the integer 1"
             }
             val enabled = requireBoolean(config, "enabled")
+            val surfaceRecoverySeconds = config.getLong("surface_recovery_seconds", -1L)
+            require(surfaceRecoverySeconds > 0L) {
+                "$CONFIG_PATH.surface_recovery_seconds must be a positive integer"
+            }
             val rawDefinitions = config.getMapList("definitions")
             val definitions = rawDefinitions.mapIndexed { index, raw -> parseDefinition(raw, index) }
             val duplicateIds = definitions.groupingBy(SeasonalPlantDefinition::id).eachCount()
@@ -68,11 +73,11 @@ class SeasonalPlantRegistry private constructor(
             plugin.logger.info(
                 "Resource Collection: seasonal plant registry enabled=$enabled definitions=${definitions.size}"
             )
-            return SeasonalPlantRegistry(enabled, definitions)
+            return SeasonalPlantRegistry(enabled, definitions, surfaceRecoverySeconds)
         }
 
         fun of(enabled: Boolean, definitions: List<SeasonalPlantDefinition>): SeasonalPlantRegistry =
-            SeasonalPlantRegistry(enabled, definitions)
+            SeasonalPlantRegistry(enabled, definitions, 86_400L)
 
         private fun parseDefinition(raw: Map<*, *>, index: Int): SeasonalPlantDefinition {
             val path = "$CONFIG_PATH.definitions[$index]"
