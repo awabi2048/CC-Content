@@ -3,6 +3,8 @@
 package jp.awabi2048.cccontent.features.brewery
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.action.ContentAction
+import com.awabi2048.ccsystem.api.action.ContentActionType
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -70,6 +72,7 @@ import org.bukkit.potion.PotionEffect
 import org.bukkit.potion.PotionEffectType
 import org.bukkit.util.Vector
 import java.io.File
+import java.time.Instant
 import java.util.UUID
 import kotlin.random.Random
 import kotlin.math.ceil
@@ -1219,6 +1222,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
                         state.fermentationExpAwarded = true
                     }
                     Bukkit.getPlayer(owner)?.sendMessage(i18n(Bukkit.getPlayer(owner), "brewery.process.bottled"))
+                    publishBrewingAction(owner, recipe.id, "fermentation", ContentActionType.BREWING_STAGE_COMPLETED)
                 }
             }
             spawnFermentationParticle(state)
@@ -1655,6 +1659,9 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             return
         }
         codec.markDistilled(item, parsed, target, settings.distillationOverPenalty, recipe ?: return, player)
+        player?.uniqueId?.let {
+            publishBrewingAction(it, parsed.recipeId, "distillation", ContentActionType.BREWING_STAGE_COMPLETED)
+        }
         if (!codec.hasStageExpAwarded(item, BrewStage.DISTILLED)) {
             player?.let { awardProcessExp(it.uniqueId, settings.distillationExp) }
             codec.markStageExpAwarded(item, BrewStage.DISTILLED)
@@ -1693,6 +1700,9 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val ageProgress = years / targetYears.toDouble()
         val finalQuality = (parsed.quality + ageProgress * 4.0).coerceIn(0.0, 100.0)
         codec.markAged(item, parsed, finalQuality, recipe ?: return, player)
+        player?.uniqueId?.let {
+            publishBrewingAction(it, parsed.recipeId, "aging", ContentActionType.BREWING_COMPLETED)
+        }
         codec.clearAgingStart(item)
         if (!codec.hasStageExpAwarded(item, BrewStage.AGED)) {
             player?.let { awardProcessExp(it.uniqueId, settings.agingExp) }
@@ -2125,6 +2135,26 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
 
     private fun copyInventoryContents(source: Inventory, target: Inventory) {
         for (slot in 0 until minOf(source.size, target.size)) target.setItem(slot, source.getItem(slot))
+    }
+
+    private fun publishBrewingAction(
+        playerId: UUID,
+        recipeId: String,
+        stage: String,
+        type: ContentActionType
+    ) {
+        CCSystem.getAPI().getContentActionDispatcher().publish(
+            ContentAction(
+                UUID.randomUUID(),
+                1,
+                Instant.now(),
+                playerId,
+                type,
+                1,
+                null,
+                mapOf("recipeId" to recipeId, "stage" to stage)
+            )
+        )
     }
 
     private data class FermentationState(
