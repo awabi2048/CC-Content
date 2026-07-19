@@ -62,6 +62,9 @@ class FishingConfigurationTest {
             assertTrue(config.getDouble("fish." + fish + ".fight.drift_per_step") > 0);
             assertTrue(config.getDouble("fish." + fish + ".fight.direction_persistence") > 0);
             assertTrue(config.getDouble("fish." + fish + ".fight.direction_persistence") <= 1);
+            var preferredSeasons = Set.copyOf(config.getStringList("fish." + fish + ".preferred_seasons"));
+            var excludedSeasons = Set.copyOf(config.getStringList("fish." + fish + ".excluded_seasons"));
+            assertTrue(java.util.Collections.disjoint(preferredSeasons, excludedSeasons));
         }
         assertTrue(Set.copyOf(config.getStringList("fish.cod.biomes")).equals(
             Set.of("ocean", "cold_ocean", "deep_ocean", "deep_cold_ocean", "river")
@@ -77,5 +80,9 @@ class FishingConfigurationTest {
             config.getDouble("fish.mackerel.fight.drift_per_step"));
         assertTrue(config.getDouble("fish.tuna.fight.duration_multiplier") >
             config.getDouble("fish.crucian_carp.fight.duration_multiplier"));
+        assertTrue(Set.copyOf(config.getStringList("fish.ayu.preferred_seasons")).equals(Set.of("summer")));
+        assertTrue(Set.copyOf(config.getStringList("fish.ayu.excluded_seasons")).equals(Set.of("winter")));
+        assertTrue(Set.copyOf(config.getStringList("fish.salmon.excluded_seasons")).equals(Set.of("spring")));
+        assertTrue(Set.copyOf(config.getStringList("fish.smelt.excluded_seasons")).equals(Set.of("summer")));
     }
 }

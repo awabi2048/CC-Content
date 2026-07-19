@@ -12,6 +12,7 @@ import jp.awabi2048.cccontent.features.fishing.FishingFightState;
 import jp.awabi2048.cccontent.features.fishing.FishingCatchSelector;
 import jp.awabi2048.cccontent.features.fishing.FishingTime;
 import jp.awabi2048.cccontent.features.fishing.FishingWeather;
+import com.awabi2048.ccsystem.api.time.Season;
 import jp.awabi2048.cccontent.features.fishing.FishRarity;
 import jp.awabi2048.cccontent.features.fishing.FishingWaterCondition;
 import jp.awabi2048.cccontent.features.fishing.FishingWaterProfile;
@@ -135,24 +136,33 @@ class FishingModelTest {
     }
 
     @Test
-    void weatherAndTimePreferencesAdjustWeightWithoutExcludingTheFish() {
+    void weatherTimeAndSeasonPreferencesAdjustWeightWithoutExcludingTheFish() {
         assertEquals(1.0, FishingCatchSelector.preferenceMultiplier(
             Set.of(FishingWeather.RAIN),
             Set.of(FishingTime.NIGHT),
+            Set.of(Season.SUMMER),
+            Set.of(),
             FishingWeather.RAIN,
-            FishingTime.NIGHT
+            FishingTime.NIGHT,
+            Season.SUMMER
         ));
-        assertEquals(0.75 * 0.8, FishingCatchSelector.preferenceMultiplier(
+        assertEquals(0.75 * 0.8 * 0.8, FishingCatchSelector.preferenceMultiplier(
             Set.of(FishingWeather.RAIN),
             Set.of(FishingTime.NIGHT),
+            Set.of(Season.SUMMER),
+            Set.of(),
             FishingWeather.CLEAR,
-            FishingTime.DAY
+            FishingTime.DAY,
+            Season.WINTER
         ), 0.000001);
         assertTrue(FishingCatchSelector.preferenceMultiplier(
             Set.of(FishingWeather.RAIN),
             Set.of(FishingTime.NIGHT),
+            Set.of(Season.SUMMER),
+            Set.of(Season.WINTER),
             FishingWeather.CLEAR,
-            FishingTime.DAY
+            FishingTime.DAY,
+            Season.SPRING
         ) > 0.0);
     }
 

@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.fishing
 
+import com.awabi2048.ccsystem.api.time.Season
 import org.bukkit.Material
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
@@ -62,6 +63,21 @@ data class FishingSettings(
                     biomes = config.getStringList("$path.biomes").toSet(),
                     weather = config.getStringList("$path.weather").map { FishingWeather.valueOf(it.uppercase()) }.toSet(),
                     times = config.getStringList("$path.times").map { FishingTime.valueOf(it.uppercase()) }.toSet(),
+                    preferredSeasons = config.getStringList("$path.preferred_seasons")
+                        .map { Season.valueOf(it.uppercase()) }
+                        .toSet(),
+                    excludedSeasons = config.getStringList("$path.excluded_seasons")
+                        .map { Season.valueOf(it.uppercase()) }
+                        .toSet()
+                        .also { excluded ->
+                            require(excluded.intersect(
+                                config.getStringList("$path.preferred_seasons")
+                                    .map { Season.valueOf(it.uppercase()) }
+                                    .toSet()
+                            ).isEmpty()) {
+                                "$path.preferred_seasons and $path.excluded_seasons must not overlap"
+                            }
+                        },
                     water = FishingWaterCondition(
                         type = FishingWaterType.fromConfigId(requireString(config.getString("$path.water.type"), "$path.water.type")),
                         depth = positiveRange(config, "$path.water.depth"),

@@ -54,6 +54,7 @@ fish:
     rarity: common
     min_level: 1
     biomes: [ocean, cold_ocean, deep_ocean, deep_cold_ocean, river]
+    preferred_seasons: [winter]
     size_cm: { min: 30, max: 100 }
     weight_grams: { min: 300, max: 15000 }
     water:
@@ -72,6 +73,8 @@ fish:
     rarity: common
     min_level: 1
     biomes: [river, frozen_river, ocean, cold_ocean]
+    preferred_seasons: [autumn]
+    excluded_seasons: [spring]
     size_cm: { min: 40, max: 150 }
     weight_grams: { min: 1000, max: 30000 }
     water:
@@ -90,6 +93,7 @@ fish:
     rarity: common
     min_level: 1
     biomes: [river]
+    preferred_seasons: [spring, autumn]
     size_cm: { min: 10, max: 45 }
     weight_grams: { min: 50, max: 2500 }
     water:
@@ -135,6 +139,8 @@ fish:
     rarity: rare
     min_level: 4
     biomes: [river]
+    preferred_seasons: [summer]
+    excluded_seasons: [winter]
     weather: [clear]
     times: [day, dusk]
     size_cm: { min: 12, max: 35 }
@@ -151,6 +157,7 @@ fish:
     rarity: rare
     min_level: 6
     biomes: [river]
+    preferred_seasons: [summer]
     weather: [rain]
     times: [dusk, night]
     size_cm: { min: 35, max: 150 }
@@ -167,6 +174,7 @@ fish:
     rarity: rare
     min_level: 7
     biomes: [river, ocean, lukewarm_ocean]
+    preferred_seasons: [summer]
     weather: [rain]
     times: [dusk, night]
     size_cm: { min: 35, max: 130 }
@@ -183,6 +191,8 @@ fish:
     rarity: common
     min_level: 3
     biomes: [frozen_river, cold_ocean]
+    preferred_seasons: [winter]
+    excluded_seasons: [summer]
     times: [dawn, day]
     size_cm: { min: 6, max: 22 }
     weight_grams: { min: 5, max: 180 }
@@ -212,6 +222,7 @@ fish:
     rarity: common
     min_level: 2
     biomes: [ocean, lukewarm_ocean, warm_ocean]
+    preferred_seasons: [summer, autumn]
     times: [dawn, dusk]
     size_cm: { min: 12, max: 55 }
     weight_grams: { min: 30, max: 2500 }
@@ -257,6 +268,7 @@ fish:
     rarity: rare
     min_level: 7
     biomes: [ocean, cold_ocean, lukewarm_ocean]
+    preferred_seasons: [spring, winter]
     size_cm: { min: 20, max: 105 }
     weight_grams: { min: 150, max: 14000 }
     water:

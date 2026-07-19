@@ -109,7 +109,12 @@ class FishingFeature(
         }
         val bait = items.resolveBait(player.inventory.itemInOffHand)
         val candidates = FishingCatchSelector.candidates(
-            FishingContext(player.world, block.location.add(0.5, 0.5, 0.5), fisherContext(player).level),
+            FishingContext(
+                player.world,
+                block.location.add(0.5, 0.5, 0.5),
+                fisherContext(player).level,
+                CCSystem.getAPI().getSeasonService().currentSeason()
+            ),
             settings.fishes,
             bait
         )
@@ -237,7 +242,12 @@ class FishingFeature(
         val fisher = fisherContext(player)
         val bait = items.resolveBait(player.inventory.itemInOffHand)
         val selected = FishingCatchSelector.select(
-            FishingContext(player.world, event.hook.location, fisher.level),
+            FishingContext(
+                player.world,
+                event.hook.location,
+                fisher.level,
+                CCSystem.getAPI().getSeasonService().currentSeason()
+            ),
             settings.fishes,
             bait,
             session.rod,
@@ -613,6 +623,9 @@ class FishingFeature(
                 add(CatalogCondition("fishing.dictionary.condition.time", localizedValues =
                     if (fish.times.isEmpty()) listOf("fishing.dictionary.condition.anytime")
                     else fish.times.map { "fishing.dictionary.time.${it.name.lowercase()}" }))
+                add(CatalogCondition("fishing.dictionary.condition.season", localizedValues =
+                    if (fish.preferredSeasons.isEmpty()) listOf("fishing.dictionary.condition.year_round")
+                    else fish.preferredSeasons.map { "fishing.dictionary.season.${it.name.lowercase()}" }))
                 add(CatalogCondition("fishing.dictionary.condition.level",
                     rawValue = fish.minLevel.toString()))
                 if (fish.requiredBaitTags.isNotEmpty()) {
@@ -673,7 +686,8 @@ class FishingFeature(
                     FishingContext(
                         player.world,
                         surveyBlock.location.add(0.5, 0.5, 0.5),
-                        fisherContext(player).level
+                        fisherContext(player).level,
+                        CCSystem.getAPI().getSeasonService().currentSeason()
                     ),
                     settings.fishes,
                     bait

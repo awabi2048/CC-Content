@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.fishing
 
+import com.awabi2048.ccsystem.api.time.Season
 import org.bukkit.Location
 import org.bukkit.HeightMap
 import org.bukkit.Material
@@ -78,6 +79,8 @@ data class FishDefinition(
     val biomes: Set<String>,
     val weather: Set<FishingWeather>,
     val times: Set<FishingTime>,
+    val preferredSeasons: Set<Season>,
+    val excludedSeasons: Set<Season>,
     val water: FishingWaterCondition,
     val sizeCm: IntRange,
     val weightGrams: IntRange,
@@ -107,6 +110,7 @@ data class FishingContext(
     val world: World,
     val bobber: Location,
     val fisherLevel: Int,
+    val season: Season,
     val waterProfile: FishingWaterProfile? = FishingWaterAnalyzer.analyze(bobber)
 ) {
     val biome: String get() = bobber.block.biome.key.key
@@ -223,6 +227,7 @@ object FishingCatchSelector {
     ): List<FishDefinition> = definitions.filter { definition ->
         context.fisherLevel >= definition.minLevel &&
             (definition.biomes.isEmpty() || definition.biomes.any { it.equals(context.biome, true) }) &&
+            context.season !in definition.excludedSeasons &&
             (!checkWater || context.waterProfile?.let(definition.water::matches) == true) &&
             (definition.requiredBaitTags.isEmpty() ||
                 bait?.specialTags?.containsAll(definition.requiredBaitTags) == true)
@@ -264,20 +269,36 @@ object FishingCatchSelector {
     fun preferenceMultiplier(
         definition: FishDefinition,
         context: FishingContext
-    ): Double = preferenceMultiplier(definition.weather, definition.times, context.weather, context.time)
+    ): Double = preferenceMultiplier(
+        definition.weather,
+        definition.times,
+        definition.preferredSeasons,
+        definition.excludedSeasons,
+        context.weather,
+        context.time,
+        context.season
+    )
 
     @JvmStatic
     fun preferenceMultiplier(
         preferredWeather: Set<FishingWeather>,
         preferredTimes: Set<FishingTime>,
+        preferredSeasons: Set<Season>,
+        excludedSeasons: Set<Season>,
         actualWeather: FishingWeather,
-        actualTime: FishingTime
+        actualTime: FishingTime,
+        actualSeason: Season
     ): Double {
         val weatherMultiplier =
             if (preferredWeather.isEmpty() || actualWeather in preferredWeather) 1.0 else 0.75
         val timeMultiplier =
             if (preferredTimes.isEmpty() || actualTime in preferredTimes) 1.0 else 0.8
-        return weatherMultiplier * timeMultiplier
+        val seasonMultiplier = when {
+            preferredSeasons.isEmpty() || actualSeason in preferredSeasons -> 1.0
+            excludedSeasons.isNotEmpty() -> 0.35
+            else -> 0.8
+        }
+        return weatherMultiplier * timeMultiplier * seasonMultiplier
     }
 
     private fun <T> weighted(items: List<T>, random: Random, weight: (T) -> Double): T {
