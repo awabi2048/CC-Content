@@ -1,7 +1,7 @@
 package jp.awabi2048.cccontent.features.fishing
 
 import com.awabi2048.ccsystem.CCSystem
-import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.action.ContentAction
@@ -113,15 +113,25 @@ class FishingFeature(
             settings.fishes,
             bait
         )
-        if (candidates.isEmpty()) return
-        val lines = buildList {
-            add(GuiLoreLine.Text(message(player, "fishing.dictionary.hint.title")))
-            candidates.forEach { fish ->
-                add(GuiLoreLine.Text("§7・§f" + message(player, "fishing.catalog.item.${fish.id}")))
-            }
+        val candidateNames = candidates.map { fish ->
+            message(player, "fishing.catalog.item.${fish.id}")
         }
+        val candidateValue = candidateNames.takeIf(List<String>::isNotEmpty)
+            ?.joinToString(message(player, "fishing.dictionary.hint.list_separator"))
+            ?: message(player, "fishing.dictionary.hint.none")
         CCSystem.getAPI().getLoreService()
-            .render(GuiLoreSpec.Rich(lines, GuiLoreFrame.BOTH))
+            .render(GuiLoreSpec.Blocks(listOf(
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.StyledText(message(player, "fishing.dictionary.hint.title"), "§e", false)
+                )),
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Data(
+                        message(player, "fishing.dictionary.hint.candidates"),
+                        candidateValue,
+                        "§a"
+                    )
+                ))
+            )))
             .forEach(player::sendMessage)
         player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.7f, 1.4f)
     }

@@ -3,6 +3,9 @@ package jp.awabi2048.cccontent.features.resourcecollection
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.action.ContentAction
 import com.awabi2048.ccsystem.api.action.ContentActionType
+import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.profession.Profession
@@ -248,20 +251,32 @@ class SpecialistCollectionService(
             block.y
         )
         player.swingMainHand()
-        val placeholders = arrayOf<Pair<String, Any>>(
-            "altitude" to localizedEnum(player, "resource_collection.inspection.altitude", result.altitude.name),
-            "biome" to localizedEnum(player, "resource_collection.inspection.biome", result.biome.name),
-            "material" to CCSystem.getAPI().getI18nString(
-                player,
-                "custom_items.resource.${result.resourceId}.name"
+        val materialHint = if (profile.detailedInspectionEnabled) {
+            CCSystem.getAPI().getI18nString(player, "custom_items.resource.${result.resourceId}.name")
+        } else {
+            text(player, "resource_collection.display.hint.companion_minerals")
+        }
+        sendAppraisal(
+            player,
+            "resource_collection.display.heading.mineral",
+            listOf(
+                GuiLoreLine.Data(
+                    text(player, "resource_collection.display.data.altitude"),
+                    localizedEnum(player, "resource_collection.inspection.altitude", result.altitude.name),
+                    "§f"
+                ),
+                GuiLoreLine.Data(
+                    text(player, "resource_collection.display.data.region"),
+                    localizedEnum(player, "resource_collection.inspection.biome", result.biome.name),
+                    "§f"
+                ),
+                GuiLoreLine.Data(
+                    text(player, "resource_collection.display.data.collectible_items"),
+                    materialHint,
+                    "§a"
+                )
             )
         )
-        val messageKey = if (profile.detailedInspectionEnabled) {
-            "resource_collection.inspection.detailed"
-        } else {
-            "resource_collection.inspection.basic"
-        }
-        player.sendMessage(message(player, messageKey, *placeholders))
         player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.75f, 0.9f)
     }
 
@@ -752,27 +767,57 @@ class SpecialistCollectionService(
         gatheringTargets[player.uniqueId] = targets
         val cooldownSeconds = profile.inspectionCooldownSeconds.takeIf { it > 0 } ?: 45
         gatheringCooldowns[player.uniqueId] = now.plusSeconds(cooldownSeconds.toLong())
-        val messageKey = when {
-            targets.isEmpty() -> "resource_collection.gathering.no_discoveries"
-            profile.detailedInspectionEnabled -> "resource_collection.gathering.inspected_detailed"
-            else -> "resource_collection.gathering.inspected"
+        val collectibleHint = when {
+            targets.isEmpty() -> text(player, "resource_collection.display.hint.none")
+            profile.detailedInspectionEnabled -> discoveredDefinitions
+                .map { definition ->
+                    CCSystem.getAPI().getI18nString(
+                        player,
+                        "custom_items.${definition.customItemId}.name"
+                    )
+                }
+                .distinct()
+                .joinToString(text(player, "resource_collection.display.list_separator"))
+            else -> text(player, "resource_collection.display.hint.seasonal_plants")
         }
-        player.sendMessage(
-            message(
-                player,
-                messageKey,
-                "count" to targets.size,
-                "season" to localizedEnum(player, "resource_collection.gathering.season", season.name),
-                "uses" to discoveredDefinitions
-                    .map { definition -> CCSystem.getAPI().getI18nString(player, definition.useNameKey) }
-                    .distinct()
-                    .joinToString("、"),
-                "groups" to discoveredDefinitions
-                    .map { definition -> CCSystem.getAPI().getI18nString(player, definition.vegetationGroupNameKey) }
-                    .distinct()
-                    .joinToString("、")
-            )
-        )
+        val appraisalLines = buildList {
+            add(GuiLoreLine.Data(
+                text(player, "resource_collection.display.data.candidate_count"),
+                targets.size,
+                "§f"
+            ))
+            add(GuiLoreLine.Data(
+                text(player, "resource_collection.display.data.season"),
+                localizedEnum(player, "resource_collection.gathering.season", season.name),
+                "§f"
+            ))
+            add(GuiLoreLine.Data(
+                text(player, "resource_collection.display.data.collectible_items"),
+                collectibleHint,
+                "§a"
+            ))
+            if (profile.detailedInspectionEnabled && discoveredDefinitions.isNotEmpty()) {
+                add(GuiLoreLine.Data(
+                    text(player, "resource_collection.display.data.uses"),
+                    discoveredDefinitions
+                        .map { definition -> CCSystem.getAPI().getI18nString(player, definition.useNameKey) }
+                        .distinct()
+                        .joinToString(text(player, "resource_collection.display.list_separator")),
+                    "§f"
+                ))
+                add(GuiLoreLine.Data(
+                    text(player, "resource_collection.display.data.vegetation_group"),
+                    discoveredDefinitions
+                        .map { definition ->
+                            CCSystem.getAPI().getI18nString(player, definition.vegetationGroupNameKey)
+                        }
+                        .distinct()
+                        .joinToString(text(player, "resource_collection.display.list_separator")),
+                    "§f"
+                ))
+            }
+        }
+        sendAppraisal(player, "resource_collection.display.heading.vegetation", appraisalLines)
         player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.25f)
     }
 
@@ -919,17 +964,26 @@ class SpecialistCollectionService(
         player.swingMainHand()
         forestTargets[player.uniqueId] = targets
         forestCooldowns[player.uniqueId] = now.plusSeconds(profile.inspectionCooldownSeconds.coerceAtLeast(1).toLong())
-        val messageKey = when {
-            targets.isEmpty() -> "resource_collection.forest.no_discoveries"
-            profile.exactMaterialInspectionEnabled -> "resource_collection.forest.inspected_exact"
-            else -> "resource_collection.forest.inspected"
+        val collectibleHint = when {
+            targets.isEmpty() -> text(player, "resource_collection.display.hint.none")
+            profile.exactMaterialInspectionEnabled ->
+                discoveredNames.joinToString(text(player, "resource_collection.display.list_separator"))
+            else -> text(player, "resource_collection.display.hint.forest_products")
         }
-        player.sendMessage(
-            message(
-                player,
-                messageKey,
-                "count" to targets.size,
-                "products" to discoveredNames.joinToString("、")
+        sendAppraisal(
+            player,
+            "resource_collection.display.heading.forest",
+            listOf(
+                GuiLoreLine.Data(
+                    text(player, "resource_collection.display.data.candidate_count"),
+                    targets.size,
+                    "§f"
+                ),
+                GuiLoreLine.Data(
+                    text(player, "resource_collection.display.data.collectible_items"),
+                    collectibleHint,
+                    "§a"
+                )
             )
         )
         player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.05f)
@@ -1348,6 +1402,18 @@ class SpecialistCollectionService(
         giveCustomItem(player, "resource.$id", amount)
     }
 
+    private fun sendAppraisal(player: Player, headingKey: String, data: List<GuiLoreLine>) {
+        val spec = GuiLoreSpec.Blocks(
+            listOf(
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.StyledText(text(player, headingKey), "§e", false)
+                )),
+                GuiLoreBlock(data)
+            )
+        )
+        CCSystem.getAPI().getLoreService().render(spec).forEach(player::sendMessage)
+    }
+
     private fun giveCustomItem(player: Player, fullId: String, amount: Int) {
         if (amount <= 0) return
         val item = CustomItemManager.createItemForPlayer(fullId, player, amount) ?: return
@@ -1415,6 +1481,9 @@ class SpecialistCollectionService(
         return Material.matchMaterial("${species}_PLANKS")
     }
 
+    private fun text(player: Player?, key: String, vararg values: Pair<String, Any>): String =
+        CCSystem.getAPI().getI18nString(player, key, values.toMap()).replace('&', '§')
+
     private fun message(player: Player?, key: String, vararg values: Pair<String, Any>): Component =
-        Component.text(CCSystem.getAPI().getI18nString(player, key, values.toMap()).replace('&', '§'))
+        Component.text(text(player, key, *values))
 }

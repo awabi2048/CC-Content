@@ -73,6 +73,13 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("gatheringTargets[player.uniqueId] = targets"));
         assertTrue(source.contains("getSeasonService().currentSeason()"));
         assertTrue(source.contains("profile.detailedInspectionEnabled"));
+        assertTrue(source.contains("GuiLoreSpec.Blocks"));
+        assertTrue(source.contains("resource_collection.display.heading.mineral"));
+        assertTrue(source.contains("resource_collection.display.heading.forest"));
+        assertTrue(source.contains("resource_collection.display.heading.vegetation"));
+        assertTrue(source.contains("resource_collection.display.data.collectible_items"));
+        assertFalse(source.contains("resource_collection.inspection.basic"));
+        assertFalse(source.contains("resource_collection.inspection.detailed"));
         assertTrue(source.contains("definition.useNameKey"));
         assertTrue(source.contains("definition.vegetationGroupNameKey"));
         assertFalse(source.contains("now().monthValue"));

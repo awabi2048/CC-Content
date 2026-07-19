@@ -25,6 +25,9 @@ class FishingSkillSourceContractTest {
         assertTrue(source.contains("ContentActionType.FISH_CAUGHT"));
         assertTrue(source.contains("ContentActionType.VANILLA_FISH_CAUGHT"));
         assertTrue(source.contains("ProfessionExperience.FIRST_DISCOVERY_BONUS"));
+        assertTrue(source.contains("GuiLoreSpec.Blocks"));
+        assertTrue(source.contains("fishing.dictionary.hint.candidates"));
+        assertFalse(source.contains("§7・§f"));
         assertFalse(source.contains("SkillEffectEngine"));
         assertFalse(source.contains("FisherBonusHandler"));
         assertFalse(source.contains("catchData.exp"));
