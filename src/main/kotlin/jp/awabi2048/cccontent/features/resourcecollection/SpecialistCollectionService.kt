@@ -782,9 +782,13 @@ class SpecialistCollectionService(
         gatheringTargets[player.uniqueId] = targets
         val cooldownSeconds = profile.inspectionCooldownSeconds.takeIf { it > 0 } ?: 45
         gatheringCooldowns[player.uniqueId] = now.plusSeconds(cooldownSeconds.toLong())
-        val collectibleHint = when {
-            targets.isEmpty() -> text(player, "resource_collection.display.hint.vegetation_none")
-            profile.detailedInspectionEnabled -> discoveredDefinitions
+        if (targets.isEmpty()) {
+            player.sendMessage(message(player, "resource_collection.display.hint.vegetation_none"))
+            player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.25f)
+            return
+        }
+        val collectibleHint = if (profile.detailedInspectionEnabled) {
+            discoveredDefinitions
                 .map { definition ->
                     CCSystem.getAPI().getI18nString(
                         player,
@@ -793,7 +797,8 @@ class SpecialistCollectionService(
                 }
                 .distinct()
                 .joinToString(text(player, "resource_collection.display.list_separator"))
-            else -> text(player, "resource_collection.display.hint.seasonal_plants")
+        } else {
+            text(player, "resource_collection.display.hint.seasonal_plants")
         }
         val appraisalLines = buildList {
             add(GuiLoreLine.Data(
@@ -927,22 +932,7 @@ class SpecialistCollectionService(
             } else {
                 "resource_collection.display.hint.forest_none"
             }
-            sendAppraisal(
-                player,
-                "resource_collection.display.heading.forest",
-                listOf(
-                    GuiLoreLine.Data(
-                        text(player, "resource_collection.display.data.candidate_count"),
-                        0,
-                        "§f"
-                    ),
-                    GuiLoreLine.Data(
-                        text(player, "resource_collection.display.data.collectible_items"),
-                        text(player, emptyResultKey),
-                        "§a"
-                    )
-                )
-            )
+            player.sendMessage(message(player, emptyResultKey))
             player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.05f)
             return
         }
@@ -1004,11 +994,15 @@ class SpecialistCollectionService(
         player.swingMainHand()
         forestTargets[player.uniqueId] = targets
         forestCooldowns[player.uniqueId] = now.plusSeconds(profile.inspectionCooldownSeconds.coerceAtLeast(1).toLong())
-        val collectibleHint = when {
-            targets.isEmpty() -> text(player, "resource_collection.display.hint.forest_none")
-            profile.exactMaterialInspectionEnabled ->
-                discoveredNames.joinToString(text(player, "resource_collection.display.list_separator"))
-            else -> text(player, "resource_collection.display.hint.forest_products")
+        if (targets.isEmpty()) {
+            player.sendMessage(message(player, "resource_collection.display.hint.forest_none"))
+            player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.05f)
+            return
+        }
+        val collectibleHint = if (profile.exactMaterialInspectionEnabled) {
+            discoveredNames.joinToString(text(player, "resource_collection.display.list_separator"))
+        } else {
+            text(player, "resource_collection.display.hint.forest_products")
         }
         sendAppraisal(
             player,

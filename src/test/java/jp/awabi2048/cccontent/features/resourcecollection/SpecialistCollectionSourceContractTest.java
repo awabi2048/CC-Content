@@ -91,6 +91,13 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("resource_collection.display.hint.vegetation_none"));
         assertTrue(source.contains("resource_collection.display.hint.forest_none"));
         assertTrue(source.contains("resource_collection.display.hint.forest_harvested"));
+        assertTrue(source.contains(
+            "player.sendMessage(message(player, \"resource_collection.display.hint.vegetation_none\"))"
+        ));
+        assertTrue(source.contains(
+            "player.sendMessage(message(player, \"resource_collection.display.hint.forest_none\"))"
+        ));
+        assertTrue(source.contains("player.sendMessage(message(player, emptyResultKey))"));
         assertTrue(source.contains("sendSubjectiveFeedback("));
         assertTrue(source.contains("feedbackTimestamps"));
         assertFalse(source.contains("resource_collection.inspection.basic"));
@@ -124,5 +131,34 @@ class SpecialistCollectionSourceContractTest {
             "src/main/kotlin/jp/awabi2048/cccontent/features/rank/job/ProfessionMinerExpListener.kt"
         ));
         assertTrue(source.contains("SpecialistCollectionService.isInternalBreak"));
+    }
+
+    @Test
+    void emptyAppraisalsShowOnlyTheSubjectiveResult() throws Exception {
+        String source = Files.readString(Path.of(
+            "src/main/kotlin/jp/awabi2048/cccontent/features/resourcecollection/SpecialistCollectionService.kt"
+        )).replace("\r\n", "\n");
+        String vegetation = source.substring(
+            source.indexOf("private fun inspectVegetation"),
+            source.indexOf("fun onGatheringDrops")
+        );
+        String forest = source.substring(
+            source.indexOf("private fun inspectForestProducts"),
+            source.indexOf("private fun tryHarvestForestProduct")
+        );
+
+        assertTrue(vegetation.contains(
+            "if (targets.isEmpty()) {\n" +
+                "            player.sendMessage(message(player, \"resource_collection.display.hint.vegetation_none\"))"
+        ));
+        assertTrue(
+            vegetation.indexOf("if (targets.isEmpty())") <
+                vegetation.indexOf("sendAppraisal(player, \"resource_collection.display.heading.vegetation\"")
+        );
+        assertTrue(forest.contains("player.sendMessage(message(player, emptyResultKey))"));
+        assertTrue(forest.contains(
+            "if (targets.isEmpty()) {\n" +
+                "            player.sendMessage(message(player, \"resource_collection.display.hint.forest_none\"))"
+        ));
     }
 }

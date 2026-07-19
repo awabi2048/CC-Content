@@ -70,8 +70,16 @@ class FishingWorldBoundarySourceContractTest {
         assertTrue(source.contains("player.rayTraceBlocks(10.0, FluidCollisionMode.ALWAYS)"));
         assertTrue(source.contains("val block = surveyWaterBlock(player)"));
         assertTrue(source.contains("val surveyBlock = surveyWaterBlock(player)"));
-        assertTrue(source.contains("candidateNames.takeIf(List<String>::isNotEmpty)"));
+        assertTrue(source.contains("if (candidateNames.isEmpty())"));
         assertTrue(source.contains("message(player, \"fishing.dictionary.hint.none\")"));
+        assertTrue(source.contains(
+            "player.sendMessage(message(player, \"fishing.dictionary.hint.none\"))\n" +
+                "            player.playSound"
+        ));
+        assertTrue(
+            dictionaryHint.indexOf("if (candidateNames.isEmpty())") <
+                dictionaryHint.indexOf(".render(GuiLoreSpec.Blocks")
+        );
         assertTrue(dictionaryHint.contains(
             "if (block == null) {\n" +
                 "            player.sendMessage(message(player, \"fishing.dictionary.hint.not_water\"))\n" +

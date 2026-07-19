@@ -137,9 +137,13 @@ class FishingFeature(
         val candidateNames = candidates.map { fish ->
             message(player, "fishing.catalog.item.${fish.id}")
         }
-        val candidateValue = candidateNames.takeIf(List<String>::isNotEmpty)
-            ?.joinToString(message(player, "fishing.dictionary.hint.list_separator"))
-            ?: message(player, "fishing.dictionary.hint.none")
+        if (candidateNames.isEmpty()) {
+            player.sendMessage(message(player, "fishing.dictionary.hint.none"))
+            player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.7f, 1.4f)
+            return
+        }
+        val candidateValue = candidateNames
+            .joinToString(message(player, "fishing.dictionary.hint.list_separator"))
         CCSystem.getAPI().getLoreService()
             .render(GuiLoreSpec.Blocks(listOf(
                 GuiLoreBlock(listOf(
