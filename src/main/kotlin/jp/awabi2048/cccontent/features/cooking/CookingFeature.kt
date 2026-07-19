@@ -16,6 +16,7 @@ import jp.awabi2048.cccontent.features.rank.profession.profile.CookSkillProfile
 import jp.awabi2048.cccontent.features.rank.profession.profile.BrewerSkillProfile
 import jp.awabi2048.cccontent.features.brewery.BreweryPreparation
 import jp.awabi2048.cccontent.features.brewery.BreweryPreparationGateway
+import jp.awabi2048.cccontent.features.brewery.BreweryRecipeGroup
 import jp.awabi2048.cccontent.features.brewery.model.FirePower
 import jp.awabi2048.cccontent.features.processing.ProcessingFirePower
 import jp.awabi2048.cccontent.features.processing.ProcessingRecipe
@@ -500,6 +501,7 @@ private class CookingController(
 
     private fun savePreparation(output: YamlConfiguration, path: String, preparation: BreweryPreparation) {
         output.set("$path.recipe_id", preparation.recipeId)
+        output.set("$path.recipe_group", preparation.recipeGroup.name)
         output.set("$path.quality", preparation.quality)
         output.set("$path.batches", preparation.batches)
         output.set("$path.fire_power", preparation.requiredFirePower.name)
@@ -513,6 +515,9 @@ private class CookingController(
         }.getOrNull() ?: return null
         return BreweryPreparation(
             recipeId,
+            runCatching {
+                BreweryRecipeGroup.valueOf(input.getString("$path.recipe_group") ?: "")
+            }.getOrDefault(BreweryRecipeGroup.BASIC),
             input.getDouble("$path.quality").coerceIn(0.0, 100.0),
             input.getInt("$path.batches").coerceIn(1, 3),
             firePower,
@@ -564,7 +569,7 @@ private class CookingController(
         (it as? Map<String, Any>)?.let(ItemStack::deserialize)
     }
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     fun onStationClick(event: PlayerInteractEvent) {
         if (event.action != Action.RIGHT_CLICK_BLOCK || !event.player.isSneaking) return
         val block = event.clickedBlock ?: return
@@ -702,6 +707,11 @@ private class CookingController(
             player.sendMessage(message(player, "cooking.error.recipe_not_found"))
             return
         }
+        if (preparation != null &&
+            !isBreweryRecipeUnlocked(preparation.recipeGroup, typedProfile as BrewerSkillProfile)) {
+            player.sendMessage(message(player, "cooking.error.recipe_not_found"))
+            return
+        }
         if (equipment == CookingEquipment.CAULDRON) {
             val waterLevel = (stationBlock.blockData as? org.bukkit.block.data.Levelled)?.level ?: 0
             val requiredWater = preparation?.batches ?: match?.batches ?: 1
@@ -768,7 +778,7 @@ private class CookingController(
         session.settled = true
         if (session.preparation != null) {
             val prototype = breweryPreparationGateway()
-                ?.createWort(session.preparation, null, session.fireMismatch)
+                ?.createWort(session.preparation, null, session.fireMismatch, session.starterId)
                 ?: return
             pendingLiquids[station] = PendingLiquid(
                 prototype,
@@ -876,6 +886,19 @@ private class CookingController(
                 if (currentFirePower(block) != session.startedFirePower) return@forEach
                 session.remainingTicks--
                 if (session.remainingTicks <= 0L) complete(station)
+            }
+            if (tickCounter % 20L == 0L) {
+                (pending.keys + pendingLiquids.keys).distinct().forEach { station ->
+                    val block = station.blockIfLoaded() ?: return@forEach
+                    val expected = pending[station]?.let { pendingResult ->
+                        recipes.firstOrNull { it.id == pendingResult.recipeId }?.equipment
+                    }
+                        ?: pendingLiquids[station]?.let {
+                            if (it.brewery) CookingEquipment.CAULDRON
+                            else recipes.firstOrNull { recipe -> recipe.id == it.recipeId }?.equipment
+                        }
+                    if (expected == null || equipmentAt(block) != expected) invalidateStation(station)
+                }
             }
             if (tickCounter % 100L == 0L && active.isNotEmpty()) saveState()
         }, 1L, 1L)
@@ -1017,6 +1040,15 @@ private class CookingController(
         CookingRecipeGroup.SPECIAL -> profile.topRecipeUnlocked
     }
 
+    private fun isBreweryRecipeUnlocked(group: BreweryRecipeGroup, profile: BrewerSkillProfile): Boolean = when (group) {
+        BreweryRecipeGroup.BASIC -> profile.basicRecipeUnlocked
+        BreweryRecipeGroup.INTERMEDIATE -> profile.intermediateRecipeUnlocked
+        BreweryRecipeGroup.ADVANCED -> profile.advancedRecipeUnlocked
+        BreweryRecipeGroup.TOP -> profile.topRecipeUnlocked
+        BreweryRecipeGroup.HERBAL -> profile.herbalRecipeUnlocked
+        BreweryRecipeGroup.WILD_AND_FUNGI -> profile.wildAndFungiRecipeUnlocked
+    }
+
     private fun equipmentAt(block: org.bukkit.block.Block): CookingEquipment? = when {
         block.type in setOf(Material.CAMPFIRE, Material.SOUL_CAMPFIRE) -> CookingEquipment.PAN
         block.type == Material.WATER_CAULDRON -> CookingEquipment.CAULDRON
@@ -1090,10 +1122,17 @@ private class CookingController(
         val pendingItems = pending[station] ?: return
         val index = CookingHolder.RESULT_SLOTS.indexOf(slot)
         val item = pendingItems.items.getOrNull(index)?.takeUnless { it.type.isAir } ?: return
-        player.setItemOnCursor(item.clone())
+        val collected = item.clone()
+        localizeResult(collected, player)
+        player.setItemOnCursor(collected)
         pendingItems.items[index] = ItemStack(Material.AIR)
-        if (slot == CookingHolder.RESULT_SLOTS.first() && pendingItems.collectors.add(player.uniqueId)) {
+        if (pendingItems.collectors.add(player.uniqueId)) {
             catalogStore.record(player.uniqueId, CatalogType.COOKING, pendingItems.recipeId)
+            publishCookingCollectionAction(
+                player.uniqueId,
+                pendingItems.recipeId,
+                pendingItems.batchId
+            )
             player.sendMessage(message(player, "cooking.process.collected", mapOf(
                 "recipe" to message(player, "cooking.recipe.${pendingItems.recipeId}")
             )))
@@ -1127,9 +1166,9 @@ private class CookingController(
             }
         }
         liquid.remaining -= 1
-        liquid.collectors.add(player.uniqueId)
-        if (!liquid.brewery) {
+        if (liquid.collectors.add(player.uniqueId) && !liquid.brewery) {
             catalogStore.record(player.uniqueId, CatalogType.COOKING, liquid.recipeId)
+            publishCookingCollectionAction(player.uniqueId, liquid.recipeId, liquid.batchId)
         }
         lowerCauldronLevel(station, 1)
         if (liquid.remaining <= 0) pendingLiquids.remove(station)
@@ -1139,6 +1178,25 @@ private class CookingController(
             render(event.view.topInventory, player)
         }
         saveState()
+    }
+
+    private fun publishCookingCollectionAction(playerId: UUID, recipeId: String, batchId: UUID) {
+        CCSystem.getAPI().getContentActionDispatcher().publish(
+            ContentAction(
+                actionId = UUID.randomUUID(),
+                schemaVersion = 1,
+                occurredAt = CCSystem.getAPI().getSharedClockService().now().toInstant(),
+                playerId = playerId,
+                actionType = ContentActionType.COOKING_COMPLETED,
+                amount = 1L,
+                worldKey = null,
+                metadata = mapOf(
+                    "recipeId" to recipeId,
+                    "role" to "collector",
+                    "batchId" to batchId.toString()
+                )
+            )
+        )
     }
 
     private fun canAcceptItem(inventory: org.bukkit.inventory.PlayerInventory, item: ItemStack): Boolean =

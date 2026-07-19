@@ -35,6 +35,7 @@ data class IngredientDefinition(
 
 data class BreweryRecipe(
     val id: String,
+    val group: BreweryRecipeGroup,
     val requiredSkillLevel: Int,
     val requiredSkills: Set<String>,
     val fermentationIngredients: Map<String, Int>,
@@ -53,6 +54,8 @@ data class BreweryRecipe(
     val finalOutputGlint: Boolean,
     val finalOutputCustomModelData: List<Int>
 )
+
+enum class BreweryRecipeGroup { BASIC, INTERMEDIATE, ADVANCED, TOP, HERBAL, WILD_AND_FUNGI }
 
 fun breweryQualityIndex(quality: Double): Int = when {
     quality < 34 -> 0
@@ -207,6 +210,9 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
     fun getIngredientDefinition(key: String): IngredientDefinition? = ingredientDefinitions[key]
 
     private fun parseRecipe(id: String, node: ConfigurationSection): BreweryRecipe? {
+        val group = runCatching {
+            BreweryRecipeGroup.valueOf(node.getString("group", "BASIC")!!.uppercase())
+        }.getOrElse { error("brewery recipe $id has invalid group") }
         val requiredSkillLevel = node.getInt("required_skill_level", 1).coerceAtLeast(1)
         val requiredSkills = node.getStringList("required_skills").map { it.trim() }.filter { it.isNotBlank() }.toSet()
 
@@ -253,6 +259,7 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
 
         return BreweryRecipe(
             id = id,
+            group = group,
             requiredSkillLevel = requiredSkillLevel,
             requiredSkills = requiredSkills,
             fermentationIngredients = ingredients,

@@ -19,6 +19,12 @@ data class BreweryLocationKey(
         return Location(world, x.toDouble(), y.toDouble(), z.toDouble())
     }
 
+    fun blockIfLoaded(worldOverride: World? = null): Block? {
+        val world = worldOverride ?: Bukkit.getWorld(worldUid) ?: return null
+        if (!world.isChunkLoaded(x shr 4, z shr 4)) return null
+        return world.getBlockAt(x, y, z)
+    }
+
     companion object {
         fun fromBlock(block: Block): BreweryLocationKey {
             return BreweryLocationKey(block.world.uid, block.x, block.y, block.z)

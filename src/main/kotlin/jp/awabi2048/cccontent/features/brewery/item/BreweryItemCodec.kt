@@ -42,6 +42,9 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     private val customItemIdKey = NamespacedKey("cccontent", "custom_item_id")
     private val batchCountKey = NamespacedKey(plugin, "brewery_batch_count")
     private val batchIdKey = NamespacedKey(plugin, "brewery_batch_id")
+    private val starterIdKey = NamespacedKey(plugin, "brewery_starter_id")
+    private val yieldAwardedKey = NamespacedKey(plugin, "brewery_yield_awarded")
+    private val collectorsKey = NamespacedKey(plugin, "brewery_collectors")
 
     data class BreweryItemState(
         val stage: BrewStage,
@@ -55,7 +58,8 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         val agingStartedAt: Long,
         val finalStars: Int,
         val batchCount: Int,
-        val batchId: UUID?
+        val batchId: UUID?,
+        val starterId: UUID?
     )
 
     fun createWortBottle(
@@ -64,7 +68,8 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         batches: Int,
         recipe: BreweryRecipe,
         player: Player?,
-        failed: Boolean
+        failed: Boolean,
+        starterId: UUID
     ): ItemStack {
         val item = ItemStack(Material.POTION)
         val meta = item.itemMeta ?: return item
@@ -89,6 +94,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         pdc.set(qualityKey, PersistentDataType.DOUBLE, if (failed) 0.0 else quality.coerceIn(0.0, 100.0))
         pdc.set(batchCountKey, PersistentDataType.INTEGER, batches.coerceAtLeast(1))
         pdc.set(batchIdKey, PersistentDataType.STRING, UUID.randomUUID().toString())
+        pdc.set(starterIdKey, PersistentDataType.STRING, starterId.toString())
         pdc.set(alcoholKey, PersistentDataType.DOUBLE, 0.0)
         pdc.set(distillCountKey, PersistentDataType.INTEGER, 0)
         pdc.set(muddyKey, PersistentDataType.BYTE, if (failed) 1 else 0)
@@ -101,7 +107,16 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         return item
     }
 
-    fun createFermentedBottle(recipeId: String, quality: Double, muddy: Boolean, history: String, recipe: BreweryRecipe, player: Player?): ItemStack {
+    fun createFermentedBottle(
+        recipeId: String,
+        quality: Double,
+        muddy: Boolean,
+        history: String,
+        recipe: BreweryRecipe,
+        player: Player?,
+        batchId: UUID?,
+        starterId: UUID?
+    ): ItemStack {
         val item = ItemStack(Material.POTION)
         val meta = item.itemMeta ?: return item
         meta.displayName(Component.text(text(player, if (muddy) "brewery.item.name.muddy" else "brewery.item.name.fermented",
@@ -110,7 +125,16 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         meta.lore(renderLore(player, if (muddy) "" else text(player, "brewery.recipe.$recipeId.middle.description"), listOf(
             "brewery.item.data.recipe" to text(player, "brewery.recipe.$recipeId.name"),
             "brewery.item.data.stage" to text(player, if (muddy) "brewery.item.stage.failed" else "brewery.item.stage.fermented"),
-            "brewery.item.data.quality" to "%.1f".format(quality)
+            "brewery.item.data.quality" to "%.1f".format(quality),
+            "brewery.item.data.next_stage" to text(
+                player,
+                when {
+                    muddy -> "brewery.item.next_stage.none"
+                    recipe.distillationRuns > 0 -> "brewery.item.next_stage.distillation"
+                    recipe.agingTimeDays > 0 -> "brewery.item.next_stage.aging"
+                    else -> "brewery.item.next_stage.completed"
+                }
+            )
         )))
         val pdc = meta.persistentDataContainer
         pdc.set(schemaVersionKey, PersistentDataType.INTEGER, CURRENT_SCHEMA_VERSION)
@@ -123,6 +147,8 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         pdc.set(ambiguousKey, PersistentDataType.BYTE, 0)
         pdc.set(historyKey, PersistentDataType.STRING, history)
         pdc.set(finalStarsKey, PersistentDataType.INTEGER, 0)
+        batchId?.let { pdc.set(batchIdKey, PersistentDataType.STRING, it.toString()) }
+        starterId?.let { pdc.set(starterIdKey, PersistentDataType.STRING, it.toString()) }
         pdc.set(customItemIdKey, PersistentDataType.STRING, "brewery.product.$recipeId")
         if (!muddy) applyPotionColor(meta, recipe.middleOutputColor)
         item.itemMeta = meta
@@ -156,7 +182,8 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
             pdc.get(agingStartKey, PersistentDataType.LONG) ?: 0L,
             pdc.get(finalStarsKey, PersistentDataType.INTEGER) ?: 0,
             (pdc.get(batchCountKey, PersistentDataType.INTEGER) ?: 1).coerceAtLeast(1),
-            pdc.get(batchIdKey, PersistentDataType.STRING)?.let { runCatching { UUID.fromString(it) }.getOrNull() })
+            pdc.get(batchIdKey, PersistentDataType.STRING)?.let { runCatching { UUID.fromString(it) }.getOrNull() },
+            pdc.get(starterIdKey, PersistentDataType.STRING)?.let { runCatching { UUID.fromString(it) }.getOrNull() })
     }
 
     fun markDistilled(item: ItemStack, state: BreweryItemState, targetDistillCount: Int, overPenalty: Double, recipe: BreweryRecipe, player: Player?) {
@@ -176,7 +203,11 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
             "brewery.item.data.stage" to text(player, "brewery.item.stage.distilled"),
             "brewery.item.data.quality" to "%.1f".format(quality),
             "brewery.item.data.distill_count" to "${state.distillCount}/$targetDistillCount",
-            "brewery.item.data.alcohol" to "%.1f%%".format(state.alcohol)
+            "brewery.item.data.alcohol" to "%.1f%%".format(state.alcohol),
+            "brewery.item.data.next_stage" to text(
+                player,
+                if (recipe.agingTimeDays > 0) "brewery.item.next_stage.aging" else "brewery.item.next_stage.completed"
+            )
         )))
         applyPotionColor(meta, recipe.finalOutputColor)
         item.itemMeta = meta
@@ -285,6 +316,27 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
 
     companion object {
         private const val FILTER_MAX_USES = 238
-        private const val CURRENT_SCHEMA_VERSION = 3
+        private const val CURRENT_SCHEMA_VERSION = 4
+    }
+
+    fun hasYieldAwarded(item: ItemStack): Boolean =
+        item.itemMeta?.persistentDataContainer?.has(yieldAwardedKey, PersistentDataType.BYTE) == true
+
+    fun markYieldAwarded(item: ItemStack) = item.editMeta {
+        it.persistentDataContainer.set(yieldAwardedKey, PersistentDataType.BYTE, 1)
+    }
+
+    fun markCollectorIfNew(item: ItemStack, collectorId: UUID): Boolean {
+        val meta = item.itemMeta ?: return false
+        val pdc = meta.persistentDataContainer
+        val collectors = pdc.get(collectorsKey, PersistentDataType.STRING)
+            .orEmpty()
+            .split(',')
+            .mapNotNull { raw -> runCatching { UUID.fromString(raw) }.getOrNull() }
+            .toMutableSet()
+        if (!collectors.add(collectorId)) return false
+        pdc.set(collectorsKey, PersistentDataType.STRING, collectors.joinToString(","))
+        item.itemMeta = meta
+        return true
     }
 }

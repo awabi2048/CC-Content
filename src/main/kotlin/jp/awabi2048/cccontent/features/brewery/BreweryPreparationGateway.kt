@@ -12,6 +12,7 @@ import org.bukkit.inventory.ItemStack
 
 data class BreweryPreparation(
     val recipeId: String,
+    val recipeGroup: BreweryRecipeGroup,
     val quality: Double,
     val batches: Int,
     val requiredFirePower: FirePower,
@@ -20,7 +21,7 @@ data class BreweryPreparation(
 
 interface BreweryPreparationGateway {
     fun match(inputItems: List<ItemStack>, maximumBatches: Int, actualFirePower: FirePower): BreweryPreparation?
-    fun createWort(preparation: BreweryPreparation, player: Player?, failed: Boolean): ItemStack
+    fun createWort(preparation: BreweryPreparation, player: Player?, failed: Boolean, starterId: java.util.UUID): ItemStack
 }
 
 internal class DefaultBreweryPreparationGateway(
@@ -55,6 +56,7 @@ internal class DefaultBreweryPreparationGateway(
             .coerceIn(0.0, 100.0)
         return BreweryPreparation(
             recipeId = recipe.id,
+            recipeGroup = recipe.group,
             quality = quality,
             batches = candidate.batches,
             requiredFirePower = recipe.fermentationIdealFirePower,
@@ -62,15 +64,16 @@ internal class DefaultBreweryPreparationGateway(
         )
     }
 
-    override fun createWort(preparation: BreweryPreparation, player: Player?, failed: Boolean): ItemStack {
+    override fun createWort(preparation: BreweryPreparation, player: Player?, failed: Boolean, starterId: java.util.UUID): ItemStack {
         val recipe = requireNotNull(recipes[preparation.recipeId])
         return codec.createWortBottle(
             preparation.recipeId,
             preparation.quality,
-            1,
+            preparation.batches,
             recipe,
             player,
-            failed
+            failed,
+            starterId
         )
     }
 
