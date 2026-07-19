@@ -9,10 +9,10 @@ import org.bukkit.World
 import kotlin.math.hypot
 import kotlin.math.round
 
-enum class ResourceCollectionKind(val profession: Profession, val bonusItemId: String) {
-    MINERAL(Profession.MINER, "mica_flake"),
-    FOREST(Profession.LUMBERJACK, "tree_resin"),
-    CROP(Profession.FARMER, "straw")
+enum class ResourceCollectionKind(val profession: Profession) {
+    MINERAL(Profession.MINER),
+    FOREST(Profession.LUMBERJACK),
+    CROP(Profession.FARMER)
 }
 
 object ResourceMaterialPolicy {
@@ -86,6 +86,19 @@ object ResourceMaterialPolicy {
     fun isWildVegetation(material: Material): Boolean = material in wildVegetation
 
     fun isVegetationBase(material: Material): Boolean = material == Material.GRASS_BLOCK
+
+    fun bonusItemId(kind: ResourceCollectionKind, sourceMaterial: Material): String? = when (kind) {
+        ResourceCollectionKind.MINERAL -> "mica_flake"
+        ResourceCollectionKind.FOREST -> "tree_resin"
+        ResourceCollectionKind.CROP -> when (sourceMaterial) {
+            Material.WHEAT -> "straw"
+            Material.POTATOES -> "sprouted_potato"
+            Material.CARROTS, Material.BEETROOTS -> "vegetable_leaves"
+            Material.COCOA -> "cocoa_pulp"
+            Material.NETHER_WART -> "wart_fiber"
+            else -> null
+        }
+    }
 
     fun isLeaf(material: Material): Boolean = material.name.endsWith("_LEAVES") ||
         material == Material.NETHER_WART_BLOCK || material == Material.WARPED_WART_BLOCK

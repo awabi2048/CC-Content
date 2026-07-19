@@ -524,11 +524,10 @@ class FishingFeature(
     private fun complete(player: Player, session: ActiveSession) {
         val catchData = session.catchData ?: return
         val before = fishdex.load(player.uniqueId)[catchData.fishId]
+        val catchLocation = session.hook.location.clone()
         clearSession(player.uniqueId, removeHook = true)
         val catchItem = items.createCatch(player, catchData)
-        player.inventory.addItem(catchItem).values.forEach { overflow ->
-            player.world.dropItemNaturally(player.location, overflow)
-        }
+        catchLocation.world?.dropItemNaturally(catchLocation, catchItem)
         val fisher = fisherContext(player)
         val recorded = fishdex.record(player.uniqueId, catchData)
         if (fisher.active) {
@@ -734,7 +733,7 @@ class FishingFeature(
             plugin.getRankManager()?.recordProfessionCycleAction(player.uniqueId)
             if (caught != null && random.nextDouble() < fisher.vanillaExtraCatchChance) {
                 val extra = caught.itemStack.clone().apply { amount = 1 }
-                player.inventory.addItem(extra).values.forEach { player.world.dropItemNaturally(player.location, it) }
+                caught.world.dropItemNaturally(caught.location, extra)
             }
         }
         CCSystem.getAPI().getContentActionDispatcher().publish(

@@ -54,7 +54,11 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("profile.topEvaluationThreshold"));
         assertTrue(source.contains("PotionEffectType.HASTE"));
         assertTrue(source.contains("getPotionEffect(PotionEffectType.HASTE) != null"));
-        assertTrue(source.contains("giveResource(player, \"heartwood\", 1)"));
+        assertTrue(source.contains("dropResourceNaturally(player, \"heartwood\", 1, origin.location)"));
+        assertTrue(source.contains("dropCustomItemNaturally"));
+        assertTrue(source.contains("dropItemNaturally"));
+        assertTrue(source.contains("Particle.BLOCK"));
+        assertTrue(source.contains("blockData.soundGroup"));
         assertTrue(source.contains("profile.leafCleanupEnabled"));
         assertTrue(source.contains("profile.automaticReplantEnabled"));
         assertTrue(source.contains("BlockPlaceEvent("));

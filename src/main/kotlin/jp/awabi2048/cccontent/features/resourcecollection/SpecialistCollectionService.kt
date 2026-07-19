@@ -307,6 +307,7 @@ class SpecialistCollectionService(
         for (block in candidates) {
             val cropType = block.type
             if (!callProtectedBreak(block, player)) continue
+            playNaturalBreakEffect(block)
             block.breakNaturally(ItemStack(Material.IRON_HOE), true)
             if (settings.isOperationEnabled(ResourceOperation.FARMER_AUTOMATIC_REPLANT) &&
                 profile.automaticReplantEnabled) {
@@ -318,7 +319,6 @@ class SpecialistCollectionService(
         player.swingMainHand()
         damageCultivationTool(player, processed, profile.durabilitySaveChance)
         awardFarmerArea(player, ContentActionType.CROP_HARVESTED, processed, originMaterial, "harvest")
-        player.sendMessage(message(player, "resource_collection.cultivation.harvested", "count" to processed))
     }
 
     private fun handleAreaTilling(event: PlayerInteractEvent, origin: Block) {
@@ -342,6 +342,7 @@ class SpecialistCollectionService(
                 val block = origin.getRelative(x, 0, z)
                 if (block.type !in tillableMaterials || block.getRelative(BlockFace.UP).type != Material.AIR) continue
                 if (!callProtectedInteract(block, player)) continue
+                playNaturalBreakEffect(block, particleCount = 4)
                 block.type = Material.FARMLAND
                 CCSystem.getAPI().getNaturalOriginRegistry().markPlayerPlaced(block)
                 processed++
@@ -350,7 +351,6 @@ class SpecialistCollectionService(
             player.swingMainHand()
             damageCultivationTool(player, processed, profile.durabilitySaveChance)
             awardFarmerArea(player, ContentActionType.SOIL_TILLED, processed, originMaterial, "tilling")
-            player.sendMessage(message(player, "resource_collection.cultivation.tilled", "count" to processed))
         })
     }
 
@@ -490,7 +490,7 @@ class SpecialistCollectionService(
         val completeTreeBatch = expectedKind == ResourceCollectionKind.FOREST && processed == targets.size
         if (treeRoot && completeTreeBatch &&
             settings.isOperationEnabled(ResourceOperation.LUMBERJACK_HEARTWOOD)) {
-            giveResource(player, "heartwood", 1)
+            dropResourceNaturally(player, "heartwood", 1, origin.location)
         }
         if (completeTreeBatch && profile is LumberjackSkillProfile) {
             if (settings.isOperationEnabled(ResourceOperation.LUMBERJACK_LEAF_CLEANUP) &&
@@ -513,8 +513,6 @@ class SpecialistCollectionService(
             }
         }
         awardBatch(player, expectedKind, processed, originalMaterial)
-        player.sendMessage(message(player, "resource_collection.batch.completed", "count" to processed))
-        player.playSound(player.location, Sound.BLOCK_DEEPSLATE_BREAK, 0.8f, 1.0f)
     }
 
     private fun breakBatchBlock(
@@ -523,6 +521,7 @@ class SpecialistCollectionService(
         player: Player,
         automaticCollection: Boolean
     ): Boolean {
+        playNaturalBreakEffect(block)
         if (!automaticCollection) return block.breakNaturally(tool, true)
         val drops = block.getDrops(tool, player).map(ItemStack::clone)
         block.type = Material.AIR
@@ -601,6 +600,7 @@ class SpecialistCollectionService(
         var processed = 0
         for (leaf in leaves) {
             if (!ResourceMaterialPolicy.isLeaf(leaf.type) || !callProtectedBreak(leaf, player)) continue
+            playNaturalBreakEffect(leaf, particleCount = 6)
             leaf.breakNaturally()
             processed++
         }
@@ -832,7 +832,7 @@ class SpecialistCollectionService(
         val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
         if (target.expiresAt.isBefore(now)) return
         val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? FarmerSkillProfile ?: return
-        completePlantGathering(player, target, profile, event.blockState.type)
+        completePlantGathering(player, target, profile, event.blockState.type, event.block.location)
     }
 
     private fun handleSurfaceGathering(event: PlayerInteractEvent, block: Block) {
@@ -854,18 +854,19 @@ class SpecialistCollectionService(
         }
         player.swingMainHand()
         targets.remove(block.key())
-        completePlantGathering(player, target, profile, block.type)
+        completePlantGathering(player, target, profile, block.type, block.location)
     }
 
     private fun completePlantGathering(
         player: Player,
         target: GatheringTarget,
         profile: FarmerSkillProfile,
-        sourceMaterial: Material
+        sourceMaterial: Material,
+        sourceLocation: Location
     ) {
         val amount = profile.guaranteedSpecialistPlantYield.coerceAtLeast(1) +
             if (random.nextDouble() < profile.specialistPlantExtraChance) 1 else 0
-        giveCustomItem(player, target.customItemId, amount)
+        dropCustomItemNaturally(player, target.customItemId, amount, sourceLocation)
         if (player.gameMode != GameMode.CREATIVE && random.nextDouble() >= profile.durabilitySaveChance) {
             player.damageItemStack(EquipmentSlot.HAND, 1)
         }
@@ -879,7 +880,6 @@ class SpecialistCollectionService(
                 "surface_gathering" to target.surface.toString()
             )
         )
-        player.sendMessage(message(player, "resource_collection.gathering.completed", "amount" to amount))
     }
 
     private fun inspectForestProducts(event: PlayerInteractEvent, origin: Block) {
@@ -902,7 +902,23 @@ class SpecialistCollectionService(
         )
         if (root == null || isAzaleaTree(species, treeBlocks) ||
             forestProductHarvestStore.isHarvested(root, species)) {
-            player.sendMessage(message(player, "resource_collection.forest.no_discoveries"))
+            sendAppraisal(
+                player,
+                "resource_collection.display.heading.forest",
+                listOf(
+                    GuiLoreLine.Data(
+                        text(player, "resource_collection.display.data.candidate_count"),
+                        0,
+                        "§f"
+                    ),
+                    GuiLoreLine.Data(
+                        text(player, "resource_collection.display.data.collectible_items"),
+                        text(player, "resource_collection.display.hint.none"),
+                        "§a"
+                    )
+                )
+            )
+            player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.05f)
             return
         }
         val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
@@ -1022,11 +1038,15 @@ class SpecialistCollectionService(
         when (target.targetKind) {
             ForestProductTargetKind.LOG -> {
                 val stripped = strippedType(block.type) ?: return true
+                playNaturalBreakEffect(block, particleCount = 8)
                 block.type = stripped
             }
-            ForestProductTargetKind.LEAF -> block.breakNaturally(player.inventory.itemInMainHand, true)
+            ForestProductTargetKind.LEAF -> {
+                playNaturalBreakEffect(block, particleCount = 6)
+                block.breakNaturally(player.inventory.itemInMainHand, true)
+            }
         }
-        giveCustomItem(player, target.customItemId, 1)
+        dropCustomItemNaturally(player, target.customItemId, 1, block.location)
         if (player.gameMode != GameMode.CREATIVE && random.nextDouble() >= profile.durabilitySaveChance) {
             player.damageItemStack(EquipmentSlot.HAND, 1)
         }
@@ -1037,7 +1057,6 @@ class SpecialistCollectionService(
             originalMaterial,
             mapOf("forest_product_definition" to target.definitionId)
         )
-        player.sendMessage(message(player, "resource_collection.forest.completed", "amount" to 1))
         return true
     }
 
@@ -1155,11 +1174,10 @@ class SpecialistCollectionService(
             occupiedBlocks[key] = player.uniqueId
             showChiselTarget(player, session)
             scheduleChiselTimeout(session)
-            player.sendMessage(message(player, "resource_collection.chisel.started"))
             return
         }
         if (current.blockKey != key || current.face != event.blockFace) {
-            cancelChisel(player.uniqueId, "resource_collection.chisel.cancelled")
+            cancelChisel(player.uniqueId, null)
             return
         }
         val interaction = resolveChiselInteractionPoint(event, block, current.face) ?: return
@@ -1188,11 +1206,11 @@ class SpecialistCollectionService(
 
     private fun completeChisel(player: Player, session: ChiselSession, profile: MinerSkillProfile) {
         val block = session.blockKey.resolve() ?: run {
-            cancelChisel(player.uniqueId, "resource_collection.chisel.cancelled")
+            cancelChisel(player.uniqueId, null)
             return
         }
         if (!validateChiselState(player, session, block)) {
-            cancelChisel(player.uniqueId, "resource_collection.chisel.cancelled")
+            cancelChisel(player.uniqueId, null)
             return
         }
         if (!callProtectedBreak(block, player)) {
@@ -1210,6 +1228,7 @@ class SpecialistCollectionService(
         session.timeout?.cancel()
         chiselSessions.remove(player.uniqueId)
         occupiedBlocks.remove(session.blockKey)
+        playNaturalBreakEffect(block)
         block.breakNaturally(ItemStack(Material.IRON_PICKAXE), true)
         if (player.gameMode != GameMode.CREATIVE) player.damageItemStack(EquipmentSlot.HAND, 1)
         if (specialAmount > 0) {
@@ -1218,7 +1237,7 @@ class SpecialistCollectionService(
                 block.biome.key.toString(),
                 block.y
             )
-            giveResource(player, result.resourceId, specialAmount)
+            dropResourceNaturally(player, result.resourceId, specialAmount, block.location)
         }
         awardSpecialist(
             player,
@@ -1226,8 +1245,6 @@ class SpecialistCollectionService(
             average >= profile.topEvaluationThreshold,
             session.originalMaterial
         )
-        player.sendMessage(message(player, "resource_collection.chisel.completed", "amount" to specialAmount))
-        player.playSound(player.location, Sound.BLOCK_AMETHYST_BLOCK_BREAK, 0.9f, 1.2f)
     }
 
     private fun validateChiselState(player: Player, session: ChiselSession, block: Block): Boolean =
@@ -1241,7 +1258,7 @@ class SpecialistCollectionService(
     private fun scheduleChiselTimeout(session: ChiselSession) {
         session.timeout = plugin.server.scheduler.runTaskLater(
             plugin,
-            Runnable { cancelChisel(session.playerId, "resource_collection.chisel.timeout") },
+            Runnable { cancelChisel(session.playerId, null) },
             settings.chisel.targetTimeoutTicks
         )
     }
@@ -1318,7 +1335,7 @@ class SpecialistCollectionService(
         plugin.server.scheduler.runTask(plugin, Runnable {
             val changed = key.resolve() ?: return@Runnable
             if (changed.type != stripped) return@Runnable
-            giveResource(player, "bark", 1)
+            dropResourceNaturally(player, "bark", 1, changed.location)
             awardSpecialist(player, ContentActionType.TREE_PROCESSED, false, stripped)
             player.playSound(player.location, Sound.ITEM_AXE_STRIP, 0.7f, 1.25f)
         })
@@ -1347,17 +1364,21 @@ class SpecialistCollectionService(
         }
         player.swingMainHand()
         val originalMaterial = block.type
+        playNaturalBreakEffect(block)
         block.type = Material.AIR
         if (precise) {
-            giveResource(player, "timber_beam", profile.timberYield.takeIf { it > 0 } ?: 1)
+            dropResourceNaturally(
+                player,
+                "timber_beam",
+                profile.timberYield.takeIf { it > 0 } ?: 1,
+                block.location
+            )
         } else {
             val item = ItemStack(planks, profile.plankYield.takeIf { it > 0 } ?: 4)
-            player.inventory.addItem(item).values.forEach { player.world.dropItemNaturally(player.location, it) }
+            block.world.dropItemNaturally(block.location.add(0.5, 0.5, 0.5), item)
         }
         if (player.gameMode != GameMode.CREATIVE) player.damageItemStack(EquipmentSlot.HAND, 1)
         awardSpecialist(player, ContentActionType.TREE_PROCESSED, false, originalMaterial)
-        player.sendMessage(message(player, "resource_collection.woodworking.completed"))
-        player.playSound(player.location, Sound.BLOCK_WOOD_BREAK, 0.8f, if (precise) 1.4f else 1.0f)
     }
 
     private fun awardSpecialist(
@@ -1398,9 +1419,8 @@ class SpecialistCollectionService(
         }
     }
 
-    private fun giveResource(player: Player, id: String, amount: Int) {
-        giveCustomItem(player, "resource.$id", amount)
-    }
+    private fun dropResourceNaturally(player: Player, id: String, amount: Int, source: Location) =
+        dropCustomItemNaturally(player, "resource.$id", amount, source)
 
     private fun sendAppraisal(player: Player, headingKey: String, data: List<GuiLoreLine>) {
         val spec = GuiLoreSpec.Blocks(
@@ -1414,10 +1434,33 @@ class SpecialistCollectionService(
         CCSystem.getAPI().getLoreService().render(spec).forEach(player::sendMessage)
     }
 
-    private fun giveCustomItem(player: Player, fullId: String, amount: Int) {
+    private fun dropCustomItemNaturally(player: Player, fullId: String, amount: Int, source: Location) {
         if (amount <= 0) return
         val item = CustomItemManager.createItemForPlayer(fullId, player, amount) ?: return
-        player.inventory.addItem(item).values.forEach { player.world.dropItemNaturally(player.location, it) }
+        val world = source.world ?: return
+        world.dropItemNaturally(source.clone().add(0.5, 0.5, 0.5), item)
+    }
+
+    private fun playNaturalBreakEffect(block: Block, particleCount: Int = 12) {
+        val blockData = block.blockData.clone()
+        val location = block.location.add(0.5, 0.5, 0.5)
+        block.world.spawnParticle(
+            Particle.BLOCK,
+            location,
+            particleCount,
+            0.28,
+            0.28,
+            0.28,
+            0.04,
+            blockData
+        )
+        val soundGroup = blockData.soundGroup
+        block.world.playSound(
+            location,
+            soundGroup.breakSound,
+            soundGroup.volume.coerceAtMost(1.0f),
+            soundGroup.pitch
+        )
     }
 
     private fun isReadyNatural(block: Block): Boolean =
@@ -1436,7 +1479,7 @@ class SpecialistCollectionService(
     @EventHandler(ignoreCancelled = true)
     fun onOtherBlockBreak(event: BlockBreakEvent) {
         val owner = occupiedBlocks[event.block.key()] ?: return
-        if (owner != event.player.uniqueId) cancelChisel(owner, "resource_collection.chisel.cancelled")
+        if (owner != event.player.uniqueId) cancelChisel(owner, null)
     }
 
     @EventHandler
@@ -1450,11 +1493,11 @@ class SpecialistCollectionService(
 
     @EventHandler
     fun onWorldChanged(event: PlayerChangedWorldEvent) =
-        cancelChisel(event.player.uniqueId, "resource_collection.chisel.cancelled")
+        cancelChisel(event.player.uniqueId, null)
 
     @EventHandler
     fun onHeldItemChanged(event: PlayerItemHeldEvent) =
-        cancelChisel(event.player.uniqueId, "resource_collection.chisel.cancelled")
+        cancelChisel(event.player.uniqueId, null)
 
     private fun Block.key(): BlockKey = BlockKey(world.uid, x, y, z)
     private fun BlockKey.resolve(): Block? = Bukkit.getWorld(worldId)?.getBlockAt(x, y, z)

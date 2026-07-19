@@ -57,7 +57,8 @@ class ResourceCollectionFeature(
             event.block.world.key, event.block.x, event.block.y, event.block.z
         )
         if (!NormalResourceBonusPolicy.succeeds(chance, natural, random)) return
-        val bonus = CustomItemManager.createItemForPlayer("resource.${kind.bonusItemId}", player, 1) ?: return
+        val bonusItemId = ResourceMaterialPolicy.bonusItemId(kind, event.blockState.type) ?: return
+        val bonus = CustomItemManager.createItemForPlayer("resource.$bonusItemId", player, 1) ?: return
         event.block.world.dropItemNaturally(event.block.location.add(0.5, 0.5, 0.5), bonus)
     }
 }
