@@ -88,6 +88,15 @@ class TypedProfessionProfileTest {
         assertTrue(profile.getBatchProcessingEnabled());
         assertTrue(profile.getAutomaticCollectionEnabled());
         assertTrue(profile.getOptimizedSearchEnabled());
+
+        MinerSkillProfile precision = (MinerSkillProfile) TypedProfessionProfileResolver.INSTANCE.resolve(
+            Profession.MINER,
+            50,
+            ProfessionSpecialization.PRECISION_MINING.getId(),
+            toggles
+        );
+        assertEquals(0.88, precision.getTopEvaluationThreshold());
+        assertEquals(1, precision.getIgnoredMinorFailures());
     }
 
     @Test

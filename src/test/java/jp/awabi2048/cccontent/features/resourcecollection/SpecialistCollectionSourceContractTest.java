@@ -45,6 +45,10 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains(".coerceIn(1, 24)"));
         assertTrue(source.contains("ProfessionExperience.batchExperience(processed)"));
         assertTrue(source.contains("profile.batchProcessingEnabled"));
+        assertTrue(source.contains("profile.automaticCollectionEnabled"));
+        assertTrue(source.contains("profile.optimizedSearchEnabled"));
+        assertTrue(source.contains("ChiselAttemptPolicy.evaluate"));
+        assertTrue(source.contains("profile.topEvaluationThreshold"));
         assertTrue(source.contains("giveResource(player, \"heartwood\", 1)"));
         assertTrue(source.contains("profile.leafCleanupEnabled"));
         assertTrue(source.contains("profile.automaticReplantEnabled"));
@@ -60,6 +64,9 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("forestTargets[player.uniqueId] = targets"));
         assertTrue(source.contains("gatheringTargets[player.uniqueId] = targets"));
         assertTrue(source.contains("getSeasonService().currentSeason()"));
+        assertTrue(source.contains("profile.detailedInspectionEnabled"));
+        assertTrue(source.contains("definition.useNameKey"));
+        assertTrue(source.contains("definition.vegetationGroupNameKey"));
         assertFalse(source.contains("now().monthValue"));
         assertTrue(source.contains("profile.areaTillingEnabled"));
         assertTrue(source.contains("profile.areaHarvestEnabled"));

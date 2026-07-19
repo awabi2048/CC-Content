@@ -122,21 +122,47 @@ object NormalResourceBonusPolicy {
 }
 
 object ChiselRewardPolicy {
+    @JvmOverloads
     fun specialMaterialCount(
         averageAccuracy: Double,
         minimumStandardEnabled: Boolean,
-        topEvaluationExtra: Int
+        topEvaluationExtra: Int,
+        topEvaluationThreshold: Double = 0.90
     ): Int {
         require(averageAccuracy in 0.0..1.0) { "Chisel accuracy must be between 0 and 1" }
         require(topEvaluationExtra >= 0) { "Chisel top-evaluation bonus must not be negative" }
+        require(topEvaluationThreshold in 0.0..1.0) {
+            "Chisel top-evaluation threshold must be between 0 and 1"
+        }
         val base = when {
-            averageAccuracy >= 0.90 -> 3
+            averageAccuracy >= topEvaluationThreshold -> 3
             averageAccuracy >= 0.70 -> 2
             averageAccuracy >= 0.40 -> 1
             minimumStandardEnabled -> 1
             else -> 0
         }
-        return base + if (averageAccuracy >= 0.90) topEvaluationExtra else 0
+        return base + if (averageAccuracy >= topEvaluationThreshold) topEvaluationExtra else 0
+    }
+}
+
+data class ChiselAttemptResult(
+    val score: Double,
+    val countsAsAttempt: Boolean,
+    val consumesIgnoredFailure: Boolean
+)
+
+object ChiselAttemptPolicy {
+    fun evaluate(distance: Double, tolerance: Double, ignoredFailuresRemaining: Int): ChiselAttemptResult {
+        require(distance >= 0.0) { "Chisel distance must not be negative" }
+        require(tolerance > 0.0) { "Chisel tolerance must be positive" }
+        require(ignoredFailuresRemaining >= 0) { "Ignored chisel failures must not be negative" }
+        val score = (1.0 - distance / tolerance).coerceIn(0.0, 1.0)
+        val minorFailure = distance > tolerance && distance <= tolerance + 0.08
+        return if (minorFailure && ignoredFailuresRemaining > 0) {
+            ChiselAttemptResult(0.0, countsAsAttempt = false, consumesIgnoredFailure = true)
+        } else {
+            ChiselAttemptResult(score, countsAsAttempt = true, consumesIgnoredFailure = false)
+        }
     }
 }
 

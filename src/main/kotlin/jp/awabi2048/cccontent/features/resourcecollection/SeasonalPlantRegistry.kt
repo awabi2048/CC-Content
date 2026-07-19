@@ -11,6 +11,8 @@ import java.util.Random
 data class SeasonalPlantDefinition(
     val id: String,
     val customItemId: String,
+    val useNameKey: String,
+    val vegetationGroupNameKey: String,
     val seasons: Set<Season>,
     val sourceMaterials: Set<Material>,
     val biomeKeys: Set<String>,
@@ -85,6 +87,8 @@ class SeasonalPlantRegistry private constructor(
             require(id.matches(Regex("[a-z0-9_]+"))) { "$path.id must use lowercase snake_case" }
             val customItemId = requireString(raw, "custom_item_id", path)
             require(customItemId.matches(Regex("[a-z0-9_.-]+"))) { "$path.custom_item_id is invalid" }
+            val useNameKey = requireLanguageKey(raw, "use_name_key", path)
+            val vegetationGroupNameKey = requireLanguageKey(raw, "vegetation_group_name_key", path)
             val seasons = requireStringList(raw, "seasons", path).map { rawSeason ->
                 runCatching { Season.valueOf(rawSeason.uppercase(Locale.ROOT)) }
                     .getOrElse { throw IllegalArgumentException("$path.seasons contains invalid season: $rawSeason") }
@@ -105,8 +109,23 @@ class SeasonalPlantRegistry private constructor(
             val weight = requireInt(raw, "weight", path)
             require(weight > 0) { "$path.weight must be positive" }
             return SeasonalPlantDefinition(
-                id, customItemId, seasons, sourceMaterials, biomeKeys, minimumY, maximumY, weight
+                id,
+                customItemId,
+                useNameKey,
+                vegetationGroupNameKey,
+                seasons,
+                sourceMaterials,
+                biomeKeys,
+                minimumY,
+                maximumY,
+                weight
             )
+        }
+
+        private fun requireLanguageKey(raw: Map<*, *>, key: String, path: String): String {
+            val value = requireString(raw, key, path)
+            require(value.matches(Regex("[a-z0-9_.-]+"))) { "$path.$key is invalid" }
+            return value
         }
 
         private fun requireString(raw: Map<*, *>, key: String, path: String): String =

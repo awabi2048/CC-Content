@@ -58,6 +58,7 @@ object TypedProfessionProfileResolver {
             automaticCollectionEnabled = tunnel && level >= 50,
             optimizedSearchEnabled = tunnel && level >= 50,
             precisionToleranceBonus = if (!precision) 0.0 else stepped(level, 15 to 0.02, 45 to 0.04),
+            topEvaluationThreshold = if (precision && level >= 45) 0.88 else 0.90,
             detailedInspectionEnabled = precision && level >= 25,
             minimumSpecialMaterialStandardEnabled = precision && level >= 35,
             topEvaluationExtraMaterial = if (precision && level >= 50) 1 else 0,

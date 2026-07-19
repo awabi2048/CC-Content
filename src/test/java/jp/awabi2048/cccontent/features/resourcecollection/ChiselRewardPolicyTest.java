@@ -19,7 +19,24 @@ class ChiselRewardPolicyTest {
     void precisionMinimumAppliesOnlyBelowTheStandardBand() {
         assertEquals(1, ChiselRewardPolicy.INSTANCE.specialMaterialCount(0.10, true, 0));
         assertEquals(1, ChiselRewardPolicy.INSTANCE.specialMaterialCount(0.50, true, 0));
+        assertEquals(4, ChiselRewardPolicy.INSTANCE.specialMaterialCount(0.88, false, 1, 0.88));
         assertThrows(IllegalArgumentException.class,
             () -> ChiselRewardPolicy.INSTANCE.specialMaterialCount(1.1, false, 0));
+    }
+
+    @Test
+    void oneMinorFailureCanBeIgnoredWithoutCountingAnAttempt() {
+        ChiselAttemptResult ignored = ChiselAttemptPolicy.INSTANCE.evaluate(0.25, 0.22, 1);
+        assertEquals(0.0, ignored.getScore());
+        assertEquals(false, ignored.getCountsAsAttempt());
+        assertEquals(true, ignored.getConsumesIgnoredFailure());
+
+        ChiselAttemptResult consumed = ChiselAttemptPolicy.INSTANCE.evaluate(0.25, 0.22, 0);
+        assertEquals(true, consumed.getCountsAsAttempt());
+        assertEquals(false, consumed.getConsumesIgnoredFailure());
+
+        ChiselAttemptResult major = ChiselAttemptPolicy.INSTANCE.evaluate(0.40, 0.22, 1);
+        assertEquals(true, major.getCountsAsAttempt());
+        assertEquals(false, major.getConsumesIgnoredFailure());
     }
 }

@@ -20,6 +20,7 @@ data class MinerSkillProfile(
     val automaticCollectionEnabled: Boolean,
     val optimizedSearchEnabled: Boolean,
     val precisionToleranceBonus: Double,
+    val topEvaluationThreshold: Double,
     val detailedInspectionEnabled: Boolean,
     val minimumSpecialMaterialStandardEnabled: Boolean,
     val topEvaluationExtraMaterial: Int,

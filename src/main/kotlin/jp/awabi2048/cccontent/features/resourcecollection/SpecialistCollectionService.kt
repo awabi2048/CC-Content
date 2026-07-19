@@ -75,6 +75,7 @@ class SpecialistCollectionService(
         var target: Location,
         var attempts: Int = 0,
         var scoreTotal: Double = 0.0,
+        var ignoredFailures: Int = 0,
         var timeout: BukkitTask? = null
     )
     private data class GatheringTarget(
@@ -406,7 +407,8 @@ class SpecialistCollectionService(
             origin,
             expectedKind,
             maximum,
-            includeDiagonalTrunks = profile is LumberjackSkillProfile && profile.multiTrunkRecognitionImproved
+            includeDiagonalTrunks = profile is LumberjackSkillProfile && profile.multiTrunkRecognitionImproved,
+            optimizedSearch = profile is MinerSkillProfile && profile.optimizedSearchEnabled
         )
         val leaves = if (expectedKind == ResourceCollectionKind.FOREST &&
             settings.isOperationEnabled(ResourceOperation.LUMBERJACK_LEAF_CLEANUP) &&
@@ -423,7 +425,8 @@ class SpecialistCollectionService(
             } else {
                 ItemStack(Material.IRON_AXE)
             }
-            if (block.breakNaturally(tool, true)) processed++
+            val automaticCollection = profile is MinerSkillProfile && profile.automaticCollectionEnabled
+            if (breakBatchBlock(block, tool, player, automaticCollection)) processed++
         }
         if (processed <= 0) {
             player.sendMessage(message(player, "resource_collection.error.protected"))
@@ -459,11 +462,29 @@ class SpecialistCollectionService(
         player.playSound(player.location, Sound.BLOCK_DEEPSLATE_BREAK, 0.8f, 1.0f)
     }
 
+    private fun breakBatchBlock(
+        block: Block,
+        tool: ItemStack,
+        player: Player,
+        automaticCollection: Boolean
+    ): Boolean {
+        if (!automaticCollection) return block.breakNaturally(tool, true)
+        val drops = block.getDrops(tool, player).map(ItemStack::clone)
+        block.type = Material.AIR
+        drops.forEach { item ->
+            player.inventory.addItem(item).values.forEach { overflow ->
+                player.world.dropItemNaturally(player.location, overflow)
+            }
+        }
+        return true
+    }
+
     private fun collectConnectedNatural(
         origin: Block,
         kind: ResourceCollectionKind,
         maximum: Int,
-        includeDiagonalTrunks: Boolean = false
+        includeDiagonalTrunks: Boolean = false,
+        optimizedSearch: Boolean = false
     ): List<Block> {
         val queue = ArrayDeque<Block>()
         val visited = mutableSetOf<BlockKey>()
@@ -478,7 +499,13 @@ class SpecialistCollectionService(
                 BlockFace.UP, BlockFace.DOWN, BlockFace.NORTH,
                 BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST
             )
-            faces.forEach { queue.add(block.getRelative(it)) }
+            val neighbors = faces.map(block::getRelative)
+            val orderedNeighbors = if (optimizedSearch) {
+                neighbors.sortedBy { neighbor -> if (neighbor.type == origin.type) 0 else 1 }
+            } else {
+                neighbors
+            }
+            orderedNeighbors.forEach(queue::add)
             if (includeDiagonalTrunks && kind == ResourceCollectionKind.FOREST) {
                 for (x in -1..1) for (z in -1..1) {
                     if (x == 0 && z == 0) continue
@@ -623,6 +650,7 @@ class SpecialistCollectionService(
         val expiresAt = now.plusSeconds(60)
         val season = CCSystem.getAPI().getSeasonService().currentSeason()
         val targets = mutableMapOf<BlockKey, GatheringTarget>()
+        val discoveredDefinitions = linkedSetOf<SeasonalPlantDefinition>()
         for (x in -radius..radius) for (y in -2..2) for (z in -radius..radius) {
             val block = origin.getRelative(x, y, z)
             if (!ResourceMaterialPolicy.isWildVegetation(block.type)) continue
@@ -641,6 +669,7 @@ class SpecialistCollectionService(
                 continue
             }
             targets[block.key()] = GatheringTarget(definition.customItemId, definition.id, expiresAt, surface = false)
+            discoveredDefinitions += definition
             player.spawnParticle(
                 Particle.HAPPY_VILLAGER,
                 block.location.add(0.5, 0.7, 0.5),
@@ -667,6 +696,7 @@ class SpecialistCollectionService(
                     expiresAt,
                     surface = true
                 )
+                discoveredDefinitions += definition
                 player.spawnParticle(
                     Particle.HAPPY_VILLAGER,
                     origin.location.add(0.5, 1.05, 0.5),
@@ -681,12 +711,27 @@ class SpecialistCollectionService(
         gatheringTargets[player.uniqueId] = targets
         val cooldownSeconds = profile.inspectionCooldownSeconds.takeIf { it > 0 } ?: 45
         gatheringCooldowns[player.uniqueId] = now.plusSeconds(cooldownSeconds.toLong())
-        val messageKey = if (targets.isEmpty()) {
-            "resource_collection.gathering.no_discoveries"
-        } else {
-            "resource_collection.gathering.inspected"
+        val messageKey = when {
+            targets.isEmpty() -> "resource_collection.gathering.no_discoveries"
+            profile.detailedInspectionEnabled -> "resource_collection.gathering.inspected_detailed"
+            else -> "resource_collection.gathering.inspected"
         }
-        player.sendMessage(message(player, messageKey, "count" to targets.size))
+        player.sendMessage(
+            message(
+                player,
+                messageKey,
+                "count" to targets.size,
+                "season" to localizedEnum(player, "resource_collection.gathering.season", season.name),
+                "uses" to discoveredDefinitions
+                    .map { definition -> CCSystem.getAPI().getI18nString(player, definition.useNameKey) }
+                    .distinct()
+                    .joinToString("、"),
+                "groups" to discoveredDefinitions
+                    .map { definition -> CCSystem.getAPI().getI18nString(player, definition.vegetationGroupNameKey) }
+                    .distinct()
+                    .joinToString("、")
+            )
+        )
         player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.25f)
     }
 
@@ -898,8 +943,16 @@ class SpecialistCollectionService(
         val interaction = event.interactionPoint ?: return
         val tolerance = 0.22 + profile.precisionToleranceBonus
         val distance = interaction.distance(current.target)
-        current.scoreTotal += (1.0 - distance / tolerance).coerceIn(0.0, 1.0)
-        current.attempts++
+        val attempt = ChiselAttemptPolicy.evaluate(
+            distance,
+            tolerance,
+            profile.ignoredMinorFailures - current.ignoredFailures
+        )
+        if (attempt.consumesIgnoredFailure) current.ignoredFailures++
+        if (attempt.countsAsAttempt) {
+            current.scoreTotal += attempt.score
+            current.attempts++
+        }
         current.timeout?.cancel()
         if (current.attempts >= 3) {
             completeChisel(player, current, profile)
@@ -928,7 +981,8 @@ class SpecialistCollectionService(
         val specialAmount = ChiselRewardPolicy.specialMaterialCount(
             average,
             profile.minimumSpecialMaterialStandardEnabled,
-            profile.topEvaluationExtraMaterial
+            profile.topEvaluationExtraMaterial,
+            profile.topEvaluationThreshold
         )
         session.timeout?.cancel()
         chiselSessions.remove(player.uniqueId)
@@ -943,7 +997,12 @@ class SpecialistCollectionService(
             )
             giveResource(player, result.resourceId, specialAmount)
         }
-        awardSpecialist(player, ContentActionType.MINERAL_EXTRACTED, average >= 0.90, session.originalMaterial)
+        awardSpecialist(
+            player,
+            ContentActionType.MINERAL_EXTRACTED,
+            average >= profile.topEvaluationThreshold,
+            session.originalMaterial
+        )
         player.sendMessage(message(player, "resource_collection.chisel.completed", "amount" to specialAmount))
         player.playSound(player.location, Sound.BLOCK_AMETHYST_BLOCK_BREAK, 0.9f, 1.2f)
     }

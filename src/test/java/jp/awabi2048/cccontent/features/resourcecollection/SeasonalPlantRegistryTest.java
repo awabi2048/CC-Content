@@ -14,6 +14,8 @@ class SeasonalPlantRegistryTest {
     private final SeasonalPlantDefinition springFern = new SeasonalPlantDefinition(
         "approved_spring_fern",
         "resource.approved_spring_fern",
+        "resource_collection.test.use",
+        "resource_collection.test.group",
         Set.of(Season.SPRING),
         Set.of(Material.FERN),
         Set.of("minecraft:plains"),
