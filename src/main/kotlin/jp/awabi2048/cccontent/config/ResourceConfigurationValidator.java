@@ -821,13 +821,13 @@ public final class ResourceConfigurationValidator {
             requireBoolean(config, "enabled", configFile, "enabled", errors);
             validateResourceFeatureSection(
                 config, "mineral",
-                Set.of("enabled", "normal_bonus_drop", "inspection", "chisel_game", "batch_mining"),
+                Set.of("enabled", "normal_bonus_drop", "work_speed", "inspection", "chisel_game", "batch_mining"),
                 configFile, errors
             );
             validateResourceFeatureSection(
                 config, "forest",
                 Set.of(
-                    "enabled", "normal_bonus_drop", "batch_felling", "heartwood", "bark",
+                    "enabled", "normal_bonus_drop", "work_speed", "batch_felling", "heartwood", "bark",
                     "timber_processing", "forest_products", "leaf_cleanup", "automatic_replant"
                 ),
                 configFile, errors
@@ -835,7 +835,7 @@ public final class ResourceConfigurationValidator {
             validateResourceFeatureSection(
                 config, "crop",
                 Set.of(
-                    "enabled", "normal_bonus_drop", "wild_gathering", "surface_gathering",
+                    "enabled", "normal_bonus_drop", "work_speed", "wild_gathering", "surface_gathering",
                     "area_tilling", "area_harvest", "automatic_replant"
                 ),
                 configFile, errors

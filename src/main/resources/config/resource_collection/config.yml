@@ -1,9 +1,10 @@
-config_version: 4
+config_version: 5
 enabled: true
 
 mineral:
   enabled: true
   normal_bonus_drop: true
+  work_speed: true
   inspection: true
   chisel_game: true
   batch_mining: true
@@ -11,6 +12,7 @@ mineral:
 forest:
   enabled: true
   normal_bonus_drop: true
+  work_speed: true
   batch_felling: true
   heartwood: true
   bark: true
@@ -22,6 +24,7 @@ forest:
 crop:
   enabled: true
   normal_bonus_drop: true
+  work_speed: true
   wild_gathering: true
   surface_gathering: true
   area_tilling: true

@@ -4,11 +4,26 @@ import org.junit.jupiter.api.Test;
 
 import java.util.EnumMap;
 import java.util.Map;
+import java.io.File;
+
+import org.bukkit.configuration.file.YamlConfiguration;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ResourceCollectionSettingsTest {
+    @Test
+    void bundledConfigurationContainsEveryOperationSwitch() {
+        YamlConfiguration yaml = YamlConfiguration.loadConfiguration(
+            new File("src/main/resources/config/resource_collection/config.yml")
+        );
+
+        assertTrue(yaml.getInt("config_version") == 5);
+        for (ResourceOperation operation : ResourceOperation.values()) {
+            assertTrue(yaml.get(operation.getConfigPath()) instanceof Boolean, operation.getConfigPath());
+        }
+    }
+
     @Test
     void professionSwitchDisablesEveryOperationInThatProfession() {
         Map<ResourceCollectionKind, Boolean> professions = enabledProfessions();

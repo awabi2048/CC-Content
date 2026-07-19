@@ -20,7 +20,7 @@ data class ResourceCollectionSettings(
 
     companion object {
         private const val CONFIG_PATH = "config/resource_collection/config.yml"
-        private const val CONFIG_VERSION = 4
+        private const val CONFIG_VERSION = 5
 
         fun load(plugin: JavaPlugin): ResourceCollectionSettings {
             val file = ensureFile(plugin, CONFIG_PATH)
@@ -48,22 +48,28 @@ data class ResourceCollectionSettings(
             val existing = YamlConfiguration.loadConfiguration(file)
             val version = existing.getInt("config_version", -1)
             if (version == CONFIG_VERSION) return
-            require(version == 2 || version == 3) {
+            require(version in 2..4) {
                 "Unsupported resource collection config version: $version"
             }
             val migrated = YamlConfiguration.loadConfiguration(file)
             migrated.set("config_version", CONFIG_VERSION)
             migrated.set("worlds", null)
-            ResourceCollectionKind.entries.forEach { kind ->
-                migrated.set("${kind.configSection}.enabled", true)
-                migrated.set(
-                    "${kind.configSection}.normal_bonus_drop",
-                    existing.getBoolean("normal_bonus.${kind.configSection}", true)
-                )
-            }
-            migrated.set("normal_bonus", null)
-            ResourceOperation.entries.forEach { operation ->
-                migrated.set(operation.configPath, true)
+            if (version <= 3) {
+                ResourceCollectionKind.entries.forEach { kind ->
+                    migrated.set("${kind.configSection}.enabled", true)
+                    migrated.set(
+                        "${kind.configSection}.normal_bonus_drop",
+                        existing.getBoolean("normal_bonus.${kind.configSection}", true)
+                    )
+                }
+                migrated.set("normal_bonus", null)
+                ResourceOperation.entries.forEach { operation ->
+                    migrated.set(operation.configPath, true)
+                }
+            } else {
+                migrated.set(ResourceOperation.MINER_WORK_SPEED.configPath, true)
+                migrated.set(ResourceOperation.LUMBERJACK_WORK_SPEED.configPath, true)
+                migrated.set(ResourceOperation.FARMER_WORK_SPEED.configPath, true)
             }
             val backup = File(file.parentFile, "${file.name}.bak-v$version")
             if (!backup.exists()) Files.copy(file.toPath(), backup.toPath())
@@ -126,9 +132,11 @@ enum class ResourceOperation(
     val configPath: String
 ) {
     MINER_INSPECTION(ResourceCollectionKind.MINERAL, "mineral.inspection"),
+    MINER_WORK_SPEED(ResourceCollectionKind.MINERAL, "mineral.work_speed"),
     MINER_CHISEL(ResourceCollectionKind.MINERAL, "mineral.chisel_game"),
     MINER_BATCH(ResourceCollectionKind.MINERAL, "mineral.batch_mining"),
     LUMBERJACK_BATCH(ResourceCollectionKind.FOREST, "forest.batch_felling"),
+    LUMBERJACK_WORK_SPEED(ResourceCollectionKind.FOREST, "forest.work_speed"),
     LUMBERJACK_HEARTWOOD(ResourceCollectionKind.FOREST, "forest.heartwood"),
     LUMBERJACK_BARK(ResourceCollectionKind.FOREST, "forest.bark"),
     LUMBERJACK_TIMBER_PROCESSING(ResourceCollectionKind.FOREST, "forest.timber_processing"),
@@ -136,6 +144,7 @@ enum class ResourceOperation(
     LUMBERJACK_LEAF_CLEANUP(ResourceCollectionKind.FOREST, "forest.leaf_cleanup"),
     LUMBERJACK_AUTOMATIC_REPLANT(ResourceCollectionKind.FOREST, "forest.automatic_replant"),
     FARMER_WILD_GATHERING(ResourceCollectionKind.CROP, "crop.wild_gathering"),
+    FARMER_WORK_SPEED(ResourceCollectionKind.CROP, "crop.work_speed"),
     FARMER_SURFACE_GATHERING(ResourceCollectionKind.CROP, "crop.surface_gathering"),
     FARMER_AREA_TILLING(ResourceCollectionKind.CROP, "crop.area_tilling"),
     FARMER_AREA_HARVEST(ResourceCollectionKind.CROP, "crop.area_harvest"),

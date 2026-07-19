@@ -38,6 +38,8 @@ import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
+import org.bukkit.potion.PotionEffect
+import org.bukkit.potion.PotionEffectType
 import org.bukkit.util.Vector
 import java.util.Random
 import java.util.ArrayDeque
@@ -109,6 +111,30 @@ class SpecialistCollectionService(
         forestTargets.clear()
         forestCooldowns.clear()
         surfaceGatheringStore.save()
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    fun onProfessionWorkSpeed(event: BlockDamageEvent) {
+        val kind = ResourceMaterialPolicy.classify(event.block.type, event.block.blockData) ?: return
+        val heldMaterial = event.player.inventory.itemInMainHand.type
+        val profile = rankManager.getTypedProfessionProfile(event.player.uniqueId)
+        val (tier, operation) = when {
+            kind == ResourceCollectionKind.MINERAL && heldMaterial.name.endsWith("_PICKAXE") &&
+                profile is MinerSkillProfile ->
+                profile.workSpeedLevel to ResourceOperation.MINER_WORK_SPEED
+            kind == ResourceCollectionKind.FOREST && heldMaterial.name.endsWith("_AXE") &&
+                profile is LumberjackSkillProfile ->
+                profile.workSpeedLevel to ResourceOperation.LUMBERJACK_WORK_SPEED
+            kind == ResourceCollectionKind.CROP && heldMaterial.name.endsWith("_HOE") &&
+                profile is FarmerSkillProfile ->
+                profile.workSpeedLevel to ResourceOperation.FARMER_WORK_SPEED
+            else -> return
+        }
+        if (tier <= 0 || !settings.isOperationEnabled(operation)) return
+        if (event.player.getPotionEffect(PotionEffectType.HASTE) != null) return
+        event.player.addPotionEffect(
+            PotionEffect(PotionEffectType.HASTE, 40, tier - 1, false, false, false)
+        )
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

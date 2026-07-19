@@ -26,9 +26,11 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("resource.geology_guide"));
         assertTrue(source.contains("inspectMineralVein"));
         assertTrue(source.contains("ResourceOperation.MINER_INSPECTION"));
+        assertTrue(source.contains("ResourceOperation.MINER_WORK_SPEED"));
         assertTrue(source.contains("ResourceOperation.MINER_CHISEL"));
         assertTrue(source.contains("ResourceOperation.MINER_BATCH"));
         assertTrue(source.contains("ResourceOperation.LUMBERJACK_BATCH"));
+        assertTrue(source.contains("ResourceOperation.LUMBERJACK_WORK_SPEED"));
         assertTrue(source.contains("ResourceOperation.LUMBERJACK_HEARTWOOD"));
         assertTrue(source.contains("ResourceOperation.LUMBERJACK_BARK"));
         assertTrue(source.contains("ResourceOperation.LUMBERJACK_TIMBER_PROCESSING"));
@@ -36,6 +38,7 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("ResourceOperation.LUMBERJACK_LEAF_CLEANUP"));
         assertTrue(source.contains("ResourceOperation.LUMBERJACK_AUTOMATIC_REPLANT"));
         assertTrue(source.contains("ResourceOperation.FARMER_WILD_GATHERING"));
+        assertTrue(source.contains("ResourceOperation.FARMER_WORK_SPEED"));
         assertTrue(source.contains("ResourceOperation.FARMER_SURFACE_GATHERING"));
         assertTrue(source.contains("ResourceOperation.FARMER_AREA_TILLING"));
         assertTrue(source.contains("ResourceOperation.FARMER_AREA_HARVEST"));
@@ -49,6 +52,8 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("profile.optimizedSearchEnabled"));
         assertTrue(source.contains("ChiselAttemptPolicy.evaluate"));
         assertTrue(source.contains("profile.topEvaluationThreshold"));
+        assertTrue(source.contains("PotionEffectType.HASTE"));
+        assertTrue(source.contains("getPotionEffect(PotionEffectType.HASTE) != null"));
         assertTrue(source.contains("giveResource(player, \"heartwood\", 1)"));
         assertTrue(source.contains("profile.leafCleanupEnabled"));
         assertTrue(source.contains("profile.automaticReplantEnabled"));
