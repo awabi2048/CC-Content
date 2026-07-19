@@ -6,6 +6,8 @@ import org.bukkit.block.data.Ageable
 import org.bukkit.block.data.BlockData
 import java.util.Random
 import org.bukkit.World
+import kotlin.math.hypot
+import kotlin.math.round
 
 enum class ResourceCollectionKind(val profession: Profession, val bonusItemId: String) {
     MINERAL(Profession.MINER, "mica_flake"),
@@ -162,12 +164,30 @@ object ChiselAttemptPolicy {
         require(tolerance > 0.0) { "Chisel tolerance must be positive" }
         require(ignoredFailuresRemaining >= 0) { "Ignored chisel failures must not be negative" }
         val score = (1.0 - distance / tolerance).coerceIn(0.0, 1.0)
-        val minorFailure = distance > tolerance && distance <= tolerance + 0.08
+        val minorFailure = distance > tolerance && distance <= tolerance + 1.0
         return if (minorFailure && ignoredFailuresRemaining > 0) {
             ChiselAttemptResult(0.0, countsAsAttempt = false, consumesIgnoredFailure = true)
         } else {
             ChiselAttemptResult(score, countsAsAttempt = true, consumesIgnoredFailure = false)
         }
+    }
+}
+
+object ChiselHitPolicy {
+    const val PIXEL_SIZE_BLOCKS: Double = 1.0 / 16.0
+    const val BASE_TOLERANCE_PIXELS: Double = 2.0
+    const val MAX_TOLERANCE_PIXELS: Double = 3.0
+
+    fun tolerancePixels(precisionBonusBlocks: Double): Double {
+        require(precisionBonusBlocks >= 0.0) { "Chisel precision bonus must not be negative" }
+        return (BASE_TOLERANCE_PIXELS + precisionBonusBlocks / PIXEL_SIZE_BLOCKS)
+            .coerceAtMost(MAX_TOLERANCE_PIXELS)
+    }
+
+    fun quantizedDistancePixels(firstAxisDeltaBlocks: Double, secondAxisDeltaBlocks: Double): Double {
+        val firstPixels = round(firstAxisDeltaBlocks / PIXEL_SIZE_BLOCKS)
+        val secondPixels = round(secondAxisDeltaBlocks / PIXEL_SIZE_BLOCKS)
+        return hypot(firstPixels, secondPixels)
     }
 }
 

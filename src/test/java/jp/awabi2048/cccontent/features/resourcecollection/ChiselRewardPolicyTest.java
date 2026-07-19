@@ -26,16 +26,16 @@ class ChiselRewardPolicyTest {
 
     @Test
     void oneMinorFailureCanBeIgnoredWithoutCountingAnAttempt() {
-        ChiselAttemptResult ignored = ChiselAttemptPolicy.INSTANCE.evaluate(0.25, 0.22, 1);
+        ChiselAttemptResult ignored = ChiselAttemptPolicy.INSTANCE.evaluate(2.5, 2.0, 1);
         assertEquals(0.0, ignored.getScore());
         assertEquals(false, ignored.getCountsAsAttempt());
         assertEquals(true, ignored.getConsumesIgnoredFailure());
 
-        ChiselAttemptResult consumed = ChiselAttemptPolicy.INSTANCE.evaluate(0.25, 0.22, 0);
+        ChiselAttemptResult consumed = ChiselAttemptPolicy.INSTANCE.evaluate(2.5, 2.0, 0);
         assertEquals(true, consumed.getCountsAsAttempt());
         assertEquals(false, consumed.getConsumesIgnoredFailure());
 
-        ChiselAttemptResult major = ChiselAttemptPolicy.INSTANCE.evaluate(0.40, 0.22, 1);
+        ChiselAttemptResult major = ChiselAttemptPolicy.INSTANCE.evaluate(3.5, 2.0, 1);
         assertEquals(true, major.getCountsAsAttempt());
         assertEquals(false, major.getConsumesIgnoredFailure());
     }

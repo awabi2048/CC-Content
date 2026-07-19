@@ -13,6 +13,7 @@ import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionExperie
 import jp.awabi2048.cccontent.items.CustomItemManager
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
+import org.bukkit.FluidCollisionMode
 import org.bukkit.GameMode
 import org.bukkit.Location
 import org.bukkit.Material
@@ -1107,9 +1108,9 @@ class SpecialistCollectionService(
             cancelChisel(player.uniqueId, "resource_collection.chisel.cancelled")
             return
         }
-        val interaction = event.interactionPoint ?: return
-        val tolerance = 0.22 + profile.precisionToleranceBonus
-        val distance = interaction.distance(current.target)
+        val interaction = resolveChiselInteractionPoint(event, block, current.face) ?: return
+        val tolerance = ChiselHitPolicy.tolerancePixels(profile.precisionToleranceBonus)
+        val distance = chiselDistancePixels(current.target, interaction, current.face)
         val attempt = ChiselAttemptPolicy.evaluate(
             distance,
             tolerance,
@@ -1193,12 +1194,12 @@ class SpecialistCollectionService(
 
     private fun showChiselTarget(player: Player, session: ChiselSession) {
         player.spawnParticle(
-            Particle.END_ROD,
+            Particle.CRIT,
             session.target,
             settings.chisel.particleCount,
-            0.025,
-            0.025,
-            0.025,
+            0.02,
+            0.02,
+            0.02,
             0.0
         )
         player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BELL, 0.55f, 1.65f)
@@ -1206,17 +1207,49 @@ class SpecialistCollectionService(
 
     private fun randomTarget(block: Block, face: BlockFace): Location {
         val center = block.location.add(0.5, 0.5, 0.5)
-        val normal = face.direction.normalize().multiply(0.505)
+        val normal = face.direction.normalize().multiply(0.501)
         val (firstAxis, secondAxis) = faceAxes(face)
-        val firstOffset = random.nextDouble() * 0.56 - 0.28
-        val secondOffset = random.nextDouble() * 0.56 - 0.28
+        val firstOffset = targetPixelOffset()
+        val secondOffset = targetPixelOffset()
         return center.add(normal).add(firstAxis.multiply(firstOffset)).add(secondAxis.multiply(secondOffset))
+    }
+
+    private fun targetPixelOffset(): Double {
+        val pixelIndex = random.nextInt(10) + 3
+        return (pixelIndex - 7.5) * ChiselHitPolicy.PIXEL_SIZE_BLOCKS
     }
 
     private fun faceAxes(face: BlockFace): Pair<Vector, Vector> = when (face) {
         BlockFace.UP, BlockFace.DOWN -> Vector(1, 0, 0) to Vector(0, 0, 1)
         BlockFace.EAST, BlockFace.WEST -> Vector(0, 1, 0) to Vector(0, 0, 1)
         else -> Vector(1, 0, 0) to Vector(0, 1, 0)
+    }
+
+    private fun resolveChiselInteractionPoint(
+        event: PlayerInteractEvent,
+        block: Block,
+        expectedFace: BlockFace
+    ): Location? {
+        event.interactionPoint?.let { return it }
+        val eye = event.player.eyeLocation
+        val hit = block.world.rayTraceBlocks(
+            eye,
+            eye.direction,
+            6.0,
+            FluidCollisionMode.NEVER,
+            true
+        ) ?: return null
+        if (hit.hitBlock?.key() != block.key() || hit.hitBlockFace != expectedFace) return null
+        return hit.hitPosition.toLocation(block.world)
+    }
+
+    private fun chiselDistancePixels(target: Location, interaction: Location, face: BlockFace): Double {
+        val delta = interaction.toVector().subtract(target.toVector())
+        val (firstAxis, secondAxis) = faceAxes(face)
+        return ChiselHitPolicy.quantizedDistancePixels(
+            delta.dot(firstAxis),
+            delta.dot(secondAxis)
+        )
     }
 
     private fun scheduleBarkReward(event: PlayerInteractEvent, block: Block) {
