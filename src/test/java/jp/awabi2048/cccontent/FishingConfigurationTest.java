@@ -4,7 +4,6 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
-import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -35,13 +34,13 @@ class FishingConfigurationTest {
         assertFalse(config.getConfigurationSection("bait.definitions").getKeys(false).isEmpty());
         assertFalse(config.getConfigurationSection("rod").getKeys(false).isEmpty());
         assertFalse(config.getConfigurationSection("fish").getKeys(false).isEmpty());
-        var expectedResistance = Map.of(
-            "cod", 10.5,
-            "salmon", 15.0,
-            "pufferfish", 21.0,
-            "tropical_fish", 27.0,
-            "ancient_coelacanth", 36.0
+        var expectedFish = Set.of(
+            "cod", "salmon", "pufferfish", "tropical_fish", "ancient_coelacanth",
+            "crucian_carp", "carp", "trout", "ayu", "catfish", "eel", "smelt",
+            "sardine", "horse_mackerel", "mackerel", "sea_bass", "flounder",
+            "sea_bream", "tuna", "grouper", "anglerfish"
         );
+        assertTrue(config.getConfigurationSection("fish").getKeys(false).equals(expectedFish));
         for (String fish : config.getConfigurationSection("fish").getKeys(false)) {
             assertTrue(config.isConfigurationSection("fish." + fish + ".quality"));
             assertTrue(config.getConfigurationSection("fish." + fish + ".quality").getKeys(false)
@@ -60,7 +59,9 @@ class FishingConfigurationTest {
             assertFalse(config.contains("fish." + fish + ".bobber_y"));
             assertFalse(config.contains("fish." + fish + ".origin_distance"));
             assertTrue(config.contains("fish." + fish + ".fight.target_center"));
-            assertTrue(config.getDouble("fish." + fish + ".fight.drift_per_step") == expectedResistance.get(fish));
+            assertTrue(config.getDouble("fish." + fish + ".fight.drift_per_step") > 0);
+            assertTrue(config.getDouble("fish." + fish + ".fight.direction_persistence") > 0);
+            assertTrue(config.getDouble("fish." + fish + ".fight.direction_persistence") <= 1);
         }
         assertTrue(Set.copyOf(config.getStringList("fish.cod.biomes")).equals(
             Set.of("ocean", "cold_ocean", "deep_ocean", "deep_cold_ocean", "river")
@@ -72,5 +73,9 @@ class FishingConfigurationTest {
             config.getInt("fish.tropical_fish.size_cm.max"));
         assertTrue(config.getInt("fish.ancient_coelacanth.weight_grams.min") >
             config.getInt("fish.tropical_fish.weight_grams.max"));
+        assertTrue(config.getDouble("fish.flounder.fight.drift_per_step") <
+            config.getDouble("fish.mackerel.fight.drift_per_step"));
+        assertTrue(config.getDouble("fish.tuna.fight.duration_multiplier") >
+            config.getDouble("fish.crucian_carp.fight.duration_multiplier"));
     }
 }
