@@ -28,8 +28,9 @@ class ResourceCollectionFeature(
         items = ResourceCollectionItems(plugin)
         items.register()
         val seasonalPlants = SeasonalPlantRegistry.load(plugin)
+        val forestProducts = ForestProductRegistry.load(plugin)
         plugin.server.pluginManager.registerEvents(this, plugin)
-        specialist = SpecialistCollectionService(plugin, rankManager, seasonalPlants, random)
+        specialist = SpecialistCollectionService(plugin, rankManager, seasonalPlants, forestProducts, random)
         plugin.server.pluginManager.registerEvents(specialist, plugin)
         plugin.logger.info("Resource Collection: normal bonus resources enabled; legacy EXP and craft rules disabled")
     }

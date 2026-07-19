@@ -1,0 +1,5 @@
+schema_version: 1
+
+# 林産物の具体的内容は未確定です。承認済み定義を追加するまで無効のまま運用します。
+enabled: false
+definitions: []

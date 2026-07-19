@@ -34,6 +34,9 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("markPlayerPlaced(root)"));
         assertTrue(source.contains("resource.gathering_guide"));
         assertTrue(source.contains("resource.gathering_sickle"));
+        assertTrue(source.contains("resource.forest_guide"));
+        assertTrue(source.contains("resource.forest_knife"));
+        assertTrue(source.contains("forestTargets[player.uniqueId] = targets"));
         assertTrue(source.contains("gatheringTargets[player.uniqueId] = targets"));
         assertTrue(source.contains("getSeasonService().currentSeason()"));
         assertFalse(source.contains("now().monthValue"));

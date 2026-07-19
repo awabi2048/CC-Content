@@ -48,6 +48,7 @@ class SpecialistCollectionService(
     private val plugin: JavaPlugin,
     private val rankManager: RankManager,
     private val seasonalPlants: SeasonalPlantRegistry,
+    private val forestProducts: ForestProductRegistry,
     private val random: Random = Random()
 ) : Listener {
     companion object {
@@ -80,11 +81,18 @@ class SpecialistCollectionService(
         val definitionId: String,
         val expiresAt: Instant
     )
+    private data class ForestProductTarget(
+        val customItemId: String,
+        val definitionId: String,
+        val expiresAt: Instant
+    )
 
     private val chiselSessions = mutableMapOf<UUID, ChiselSession>()
     private val occupiedBlocks = mutableMapOf<BlockKey, UUID>()
     private val gatheringTargets = mutableMapOf<UUID, MutableMap<BlockKey, GatheringTarget>>()
     private val gatheringCooldowns = mutableMapOf<UUID, Instant>()
+    private val forestTargets = mutableMapOf<UUID, MutableMap<BlockKey, ForestProductTarget>>()
+    private val forestCooldowns = mutableMapOf<UUID, Instant>()
     private val tillableMaterials = setOf(Material.DIRT, Material.GRASS_BLOCK, Material.DIRT_PATH)
 
     fun shutdown() {
@@ -92,6 +100,8 @@ class SpecialistCollectionService(
         occupiedBlocks.clear()
         gatheringTargets.clear()
         gatheringCooldowns.clear()
+        forestTargets.clear()
+        forestCooldowns.clear()
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -144,6 +154,7 @@ class SpecialistCollectionService(
         when (customId) {
             "resource.woodworking_hatchet" -> processPlacedLog(event, block, precise = false)
             "resource.woodworking_knife" -> processPlacedLog(event, block, precise = true)
+            "resource.forest_guide" -> inspectForestProducts(event, block)
             "resource.gathering_guide" -> inspectVegetation(event, block)
             "resource.cultivation_hoe" -> handleAreaTilling(event, block)
             else -> scheduleBarkReward(event, block)
@@ -597,6 +608,99 @@ class SpecialistCollectionService(
         player.sendMessage(message(player, "resource_collection.gathering.completed", "amount" to amount))
     }
 
+    private fun inspectForestProducts(event: PlayerInteractEvent, origin: Block) {
+        event.isCancelled = true
+        val player = event.player
+        val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? LumberjackSkillProfile
+        if (profile == null || profile.inspectionRadius <= 0 ||
+            !RankReleasePolicy.canAccessProfession(player, Profession.LUMBERJACK)) {
+            player.sendMessage(message(player, "resource_collection.error.lumberjack_required"))
+            return
+        }
+        if (!isReadyNatural(origin) ||
+            ResourceMaterialPolicy.classify(origin.type, origin.blockData) != ResourceCollectionKind.FOREST) {
+            player.sendMessage(message(player, "resource_collection.error.natural_tree_required"))
+            return
+        }
+        val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
+        if (forestCooldowns[player.uniqueId]?.isAfter(now) == true) {
+            player.sendMessage(message(player, "resource_collection.forest.cooldown"))
+            return
+        }
+        val expiresAt = now.plusSeconds(60)
+        val targets = mutableMapOf<BlockKey, ForestProductTarget>()
+        val discoveredNames = linkedSetOf<String>()
+        val radius = profile.inspectionRadius.coerceIn(2, 8)
+        for (x in -radius..radius) for (y in -radius..radius) for (z in -radius..radius) {
+            val block = origin.getRelative(x, y, z)
+            if (!isReadyNatural(block)) continue
+            val definition = forestProducts.select(
+                origin.type,
+                block.type,
+                block.biome.key.toString(),
+                profile.discoveryChanceBonus,
+                random
+            ) ?: continue
+            if (CustomItemManager.getItem(definition.customItemId) == null) {
+                plugin.logger.warning(
+                    "[Resource Collection] 存在しない林産物アイテムを無視しました: ${definition.customItemId}"
+                )
+                continue
+            }
+            if (!CCSystem.getAPI().hasI18nKey(definition.displayNameKey)) {
+                plugin.logger.warning(
+                    "[Resource Collection] 存在しない林産物言語キーを無視しました: ${definition.displayNameKey}"
+                )
+                continue
+            }
+            targets[block.key()] = ForestProductTarget(definition.customItemId, definition.id, expiresAt)
+            if (profile.exactMaterialInspectionEnabled) {
+                discoveredNames.add(CCSystem.getAPI().getI18nString(player, definition.displayNameKey))
+            }
+            player.spawnParticle(Particle.WAX_ON, block.location.add(0.5, 0.6, 0.5), 3, 0.16, 0.15, 0.16, 0.0)
+        }
+        forestTargets[player.uniqueId] = targets
+        forestCooldowns[player.uniqueId] = now.plusSeconds(profile.inspectionCooldownSeconds.coerceAtLeast(1).toLong())
+        val messageKey = when {
+            targets.isEmpty() -> "resource_collection.forest.no_discoveries"
+            profile.exactMaterialInspectionEnabled -> "resource_collection.forest.inspected_exact"
+            else -> "resource_collection.forest.inspected"
+        }
+        player.sendMessage(
+            message(
+                player,
+                messageKey,
+                "count" to targets.size,
+                "products" to discoveredNames.joinToString("、")
+            )
+        )
+        player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.05f)
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onForestProductDrops(event: BlockDropItemEvent) {
+        val player = event.player
+        if (CustomItemManager.identify(player.inventory.itemInMainHand)?.fullId != "resource.forest_knife") return
+        val targets = forestTargets[player.uniqueId] ?: return
+        val target = targets.remove(event.block.key()) ?: return
+        val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
+        if (target.expiresAt.isBefore(now)) return
+        val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? LumberjackSkillProfile ?: return
+        val amount = 1 + if (random.nextDouble() < profile.extraForestProductChance) 1 else 0
+        giveCustomItem(player, target.customItemId, amount)
+        if (player.gameMode != GameMode.CREATIVE && random.nextDouble() >= profile.durabilitySaveChance) {
+            player.damageItemStack(EquipmentSlot.HAND, 1)
+        }
+        awardSpecialist(
+            player,
+            ContentActionType.TREE_PROCESSED,
+            amount > 1,
+            event.blockState.type,
+            mapOf("forest_product_definition" to target.definitionId)
+        )
+        player.sendMessage(message(player, "resource_collection.forest.completed", "amount" to amount))
+    }
+
     private fun cropSeed(crop: Material): Material? = when (crop) {
         Material.WHEAT -> Material.WHEAT_SEEDS
         Material.CARROTS -> Material.CARROT
@@ -862,6 +966,8 @@ class SpecialistCollectionService(
         cancelChisel(event.player.uniqueId, null)
         gatheringTargets.remove(event.player.uniqueId)
         gatheringCooldowns.remove(event.player.uniqueId)
+        forestTargets.remove(event.player.uniqueId)
+        forestCooldowns.remove(event.player.uniqueId)
     }
 
     @EventHandler
