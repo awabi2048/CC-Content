@@ -1,8 +1,29 @@
-﻿config_version: 3
+config_version: 4
 enabled: true
 
-normal_bonus:
-  mineral: true
-  forest: true
-  crop: true
+mineral:
+  enabled: true
+  normal_bonus_drop: true
+  inspection: true
+  chisel_game: true
+  batch_mining: true
 
+forest:
+  enabled: true
+  normal_bonus_drop: true
+  batch_felling: true
+  heartwood: true
+  bark: true
+  timber_processing: true
+  forest_products: true
+  leaf_cleanup: true
+  automatic_replant: true
+
+crop:
+  enabled: true
+  normal_bonus_drop: true
+  wild_gathering: true
+  surface_gathering: true
+  area_tilling: true
+  area_harvest: true
+  automatic_replant: true

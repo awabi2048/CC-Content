@@ -47,6 +47,7 @@ import java.time.Instant
 class SpecialistCollectionService(
     private val plugin: JavaPlugin,
     private val rankManager: RankManager,
+    private val settings: ResourceCollectionSettings,
     private val seasonalPlants: SeasonalPlantRegistry,
     private val forestProducts: ForestProductRegistry,
     private val random: Random = Random()
@@ -113,16 +114,19 @@ class SpecialistCollectionService(
     fun onChiselBlockDamage(event: BlockDamageEvent) {
         val customId = CustomItemManager.identify(event.player.inventory.itemInMainHand)?.fullId
         val shouldCancel = when (customId) {
-            "resource.chisel" -> true
+            "resource.chisel" -> settings.isOperationEnabled(ResourceOperation.MINER_CHISEL)
             "resource.mining_hammer" ->
+                settings.isOperationEnabled(ResourceOperation.MINER_BATCH) &&
                 (rankManager.getTypedProfessionProfile(event.player.uniqueId) as? MinerSkillProfile)
                     ?.batchProcessingEnabled == true &&
                     ResourceMaterialPolicy.classify(event.block.type, event.block.blockData) == ResourceCollectionKind.MINERAL
             "resource.felling_axe" ->
+                settings.isOperationEnabled(ResourceOperation.LUMBERJACK_BATCH) &&
                 (rankManager.getTypedProfessionProfile(event.player.uniqueId) as? LumberjackSkillProfile)
                     ?.batchProcessingEnabled == true &&
                     ResourceMaterialPolicy.classify(event.block.type, event.block.blockData) == ResourceCollectionKind.FOREST
             "resource.cultivation_hoe" ->
+                settings.isOperationEnabled(ResourceOperation.FARMER_AREA_HARVEST) &&
                 (rankManager.getTypedProfessionProfile(event.player.uniqueId) as? FarmerSkillProfile)
                     ?.areaHarvestEnabled == true &&
                     ResourceMaterialPolicy.classify(event.block.type, event.block.blockData) == ResourceCollectionKind.CROP
@@ -139,33 +143,52 @@ class SpecialistCollectionService(
         val block = event.clickedBlock ?: return
         if (internalInteractions.contains(internalInteractionKey(event.player.uniqueId, block))) return
         val customId = CustomItemManager.identify(event.player.inventory.itemInMainHand)?.fullId
-        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.chisel") {
+        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.chisel" &&
+            settings.isOperationEnabled(ResourceOperation.MINER_CHISEL)) {
             handleChiselClick(event, block)
             return
         }
-        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.mining_hammer") {
+        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.mining_hammer" &&
+            settings.isOperationEnabled(ResourceOperation.MINER_BATCH)) {
             handleBatchBreak(event, block, ResourceCollectionKind.MINERAL)
             return
         }
-        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.felling_axe") {
+        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.felling_axe" &&
+            settings.isOperationEnabled(ResourceOperation.LUMBERJACK_BATCH)) {
             handleBatchBreak(event, block, ResourceCollectionKind.FOREST)
             return
         }
-        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.cultivation_hoe") {
+        if (event.action == Action.LEFT_CLICK_BLOCK && customId == "resource.cultivation_hoe" &&
+            settings.isOperationEnabled(ResourceOperation.FARMER_AREA_HARVEST)) {
             handleAreaHarvest(event, block)
             return
         }
         if (event.action != Action.RIGHT_CLICK_BLOCK || !event.player.isSneaking) return
         when (customId) {
-            "resource.geology_guide" -> inspectMineralVein(event, block)
-            "resource.woodworking_hatchet" -> processPlacedLog(event, block, precise = false)
-            "resource.woodworking_knife" -> processPlacedLog(event, block, precise = true)
-            "resource.forest_guide" -> inspectForestProducts(event, block)
-            "resource.gathering_guide" -> inspectVegetation(event, block)
-            "resource.gathering_sickle" -> handleSurfaceGathering(event, block)
-            "resource.cultivation_hoe" -> handleAreaTilling(event, block)
-            else -> scheduleBarkReward(event, block)
+            "resource.geology_guide" ->
+                ifEnabled(ResourceOperation.MINER_INSPECTION) { inspectMineralVein(event, block) }
+            "resource.woodworking_hatchet" ->
+                ifEnabled(ResourceOperation.LUMBERJACK_TIMBER_PROCESSING) {
+                    processPlacedLog(event, block, precise = false)
+                }
+            "resource.woodworking_knife" ->
+                ifEnabled(ResourceOperation.LUMBERJACK_TIMBER_PROCESSING) {
+                    processPlacedLog(event, block, precise = true)
+                }
+            "resource.forest_guide" ->
+                ifEnabled(ResourceOperation.LUMBERJACK_FOREST_PRODUCTS) { inspectForestProducts(event, block) }
+            "resource.gathering_guide" ->
+                ifEnabled(ResourceOperation.FARMER_WILD_GATHERING) { inspectVegetation(event, block) }
+            "resource.gathering_sickle" ->
+                ifEnabled(ResourceOperation.FARMER_SURFACE_GATHERING) { handleSurfaceGathering(event, block) }
+            "resource.cultivation_hoe" ->
+                ifEnabled(ResourceOperation.FARMER_AREA_TILLING) { handleAreaTilling(event, block) }
+            else -> ifEnabled(ResourceOperation.LUMBERJACK_BARK) { scheduleBarkReward(event, block) }
         }
+    }
+
+    private inline fun ifEnabled(operation: ResourceOperation, action: () -> Unit) {
+        if (settings.isOperationEnabled(operation)) action()
     }
 
     private fun inspectMineralVein(event: PlayerInteractEvent, block: Block) {
@@ -232,7 +255,10 @@ class SpecialistCollectionService(
             val cropType = block.type
             if (!callProtectedBreak(block, player)) continue
             block.breakNaturally(ItemStack(Material.IRON_HOE), true)
-            if (profile.automaticReplantEnabled) replantCrop(player, block, cropType, profile)
+            if (settings.isOperationEnabled(ResourceOperation.FARMER_AUTOMATIC_REPLANT) &&
+                profile.automaticReplantEnabled) {
+                replantCrop(player, block, cropType, profile)
+            }
             processed++
         }
         if (processed <= 0) return
@@ -383,6 +409,7 @@ class SpecialistCollectionService(
             includeDiagonalTrunks = profile is LumberjackSkillProfile && profile.multiTrunkRecognitionImproved
         )
         val leaves = if (expectedKind == ResourceCollectionKind.FOREST &&
+            settings.isOperationEnabled(ResourceOperation.LUMBERJACK_LEAF_CLEANUP) &&
             profile is LumberjackSkillProfile && profile.leafCleanupEnabled) {
             collectTreeLeaves(origin, targets, maximum = 256)
         } else {
@@ -403,12 +430,17 @@ class SpecialistCollectionService(
             return
         }
         val completeTreeBatch = expectedKind == ResourceCollectionKind.FOREST && processed == targets.size
-        if (treeRoot && completeTreeBatch) {
+        if (treeRoot && completeTreeBatch &&
+            settings.isOperationEnabled(ResourceOperation.LUMBERJACK_HEARTWOOD)) {
             giveResource(player, "heartwood", 1)
         }
         if (completeTreeBatch && profile is LumberjackSkillProfile) {
-            if (profile.leafCleanupEnabled) cleanupTreeLeaves(player, leaves)
-            if (profile.automaticReplantEnabled && treeRoot) {
+            if (settings.isOperationEnabled(ResourceOperation.LUMBERJACK_LEAF_CLEANUP) &&
+                profile.leafCleanupEnabled) {
+                cleanupTreeLeaves(player, leaves)
+            }
+            if (settings.isOperationEnabled(ResourceOperation.LUMBERJACK_AUTOMATIC_REPLANT) &&
+                profile.automaticReplantEnabled && treeRoot) {
                 replantTree(player, origin, originalMaterial)
             }
         }
@@ -660,6 +692,7 @@ class SpecialistCollectionService(
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     fun onGatheringDrops(event: BlockDropItemEvent) {
+        if (!settings.isOperationEnabled(ResourceOperation.FARMER_WILD_GATHERING)) return
         val player = event.player
         if (CustomItemManager.identify(player.inventory.itemInMainHand)?.fullId != "resource.gathering_sickle") return
         val targets = gatheringTargets[player.uniqueId] ?: return
@@ -788,6 +821,7 @@ class SpecialistCollectionService(
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     fun onForestProductDrops(event: BlockDropItemEvent) {
+        if (!settings.isOperationEnabled(ResourceOperation.LUMBERJACK_FOREST_PRODUCTS)) return
         val player = event.player
         if (CustomItemManager.identify(player.inventory.itemInMainHand)?.fullId != "resource.forest_knife") return
         val targets = forestTargets[player.uniqueId] ?: return

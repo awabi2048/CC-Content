@@ -30,7 +30,7 @@ class ResourceCollectionFeature(
         val seasonalPlants = SeasonalPlantRegistry.load(plugin)
         val forestProducts = ForestProductRegistry.load(plugin)
         plugin.server.pluginManager.registerEvents(this, plugin)
-        specialist = SpecialistCollectionService(plugin, rankManager, seasonalPlants, forestProducts, random)
+        specialist = SpecialistCollectionService(plugin, rankManager, settings, seasonalPlants, forestProducts, random)
         plugin.server.pluginManager.registerEvents(specialist, plugin)
         plugin.logger.info("Resource Collection: normal bonus resources enabled; legacy EXP and craft rules disabled")
     }
@@ -43,6 +43,7 @@ class ResourceCollectionFeature(
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     fun onBlockDrops(event: BlockDropItemEvent) {
         val kind = ResourceMaterialPolicy.classify(event.blockState.type, event.blockState.blockData) ?: return
+        if (!settings.isProfessionEnabled(kind)) return
         if (settings.normalBonusEnabled[kind] != true) return
         val player = event.player
         if (rankManager.getPlayerProfession(player.uniqueId)?.profession != kind.profession) return

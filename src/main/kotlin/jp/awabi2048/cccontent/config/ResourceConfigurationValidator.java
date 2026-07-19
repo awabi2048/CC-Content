@@ -819,13 +819,42 @@ public final class ResourceConfigurationValidator {
         Map<String, Object> config = rootMap(configs, configFile, errors);
         if (config != null) {
             requireBoolean(config, "enabled", configFile, "enabled", errors);
-            Map<String, Object> normalBonus = requireMap(config, "normal_bonus", configFile, errors);
-            if (normalBonus != null) {
-                requireAllowedKeys(normalBonus, Set.of("mineral", "forest", "crop"), configFile, errors);
-                for (String key : List.of("mineral", "forest", "crop")) {
-                    requireBoolean(normalBonus, key, configFile, "normal_bonus." + key, errors);
-                }
-            }
+            validateResourceFeatureSection(
+                config, "mineral",
+                Set.of("enabled", "normal_bonus_drop", "inspection", "chisel_game", "batch_mining"),
+                configFile, errors
+            );
+            validateResourceFeatureSection(
+                config, "forest",
+                Set.of(
+                    "enabled", "normal_bonus_drop", "batch_felling", "heartwood", "bark",
+                    "timber_processing", "forest_products", "leaf_cleanup", "automatic_replant"
+                ),
+                configFile, errors
+            );
+            validateResourceFeatureSection(
+                config, "crop",
+                Set.of(
+                    "enabled", "normal_bonus_drop", "wild_gathering", "surface_gathering",
+                    "area_tilling", "area_harvest", "automatic_replant"
+                ),
+                configFile, errors
+            );
+        }
+    }
+
+    private static void validateResourceFeatureSection(
+        Map<String, Object> config,
+        String sectionName,
+        Set<String> allowedKeys,
+        Path configFile,
+        List<String> errors
+    ) {
+        Map<String, Object> section = requireMap(config, sectionName, configFile, errors);
+        if (section == null) return;
+        requireAllowedKeys(section, allowedKeys, configFile, errors);
+        for (String key : allowedKeys) {
+            requireBoolean(section, key, configFile, sectionName + "." + key, errors);
         }
     }
 
