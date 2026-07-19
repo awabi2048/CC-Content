@@ -118,10 +118,11 @@ class FishingFeature(
     private fun showLocalFishingHint(player: Player, event: PlayerInteractEvent) {
         event.isCancelled = true
         val block = surveyWaterBlock(player)
-        if (block == null || !isReadyResourceWorld(player)) {
+        if (block == null) {
             player.sendMessage(message(player, "fishing.dictionary.hint.not_water"))
             return
         }
+        if (!isReadyResourceWorld(player)) return
         val bait = items.resolveBait(player.inventory.itemInOffHand)
         val candidates = FishingCatchSelector.candidates(
             FishingContext(

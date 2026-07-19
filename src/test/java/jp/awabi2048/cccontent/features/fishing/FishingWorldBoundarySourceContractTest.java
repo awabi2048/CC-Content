@@ -62,12 +62,27 @@ class FishingWorldBoundarySourceContractTest {
     @Test
     void dictionaryAndSearchUseTheSameTenBlockWaterSurvey() throws Exception {
         String source = readSource();
+        String dictionaryHint = source.substring(
+            source.indexOf("private fun showLocalFishingHint"),
+            source.indexOf("fun shutdown()")
+        );
 
         assertTrue(source.contains("player.rayTraceBlocks(10.0, FluidCollisionMode.ALWAYS)"));
         assertTrue(source.contains("val block = surveyWaterBlock(player)"));
         assertTrue(source.contains("val surveyBlock = surveyWaterBlock(player)"));
         assertTrue(source.contains("candidateNames.takeIf(List<String>::isNotEmpty)"));
         assertTrue(source.contains("message(player, \"fishing.dictionary.hint.none\")"));
+        assertTrue(dictionaryHint.contains(
+            "if (block == null) {\n" +
+                "            player.sendMessage(message(player, \"fishing.dictionary.hint.not_water\"))\n" +
+                "            return\n" +
+                "        }"
+        ));
+        assertTrue(dictionaryHint.contains("if (!isReadyResourceWorld(player)) return"));
+        assertTrue(
+            dictionaryHint.indexOf("if (block == null)") <
+                dictionaryHint.indexOf("if (!isReadyResourceWorld(player)) return")
+        );
     }
 
     @Test
