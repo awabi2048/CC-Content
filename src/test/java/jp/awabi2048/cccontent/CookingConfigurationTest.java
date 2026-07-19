@@ -80,7 +80,7 @@ class CookingConfigurationTest {
         var source = java.nio.file.Files.readString(Path.of(
             "src/main/kotlin/jp/awabi2048/cccontent/features/cooking/CookingFeature.kt"));
         assertTrue(source.contains("mutableMapOf<CookingStationKey, ActiveCooking>()"));
-        assertTrue(source.contains("mutableMapOf<CookingStationKey, List<ItemStack>>()"));
+        assertTrue(source.contains("mutableMapOf<CookingStationKey, PendingItems>()"));
         assertTrue(source.contains("station.blockIfLoaded()"));
         assertTrue(source.contains("currentFirePower(block) != session.startedFirePower"));
         assertTrue(source.contains("mutableMapOf<CookingStationKey, PendingLiquid>()"));

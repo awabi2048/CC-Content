@@ -145,12 +145,13 @@ private data class CookingRecipe(
     val seasonings: Map<String, Int>,
     val resultMaterial: Material,
     val resultModel: NamespacedKey,
+    val resultContainer: Material?,
     val exp: Long,
     val completionTicks: Long,
     val weight: Double,
     val group: CookingRecipeGroup
 )
-private data class CookingMatch(val recipe: CookingRecipe, val score: Double)
+private data class CookingMatch(val recipe: CookingRecipe, val score: Double, val batches: Int)
 
 private data class ProcessingProfileSnapshot(
     val processingTimeReduction: Double,
@@ -215,7 +216,7 @@ private class CookingController(
     private val ingredients = mutableMapOf<String, CookingIngredient>()
     private var minimumSimilarity = 0.5
     private var ingredientSlotsByLevel: Map<Int, Int> = emptyMap()
-    private val pending = mutableMapOf<CookingStationKey, List<ItemStack>>()
+    private val pending = mutableMapOf<CookingStationKey, PendingItems>()
     private val pendingLiquids = mutableMapOf<CookingStationKey, PendingLiquid>()
     private val active = mutableMapOf<CookingStationKey, ActiveCooking>()
     private val stationLocks = mutableMapOf<CookingStationKey, UUID>()
@@ -227,6 +228,7 @@ private class CookingController(
         val recipe: CookingRecipe,
         var remainingTicks: Long,
         val score: Int,
+        val batches: Int,
         val seasoningIds: List<String>,
         val starterId: UUID,
         val profile: ProcessingProfileSnapshot,
@@ -242,7 +244,19 @@ private class CookingController(
         val prototype: ItemStack,
         var remaining: Int,
         val container: Material,
-        val recipeId: String
+        val recipeId: String,
+        val starterId: UUID,
+        val batchId: UUID,
+        val brewery: Boolean,
+        val collectors: MutableSet<UUID> = mutableSetOf()
+    )
+
+    private data class PendingItems(
+        val items: MutableList<ItemStack>,
+        val starterId: UUID,
+        val recipeId: String,
+        val batchId: UUID,
+        val collectors: MutableSet<UUID> = mutableSetOf()
     )
 
     private enum class CookingFirePower {
@@ -251,7 +265,7 @@ private class CookingController(
     }
 
     private companion object {
-        const val CURRENT_STATE_SCHEMA_VERSION = 2
+        const val CURRENT_STATE_SCHEMA_VERSION = 3
     }
 
     fun initialize() {
@@ -305,13 +319,17 @@ private class CookingController(
                 ?: error("cooking recipe $id has invalid result material")
             val model = NamespacedKey.fromString(requireNotNull(section.getString("result.item_model")) { "cooking recipe $id result.item_model is required" })
                 ?: error("cooking recipe $id has invalid item_model")
+            val container = section.getString("result.container")?.let { raw ->
+                Material.matchMaterial(raw)?.takeIf { it == Material.BOWL || it == Material.GLASS_BOTTLE }
+                    ?: error("cooking recipe $id has invalid result.container")
+            }
             val equipment = section.getString("equipment")
                 ?.uppercase()
                 ?.let { runCatching { CookingEquipment.valueOf(it) }.getOrNull() }
                 ?: error("cooking recipe $id has invalid equipment")
             require(ingredientMap.isNotEmpty()) { "cooking recipe $id has no ingredients" }
             recipes += CookingRecipe(
-                id, equipment, ingredientMap, seasoningMap, material, model,
+                id, equipment, ingredientMap, seasoningMap, material, model, container,
                 positiveLong(section.get("exp"), "cooking recipe $id exp"),
                 positiveLong(section.get("completion_seconds"), "cooking recipe $id completion_seconds") * 20L,
                 section.getDouble("weight", 1.0).also { require(it >= 0.0) { "cooking recipe $id weight must be non-negative" } },
@@ -354,9 +372,23 @@ private class CookingController(
         active.clear()
         if (stateFile.exists() && state.getInt("schema_version", -1) != CURRENT_STATE_SCHEMA_VERSION) return
         state.getConfigurationSection("pending")?.getKeys(false)?.forEach { pathKey ->
-            val serialized = state.getString("pending.$pathKey.station") ?: return@forEach
+            val path = "pending.$pathKey"
+            val serialized = state.getString("$path.station") ?: return@forEach
             val station = CookingStationKey.deserialize(serialized) ?: return@forEach
-            pending[station] = loadItems(state.getList("pending.$pathKey.items").orEmpty())
+            val starterId = state.getString("$path.starter")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                ?: return@forEach
+            val recipeId = state.getString("$path.recipe_id") ?: return@forEach
+            val batchId = state.getString("$path.batch_id")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                ?: return@forEach
+            pending[station] = PendingItems(
+                loadItems(state.getList("$path.items").orEmpty()).toMutableList(),
+                starterId,
+                recipeId,
+                batchId,
+                state.getStringList("$path.collectors").mapNotNullTo(mutableSetOf()) {
+                    runCatching { UUID.fromString(it) }.getOrNull()
+                }
+            )
         }
         state.getConfigurationSection("active")?.getKeys(false)?.forEach { pathKey ->
             val path = "active.$pathKey"
@@ -372,6 +404,7 @@ private class CookingController(
                 recipe,
                 state.getLong("$path.remaining_ticks").coerceAtLeast(1L),
                 state.getInt("$path.score").coerceIn(0, 100),
+                state.getInt("$path.batches", 1).coerceIn(1, 3),
                 state.getStringList("$path.seasonings"),
                 starterId,
                 profile,
@@ -394,7 +427,15 @@ private class CookingController(
                 prototype,
                 state.getInt("$path.remaining").coerceIn(1, 3),
                 container,
-                state.getString("$path.recipe_id") ?: return@forEach
+                state.getString("$path.recipe_id") ?: return@forEach,
+                state.getString("$path.starter")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: return@forEach,
+                state.getString("$path.batch_id")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    ?: return@forEach,
+                state.getBoolean("$path.brewery"),
+                state.getStringList("$path.collectors").mapNotNullTo(mutableSetOf()) {
+                    runCatching { UUID.fromString(it) }.getOrNull()
+                }
             )
         }
     }
@@ -402,10 +443,14 @@ private class CookingController(
     private fun saveState() {
         val output = YamlConfiguration()
         output.set("schema_version", CURRENT_STATE_SCHEMA_VERSION)
-        pending.forEach { (station, items) ->
+        pending.forEach { (station, pendingItems) ->
             val path = "pending.${station.pathKey()}"
             output.set("$path.station", station.serialize())
-            output.set("$path.items", items.map { it.serialize() })
+            output.set("$path.items", pendingItems.items.map { it.serialize() })
+            output.set("$path.starter", pendingItems.starterId.toString())
+            output.set("$path.recipe_id", pendingItems.recipeId)
+            output.set("$path.batch_id", pendingItems.batchId.toString())
+            output.set("$path.collectors", pendingItems.collectors.map(UUID::toString).sorted())
         }
         active.forEach { (station, session) ->
             val path = "active.${station.pathKey()}"
@@ -413,6 +458,7 @@ private class CookingController(
             output.set("$path.recipe", session.recipe.id)
             output.set("$path.remaining_ticks", session.remainingTicks)
             output.set("$path.score", session.score)
+            output.set("$path.batches", session.batches)
             output.set("$path.seasonings", session.seasoningIds)
             output.set("$path.starter", session.starterId.toString())
             saveProfile(output, "$path.profile", session.profile)
@@ -429,6 +475,10 @@ private class CookingController(
             output.set("$path.remaining", liquid.remaining)
             output.set("$path.container", liquid.container.name)
             output.set("$path.recipe_id", liquid.recipeId)
+            output.set("$path.starter", liquid.starterId.toString())
+            output.set("$path.batch_id", liquid.batchId.toString())
+            output.set("$path.brewery", liquid.brewery)
+            output.set("$path.collectors", liquid.collectors.map(UUID::toString).sorted())
         }
         saveAtomically(output, stateFile)
     }
@@ -477,6 +527,7 @@ private class CookingController(
         emptyMap(),
         Material.POTION,
         NamespacedKey.minecraft("potion"),
+        Material.GLASS_BOTTLE,
         0L,
         preparation.processingSeconds * 20L,
         1.0,
@@ -549,6 +600,11 @@ private class CookingController(
             collectLiquid(player, event, holder.station)
             return
         }
+        if (slot in CookingHolder.RESULT_SLOTS && pending.containsKey(holder.station)) {
+            event.isCancelled = true
+            collectItemResult(player, event, holder.station, slot)
+            return
+        }
         if (slot in CookingHolder.INGREDIENT_SLOTS && slot !in unlockedSlots(player)) event.isCancelled = true
         if (slot in 0 until event.view.topInventory.size && slot !in CookingHolder.INPUT_SLOTS) event.isCancelled = true
     }
@@ -569,7 +625,7 @@ private class CookingController(
         val holder = event.inventory.holder as? CookingHolder ?: return
         val player = event.player as? Player ?: return
         stationLocks.remove(holder.station, player.uniqueId)
-        if (active.containsKey(holder.station) || pendingLiquids.containsKey(holder.station)) return
+        if (active.containsKey(holder.station) || pending.containsKey(holder.station) || pendingLiquids.containsKey(holder.station)) return
         returnInputs(player, event.inventory, holder)
     }
 
@@ -583,22 +639,15 @@ private class CookingController(
             return
         }
         stationLocks[station] = player.uniqueId
-        pending.remove(station)?.let { results ->
-            results.forEach { item ->
-                localizeResult(item, player)
-                player.inventory.addItem(item).values.forEach { player.world.dropItem(player.location, it) }
-                item.itemMeta?.persistentDataContainer?.get(recipeKey, PersistentDataType.STRING)?.let { recipeId ->
-                    catalogStore.record(player.uniqueId, CatalogType.COOKING, recipeId)
-                    player.sendMessage(message(player, "cooking.process.collected", mapOf("recipe" to message(player, "cooking.recipe.$recipeId"))))
-                }
-            }
-            saveState()
-        }
         val title = message(player, "cooking.ui.title")
         val holder = CookingHolder(player.uniqueId, station, equipment)
         val inventory = Bukkit.createInventory(holder, 54, Component.text(title))
         holder.backingInventory = inventory
-        if (pendingLiquids.containsKey(station)) renderLiquid(inventory, player, station) else render(inventory, player)
+        when {
+            pendingLiquids.containsKey(station) -> renderLiquid(inventory, player, station)
+            pending.containsKey(station) -> renderPendingItems(inventory, player, station)
+            else -> render(inventory, player)
+        }
         player.openInventory(inventory)
     }
 
@@ -653,9 +702,10 @@ private class CookingController(
             player.sendMessage(message(player, "cooking.error.recipe_not_found"))
             return
         }
-        if (preparation != null) {
+        if (equipment == CookingEquipment.CAULDRON) {
             val waterLevel = (stationBlock.blockData as? org.bukkit.block.data.Levelled)?.level ?: 0
-            if (waterLevel < preparation.batches) {
+            val requiredWater = preparation?.batches ?: match?.batches ?: 1
+            if (waterLevel < requiredWater) {
                 player.sendMessage(message(player, "cooking.error.recipe_not_found"))
                 return
             }
@@ -688,6 +738,7 @@ private class CookingController(
             recipe,
             duration,
             score,
+            preparation?.batches ?: match?.batches ?: 1,
             seasoningIds,
             player.uniqueId,
             snapshot,
@@ -723,7 +774,10 @@ private class CookingController(
                 prototype,
                 session.preparation.batches.coerceIn(1, 3),
                 Material.GLASS_BOTTLE,
-                session.preparation.recipeId
+                session.preparation.recipeId,
+                session.starterId,
+                UUID.randomUUID(),
+                true
             )
             publishBrewingPreparationAction(session)
             active.remove(station)
@@ -738,7 +792,30 @@ private class CookingController(
             meta.persistentDataContainer.set(customItemIdKey, PersistentDataType.STRING, "cooking.dish_${session.recipe.id}")
             meta.persistentDataContainer.set(recipeKey, PersistentDataType.STRING, session.recipe.id)
         }
-        pending[station] = listOfNotNull(result, session.savedIngredient)
+        val batchId = UUID.randomUUID()
+        if (session.recipe.resultContainer != null) {
+            result.amount = 1
+            pendingLiquids[station] = PendingLiquid(
+                result,
+                session.batches.coerceIn(1, 3),
+                session.recipe.resultContainer,
+                session.recipe.id,
+                session.starterId,
+                batchId,
+                false
+            )
+        } else {
+            result.amount = (session.batches + if (session.extraResult) 1 else 0).coerceAtMost(4)
+            pending[station] = PendingItems(
+                listOfNotNull(result, session.savedIngredient).toMutableList(),
+                session.starterId,
+                session.recipe.id,
+                batchId
+            )
+            if (session.recipe.equipment == CookingEquipment.CAULDRON) {
+                lowerCauldronLevel(station, session.batches)
+            }
+        }
         if (rankManagerProvider()?.getPlayerProfession(session.starterId)?.profession == jp.awabi2048.cccontent.features.rank.profession.Profession.COOK) {
             rankManagerProvider()?.addProfessionExp(session.starterId, session.recipe.exp)
         }
@@ -915,7 +992,7 @@ private class CookingController(
         val recipe = candidates.firstOrNull { it.id == candidate.recipe.id } ?: return null
         val score = (1.0 - candidate.ratioDistance / 2.0 - candidate.unmatchedAmount * 0.1)
             .coerceIn(0.0, 1.0)
-        return CookingMatch(recipe, score)
+        return CookingMatch(recipe, score, candidate.batches)
     }
 
     private fun CookingRecipe.processingRecipe(firePower: ProcessingFirePower) = ProcessingRecipe(
@@ -990,6 +1067,46 @@ private class CookingController(
         }
     }
 
+    private fun renderPendingItems(inventory: Inventory, player: Player, station: CookingStationKey) {
+        render(inventory, player)
+        val result = pending[station] ?: return
+        CookingHolder.INPUT_SLOTS.forEach { inventory.setItem(it, GuiMenuItems.backgroundPane(Material.GRAY_STAINED_GLASS_PANE)) }
+        result.items.forEachIndexed { index, item ->
+            if (item.type.isAir) return@forEachIndexed
+            val slot = CookingHolder.RESULT_SLOTS.getOrNull(index) ?: return@forEachIndexed
+            val localized = item.clone()
+            localizeResult(localized, player)
+            inventory.setItem(slot, localized)
+        }
+    }
+
+    private fun collectItemResult(
+        player: Player,
+        event: InventoryClickEvent,
+        station: CookingStationKey,
+        slot: Int
+    ) {
+        if (event.click != ClickType.LEFT || !event.cursor.type.isAir) return
+        val pendingItems = pending[station] ?: return
+        val index = CookingHolder.RESULT_SLOTS.indexOf(slot)
+        val item = pendingItems.items.getOrNull(index)?.takeUnless { it.type.isAir } ?: return
+        player.setItemOnCursor(item.clone())
+        pendingItems.items[index] = ItemStack(Material.AIR)
+        if (slot == CookingHolder.RESULT_SLOTS.first() && pendingItems.collectors.add(player.uniqueId)) {
+            catalogStore.record(player.uniqueId, CatalogType.COOKING, pendingItems.recipeId)
+            player.sendMessage(message(player, "cooking.process.collected", mapOf(
+                "recipe" to message(player, "cooking.recipe.${pendingItems.recipeId}")
+            )))
+        }
+        if (pendingItems.items.all { it.type.isAir }) {
+            pending.remove(station)
+            render(event.view.topInventory, player)
+        } else {
+            renderPendingItems(event.view.topInventory, player, station)
+        }
+        saveState()
+    }
+
     private fun collectLiquid(player: Player, event: InventoryClickEvent, station: CookingStationKey) {
         if (event.click != ClickType.LEFT) return
         val liquid = pendingLiquids[station] ?: return
@@ -999,7 +1116,7 @@ private class CookingController(
         if (cursor.amount == 1) {
             player.setItemOnCursor(result)
         } else {
-            if (player.inventory.firstEmpty() < 0) return
+            if (!canAcceptItem(player.inventory, result)) return
             cursor.amount -= 1
             player.setItemOnCursor(cursor)
             val leftovers = player.inventory.addItem(result)
@@ -1010,7 +1127,11 @@ private class CookingController(
             }
         }
         liquid.remaining -= 1
-        lowerCauldronLevel(station)
+        liquid.collectors.add(player.uniqueId)
+        if (!liquid.brewery) {
+            catalogStore.record(player.uniqueId, CatalogType.COOKING, liquid.recipeId)
+        }
+        lowerCauldronLevel(station, 1)
         if (liquid.remaining <= 0) pendingLiquids.remove(station)
         if (pendingLiquids.containsKey(station)) {
             renderLiquid(event.view.topInventory, player, station)
@@ -1020,13 +1141,20 @@ private class CookingController(
         saveState()
     }
 
-    private fun lowerCauldronLevel(station: CookingStationKey) {
+    private fun canAcceptItem(inventory: org.bukkit.inventory.PlayerInventory, item: ItemStack): Boolean =
+        inventory.storageContents.any { current ->
+            current == null || current.type.isAir ||
+                (current.isSimilar(item) && current.amount < current.maxStackSize)
+        }
+
+    private fun lowerCauldronLevel(station: CookingStationKey, amount: Int) {
         val block = station.blockIfLoaded() ?: return
         val levelled = block.blockData as? org.bukkit.block.data.Levelled ?: return
-        if (levelled.level <= 1) {
+        val remaining = levelled.level - amount.coerceAtLeast(0)
+        if (remaining <= 0) {
             block.type = Material.CAULDRON
         } else {
-            levelled.level -= 1
+            levelled.level = remaining
             block.blockData = levelled
         }
     }
@@ -1096,6 +1224,7 @@ private class CookingHolder(
         val SEASONING_SLOTS = listOf(30, 31, 32)
         val INPUT_SLOTS = INGREDIENT_SLOTS + SEASONING_SLOTS
         val LIQUID_SLOTS = INGREDIENT_SLOTS
+        val RESULT_SLOTS = listOf(22, 23)
         val FRAME_SLOTS = (0..8).toList() + (45..53).toList()
     }
 }
