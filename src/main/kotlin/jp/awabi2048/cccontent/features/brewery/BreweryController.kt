@@ -2146,6 +2146,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val schemaVersion = yml.getInt("schema_version", -1)
         if (schemaVersion != 5) {
             plugin.logger.warning("[Brewery] 旧形式の設備状態を破棄しました: schema_version=$schemaVersion")
+            saveStateInternal()
             return
         }
         yml.getStringList("fermentation_barrels").forEach { serialized ->

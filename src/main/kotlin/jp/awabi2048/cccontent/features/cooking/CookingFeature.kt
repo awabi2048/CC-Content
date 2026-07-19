@@ -371,7 +371,10 @@ private class CookingController(
         pending.clear()
         pendingLiquids.clear()
         active.clear()
-        if (stateFile.exists() && state.getInt("schema_version", -1) != CURRENT_STATE_SCHEMA_VERSION) return
+        if (stateFile.exists() && state.getInt("schema_version", -1) != CURRENT_STATE_SCHEMA_VERSION) {
+            saveState()
+            return
+        }
         state.getConfigurationSection("pending")?.getKeys(false)?.forEach { pathKey ->
             val path = "pending.$pathKey"
             val serialized = state.getString("$path.station") ?: return@forEach
