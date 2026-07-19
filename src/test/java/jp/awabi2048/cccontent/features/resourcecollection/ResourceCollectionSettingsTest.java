@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import java.util.EnumMap;
 import java.util.Map;
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -22,6 +24,17 @@ class ResourceCollectionSettingsTest {
         for (ResourceOperation operation : ResourceOperation.values()) {
             assertTrue(yaml.get(operation.getConfigPath()) instanceof Boolean, operation.getConfigPath());
         }
+    }
+
+    @Test
+    void settingsLoaderContainsPostMigrationLegacyWorldCleanup() throws Exception {
+        String source = Files.readString(Path.of(
+            "src/main/kotlin/jp/awabi2048/cccontent/features/resourcecollection/ResourceCollectionSettings.kt"
+        ));
+
+        assertTrue(source.contains("removeLegacyWorldSetting(plugin, file)"));
+        assertTrue(source.contains("config.set(\"worlds\", null)"));
+        assertTrue(source.contains(".bak-worlds"));
     }
 
     @Test

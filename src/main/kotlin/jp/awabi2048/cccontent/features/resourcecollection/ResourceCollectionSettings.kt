@@ -25,6 +25,7 @@ data class ResourceCollectionSettings(
         fun load(plugin: JavaPlugin): ResourceCollectionSettings {
             val file = ensureFile(plugin, CONFIG_PATH)
             migrateIfRequired(plugin, file)
+            removeLegacyWorldSetting(plugin, file)
             archiveLegacyCollectionRules(plugin, file.parentFile)
             val config = YamlConfiguration.loadConfiguration(file)
             require(config.get("config_version") is Number && config.getInt("config_version") == CONFIG_VERSION) {
@@ -104,6 +105,32 @@ data class ResourceCollectionSettings(
             }
             Files.move(legacy.toPath(), backup.toPath())
             plugin.logger.info("Legacy resource collection EXP and craft rules were archived as ${backup.name}")
+        }
+
+        private fun removeLegacyWorldSetting(plugin: JavaPlugin, file: File) {
+            val config = YamlConfiguration.loadConfiguration(file)
+            if (!config.contains("worlds")) return
+            val backup = File(file.parentFile, "${file.name}.bak-worlds")
+            if (!backup.exists()) Files.copy(file.toPath(), backup.toPath())
+            config.set("worlds", null)
+            val temporary = File(file.parentFile, "${file.name}.cleanup")
+            runCatching {
+                config.save(temporary)
+                runCatching {
+                    Files.move(
+                        temporary.toPath(), file.toPath(),
+                        StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING
+                    )
+                }.getOrElse {
+                    Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+            }.onFailure {
+                temporary.delete()
+                throw IllegalStateException("Legacy resource collection world setting cleanup failed", it)
+            }
+            plugin.logger.info(
+                "Legacy resource collection worlds setting was removed; backup=${backup.name}"
+            )
         }
 
         private fun ensureFile(plugin: JavaPlugin, path: String): File {
