@@ -1,6 +1,8 @@
 package jp.awabi2048.cccontent.features.cooking
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.action.ContentAction
+import com.awabi2048.ccsystem.api.action.ContentActionType
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -10,6 +12,7 @@ import com.awabi2048.ccsystem.api.gui.GuiMenuIconData
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import jp.awabi2048.cccontent.features.rank.RankManager
+import jp.awabi2048.cccontent.features.rank.profession.profile.CookSkillProfile
 import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import jp.awabi2048.cccontent.features.catalog.CatalogType
@@ -49,6 +52,7 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import java.io.File
 import java.util.UUID
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /** 料理の設定、GUI、調理セッション、図鑑を一つの機能境界で管理する。 */
@@ -129,6 +133,30 @@ private data class CookingRecipe(
 )
 private data class CookingMatch(val recipe: CookingRecipe, val score: Double)
 
+private data class CookProfileSnapshot(
+    val processingTimeReduction: Double,
+    val minimumCompletion: Int,
+    val ingredientSlots: Int,
+    val mismatchPenaltyReduction: Double,
+    val materialSaveChance: Double,
+    val extraCompletionChance: Double,
+    val seasoningEffectMultiplier: Double,
+    val exactMatchCompletionBonus: Int
+) {
+    companion object {
+        fun from(profile: CookSkillProfile): CookProfileSnapshot = CookProfileSnapshot(
+            profile.processingTimeReduction,
+            profile.minimumCompletion,
+            profile.ingredientSlots,
+            profile.mismatchPenaltyReduction,
+            profile.materialSaveChance,
+            profile.extraCompletionChance,
+            profile.seasoningEffectMultiplier,
+            profile.exactMatchCompletionBonus
+        )
+    }
+}
+
 internal fun cookingStartClickAllowed(click: ClickType): Boolean = click == ClickType.LEFT || click == ClickType.RIGHT
 
 internal fun cookingInputRemainders(inputAmounts: Map<String, Int>, required: Map<String, Int>): Map<String, Int>? {
@@ -151,7 +179,6 @@ private class CookingController(
     private val stateFile get() = File(plugin.dataFolder, "data/cooking/state.yml")
     private val itemIdKey = NamespacedKey("cccontent", "cooking_item_id")
     private val recipeKey = NamespacedKey("cccontent", "cooking_recipe_id")
-    private val completionKey = NamespacedKey("cccontent", "cooking_completion")
     private val customItemIdKey = NamespacedKey("cccontent", "custom_item_id")
     private val recipes = mutableListOf<CookingRecipe>()
     private val ingredients = mutableMapOf<String, CookingIngredient>()
@@ -170,6 +197,9 @@ private class CookingController(
         val score: Int,
         val seasoningIds: List<String>,
         val starterId: UUID,
+        val profile: CookProfileSnapshot,
+        val savedIngredient: ItemStack?,
+        val extraResult: Boolean,
         var settled: Boolean = false
     )
 
@@ -277,12 +307,16 @@ private class CookingController(
             val recipe = recipes.firstOrNull { it.id == state.getString("$path.recipe") } ?: return@forEach
             val starterId = state.getString("$path.starter")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
                 ?: return@forEach
+            val profile = loadProfile(state, "$path.profile") ?: return@forEach
             active[station] = ActiveCooking(
                 recipe,
                 state.getLong("$path.remaining_ticks").coerceAtLeast(1L),
                 state.getInt("$path.score").coerceIn(0, 100),
                 state.getStringList("$path.seasonings"),
-                starterId
+                starterId,
+                profile,
+                state.getItemStack("$path.saved_ingredient"),
+                state.getBoolean("$path.extra_result")
             )
         }
     }
@@ -302,8 +336,36 @@ private class CookingController(
             output.set("$path.score", session.score)
             output.set("$path.seasonings", session.seasoningIds)
             output.set("$path.starter", session.starterId.toString())
+            saveProfile(output, "$path.profile", session.profile)
+            output.set("$path.saved_ingredient", session.savedIngredient)
+            output.set("$path.extra_result", session.extraResult)
         }
         output.save(stateFile)
+    }
+
+    private fun saveProfile(output: YamlConfiguration, path: String, profile: CookProfileSnapshot) {
+        output.set("$path.processing_time_reduction", profile.processingTimeReduction)
+        output.set("$path.minimum_completion", profile.minimumCompletion)
+        output.set("$path.ingredient_slots", profile.ingredientSlots)
+        output.set("$path.mismatch_penalty_reduction", profile.mismatchPenaltyReduction)
+        output.set("$path.material_save_chance", profile.materialSaveChance)
+        output.set("$path.extra_completion_chance", profile.extraCompletionChance)
+        output.set("$path.seasoning_effect_multiplier", profile.seasoningEffectMultiplier)
+        output.set("$path.exact_match_completion_bonus", profile.exactMatchCompletionBonus)
+    }
+
+    private fun loadProfile(input: YamlConfiguration, path: String): CookProfileSnapshot? {
+        if (!input.isConfigurationSection(path)) return null
+        return CookProfileSnapshot(
+            input.getDouble("$path.processing_time_reduction").coerceIn(0.0, 1.0),
+            input.getInt("$path.minimum_completion").coerceIn(0, 100),
+            input.getInt("$path.ingredient_slots").coerceIn(1, 5),
+            input.getDouble("$path.mismatch_penalty_reduction").coerceIn(0.0, 1.0),
+            input.getDouble("$path.material_save_chance").coerceIn(0.0, 1.0),
+            input.getDouble("$path.extra_completion_chance").coerceIn(0.0, 1.0),
+            input.getDouble("$path.seasoning_effect_multiplier").coerceAtLeast(0.0),
+            input.getInt("$path.exact_match_completion_bonus").coerceAtLeast(0)
+        )
     }
 
     private fun loadItems(values: List<Any?>): List<ItemStack> = values.filterNotNull().mapNotNull {
@@ -377,8 +439,7 @@ private class CookingController(
                 localizeResult(item, player)
                 player.inventory.addItem(item).values.forEach { player.world.dropItem(player.location, it) }
                 item.itemMeta?.persistentDataContainer?.get(recipeKey, PersistentDataType.STRING)?.let { recipeId ->
-                    val completion = item.itemMeta?.persistentDataContainer?.get(completionKey, PersistentDataType.INTEGER)
-                    catalogStore.record(player.uniqueId, CatalogType.COOKING, recipeId, completion = completion)
+                    catalogStore.record(player.uniqueId, CatalogType.COOKING, recipeId)
                     player.sendMessage(message(player, "cooking.process.collected", mapOf("recipe" to message(player, "cooking.recipe.$recipeId"))))
                 }
             }
@@ -422,18 +483,41 @@ private class CookingController(
         if (ingredientItems.isEmpty()) { player.sendMessage(message(player, "cooking.error.no_ingredients")); return }
         val match = findBestMatch(ingredientItems, seasoningItems, equipment)
         if (match == null || match.score < minimumSimilarity) { player.sendMessage(message(player, "cooking.error.recipe_not_found")); return }
+        val profile = rankManagerProvider()?.getTypedProfessionProfile(player.uniqueId) as? CookSkillProfile
+            ?: return player.sendMessage(message(player, "cooking.error.recipe_not_found"))
+        val snapshot = CookProfileSnapshot.from(profile)
+        if (match.recipe.ingredients.size > snapshot.ingredientSlots) {
+            player.sendMessage(message(player, "cooking.error.recipe_not_found"))
+            return
+        }
+        val savedIngredient = if (Math.random() < snapshot.materialSaveChance) {
+            ingredientItems.firstOrNull()?.clone()?.apply { amount = 1 }
+        } else {
+            null
+        }
         if (!consumeInputs(inventory, match.recipe)) {
             player.sendMessage(message(player, "cooking.error.recipe_not_found")); return
         }
         CookingHolder.INPUT_SLOTS.forEach { inventory.setItem(it, null) }
         val seasoningIds = seasoningItems.flatMap { item -> ingredients.keys.filter { it == itemId(item) } }
-        val score = (match.score * 100.0).roundToInt().coerceIn(0, 100)
+        val baseScore = (match.score * 100.0).roundToInt()
+        val mismatchRecovered = ((100 - baseScore) * snapshot.mismatchPenaltyReduction).roundToInt()
+        val exactBonus = if (baseScore == 100) snapshot.exactMatchCompletionBonus else 0
+        val score = (baseScore + mismatchRecovered + exactBonus)
+            .coerceAtLeast(snapshot.minimumCompletion)
+            .coerceIn(0, 100)
+        val duration = ceil(match.recipe.completionTicks * (1.0 - snapshot.processingTimeReduction))
+            .toLong()
+            .coerceAtLeast(1L)
         active[station] = ActiveCooking(
             match.recipe,
-            match.recipe.completionTicks,
+            duration,
             score,
             seasoningIds,
-            player.uniqueId
+            player.uniqueId,
+            snapshot,
+            savedIngredient,
+            Math.random() < snapshot.extraCompletionChance
         )
         returnInputs(player, inventory, inventory.holder as? CookingHolder)
         saveState()
@@ -446,25 +530,43 @@ private class CookingController(
         if (session.settled || session.remainingTicks > 0) return
         session.settled = true
         val result = ItemStack(session.recipe.resultMaterial)
-        result.amount = 1
+        result.amount = if (session.extraResult) 2 else 1
         result.editMeta { meta ->
             meta.setItemModel(session.recipe.resultModel)
             meta.persistentDataContainer.set(itemIdKey, PersistentDataType.STRING, "dish_${session.recipe.id}")
             meta.persistentDataContainer.set(customItemIdKey, PersistentDataType.STRING, "cooking.dish_${session.recipe.id}")
             meta.persistentDataContainer.set(recipeKey, PersistentDataType.STRING, session.recipe.id)
-            meta.persistentDataContainer.set(completionKey, PersistentDataType.INTEGER, session.score)
         }
-        pending[station] = listOf(result)
+        pending[station] = listOfNotNull(result, session.savedIngredient)
         if (rankManagerProvider()?.getPlayerProfession(session.starterId)?.profession == jp.awabi2048.cccontent.features.rank.profession.Profession.COOK) {
             rankManagerProvider()?.addProfessionExp(session.starterId, session.recipe.exp)
         }
         catalogStore.record(session.starterId, CatalogType.COOKING, session.recipe.id, completion = session.score, obtained = false)
+        publishCookingAction(session)
         Bukkit.getPlayer(session.starterId)?.takeIf(Player::isOnline)?.let { player ->
             player.sendMessage(message(player, "cooking.process.completed", mapOf("recipe" to message(player, "cooking.recipe.${session.recipe.id}"), "score" to session.score)))
             player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 0.7f, 1.4f)
         }
         active.remove(station)
         saveState()
+    }
+
+    private fun publishCookingAction(session: ActiveCooking) {
+        CCSystem.getAPI().getContentActionDispatcher().publish(
+            ContentAction(
+                actionId = UUID.randomUUID(),
+                schemaVersion = 1,
+                occurredAt = CCSystem.getAPI().getSharedClockService().now().toInstant(),
+                playerId = session.starterId,
+                actionType = ContentActionType.COOKING_COMPLETED,
+                amount = 1L,
+                worldKey = null,
+                metadata = mapOf(
+                    "recipeId" to session.recipe.id,
+                    "completion" to session.score.toString()
+                )
+            )
+        )
     }
 
     private fun startProgressTask() {
@@ -487,23 +589,13 @@ private class CookingController(
 
     private fun localizeResult(item: ItemStack, player: Player) {
         val recipeId = item.itemMeta?.persistentDataContainer?.get(recipeKey, PersistentDataType.STRING) ?: return
-        val completion = item.itemMeta?.persistentDataContainer?.get(completionKey, PersistentDataType.INTEGER) ?: 0
         item.editMeta {
             it.displayName(Component.text(message(player, "cooking.recipe.$recipeId")))
             it.lore(
                 CCSystem.getAPI().getLoreService().render(
                     GuiLoreSpec.Blocks(
                         listOf(
-                            GuiLoreBlock(listOf(GuiLoreLine.Text(message(player, "cooking.recipe_description.$recipeId")))),
-                            GuiLoreBlock(
-                                listOf(
-                                    GuiLoreLine.Data(
-                                        message(player, "cooking.item.data.completion"),
-                                        "$completion%",
-                                        "§f"
-                                    )
-                                )
-                            )
+                            GuiLoreBlock(listOf(GuiLoreLine.Text(message(player, "cooking.recipe_description.$recipeId"))))
                         )
                     )
                 )
@@ -629,11 +721,10 @@ private class CookingController(
     }
 
     private fun unlockedSlots(player: Player): Set<Int> = CookingHolder.INGREDIENT_SLOTS.take(configuredIngredientSlotCount(player)).toSet()
-    private fun configuredIngredientSlotCount(player: Player): Int {
-        val currentLevel = level(player)
-        return ingredientSlotsByLevel.entries.filter { it.key <= currentLevel }.maxByOrNull { it.key }?.value
-            ?: error("No cooking ingredient slot setting applies to profession level $currentLevel")
-    }
+    private fun configuredIngredientSlotCount(player: Player): Int =
+        (rankManagerProvider()?.getTypedProfessionProfile(player.uniqueId) as? CookSkillProfile)?.ingredientSlots
+            ?: ingredientSlotsByLevel.entries.filter { it.key <= level(player) }.maxByOrNull { it.key }?.value
+            ?: 1
     private fun level(player: Player): Int = rankManagerProvider()?.getCurrentProfessionLevel(player.uniqueId) ?: 1
     private fun isRealItem(item: ItemStack): Boolean = item.type != Material.AIR && item.type != Material.GRAY_STAINED_GLASS_PANE && item.type != Material.WHITE_STAINED_GLASS_PANE && item.type != Material.BARRIER
     private fun returnInputs(player: Player, inventory: Inventory, holder: CookingHolder?, excludedSlots: Set<Int> = emptySet()) {

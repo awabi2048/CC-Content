@@ -142,7 +142,8 @@ class CookingConfigurationTest {
             "src/main/kotlin/jp/awabi2048/cccontent/features/cooking/CookingFeature.kt"));
         assertTrue(source.contains("GuiLoreSpec.Blocks"));
         assertTrue(source.contains("cooking.recipe_description.$recipeId"));
-        assertTrue(source.contains("cooking.item.data.completion"));
+        assertFalse(source.contains("NamespacedKey(\"cccontent\", \"cooking_completion\")"));
+        assertFalse(source.contains("cooking.item.data.completion"));
 
         var ja = YamlConfiguration.loadConfiguration(LANG_ROOT.resolve("ja_jp/content/cooking.yml").toFile());
         var en = YamlConfiguration.loadConfiguration(LANG_ROOT.resolve("en_us/content/cooking.yml").toFile());
