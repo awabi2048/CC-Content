@@ -9,6 +9,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
 import jp.awabi2048.cccontent.features.rank.profession.Profession
+import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
@@ -60,7 +61,8 @@ class PrestigeToken {
             completedAtEpochMillis: Long,
             representativeStatistic: Long
         ): ItemStack {
-            val item = ItemStack(Material.PAPER)
+            val item = ItemStack(Material.POISONOUS_POTATO)
+            PoisonousPotatoComponentPack.applyNonConsumable(item)
             val meta = item.itemMeta
             if (meta == null) {
                 org.bukkit.Bukkit.getLogger().warning("[CCContent] Failed to create PrestigeToken: itemMeta is null")
@@ -77,6 +79,8 @@ class PrestigeToken {
                     "profession" to professionName
                 )
             )
+            meta.setItemModel(NamespacedKey.minecraft("paper"))
+            meta.setMaxStackSize(1)
 
             val specializationName = specializationId?.let {
                 messageProvider.getMessage("profession.specialization.$it.name")

@@ -7,6 +7,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.Material
@@ -223,9 +224,12 @@ class FishingItems(
         override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
         override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-            val item = ItemStack(Material.BOOK)
+            val item = ItemStack(Material.POISONOUS_POTATO)
+            PoisonousPotatoComponentPack.applyNonConsumable(item)
             val meta = item.itemMeta
             meta.displayName(Component.text(message(player, "custom_items.fishing.dictionary.name")))
+            meta.setItemModel(NamespacedKey.minecraft("book"))
+            meta.setMaxStackSize(1)
             meta.lore(CCSystem.getAPI().getLoreService().render(
                 GuiLoreSpec.Blocks(listOf(GuiLoreBlock(listOf(
                     GuiLoreLine.Text(message(player, "custom_items.fishing.dictionary.description")),

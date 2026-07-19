@@ -4,6 +4,7 @@ import com.awabi2048.ccsystem.CCSystem
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.CustomItemManager
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -17,7 +18,6 @@ class ResourceCollectionItems(plugin: JavaPlugin) {
         val id: String,
         val model: Material,
         val tags: Set<String> = emptySet(),
-        val base: Material = Material.POISONOUS_POTATO,
         val stackable: Boolean = true
     )
 
@@ -40,16 +40,16 @@ class ResourceCollectionItems(plugin: JavaPlugin) {
         Definition("heartwood", Material.STRIPPED_OAK_LOG, setOf("wood", "structural")),
         Definition("bark", Material.PAPER, setOf("wood", "bark")),
         Definition("timber_beam", Material.STRIPPED_OAK_LOG, setOf("wood", "processed", "structural")),
-        Definition("chisel", Material.IRON_PICKAXE, base = Material.IRON_PICKAXE, stackable = false),
-        Definition("geology_guide", Material.KNOWLEDGE_BOOK, base = Material.KNOWLEDGE_BOOK, stackable = false),
-        Definition("mining_hammer", Material.IRON_PICKAXE, base = Material.IRON_PICKAXE, stackable = false),
-        Definition("felling_axe", Material.IRON_AXE, base = Material.IRON_AXE, stackable = false),
-        Definition("woodworking_hatchet", Material.IRON_AXE, base = Material.IRON_AXE, stackable = false),
-        Definition("woodworking_knife", Material.SHEARS, base = Material.SHEARS, stackable = false),
-        Definition("forest_guide", Material.WRITABLE_BOOK, base = Material.WRITABLE_BOOK, stackable = false),
-        Definition("gathering_guide", Material.BOOK, base = Material.BOOK, stackable = false),
-        Definition("gathering_sickle", Material.IRON_HOE, base = Material.IRON_HOE, stackable = false),
-        Definition("cultivation_hoe", Material.DIAMOND_HOE, base = Material.DIAMOND_HOE, stackable = false)
+        Definition("chisel", Material.IRON_PICKAXE, stackable = false),
+        Definition("geology_guide", Material.KNOWLEDGE_BOOK, stackable = false),
+        Definition("mining_hammer", Material.IRON_PICKAXE, stackable = false),
+        Definition("felling_axe", Material.IRON_AXE, stackable = false),
+        Definition("woodworking_hatchet", Material.IRON_AXE, stackable = false),
+        Definition("woodworking_knife", Material.SHEARS, stackable = false),
+        Definition("forest_guide", Material.WRITABLE_BOOK, stackable = false),
+        Definition("gathering_guide", Material.BOOK, stackable = false),
+        Definition("gathering_sickle", Material.IRON_HOE, stackable = false),
+        Definition("cultivation_hoe", Material.DIAMOND_HOE, stackable = false)
     )
 
     fun register() {
@@ -72,14 +72,16 @@ class ResourceCollectionItems(plugin: JavaPlugin) {
         override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
         override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-            val item = ItemStack(definition.base, if (definition.stackable) amount else 1)
+            val item = ItemStack(Material.POISONOUS_POTATO, if (definition.stackable) amount else 1)
             val meta = item.itemMeta
             meta.displayName(Component.text(message(player, "custom_items.resource.${definition.id}.name"))
                 .decoration(TextDecoration.ITALIC, false))
-            meta.lore(listOf(Component.text(message(player, "custom_items.resource.${definition.id}.description"))
+            meta.lore(listOf(Component.text(message(player, "custom_items.resource.${definition.id}.description"), NamedTextColor.GRAY)
                 .decoration(TextDecoration.ITALIC, false)))
+            meta.setItemModel(itemModel)
+            meta.setMaxStackSize(if (definition.stackable) 64 else 1)
+            meta.persistentDataContainer.set(resourceIdKey, PersistentDataType.STRING, definition.id)
             if (definition.tags.isNotEmpty()) {
-                meta.persistentDataContainer.set(resourceIdKey, PersistentDataType.STRING, definition.id)
                 meta.persistentDataContainer.set(
                     resourceTagsKey,
                     PersistentDataType.STRING,
@@ -91,7 +93,7 @@ class ResourceCollectionItems(plugin: JavaPlugin) {
         }
 
         override fun matches(item: ItemStack): Boolean =
-            definition.tags.isNotEmpty() &&
+            item.type == Material.POISONOUS_POTATO &&
                 item.itemMeta?.persistentDataContainer?.get(resourceIdKey, PersistentDataType.STRING) == definition.id
 
         private fun message(player: Player?, key: String): String =

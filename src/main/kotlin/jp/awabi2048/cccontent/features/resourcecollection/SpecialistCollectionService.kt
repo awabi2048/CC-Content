@@ -246,6 +246,7 @@ class SpecialistCollectionService(
             block.biome.key.toString(),
             block.y
         )
+        player.swingMainHand()
         val placeholders = arrayOf<Pair<String, Any>>(
             "altitude" to localizedEnum(player, "resource_collection.inspection.altitude", result.altitude.name),
             "biome" to localizedEnum(player, "resource_collection.inspection.biome", result.biome.name),
@@ -298,6 +299,7 @@ class SpecialistCollectionService(
             processed++
         }
         if (processed <= 0) return
+        player.swingMainHand()
         damageCultivationTool(player, processed, profile.durabilitySaveChance)
         awardFarmerArea(player, ContentActionType.CROP_HARVESTED, processed, originMaterial, "harvest")
         player.sendMessage(message(player, "resource_collection.cultivation.harvested", "count" to processed))
@@ -329,6 +331,7 @@ class SpecialistCollectionService(
                 processed++
             }
             if (processed <= 0) return@Runnable
+            player.swingMainHand()
             damageCultivationTool(player, processed, profile.durabilitySaveChance)
             awardFarmerArea(player, ContentActionType.SOIL_TILLED, processed, originMaterial, "tilling")
             player.sendMessage(message(player, "resource_collection.cultivation.tilled", "count" to processed))
@@ -467,6 +470,7 @@ class SpecialistCollectionService(
             player.sendMessage(message(player, "resource_collection.error.protected"))
             return
         }
+        player.swingMainHand()
         val completeTreeBatch = expectedKind == ResourceCollectionKind.FOREST && processed == targets.size
         if (treeRoot && completeTreeBatch &&
             settings.isOperationEnabled(ResourceOperation.LUMBERJACK_HEARTWOOD)) {
@@ -743,6 +747,7 @@ class SpecialistCollectionService(
                 )
             }
         }
+        player.swingMainHand()
         gatheringTargets[player.uniqueId] = targets
         val cooldownSeconds = profile.inspectionCooldownSeconds.takeIf { it > 0 } ?: 45
         gatheringCooldowns[player.uniqueId] = now.plusSeconds(cooldownSeconds.toLong())
@@ -801,6 +806,7 @@ class SpecialistCollectionService(
             player.sendMessage(message(player, "resource_collection.gathering.surface_depleted"))
             return
         }
+        player.swingMainHand()
         targets.remove(block.key())
         completePlantGathering(player, target, profile, block.type)
     }
@@ -909,6 +915,7 @@ class SpecialistCollectionService(
                 )
             }
         }
+        player.swingMainHand()
         forestTargets[player.uniqueId] = targets
         forestCooldowns[player.uniqueId] = now.plusSeconds(profile.inspectionCooldownSeconds.coerceAtLeast(1).toLong())
         val messageKey = when {
@@ -955,6 +962,7 @@ class SpecialistCollectionService(
             return true
         }
         if (!forestProductHarvestStore.claim(root, target.species)) return true
+        player.swingMainHand()
         val originalMaterial = block.type
         when (target.targetKind) {
             ForestProductTargetKind.LOG -> {
@@ -1136,6 +1144,7 @@ class SpecialistCollectionService(
             cancelChisel(player.uniqueId, "resource_collection.error.protected")
             return
         }
+        player.swingMainHand()
         val average = session.scoreTotal / session.attempts.coerceAtLeast(1)
         val specialAmount = ChiselRewardPolicy.specialMaterialCount(
             average,
@@ -1249,6 +1258,7 @@ class SpecialistCollectionService(
             player.sendMessage(message(player, "resource_collection.error.protected"))
             return
         }
+        player.swingMainHand()
         val originalMaterial = block.type
         block.type = Material.AIR
         if (precise) {

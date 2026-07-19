@@ -5,8 +5,11 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.items.CustomItem
+import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
 import jp.awabi2048.cccontent.util.ItemMetaCompat
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
+import net.kyori.adventure.text.format.TextDecoration
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
@@ -30,11 +33,17 @@ class CustomHeadItem(
     override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
     override fun createItemForPlayer(player: Player?, amount: Int): ItemStack {
-        val material = if (variant.itemMaterial.isItem) variant.itemMaterial else Material.NAME_TAG
-        val item = ItemStack(material, amount)
+        val modelMaterial = if (variant.itemMaterial.isItem) variant.itemMaterial else Material.NAME_TAG
+        val item = ItemStack(Material.POISONOUS_POTATO, amount)
+        PoisonousPotatoComponentPack.applyNonConsumable(item)
         val meta = item.itemMeta ?: return item
         meta.displayName(Component.text(variant.itemDisplayName))
-        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(variant.itemLore.map { GuiLoreLine.Text(it) }, GuiLoreFrame.NONE)))
+        meta.lore(variant.itemLore.map {
+            Component.text(it.replace(Regex("§[0-9a-fk-or]", RegexOption.IGNORE_CASE), ""), NamedTextColor.GRAY)
+                .decoration(TextDecoration.ITALIC, false)
+        })
+        meta.setItemModel(NamespacedKey.minecraft(modelMaterial.key.key))
+        meta.setMaxStackSize(1)
         variant.itemCustomModelData?.let { ItemMetaCompat.setLegacyCustomModelData(meta, it) }
         meta.persistentDataContainer.set(variantKey, PersistentDataType.STRING, variant.variantId)
         item.itemMeta = meta

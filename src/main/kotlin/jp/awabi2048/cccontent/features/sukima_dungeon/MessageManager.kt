@@ -21,9 +21,11 @@ object MessageManager {
         return LangManager.getMessage(lang, key, params)
     }
 
-    fun getList(player: Player?, key: String): List<String> {
+    fun getList(player: Player?, key: String, params: Map<String, String> = emptyMap()): List<String> {
         val lang = ContentLocaleResolver.resolve(player)
-        return LangManager.getList(lang, key)
+        return LangManager.getList(lang, key).map { line ->
+            params.entries.fold(line) { text, (name, value) -> text.replace("{$name}", value) }
+        }
     }
 
     fun getTierName(player: Player?, tier: String): String {
