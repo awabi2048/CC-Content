@@ -1,13 +1,15 @@
-﻿config_version: 1
-
+config_version: 3
 enabled: true
 
-settings:
-  minimum_similarity: 0.5
-  ingredient_slots_by_level:
-    1: 1
-    2: 2
-    3: 3
-    4: 4
-    5: 5
+matching:
+  maximum_excess_ratio_per_ingredient: 0.50
+  maximum_unknown_ratio: 0.20
+  maximum_total_error: 0.30
+  ambiguity_margin: 0.10
 
+equipment:
+  pan_max_scale: 5
+  cauldron_max_scale: 3
+
+state:
+  flush_interval_ticks: 100

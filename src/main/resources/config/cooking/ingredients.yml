@@ -1,0 +1,427 @@
+config_version: 2
+
+ingredients:
+  apple:
+    matcher:
+      material: APPLE
+    display_name_key: item.minecraft.apple
+    container_remainder: null
+  beef:
+    matcher:
+      material: BEEF
+    display_name_key: item.minecraft.beef
+    container_remainder: null
+  beetroot:
+    matcher:
+      material: BEETROOT
+    display_name_key: item.minecraft.beetroot
+    container_remainder: null
+  brown_mushroom:
+    matcher:
+      material: BROWN_MUSHROOM
+    display_name_key: item.minecraft.brown_mushroom
+    container_remainder: null
+  butter:
+    matcher:
+      custom_item_id: cooking.butter
+    display_name_key: custom_items.cooking.butter.name
+    container_remainder: null
+  carrot:
+    matcher:
+      material: CARROT
+    display_name_key: item.minecraft.carrot
+    container_remainder: null
+  chicken:
+    matcher:
+      material: CHICKEN
+    display_name_key: item.minecraft.chicken
+    container_remainder: null
+  chorus_fruit:
+    matcher:
+      material: CHORUS_FRUIT
+    display_name_key: item.minecraft.chorus_fruit
+    container_remainder: null
+  cocoa_syrup:
+    matcher:
+      custom_item_id: cooking.cocoa_syrup
+    display_name_key: custom_items.cooking.cocoa_syrup.name
+    container_remainder: null
+  cooked_rice:
+    matcher:
+      custom_item_id: cooking.cooked_rice
+    display_name_key: custom_items.cooking.cooked_rice.name
+    container_remainder: null
+  crimson_fungus:
+    matcher:
+      material: CRIMSON_FUNGUS
+    display_name_key: item.minecraft.crimson_fungus
+    container_remainder: null
+  curry_roux:
+    matcher:
+      custom_item_id: cooking.curry_roux
+    display_name_key: custom_items.cooking.curry_roux.name
+    container_remainder: null
+  cut_apple:
+    matcher:
+      custom_item_id: cooking.cut_apple
+    display_name_key: custom_items.cooking.cut_apple.name
+    container_remainder: null
+  cut_beef:
+    matcher:
+      custom_item_id: cooking.cut_beef
+    display_name_key: custom_items.cooking.cut_beef.name
+    container_remainder: null
+  cut_carrot:
+    matcher:
+      custom_item_id: cooking.cut_carrot
+    display_name_key: custom_items.cooking.cut_carrot.name
+    container_remainder: null
+  cut_chicken:
+    matcher:
+      custom_item_id: cooking.cut_chicken
+    display_name_key: custom_items.cooking.cut_chicken.name
+    container_remainder: null
+  cut_daikon:
+    matcher:
+      custom_item_id: cooking.cut_daikon
+    display_name_key: custom_items.cooking.cut_daikon.name
+    container_remainder: null
+  cut_green_onion:
+    matcher:
+      custom_item_id: cooking.cut_green_onion
+    display_name_key: custom_items.cooking.cut_green_onion.name
+    container_remainder: null
+  cut_onion:
+    matcher:
+      custom_item_id: cooking.cut_onion
+    display_name_key: custom_items.cooking.cut_onion.name
+    container_remainder: null
+  cut_pork:
+    matcher:
+      custom_item_id: cooking.cut_pork
+    display_name_key: custom_items.cooking.cut_pork.name
+    container_remainder: null
+  cut_potato:
+    matcher:
+      custom_item_id: cooking.cut_potato
+    display_name_key: custom_items.cooking.cut_potato.name
+    container_remainder: null
+  cut_tomato:
+    matcher:
+      custom_item_id: cooking.cut_tomato
+    display_name_key: custom_items.cooking.cut_tomato.name
+    container_remainder: null
+  dashi:
+    matcher:
+      custom_item_id: cooking.dashi
+    display_name_key: custom_items.cooking.dashi.name
+    container_remainder: null
+  dried_kelp:
+    matcher:
+      material: DRIED_KELP
+    display_name_key: item.minecraft.dried_kelp
+    container_remainder: null
+  egg:
+    matcher:
+      material: EGG
+    display_name_key: item.minecraft.egg
+    container_remainder: null
+  fillet_anglerfish:
+    matcher:
+      custom_item_id: cooking.fillet_anglerfish
+    display_name_key: custom_items.cooking.fillet_anglerfish.name
+    container_remainder: null
+  fillet_cod:
+    matcher:
+      custom_item_id: cooking.fillet_cod
+    display_name_key: custom_items.cooking.fillet_cod.name
+    container_remainder: null
+  fillet_eel:
+    matcher:
+      custom_item_id: cooking.fillet_eel
+    display_name_key: custom_items.cooking.fillet_eel.name
+    container_remainder: null
+  fillet_flounder:
+    matcher:
+      custom_item_id: cooking.fillet_flounder
+    display_name_key: custom_items.cooking.fillet_flounder.name
+    container_remainder: null
+  fillet_mackerel:
+    matcher:
+      custom_item_id: cooking.fillet_mackerel
+    display_name_key: custom_items.cooking.fillet_mackerel.name
+    container_remainder: null
+  fillet_pufferfish:
+    matcher:
+      custom_item_id: cooking.fillet_pufferfish
+    display_name_key: custom_items.cooking.fillet_pufferfish.name
+    container_remainder: null
+  fillet_salmon:
+    matcher:
+      custom_item_id: cooking.fillet_salmon
+    display_name_key: custom_items.cooking.fillet_salmon.name
+    container_remainder: null
+  fillet_sardine:
+    matcher:
+      custom_item_id: cooking.fillet_sardine
+    display_name_key: custom_items.cooking.fillet_sardine.name
+    container_remainder: null
+  fillet_tuna:
+    matcher:
+      custom_item_id: cooking.fillet_tuna
+    display_name_key: custom_items.cooking.fillet_tuna.name
+    container_remainder: null
+  fish_anglerfish:
+    matcher:
+      fish_id: anglerfish
+    display_name_key: fishing.catalog.item.anglerfish
+    container_remainder: null
+  fish_ayu:
+    matcher:
+      fish_id: ayu
+    display_name_key: fishing.catalog.item.ayu
+    container_remainder: null
+  fish_carp:
+    matcher:
+      fish_id: carp
+    display_name_key: fishing.catalog.item.carp
+    container_remainder: null
+  fish_catfish:
+    matcher:
+      fish_id: catfish
+    display_name_key: fishing.catalog.item.catfish
+    container_remainder: null
+  fish_cod:
+    matcher:
+      fish_id: cod
+    display_name_key: fishing.catalog.item.cod
+    container_remainder: null
+  fish_crucian_carp:
+    matcher:
+      fish_id: crucian_carp
+    display_name_key: fishing.catalog.item.crucian_carp
+    container_remainder: null
+  fish_eel:
+    matcher:
+      fish_id: eel
+    display_name_key: fishing.catalog.item.eel
+    container_remainder: null
+  fish_flounder:
+    matcher:
+      fish_id: flounder
+    display_name_key: fishing.catalog.item.flounder
+    container_remainder: null
+  fish_grouper:
+    matcher:
+      fish_id: grouper
+    display_name_key: fishing.catalog.item.grouper
+    container_remainder: null
+  fish_horse_mackerel:
+    matcher:
+      fish_id: horse_mackerel
+    display_name_key: fishing.catalog.item.horse_mackerel
+    container_remainder: null
+  fish_mackerel:
+    matcher:
+      fish_id: mackerel
+    display_name_key: fishing.catalog.item.mackerel
+    container_remainder: null
+  fish_pufferfish:
+    matcher:
+      fish_id: pufferfish
+    display_name_key: fishing.catalog.item.pufferfish
+    container_remainder: null
+  fish_salmon:
+    matcher:
+      fish_id: salmon
+    display_name_key: fishing.catalog.item.salmon
+    container_remainder: null
+  fish_sardine:
+    matcher:
+      fish_id: sardine
+    display_name_key: fishing.catalog.item.sardine
+    container_remainder: null
+  fish_sea_bass:
+    matcher:
+      fish_id: sea_bass
+    display_name_key: fishing.catalog.item.sea_bass
+    container_remainder: null
+  fish_sea_bream:
+    matcher:
+      fish_id: sea_bream
+    display_name_key: fishing.catalog.item.sea_bream
+    container_remainder: null
+  fish_smelt:
+    matcher:
+      fish_id: smelt
+    display_name_key: fishing.catalog.item.smelt
+    container_remainder: null
+  fish_tropical_fish:
+    matcher:
+      fish_id: tropical_fish
+    display_name_key: fishing.catalog.item.tropical_fish
+    container_remainder: null
+  fish_trout:
+    matcher:
+      fish_id: trout
+    display_name_key: fishing.catalog.item.trout
+    container_remainder: null
+  fish_tuna:
+    matcher:
+      fish_id: tuna
+    display_name_key: fishing.catalog.item.tuna
+    container_remainder: null
+  ghast_tear:
+    matcher:
+      material: GHAST_TEAR
+    display_name_key: item.minecraft.ghast_tear
+    container_remainder: null
+  honey_bottle:
+    matcher:
+      material: HONEY_BOTTLE
+    display_name_key: item.minecraft.honey_bottle
+    container_remainder:
+      material: GLASS_BOTTLE
+      amount: 1
+  milk_bucket:
+    matcher:
+      material: MILK_BUCKET
+    display_name_key: item.minecraft.milk_bucket
+    container_remainder:
+      material: BUCKET
+      amount: 1
+  miso:
+    matcher:
+      custom_item_id: cooking.miso
+    display_name_key: custom_items.cooking.miso.name
+    container_remainder: null
+  porkchop:
+    matcher:
+      material: PORKCHOP
+    display_name_key: item.minecraft.porkchop
+    container_remainder: null
+  potato:
+    matcher:
+      material: POTATO
+    display_name_key: item.minecraft.potato
+    container_remainder: null
+  pumpkin:
+    matcher:
+      material: PUMPKIN
+    display_name_key: item.minecraft.pumpkin
+    container_remainder: null
+  rabbit:
+    matcher:
+      material: RABBIT
+    display_name_key: item.minecraft.rabbit
+    container_remainder: null
+  red_mushroom:
+    matcher:
+      material: RED_MUSHROOM
+    display_name_key: item.minecraft.red_mushroom
+    container_remainder: null
+  resource_blueberry:
+    matcher:
+      resource_id: blueberry
+    display_name_key: custom_items.resource.blueberry.name
+    container_remainder: null
+  resource_cocoa_pulp:
+    matcher:
+      resource_id: cocoa_pulp
+    display_name_key: custom_items.resource.cocoa_pulp.name
+    container_remainder: null
+  resource_daikon:
+    matcher:
+      resource_id: daikon
+    display_name_key: custom_items.resource.daikon.name
+    container_remainder: null
+  resource_ginger:
+    matcher:
+      resource_id: ginger
+    display_name_key: custom_items.resource.ginger.name
+    container_remainder: null
+  resource_grape:
+    matcher:
+      resource_id: grape
+    display_name_key: custom_items.resource.grape.name
+    container_remainder: null
+  resource_green_onion:
+    matcher:
+      resource_id: green_onion
+    display_name_key: custom_items.resource.green_onion.name
+    container_remainder: null
+  resource_onion:
+    matcher:
+      resource_id: onion
+    display_name_key: custom_items.resource.onion.name
+    container_remainder: null
+  resource_rice:
+    matcher:
+      resource_id: rice
+    display_name_key: custom_items.resource.rice.name
+    container_remainder: null
+  resource_rock_salt:
+    matcher:
+      resource_id: rock_salt
+    display_name_key: custom_items.resource.rock_salt.name
+    container_remainder: null
+  resource_strawberry:
+    matcher:
+      resource_id: strawberry
+    display_name_key: custom_items.resource.strawberry.name
+    container_remainder: null
+  resource_tea_leaf:
+    matcher:
+      resource_id: tea_leaf
+    display_name_key: custom_items.resource.tea_leaf.name
+    container_remainder: null
+  resource_tomato:
+    matcher:
+      resource_id: tomato
+    display_name_key: custom_items.resource.tomato.name
+    container_remainder: null
+  resource_vegetable_leaves:
+    matcher:
+      resource_id: vegetable_leaves
+    display_name_key: custom_items.resource.vegetable_leaves.name
+    container_remainder: null
+  roasted_coffee:
+    matcher:
+      custom_item_id: cooking.roasted_coffee
+    display_name_key: custom_items.cooking.roasted_coffee.name
+    container_remainder: null
+  slice_brown_mushroom:
+    matcher:
+      custom_item_id: cooking.slice_brown_mushroom
+    display_name_key: custom_items.cooking.slice_brown_mushroom.name
+    container_remainder: null
+  slice_red_mushroom:
+    matcher:
+      custom_item_id: cooking.slice_red_mushroom
+    display_name_key: custom_items.cooking.slice_red_mushroom.name
+    container_remainder: null
+  soy_sauce:
+    matcher:
+      custom_item_id: cooking.soy_sauce
+    display_name_key: custom_items.cooking.soy_sauce.name
+    container_remainder: null
+  sugar:
+    matcher:
+      material: SUGAR
+    display_name_key: item.minecraft.sugar
+    container_remainder: null
+  tofu:
+    matcher:
+      custom_item_id: cooking.tofu
+    display_name_key: custom_items.cooking.tofu.name
+    container_remainder: null
+  tomato_sauce:
+    matcher:
+      custom_item_id: cooking.tomato_sauce
+    display_name_key: custom_items.cooking.tomato_sauce.name
+    container_remainder: null
+  warped_fungus:
+    matcher:
+      material: WARPED_FUNGUS
+    display_name_key: item.minecraft.warped_fungus
+    container_remainder: null

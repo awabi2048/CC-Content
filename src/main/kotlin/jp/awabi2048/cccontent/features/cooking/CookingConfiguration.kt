@@ -56,7 +56,8 @@ data class UnifiedCookingResult(
     val saturationModifier: Float,
     val alwaysEat: Boolean,
     val effects: List<CookingEffectDefinition>,
-    val maxStackSize: Int
+    val maxStackSize: Int,
+    val amountPerScale: Int
 )
 
 data class UnifiedCookingRecipe(
@@ -256,7 +257,8 @@ object UnifiedCookingConfigurationLoader {
             if (failure) 0f else section.getDouble("saturation_modifier", 0.0).toFloat(),
             !failure && section.getBoolean("always_eat", false),
             if (failure) emptyList() else effects,
-            section.getInt("max_stack_size", if (container == null) 16 else 1).also { require(it in 1..64) }
+            section.getInt("max_stack_size", if (container == null) 16 else 1).also { require(it in 1..64) },
+            section.getInt("amount_per_scale", 1).also { require(it > 0) }
         )
     }
 

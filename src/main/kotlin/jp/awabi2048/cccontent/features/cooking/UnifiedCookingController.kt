@@ -444,7 +444,7 @@ internal class UnifiedCookingController(
             )
         }
         val snapshot = CookingRecipeSnapshot(
-            configured.result.customItemId, 1, configured.failureResult.customItemId,
+            configured.result.customItemId, configured.result.amountPerScale, configured.failureResult.customItemId,
             selected.recipe.durationSeconds, requireNotNull(selected.recipe.heat), selected.recipe.waterUnits,
             selected.recipe.resultKind, configured.result.container?.name, configured.result.liquidPane?.name,
             selected.recipe.experience

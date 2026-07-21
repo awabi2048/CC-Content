@@ -651,13 +651,27 @@ public final class ResourceConfigurationValidator {
         Map<String, Object> config = rootMap(configs, configFile, errors);
         if (config != null) {
             requireBoolean(config, "enabled", configFile, "enabled", errors);
-            Map<String, Object> settings = requireMap(config, "settings", configFile, errors);
-            if (settings != null) requireRatio(settings.get("minimum_similarity"), configFile, "settings.minimum_similarity", errors);
+            Map<String, Object> matching = requireMap(config, "matching", configFile, errors);
+            if (matching != null) {
+                for (String key : List.of("maximum_excess_ratio_per_ingredient", "maximum_unknown_ratio",
+                    "maximum_total_error", "ambiguity_margin")) {
+                    requireRatio(matching.get(key), configFile, "matching." + key, errors);
+                }
+            }
+            Map<String, Object> equipment = requireMap(config, "equipment", configFile, errors);
+            if (equipment != null) {
+                requireIntegerRange(equipment.get("pan_max_scale"), 5, 5, configFile, "equipment.pan_max_scale", errors);
+                requireIntegerRange(equipment.get("cauldron_max_scale"), 3, 3, configFile, "equipment.cauldron_max_scale", errors);
+            }
+            Map<String, Object> state = requireMap(config, "state", configFile, errors);
+            if (state != null) requirePositiveInteger(state.get("flush_interval_ticks"), configFile, "state.flush_interval_ticks", errors);
         }
-        Path recipeFile = configRoot.resolve("cooking/recipe.yml");
-        Map<String, Object> root = rootMap(configs, recipeFile, errors);
-        if (root != null) {
-            requireMap(root, "recipes", recipeFile, errors);
+        for (String name : List.of("ingredients.yml", "cutting.yml", "recipe.yml")) {
+            Path file = configRoot.resolve("cooking/" + name);
+            Map<String, Object> root = rootMap(configs, file, errors);
+            if (root != null) {
+                requireMap(root, name.equals("ingredients.yml") ? "ingredients" : "recipes", file, errors);
+            }
         }
     }
 
@@ -1025,12 +1039,13 @@ public final class ResourceConfigurationValidator {
     }
 
     private static void requireIntegerRange(Object value, int minimum, int maximum, Path file, String path, List<String> errors) {
-        if (!(value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long)) {
+        if (!(value instanceof Number number) || !Double.isFinite(number.doubleValue()) ||
+            number.doubleValue() != number.longValue()) {
             errors.add(format("invalid integer", file, path, "integer value is required"));
             return;
         }
-        long number = ((Number) value).longValue();
-        if (number < minimum || number > maximum) {
+        long integer = number.longValue();
+        if (integer < minimum || integer > maximum) {
             errors.add(format("invalid integer range", file, path, "value must be between " + minimum + " and " + maximum));
         }
     }
