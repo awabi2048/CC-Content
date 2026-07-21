@@ -35,6 +35,7 @@ data class IngredientDefinition(
 
 data class BreweryRecipe(
     val id: String,
+    val primaryOutputId: String,
     val requiredSkillLevel: Int,
     val requiredSkills: Set<String>,
     val fermentationIngredients: Map<String, Int>,
@@ -51,7 +52,21 @@ data class BreweryRecipe(
     val finalOutputColor: String?,
     val finalOutputEffects: List<BreweryEffectDefinition>,
     val finalOutputGlint: Boolean,
-    val finalOutputCustomModelData: List<Int>
+    val finalOutputCustomModelData: List<Int>,
+    val agingVariants: List<BreweryAgingVariant>,
+    val outputs: Map<String, BreweryOutputDefinition>
+)
+
+data class BreweryAgingVariant(val outputId: String, val targetUnits: Int, val barrelTypes: Set<String>)
+
+data class BreweryOutputDefinition(
+    val id: String,
+    val glint: Boolean,
+    val effects: List<BreweryEffectDefinition>,
+    val itemModel: String,
+    val alcoholPercent: Double,
+    val intoxicationPoints: Double,
+    val soberingPoints: Double
 )
 
 fun breweryQualityIndex(quality: Double): Int = when {
@@ -182,23 +197,87 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
     }
 
     fun loadRecipes(): Map<String, BreweryRecipe> {
-        val file = File(plugin.dataFolder, "config/brewery/recipe.yml")
+        val file = File(plugin.dataFolder, "config/brewery/recipes.yml")
         val yml = YamlConfiguration.loadConfiguration(file)
-        require(yml.getInt("config_version", -1) == 2) { "Breweryレシピ設定のconfig_versionが2ではありません" }
-        val recipeSection = yml.getConfigurationSection("recipes")
-            ?: error("Breweryレシピ設定にrecipesセクションがありません")
-        val recipes = mutableMapOf<String, BreweryRecipe>()
-        for (id in recipeSection.getKeys(false)) {
-            val node = recipeSection.getConfigurationSection(id) ?: continue
-            val recipe = parseRecipe(id, node)
-            if (recipe != null) {
-                recipes[id] = recipe
-            }
-        }
-        return recipes
+        require(yml.getInt("config_version", -1) == 3) { "Breweryレシピ設定のconfig_versionが3ではありません" }
+        val preparations = yml.getConfigurationSection("preparations")
+            ?: error("Breweryレシピ設定にpreparationsセクションがありません")
+        val families = yml.getConfigurationSection("brew_families")
+            ?: error("Breweryレシピ設定にbrew_familiesセクションがありません")
+        return families.getKeys(false).associateWith { familyId ->
+            parseFamily(familyId, requireNotNull(families.getConfigurationSection(familyId)), preparations)
+        }.also { require(it.size == 26) { "brew_families must contain exactly 26 families" } }
     }
 
-    fun getIngredientDefinition(key: String): IngredientDefinition? = ingredientDefinitions[key]
+    fun getIngredientDefinition(key: String): IngredientDefinition? = ingredientDefinitions[key] ?: when {
+        key.startsWith("minecraft:") -> Material.matchMaterial(key.removePrefix("minecraft:").uppercase())
+            ?.let { IngredientDefinition(key, materials = setOf(it)) }
+        key.startsWith("resource.") -> IngredientDefinition(key, customItemIds = setOf(key))
+        else -> null
+    }
+
+    private fun requiredString(section: ConfigurationSection, path: String): String =
+        section.getString(path)?.trim()?.takeIf { it.isNotEmpty() }
+            ?: error("${section.currentPath}.$path is required")
+
+    private fun parseFamily(
+        familyId: String,
+        family: ConfigurationSection,
+        preparations: ConfigurationSection
+    ): BreweryRecipe {
+        val preparationId = requiredString(family, "preparation")
+        val preparation = preparations.getConfigurationSection(preparationId)
+            ?: error("Unknown preparation $preparationId for $familyId")
+        require(requiredString(preparation, "family") == familyId)
+        require(preparation.getInt("water_units") == 3 && preparation.getInt("max_scale") == 1)
+        val ingredients = requireNotNull(preparation.getConfigurationSection("ingredients")).getKeys(false)
+            .associateWith { preparation.getInt("ingredients.$it").also { amount -> require(amount > 0) } }
+        val fermentation = requireNotNull(family.getConfigurationSection("fermentation"))
+        require(requiredString(fermentation, "yeast") == "brewery.cultured_yeast")
+        val distillation = requireNotNull(family.getConfigurationSection("distillation"))
+        val aging = requireNotNull(family.getConfigurationSection("aging"))
+        val variants = aging.getMapList("variants").map { raw ->
+            BreweryAgingVariant(
+                raw["output_id"]?.toString() ?: error("$familyId aging output_id is required"),
+                (raw["target_units"] as? Number)?.toInt()?.also { require(it > 0) }
+                    ?: error("$familyId target_units is required"),
+                (raw["barrel_types"] as? List<*>)?.map { it.toString().lowercase() }?.toSet().orEmpty()
+            )
+        }.sortedBy(BreweryAgingVariant::targetUnits)
+        val outputSection = requireNotNull(family.getConfigurationSection("outputs"))
+        val outputs = outputSection.getKeys(false).associateWith { outputId ->
+            val output = requireNotNull(outputSection.getConfigurationSection(outputId))
+            val consumption = requireNotNull(output.getConfigurationSection("consumption"))
+            val alcohol = consumption.getDouble("alcohol_percent")
+            val intoxication = consumption.getDouble("intoxication_points")
+            val sobering = consumption.getDouble("sobering_points")
+            require(alcohol in 0.0..100.0 && intoxication in 0.0..100.0 && sobering in 0.0..100.0)
+            require(!(intoxication > 0 && sobering > 0))
+            require((alcohol == 0.0) == (intoxication == 0.0))
+            BreweryOutputDefinition(
+                outputId, output.getBoolean("glint"), output.getStringList("effects").map { parseEffect(outputId, it) },
+                requiredString(output, "item_model"), alcohol, intoxication, sobering
+            )
+        }
+        require(outputs.isNotEmpty() && variants.all { it.outputId in outputs })
+        val primary = variants.firstOrNull()?.outputId ?: outputs.keys.single()
+        val primaryOutput = outputs.getValue(primary)
+        val heat = when (requiredString(preparation, "heat")) {
+            "NORMAL" -> FirePower.MEDIUM
+            "HIGH" -> FirePower.HIGH
+            else -> error("Unknown preparation heat for $familyId")
+        }
+        return BreweryRecipe(
+            familyId, primary, 1, emptySet(), ingredients,
+            fermentation.getInt("duration_seconds").also { require(it > 0) }, heat,
+            null, distillation.getInt("duration_seconds_per_run").also { require(it > 0) },
+            distillation.getInt("filter_consumption_per_run").also { require(it > 0) },
+            distillation.getInt("required_runs").also { require(it >= 0) },
+            variants.firstOrNull()?.targetUnits ?: 0,
+            variants.firstOrNull()?.barrelTypes ?: setOf("any"), null,
+            primaryOutput.alcoholPercent, null, primaryOutput.effects, primaryOutput.glint, emptyList(), variants, outputs
+        )
+    }
 
     private fun parseRecipe(id: String, node: ConfigurationSection): BreweryRecipe? {
         val requiredSkillLevel = node.getInt("required_skill_level", 1).coerceAtLeast(1)
@@ -247,6 +326,7 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
 
         return BreweryRecipe(
             id = id,
+            primaryOutputId = id,
             requiredSkillLevel = requiredSkillLevel,
             requiredSkills = requiredSkills,
             fermentationIngredients = ingredients,
@@ -263,7 +343,9 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
             finalOutputColor = color,
             finalOutputEffects = effects,
             finalOutputGlint = finalOutputSection.getBoolean("glint", false),
-            finalOutputCustomModelData = customModelData
+            finalOutputCustomModelData = customModelData,
+            agingVariants = emptyList(),
+            outputs = emptyMap()
         )
     }
 

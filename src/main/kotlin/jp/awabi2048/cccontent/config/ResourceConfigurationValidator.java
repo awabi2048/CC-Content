@@ -528,34 +528,27 @@ public final class ResourceConfigurationValidator {
         if (config != null) {
             requireMap(config, "brewery", configFile, errors);
         }
-        Path recipeFile = configRoot.resolve("brewery/recipe.yml");
+        Path recipeFile = configRoot.resolve("brewery/recipes.yml");
         Map<String, Object> recipeRoot = rootMap(configs, recipeFile, errors);
         if (recipeRoot != null) {
-            Map<String, Object> recipes = requireMap(recipeRoot, "recipes", recipeFile, errors);
-            if (recipes == null) {
+            Map<String, Object> preparations = requireMap(recipeRoot, "preparations", recipeFile, errors);
+            Map<String, Object> recipes = requireMap(recipeRoot, "brew_families", recipeFile, errors);
+            if (preparations == null || recipes == null) {
                 return;
             }
-            requireNonEmpty(recipes, recipeFile, "recipes", errors);
+            requireNonEmpty(preparations, recipeFile, "preparations", errors);
+            requireNonEmpty(recipes, recipeFile, "brew_families", errors);
             for (Map.Entry<String, Object> entry : recipes.entrySet()) {
                 Map<String, Object> recipe = asMap(entry.getValue());
-                String path = "recipes." + entry.getKey();
+                String path = "brew_families." + entry.getKey();
                 if (recipe == null) {
                     errors.add(format("invalid brewery recipe", recipeFile, path, "recipe must be a section"));
                     continue;
                 }
-                requirePositiveNumber(recipe, "required_skill_level", recipeFile, path + ".required_skill_level", errors);
                 requireMap(recipe, "fermentation", recipeFile, errors, path + ".fermentation");
-                Map<String, Object> finalOutput = requireMap(recipe, "final_output", recipeFile, errors, path + ".final_output");
-                if (finalOutput != null) {
-                    requireFiniteNumberRange(
-                        finalOutput.get("alcohol"),
-                        -100.0,
-                        100.0,
-                        recipeFile,
-                        path + ".final_output.alcohol",
-                        errors
-                    );
-                }
+                requireMap(recipe, "distillation", recipeFile, errors, path + ".distillation");
+                requireMap(recipe, "aging", recipeFile, errors, path + ".aging");
+                requireMap(recipe, "outputs", recipeFile, errors, path + ".outputs");
             }
         }
     }

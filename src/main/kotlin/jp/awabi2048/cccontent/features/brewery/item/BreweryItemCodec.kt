@@ -146,29 +146,37 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     fun setAgingStart(item: ItemStack, startedAt: Long) { item.editMeta { it.persistentDataContainer.set(agingStartKey, PersistentDataType.LONG, startedAt) } }
     fun clearAgingStart(item: ItemStack) { item.editMeta { it.persistentDataContainer.remove(agingStartKey) } }
 
-    fun markAged(item: ItemStack, state: BreweryItemState, finalQuality: Double, recipe: BreweryRecipe, player: Player?) {
+    fun markAged(
+        item: ItemStack,
+        state: BreweryItemState,
+        finalQuality: Double,
+        recipe: BreweryRecipe,
+        player: Player?,
+        outputId: String = recipe.primaryOutputId
+    ) {
         val rounded = (finalQuality / 20.0).roundToInt().coerceIn(0, 5) * 20
         val stars = (rounded / 20).coerceIn(1, 5)
         val meta = item.itemMeta ?: return
         val pdc = meta.persistentDataContainer
         pdc.set(stageKey, PersistentDataType.STRING, BrewStage.AGED.name)
         pdc.set(qualityKey, PersistentDataType.DOUBLE, finalQuality.coerceIn(0.0, 100.0))
-        val correctedAlcohol =
-            jp.awabi2048.cccontent.features.brewery.BreweryIntoxicationMath
-                .qualityCorrectedAlcohol(recipe.finalOutputAlcohol, finalQuality)
-        pdc.set(alcoholKey, PersistentDataType.DOUBLE, correctedAlcohol)
+        val output = recipe.outputs[outputId]
+        val alcohol = output?.alcoholPercent ?: recipe.finalOutputAlcohol
+        pdc.remove(alcoholKey)
         pdc.set(finalStarsKey, PersistentDataType.INTEGER, stars)
         val tier = breweryQualityTier(finalQuality)
-        val product = text(player, "brewery.recipe.${recipe.id}.final.$tier.name")
-        meta.displayName(Component.text(text(player, "brewery.item.name.aged", "recipe" to text(player, "brewery.recipe.${recipe.id}.name"), "product" to product, "stars" to "★".repeat(stars))))
-        meta.setEnchantmentGlintOverride(recipe.finalOutputGlint)
-        meta.lore(renderLore(player, text(player, "brewery.recipe.${recipe.id}.final.$tier.description"), listOf(
-            "brewery.item.data.recipe" to text(player, "brewery.recipe.${recipe.id}.name"),
+        val product = text(player, "brewery.recipe.$outputId.final.$tier.name")
+        meta.displayName(Component.text(text(player, "brewery.item.name.aged", "recipe" to text(player, "brewery.recipe.$outputId.name"), "product" to product, "stars" to "★".repeat(stars))))
+        meta.setEnchantmentGlintOverride(output?.glint ?: recipe.finalOutputGlint)
+        meta.setItemModel(NamespacedKey.fromString(output?.itemModel ?: "kota_server:custom_item/brewery/$outputId"))
+        meta.lore(renderLore(player, text(player, "brewery.recipe.$outputId.final.$tier.description"), listOf(
+            "brewery.item.data.recipe" to text(player, "brewery.recipe.$outputId.name"),
             "brewery.item.data.stage" to text(player, "brewery.item.stage.aged"),
             "brewery.item.data.final_quality" to "%.1f".format(finalQuality.coerceIn(0.0, 100.0)),
             "brewery.item.data.rating" to "★".repeat(stars),
-            "brewery.item.data.alcohol" to "%.1f%%".format(correctedAlcohol)
+            "brewery.item.data.alcohol" to "%.1f%%".format(alcohol)
         )))
+        pdc.set(customItemIdKey, PersistentDataType.STRING, "brewery.$outputId")
         applyPotionColor(meta, recipe.finalOutputColor)
         item.itemMeta = meta
         recipe.finalOutputCustomModelData.getOrNull(breweryQualityIndex(finalQuality))?.let { model ->
@@ -178,6 +186,9 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
             )
         }
     }
+
+    fun outputId(item: ItemStack): String? = item.itemMeta?.persistentDataContainer
+        ?.get(customItemIdKey, PersistentDataType.STRING)?.removePrefix("brewery.")
 
     fun hasStageExpAwarded(item: ItemStack, stage: BrewStage): Boolean =
         ((item.itemMeta?.persistentDataContainer?.get(expAwardedKey, PersistentDataType.INTEGER) ?: 0) and (1 shl stage.ordinal)) != 0

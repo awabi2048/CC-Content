@@ -1,0 +1,1034 @@
+config_version: 3
+
+preparations:
+  wheatbeer_wort:
+    family: wheatbeer
+    group: BASIC
+    ingredients:
+      "minecraft:wheat": 4
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 480
+    heat: NORMAL
+    liquid_pane: YELLOW_STAINED_GLASS_PANE
+    failure_result: brewery.failed_wheatbeer_wort
+  beer_wort:
+    family: beer
+    group: BASIC
+    ingredients:
+      "minecraft:wheat": 6
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 480
+    heat: NORMAL
+    liquid_pane: ORANGE_STAINED_GLASS_PANE
+    failure_result: brewery.failed_beer_wort
+  darkbeer_wort:
+    family: darkbeer
+    group: INTERMEDIATE
+    ingredients:
+      "minecraft:wheat": 8
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 480
+    heat: NORMAL
+    liquid_pane: BROWN_STAINED_GLASS_PANE
+    failure_result: brewery.failed_darkbeer_wort
+  mead_must:
+    family: mead
+    group: BASIC
+    ingredients:
+      "minecraft:honey_bottle": 6
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 180
+    heat: NORMAL
+    liquid_pane: YELLOW_STAINED_GLASS_PANE
+    failure_result: brewery.failed_mead_must
+  apple_mead_must:
+    family: ap_mead
+    group: INTERMEDIATE
+    ingredients:
+      "minecraft:honey_bottle": 10
+      "minecraft:apple": 2
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 240
+    heat: NORMAL
+    liquid_pane: ORANGE_STAINED_GLASS_PANE
+    failure_result: brewery.failed_apple_mead_must
+  red_grape_must:
+    family: red_wine
+    group: INTERMEDIATE
+    ingredients:
+      "resource.grape": 5
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 300
+    heat: NORMAL
+    liquid_pane: RED_STAINED_GLASS_PANE
+    failure_result: brewery.failed_red_grape_must
+  white_glowberry_must:
+    family: whitewine
+    group: INTERMEDIATE
+    ingredients:
+      "minecraft:glow_berries": 5
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 300
+    heat: NORMAL
+    liquid_pane: WHITE_STAINED_GLASS_PANE
+    failure_result: brewery.failed_white_glowberry_must
+  cider_must:
+    family: cidre
+    group: BASIC
+    ingredients:
+      "minecraft:apple": 14
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 420
+    heat: NORMAL
+    liquid_pane: ORANGE_STAINED_GLASS_PANE
+    failure_result: brewery.failed_cider_must
+  apple_liquor_mash:
+    family: apple_liquor
+    group: ADVANCED
+    ingredients:
+      "minecraft:apple": 4
+      "minecraft:sugar": 16
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 960
+    heat: NORMAL
+    liquid_pane: BROWN_STAINED_GLASS_PANE
+    failure_result: brewery.failed_apple_liquor_mash
+  whisky_wort:
+    family: whisky
+    group: ADVANCED
+    ingredients:
+      "minecraft:wheat": 10
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 600
+    heat: NORMAL
+    liquid_pane: ORANGE_STAINED_GLASS_PANE
+    failure_result: brewery.failed_whisky_wort
+  rum_wash:
+    family: rum
+    group: ADVANCED
+    ingredients:
+      "minecraft:sugar_cane": 18
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 360
+    heat: NORMAL
+    liquid_pane: RED_STAINED_GLASS_PANE
+    failure_result: brewery.failed_rum_wash
+  vodka_mash:
+    family: vodka
+    group: ADVANCED
+    ingredients:
+      "minecraft:potato": 10
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 900
+    heat: NORMAL
+    liquid_pane: WHITE_STAINED_GLASS_PANE
+    failure_result: brewery.failed_vodka_mash
+  gin_wash:
+    family: gin
+    group: HERBAL
+    ingredients:
+      "minecraft:wheat": 9
+      "minecraft:cornflower": 6
+      "minecraft:apple": 1
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 360
+    heat: NORMAL
+    liquid_pane: LIGHT_BLUE_STAINED_GLASS_PANE
+    failure_result: brewery.failed_gin_wash
+  tequila_wash:
+    family: tequila
+    group: ADVANCED
+    ingredients:
+      "minecraft:cactus": 8
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 900
+    heat: NORMAL
+    liquid_pane: YELLOW_STAINED_GLASS_PANE
+    failure_result: brewery.failed_tequila_wash
+  absinthe_wash:
+    family: absinthe
+    group: HERBAL
+    ingredients:
+      "minecraft:oxeye_daisy": 4
+      "minecraft:dandelion": 4
+      "resource.spice_leaf": 8
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 180
+    heat: NORMAL
+    liquid_pane: LIME_STAINED_GLASS_PANE
+    failure_result: brewery.failed_absinthe_wash
+  great_absinthe_wash:
+    family: gr_absinthe
+    group: TOP
+    ingredients:
+      "minecraft:oxeye_daisy": 6
+      "minecraft:dandelion": 6
+      "minecraft:fern": 12
+      "minecraft:poisonous_potato": 3
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 300
+    heat: NORMAL
+    liquid_pane: GREEN_STAINED_GLASS_PANE
+    failure_result: brewery.failed_great_absinthe_wash
+  spirytus_mash:
+    family: spirytus
+    group: TOP
+    ingredients:
+      "minecraft:wheat": 12
+      "minecraft:potato": 16
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 540
+    heat: NORMAL
+    liquid_pane: LIME_STAINED_GLASS_PANE
+    failure_result: brewery.failed_spirytus_mash
+  apple_saida_must:
+    family: apple_saida
+    group: BASIC
+    ingredients:
+      "minecraft:apple": 5
+      "minecraft:sugar": 3
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 240
+    heat: NORMAL
+    liquid_pane: RED_STAINED_GLASS_PANE
+    failure_result: brewery.failed_apple_saida_must
+  sake_mash:
+    family: sake
+    group: INTERMEDIATE
+    ingredients:
+      "resource.rice": 8
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 540
+    heat: NORMAL
+    liquid_pane: WHITE_STAINED_GLASS_PANE
+    failure_result: brewery.failed_sake_mash
+  awamori_mash:
+    family: awamori
+    group: ADVANCED
+    ingredients:
+      "resource.rice": 10
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 660
+    heat: NORMAL
+    liquid_pane: LIME_STAINED_GLASS_PANE
+    failure_result: brewery.failed_awamori_mash
+  shochu_mash:
+    family: shochu
+    group: ADVANCED
+    ingredients:
+      "resource.rice": 6
+      "minecraft:potato": 4
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 600
+    heat: NORMAL
+    liquid_pane: LIGHT_GRAY_STAINED_GLASS_PANE
+    failure_result: brewery.failed_shochu_mash
+  brandy_must:
+    family: brandy
+    group: ADVANCED
+    ingredients:
+      "resource.grape": 10
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 480
+    heat: NORMAL
+    liquid_pane: ORANGE_STAINED_GLASS_PANE
+    failure_result: brewery.failed_brandy_must
+  moonshine_mash:
+    family: moonshine
+    group: TOP
+    ingredients:
+      "minecraft:wheat": 12
+      "minecraft:potato": 15
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 540
+    heat: NORMAL
+    liquid_pane: RED_STAINED_GLASS_PANE
+    failure_result: brewery.failed_moonshine_mash
+  mushroom_ale_wort:
+    family: mushroom_ale
+    group: WILD_AND_FUNGI
+    ingredients:
+      "minecraft:wheat": 4
+      "minecraft:red_mushroom": 2
+      "minecraft:brown_mushroom": 2
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 480
+    heat: NORMAL
+    liquid_pane: BROWN_STAINED_GLASS_PANE
+    failure_result: brewery.failed_mushroom_ale_wort
+  chorus_spirit_wash:
+    family: chorus_spirit
+    group: TOP
+    ingredients:
+      "minecraft:chorus_fruit": 6
+      "minecraft:sugar": 4
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 600
+    heat: HIGH
+    liquid_pane: PURPLE_STAINED_GLASS_PANE
+    failure_result: brewery.failed_chorus_spirit_wash
+  cacao_must:
+    family: cacao_wine
+    group: WILD_AND_FUNGI
+    ingredients:
+      "resource.cocoa_pulp": 6
+      "minecraft:sugar": 2
+    water_units: 3
+    max_scale: 1
+    duration_seconds: 360
+    heat: NORMAL
+    liquid_pane: BROWN_STAINED_GLASS_PANE
+    failure_result: brewery.failed_cacao_must
+
+brew_families:
+  wheatbeer:
+    group: BASIC
+    preparation: wheatbeer_wort
+    fermentation:
+      duration_seconds: 960
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 0
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+    outputs:
+      wheatbeer:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/wheatbeer
+        consumption:
+          alcohol_percent: 5.0
+          intoxication_points: 5.0
+          sobering_points: 0.0
+  beer:
+    group: BASIC
+    preparation: beer_wort
+    fermentation:
+      duration_seconds: 960
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 0
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+    outputs:
+      beer:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/beer
+        consumption:
+          alcohol_percent: 6.0
+          intoxication_points: 6.0
+          sobering_points: 0.0
+  darkbeer:
+    group: INTERMEDIATE
+    preparation: darkbeer_wort
+    fermentation:
+      duration_seconds: 960
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 0
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+    outputs:
+      darkbeer:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/darkbeer
+        consumption:
+          alcohol_percent: 7.0
+          intoxication_points: 7.0
+          sobering_points: 0.0
+  mead:
+    group: BASIC
+    preparation: mead_must
+    fermentation:
+      duration_seconds: 600
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 0
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: mead
+          target_units: 4
+          barrel_types: [OAK]
+    outputs:
+      mead:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/mead
+        consumption:
+          alcohol_percent: 11.0
+          intoxication_points: 9.0
+          sobering_points: 0.0
+  ap_mead:
+    group: INTERMEDIATE
+    preparation: apple_mead_must
+    fermentation:
+      duration_seconds: 600
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 0
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: ap_mead
+          target_units: 4
+          barrel_types: [OAK]
+    outputs:
+      ap_mead:
+        glint: false
+        effects:
+          - WATER_BREATHING/1-2/150
+        item_model: kota_server:custom_item/brewery/ap_mead
+        consumption:
+          alcohol_percent: 11.0
+          intoxication_points: 9.0
+          sobering_points: 0.0
+  red_wine:
+    group: INTERMEDIATE
+    preparation: red_grape_must
+    fermentation:
+      duration_seconds: 600
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 0
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: vintagewine
+          target_units: 202
+          barrel_types: [ANY]
+    outputs:
+      redwine:
+        glint: 
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/redwine
+        consumption:
+          alcohol_percent: 14.0
+          intoxication_points: 11.0
+          sobering_points: 0.0
+      vintagewine:
+        glint: true
+        effects:
+          - ABSORPTION/0-3/0-180
+          - REGENERATION/0-3/10-20
+          - RESISTANCE/0/0-60
+        item_model: kota_server:custom_item/brewery/vintagewine
+        consumption:
+          alcohol_percent: 14.0
+          intoxication_points: 12.0
+          sobering_points: 0.0
+  whitewine:
+    group: INTERMEDIATE
+    preparation: white_glowberry_must
+    fermentation:
+      duration_seconds: 600
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 0
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: whitewine
+          target_units: 20
+          barrel_types: [ANY]
+    outputs:
+      whitewine:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/whitewine
+        consumption:
+          alcohol_percent: 12.0
+          intoxication_points: 10.0
+          sobering_points: 0.0
+  cidre:
+    group: BASIC
+    preparation: cider_must
+    fermentation:
+      duration_seconds: 840
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 0
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+    outputs:
+      cidre:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/cidre
+        consumption:
+          alcohol_percent: 7.0
+          intoxication_points: 6.0
+          sobering_points: 0.0
+  apple_liquor:
+    group: ADVANCED
+    preparation: apple_liquor_mash
+    fermentation:
+      duration_seconds: 1920
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 3
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+    outputs:
+      apple_liquor:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/apple_liquor
+        consumption:
+          alcohol_percent: 20.0
+          intoxication_points: 14.0
+          sobering_points: 0.0
+  whisky:
+    group: ADVANCED
+    preparation: whisky_wort
+    fermentation:
+      duration_seconds: 1200
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 2
+      duration_seconds_per_run: 50
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: whisky
+          target_units: 18
+          barrel_types: [SPRUCE]
+    outputs:
+      whisky:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/whisky
+        consumption:
+          alcohol_percent: 40.0
+          intoxication_points: 20.0
+          sobering_points: 0.0
+  rum:
+    group: ADVANCED
+    preparation: rum_wash
+    fermentation:
+      duration_seconds: 720
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 2
+      duration_seconds_per_run: 30
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+    outputs:
+      rum:
+        glint: false
+        effects:
+          - FIRE_RESISTANCE/1/20-100
+          - POISON/1-0/30-0
+        item_model: kota_server:custom_item/brewery/rum
+        consumption:
+          alcohol_percent: 35.0
+          intoxication_points: 18.0
+          sobering_points: 0.0
+  vodka:
+    group: ADVANCED
+    preparation: vodka_mash
+    fermentation:
+      duration_seconds: 1800
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 3
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants: []
+    outputs:
+      vodka:
+        glint: false
+        effects:
+          - WEAKNESS/0/15
+          - POISON/0/10
+        item_model: kota_server:custom_item/brewery/vodka
+        consumption:
+          alcohol_percent: 40.0
+          intoxication_points: 20.0
+          sobering_points: 0.0
+  gin:
+    group: HERBAL
+    preparation: gin_wash
+    fermentation:
+      duration_seconds: 720
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 2
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants: []
+    outputs:
+      gin:
+        glint: false
+        effects:
+          - WEAKNESS/0/15
+          - HEALTH_BOOST/0-2/30-180
+        item_model: kota_server:custom_item/brewery/gin
+        consumption:
+          alcohol_percent: 40.0
+          intoxication_points: 20.0
+          sobering_points: 0.0
+  tequila:
+    group: ADVANCED
+    preparation: tequila_wash
+    fermentation:
+      duration_seconds: 1800
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 2
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: tequila
+          target_units: 12
+          barrel_types: [BIRCH]
+    outputs:
+      tequila:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/tequila
+        consumption:
+          alcohol_percent: 38.0
+          intoxication_points: 19.0
+          sobering_points: 0.0
+  absinthe:
+    group: HERBAL
+    preparation: absinthe_wash
+    fermentation:
+      duration_seconds: 600
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 6
+      duration_seconds_per_run: 80
+      filter_consumption_per_run: 1
+    aging:
+      variants: []
+    outputs:
+      absinthe:
+        glint: false
+        effects:
+          - POISON/0/15-25
+        item_model: kota_server:custom_item/brewery/absinthe
+        consumption:
+          alcohol_percent: 55.0
+          intoxication_points: 25.0
+          sobering_points: 0.0
+  gr_absinthe:
+    group: TOP
+    preparation: great_absinthe_wash
+    fermentation:
+      duration_seconds: 600
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 6
+      duration_seconds_per_run: 85
+      filter_consumption_per_run: 1
+    aging:
+      variants: []
+    outputs:
+      gr_absinthe:
+        glint: t
+        effects:
+          - POISON/0/25-40
+          - INSTANT_DAMAGE/2/1
+          - NIGHT_VISION/0/40-60
+        item_model: kota_server:custom_item/brewery/gr_absinthe
+        consumption:
+          alcohol_percent: 65.0
+          intoxication_points: 28.0
+          sobering_points: 0.0
+  spirytus:
+    group: TOP
+    preparation: spirytus_mash
+    fermentation:
+      duration_seconds: 1080
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 70
+      duration_seconds_per_run: 10
+      filter_consumption_per_run: 1
+    aging:
+      variants: []
+    outputs:
+      spirytus:
+        glint: false
+        effects:
+          - HASTE/0-3/60-300
+          - JUMP_BOOST/0-3/10-30
+          - POISON/1-0/30-0
+          - BLINDNESS/0/30-10
+          - GLOWING/0/30-240
+        item_model: kota_server:custom_item/brewery/spirytus
+        consumption:
+          alcohol_percent: 95.0
+          intoxication_points: 35.0
+          sobering_points: 0.0
+  apple_saida:
+    group: BASIC
+    preparation: apple_saida_must
+    fermentation:
+      duration_seconds: 600
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 0
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: apple_saida
+          target_units: 2
+          barrel_types: [JUNGLE]
+    outputs:
+      apple_saida:
+        glint: false
+        effects:
+          - STRENGTH/0-1/30-180
+          - UNLUCK/3-1/60-0
+        item_model: kota_server:custom_item/brewery/apple_saida
+        consumption:
+          alcohol_percent: 0.0
+          intoxication_points: 0.0
+          sobering_points: 0.0
+  sake:
+    group: INTERMEDIATE
+    preparation: sake_mash
+    fermentation:
+      duration_seconds: 1080
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 0
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: sake
+          target_units: 6
+          barrel_types: [ANY]
+    outputs:
+      sake:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/sake
+        consumption:
+          alcohol_percent: 15.0
+          intoxication_points: 12.0
+          sobering_points: 0.0
+  awamori:
+    group: ADVANCED
+    preparation: awamori_mash
+    fermentation:
+      duration_seconds: 1320
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 1
+      duration_seconds_per_run: 60
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+    outputs:
+      awamori:
+        glint: t
+        effects:
+          - DOLPHINS_GRACE/0/90
+          - NIGHT_VISION/0/90
+          - LUCK/3/90
+        item_model: kota_server:custom_item/brewery/awamori
+        consumption:
+          alcohol_percent: 30.0
+          intoxication_points: 16.0
+          sobering_points: 0.0
+  shochu:
+    group: ADVANCED
+    preparation: shochu_mash
+    fermentation:
+      duration_seconds: 1200
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 1
+      duration_seconds_per_run: 60
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: shochu
+          target_units: 10
+          barrel_types: [ANY]
+    outputs:
+      shochu:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/shochu
+        consumption:
+          alcohol_percent: 25.0
+          intoxication_points: 14.0
+          sobering_points: 0.0
+  brandy:
+    group: ADVANCED
+    preparation: brandy_must
+    fermentation:
+      duration_seconds: 960
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 2
+      duration_seconds_per_run: 50
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+    outputs:
+      brandy:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/brandy
+        consumption:
+          alcohol_percent: 40.0
+          intoxication_points: 20.0
+          sobering_points: 0.0
+  moonshine:
+    group: TOP
+    preparation: moonshine_mash
+    fermentation:
+      duration_seconds: 1080
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 70
+      duration_seconds_per_run: 10
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: moonshine
+          target_units: 5
+          barrel_types: [WARPED]
+    outputs:
+      moonshine:
+        glint: t
+        effects:
+          - LEVITATION/2/5-10
+          - SLOW_FALLING/0/10-15
+          - BLINDNESS/0/4
+          - NAUSEA/6/18
+          - SLOWNESS/10/16
+        item_model: kota_server:custom_item/brewery/moonshine
+        consumption:
+          alcohol_percent: 70.0
+          intoxication_points: 30.0
+          sobering_points: 0.0
+  mushroom_ale:
+    group: WILD_AND_FUNGI
+    preparation: mushroom_ale_wort
+    fermentation:
+      duration_seconds: 960
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 0
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+    outputs:
+      mushroom_ale:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/mushroom_ale
+        consumption:
+          alcohol_percent: 7.0
+          intoxication_points: 7.0
+          sobering_points: 0.0
+  chorus_spirit:
+    group: TOP
+    preparation: chorus_spirit_wash
+    fermentation:
+      duration_seconds: 1200
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 2
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+        - output_id: 
+          target_units: 
+          barrel_types: []
+    outputs:
+      chorus_spirit:
+        glint: t
+        effects:
+          - LEVITATION/0/5
+          - SLOW_FALLING/0/20
+        item_model: kota_server:custom_item/brewery/chorus_spirit
+        consumption:
+          alcohol_percent: 25.0
+          intoxication_points: 15.0
+          sobering_points: 0.0
+  cacao_wine:
+    group: WILD_AND_FUNGI
+    preparation: cacao_must
+    fermentation:
+      duration_seconds: 720
+      yeast: brewery.cultured_yeast
+    distillation:
+      required_runs: 0
+      duration_seconds_per_run: 45
+      filter_consumption_per_run: 1
+    aging:
+      variants:
+        - output_id: cacao_wine
+          target_units: 4
+          barrel_types: [JUNGLE]
+    outputs:
+      cacao_wine:
+        glint: false
+        effects:
+          - -
+        item_model: kota_server:custom_item/brewery/cacao_wine
+        consumption:
+          alcohol_percent: 10.0
+          intoxication_points: 8.0
+          sobering_points: 0.0

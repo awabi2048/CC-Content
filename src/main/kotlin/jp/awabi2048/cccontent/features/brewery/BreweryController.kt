@@ -184,6 +184,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         if (parsed.stage != BrewStage.AGED) return
 
         val recipe = recipes[parsed.recipeId] ?: return
+        val output = recipe.outputs[codec.outputId(event.item) ?: recipe.primaryOutputId]
         val now = System.currentTimeMillis()
         val state = intoxicationStates.getOrPut(event.player.uniqueId) { BreweryIntoxicationState() }
         BreweryIntoxicationMath.decay(
@@ -192,14 +193,14 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             settings.intoxicationDecayPerSecond,
             settings.stateRetentionSeconds
         )
-        val alcohol = parsed.alcohol.coerceIn(-100.0, 100.0)
-        state.alcohol = (state.alcohol + alcohol).coerceIn(0.0, 100.0)
+        val intoxication = output?.intoxicationPoints ?: parsed.alcohol.coerceIn(0.0, 100.0)
+        state.alcohol = (state.alcohol + intoxication - (output?.soberingPoints ?: 0.0)).coerceIn(0.0, 100.0)
         state.updatedAtMillis = now
         if (state.alcohol >= settings.faintThreshold) {
             state.faintUntilMillis = maxOf(state.faintUntilMillis, now + settings.faintDurationSeconds * 1000L)
         }
 
-        recipe.finalOutputEffects.forEach { definition ->
+        (output?.effects ?: recipe.finalOutputEffects).forEach { definition ->
             val resolved = definition.resolve(parsed.quality)
             event.player.addPotionEffect(
                 PotionEffect(
@@ -212,17 +213,18 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
                 )
             )
         }
-        recordCatalog(event.player.uniqueId, recipe.id, parsed.quality, drunk = true, obtained = false)
+        val outputId = codec.outputId(event.item) ?: recipe.primaryOutputId
+        recordCatalog(event.player.uniqueId, outputId, parsed.quality, drunk = true, obtained = false)
         applyIntoxicationEffects(event.player, state, now, forceStumble = true)
         event.player.sendMessage(
             i18n(
                 event.player,
                 "brewery.drink.completed",
-                "recipe" to i18n(event.player, "brewery.recipe.${recipe.id}.name"),
+                "recipe" to i18n(event.player, "brewery.recipe.$outputId.name"),
                 "alcohol" to "%.1f".format(state.alcohol)
             )
         )
-        val drinkMessageKey = "brewery.recipe.${recipe.id}.drink_message"
+        val drinkMessageKey = "brewery.recipe.$outputId.drink_message"
         if (CCSystem.getAPI().hasI18nKey(drinkMessageKey)) {
             event.player.sendMessage(i18n(event.player, drinkMessageKey))
         }
@@ -1709,7 +1711,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             afterState.distillCount == target &&
             recipe.agingTimeDays == 0
         ) {
-            codec.markAged(item, afterState, afterState.quality, recipe, player)
+            codec.markAged(item, afterState, afterState.quality, recipe, player, recipe.primaryOutputId)
             afterState = codec.parse(item)
             player?.let {
                 recordCatalog(it.uniqueId, parsed.recipeId, afterState?.quality ?: before, drunk = false, obtained = true)
@@ -1733,18 +1735,22 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         if (parsed.stage == BrewStage.AGED) return
         val startedAt = state.insertedAtEpochMillis[slot] ?: System.currentTimeMillis()
         val years = calculateAgingYears(startedAt, state.size)
-        val recipe = recipes[parsed.recipeId]
-        val targetYears = recipe?.agingTimeDays?.coerceAtLeast(1) ?: 1
+        val recipe = recipes[parsed.recipeId] ?: return
+        val targetYears = recipe.agingTimeDays.coerceAtLeast(1)
         val ageProgress = years / targetYears.toDouble()
         val finalQuality = (parsed.quality + ageProgress * 4.0).coerceIn(0.0, 100.0)
-        codec.markAged(item, parsed, finalQuality, recipe ?: return, player)
+        val selectedOutput = recipe.agingVariants
+            .filter { years >= it.targetUnits }
+            .maxByOrNull { it.targetUnits }
+            ?.outputId ?: recipe.primaryOutputId
+        codec.markAged(item, parsed, finalQuality, recipe, player, selectedOutput)
         codec.clearAgingStart(item)
         if (!codec.hasStageExpAwarded(item, BrewStage.AGED)) {
             player?.let { awardProcessExp(it.uniqueId, settings.agingExp) }
             codec.markStageExpAwarded(item, BrewStage.AGED)
         }
         player?.let {
-            recordCatalog(it.uniqueId, parsed.recipeId, finalQuality, drunk = false, obtained = true)
+            recordCatalog(it.uniqueId, selectedOutput, finalQuality, drunk = false, obtained = true)
         }
     }
 

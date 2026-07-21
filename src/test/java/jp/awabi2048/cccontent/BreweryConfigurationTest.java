@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BreweryConfigurationTest {
     private static final Path CONFIG = Path.of("src/main/resources/config/brewery/config.yml");
-    private static final Path RECIPES = Path.of("src/main/resources/config/brewery/recipe.yml");
+    private static final Path RECIPES = Path.of("src/main/resources/config/brewery/recipes.yml");
 
     @Test
     void usesOnlyTheVersionedConfigurationShape() {
@@ -26,10 +26,23 @@ class BreweryConfigurationTest {
         assertFalse(config.contains("brewery.fire"));
         assertFalse(config.contains("brewery.aging.real_seconds_per_year"));
         assertEquals(100, config.getInt("brewery.state.flush_interval_ticks"));
-        assertEquals(2, recipes.getInt("config_version"));
+        assertEquals(3, recipes.getInt("config_version"));
         assertFalse(recipes.contains("schema_version"));
-        assertTrue(recipes.isConfigurationSection("recipes"));
-        assertEquals(35, recipes.getConfigurationSection("recipes").getKeys(false).size());
+        assertTrue(recipes.isConfigurationSection("preparations"));
+        assertTrue(recipes.isConfigurationSection("brew_families"));
+        assertEquals(26, recipes.getConfigurationSection("preparations").getKeys(false).size());
+        assertEquals(26, recipes.getConfigurationSection("brew_families").getKeys(false).size());
+        long outputCount = recipes.getConfigurationSection("brew_families").getKeys(false).stream()
+            .mapToLong(id -> recipes.getConfigurationSection("brew_families." + id + ".outputs").getKeys(false).size())
+            .sum();
+        assertEquals(27, outputCount);
+        assertTrue(recipes.isConfigurationSection("brew_families.red_wine.outputs.redwine"));
+        assertTrue(recipes.isConfigurationSection("brew_families.red_wine.outputs.vintagewine"));
+        for (String removed : java.util.List.of("pork_soup", "potato_soup", "coffee", "rd_smoothie",
+            "yl_smoothie", "pl_smoothie", "mix_smoothie", "or_smoothie", "bl_smoothie",
+            "vt_smoothie", "gr_smoothie")) {
+            assertFalse(recipes.contains("brew_families." + removed));
+        }
 
         for (String key : recipes.getKeys(true)) {
             assertFalse(key.toLowerCase().endsWith("alchol"), "legacy alcohol typo remains: " + key);
@@ -39,15 +52,15 @@ class BreweryConfigurationTest {
     @Test
     void recipesPreserveZeroStepRequirements() {
         var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
-        assertEquals(0, recipes.getInt("recipes.wheatbeer.distillation.runs"));
-        assertEquals(0, recipes.getInt("recipes.vodka.aging.time_days"));
-        assertTrue(recipes.getInt("recipes.whisky.distillation.runs") > 0);
+        assertEquals(0, recipes.getInt("brew_families.wheatbeer.distillation.required_runs"));
+        assertTrue(recipes.getMapList("brew_families.vodka.aging.variants").isEmpty());
+        assertTrue(recipes.getInt("brew_families.whisky.distillation.required_runs") > 0);
     }
 
     @Test
     void sampleRecipesExposeTypedPotionEffects() {
         var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
-        var effects = recipes.getStringList("recipes.moonshine.final_output.effects");
+        var effects = recipes.getStringList("brew_families.moonshine.outputs.moonshine.effects");
 
         assertFalse(effects.isEmpty());
         for (String effect : effects) {
@@ -65,7 +78,7 @@ class BreweryConfigurationTest {
         for (String key : recipes.getKeys(true)) {
             assertFalse(key.endsWith(".name"));
             assertFalse(key.endsWith(".description"));
-            assertFalse(key.equals("recipes.wheatbeer.name"));
+            assertFalse(key.equals("brew_families.wheatbeer.name"));
         }
     }
 
