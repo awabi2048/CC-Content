@@ -18,10 +18,13 @@ data class CookingStoredInput(
     }
 }
 
+enum class CookingOutputKind { CUSTOM_ITEM, SERIALIZED_ITEM, MATERIAL }
+
 data class CookingOutputStack(
     val customItemId: String,
     val amount: Int,
-    val failed: Boolean
+    val failed: Boolean,
+    val kind: CookingOutputKind = CookingOutputKind.CUSTOM_ITEM
 ) {
     init {
         require(customItemId.isNotBlank())
@@ -94,7 +97,6 @@ data class CookingStationSession(
         require(totalTicks > 0)
         require(remainingTicks in 0..totalTicks)
         require(consumedWaterUnits in 0..reservedWaterUnits)
-        require(!(outputStacks.isNotEmpty() && reservoir != null))
     }
 }
 
@@ -168,12 +170,17 @@ object CookingStationStateMachine {
         val snapshot = session.recipeSnapshot
         val itemId = if (session.failureCommitted) snapshot.failureResultId else snapshot.normalResultId
         val failed = session.failureCommitted
+        val remainders = session.originalInputs.mapNotNull { input ->
+            input.containerRemainderMaterial?.let {
+                CookingOutputStack(it, input.containerRemainderAmount, failed = false, CookingOutputKind.MATERIAL)
+            }
+        }
         return when (recipe.resultKind) {
             CookingResultKind.ITEM -> session.copy(
                 state = CookingProcessState.READY_ITEM,
                 outputStacks = List(session.scale) {
                     CookingOutputStack(itemId, snapshot.resultAmountPerScale, failed)
-                }
+                } + remainders
             )
             CookingResultKind.BOWL, CookingResultKind.BOTTLE -> {
                 val containerMaterial = requireNotNull(snapshot.containerMaterial)
@@ -184,6 +191,7 @@ object CookingStationStateMachine {
                 }
                 session.copy(
                     state = CookingProcessState.READY_LIQUID,
+                    outputStacks = remainders,
                     reservoir = CookingReservoir(itemId, servings, servings, containerMaterial, failed)
                 )
             }
@@ -194,11 +202,7 @@ object CookingStationStateMachine {
     fun cancel(session: CookingStationSession): CookingStationSession? {
         if (session.failureCommitted || session.state !in cancellableStates) return null
         val returned = session.originalInputs.map {
-            CookingOutputStack(it.serializedItem, it.amount, failed = false)
-        } + session.originalInputs.mapNotNull { input ->
-            input.containerRemainderMaterial?.let {
-                CookingOutputStack(it, input.containerRemainderAmount, failed = false)
-            }
+            CookingOutputStack(it.serializedItem, it.amount, failed = false, CookingOutputKind.SERIALIZED_ITEM)
         }
         return session.copy(
             state = CookingProcessState.CANCELLED_RETURN,
@@ -230,7 +234,9 @@ object CookingStationStateMachine {
         if (reservoir.remaining <= 0) return null
         val next = reservoir.remaining - 1
         return session.copy(
-            state = if (next == 0) CookingProcessState.IDLE else CookingProcessState.READY_LIQUID,
+            state = if (next == 0) {
+                if (session.outputStacks.isEmpty()) CookingProcessState.IDLE else CookingProcessState.READY_ITEM
+            } else CookingProcessState.READY_LIQUID,
             reservoir = if (next == 0) null else reservoir.copy(remaining = next),
             consumedWaterUnits = (session.consumedWaterUnits + if (session.reservedWaterUnits > 0) 1 else 0)
                 .coerceAtMost(session.reservedWaterUnits)

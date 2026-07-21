@@ -78,6 +78,22 @@ class CookingStationStateMachineTest {
         assertNull(CookingStationStateMachine.cancel(failure));
     }
 
+    @Test
+    void containerRemaindersRemainAfterLastLiquidServing() {
+        CookingRecipeDefinition recipe = recipe(CookingStation.CAULDRON, CookingResultKind.BOTTLE, 1);
+        CookingStoredInput honey = new CookingStoredInput("honey", 1, "serialized", "GLASS_BOTTLE", 1);
+        CookingStationSession session = CookingStationStateMachine.start(
+            recipe, snapshot(recipe), "player", 1, CookingHeat.HIGH, List.of(honey), 1.0
+        );
+        CookingStationStep.Completed completed = (CookingStationStep.Completed)
+            CookingStationStateMachine.tick(session, CookingHeat.HIGH);
+        CookingStationSession ready = CookingStationStateMachine.finish(completed.getSession(), recipe);
+        CookingStationSession afterLiquid = CookingStationStateMachine.collectLiquid(ready);
+        assertNotNull(afterLiquid);
+        assertEquals(CookingProcessState.READY_ITEM, afterLiquid.getState());
+        assertEquals(CookingOutputKind.MATERIAL, afterLiquid.getOutputStacks().getFirst().getKind());
+    }
+
     private static CookingRecipeDefinition recipe(
         CookingStation station,
         CookingResultKind kind,

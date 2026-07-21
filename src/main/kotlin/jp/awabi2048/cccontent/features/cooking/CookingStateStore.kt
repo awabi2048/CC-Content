@@ -75,7 +75,10 @@ internal class CookingStateStore(private val file: File) {
             )
         })
         target.set("ready_items", session.outputStacks.map { item ->
-            linkedMapOf("custom_item_id" to item.customItemId, "amount" to item.amount, "failed" to item.failed)
+            linkedMapOf(
+                "custom_item_id" to item.customItemId, "amount" to item.amount,
+                "failed" to item.failed, "kind" to item.kind.name
+            )
         })
         session.reservoir?.let { reservoir ->
             target.set("liquid_result_id", reservoir.customItemId)
@@ -117,7 +120,10 @@ internal class CookingStateStore(private val file: File) {
             )
         }
         val outputs = section.getMapList("ready_items").map { raw ->
-            CookingOutputStack(mapString(raw, "custom_item_id"), mapInt(raw, "amount"), mapBoolean(raw, "failed"))
+            CookingOutputStack(
+                mapString(raw, "custom_item_id"), mapInt(raw, "amount"), mapBoolean(raw, "failed"),
+                enumValueOf(mapString(raw, "kind"))
+            )
         }
         val liquidId = section.getString("liquid_result_id")
         val reservoir = liquidId?.let {
