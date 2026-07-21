@@ -43,7 +43,6 @@ public final class ResourceConfigurationValidator {
         validateArenaSettingsConfig(configRoot, configs, errors);
         validateArenaMissionConfig(configRoot, configs, errors);
         validateArenaOverEnchanterConfig(configRoot, configs, errors);
-        validateIngredientDefinitions(configRoot, configs, errors);
         validateMobDefinitions(configRoot, configs, errors);
         validateArenaDropConfig(configRoot, configs, errors);
         validateArenaRewardConfig(configRoot, configs, errors);
@@ -202,53 +201,6 @@ public final class ResourceConfigurationValidator {
         Map<String, Object> combatExp = requireMap(root, "combat_exp", file, errors);
         if (combatExp != null) {
             requireNonNegativeNumber(combatExp, "health_multiplier", file, "combat_exp.health_multiplier", errors);
-        }
-    }
-
-    private static void validateIngredientDefinitions(Path configRoot, Map<Path, Object> configs, List<String> errors) {
-        Path file = configRoot.resolve("ingredient_definition.yml");
-        Map<String, Object> root = rootMap(configs, file, errors);
-        if (root == null) {
-            return;
-        }
-        Map<String, Object> ingredients = requireMap(root, "ingredients", file, errors);
-        if (ingredients == null) {
-            return;
-        }
-        requireNonEmpty(ingredients, file, "ingredients", errors);
-        for (Map.Entry<String, Object> entry : ingredients.entrySet()) {
-            Map<String, Object> ingredient = asMap(entry.getValue());
-            String path = "ingredients." + entry.getKey();
-            if (ingredient == null) {
-                errors.add(format("invalid ingredient", file, path, "ingredient must be a section"));
-                continue;
-            }
-            boolean hasMaterial = isNonBlankString(ingredient.get("material"));
-            boolean hasMaterials = ingredient.get("materials") instanceof List<?> list && !list.isEmpty();
-            boolean hasCustomItem = isNonBlankString(ingredient.get("custom_item_id"));
-            boolean hasCustomItems = ingredient.get("custom_item_ids") instanceof List<?> list && !list.isEmpty();
-            if (!hasMaterial && !hasMaterials && !hasCustomItem && !hasCustomItems) {
-                errors.add(format("missing ingredient matcher", file, path, "material, materials, custom_item_id, or custom_item_ids is required"));
-            }
-            if (hasMaterial) {
-                requireMaterial(ingredient.get("material"), file, path + ".material", errors);
-            }
-            if (ingredient.get("materials") instanceof List<?> list) {
-                for (int i = 0; i < list.size(); i++) {
-                    requireMaterial(list.get(i), file, path + ".materials[" + i + "]", errors);
-                }
-            }
-            if (hasCustomItem && !isCustomItemId((String) ingredient.get("custom_item_id"))) {
-                errors.add(format("invalid custom item id", file, path + ".custom_item_id", "feature.id format is required"));
-            }
-            if (ingredient.get("custom_item_ids") instanceof List<?> list) {
-                for (int i = 0; i < list.size(); i++) {
-                    Object value = list.get(i);
-                    if (!(value instanceof String id) || !isCustomItemId(id)) {
-                        errors.add(format("invalid custom item id", file, path + ".custom_item_ids[" + i + "]", "feature.id format is required"));
-                    }
-                }
-            }
         }
     }
 

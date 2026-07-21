@@ -1329,7 +1329,6 @@ class CCContent : JavaPlugin(), Listener {
         val bundledMarkers = listOf(
             "/themes/",
             "/recipe",
-            "ingredient_definition",
             "mob_definition",
             "/mob_type",
             "/drop",

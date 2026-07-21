@@ -52,7 +52,6 @@ class BreweryFeature(private val plugin: JavaPlugin, private val catalogStore: C
     private fun ensureResources() {
         ensureFile("config/brewery/config.yml")
         ensureFile("config/brewery/recipes.yml")
-        ensureFile("config/ingredient_definition.yml")
     }
 
     private fun ensureFile(path: String) {
