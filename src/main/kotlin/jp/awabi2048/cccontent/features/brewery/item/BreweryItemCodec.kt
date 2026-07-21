@@ -147,11 +147,15 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         item.itemMeta = meta
     }
 
-    fun incrementDistillation(item: ItemStack, @Suppress("UNUSED_PARAMETER") targetDistillCount: Int, @Suppress("UNUSED_PARAMETER") targetAlcohol: Double) {
+    fun incrementDistillation(item: ItemStack, targetDistillCount: Int, overPenalty: Int) {
         val meta = item.itemMeta ?: return
         val pdc = meta.persistentDataContainer
         val count = (pdc.get(distillCountKey, PersistentDataType.INTEGER) ?: 0) + 1
         pdc.set(distillCountKey, PersistentDataType.INTEGER, count)
+        if (count > targetDistillCount) {
+            val quality = pdc.get(qualityKey, PersistentDataType.DOUBLE) ?: 0.0
+            pdc.set(qualityKey, PersistentDataType.DOUBLE, (quality - overPenalty).coerceAtLeast(0.0))
+        }
         item.itemMeta = meta
     }
 
