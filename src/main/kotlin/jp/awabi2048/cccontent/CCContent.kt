@@ -1482,7 +1482,8 @@ class CCContent : JavaPlugin(), Listener {
                 contentOperationalStatuses()[type.id]?.operationalState == ContentOperationalState.ENABLED
             },
             fishingSearchTarget = { playerId -> fishingFeature?.getSearchTarget(playerId) },
-            setFishingSearchTarget = { player, fishId -> fishingFeature?.setSearchTarget(player, fishId) }
+            setFishingSearchTarget = { player, fishId -> fishingFeature?.setSearchTarget(player, fishId) },
+            openFishingJournal = { player -> fishingFeature?.openJournal(player) }
         )
         CCSystem.getAPI().getMenuCommandService().register(
             PublicMenuDefinition(

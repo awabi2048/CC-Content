@@ -4,6 +4,7 @@ import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.action.ContentAction
 import com.awabi2048.ccsystem.api.action.ContentActionType
 import jp.awabi2048.cccontent.CCContent
@@ -21,6 +22,7 @@ import net.kyori.adventure.text.Component
 import net.kyori.adventure.title.Title
 import org.bukkit.Bukkit
 import org.bukkit.Material
+import org.bukkit.NamespacedKey
 import org.bukkit.Particle
 import org.bukkit.Sound
 import org.bukkit.FluidCollisionMode
@@ -36,11 +38,19 @@ import org.bukkit.event.player.PlayerFishEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.world.WorldUnloadEvent
+import org.bukkit.event.inventory.InventoryClickEvent
+import org.bukkit.event.inventory.InventoryDragEvent
 import org.bukkit.inventory.EquipmentSlot
+import org.bukkit.inventory.Inventory
+import org.bukkit.inventory.InventoryHolder
+import org.bukkit.inventory.ItemStack
+import org.bukkit.persistence.PersistentDataType
 import org.bukkit.scheduler.BukkitTask
 import org.bukkit.util.Vector
 import java.io.File
 import java.time.Duration
+import java.time.Instant
+import java.time.format.DateTimeFormatter
 import java.util.Random
 import java.util.UUID
 import kotlin.math.roundToLong
@@ -86,6 +96,7 @@ class FishingFeature(
     private val searchReady = mutableMapOf<UUID, Boolean>()
     private var searchTask: BukkitTask? = null
     private val random = Random()
+    private var fishdexOpener: ((Player) -> Unit)? = null
 
     fun initialize(logger: FeatureInitializationLogger) {
         settings = FishingSettings.load(plugin)
@@ -108,8 +119,145 @@ class FishingFeature(
     }
 
     fun registerDictionary(opener: (Player) -> Unit) {
+        fishdexOpener = opener
         items.registerDictionary(opener) { player, event -> showLocalFishingHint(player, event) }
     }
+
+    fun openJournal(player: Player, requestedPage: Int = 0) {
+        val records = catchJournal.recent(player.uniqueId)
+        val contentSlots = JOURNAL_CONTENT_SLOTS
+        val totalPages = maxOf(1, (records.size + contentSlots.size - 1) / contentSlots.size)
+        val page = requestedPage.coerceIn(0, totalPages - 1)
+        val holder = CatchJournalHolder(player.uniqueId, page, totalPages)
+        val inventory = Bukkit.createInventory(holder, 45, Component.text(message(player, "fishing.journal.title", "page" to (page + 1), "pages" to totalPages)))
+        holder.backingInventory = inventory
+        CCSystem.getAPI().getGuiLayoutService().applyStandardFrame(inventory)
+        records.drop(page * contentSlots.size).take(contentSlots.size).forEachIndexed { index, record ->
+            val slot = contentSlots[index]
+            holder.recordIdsBySlot[slot] = record.recordId
+            inventory.setItem(slot, journalRecordIcon(player, record))
+        }
+        val service = CCSystem.getAPI().getGuiElementService()
+        if (page > 0) inventory.setItem(36, service.item(com.awabi2048.ccsystem.api.gui.GuiItemSpec(Material.ARROW, com.awabi2048.ccsystem.api.gui.GuiNameSpec.Text(message(player, "fishing.journal.previous"), GuiNameStyle.DEFAULT), GuiLoreSpec.None, com.awabi2048.ccsystem.api.gui.GuiElementRole.NAVIGATION, 1)))
+        inventory.setItem(38, service.item(com.awabi2048.ccsystem.api.gui.GuiItemSpec(Material.BOOK, com.awabi2048.ccsystem.api.gui.GuiNameSpec.Text(message(player, "fishing.journal.fishdex_tab"), GuiNameStyle.DEFAULT), GuiLoreSpec.None, com.awabi2048.ccsystem.api.gui.GuiElementRole.NAVIGATION, 1)))
+        inventory.setItem(40, service.item(com.awabi2048.ccsystem.api.gui.GuiItemSpec(Material.PAPER, com.awabi2048.ccsystem.api.gui.GuiNameSpec.Text(message(player, "fishing.journal.status", "count" to records.size, "page" to (page + 1), "pages" to totalPages), GuiNameStyle.DEFAULT), GuiLoreSpec.None, com.awabi2048.ccsystem.api.gui.GuiElementRole.CONTENT, 1)))
+        inventory.setItem(42, service.item(com.awabi2048.ccsystem.api.gui.GuiItemSpec(Material.BARRIER, com.awabi2048.ccsystem.api.gui.GuiNameSpec.Text(message(player, "fishing.journal.close"), GuiNameStyle.DEFAULT), GuiLoreSpec.None, com.awabi2048.ccsystem.api.gui.GuiElementRole.CANCEL, 1)))
+        if (page + 1 < totalPages) inventory.setItem(44, service.item(com.awabi2048.ccsystem.api.gui.GuiItemSpec(Material.ARROW, com.awabi2048.ccsystem.api.gui.GuiNameSpec.Text(message(player, "fishing.journal.next"), GuiNameStyle.DEFAULT), GuiLoreSpec.None, com.awabi2048.ccsystem.api.gui.GuiElementRole.NAVIGATION, 1)))
+        player.openInventory(inventory)
+    }
+
+    private fun journalRecordIcon(player: Player, record: CatchJournalRecord): ItemStack {
+        val item = ItemStack(settings.fishes.firstOrNull { it.id == record.fishId }?.material ?: Material.COD)
+        item.editMeta { meta ->
+            meta.displayName(Component.text(message(player, "fishing.catalog.item.${record.fishId}")))
+            meta.lore(listOf(
+                Component.empty(),
+                Component.text(message(player, "fishing.dictionary.description.${record.fishId}")),
+                Component.empty(),
+                Component.text(message(player, "fishing.journal.size", "value" to record.sizeCm)),
+                Component.text(message(player, "fishing.journal.weight", "value" to record.weightGrams)),
+                Component.text(message(player, "fishing.journal.quality", "value" to record.quality.stars)),
+                Component.text(message(player, "fishing.journal.date", "value" to formatCatchTime(record.caughtAtEpochMillis))),
+                Component.text(message(player, "fishing.journal.angler", "value" to record.anglerName)),
+                Component.empty(),
+                Component.text(message(player, "fishing.journal.detail_action"))
+            ))
+        }
+        return item
+    }
+
+    private fun openJournalDetail(player: Player, recordId: UUID, returnPage: Int) {
+        val record = catchJournal.find(player.uniqueId, recordId) ?: return
+        val holder = CatchJournalDetailHolder(player.uniqueId, recordId, returnPage)
+        val inventory = Bukkit.createInventory(holder, 45, Component.text(message(player, "fishing.journal.detail_title")))
+        holder.backingInventory = inventory
+        CCSystem.getAPI().getGuiLayoutService().applyStandardFrame(inventory)
+        inventory.setItem(4, journalRecordIcon(player, record))
+        inventory.setItem(20, journalInfoItem(player, Material.TROPICAL_FISH, "fishing.journal.catch_info", record))
+        inventory.setItem(22, journalGyotakuButton(player, record))
+        inventory.setItem(24, journalInfoItem(player, Material.CLOCK, "fishing.journal.record_info", record))
+        val service = CCSystem.getAPI().getGuiElementService()
+        inventory.setItem(40, service.item(com.awabi2048.ccsystem.api.gui.GuiItemSpec(Material.ARROW, com.awabi2048.ccsystem.api.gui.GuiNameSpec.Text(message(player, "fishing.journal.back"), GuiNameStyle.DEFAULT), GuiLoreSpec.None, com.awabi2048.ccsystem.api.gui.GuiElementRole.BACK, 1)))
+        player.openInventory(inventory)
+    }
+
+    private fun journalInfoItem(player: Player, material: Material, nameKey: String, record: CatchJournalRecord): ItemStack =
+        ItemStack(material).apply { editMeta { meta ->
+            meta.displayName(Component.text(message(player, nameKey)))
+            meta.lore(listOf(
+                Component.text(message(player, "fishing.journal.size", "value" to record.sizeCm)),
+                Component.text(message(player, "fishing.journal.weight", "value" to record.weightGrams)),
+                Component.text(message(player, "fishing.journal.quality", "value" to record.quality.stars)),
+                Component.text(message(player, "fishing.journal.date", "value" to formatCatchTime(record.caughtAtEpochMillis))),
+                Component.text(message(player, "fishing.journal.angler", "value" to record.anglerName))
+            ))
+        } }
+
+    private fun journalGyotakuButton(player: Player, record: CatchJournalRecord): ItemStack =
+        ItemStack(if (record.gyotakuIssued) Material.GRAY_DYE else Material.PAPER).apply { editMeta { meta ->
+            meta.displayName(Component.text(message(player, if (record.gyotakuIssued) "fishing.journal.gyotaku_done" else "fishing.journal.gyotaku_create")))
+            meta.lore(listOf(Component.text(message(player, "fishing.journal.gyotaku_cost"))))
+        } }
+
+    private fun issueGyotaku(player: Player, holder: CatchJournalDetailHolder) {
+        val record = catchJournal.find(player.uniqueId, holder.recordId) ?: return
+        if (record.gyotakuIssued) {
+            player.sendMessage(message(player, "fishing.journal.gyotaku_already"))
+            return
+        }
+        if (!hasMaterial(player, Material.PAPER) || !hasMaterial(player, Material.INK_SAC)) {
+            player.sendMessage(message(player, "fishing.journal.material_missing"))
+            return
+        }
+        if (player.inventory.firstEmpty() < 0) {
+            player.sendMessage(message(player, "fishing.journal.inventory_full"))
+            return
+        }
+        consumeOne(player, Material.PAPER)
+        consumeOne(player, Material.INK_SAC)
+        player.inventory.addItem(createGyotaku(player, record))
+        check(catchJournal.markGyotakuIssued(player.uniqueId, record.recordId))
+        player.sendMessage(message(player, "fishing.journal.gyotaku_created", "fish" to message(player, "fishing.catalog.item.${record.fishId}")))
+        openJournalDetail(player, record.recordId, holder.returnPage)
+    }
+
+    private fun hasMaterial(player: Player, material: Material): Boolean =
+        player.inventory.storageContents.any { it?.type == material && it.amount > 0 }
+
+    private fun consumeOne(player: Player, material: Material) {
+        val slot = player.inventory.storageContents.indexOfFirst { it?.type == material && it.amount > 0 }
+        check(slot >= 0)
+        val item = player.inventory.getItem(slot)!!
+        if (item.amount == 1) player.inventory.setItem(slot, null) else item.amount -= 1
+    }
+
+    private fun createGyotaku(player: Player, record: CatchJournalRecord): ItemStack = ItemStack(Material.PAPER).apply {
+        editMeta { meta ->
+            meta.displayName(Component.text(message(player, "fishing.journal.gyotaku_name", "fish" to message(player, "fishing.catalog.item.${record.fishId}"))))
+            meta.lore(listOf(
+                Component.text(message(player, "fishing.journal.gyotaku_description_1", "angler" to record.anglerName)),
+                Component.text(message(player, "fishing.journal.gyotaku_description_2")),
+                Component.empty(),
+                Component.text(message(player, "fishing.journal.size", "value" to record.sizeCm)),
+                Component.text(message(player, "fishing.journal.weight", "value" to record.weightGrams)),
+                Component.text(message(player, "fishing.journal.quality", "value" to record.quality.stars)),
+                Component.text(message(player, "fishing.journal.date", "value" to formatCatchTime(record.caughtAtEpochMillis))),
+                Component.text(message(player, "fishing.journal.angler", "value" to record.anglerName))
+            ))
+            val pdc = meta.persistentDataContainer
+            pdc.set(NamespacedKey("cccontent", "gyotaku_schema"), PersistentDataType.INTEGER, 1)
+            pdc.set(NamespacedKey("cccontent", "gyotaku_record_id"), PersistentDataType.STRING, record.recordId.toString())
+            pdc.set(NamespacedKey("cccontent", "fish_id"), PersistentDataType.STRING, record.fishId)
+            pdc.set(NamespacedKey("cccontent", "fish_weight_grams"), PersistentDataType.INTEGER, record.weightGrams)
+            pdc.set(NamespacedKey("cccontent", "fish_size_cm"), PersistentDataType.INTEGER, record.sizeCm)
+            pdc.set(NamespacedKey("cccontent", "fish_quality"), PersistentDataType.STRING, record.quality.id)
+            pdc.set(NamespacedKey("cccontent", "caught_at_epoch_millis"), PersistentDataType.LONG, record.caughtAtEpochMillis)
+            pdc.set(NamespacedKey("cccontent", "angler_uuid"), PersistentDataType.STRING, record.anglerUuid.toString())
+            pdc.set(NamespacedKey("cccontent", "angler_name"), PersistentDataType.STRING, record.anglerName)
+        }
+    }
+
+    private fun formatCatchTime(epochMillis: Long): String = CATCH_TIME_FORMATTER.format(Instant.ofEpochMilli(epochMillis))
 
     fun clearNaturalFishingGrounds(): Boolean {
         if (!::naturalFishingGrounds.isInitialized) return false
@@ -611,9 +759,11 @@ class FishingFeature(
         }
         publishCatchAction(player, catchData, before?.discovered != true)
         val catchItem = items.createCatch(player, catchData)
-        player.inventory.addItem(catchItem).values.forEach { overflow ->
+        val overflowItems = player.inventory.addItem(catchItem).values
+        overflowItems.forEach { overflow ->
             catchLocation.world?.dropItem(catchLocation, overflow)
         }
+        if (overflowItems.isNotEmpty()) player.sendMessage(message(player, "fishing.catch.overflow"))
         val preserveDurability = fisher.active && random.nextDouble() < fisher.durabilitySaveChance
         if (!preserveDurability && items.damageRod(player)) {
             player.sendMessage(message(player, "fishing.error.rod_broken"))
@@ -647,6 +797,39 @@ class FishingFeature(
         session.bossBar?.let { bar -> player?.hideBossBar(bar) }
         player?.sendActionBar(Component.empty())
         if (removeHook && session.hook.isValid) session.hook.remove()
+    }
+
+    @EventHandler
+    fun onJournalClick(event: InventoryClickEvent) {
+        when (val holder = event.view.topInventory.holder) {
+            is CatchJournalHolder -> {
+                event.isCancelled = true
+                val player = event.whoClicked as? Player ?: return
+                if (holder.owner != player.uniqueId) return
+                when (event.rawSlot) {
+                    36 -> if (holder.page > 0) openJournal(player, holder.page - 1)
+                    38 -> fishdexOpener?.invoke(player)
+                    42 -> player.closeInventory()
+                    44 -> if (holder.page + 1 < holder.totalPages) openJournal(player, holder.page + 1)
+                    else -> holder.recordIdsBySlot[event.rawSlot]?.let { openJournalDetail(player, it, holder.page) }
+                }
+            }
+            is CatchJournalDetailHolder -> {
+                event.isCancelled = true
+                val player = event.whoClicked as? Player ?: return
+                if (holder.owner != player.uniqueId) return
+                when (event.rawSlot) {
+                    22 -> issueGyotaku(player, holder)
+                    40 -> openJournal(player, holder.returnPage)
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    fun onJournalDrag(event: InventoryDragEvent) {
+        if (event.view.topInventory.holder is CatchJournalHolder ||
+            event.view.topInventory.holder is CatchJournalDetailHolder) event.isCancelled = true
     }
 
     @EventHandler
@@ -872,4 +1055,29 @@ class FishingFeature(
     private fun isBedrockPlayer(player: Player): Boolean {
         return myWorldBridge.isBedrock(player)
     }
+
+    companion object {
+        private val JOURNAL_CONTENT_SLOTS = (10..16).toList() + (19..25).toList() + (28..34).toList()
+        private val CATCH_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm")
+            .withZone(CCSystem.getAPI().getSharedClockService().zoneId)
+    }
+}
+
+private class CatchJournalHolder(
+    val owner: UUID,
+    val page: Int,
+    val totalPages: Int
+) : InventoryHolder {
+    lateinit var backingInventory: Inventory
+    val recordIdsBySlot: MutableMap<Int, UUID> = mutableMapOf()
+    override fun getInventory(): Inventory = backingInventory
+}
+
+private class CatchJournalDetailHolder(
+    val owner: UUID,
+    val recordId: UUID,
+    val returnPage: Int
+) : InventoryHolder {
+    lateinit var backingInventory: Inventory
+    override fun getInventory(): Inventory = backingInventory
 }
