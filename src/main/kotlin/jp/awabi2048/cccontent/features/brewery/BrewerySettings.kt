@@ -145,7 +145,8 @@ data class BrewerySettings(
     val stateRetentionSeconds: Long,
     val fermentationExp: Long,
     val distillationExp: Long,
-    val agingExp: Long
+    val agingExp: Long,
+    val flushIntervalTicks: Long
 )
 
 class BrewerySettingsLoader(private val plugin: JavaPlugin) {
@@ -192,7 +193,8 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
             stateRetentionSeconds = root.getLong("intoxication.state_retention_seconds", 604800L).coerceAtLeast(1L),
             fermentationExp = root.getLong("rank_exp.fermentation_batch", 10L).coerceAtLeast(0L),
             distillationExp = root.getLong("rank_exp.distillation_batch", 20L).coerceAtLeast(0L),
-            agingExp = root.getLong("rank_exp.aging_per_bottle", 10L).coerceAtLeast(0L)
+            agingExp = root.getLong("rank_exp.aging_per_bottle", 10L).coerceAtLeast(0L),
+            flushIntervalTicks = root.getLong("state.flush_interval_ticks", 100L).also { require(it > 0) }
         )
     }
 

@@ -135,5 +135,9 @@ class BreweryConfigurationTest {
         assertFalse(source.contains("FERMENT_FUEL_SLOT"));
         assertFalse(source.contains("mockClock"));
         assertFalse(source.contains("isClockAcceleratorItem"));
+        assertFalse(source.contains("intoxicationStates"));
+        assertFalse(source.contains("yml.set(\"$base.alcohol\""));
+        assertTrue(source.contains("NamespacedKey(\"cccontent\", \"intoxication_level\")"));
+        assertTrue(source.contains("yml.set(\"schema_version\", 5)"));
     }
 }

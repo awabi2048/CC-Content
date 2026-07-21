@@ -11,7 +11,6 @@ import com.awabi2048.ccsystem.api.gui.GuiMenuIconData
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import jp.awabi2048.cccontent.CCContent
-import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.features.brewery.item.BreweryItemCodec
 import jp.awabi2048.cccontent.features.brewery.barrel.BarrelMatchResult
 import jp.awabi2048.cccontent.features.brewery.barrel.BreweryBarrel
@@ -87,6 +86,10 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
     )
     private val filterRecipeKey = NamespacedKey(plugin, "brewery_sample_filter")
     private val yeastKey = NamespacedKey(plugin, "brewery_cultured_yeast")
+    private val intoxicationSchemaKey = NamespacedKey("cccontent", "intoxication_schema")
+    private val intoxicationLevelKey = NamespacedKey("cccontent", "intoxication_level")
+    private val intoxicationUpdatedAtKey = NamespacedKey("cccontent", "intoxication_updated_at")
+    private val intoxicationFaintUntilKey = NamespacedKey("cccontent", "intoxication_faint_until")
     private val uiKindKey = NamespacedKey(plugin, "brewery_ui_kind")
     private val rankManager = (plugin as? CCContent)?.getRankManager()
 
@@ -100,7 +103,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
     private val distillationStates = mutableMapOf<BreweryLocationKey, DistillationState>()
     private val agingStates = mutableMapOf<BreweryLocationKey, AgingState>()
     private val machineLocks = mutableMapOf<BreweryLocationKey, java.util.UUID>()
-    private val intoxicationStates = mutableMapOf<UUID, BreweryIntoxicationState>()
 
     private data class BarrelSignContext(
         val size: BarrelSize,
@@ -144,7 +146,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             tickFermentation()
             tickDistillation()
             tickIntoxication()
-            if (fermentationStates.isNotEmpty() || distillationStates.isNotEmpty() || agingStates.isNotEmpty() || intoxicationStates.isNotEmpty()) {
+            if (fermentationStates.isNotEmpty() || distillationStates.isNotEmpty() || agingStates.isNotEmpty()) {
                 markDirty()
             }
         }, 20L, 20L)
@@ -185,7 +187,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val recipe = recipes[parsed.recipeId] ?: return
         val output = recipe.outputs[codec.outputId(event.item) ?: recipe.primaryOutputId]
         val now = System.currentTimeMillis()
-        val state = intoxicationStates.getOrPut(event.player.uniqueId) { BreweryIntoxicationState() }
+        val state = loadIntoxication(event.player)
         BreweryIntoxicationMath.decay(
             state,
             now,
@@ -228,11 +230,12 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             event.player.sendMessage(i18n(event.player, drinkMessageKey))
         }
         markDirty()
+        saveIntoxication(event.player, state)
     }
 
     @EventHandler
     fun onPlayerJoin(event: PlayerJoinEvent) {
-        val state = intoxicationStates[event.player.uniqueId] ?: return
+        val state = loadIntoxication(event.player)
         val now = System.currentTimeMillis()
         BreweryIntoxicationMath.decay(
             state,
@@ -242,18 +245,19 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         )
         state.updatedAtMillis = now
         applyIntoxicationEffects(event.player, state, now, forceStumble = false)
-        markDirty()
+        saveIntoxication(event.player, state)
     }
 
     @EventHandler
     fun onPlayerQuit(event: PlayerQuitEvent) {
-        intoxicationStates[event.player.uniqueId]?.updatedAtMillis = System.currentTimeMillis()
-        markDirty()
+        val state = loadIntoxication(event.player)
+        state.updatedAtMillis = System.currentTimeMillis()
+        saveIntoxication(event.player, state)
     }
 
     @EventHandler
     fun onPlayerMove(event: PlayerMoveEvent) {
-        val state = intoxicationStates[event.player.uniqueId] ?: return
+        val state = loadIntoxication(event.player)
         if (state.faintUntilMillis > System.currentTimeMillis() && event.from != event.to) {
             event.isCancelled = true
         }
@@ -1749,16 +1753,35 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
 
     private fun tickIntoxication() {
         val now = System.currentTimeMillis()
-        intoxicationStates.forEach { (uuid, state) ->
+        Bukkit.getOnlinePlayers().forEach { player ->
+            val state = loadIntoxication(player)
             val changed = BreweryIntoxicationMath.decay(
                 state,
                 now,
                 settings.intoxicationDecayPerSecond,
                 settings.stateRetentionSeconds
             )
-            val player = Bukkit.getPlayer(uuid) ?: return@forEach
             applyIntoxicationEffects(player, state, now, forceStumble = changed)
+            saveIntoxication(player, state)
         }
+    }
+
+    private fun loadIntoxication(player: Player): BreweryIntoxicationState {
+        val pdc = player.persistentDataContainer
+        if (pdc.get(intoxicationSchemaKey, PersistentDataType.INTEGER) != 2) return BreweryIntoxicationState()
+        return BreweryIntoxicationState(
+            pdc.get(intoxicationLevelKey, PersistentDataType.DOUBLE)?.coerceIn(0.0, 100.0) ?: 0.0,
+            pdc.get(intoxicationUpdatedAtKey, PersistentDataType.LONG) ?: 0L,
+            pdc.get(intoxicationFaintUntilKey, PersistentDataType.LONG) ?: 0L
+        )
+    }
+
+    private fun saveIntoxication(player: Player, state: BreweryIntoxicationState) {
+        val pdc = player.persistentDataContainer
+        pdc.set(intoxicationSchemaKey, PersistentDataType.INTEGER, 2)
+        pdc.set(intoxicationLevelKey, PersistentDataType.DOUBLE, state.alcohol.coerceIn(0.0, 100.0))
+        pdc.set(intoxicationUpdatedAtKey, PersistentDataType.LONG, state.updatedAtMillis)
+        pdc.set(intoxicationFaintUntilKey, PersistentDataType.LONG, state.faintUntilMillis)
     }
 
     private fun applyIntoxicationEffects(
@@ -1873,7 +1896,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
 
     private fun saveStateInternal() {
         val yml = YamlConfiguration()
-        yml.set("schema_version", 4)
+        yml.set("schema_version", 5)
         fermentationStates.forEach { (key, state) ->
             val base = "fermentation.${key.toSerialized()}"
             yml.set("$base.running", state.running)
@@ -1914,12 +1937,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             }
         }
 
-        intoxicationStates.forEach { (uuid, state) ->
-            val base = "intoxication.$uuid"
-            yml.set("$base.alcohol", state.alcohol)
-            yml.set("$base.updatedAtMillis", state.updatedAtMillis)
-            yml.set("$base.faintUntilMillis", state.faintUntilMillis)
-        }
         stateFile.parentFile?.mkdirs()
         yml.save(stateFile)
     }
@@ -1933,12 +1950,11 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         fermentationStates.clear()
         distillationStates.clear()
         agingStates.clear()
-        intoxicationStates.clear()
 
         if (!stateFile.exists()) return
         val yml = YamlConfiguration.loadConfiguration(stateFile)
         val schemaVersion = yml.getInt("schema_version", -1)
-        if (schemaVersion != 4) {
+        if (schemaVersion != 5) {
             plugin.logger.warning("[Brewery] 旧形式の設備状態を破棄しました: schema_version=$schemaVersion")
             return
         }
@@ -2038,28 +2054,20 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             refreshAgingDecor(state)
         }
 
-        yml.getConfigurationSection("intoxication")?.getKeys(false)?.forEach { rawUuid ->
-            val uuid = runCatching { UUID.fromString(rawUuid) }.getOrNull() ?: return@forEach
-            intoxicationStates[uuid] = BreweryIntoxicationState(
-                alcohol = yml.getDouble("intoxication.$rawUuid.alcohol", 0.0).coerceIn(0.0, 100.0),
-                updatedAtMillis = yml.getLong("intoxication.$rawUuid.updatedAtMillis", 0L),
-                faintUntilMillis = yml.getLong("intoxication.$rawUuid.faintUntilMillis", 0L)
-            )
-        }
         dirty = false
     }
 
-    fun catalogItems(): List<CatalogItem> = recipes.values.map { CatalogItem(it.id, Material.POTION) }
+    fun catalogItems(): List<CatalogItem> = recipes.values
+        .flatMap { it.outputs.keys }
+        .distinct()
+        .map { CatalogItem(it, Material.POTION) }
 
     private fun markDirty() {
         dirty = true
     }
 
     private fun getFlushIntervalTicks(): Long {
-        val minutes = CoreConfigManager.get(plugin)
-            .getLong("persistence.flush_interval_minutes", 1L)
-            .coerceAtLeast(1L)
-        return minutes * 60L * 20L
+        return settings.flushIntervalTicks
     }
 
     private fun saveInventory(yml: YamlConfiguration, path: String, inventory: Inventory) {
