@@ -21,6 +21,7 @@ import jp.awabi2048.cccontent.featurestate.ContentFeatureCatalog
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemInteractionListener
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.persistence.ContentItemMigrationListener
 import jp.awabi2048.cccontent.items.misc.BigLight
 import jp.awabi2048.cccontent.items.misc.AutoIgnitionBoosterConfig
 import jp.awabi2048.cccontent.items.misc.AutoIgnitionBoosterItem
@@ -67,7 +68,6 @@ import jp.awabi2048.cccontent.items.misc.BronzeNozzleItem
 import jp.awabi2048.cccontent.items.misc.AirTriggerItem
 import jp.awabi2048.cccontent.items.misc.DecentBowItem
 import jp.awabi2048.cccontent.items.sukima.*
-import jp.awabi2048.cccontent.items.brewery.BreweryMockClockItem
 import jp.awabi2048.cccontent.items.brewery.BreweryCulturedYeastItem
 import jp.awabi2048.cccontent.items.brewery.BrewerySampleFilterItem
 import jp.awabi2048.cccontent.items.arena.*
@@ -411,6 +411,15 @@ class CCContent : JavaPlugin(), Listener {
             }
         }
 
+        initializeFeatureIfEnabled("Resource Collection", "resource_collection") {
+            val rankManager = rankManagerInstance
+                ?: throw IllegalStateException("Resource Collection requires the Rank System")
+            val feature = ResourceCollectionFeature(this, rankManager)
+            resourceCollectionFeature = feature
+            feature.initialize()
+            featureInitLogger.setStatus("Resource Collection", FeatureInitializationLogger.Status.SUCCESS)
+        }
+
         initializeFeatureIfEnabled("Brewery", "brewery") {
             initializeBrewery()
         }
@@ -423,15 +432,6 @@ class CCContent : JavaPlugin(), Listener {
             val feature = FishingFeature(this, catalogStore, myWorldBridge)
             fishingFeature = feature
             feature.initialize(featureInitLogger)
-        }
-
-        initializeFeatureIfEnabled("Resource Collection", "resource_collection") {
-            val rankManager = rankManagerInstance
-                ?: throw IllegalStateException("Resource Collection requires the Rank System")
-            val feature = ResourceCollectionFeature(this, rankManager)
-            resourceCollectionFeature = feature
-            feature.initialize()
-            featureInitLogger.setStatus("Resource Collection", FeatureInitializationLogger.Status.SUCCESS)
         }
 
         initializeFeatureIfEnabled("Seasonal", "seasonal") {
@@ -599,6 +599,7 @@ class CCContent : JavaPlugin(), Listener {
             }
         }
         server.pluginManager.registerEvents(CustomItemInteractionListener(), this)
+        server.pluginManager.registerEvents(ContentItemMigrationListener(logger), this)
         if (::npcMenuService.isInitialized) {
             server.pluginManager.registerEvents(npcMenuService, this)
         }
@@ -1087,7 +1088,6 @@ class CCContent : JavaPlugin(), Listener {
 
         if (isContentEnabled("brewery")) {
             CustomItemManager.register(BrewerySampleFilterItem(this))
-            CustomItemManager.register(BreweryMockClockItem(this))
             CustomItemManager.register(BreweryCulturedYeastItem(this))
         }
 
@@ -1329,7 +1329,6 @@ class CCContent : JavaPlugin(), Listener {
         val bundledMarkers = listOf(
             "/themes/",
             "/recipe",
-            "ingredient_definition",
             "mob_definition",
             "/mob_type",
             "/drop",
@@ -1350,7 +1349,11 @@ class CCContent : JavaPlugin(), Listener {
                 YamlConfiguration.loadConfiguration(InputStreamReader(input, StandardCharsets.UTF_8))
             } ?: error("Missing bundled config: $resourcePath")
             val currentVersion = bundled.getInt("config_version", 1)
-            val classification = if (bundledMarkers.any(resourcePath::contains)) {
+            val bundledDefinitionPaths = setOf(
+                "config/resource_collection/seasonal_plants.yml",
+                "config/resource_collection/forest_products.yml"
+            )
+            val classification = if (resourcePath in bundledDefinitionPaths || bundledMarkers.any(resourcePath::contains)) {
                 ConfigClassification.BUNDLED_DEFINITION
             } else {
                 ConfigClassification.MANAGED_CONFIG
@@ -1482,7 +1485,8 @@ class CCContent : JavaPlugin(), Listener {
                 contentOperationalStatuses()[type.id]?.operationalState == ContentOperationalState.ENABLED
             },
             fishingSearchTarget = { playerId -> fishingFeature?.getSearchTarget(playerId) },
-            setFishingSearchTarget = { player, fishId -> fishingFeature?.setSearchTarget(player, fishId) }
+            setFishingSearchTarget = { player, fishId -> fishingFeature?.setSearchTarget(player, fishId) },
+            openFishingJournal = { player -> fishingFeature?.openJournal(player) }
         )
         CCSystem.getAPI().getMenuCommandService().register(
             PublicMenuDefinition(

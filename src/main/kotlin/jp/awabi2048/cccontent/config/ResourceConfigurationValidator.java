@@ -43,7 +43,6 @@ public final class ResourceConfigurationValidator {
         validateArenaSettingsConfig(configRoot, configs, errors);
         validateArenaMissionConfig(configRoot, configs, errors);
         validateArenaOverEnchanterConfig(configRoot, configs, errors);
-        validateIngredientDefinitions(configRoot, configs, errors);
         validateMobDefinitions(configRoot, configs, errors);
         validateArenaDropConfig(configRoot, configs, errors);
         validateArenaRewardConfig(configRoot, configs, errors);
@@ -54,7 +53,6 @@ public final class ResourceConfigurationValidator {
         validateNpcMenu(configRoot, configs, errors);
         validateCustomItemConfigs(configRoot, configs, errors);
         validateBreweryConfigs(configRoot, configs, errors);
-        validateGardenConfigs(configRoot, configs, errors);
         validateCookingConfigs(configRoot, configs, errors);
         validatePartyConfigs(configRoot, configs, errors);
         validateFishingConfigs(configRoot, configs, errors);
@@ -203,53 +201,6 @@ public final class ResourceConfigurationValidator {
         Map<String, Object> combatExp = requireMap(root, "combat_exp", file, errors);
         if (combatExp != null) {
             requireNonNegativeNumber(combatExp, "health_multiplier", file, "combat_exp.health_multiplier", errors);
-        }
-    }
-
-    private static void validateIngredientDefinitions(Path configRoot, Map<Path, Object> configs, List<String> errors) {
-        Path file = configRoot.resolve("ingredient_definition.yml");
-        Map<String, Object> root = rootMap(configs, file, errors);
-        if (root == null) {
-            return;
-        }
-        Map<String, Object> ingredients = requireMap(root, "ingredients", file, errors);
-        if (ingredients == null) {
-            return;
-        }
-        requireNonEmpty(ingredients, file, "ingredients", errors);
-        for (Map.Entry<String, Object> entry : ingredients.entrySet()) {
-            Map<String, Object> ingredient = asMap(entry.getValue());
-            String path = "ingredients." + entry.getKey();
-            if (ingredient == null) {
-                errors.add(format("invalid ingredient", file, path, "ingredient must be a section"));
-                continue;
-            }
-            boolean hasMaterial = isNonBlankString(ingredient.get("material"));
-            boolean hasMaterials = ingredient.get("materials") instanceof List<?> list && !list.isEmpty();
-            boolean hasCustomItem = isNonBlankString(ingredient.get("custom_item_id"));
-            boolean hasCustomItems = ingredient.get("custom_item_ids") instanceof List<?> list && !list.isEmpty();
-            if (!hasMaterial && !hasMaterials && !hasCustomItem && !hasCustomItems) {
-                errors.add(format("missing ingredient matcher", file, path, "material, materials, custom_item_id, or custom_item_ids is required"));
-            }
-            if (hasMaterial) {
-                requireMaterial(ingredient.get("material"), file, path + ".material", errors);
-            }
-            if (ingredient.get("materials") instanceof List<?> list) {
-                for (int i = 0; i < list.size(); i++) {
-                    requireMaterial(list.get(i), file, path + ".materials[" + i + "]", errors);
-                }
-            }
-            if (hasCustomItem && !isCustomItemId((String) ingredient.get("custom_item_id"))) {
-                errors.add(format("invalid custom item id", file, path + ".custom_item_id", "feature.id format is required"));
-            }
-            if (ingredient.get("custom_item_ids") instanceof List<?> list) {
-                for (int i = 0; i < list.size(); i++) {
-                    Object value = list.get(i);
-                    if (!(value instanceof String id) || !isCustomItemId(id)) {
-                        errors.add(format("invalid custom item id", file, path + ".custom_item_ids[" + i + "]", "feature.id format is required"));
-                    }
-                }
-            }
         }
     }
 
@@ -529,108 +480,27 @@ public final class ResourceConfigurationValidator {
         if (config != null) {
             requireMap(config, "brewery", configFile, errors);
         }
-        Path recipeFile = configRoot.resolve("brewery/recipe.yml");
+        Path recipeFile = configRoot.resolve("brewery/recipes.yml");
         Map<String, Object> recipeRoot = rootMap(configs, recipeFile, errors);
         if (recipeRoot != null) {
-            Map<String, Object> recipes = requireMap(recipeRoot, "recipes", recipeFile, errors);
-            if (recipes == null) {
+            Map<String, Object> preparations = requireMap(recipeRoot, "preparations", recipeFile, errors);
+            Map<String, Object> recipes = requireMap(recipeRoot, "brew_families", recipeFile, errors);
+            if (preparations == null || recipes == null) {
                 return;
             }
-            requireNonEmpty(recipes, recipeFile, "recipes", errors);
+            requireNonEmpty(preparations, recipeFile, "preparations", errors);
+            requireNonEmpty(recipes, recipeFile, "brew_families", errors);
             for (Map.Entry<String, Object> entry : recipes.entrySet()) {
                 Map<String, Object> recipe = asMap(entry.getValue());
-                String path = "recipes." + entry.getKey();
+                String path = "brew_families." + entry.getKey();
                 if (recipe == null) {
                     errors.add(format("invalid brewery recipe", recipeFile, path, "recipe must be a section"));
                     continue;
                 }
-                requirePositiveNumber(recipe, "required_skill_level", recipeFile, path + ".required_skill_level", errors);
                 requireMap(recipe, "fermentation", recipeFile, errors, path + ".fermentation");
-                Map<String, Object> finalOutput = requireMap(recipe, "final_output", recipeFile, errors, path + ".final_output");
-                if (finalOutput != null) {
-                    requireFiniteNumberRange(
-                        finalOutput.get("alcohol"),
-                        -100.0,
-                        100.0,
-                        recipeFile,
-                        path + ".final_output.alcohol",
-                        errors
-                    );
-                }
-            }
-        }
-    }
-
-    private static void validateGardenConfigs(Path configRoot, Map<Path, Object> configs, List<String> errors) {
-        Path file = configRoot.resolve("brewery/garden.yml");
-        Map<String, Object> root = rootMap(configs, file, errors);
-        if (root == null) return;
-        Map<String, Object> garden = requireMap(root, "garden", file, errors);
-        if (garden == null) return;
-        requireFiniteNumberRange(garden.get("seed_drop_chance"), 0.0, 1.0, file, "garden.seed_drop_chance", errors);
-        requirePositiveInteger(garden.get("growth_check_interval_seconds"), file, "garden.growth_check_interval_seconds", errors);
-
-        Object sources = garden.get("seed_source_materials");
-        if (!(sources instanceof List<?> sourceList) || sourceList.isEmpty()) {
-            errors.add(format("invalid seed source materials", file, "garden.seed_source_materials", "non-empty material list is required"));
-        } else {
-            for (int i = 0; i < sourceList.size(); i++) {
-                requireMaterial(sourceList.get(i), file, "garden.seed_source_materials[" + i + "]", errors);
-            }
-        }
-
-        Map<String, Object> plants = requireMap(garden, "plants", file, errors, "garden.plants");
-        if (plants == null) return;
-        requireNonEmpty(plants, file, "garden.plants", errors);
-        for (Map.Entry<String, Object> entry : plants.entrySet()) {
-            String plantPath = "garden.plants." + entry.getKey();
-            if (!entry.getKey().matches("[a-z0-9_]+")) {
-                errors.add(format("invalid garden plant id", file, plantPath, "lowercase snake case id is required"));
-            }
-            Map<String, Object> plant = asMap(entry.getValue());
-            if (plant == null) {
-                errors.add(format("invalid garden plant", file, plantPath, "plant must be a section"));
-                continue;
-            }
-            requireString(plant, "seed_language_key", file, plantPath + ".seed_language_key", errors);
-            requireString(plant, "fruit_language_key", file, plantPath + ".fruit_language_key", errors);
-            Map<String, Object> stages = requireMap(plant, "stages", file, errors, plantPath + ".stages");
-            if (stages == null || stages.isEmpty()) {
-                if (stages != null) errors.add(format("missing garden stages", file, plantPath + ".stages", "at least one stage is required"));
-                continue;
-            }
-            List<Integer> stageIds = new ArrayList<>();
-            for (Map.Entry<?, ?> stageEntry : ((Map<?, ?>) stages).entrySet()) {
-                String stageKey = String.valueOf(stageEntry.getKey());
-                Integer stageId;
-                try {
-                    stageId = Integer.valueOf(stageKey);
-                } catch (NumberFormatException exception) {
-                    errors.add(format("invalid garden stage id", file, plantPath + ".stages." + stageKey, "integer stage id is required"));
-                    continue;
-                }
-                stageIds.add(stageId);
-                String stagePath = plantPath + ".stages." + stageKey;
-                Map<String, Object> stage = asMap(stageEntry.getValue());
-                if (stage == null) {
-                    errors.add(format("invalid garden stage", file, stagePath, "stage must be a section"));
-                    continue;
-                }
-                requireMaterial(stage.get("material"), file, stagePath + ".material", errors);
-                requireString(stage, "block_data", file, stagePath + ".block_data", errors);
-                requirePositiveInteger(stage.get("growth_seconds"), file, stagePath + ".growth_seconds", errors);
-            }
-            stageIds.sort(Integer::compareTo);
-            for (int index = 0; index < stageIds.size(); index++) {
-                if (stageIds.get(index) != index) {
-                    errors.add(format("non-contiguous garden stages", file, plantPath + ".stages", "stage ids must start at 0 and be contiguous"));
-                    break;
-                }
-            }
-            Object regrowth = plant.get("regrowth_stage");
-            if (!(regrowth instanceof Number number) || number.doubleValue() != number.intValue() ||
-                number.intValue() < 0 || number.intValue() >= stageIds.size()) {
-                errors.add(format("invalid garden regrowth stage", file, plantPath + ".regrowth_stage", "existing stage id is required"));
+                requireMap(recipe, "distillation", recipeFile, errors, path + ".distillation");
+                requireMap(recipe, "aging", recipeFile, errors, path + ".aging");
+                requireMap(recipe, "outputs", recipeFile, errors, path + ".outputs");
             }
         }
     }
@@ -651,13 +521,27 @@ public final class ResourceConfigurationValidator {
         Map<String, Object> config = rootMap(configs, configFile, errors);
         if (config != null) {
             requireBoolean(config, "enabled", configFile, "enabled", errors);
-            Map<String, Object> settings = requireMap(config, "settings", configFile, errors);
-            if (settings != null) requireRatio(settings.get("minimum_similarity"), configFile, "settings.minimum_similarity", errors);
+            Map<String, Object> matching = requireMap(config, "matching", configFile, errors);
+            if (matching != null) {
+                for (String key : List.of("maximum_excess_ratio_per_ingredient", "maximum_unknown_ratio",
+                    "maximum_total_error", "ambiguity_margin")) {
+                    requireRatio(matching.get(key), configFile, "matching." + key, errors);
+                }
+            }
+            Map<String, Object> equipment = requireMap(config, "equipment", configFile, errors);
+            if (equipment != null) {
+                requireIntegerRange(equipment.get("pan_max_scale"), 5, 5, configFile, "equipment.pan_max_scale", errors);
+                requireIntegerRange(equipment.get("cauldron_max_scale"), 3, 3, configFile, "equipment.cauldron_max_scale", errors);
+            }
+            Map<String, Object> state = requireMap(config, "state", configFile, errors);
+            if (state != null) requirePositiveInteger(state.get("flush_interval_ticks"), configFile, "state.flush_interval_ticks", errors);
         }
-        Path recipeFile = configRoot.resolve("cooking/recipe.yml");
-        Map<String, Object> root = rootMap(configs, recipeFile, errors);
-        if (root != null) {
-            requireMap(root, "recipes", recipeFile, errors);
+        for (String name : List.of("ingredients.yml", "cutting.yml", "recipe.yml")) {
+            Path file = configRoot.resolve("cooking/" + name);
+            Map<String, Object> root = rootMap(configs, file, errors);
+            if (root != null) {
+                requireMap(root, name.equals("ingredients.yml") ? "ingredients" : "recipes", file, errors);
+            }
         }
     }
 
@@ -1025,12 +909,13 @@ public final class ResourceConfigurationValidator {
     }
 
     private static void requireIntegerRange(Object value, int minimum, int maximum, Path file, String path, List<String> errors) {
-        if (!(value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long)) {
+        if (!(value instanceof Number number) || !Double.isFinite(number.doubleValue()) ||
+            number.doubleValue() != number.longValue()) {
             errors.add(format("invalid integer", file, path, "integer value is required"));
             return;
         }
-        long number = ((Number) value).longValue();
-        if (number < minimum || number > maximum) {
+        long integer = number.longValue();
+        if (integer < minimum || integer > maximum) {
             errors.add(format("invalid integer range", file, path, "value must be between " + minimum + " and " + maximum));
         }
     }

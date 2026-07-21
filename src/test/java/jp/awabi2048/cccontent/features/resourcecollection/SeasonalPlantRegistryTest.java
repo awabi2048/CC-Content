@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.resourcecollection;
 
 import com.awabi2048.ccsystem.api.time.Season;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import org.bukkit.Material;
@@ -16,12 +17,12 @@ class SeasonalPlantRegistryTest {
         "resource.approved_spring_fern",
         "resource_collection.test.use",
         "resource_collection.test.group",
-        Set.of(Season.SPRING),
+        Map.of(Season.SPRING, 1, Season.SUMMER, 0, Season.AUTUMN, 0, Season.WINTER, 0),
         Set.of(Material.FERN),
         Set.of("minecraft:plains"),
         60,
         100,
-        1
+        "kota_server:custom_item/resource/approved_spring_fern"
     );
 
     @Test

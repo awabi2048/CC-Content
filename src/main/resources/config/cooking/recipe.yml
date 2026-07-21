@@ -1,68 +1,1657 @@
-﻿config_version: 1
-
-ingredients:
-  potato:
-    material: POTATO
-  carrot:
-    material: CARROT
-  wheat:
-    material: WHEAT
-  beef:
-    material: BEEF
-  cod:
-    material: COD
-  sugar:
-    material: SUGAR
-  honey:
-    material: HONEY_BOTTLE
+config_version: 3
 
 recipes:
-  rustic_stew:
+  cooked_rice:
     equipment: CAULDRON
+    group: INTERMEDIATE_MATERIAL
+    tier: BASIC
+    heat: NORMAL
     ingredients:
-      potato: 2
-      carrot: 1
-      beef: 1
-    seasonings:
+      resource_rice: 2
+    water_units: 1
+    duration_seconds: 10
+    exp: 0
+    result:
+      kind: ITEM
+      custom_item_id: cooking.cooked_rice
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/cooked_rice
+      nutrition: 0
+      saturation_modifier: 0.0
+      max_stack_size: 64
+      amount_per_scale: 2
+    failure_result:
+      custom_item_id: cooking.burnt_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  tomato_sauce:
+    equipment: CAULDRON
+    group: INTERMEDIATE_MATERIAL
+    tier: BASIC
+    heat: HIGH
+    ingredients:
+      cut_tomato: 3
+      resource_rock_salt: 1
+    water_units: 1
+    duration_seconds: 8
+    exp: 0
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.tomato_sauce
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/tomato_sauce
+      container: GLASS_BOTTLE
+      liquid_pane: RED_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 16
+      amount_per_scale: 1
+    failure_result:
+      custom_item_id: cooking.underprepared_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/underprepared_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  dashi:
+    equipment: CAULDRON
+    group: INTERMEDIATE_MATERIAL
+    tier: BASIC
+    heat: NORMAL
+    ingredients:
+      dried_kelp: 1
+      fillet_sardine: 2
+    water_units: 1
+    duration_seconds: 8
+    exp: 0
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.dashi
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/dashi
+      container: GLASS_BOTTLE
+      liquid_pane: YELLOW_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 16
+      amount_per_scale: 1
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  rice_vinegar:
+    equipment: CAULDRON
+    group: INTERMEDIATE_MATERIAL
+    tier: BASIC
+    heat: NORMAL
+    ingredients:
+      resource_rice: 2
       sugar: 1
+    water_units: 1
+    duration_seconds: 8
+    exp: 0
     result:
-      material: BAKED_POTATO
-      item_model: kota_server:custom_item/cooking/rustic_stew
-    exp: 18
-    completion_seconds: 4
-  sweet_bread:
-    equipment: PAN
+      kind: BOTTLE
+      custom_item_id: cooking.rice_vinegar
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/rice_vinegar
+      container: GLASS_BOTTLE
+      liquid_pane: WHITE_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 16
+      amount_per_scale: 1
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  cocoa_syrup:
+    equipment: CAULDRON
+    group: INTERMEDIATE_MATERIAL
+    tier: BASIC
+    heat: HIGH
     ingredients:
-      wheat: 3
+      resource_cocoa_pulp: 3
       sugar: 1
-    seasonings:
-      honey: 1
+    water_units: 1
+    duration_seconds: 8
+    exp: 0
     result:
-      material: BREAD
-      item_model: kota_server:custom_item/cooking/sweet_bread
-    exp: 15
-    completion_seconds: 3
-  grilled_cod:
+      kind: BOTTLE
+      custom_item_id: cooking.cocoa_syrup
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/cocoa_syrup
+      container: GLASS_BOTTLE
+      liquid_pane: BROWN_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 16
+      amount_per_scale: 1
+    failure_result:
+      custom_item_id: cooking.underprepared_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/underprepared_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  pan_fried_potato:
     equipment: PAN
+    group: BASIC
+    tier: BASIC
+    heat: HIGH
     ingredients:
-      cod: 2
-      potato: 1
-    seasonings:
-      honey: 1
+      cut_potato: 2
+      resource_rock_salt: 1
+    water_units: 0
+    duration_seconds: 4
+    exp: 8
     result:
-      material: COOKED_COD
-      item_model: kota_server:custom_item/cooking/grilled_cod
-    exp: 16
-    completion_seconds: 3
-  carrot_cookie:
+      kind: ITEM
+      custom_item_id: cooking.pan_fried_potato
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/pan_fried_potato
+      nutrition: 5
+      saturation_modifier: 0.6
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  honey_carrot:
     equipment: PAN
+    group: BASIC
+    tier: BASIC
+    heat: NORMAL
     ingredients:
       carrot: 2
-      wheat: 1
-      sugar: 1
+      honey_bottle: 1
+    water_units: 0
+    duration_seconds: 4
+    exp: 8
     result:
-      material: COOKIE
-      item_model: kota_server:custom_item/cooking/carrot_cookie
+      kind: ITEM
+      custom_item_id: cooking.honey_carrot
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/honey_carrot
+      nutrition: 5
+      saturation_modifier: 0.6
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  grilled_cod:
+    equipment: PAN
+    group: BASIC
+    tier: BASIC
+    heat: NORMAL
+    ingredients:
+      fish_cod: 1
+      resource_rock_salt: 1
+    water_units: 0
+    duration_seconds: 5
+    exp: 10
+    result:
+      kind: ITEM
+      custom_item_id: cooking.grilled_cod
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/grilled_cod
+      nutrition: 5
+      saturation_modifier: 0.6
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  grilled_mackerel:
+    equipment: PAN
+    group: BASIC
+    tier: BASIC
+    heat: NORMAL
+    ingredients:
+      fish_mackerel: 1
+      resource_rock_salt: 1
+    water_units: 0
+    duration_seconds: 5
+    exp: 10
+    result:
+      kind: ITEM
+      custom_item_id: cooking.grilled_mackerel
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/grilled_mackerel
+      nutrition: 5
+      saturation_modifier: 0.6
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  grilled_horse_mackerel:
+    equipment: PAN
+    group: BASIC
+    tier: BASIC
+    heat: NORMAL
+    ingredients:
+      fish_horse_mackerel: 1
+      resource_rock_salt: 1
+    water_units: 0
+    duration_seconds: 5
+    exp: 10
+    result:
+      kind: ITEM
+      custom_item_id: cooking.grilled_horse_mackerel
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/grilled_horse_mackerel
+      nutrition: 5
+      saturation_modifier: 0.6
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  potato_soup:
+    equipment: CAULDRON
+    group: BASIC
+    tier: BASIC
+    heat: NORMAL
+    ingredients:
+      cut_potato: 3
+      cut_carrot: 1
+    water_units: 1
+    duration_seconds: 8
     exp: 12
-    completion_seconds: 2
-
+    result:
+      kind: BOWL
+      custom_item_id: cooking.potato_soup
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/potato_soup
+      container: BOWL
+      liquid_pane: YELLOW_STAINED_GLASS_PANE
+      nutrition: 5
+      saturation_modifier: 0.6
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - INSTANT_HEALTH/1/1
+    failure_result:
+      custom_item_id: cooking.burnt_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  mushroom_soup:
+    equipment: CAULDRON
+    group: BASIC
+    tier: BASIC
+    heat: NORMAL
+    ingredients:
+      slice_red_mushroom: 2
+      slice_brown_mushroom: 2
+    water_units: 1
+    duration_seconds: 8
+    exp: 12
+    result:
+      kind: BOWL
+      custom_item_id: cooking.mushroom_soup
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/mushroom_soup
+      container: BOWL
+      liquid_pane: BROWN_STAINED_GLASS_PANE
+      nutrition: 5
+      saturation_modifier: 0.6
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  miso_soup:
+    equipment: CAULDRON
+    group: BULK
+    tier: BASIC
+    heat: NORMAL
+    ingredients:
+      miso: 1
+      tofu: 1
+      cut_green_onion: 1
+    water_units: 1
+    duration_seconds: 7
+    exp: 15
+    result:
+      kind: BOWL
+      custom_item_id: cooking.miso_soup
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/miso_soup
+      container: BOWL
+      liquid_pane: BROWN_STAINED_GLASS_PANE
+      nutrition: 5
+      saturation_modifier: 0.6
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  green_tea:
+    equipment: CAULDRON
+    group: HERBAL
+    tier: BASIC
+    heat: NORMAL
+    ingredients:
+      resource_tea_leaf: 2
+    water_units: 1
+    duration_seconds: 6
+    exp: 10
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.green_tea
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/green_tea
+      container: GLASS_BOTTLE
+      liquid_pane: LIME_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  hot_cocoa:
+    equipment: CAULDRON
+    group: HERBAL
+    tier: BASIC
+    heat: NORMAL
+    ingredients:
+      cocoa_syrup: 1
+      milk_bucket: 1
+    water_units: 1
+    duration_seconds: 8
+    exp: 12
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.hot_cocoa
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/hot_cocoa
+      container: GLASS_BOTTLE
+      liquid_pane: BROWN_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  meat_vegetable_stir_fry:
+    equipment: PAN
+    group: BULK
+    tier: INTERMEDIATE
+    heat: HIGH
+    ingredients:
+      cut_pork: 2
+      cut_onion: 1
+      cut_carrot: 1
+      resource_vegetable_leaves: 1
+      soy_sauce: 1
+    water_units: 0
+    duration_seconds: 9
+    exp: 22
+    result:
+      kind: BOWL
+      custom_item_id: cooking.meat_vegetable_stir_fry
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/meat_vegetable_stir_fry
+      container: BOWL
+      liquid_pane: ORANGE_STAINED_GLASS_PANE
+      nutrition: 7
+      saturation_modifier: 0.8
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  hamburg_steak:
+    equipment: PAN
+    group: BULK
+    tier: INTERMEDIATE
+    heat: HIGH
+    ingredients:
+      cut_beef: 2
+      cut_onion: 1
+      egg: 1
+      tomato_sauce: 1
+    water_units: 0
+    duration_seconds: 10
+    exp: 26
+    result:
+      kind: ITEM
+      custom_item_id: cooking.hamburg_steak
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/hamburg_steak
+      nutrition: 7
+      saturation_modifier: 0.8
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  teriyaki_chicken:
+    equipment: PAN
+    group: BULK
+    tier: INTERMEDIATE
+    heat: HIGH
+    ingredients:
+      cut_chicken: 2
+      soy_sauce: 1
+      sugar: 1
+      resource_ginger: 1
+    water_units: 0
+    duration_seconds: 8
+    exp: 24
+    result:
+      kind: ITEM
+      custom_item_id: cooking.teriyaki_chicken
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/teriyaki_chicken
+      nutrition: 7
+      saturation_modifier: 0.8
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  vegetable_curry_rice:
+    equipment: CAULDRON
+    group: BULK
+    tier: INTERMEDIATE
+    heat: HIGH
+    ingredients:
+      cooked_rice: 1
+      curry_roux: 1
+      cut_onion: 1
+      cut_potato: 1
+      cut_carrot: 1
+    water_units: 1
+    duration_seconds: 12
+    exp: 26
+    result:
+      kind: BOWL
+      custom_item_id: cooking.vegetable_curry_rice
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/vegetable_curry_rice
+      container: BOWL
+      liquid_pane: ORANGE_STAINED_GLASS_PANE
+      nutrition: 7
+      saturation_modifier: 0.8
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  cod_simmered:
+    equipment: CAULDRON
+    group: SEAFOOD
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      fillet_cod: 2
+      soy_sauce: 1
+      resource_ginger: 1
+      sugar: 1
+    water_units: 1
+    duration_seconds: 11
+    exp: 26
+    result:
+      kind: BOWL
+      custom_item_id: cooking.cod_simmered
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/cod_simmered
+      container: BOWL
+      liquid_pane: BROWN_STAINED_GLASS_PANE
+      nutrition: 7
+      saturation_modifier: 0.8
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  mackerel_miso_simmer:
+    equipment: CAULDRON
+    group: SEAFOOD
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      fillet_mackerel: 2
+      miso: 1
+      resource_ginger: 1
+    water_units: 1
+    duration_seconds: 12
+    exp: 25
+    result:
+      kind: BOWL
+      custom_item_id: cooking.mackerel_miso_simmer
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/mackerel_miso_simmer
+      container: BOWL
+      liquid_pane: BROWN_STAINED_GLASS_PANE
+      nutrition: 7
+      saturation_modifier: 0.8
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  cod_meuniere:
+    equipment: PAN
+    group: SEAFOOD
+    tier: INTERMEDIATE
+    heat: HIGH
+    ingredients:
+      fillet_cod: 2
+      butter: 1
+      resource_rock_salt: 1
+    water_units: 0
+    duration_seconds: 7
+    exp: 22
+    result:
+      kind: ITEM
+      custom_item_id: cooking.cod_meuniere
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/cod_meuniere
+      nutrition: 7
+      saturation_modifier: 0.8
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  flounder_meuniere:
+    equipment: PAN
+    group: SEAFOOD
+    tier: INTERMEDIATE
+    heat: HIGH
+    ingredients:
+      fillet_flounder: 2
+      butter: 1
+      resource_rock_salt: 1
+    water_units: 0
+    duration_seconds: 7
+    exp: 24
+    result:
+      kind: ITEM
+      custom_item_id: cooking.flounder_meuniere
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/flounder_meuniere
+      nutrition: 7
+      saturation_modifier: 0.8
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  ayu_shioyaki:
+    equipment: PAN
+    group: SEAFOOD
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      fish_ayu: 1
+      resource_rock_salt: 1
+    water_units: 0
+    duration_seconds: 5
+    exp: 20
+    result:
+      kind: ITEM
+      custom_item_id: cooking.ayu_shioyaki
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/ayu_shioyaki
+      nutrition: 7
+      saturation_modifier: 0.8
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  sea_bream_shioyaki:
+    equipment: PAN
+    group: SEAFOOD
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      fish_sea_bream: 1
+      resource_rock_salt: 1
+    water_units: 0
+    duration_seconds: 6
+    exp: 22
+    result:
+      kind: ITEM
+      custom_item_id: cooking.sea_bream_shioyaki
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/sea_bream_shioyaki
+      nutrition: 7
+      saturation_modifier: 0.8
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  smelt_soup:
+    equipment: CAULDRON
+    group: SEAFOOD
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      fish_smelt: 2
+      dashi: 1
+      cut_green_onion: 1
+    water_units: 1
+    duration_seconds: 9
+    exp: 24
+    result:
+      kind: BOWL
+      custom_item_id: cooking.smelt_soup
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/smelt_soup
+      container: BOWL
+      liquid_pane: LIGHT_GRAY_STAINED_GLASS_PANE
+      nutrition: 7
+      saturation_modifier: 0.8
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  potato_potage:
+    equipment: CAULDRON
+    group: BULK
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      cut_potato: 3
+      cut_onion: 1
+      milk_bucket: 1
+    water_units: 1
+    duration_seconds: 10
+    exp: 24
+    result:
+      kind: BOWL
+      custom_item_id: cooking.potato_potage
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/potato_potage
+      container: BOWL
+      liquid_pane: WHITE_STAINED_GLASS_PANE
+      nutrition: 7
+      saturation_modifier: 0.8
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  mushroom_butter_saute:
+    equipment: PAN
+    group: WILD
+    tier: INTERMEDIATE
+    heat: HIGH
+    ingredients:
+      slice_red_mushroom: 1
+      slice_brown_mushroom: 2
+      butter: 1
+    water_units: 0
+    duration_seconds: 7
+    exp: 22
+    result:
+      kind: ITEM
+      custom_item_id: cooking.mushroom_butter_saute
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/mushroom_butter_saute
+      nutrition: 7
+      saturation_modifier: 0.8
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  ginger_drink:
+    equipment: CAULDRON
+    group: HERBAL
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      resource_ginger: 1
+      honey_bottle: 1
+    water_units: 1
+    duration_seconds: 7
+    exp: 20
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.ginger_drink
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/ginger_drink
+      container: GLASS_BOTTLE
+      liquid_pane: ORANGE_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  coffee:
+    equipment: CAULDRON
+    group: HERBAL
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      roasted_coffee: 2
+      sugar: 1
+    water_units: 1
+    duration_seconds: 7
+    exp: 20
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.coffee
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/coffee
+      container: GLASS_BOTTLE
+      liquid_pane: BLACK_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - REGENERATION/1/5
+        - SPEED/1/140
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  rd_smoothie:
+    equipment: CAULDRON
+    group: HERBAL
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      resource_strawberry: 3
+      sugar: 1
+    water_units: 1
+    duration_seconds: 6
+    exp: 18
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.rd_smoothie
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/rd_smoothie
+      container: GLASS_BOTTLE
+      liquid_pane: RED_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - SATURATION/8/1
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  yl_smoothie:
+    equipment: CAULDRON
+    group: HERBAL
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      cut_apple: 2
+      honey_bottle: 1
+    water_units: 1
+    duration_seconds: 6
+    exp: 18
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.yl_smoothie
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/yl_smoothie
+      container: GLASS_BOTTLE
+      liquid_pane: YELLOW_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - JUMP_BOOST/2/120
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  pl_smoothie:
+    equipment: CAULDRON
+    group: HERBAL
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      resource_blueberry: 3
+      sugar: 1
+    water_units: 1
+    duration_seconds: 6
+    exp: 18
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.pl_smoothie
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/pl_smoothie
+      container: GLASS_BOTTLE
+      liquid_pane: PURPLE_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - NIGHT_VISION/0/120
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  mix_smoothie:
+    equipment: CAULDRON
+    group: HERBAL
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      resource_strawberry: 1
+      resource_blueberry: 1
+      cut_apple: 1
+    water_units: 1
+    duration_seconds: 6
+    exp: 20
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.mix_smoothie
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/mix_smoothie
+      container: GLASS_BOTTLE
+      liquid_pane: PINK_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - SATURATION/4/1
+        - NIGHT_VISION/0/60
+        - JUMP_BOOST/2/60
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  or_smoothie:
+    equipment: CAULDRON
+    group: HERBAL
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      cut_apple: 2
+      cut_carrot: 1
+    water_units: 1
+    duration_seconds: 6
+    exp: 18
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.or_smoothie
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/or_smoothie
+      container: GLASS_BOTTLE
+      liquid_pane: ORANGE_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - SATURATION/6/1
+        - JUMP_BOOST/2/90
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  bl_smoothie:
+    equipment: CAULDRON
+    group: HERBAL
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      resource_grape: 3
+      sugar: 1
+    water_units: 1
+    duration_seconds: 6
+    exp: 18
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.bl_smoothie
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/bl_smoothie
+      container: GLASS_BOTTLE
+      liquid_pane: RED_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - SATURATION/6/1
+        - NIGHT_VISION/0/90
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  vt_smoothie:
+    equipment: CAULDRON
+    group: HERBAL
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      resource_blueberry: 2
+      resource_grape: 1
+    water_units: 1
+    duration_seconds: 6
+    exp: 18
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.vt_smoothie
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/vt_smoothie
+      container: GLASS_BOTTLE
+      liquid_pane: MAGENTA_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - NIGHT_VISION/0/90
+        - JUMP_BOOST/2/90
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  gr_smoothie:
+    equipment: CAULDRON
+    group: HERBAL
+    tier: INTERMEDIATE
+    heat: NORMAL
+    ingredients:
+      resource_vegetable_leaves: 3
+      honey_bottle: 1
+    water_units: 1
+    duration_seconds: 6
+    exp: 18
+    result:
+      kind: BOTTLE
+      custom_item_id: cooking.gr_smoothie
+      base_material: POTION
+      item_model: kota_server:custom_item/cooking/gr_smoothie
+      container: GLASS_BOTTLE
+      liquid_pane: GREEN_STAINED_GLASS_PANE
+      nutrition: 0
+      saturation_modifier: 0.0
+      always_eat: true
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bottle_liquid
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  pork_soup:
+    equipment: CAULDRON
+    group: BULK
+    tier: ADVANCED
+    heat: NORMAL
+    ingredients:
+      cut_pork: 2
+      cut_potato: 2
+      cut_carrot: 1
+      cut_onion: 1
+      miso: 1
+    water_units: 2
+    duration_seconds: 12
+    exp: 30
+    result:
+      kind: BOWL
+      custom_item_id: cooking.pork_soup
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/pork_soup
+      container: BOWL
+      liquid_pane: BROWN_STAINED_GLASS_PANE
+      nutrition: 9
+      saturation_modifier: 1.0
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - LUCK/2/60
+        - GLOWING/0/60
+    failure_result:
+      custom_item_id: cooking.burnt_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  cream_stew:
+    equipment: CAULDRON
+    group: BULK
+    tier: ADVANCED
+    heat: NORMAL
+    ingredients:
+      cut_chicken: 2
+      cut_potato: 2
+      cut_carrot: 1
+      cut_onion: 1
+      milk_bucket: 1
+    water_units: 2
+    duration_seconds: 14
+    exp: 32
+    result:
+      kind: BOWL
+      custom_item_id: cooking.cream_stew
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/cream_stew
+      container: BOWL
+      liquid_pane: WHITE_STAINED_GLASS_PANE
+      nutrition: 9
+      saturation_modifier: 1.0
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  beef_stew:
+    equipment: CAULDRON
+    group: BULK
+    tier: ADVANCED
+    heat: NORMAL
+    ingredients:
+      cut_beef: 2
+      cut_potato: 2
+      cut_carrot: 1
+      cut_onion: 1
+      tomato_sauce: 1
+    water_units: 2
+    duration_seconds: 14
+    exp: 32
+    result:
+      kind: BOWL
+      custom_item_id: cooking.beef_stew
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/beef_stew
+      container: BOWL
+      liquid_pane: RED_STAINED_GLASS_PANE
+      nutrition: 9
+      saturation_modifier: 1.0
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  fried_rice:
+    equipment: PAN
+    group: BULK
+    tier: ADVANCED
+    heat: HIGH
+    ingredients:
+      cooked_rice: 1
+      egg: 1
+      cut_pork: 1
+      cut_carrot: 1
+      cut_green_onion: 1
+    water_units: 0
+    duration_seconds: 8
+    exp: 30
+    result:
+      kind: BOWL
+      custom_item_id: cooking.fried_rice
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/fried_rice
+      container: BOWL
+      liquid_pane: YELLOW_STAINED_GLASS_PANE
+      nutrition: 9
+      saturation_modifier: 1.0
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  omurice:
+    equipment: PAN
+    group: BULK
+    tier: ADVANCED
+    heat: HIGH
+    ingredients:
+      cooked_rice: 1
+      tomato_sauce: 1
+      egg: 1
+      cut_chicken: 1
+      cut_onion: 1
+    water_units: 0
+    duration_seconds: 10
+    exp: 32
+    result:
+      kind: BOWL
+      custom_item_id: cooking.omurice
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/omurice
+      container: BOWL
+      liquid_pane: ORANGE_STAINED_GLASS_PANE
+      nutrition: 9
+      saturation_modifier: 1.0
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  tuna_steak:
+    equipment: PAN
+    group: SEAFOOD
+    tier: ADVANCED
+    heat: HIGH
+    ingredients:
+      fillet_tuna: 2
+      resource_rock_salt: 1
+      resource_ginger: 1
+    water_units: 0
+    duration_seconds: 8
+    exp: 32
+    result:
+      kind: ITEM
+      custom_item_id: cooking.tuna_steak
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/tuna_steak
+      nutrition: 9
+      saturation_modifier: 1.0
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  salmon_mushroom_grill:
+    equipment: PAN
+    group: SEAFOOD
+    tier: ADVANCED
+    heat: HIGH
+    ingredients:
+      fillet_salmon: 2
+      slice_brown_mushroom: 2
+      butter: 1
+      resource_rock_salt: 1
+    water_units: 0
+    duration_seconds: 9
+    exp: 34
+    result:
+      kind: ITEM
+      custom_item_id: cooking.salmon_mushroom_grill
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/salmon_mushroom_grill
+      nutrition: 9
+      saturation_modifier: 1.0
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  eel_kabayaki:
+    equipment: PAN
+    group: SEAFOOD
+    tier: ADVANCED
+    heat: HIGH
+    ingredients:
+      fillet_eel: 2
+      soy_sauce: 1
+      sugar: 1
+    water_units: 0
+    duration_seconds: 8
+    exp: 30
+    result:
+      kind: ITEM
+      custom_item_id: cooking.eel_kabayaki
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/eel_kabayaki
+      nutrition: 9
+      saturation_modifier: 1.0
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  nether_fungus_stir_fry:
+    equipment: PAN
+    group: WILD
+    tier: ADVANCED
+    heat: HIGH
+    ingredients:
+      crimson_fungus: 1
+      warped_fungus: 1
+      cut_pork: 2
+      resource_rock_salt: 1
+    water_units: 0
+    duration_seconds: 9
+    exp: 34
+    result:
+      kind: ITEM
+      custom_item_id: cooking.nether_fungus_stir_fry
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/nether_fungus_stir_fry
+      nutrition: 9
+      saturation_modifier: 1.0
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  chorus_compote:
+    equipment: CAULDRON
+    group: WILD
+    tier: ADVANCED
+    heat: HIGH
+    ingredients:
+      chorus_fruit: 3
+      sugar: 1
+    water_units: 1
+    duration_seconds: 10
+    exp: 32
+    result:
+      kind: BOWL
+      custom_item_id: cooking.chorus_compote
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/chorus_compote
+      container: BOWL
+      liquid_pane: PURPLE_STAINED_GLASS_PANE
+      nutrition: 9
+      saturation_modifier: 1.0
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  autumn_salmon_hotpot:
+    equipment: CAULDRON
+    group: SEAFOOD
+    tier: TOP
+    heat: NORMAL
+    ingredients:
+      fillet_salmon: 2
+      slice_brown_mushroom: 2
+      resource_vegetable_leaves: 1
+      cut_daikon: 1
+      dashi: 1
+    water_units: 2
+    duration_seconds: 15
+    exp: 45
+    result:
+      kind: BOWL
+      custom_item_id: cooking.autumn_salmon_hotpot
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/autumn_salmon_hotpot
+      container: BOWL
+      liquid_pane: ORANGE_STAINED_GLASS_PANE
+      nutrition: 12
+      saturation_modifier: 1.2
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  anglerfish_hotpot:
+    equipment: CAULDRON
+    group: SEAFOOD
+    tier: TOP
+    heat: NORMAL
+    ingredients:
+      fillet_anglerfish: 2
+      slice_brown_mushroom: 2
+      resource_vegetable_leaves: 1
+      cut_daikon: 1
+      dashi: 1
+    water_units: 2
+    duration_seconds: 16
+    exp: 48
+    result:
+      kind: BOWL
+      custom_item_id: cooking.anglerfish_hotpot
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/anglerfish_hotpot
+      container: BOWL
+      liquid_pane: BROWN_STAINED_GLASS_PANE
+      nutrition: 12
+      saturation_modifier: 1.2
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  fugu_hotpot:
+    equipment: CAULDRON
+    group: SPECIAL
+    tier: TOP
+    heat: NORMAL
+    ingredients:
+      fillet_pufferfish: 2
+      dashi: 1
+      cut_daikon: 1
+      cut_green_onion: 1
+      slice_brown_mushroom: 1
+    water_units: 2
+    duration_seconds: 16
+    exp: 50
+    result:
+      kind: BOWL
+      custom_item_id: cooking.fugu_hotpot
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/fugu_hotpot
+      container: BOWL
+      liquid_pane: WHITE_STAINED_GLASS_PANE
+      nutrition: 12
+      saturation_modifier: 1.2
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.burnt_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/burnt_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  soul_fire_tuna_steak:
+    equipment: PAN
+    group: SPECIAL
+    tier: TOP
+    heat: HIGH
+    ingredients:
+      fillet_tuna: 2
+      resource_rock_salt: 1
+      ghast_tear: 1
+    water_units: 0
+    duration_seconds: 10
+    exp: 50
+    result:
+      kind: ITEM
+      custom_item_id: cooking.soul_fire_tuna_steak
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/soul_fire_tuna_steak
+      nutrition: 12
+      saturation_modifier: 1.2
+      max_stack_size: 16
+      amount_per_scale: 1
+      effects:
+        - FIRE_RESISTANCE/0/120
+    failure_result:
+      custom_item_id: cooking.undercooked_solid_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_solid_food
+      max_stack_size: 1
+      amount_per_scale: 1
+  adventurers_hotpot:
+    equipment: CAULDRON
+    group: SPECIAL
+    tier: TOP
+    heat: HIGH
+    ingredients:
+      cut_beef: 1
+      cut_pork: 1
+      cut_chicken: 1
+      cut_potato: 2
+      cut_carrot: 2
+    water_units: 3
+    duration_seconds: 18
+    exp: 60
+    result:
+      kind: BOWL
+      custom_item_id: cooking.adventurers_hotpot
+      base_material: RABBIT_STEW
+      item_model: kota_server:custom_item/cooking/adventurers_hotpot
+      container: BOWL
+      liquid_pane: RED_STAINED_GLASS_PANE
+      nutrition: 12
+      saturation_modifier: 1.2
+      max_stack_size: 1
+      amount_per_scale: 1
+      effects:
+        - -
+    failure_result:
+      custom_item_id: cooking.undercooked_bowl_food
+      base_material: POISONOUS_POTATO
+      item_model: kota_server:custom_item/cooking/undercooked_bowl_food
+      liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1

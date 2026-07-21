@@ -32,9 +32,4 @@ object BreweryIntoxicationMath {
         }
         return previous != state.alcohol
     }
-
-    @JvmStatic
-    fun qualityCorrectedAlcohol(baseAlcohol: Double, quality: Double): Double {
-        return (baseAlcohol * quality.coerceIn(0.0, 100.0) / 100.0).coerceIn(-100.0, 100.0)
-    }
 }

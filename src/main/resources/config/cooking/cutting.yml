@@ -1,0 +1,353 @@
+config_version: 2
+
+recipes:
+  cut_onion:
+    input: resource_onion
+    output:
+      custom_item_id: cooking.cut_onion
+      amount: 2
+    food_class: FIRM
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  cut_carrot:
+    input: carrot
+    output:
+      custom_item_id: cooking.cut_carrot
+      amount: 2
+    food_class: FIRM
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  cut_potato:
+    input: potato
+    output:
+      custom_item_id: cooking.cut_potato
+      amount: 2
+    food_class: FIRM
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  cut_tomato:
+    input: resource_tomato
+    output:
+      custom_item_id: cooking.cut_tomato
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  cut_daikon:
+    input: resource_daikon
+    output:
+      custom_item_id: cooking.cut_daikon
+      amount: 3
+    food_class: FIRM
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  cut_green_onion:
+    input: resource_green_onion
+    output:
+      custom_item_id: cooking.cut_green_onion
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  cut_beetroot:
+    input: beetroot
+    output:
+      custom_item_id: cooking.cut_beetroot
+      amount: 2
+    food_class: FIRM
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  cut_pumpkin:
+    input: pumpkin
+    output:
+      custom_item_id: cooking.cut_pumpkin
+      amount: 4
+    food_class: TOUGH
+    base_durability: 2
+    stage:
+      type: PRIMARY
+      depth: 1
+  slice_red_mushroom:
+    input: red_mushroom
+    output:
+      custom_item_id: cooking.slice_red_mushroom
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  slice_brown_mushroom:
+    input: brown_mushroom
+    output:
+      custom_item_id: cooking.slice_brown_mushroom
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  cut_apple:
+    input: apple
+    output:
+      custom_item_id: cooking.cut_apple
+      amount: 2
+    food_class: FIRM
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  cut_beef:
+    input: beef
+    output:
+      custom_item_id: cooking.cut_beef
+      amount: 2
+    food_class: TOUGH
+    base_durability: 2
+    stage:
+      type: PRIMARY
+      depth: 1
+  cut_pork:
+    input: porkchop
+    output:
+      custom_item_id: cooking.cut_pork
+      amount: 2
+    food_class: TOUGH
+    base_durability: 2
+    stage:
+      type: PRIMARY
+      depth: 1
+  cut_chicken:
+    input: chicken
+    output:
+      custom_item_id: cooking.cut_chicken
+      amount: 2
+    food_class: TOUGH
+    base_durability: 2
+    stage:
+      type: PRIMARY
+      depth: 1
+  cut_rabbit:
+    input: rabbit
+    output:
+      custom_item_id: cooking.cut_rabbit
+      amount: 2
+    food_class: TOUGH
+    base_durability: 2
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_cod:
+    input: fish_cod
+    output:
+      custom_item_id: cooking.fillet_cod
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_salmon:
+    input: fish_salmon
+    output:
+      custom_item_id: cooking.fillet_salmon
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_crucian_carp:
+    input: fish_crucian_carp
+    output:
+      custom_item_id: cooking.fillet_crucian_carp
+      amount: 1
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_carp:
+    input: fish_carp
+    output:
+      custom_item_id: cooking.fillet_carp
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_trout:
+    input: fish_trout
+    output:
+      custom_item_id: cooking.fillet_trout
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_ayu:
+    input: fish_ayu
+    output:
+      custom_item_id: cooking.fillet_ayu
+      amount: 1
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_catfish:
+    input: fish_catfish
+    output:
+      custom_item_id: cooking.fillet_catfish
+      amount: 3
+    food_class: TOUGH
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_eel:
+    input: fish_eel
+    output:
+      custom_item_id: cooking.fillet_eel
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_smelt:
+    input: fish_smelt
+    output:
+      custom_item_id: cooking.fillet_smelt
+      amount: 1
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_sardine:
+    input: fish_sardine
+    output:
+      custom_item_id: cooking.fillet_sardine
+      amount: 1
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_horse_mackerel:
+    input: fish_horse_mackerel
+    output:
+      custom_item_id: cooking.fillet_horse_mackerel
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_mackerel:
+    input: fish_mackerel
+    output:
+      custom_item_id: cooking.fillet_mackerel
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_sea_bass:
+    input: fish_sea_bass
+    output:
+      custom_item_id: cooking.fillet_sea_bass
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_flounder:
+    input: fish_flounder
+    output:
+      custom_item_id: cooking.fillet_flounder
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_sea_bream:
+    input: fish_sea_bream
+    output:
+      custom_item_id: cooking.fillet_sea_bream
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_tuna:
+    input: fish_tuna
+    output:
+      custom_item_id: cooking.fillet_tuna
+      amount: 4
+    food_class: TOUGH
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_grouper:
+    input: fish_grouper
+    output:
+      custom_item_id: cooking.fillet_grouper
+      amount: 3
+    food_class: TOUGH
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_anglerfish:
+    input: fish_anglerfish
+    output:
+      custom_item_id: cooking.fillet_anglerfish
+      amount: 3
+    food_class: TOUGH
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_pufferfish:
+    input: fish_pufferfish
+    output:
+      custom_item_id: cooking.fillet_pufferfish
+      amount: 2
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1
+  fillet_tropical_fish:
+    input: fish_tropical_fish
+    output:
+      custom_item_id: cooking.fillet_tropical_fish
+      amount: 1
+    food_class: DELICATE
+    base_durability: 1
+    stage:
+      type: PRIMARY
+      depth: 1

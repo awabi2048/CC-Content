@@ -1,46 +1,40 @@
-﻿config_version: 2
+config_version: 3
+
 brewery:
   quality:
-    penalty_per_30s_mismatch_fire: 2.0
-    penalty_per_over_distillation: 5.0
-    count_difference_penalty: 5.0
-    unmatched_item_penalty: 10.0
-  fire:
-    fuel_seconds_per_item: 30
-    medium_materials:
-      - OAK_LOG
-      - SPRUCE_LOG
-      - BIRCH_LOG
-      - JUNGLE_LOG
-      - ACACIA_LOG
-      - DARK_OAK_LOG
-      - MANGROVE_LOG
-      - CHERRY_LOG
-      - PALE_OAK_LOG
-      - CRIMSON_STEM
-      - WARPED_STEM
+    over_distillation_penalty: 5
+    maximum_over_distillation_runs: 3
+    maximum_over_aging_penalty: 20
+
   distillation:
     filter_speed_bonus: 0.15
+
   aging:
-    real_seconds_per_year: 1200
-    angel_share_percent_per_year: 2.0
+    real_seconds_per_unit: 1200
     small_barrel_speed_multiplier: 1.25
+    large_barrel_speed_multiplier: 1.0
+    small_barrel_loss_percent_per_target_unit: 1.0
+    small_barrel_loss_cap_percent: 25.0
+
   barrel:
     fermentation_sign_keyword: "[ferment]"
     aging_sign_keyword: "barrel"
     fermentation_capacity: 3
     open_large_everywhere: true
-    inventory_rows_large: 3
-    inventory_rows_small: 1
+
   intoxication:
+    schema_version: 2
     nausea_threshold: 25.0
     stumble_threshold: 50.0
     faint_threshold: 90.0
     decay_per_second: 0.05
     faint_duration_seconds: 8
+    state_retention_seconds: 604800
+
   state:
-    retention_seconds: 604800
+    flush_interval_ticks: 100
+
   rank_exp:
-    fermentation: 10
-    distillation: 20
-    aging: 30
+    fermentation_batch: 10
+    distillation_batch: 20
+    aging_per_bottle: 10

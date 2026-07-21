@@ -12,21 +12,37 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BreweryConfigurationTest {
     private static final Path CONFIG = Path.of("src/main/resources/config/brewery/config.yml");
-    private static final Path RECIPES = Path.of("src/main/resources/config/brewery/recipe.yml");
+    private static final Path RECIPES = Path.of("src/main/resources/config/brewery/recipes.yml");
 
     @Test
     void usesOnlyTheVersionedConfigurationShape() {
         var config = YamlConfiguration.loadConfiguration(CONFIG.toFile());
         var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
 
-        assertEquals(2, config.getInt("config_version"));
+        assertEquals(3, config.getInt("config_version"));
         assertFalse(config.contains("schema_version"));
         assertTrue(config.isConfigurationSection("brewery"));
         assertFalse(config.contains("settings"));
-        assertEquals(2, recipes.getInt("config_version"));
+        assertFalse(config.contains("brewery.fire"));
+        assertFalse(config.contains("brewery.aging.real_seconds_per_year"));
+        assertEquals(100, config.getInt("brewery.state.flush_interval_ticks"));
+        assertEquals(3, recipes.getInt("config_version"));
         assertFalse(recipes.contains("schema_version"));
-        assertTrue(recipes.isConfigurationSection("recipes"));
-        assertEquals(35, recipes.getConfigurationSection("recipes").getKeys(false).size());
+        assertTrue(recipes.isConfigurationSection("preparations"));
+        assertTrue(recipes.isConfigurationSection("brew_families"));
+        assertEquals(26, recipes.getConfigurationSection("preparations").getKeys(false).size());
+        assertEquals(26, recipes.getConfigurationSection("brew_families").getKeys(false).size());
+        long outputCount = recipes.getConfigurationSection("brew_families").getKeys(false).stream()
+            .mapToLong(id -> recipes.getConfigurationSection("brew_families." + id + ".outputs").getKeys(false).size())
+            .sum();
+        assertEquals(27, outputCount);
+        assertTrue(recipes.isConfigurationSection("brew_families.red_wine.outputs.redwine"));
+        assertTrue(recipes.isConfigurationSection("brew_families.red_wine.outputs.vintagewine"));
+        for (String removed : java.util.List.of("pork_soup", "potato_soup", "coffee", "rd_smoothie",
+            "yl_smoothie", "pl_smoothie", "mix_smoothie", "or_smoothie", "bl_smoothie",
+            "vt_smoothie", "gr_smoothie")) {
+            assertFalse(recipes.contains("brew_families." + removed));
+        }
 
         for (String key : recipes.getKeys(true)) {
             assertFalse(key.toLowerCase().endsWith("alchol"), "legacy alcohol typo remains: " + key);
@@ -36,15 +52,15 @@ class BreweryConfigurationTest {
     @Test
     void recipesPreserveZeroStepRequirements() {
         var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
-        assertEquals(0, recipes.getInt("recipes.wheatbeer.distillation.runs"));
-        assertEquals(0, recipes.getInt("recipes.vodka.aging.time_days"));
-        assertTrue(recipes.getInt("recipes.whisky.distillation.runs") > 0);
+        assertEquals(0, recipes.getInt("brew_families.wheatbeer.distillation.required_runs"));
+        assertTrue(recipes.getMapList("brew_families.vodka.aging.variants").isEmpty());
+        assertTrue(recipes.getInt("brew_families.whisky.distillation.required_runs") > 0);
     }
 
     @Test
     void sampleRecipesExposeTypedPotionEffects() {
         var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
-        var effects = recipes.getStringList("recipes.moonshine.final_output.effects");
+        var effects = recipes.getStringList("brew_families.moonshine.outputs.moonshine.effects");
 
         assertFalse(effects.isEmpty());
         for (String effect : effects) {
@@ -57,25 +73,42 @@ class BreweryConfigurationTest {
     }
 
     @Test
+    void everyFamilyHasCompleteVariantsOutputsAndEffects() {
+        var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
+        var families = recipes.getConfigurationSection("brew_families");
+        for (String familyId : families.getKeys(false)) {
+            var family = families.getConfigurationSection(familyId);
+            var outputs = family.getConfigurationSection("outputs");
+            assertFalse(outputs.getKeys(false).isEmpty(), familyId);
+            for (var variant : family.getMapList("aging.variants")) {
+                String outputId = String.valueOf(variant.get("output_id"));
+                assertTrue(outputs.contains(outputId), familyId + " -> " + outputId);
+                assertTrue(((Number) variant.get("target_units")).intValue() > 0, familyId);
+                assertFalse(((java.util.List<?>) variant.get("barrel_types")).isEmpty(), familyId);
+            }
+            for (String outputId : outputs.getKeys(false)) {
+                assertTrue(outputs.isBoolean(outputId + ".glint"), familyId + "/" + outputId);
+                assertTrue(outputs.isList(outputId + ".effects"), familyId + "/" + outputId);
+                for (String effect : outputs.getStringList(outputId + ".effects")) {
+                    assertTrue(effect.matches("[A-Z_]+/\\d+(?:-\\d+)?/\\d+(?:-\\d+)?"), effect);
+                }
+            }
+        }
+        var redVariants = recipes.getMapList("brew_families.red_wine.aging.variants");
+        assertEquals("redwine", redVariants.get(0).get("output_id"));
+        assertEquals(20, ((Number) redVariants.get(0).get("target_units")).intValue());
+        assertEquals("vintagewine", redVariants.get(1).get("output_id"));
+        assertEquals(202, ((Number) redVariants.get(1).get("target_units")).intValue());
+    }
+
+    @Test
     void recipeConfigKeepsDisplayTextOutOfGameplayConfig() {
         var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
         for (String key : recipes.getKeys(true)) {
             assertFalse(key.endsWith(".name"));
             assertFalse(key.endsWith(".description"));
-            assertFalse(key.equals("recipes.wheatbeer.name"));
+            assertFalse(key.equals("brew_families.wheatbeer.name"));
         }
-    }
-
-    @Test
-    void codecUsesStructuredLoreAndNoAutomaticLegacyLore() throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/kotlin/jp/awabi2048/cccontent/features/brewery/item/BreweryItemCodec.kt"));
-        assertFalse(source.contains("GuiLoreSpec.Auto"));
-        assertFalse(source.contains("GuiLoreLine.Raw"));
-        assertTrue(source.contains("GuiLoreSpec.Blocks"));
-        assertTrue(source.contains("meta.displayName(Component.text("));
-        assertFalse(source.contains("meta.setDisplayName("));
-        assertTrue(source.contains("\"brewery.product.$recipeId\""));
     }
 
     @Test
@@ -87,20 +120,7 @@ class BreweryConfigurationTest {
     }
 
     @Test
-    void destroyedEquipmentDiscardsAllInternalContents() throws Exception {
-        String source = Files.readString(Path.of(
-            "src/main/kotlin/jp/awabi2048/cccontent/features/brewery/BreweryController.kt"));
-        assertTrue(source.contains("private fun invalidateAt(key: BreweryLocationKey)"));
-        assertTrue(source.contains("inventory.clear()"));
-        assertFalse(source.contains("dropInventoryContents"));
-        int start = source.indexOf("private fun invalidateAt(key: BreweryLocationKey)");
-        int end = source.indexOf("private fun finalizeDistilledItem", start);
-        assertTrue(start >= 0 && end > start);
-        assertFalse(source.substring(start, end).contains("dropItemNaturally"));
-    }
-
-    @Test
-    void fermentationAndAgingUseDistinctBarrelTypes() throws Exception {
+    void fermentationAndAgingHaveDistinctConfiguration() {
         var config = YamlConfiguration.loadConfiguration(CONFIG.toFile());
         assertEquals("[ferment]", config.getString("brewery.barrel.fermentation_sign_keyword"));
         assertEquals("barrel", config.getString("brewery.barrel.aging_sign_keyword"));
@@ -108,14 +128,5 @@ class BreweryConfigurationTest {
         assertFalse(config.contains("brewery.barrel.age_in_minecraft_barrels"));
         assertFalse(config.contains("brewery.barrel.max_brews_in_minecraft_barrels"));
 
-        String source = Files.readString(Path.of(
-            "src/main/kotlin/jp/awabi2048/cccontent/features/brewery/BreweryController.kt"));
-        assertTrue(source.contains("fermentationBarrelFor(block)"));
-        assertTrue(source.contains("attachedVanillaBarrel(event.block)"));
-        assertTrue(source.contains("state.startedAtEpochMillis = System.currentTimeMillis()"));
-        assertTrue(source.contains("now - state.startedAtEpochMillis"));
-        assertFalse(source.contains("isFermentationCauldron"));
-        assertFalse(source.contains("BarrelSize.MINECRAFT"));
-        assertFalse(source.contains("FERMENT_FUEL_SLOT"));
     }
 }

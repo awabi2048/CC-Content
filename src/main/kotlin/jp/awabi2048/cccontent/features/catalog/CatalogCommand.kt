@@ -55,7 +55,8 @@ class CatalogCommand(
     private val items: (CatalogType) -> List<CatalogItem>,
     private val isAvailable: (CatalogType) -> Boolean,
     private val fishingSearchTarget: (UUID) -> String? = { null },
-    private val setFishingSearchTarget: (Player, String?) -> Unit = { _, _ -> }
+    private val setFishingSearchTarget: (Player, String?) -> Unit = { _, _ -> },
+    private val openFishingJournal: (Player) -> Unit = {}
 ) : CommandExecutor, Listener {
     fun openFromPublicRoute(player: Player, arguments: Map<String, String>): Boolean {
         val type = arguments["type"]
@@ -125,23 +126,20 @@ class CatalogCommand(
         val elementService = CCSystem.getAPI().getGuiElementService()
         if (page > 0) inventory.setItem(layout.previousPageSlot, navigationItem(elementService, Material.ARROW, text(player, "fishing.fishdex.previous")))
         if (page + 1 < totalPages) inventory.setItem(layout.nextPageSlot, navigationItem(elementService, Material.ARROW, text(player, "fishing.fishdex.next")))
-        val targetId = fishingSearchTarget(player.uniqueId)
-        val targetName = targetId?.let { text(player, "fishing.catalog.item.$it") }
-            ?: text(player, "fishing.dictionary.search.none")
         inventory.setItem(layout.actionSlot, elementService.menuIcon(GuiMenuIconSpec(
-                material = if (targetId == null) Material.COMPASS else Material.RECOVERY_COMPASS,
-                name = GuiNameSpec.Text(text(player, "fishing.dictionary.search.footer"), GuiNameStyle.DEFAULT),
-                role = GuiElementRole.CONTENT,
+                material = Material.WRITABLE_BOOK,
+                name = GuiNameSpec.Text(text(player, "fishing.journal.tab"), GuiNameStyle.DEFAULT),
+                role = GuiElementRole.NAVIGATION,
                 amount = 1,
                 description = emptyList(),
-                data = listOf(GuiMenuIconData(text(player, "fishing.dictionary.search.current"), targetName, "§f")),
+                data = emptyList(),
                 options = emptyList(),
                 warnings = emptyList(),
                 dangers = emptyList(),
-                actions = if (targetId == null) emptyList() else listOf(GuiMenuIconAction(
-                    text(player, "fishing.dictionary.search.clear_operation"),
-                    text(player, "fishing.dictionary.search.clear_action"),
-                    text(player, "fishing.dictionary.search.clear_resolved"),
+                actions = listOf(GuiMenuIconAction(
+                    text(player, "fishing.journal.tab_operation"),
+                    text(player, "fishing.journal.tab_action"),
+                    text(player, "fishing.journal.tab_resolved"),
                     true
                 )),
                 glint = null
@@ -219,7 +217,12 @@ class CatalogCommand(
                     text(player, "fishing.dictionary.detail.resolved"),
                     true
                 ))
-                if (!selected) add(GuiMenuIconAction(
+                add(if (selected) GuiMenuIconAction(
+                    text(player, "fishing.dictionary.search.clear_operation"),
+                    text(player, "fishing.dictionary.search.clear_action"),
+                    text(player, "fishing.dictionary.search.clear_resolved"),
+                    true
+                ) else GuiMenuIconAction(
                     text(player, "fishing.dictionary.search.operation"),
                     text(player, "fishing.dictionary.search.action"),
                     text(player, "fishing.dictionary.search.resolved"),
@@ -320,15 +323,12 @@ class CatalogCommand(
             when (event.rawSlot) {
                 layout.previousPageSlot -> if (holder.page > 0) open(player, holder.type, holder.page - 1)
                 layout.nextPageSlot -> if (holder.page + 1 < holder.totalPages) open(player, holder.type, holder.page + 1)
-                layout.actionSlot -> if (fishingSearchTarget(player.uniqueId) != null) {
-                    setFishingSearchTarget(player, null)
-                    open(player, holder.type, holder.page)
-                }
+                layout.actionSlot -> openFishingJournal(player)
                 else -> {
                     val fishId = holder.itemIdsBySlot[event.rawSlot] ?: return
                     if (store.entries(player.uniqueId, CatalogType.FISHING)[fishId]?.discovered != true) return
                     if (event.isRightClick) {
-                        setFishingSearchTarget(player, fishId)
+                        setFishingSearchTarget(player, if (fishingSearchTarget(player.uniqueId) == fishId) null else fishId)
                         open(player, holder.type, holder.page)
                     } else if (event.isLeftClick) {
                         player.playSound(player.location, org.bukkit.Sound.ITEM_BOOK_PAGE_TURN, 0.7f, 1.2f)

@@ -10,7 +10,7 @@ object ContentConfigScope {
             "core.yml" -> "core"
             "custom_item" -> "custom_items"
             "npc" -> "oage_shrine"
-            "ingredient_definition.yml", "mob_definition.yml" -> "shared"
+            "mob_definition.yml" -> "shared"
             else -> first.removeSuffix(".yml")
         }
     }
