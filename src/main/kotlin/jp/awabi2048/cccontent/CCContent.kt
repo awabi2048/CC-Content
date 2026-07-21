@@ -411,6 +411,15 @@ class CCContent : JavaPlugin(), Listener {
             }
         }
 
+        initializeFeatureIfEnabled("Resource Collection", "resource_collection") {
+            val rankManager = rankManagerInstance
+                ?: throw IllegalStateException("Resource Collection requires the Rank System")
+            val feature = ResourceCollectionFeature(this, rankManager)
+            resourceCollectionFeature = feature
+            feature.initialize()
+            featureInitLogger.setStatus("Resource Collection", FeatureInitializationLogger.Status.SUCCESS)
+        }
+
         initializeFeatureIfEnabled("Brewery", "brewery") {
             initializeBrewery()
         }
@@ -423,15 +432,6 @@ class CCContent : JavaPlugin(), Listener {
             val feature = FishingFeature(this, catalogStore, myWorldBridge)
             fishingFeature = feature
             feature.initialize(featureInitLogger)
-        }
-
-        initializeFeatureIfEnabled("Resource Collection", "resource_collection") {
-            val rankManager = rankManagerInstance
-                ?: throw IllegalStateException("Resource Collection requires the Rank System")
-            val feature = ResourceCollectionFeature(this, rankManager)
-            resourceCollectionFeature = feature
-            feature.initialize()
-            featureInitLogger.setStatus("Resource Collection", FeatureInitializationLogger.Status.SUCCESS)
         }
 
         initializeFeatureIfEnabled("Seasonal", "seasonal") {
@@ -1349,7 +1349,11 @@ class CCContent : JavaPlugin(), Listener {
                 YamlConfiguration.loadConfiguration(InputStreamReader(input, StandardCharsets.UTF_8))
             } ?: error("Missing bundled config: $resourcePath")
             val currentVersion = bundled.getInt("config_version", 1)
-            val classification = if (bundledMarkers.any(resourcePath::contains)) {
+            val bundledDefinitionPaths = setOf(
+                "config/resource_collection/seasonal_plants.yml",
+                "config/resource_collection/forest_products.yml"
+            )
+            val classification = if (resourcePath in bundledDefinitionPaths || bundledMarkers.any(resourcePath::contains)) {
                 ConfigClassification.BUNDLED_DEFINITION
             } else {
                 ConfigClassification.MANAGED_CONFIG
