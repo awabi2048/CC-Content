@@ -27,10 +27,33 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
         configuration.cuttingRecipes.values
             .distinctBy(CuttingRecipeDefinition::outputCustomItemId)
             .forEach { recipe -> register(IntermediateItem(recipe.outputCustomItemId)) }
+        listOf(
+            "miso" to 16, "soy_sauce" to 16, "curry_roux" to 64, "butter" to 64,
+            "dough" to 64, "sweet_dough" to 64, "carrot_cookie_dough" to 64, "roasted_coffee" to 64
+        ).forEach { (id, stack) -> register(IntermediateItem("cooking.$id", stack)) }
         configuration.recipes.values
             .flatMap { listOf(it.result, it.failureResult) }
             .distinctBy(UnifiedCookingResult::customItemId)
             .forEach { result -> register(ResultItem(result)) }
+        CookingVanillaDefinitions.all.filter { it.experience > 0 }.forEach { definition ->
+            val nutrition = when (definition.tier) {
+                CookingTier.BASIC -> 5
+                CookingTier.INTERMEDIATE -> 7
+                CookingTier.ADVANCED -> 9
+                CookingTier.TOP -> 12
+            }
+            val saturation = when (definition.tier) {
+                CookingTier.BASIC -> 0.6f
+                CookingTier.INTERMEDIATE -> 0.8f
+                CookingTier.ADVANCED -> 1.0f
+                CookingTier.TOP -> 1.2f
+            }
+            register(ResultItem(UnifiedCookingResult(
+                "cooking.${definition.id}", Material.POISONOUS_POTATO,
+                NamespacedKey("kota_server", "custom_item/cooking/${definition.id}"), null, null,
+                nutrition, saturation, false, emptyList(), 16, definition.outputAmount
+            )))
+        }
     }
 
     fun unregister() {
@@ -84,12 +107,12 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
             }
     }
 
-    private class IntermediateItem(fullId: String) : BaseCookingItem(fullId.removePrefix("cooking.")) {
+    private class IntermediateItem(fullId: String, private val maximumStack: Int = 64) : BaseCookingItem(fullId.removePrefix("cooking.")) {
         override val itemModel = NamespacedKey("kota_server", "custom_item/cooking/$id")
         override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
         override fun createItemForPlayer(player: Player?, amount: Int): ItemStack =
             ItemStack(Material.POISONOUS_POTATO, amount.coerceAtLeast(1)).also { item ->
-                localizedMeta(item, player, 64, requireNotNull(itemModel))
+                localizedMeta(item, player, maximumStack, requireNotNull(itemModel))
                 item.unsetData(DataComponentTypes.FOOD)
                 item.unsetData(DataComponentTypes.CONSUMABLE)
                 item.editMeta { meta ->

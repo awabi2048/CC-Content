@@ -14,6 +14,7 @@ class CookingFeature(
     private val catalogStore: CatalogStore
 ) {
     private var controller: UnifiedCookingController? = null
+    private var vanillaRecipes: CookingVanillaRecipeController? = null
     private var items: CookingItems? = null
     private var configuration: UnifiedCookingConfiguration? = null
 
@@ -45,15 +46,20 @@ class CookingFeature(
     fun shutdown() {
         controller?.shutdown()
         controller = null
+        vanillaRecipes?.shutdown()
+        vanillaRecipes = null
         items?.unregister()
         items = null
         configuration = null
     }
 
-    fun catalogItems(): List<CatalogItem> = configuration?.recipes?.values
-        ?.filter { it.definition.experience > 0 }
-        ?.map { CatalogItem(it.definition.id, it.result.baseMaterial) }
-        .orEmpty()
+    fun catalogItems(): List<CatalogItem> = configuration?.let { loaded ->
+        loaded.recipes.values
+            .filter { it.definition.experience > 0 }
+            .map { CatalogItem(it.definition.id, it.result.baseMaterial) } +
+            CookingVanillaDefinitions.all.filter { it.experience > 0 }
+                .map { CatalogItem(it.id, org.bukkit.Material.POISONOUS_POTATO) }
+    }.orEmpty()
 
     private fun start() {
         val loaded = UnifiedCookingConfigurationLoader.load(plugin.dataFolder)
@@ -61,6 +67,8 @@ class CookingFeature(
         items = CookingItems(loaded).also(CookingItems::register)
         controller = UnifiedCookingController(plugin, rankManagerProvider, catalogStore, loaded)
             .also(UnifiedCookingController::initialize)
+        vanillaRecipes = CookingVanillaRecipeController(plugin, rankManagerProvider, catalogStore)
+            .also(CookingVanillaRecipeController::initialize)
     }
 
     private fun enabled(): Boolean {
