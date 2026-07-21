@@ -102,7 +102,7 @@ class SeasonalPlantRegistry private constructor(
             val vegetationGroupNameKey = requireLanguageKey(raw, "vegetation_group_name_key", path)
             val rawWeights = raw["weights_by_season"] as? Map<*, *>
                 ?: throw IllegalArgumentException("$path.weights_by_season must be a map")
-            val weights = Season.entries.associateWith { season ->
+            val weights = Season::class.java.enumConstants.associateWith { season ->
                 requireInt(rawWeights, season.name, "$path.weights_by_season").also {
                     require(it >= 0) { "$path.weights_by_season.${season.name} must not be negative" }
                 }

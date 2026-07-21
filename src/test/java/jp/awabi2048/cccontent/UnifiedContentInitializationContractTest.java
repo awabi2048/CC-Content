@@ -35,6 +35,16 @@ class UnifiedContentInitializationContractTest {
         assertVersionedDefinition("forest_products.yml");
     }
 
+    @Test
+    void sharedSeasonEnumDoesNotExposeKotlinEnumEntriesAcrossPluginLoaders() throws Exception {
+        String source = Files.readString(
+            Path.of("src/main/kotlin/jp/awabi2048/cccontent/features/resourcecollection/SeasonalPlantRegistry.kt"),
+            StandardCharsets.UTF_8
+        );
+        assertTrue(source.contains("Season::class.java.enumConstants"));
+        assertTrue(!source.contains("Season.entries"));
+    }
+
     private static void assertVersionedDefinition(String name) {
         YamlConfiguration config = YamlConfiguration.loadConfiguration(
             Path.of("src/main/resources/config/resource_collection", name).toFile()
