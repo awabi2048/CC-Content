@@ -140,19 +140,17 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
         val file = File(plugin.dataFolder, "config/brewery/config.yml")
         val yml = YamlConfiguration.loadConfiguration(file)
         val configVersion = yml.getInt("config_version", -1)
-        require(configVersion == 2) { "Brewery設定のconfig_versionが2ではありません: $configVersion" }
+        require(configVersion == 3) { "Brewery設定のconfig_versionが3ではありません: $configVersion" }
         val root = yml.getConfigurationSection("brewery")
             ?: error("Brewery設定にbreweryセクションがありません")
-        val mediumRaw = root.getStringList("fire.medium_materials")
-        val mediumMaterials = mediumRaw.mapNotNull { runCatching { Material.valueOf(it) }.getOrNull() }.toSet()
         return BrewerySettings(
             configVersion = configVersion,
-            mismatchFirePenaltyPer30Seconds = root.getDouble("quality.penalty_per_30s_mismatch_fire", 2.0),
-            distillationOverPenalty = root.getDouble("quality.penalty_per_over_distillation", 5.0),
-            fuelSecondsPerItem = root.getInt("fire.fuel_seconds_per_item", 30).coerceAtLeast(1),
+            mismatchFirePenaltyPer30Seconds = 2.0,
+            distillationOverPenalty = root.getDouble("quality.over_distillation_penalty", 5.0),
+            fuelSecondsPerItem = 30,
             filterSpeedBonus = root.getDouble("distillation.filter_speed_bonus", 0.15).coerceIn(0.0, 0.9),
-            angelSharePercentPerYear = root.getDouble("aging.angel_share_percent_per_year", 2.0).coerceAtLeast(0.0),
-            agingRealSecondsPerYear = root.getLong("aging.real_seconds_per_year", 1200L).coerceAtLeast(1L),
+            angelSharePercentPerYear = root.getDouble("aging.small_barrel_loss_percent_per_target_unit", 1.0).coerceAtLeast(0.0),
+            agingRealSecondsPerYear = root.getLong("aging.real_seconds_per_unit", 1200L).coerceAtLeast(1L),
             smallBarrelSpeedMultiplier = root.getDouble("aging.small_barrel_speed_multiplier", 1.25).coerceAtLeast(0.1),
             fermentationSignKeyword = root.getString("barrel.fermentation_sign_keyword")
                 ?.trim()
@@ -166,24 +164,20 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
                 require(it in 1..5) { "brewery.barrel.fermentation_capacity must be between 1 and 5" }
             },
             openLargeBarrelEverywhere = root.getBoolean("barrel.open_large_everywhere", true),
-            barrelInventoryRowsLarge = root.getInt("barrel.inventory_rows_large", 3).also {
-                require(it in 1..6) { "barrel.inventory_rows_large must be between 1 and 6" }
-            },
-            barrelInventoryRowsSmall = root.getInt("barrel.inventory_rows_small", 1).also {
-                require(it in 1..6) { "barrel.inventory_rows_small must be between 1 and 6" }
-            },
-            countDifferencePenalty = root.getDouble("quality.count_difference_penalty", 5.0).coerceAtLeast(0.0),
-            unmatchedItemPenalty = root.getDouble("quality.unmatched_item_penalty", 10.0).coerceAtLeast(0.0),
-            allowedMediumFireMaterials = mediumMaterials,
+            barrelInventoryRowsLarge = 3,
+            barrelInventoryRowsSmall = 1,
+            countDifferencePenalty = 5.0,
+            unmatchedItemPenalty = 10.0,
+            allowedMediumFireMaterials = emptySet(),
             nauseaThreshold = root.getDouble("intoxication.nausea_threshold", 25.0).coerceAtLeast(0.0),
             stumbleThreshold = root.getDouble("intoxication.stumble_threshold", 50.0).coerceAtLeast(0.0),
             faintThreshold = root.getDouble("intoxication.faint_threshold", 90.0).coerceAtLeast(0.0),
             intoxicationDecayPerSecond = root.getDouble("intoxication.decay_per_second", 0.05).coerceAtLeast(0.0),
             faintDurationSeconds = root.getLong("intoxication.faint_duration_seconds", 8L).coerceAtLeast(1L),
-            stateRetentionSeconds = root.getLong("state.retention_seconds", 604800L).coerceAtLeast(1L),
-            fermentationExp = root.getLong("rank_exp.fermentation", 10L).coerceAtLeast(0L),
-            distillationExp = root.getLong("rank_exp.distillation", 20L).coerceAtLeast(0L),
-            agingExp = root.getLong("rank_exp.aging", 30L).coerceAtLeast(0L)
+            stateRetentionSeconds = root.getLong("intoxication.state_retention_seconds", 604800L).coerceAtLeast(1L),
+            fermentationExp = root.getLong("rank_exp.fermentation_batch", 10L).coerceAtLeast(0L),
+            distillationExp = root.getLong("rank_exp.distillation_batch", 20L).coerceAtLeast(0L),
+            agingExp = root.getLong("rank_exp.aging_per_bottle", 10L).coerceAtLeast(0L)
         )
     }
 

@@ -19,10 +19,13 @@ class BreweryConfigurationTest {
         var config = YamlConfiguration.loadConfiguration(CONFIG.toFile());
         var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
 
-        assertEquals(2, config.getInt("config_version"));
+        assertEquals(3, config.getInt("config_version"));
         assertFalse(config.contains("schema_version"));
         assertTrue(config.isConfigurationSection("brewery"));
         assertFalse(config.contains("settings"));
+        assertFalse(config.contains("brewery.fire"));
+        assertFalse(config.contains("brewery.aging.real_seconds_per_year"));
+        assertEquals(100, config.getInt("brewery.state.flush_interval_ticks"));
         assertEquals(2, recipes.getInt("config_version"));
         assertFalse(recipes.contains("schema_version"));
         assertTrue(recipes.isConfigurationSection("recipes"));
