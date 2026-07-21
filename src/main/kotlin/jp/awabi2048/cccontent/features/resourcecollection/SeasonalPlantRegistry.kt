@@ -52,6 +52,19 @@ class SeasonalPlantRegistry private constructor(
         return null
     }
 
+    fun selectStable(
+        season: Season,
+        material: Material,
+        biomeKey: String,
+        y: Int,
+        seed: Long
+    ): SeasonalPlantDefinition? {
+        if (!enabled) return null
+        val candidates = definitions.filter { it.matches(season, material, biomeKey, y) }
+        val selected = GatheringPatchModel.weightedIndex(candidates.map { it.weight(season) }, seed) ?: return null
+        return candidates[selected]
+    }
+
     fun size(): Int = definitions.size
 
     companion object {

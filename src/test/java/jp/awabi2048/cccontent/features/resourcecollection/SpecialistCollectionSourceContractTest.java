@@ -157,7 +157,7 @@ class SpecialistCollectionSourceContractTest {
         )).replace("\r\n", "\n");
         String vegetation = source.substring(
             source.indexOf("private fun inspectVegetation"),
-            source.indexOf("fun onGatheringDrops")
+            source.indexOf("private fun startGathering")
         );
         String forest = source.substring(
             source.indexOf("private fun inspectForestProducts"),

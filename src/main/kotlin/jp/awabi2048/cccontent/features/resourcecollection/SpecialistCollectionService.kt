@@ -32,11 +32,11 @@ import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockDamageEvent
-import org.bukkit.event.block.BlockDropItemEvent
 import org.bukkit.event.player.PlayerChangedWorldEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerItemHeldEvent
 import org.bukkit.event.player.PlayerQuitEvent
+import org.bukkit.event.player.PlayerItemConsumeEvent
 import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
@@ -48,6 +48,7 @@ import java.util.Random
 import java.util.ArrayDeque
 import java.util.UUID
 import java.time.Instant
+import org.bukkit.block.data.Bisected
 
 class SpecialistCollectionService(
     private val plugin: JavaPlugin,
@@ -83,11 +84,28 @@ class SpecialistCollectionService(
         var ignoredFailures: Int = 0,
         var timeout: BukkitTask? = null
     )
+    private data class GatheringPlantSnapshot(
+        val anchor: BlockKey,
+        val physicalBlocks: List<GatheringBlockSnapshot>
+    )
+    private data class GatheringBlockSnapshot(
+        val key: BlockKey,
+        val material: Material,
+        val blockData: String
+    )
     private data class GatheringTarget(
+        val patchId: String,
         val customItemId: String,
         val definitionId: String,
         val expiresAt: Instant,
-        val surface: Boolean
+        val anchor: BlockKey,
+        val plants: List<GatheringPlantSnapshot>
+    )
+    private data class GatheringSession(
+        val patchId: String,
+        val heldSlot: Int,
+        val heldItem: ItemStack,
+        val task: BukkitTask
     )
     private data class ForestProductTarget(
         val customItemId: String,
@@ -100,7 +118,10 @@ class SpecialistCollectionService(
 
     private val chiselSessions = mutableMapOf<UUID, ChiselSession>()
     private val occupiedBlocks = mutableMapOf<BlockKey, UUID>()
-    private val gatheringTargets = mutableMapOf<UUID, MutableMap<BlockKey, GatheringTarget>>()
+    private val gatheringTargets = mutableMapOf<UUID, MutableMap<String, GatheringTarget>>()
+    private val gatheringTargetBlocks = mutableMapOf<UUID, MutableMap<BlockKey, String>>()
+    private val gatheringLocks = mutableMapOf<String, UUID>()
+    private val gatheringSessions = mutableMapOf<UUID, GatheringSession>()
     private val gatheringCooldowns = mutableMapOf<UUID, Instant>()
     private val forestTargets = mutableMapOf<UUID, MutableMap<BlockKey, ForestProductTarget>>()
     private val forestCooldowns = mutableMapOf<UUID, Instant>()
@@ -114,6 +135,10 @@ class SpecialistCollectionService(
         chiselSessions.keys.toList().forEach(::cancelChisel)
         occupiedBlocks.clear()
         gatheringTargets.clear()
+        gatheringTargetBlocks.clear()
+        gatheringSessions.values.forEach { it.task.cancel() }
+        gatheringSessions.clear()
+        gatheringLocks.clear()
         gatheringCooldowns.clear()
         forestTargets.clear()
         forestCooldowns.clear()
@@ -166,6 +191,10 @@ class SpecialistCollectionService(
             handleChiselClick(event, block)
             return
         }
+        if (event.action == Action.RIGHT_CLICK_BLOCK && customId == "resource.gathering_sickle") {
+            ifEnabled(ResourceOperation.FARMER_WILD_GATHERING) { startGathering(event, block) }
+            return
+        }
         if (event.action != Action.RIGHT_CLICK_BLOCK || !event.player.isSneaking) return
         when (customId) {
             "resource.geology_guide" ->
@@ -196,7 +225,7 @@ class SpecialistCollectionService(
         event.isCancelled = true
         val player = event.player
         val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? MinerSkillProfile
-        if (profile == null || !profile.expertOperationUnlocked ||
+        if (profile == null || profile.level < 5 || !profile.expertOperationUnlocked ||
             !RankReleasePolicy.canAccessProfession(player, Profession.MINER)) {
             return
         }
@@ -417,18 +446,28 @@ class SpecialistCollectionService(
         val radius = profile.inspectionRadius.coerceAtLeast(2)
         val expiresAt = now.plusSeconds(60)
         val season = CCSystem.getAPI().getSeasonService().currentSeason()
-        val targets = mutableMapOf<BlockKey, GatheringTarget>()
+        val targets = mutableMapOf<String, GatheringTarget>()
+        val targetBlocks = mutableMapOf<BlockKey, String>()
+        val logicalPlants = mutableMapOf<GatheringPlantPosition, GatheringPlantSnapshot>()
+        val candidates = mutableListOf<GatheringPatchCandidate>()
         val discoveredDefinitions = linkedSetOf<SeasonalPlantDefinition>()
         for (x in -radius..radius) for (y in -2..2) for (z in -radius..radius) {
-            val block = origin.getRelative(x, y, z)
-            if (!ResourceMaterialPolicy.isWildVegetation(block.type)) continue
-            if (!CCSystem.getAPI().getNaturalOriginRegistry().isNatural(block)) continue
-            val definition = seasonalPlants.select(
-                season,
-                block.type,
-                block.biome.key.toString(),
-                block.y,
-                random
+            val anchor = logicalVegetationAnchor(origin.getRelative(x, y, z)) ?: continue
+            val group = GatheringVegetationGroup.from(anchor.type) ?: continue
+            if (logicalPlants.containsKey(anchor.position())) continue
+            val physical = logicalVegetationBlocks(anchor)
+            if (physical.any { !CCSystem.getAPI().getNaturalOriginRegistry().isNatural(it) }) continue
+            logicalPlants[anchor.position()] = GatheringPlantSnapshot(
+                anchor.key(),
+                physical.map { GatheringBlockSnapshot(it.key(), it.type, it.blockData.asString) }
+            )
+            candidates += GatheringPatchCandidate(anchor.position(), group)
+        }
+        for (patch in GatheringPatchModel.build(origin.world.uid, candidates)) {
+            val anchorBlock = origin.world.getBlockAt(patch.anchor.x, patch.anchor.y, patch.anchor.z)
+            val seed = GatheringPatchModel.stableSeed(origin.world.seed, origin.world.uid, patch.anchor, season)
+            val definition = seasonalPlants.selectStable(
+                season, anchorBlock.type, anchorBlock.biome.key.toString(), anchorBlock.y, seed
             ) ?: continue
             if (CustomItemManager.getItem(definition.customItemId) == null) {
                 plugin.logger.warning(
@@ -436,20 +475,25 @@ class SpecialistCollectionService(
                 )
                 continue
             }
-            targets[block.key()] = GatheringTarget(definition.customItemId, definition.id, expiresAt, surface = false)
-            discoveredDefinitions += definition
-            player.spawnParticle(
-                Particle.HAPPY_VILLAGER,
-                block.location.add(0.5, 0.7, 0.5),
-                3,
-                0.18,
-                0.15,
-                0.18,
-                0.0
+            val plants = patch.plants.mapNotNull(logicalPlants::get)
+            if (plants.isEmpty()) continue
+            targets[patch.id] = GatheringTarget(
+                patch.id, definition.customItemId, definition.id, expiresAt, anchorBlock.key(), plants
             )
+            plants.flatMap(GatheringPlantSnapshot::physicalBlocks).forEach { targetBlocks[it.key] = patch.id }
+            discoveredDefinitions += definition
+            plants.forEach { plant ->
+                plant.anchor.resolve()?.let { targetBlock ->
+                    player.spawnParticle(
+                        Particle.HAPPY_VILLAGER, targetBlock.location.add(0.5, 0.7, 0.5),
+                        3, 0.18, 0.15, 0.18, 0.0
+                    )
+                }
+            }
         }
         player.swingMainHand()
         gatheringTargets[player.uniqueId] = targets
+        gatheringTargetBlocks[player.uniqueId] = targetBlocks
         val cooldownSeconds = profile.inspectionCooldownSeconds.takeIf { it > 0 } ?: 45
         gatheringCooldowns[player.uniqueId] = now.plusSeconds(cooldownSeconds.toLong())
         if (targets.isEmpty()) {
@@ -473,7 +517,7 @@ class SpecialistCollectionService(
         val appraisalLines = buildList {
             add(GuiLoreLine.Data(
                 text(player, "resource_collection.display.data.candidate_count"),
-                targets.size,
+                targets.values.sumOf { it.plants.size },
                 "§f"
             ))
             add(GuiLoreLine.Data(
@@ -511,30 +555,86 @@ class SpecialistCollectionService(
         player.playSound(player.location, Sound.ITEM_BOOK_PAGE_TURN, 0.8f, 1.25f)
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    fun onGatheringDrops(event: BlockDropItemEvent) {
-        if (!settings.isOperationEnabled(ResourceOperation.FARMER_WILD_GATHERING)) return
+    private fun startGathering(event: PlayerInteractEvent, block: Block) {
         val player = event.player
-        if (CustomItemManager.identify(player.inventory.itemInMainHand)?.fullId != "resource.gathering_sickle") return
-        val targets = gatheringTargets[player.uniqueId] ?: return
-        val target = targets.remove(event.block.key()) ?: return
-        if (target.surface) return
-        val now = CCSystem.getAPI().getSharedClockService().now().toInstant()
-        if (target.expiresAt.isBefore(now)) return
         val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? FarmerSkillProfile ?: return
-        completePlantGathering(player, target, profile, event.blockState.type, event.block.location)
+        if (profile.level < 5 || !profile.expertOperationUnlocked ||
+            !RankReleasePolicy.canAccessProfession(player, Profession.FARMER)) return
+        val patchId = gatheringTargetBlocks[player.uniqueId]?.get(block.key()) ?: return
+        val target = gatheringTargets[player.uniqueId]?.get(patchId) ?: return
+        if (target.expiresAt.isBefore(CCSystem.getAPI().getSharedClockService().now().toInstant())) return
+        val owner = gatheringLocks.putIfAbsent(patchId, player.uniqueId)
+        if (owner != null && owner != player.uniqueId) return
+        event.setUseInteractedBlock(Event.Result.DENY)
+        event.setUseItemInHand(Event.Result.ALLOW)
+        cancelGathering(player.uniqueId)
+        gatheringLocks[patchId] = player.uniqueId
+        val heldSlot = player.inventory.heldItemSlot
+        val held = player.inventory.itemInMainHand.clone()
+        lateinit var task: BukkitTask
+        var ticks = 0
+        task = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
+            ticks++
+            val targetedPatch = player.getTargetBlockExact(6, FluidCollisionMode.NEVER)?.key()?.let { key ->
+                gatheringTargetBlocks[player.uniqueId]?.get(key)
+            }
+            val valid = player.isOnline && player.world.uid == block.world.uid &&
+                CustomItemManager.identify(player.inventory.itemInMainHand)?.fullId == "resource.gathering_sickle" &&
+                player.inventory.heldItemSlot == heldSlot && player.inventory.itemInMainHand.isSimilar(held) &&
+                player.hasActiveItem() && targetedPatch == patchId &&
+                validateGatheringTarget(player, target, checkProtection = false)
+            if (!valid) {
+                cancelGathering(player.uniqueId)
+                return@Runnable
+            }
+            if (ticks >= 40) {
+                player.clearActiveItem()
+                task.cancel()
+                gatheringSessions.remove(player.uniqueId)
+                if (validateGatheringTarget(player, target, checkProtection = true)) {
+                    completePlantGathering(player, target, profile)
+                }
+                gatheringLocks.remove(patchId, player.uniqueId)
+            }
+        }, 1L, 1L)
+        gatheringSessions[player.uniqueId] = GatheringSession(patchId, heldSlot, held, task)
+    }
+
+    @EventHandler(ignoreCancelled = false)
+    fun onGatheringSickleConsume(event: PlayerItemConsumeEvent) {
+        if (CustomItemManager.identify(event.item)?.fullId == "resource.gathering_sickle") event.isCancelled = true
+    }
+
+    private fun validateGatheringTarget(player: Player, target: GatheringTarget, checkProtection: Boolean): Boolean {
+        val anchor = target.anchor.resolve() ?: return false
+        if (gatheringLocks[target.patchId] != player.uniqueId || !isReadyWorld(anchor)) return false
+        return target.plants.flatMap(GatheringPlantSnapshot::physicalBlocks).all { snapshot ->
+            val current = snapshot.key.resolve() ?: return@all false
+            current.type == snapshot.material && current.blockData.asString == snapshot.blockData &&
+                CCSystem.getAPI().getNaturalOriginRegistry().isNatural(current) &&
+                (!checkProtection || callProtectedBreak(current, player))
+        }
     }
 
     private fun completePlantGathering(
         player: Player,
         target: GatheringTarget,
-        profile: FarmerSkillProfile,
-        sourceMaterial: Material,
-        sourceLocation: Location
+        profile: FarmerSkillProfile
     ) {
-        val amount = profile.guaranteedSpecialistPlantYield.coerceAtLeast(1) +
+        val baseYield = when (target.plants.size) { in 1..4 -> 1; in 5..8 -> 2; else -> 3 }
+        val amount = baseYield + profile.guaranteedSpecialistPlantYield.coerceAtLeast(0) +
             if (random.nextDouble() < profile.specialistPlantExtraChance) 1 else 0
-        dropCustomItemNaturally(player, target.customItemId, amount, sourceLocation)
+        val anchor = target.anchor.resolve() ?: return
+        target.plants.flatMap(GatheringPlantSnapshot::physicalBlocks).forEach { snapshot ->
+            val current = snapshot.key.resolve() ?: return
+            playNaturalBreakEffect(current, 4)
+            current.type = if (snapshot.material == Material.SEAGRASS || snapshot.material == Material.TALL_SEAGRASS) {
+                Material.WATER
+            } else {
+                Material.AIR
+            }
+        }
+        giveCustomItemOrDrop(player, target.customItemId, amount, anchor.location)
         sendCustomCollectionResult(
             player,
             "resource_collection.gathering.completed",
@@ -548,12 +648,21 @@ class SpecialistCollectionService(
             player,
             ContentActionType.PLANT_GATHERED,
             amount > 1,
-            sourceMaterial,
+            target.plants.first().physicalBlocks.first().material,
             mapOf(
                 "seasonal_plant_definition" to target.definitionId,
                 "seasonal_patch" to "true"
             )
         )
+        gatheringTargets[player.uniqueId]?.remove(target.patchId)
+        gatheringTargetBlocks[player.uniqueId]?.entries?.removeIf { it.value == target.patchId }
+    }
+
+    private fun giveCustomItemOrDrop(player: Player, fullId: String, amount: Int, source: Location) {
+        val item = CustomItemManager.createItemForPlayer(fullId, player, amount) ?: return
+        player.inventory.addItem(item).values.forEach { leftover ->
+            source.world?.dropItemNaturally(source.clone().add(0.5, 0.5, 0.5), leftover)
+        }
     }
 
     private fun inspectForestProducts(event: PlayerInteractEvent, origin: Block) {
@@ -1232,6 +1341,28 @@ class SpecialistCollectionService(
     private fun isReadyWorld(block: Block): Boolean =
         CCSystem.getAPI().getResourceWorldLifecycleService().isReady(block.world.key)
 
+    private fun logicalVegetationAnchor(block: Block): Block? {
+        if (GatheringVegetationGroup.from(block.type) == null) return null
+        val bisected = block.blockData as? Bisected ?: return block
+        return if (bisected.half == Bisected.Half.TOP) block.getRelative(BlockFace.DOWN) else block
+    }
+
+    private fun logicalVegetationBlocks(anchor: Block): List<Block> {
+        val bisected = anchor.blockData as? Bisected ?: return listOf(anchor)
+        if (bisected.half != Bisected.Half.BOTTOM) return emptyList()
+        val upper = anchor.getRelative(BlockFace.UP)
+        val upperData = upper.blockData as? Bisected
+        return if (upper.type == anchor.type && upperData?.half == Bisected.Half.TOP) listOf(anchor, upper) else emptyList()
+    }
+
+    private fun Block.position(): GatheringPlantPosition = GatheringPlantPosition(x, y, z)
+
+    private fun cancelGathering(playerId: UUID) {
+        val session = gatheringSessions.remove(playerId) ?: return
+        session.task.cancel()
+        gatheringLocks.remove(session.patchId, playerId)
+    }
+
     private fun cancelChisel(playerId: UUID) {
         val session = chiselSessions.remove(playerId) ?: return
         session.timeout?.cancel()
@@ -1247,7 +1378,9 @@ class SpecialistCollectionService(
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
         cancelChisel(event.player.uniqueId)
+        cancelGathering(event.player.uniqueId)
         gatheringTargets.remove(event.player.uniqueId)
+        gatheringTargetBlocks.remove(event.player.uniqueId)
         gatheringCooldowns.remove(event.player.uniqueId)
         forestTargets.remove(event.player.uniqueId)
         forestCooldowns.remove(event.player.uniqueId)
@@ -1255,12 +1388,16 @@ class SpecialistCollectionService(
     }
 
     @EventHandler
-    fun onWorldChanged(event: PlayerChangedWorldEvent) =
+    fun onWorldChanged(event: PlayerChangedWorldEvent) {
         cancelChisel(event.player.uniqueId)
+        cancelGathering(event.player.uniqueId)
+    }
 
     @EventHandler
-    fun onHeldItemChanged(event: PlayerItemHeldEvent) =
+    fun onHeldItemChanged(event: PlayerItemHeldEvent) {
         cancelChisel(event.player.uniqueId)
+        cancelGathering(event.player.uniqueId)
+    }
 
     private fun Block.key(): BlockKey = BlockKey(world.uid, x, y, z)
     private fun BlockKey.resolve(): Block? = Bukkit.getWorld(worldId)?.getBlockAt(x, y, z)

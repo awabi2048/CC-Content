@@ -13,6 +13,9 @@ import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
+import io.papermc.paper.datacomponent.DataComponentTypes
+import io.papermc.paper.datacomponent.item.Consumable
+import io.papermc.paper.datacomponent.item.consumable.ItemUseAnimation
 
 class ResourceCollectionItems(plugin: JavaPlugin) {
     private data class Definition(
@@ -105,6 +108,16 @@ class ResourceCollectionItems(plugin: JavaPlugin) {
                 )
             }
             item.itemMeta = meta
+            if (definition.id == "gathering_sickle") {
+                item.setData(DataComponentTypes.MAX_DAMAGE, 256)
+                item.setData(
+                    DataComponentTypes.CONSUMABLE,
+                    Consumable.consumable()
+                        .consumeSeconds(3600.0f)
+                        .animation(ItemUseAnimation.BRUSH)
+                        .hasConsumeParticles(false)
+                )
+            }
             return item
         }
 
