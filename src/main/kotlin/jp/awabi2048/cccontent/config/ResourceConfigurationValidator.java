@@ -54,7 +54,6 @@ public final class ResourceConfigurationValidator {
         validateNpcMenu(configRoot, configs, errors);
         validateCustomItemConfigs(configRoot, configs, errors);
         validateBreweryConfigs(configRoot, configs, errors);
-        validateGardenConfigs(configRoot, configs, errors);
         validateCookingConfigs(configRoot, configs, errors);
         validatePartyConfigs(configRoot, configs, errors);
         validateFishingConfigs(configRoot, configs, errors);
@@ -557,80 +556,6 @@ public final class ResourceConfigurationValidator {
                         errors
                     );
                 }
-            }
-        }
-    }
-
-    private static void validateGardenConfigs(Path configRoot, Map<Path, Object> configs, List<String> errors) {
-        Path file = configRoot.resolve("brewery/garden.yml");
-        Map<String, Object> root = rootMap(configs, file, errors);
-        if (root == null) return;
-        Map<String, Object> garden = requireMap(root, "garden", file, errors);
-        if (garden == null) return;
-        requireFiniteNumberRange(garden.get("seed_drop_chance"), 0.0, 1.0, file, "garden.seed_drop_chance", errors);
-        requirePositiveInteger(garden.get("growth_check_interval_seconds"), file, "garden.growth_check_interval_seconds", errors);
-
-        Object sources = garden.get("seed_source_materials");
-        if (!(sources instanceof List<?> sourceList) || sourceList.isEmpty()) {
-            errors.add(format("invalid seed source materials", file, "garden.seed_source_materials", "non-empty material list is required"));
-        } else {
-            for (int i = 0; i < sourceList.size(); i++) {
-                requireMaterial(sourceList.get(i), file, "garden.seed_source_materials[" + i + "]", errors);
-            }
-        }
-
-        Map<String, Object> plants = requireMap(garden, "plants", file, errors, "garden.plants");
-        if (plants == null) return;
-        requireNonEmpty(plants, file, "garden.plants", errors);
-        for (Map.Entry<String, Object> entry : plants.entrySet()) {
-            String plantPath = "garden.plants." + entry.getKey();
-            if (!entry.getKey().matches("[a-z0-9_]+")) {
-                errors.add(format("invalid garden plant id", file, plantPath, "lowercase snake case id is required"));
-            }
-            Map<String, Object> plant = asMap(entry.getValue());
-            if (plant == null) {
-                errors.add(format("invalid garden plant", file, plantPath, "plant must be a section"));
-                continue;
-            }
-            requireString(plant, "seed_language_key", file, plantPath + ".seed_language_key", errors);
-            requireString(plant, "fruit_language_key", file, plantPath + ".fruit_language_key", errors);
-            Map<String, Object> stages = requireMap(plant, "stages", file, errors, plantPath + ".stages");
-            if (stages == null || stages.isEmpty()) {
-                if (stages != null) errors.add(format("missing garden stages", file, plantPath + ".stages", "at least one stage is required"));
-                continue;
-            }
-            List<Integer> stageIds = new ArrayList<>();
-            for (Map.Entry<?, ?> stageEntry : ((Map<?, ?>) stages).entrySet()) {
-                String stageKey = String.valueOf(stageEntry.getKey());
-                Integer stageId;
-                try {
-                    stageId = Integer.valueOf(stageKey);
-                } catch (NumberFormatException exception) {
-                    errors.add(format("invalid garden stage id", file, plantPath + ".stages." + stageKey, "integer stage id is required"));
-                    continue;
-                }
-                stageIds.add(stageId);
-                String stagePath = plantPath + ".stages." + stageKey;
-                Map<String, Object> stage = asMap(stageEntry.getValue());
-                if (stage == null) {
-                    errors.add(format("invalid garden stage", file, stagePath, "stage must be a section"));
-                    continue;
-                }
-                requireMaterial(stage.get("material"), file, stagePath + ".material", errors);
-                requireString(stage, "block_data", file, stagePath + ".block_data", errors);
-                requirePositiveInteger(stage.get("growth_seconds"), file, stagePath + ".growth_seconds", errors);
-            }
-            stageIds.sort(Integer::compareTo);
-            for (int index = 0; index < stageIds.size(); index++) {
-                if (stageIds.get(index) != index) {
-                    errors.add(format("non-contiguous garden stages", file, plantPath + ".stages", "stage ids must start at 0 and be contiguous"));
-                    break;
-                }
-            }
-            Object regrowth = plant.get("regrowth_stage");
-            if (!(regrowth instanceof Number number) || number.doubleValue() != number.intValue() ||
-                number.intValue() < 0 || number.intValue() >= stageIds.size()) {
-                errors.add(format("invalid garden regrowth stage", file, plantPath + ".regrowth_stage", "existing stage id is required"));
             }
         }
     }
