@@ -21,6 +21,7 @@ import jp.awabi2048.cccontent.featurestate.ContentFeatureCatalog
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemInteractionListener
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.persistence.ContentItemMigrationListener
 import jp.awabi2048.cccontent.items.misc.BigLight
 import jp.awabi2048.cccontent.items.misc.AutoIgnitionBoosterConfig
 import jp.awabi2048.cccontent.items.misc.AutoIgnitionBoosterItem
@@ -599,6 +600,7 @@ class CCContent : JavaPlugin(), Listener {
             }
         }
         server.pluginManager.registerEvents(CustomItemInteractionListener(), this)
+        server.pluginManager.registerEvents(ContentItemMigrationListener(logger), this)
         if (::npcMenuService.isInitialized) {
             server.pluginManager.registerEvents(npcMenuService, this)
         }

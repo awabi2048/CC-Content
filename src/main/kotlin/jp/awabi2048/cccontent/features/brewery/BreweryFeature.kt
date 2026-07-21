@@ -5,6 +5,8 @@ import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 class BreweryFeature(private val plugin: JavaPlugin, private val catalogStore: CatalogStore) {
     private var controller: BreweryController? = null
@@ -12,6 +14,7 @@ class BreweryFeature(private val plugin: JavaPlugin, private val catalogStore: C
     fun initialize(featureInitLogger: FeatureInitializationLogger? = null) {
         try {
             ensureResources()
+            retireGardenLedger()
             controller = BreweryController(plugin, catalogStore).also { it.initialize() }
             featureInitLogger?.apply {
                 setStatus("Brewery", FeatureInitializationLogger.Status.SUCCESS)
@@ -57,5 +60,16 @@ class BreweryFeature(private val plugin: JavaPlugin, private val catalogStore: C
         if (file.exists()) return
         file.parentFile?.mkdirs()
         plugin.saveResource(path, false)
+    }
+
+    private fun retireGardenLedger() {
+        val ledger = File(plugin.dataFolder, "data/brewery/garden.yml")
+        if (!ledger.exists()) return
+        val stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+        val backup = File(plugin.dataFolder, "data/migration/$stamp/data/brewery/garden.yml")
+        backup.parentFile.mkdirs()
+        check(ledger.copyTo(backup, overwrite = false).exists()) { "Garden台帳のバックアップに失敗しました" }
+        check(ledger.delete()) { "Garden台帳の削除に失敗しました" }
+        plugin.logger.info("[GardenMigration] Garden台帳をバックアップし、管理対象から解除しました: ${backup.path}")
     }
 }
