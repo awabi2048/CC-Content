@@ -133,5 +133,7 @@ class BreweryConfigurationTest {
         assertFalse(source.contains("isFermentationCauldron"));
         assertFalse(source.contains("BarrelSize.MINECRAFT"));
         assertFalse(source.contains("FERMENT_FUEL_SLOT"));
+        assertFalse(source.contains("mockClock"));
+        assertFalse(source.contains("isClockAcceleratorItem"));
     }
 }

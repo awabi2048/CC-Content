@@ -86,7 +86,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         plugin.logger
     )
     private val filterRecipeKey = NamespacedKey(plugin, "brewery_sample_filter")
-    private val mockClockKey = NamespacedKey(plugin, "brewery_mock_clock")
     private val yeastKey = NamespacedKey(plugin, "brewery_cultured_yeast")
     private val uiKindKey = NamespacedKey(plugin, "brewery_ui_kind")
     private val rankManager = (plugin as? CCContent)?.getRankManager()
@@ -601,11 +600,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
     private fun quickMoveToAging(state: AgingState, item: ItemStack): Int {
         val before = item.amount
         val inputSlots = agingInputSlots(state)
-        val clockSlot = if (state.size == BarrelSize.BIG) BIG_AGING_CLOCK_SLOT else SMALL_AGING_CLOCK_SLOT
-
-        if (isClockAcceleratorItem(item)) {
-            moveToSingleSlot(item, state.inventory, clockSlot) { isClockAcceleratorItem(it) }
-        }
 
         if (item.amount > 0) {
             val emptyBefore = inputSlots.filter { state.inventory.getItem(it).isEmptyOrAir() }.toSet()
@@ -633,17 +627,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         }
 
         return (before - item.amount).coerceAtLeast(0)
-    }
-
-    private fun isClockAcceleratorItem(item: ItemStack): Boolean {
-        if (item.type == Material.CLOCK) {
-            return true
-        }
-        if (item.type != Material.POISONOUS_POTATO) {
-            return false
-        }
-        val meta = item.itemMeta ?: return false
-        return meta.persistentDataContainer.has(mockClockKey, PersistentDataType.BYTE)
     }
 
     private fun isYeastItem(item: ItemStack): Boolean =
@@ -796,12 +779,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             return
         }
 
-        if (slot == FERMENT_CLOCK_SLOT) {
-            val moved = handleSingleSlotMove(event, setOf(FERMENT_CLOCK_SLOT)) { placing -> isClockAcceleratorItem(placing) }
-            if (moved) playUiSuccessSound(player)
-            refreshFermentationDecor(state)
-            return
-        }
+        if (slot == FERMENT_CLOCK_SLOT) return
 
         if (slot in FERMENT_INPUT_SLOTS) {
             val cursor = event.cursor
@@ -907,12 +885,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             return
         }
 
-        if (slot == DISTILL_CLOCK_SLOT) {
-            val moved = handleSingleSlotMove(event, setOf(DISTILL_CLOCK_SLOT)) { placing -> isClockAcceleratorItem(placing) }
-            if (moved) playUiSuccessSound(player)
-            refreshDistillationDecor(state)
-            return
-        }
+        if (slot == DISTILL_CLOCK_SLOT) return
 
         if (slot == DISTILL_FILTER_SLOT) {
             val moved = handleSingleSlotMove(event, setOf(DISTILL_FILTER_SLOT)) { placing -> codec.isSampleFilter(placing) }
@@ -935,12 +908,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val barrelSlot = if (state.size == BarrelSize.BIG) BIG_AGING_BARREL_SLOT else SMALL_AGING_BARREL_SLOT
         val clockSlot = if (state.size == BarrelSize.BIG) BIG_AGING_CLOCK_SLOT else SMALL_AGING_CLOCK_SLOT
 
-        if (slot == clockSlot) {
-            val moved = handleSingleSlotMove(event, setOf(clockSlot)) { placing -> isClockAcceleratorItem(placing) }
-            if (moved) playUiSuccessSound(player)
-            refreshAgingDecor(state)
-            return
-        }
+        if (slot == clockSlot) return
 
         if (slot == barrelSlot) return
 
@@ -1433,9 +1401,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             inventory.setItem(FERMENT_YEAST_SLOT, placeholder(Material.GREEN_STAINED_GLASS_PANE, "fermentation_yeast"))
         }
 
-        if (inventory.getItem(FERMENT_CLOCK_SLOT).isEmptyOrAir()) {
-            inventory.setItem(FERMENT_CLOCK_SLOT, placeholder(Material.COMPASS, "clock"))
-        }
+        inventory.setItem(FERMENT_CLOCK_SLOT, placeholder(Material.CLOCK, "clock"))
     }
 
     private fun backgroundPane(material: Material): ItemStack {
@@ -1565,9 +1531,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         if (filter == null || filter.type.isAir) {
             inventory.setItem(DISTILL_FILTER_SLOT, placeholder(Material.LIME_STAINED_GLASS_PANE, "distillation_filter"))
         }
-        if (inventory.getItem(DISTILL_CLOCK_SLOT).isEmptyOrAir()) {
-            inventory.setItem(DISTILL_CLOCK_SLOT, placeholder(Material.COMPASS, "clock"))
-        }
+        inventory.setItem(DISTILL_CLOCK_SLOT, placeholder(Material.CLOCK, "clock"))
     }
 
     private fun isDistillationPlaceholderItem(item: ItemStack): Boolean {
@@ -1625,6 +1589,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
                 GuiElementRole.CONTENT
             ))
         }
+        state.inventory.setItem(clockSlot, placeholder(Material.CLOCK, "clock"))
     }
 
     private fun applyAgingBackground(state: AgingState) {
@@ -1655,10 +1620,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             inventory.setItem(barrelSlot, placeholder(Material.BROWN_STAINED_GLASS_PANE, "aging_barrel"))
         }
 
-        val clock = inventory.getItem(clockSlot)
-        if (clock == null || clock.type.isAir) {
-            inventory.setItem(clockSlot, placeholder(Material.YELLOW_STAINED_GLASS_PANE, "aging_clock"))
-        }
+        inventory.setItem(clockSlot, placeholder(Material.CLOCK, "clock"))
     }
 
     private fun isBarrelTypeAllowed(currentWoodType: String, allowedTypes: Set<String>): Boolean {
