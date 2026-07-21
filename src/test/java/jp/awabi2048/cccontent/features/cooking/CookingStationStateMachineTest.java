@@ -15,7 +15,7 @@ class CookingStationStateMachineTest {
     void wrongHeatCommitsFailureAndNeverRecoversToNormal() {
         CookingRecipeDefinition recipe = recipe(CookingStation.PAN, CookingResultKind.ITEM, 0);
         CookingStationSession started = CookingStationStateMachine.start(
-            recipe, "player", 2, CookingHeat.NORMAL, List.of(INPUT), 0.0
+            recipe, snapshot(recipe), "player", 2, CookingHeat.NORMAL, List.of(INPUT), 0.0
         );
         assertTrue(started.getFailureCommitted());
         assertEquals(CookingProcessState.PROCESSING_FAILURE, started.getState());
@@ -34,6 +34,7 @@ class CookingStationStateMachineTest {
     void extinguishedHeatPausesWithoutProgress() {
         CookingStationSession started = CookingStationStateMachine.start(
             recipe(CookingStation.PAN, CookingResultKind.ITEM, 0),
+            snapshot(recipe(CookingStation.PAN, CookingResultKind.ITEM, 0)),
             "player", 1, CookingHeat.HIGH, List.of(INPUT), 0.25
         );
         CookingStationSession paused = ((CookingStationStep.Updated)
@@ -47,7 +48,7 @@ class CookingStationStateMachineTest {
     void failureAndNormalOutputsAreSeparated() {
         CookingRecipeDefinition recipe = recipe(CookingStation.CAULDRON, CookingResultKind.BOWL, 1);
         CookingStationSession normal = CookingStationStateMachine.start(
-            recipe, "player", 2, CookingHeat.HIGH, List.of(INPUT), 0.0
+            recipe, snapshot(recipe), "player", 2, CookingHeat.HIGH, List.of(INPUT), 0.0
         );
         while (normal.getRemainingTicks() > 0) {
             CookingStationStep step = CookingStationStateMachine.tick(normal, CookingHeat.HIGH);
@@ -56,7 +57,7 @@ class CookingStationStateMachineTest {
                 : ((CookingStationStep.Completed) step).getSession();
         }
         CookingStationSession finished = CookingStationStateMachine.finish(
-            normal, recipe, "cooking.soup", "cooking.burnt_bowl_food", "BOWL"
+            normal, recipe
         );
         assertEquals(CookingProcessState.READY_LIQUID, finished.getState());
         assertEquals(2, finished.getReservoir().getMaximum());
@@ -71,6 +72,7 @@ class CookingStationStateMachineTest {
     void cancellationIsUnavailableForFailureProcessing() {
         CookingStationSession failure = CookingStationStateMachine.start(
             recipe(CookingStation.PAN, CookingResultKind.ITEM, 0),
+            snapshot(recipe(CookingStation.PAN, CookingResultKind.ITEM, 0)),
             "player", 1, CookingHeat.NORMAL, List.of(INPUT), 0.0
         );
         assertNull(CookingStationStateMachine.cancel(failure));
@@ -84,6 +86,16 @@ class CookingStationStateMachineTest {
         return new CookingRecipeDefinition(
             "recipe", station, "BASIC", CookingTier.BASIC, CookingHeat.HIGH,
             Map.of("cut_potato", 2), water, 4, 8, kind
+        );
+    }
+
+    private static CookingRecipeSnapshot snapshot(CookingRecipeDefinition recipe) {
+        return new CookingRecipeSnapshot(
+            "cooking.soup", 1, "cooking.burnt_bowl_food", recipe.getDurationSeconds(),
+            recipe.getHeat(), recipe.getWaterUnits(), recipe.getResultKind(),
+            recipe.getResultKind() == CookingResultKind.ITEM ? null : "BOWL",
+            recipe.getResultKind() == CookingResultKind.ITEM ? null : "YELLOW_STAINED_GLASS_PANE",
+            recipe.getExperience(), null, null
         );
     }
 }

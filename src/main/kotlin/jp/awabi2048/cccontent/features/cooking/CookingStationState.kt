@@ -29,6 +29,31 @@ data class CookingOutputStack(
     }
 }
 
+data class CookingRecipeSnapshot(
+    val normalResultId: String,
+    val resultAmountPerScale: Int,
+    val failureResultId: String,
+    val durationSeconds: Int,
+    val expectedHeat: CookingHeat,
+    val waterUnits: Int,
+    val resultKind: CookingResultKind,
+    val containerMaterial: String?,
+    val liquidPaneMaterial: String?,
+    val experience: Long,
+    val brewFamilyId: String? = null,
+    val preparedQuality: Int? = null
+) {
+    init {
+        require(normalResultId.isNotBlank() && failureResultId.isNotBlank())
+        require(resultAmountPerScale > 0)
+        require(durationSeconds > 0)
+        require(waterUnits in 0..3)
+        require(experience >= 0)
+        require(preparedQuality == null || preparedQuality in 0..100)
+        require((resultKind == CookingResultKind.ITEM) == (containerMaterial == null))
+    }
+}
+
 data class CookingReservoir(
     val customItemId: String,
     val remaining: Int,
@@ -46,6 +71,7 @@ data class CookingReservoir(
 
 data class CookingStationSession(
     val recipeId: String,
+    val recipeSnapshot: CookingRecipeSnapshot,
     val starterId: String,
     val scale: Int,
     val startHeat: CookingHeat,
@@ -81,6 +107,7 @@ object CookingStationStateMachine {
     @JvmStatic
     fun start(
         recipe: CookingRecipeDefinition,
+        recipeSnapshot: CookingRecipeSnapshot,
         starterId: String,
         scale: Int,
         actualHeat: CookingHeat,
@@ -89,12 +116,17 @@ object CookingStationStateMachine {
     ): CookingStationSession {
         require(recipe.station == CookingStation.PAN || recipe.station == CookingStation.CAULDRON)
         require(recipe.heat != null)
+        require(recipeSnapshot.expectedHeat == recipe.heat)
+        require(recipeSnapshot.durationSeconds == recipe.durationSeconds)
+        require(recipeSnapshot.waterUnits == recipe.waterUnits)
+        require(recipeSnapshot.resultKind == recipe.resultKind)
         require(processingTimeReduction in 0.0..1.0)
         val ticks = (recipe.durationSeconds * 20.0 * (1.0 - processingTimeReduction))
             .roundToLong().coerceAtLeast(1L)
         val failure = actualHeat != recipe.heat
         return CookingStationSession(
             recipe.id,
+            recipeSnapshot,
             starterId,
             scale,
             actualHeat,
@@ -129,22 +161,22 @@ object CookingStationStateMachine {
     @JvmStatic
     fun finish(
         session: CookingStationSession,
-        recipe: CookingRecipeDefinition,
-        normalCustomItemId: String,
-        failureCustomItemId: String,
-        containerMaterial: String?
+        recipe: CookingRecipeDefinition
     ): CookingStationSession {
         require(session.remainingTicks == 0L)
         require(session.recipeId == recipe.id)
-        val itemId = if (session.failureCommitted) failureCustomItemId else normalCustomItemId
+        val snapshot = session.recipeSnapshot
+        val itemId = if (session.failureCommitted) snapshot.failureResultId else snapshot.normalResultId
         val failed = session.failureCommitted
         return when (recipe.resultKind) {
             CookingResultKind.ITEM -> session.copy(
                 state = CookingProcessState.READY_ITEM,
-                outputStacks = List(session.scale) { CookingOutputStack(itemId, 1, failed) }
+                outputStacks = List(session.scale) {
+                    CookingOutputStack(itemId, snapshot.resultAmountPerScale, failed)
+                }
             )
             CookingResultKind.BOWL, CookingResultKind.BOTTLE -> {
-                requireNotNull(containerMaterial)
+                val containerMaterial = requireNotNull(snapshot.containerMaterial)
                 val servings = if (recipe.station == CookingStation.CAULDRON) {
                     recipe.waterUnits * session.scale
                 } else {
