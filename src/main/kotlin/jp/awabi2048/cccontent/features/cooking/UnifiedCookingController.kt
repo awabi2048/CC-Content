@@ -3,10 +3,12 @@ package jp.awabi2048.cccontent.features.cooking
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
+import jp.awabi2048.cccontent.features.catalog.CatalogType
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.profession.profile.CookSkillProfile
 import jp.awabi2048.cccontent.gui.GuiMenuItems
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.persistence.ContentPdcKeys
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.FluidCollisionMode
@@ -28,6 +30,7 @@ import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryCloseEvent
 import org.bukkit.event.inventory.InventoryDragEvent
 import org.bukkit.event.player.PlayerInteractEvent
+import org.bukkit.event.player.PlayerItemConsumeEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerTeleportEvent
 import org.bukkit.event.entity.PlayerDeathEvent
@@ -36,7 +39,10 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.Damageable
+import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.potion.PotionEffect
+import org.bukkit.potion.PotionEffectType
 import org.bukkit.scheduler.BukkitTask
 import java.io.File
 import java.util.Base64
@@ -45,7 +51,7 @@ import java.util.UUID
 internal class UnifiedCookingController(
     private val plugin: JavaPlugin,
     private val rankManagerProvider: () -> RankManager?,
-    @Suppress("UNUSED_PARAMETER") private val catalogStore: CatalogStore,
+    private val catalogStore: CatalogStore,
     private val configuration: UnifiedCookingConfiguration
 ) : Listener {
     private val resolver = CookingIngredientResolver(configuration.ingredients.values)
@@ -141,6 +147,26 @@ internal class UnifiedCookingController(
     @EventHandler fun onQuit(event: PlayerQuitEvent) = closeIfOpen(event.player)
     @EventHandler fun onTeleport(event: PlayerTeleportEvent) = closeIfOpen(event.player)
     @EventHandler fun onDeath(event: PlayerDeathEvent) = closeIfOpen(event.player)
+
+    @EventHandler(ignoreCancelled = true)
+    fun onConsume(event: PlayerItemConsumeEvent) {
+        val recipeId = event.item.itemMeta?.persistentDataContainer
+            ?.get(ContentPdcKeys.cookingRecipeId, PersistentDataType.STRING) ?: return
+        val recipe = configuration.recipes[recipeId] ?: return
+        recipe.result.effects.forEach { effect ->
+            val type = PotionEffectType.getByName(effect.type)
+                ?: error("Unknown cooking potion effect: ${effect.type}")
+            event.player.addPotionEffect(PotionEffect(type, effect.durationSeconds * 20, effect.amplifier))
+        }
+        recipe.result.container?.let { container ->
+            Bukkit.getScheduler().runTask(plugin, Runnable {
+                val remainder = ItemStack(container)
+                event.player.inventory.addItem(remainder).values.forEach { leftover ->
+                    event.player.world.dropItemNaturally(event.player.location, leftover)
+                }
+            })
+        }
+    }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     fun onBreak(event: BlockBreakEvent) {
@@ -324,8 +350,18 @@ internal class UnifiedCookingController(
 
     private fun updateAfterCollection(holder: UnifiedCookingHolder, next: CookingStationSession, player: Player) {
         val current = stations[holder.stationKey] ?: return
+        val successful = configuration.recipes[next.recipeId]?.definition?.experience?.let { it > 0 } == true &&
+            !next.failureCommitted
+        val collectorId = player.uniqueId.toString()
+        val firstCollection = collectorId !in current.collectorIds
+        if (successful && firstCollection) {
+            catalogStore.record(player.uniqueId, CatalogType.COOKING, next.recipeId, obtained = true)
+        }
         if (next.state == CookingProcessState.IDLE) stations.remove(holder.stationKey)
-        else stations[holder.stationKey] = current.copy(session = next)
+        else stations[holder.stationKey] = current.copy(
+            session = next,
+            collectorIds = if (firstCollection) current.collectorIds + collectorId else current.collectorIds
+        )
         dirty = true
         flush()
         render(player, player.openInventory.topInventory, holder)
@@ -491,7 +527,19 @@ internal class UnifiedCookingController(
                     val definition = configuration.recipes[session.recipeId]?.definition
                         ?: snapshotDefinition(data.equipment, step.session)
                     val finished = CookingStationStateMachine.finish(step.session, definition)
-                    stations[key] = data.copy(session = finished)
+                    val successful = !finished.failureCommitted && finished.recipeSnapshot.experience > 0
+                    val starter = UUID.fromString(finished.starterId)
+                    if (successful && !data.experienceAwarded) {
+                        rankManagerProvider()?.addProfessionExp(starter, finished.recipeSnapshot.experience)
+                    }
+                    if (successful && !data.starterCatalogAwarded) {
+                        catalogStore.record(starter, CatalogType.COOKING, finished.recipeId, obtained = false)
+                    }
+                    stations[key] = data.copy(
+                        session = finished,
+                        experienceAwarded = data.experienceAwarded || successful,
+                        starterCatalogAwarded = data.starterCatalogAwarded || successful
+                    )
                     dirty = true
                     flush()
                     locks[key]?.let(Bukkit::getPlayer)?.let { player ->
