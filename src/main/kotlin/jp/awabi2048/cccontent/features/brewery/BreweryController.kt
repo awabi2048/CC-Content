@@ -20,13 +20,13 @@ import jp.awabi2048.cccontent.features.brewery.barrel.BreweryBarrelStore
 import jp.awabi2048.cccontent.features.brewery.model.BarrelSize
 import jp.awabi2048.cccontent.features.brewery.model.BreweryLocationKey
 import jp.awabi2048.cccontent.features.brewery.model.BrewStage
-import jp.awabi2048.cccontent.features.brewery.model.FirePower
 import jp.awabi2048.cccontent.features.brewery.BreweryIntoxicationMath
 import jp.awabi2048.cccontent.features.brewery.BreweryIntoxicationState
 import jp.awabi2048.cccontent.features.rank.profession.profile.BrewerSkillProfile
 import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import jp.awabi2048.cccontent.features.catalog.CatalogType
+import jp.awabi2048.cccontent.items.brewery.BreweryCulturedYeastItem
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -61,6 +61,7 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.ShapedRecipe
+import org.bukkit.inventory.ShapelessRecipe
 import org.bukkit.persistence.PersistentDataType
 import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.plugin.java.JavaPlugin
@@ -86,6 +87,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         plugin.logger
     )
     private val filterRecipeKey = NamespacedKey(plugin, "brewery_sample_filter")
+    private val yeastRecipeKey = NamespacedKey(plugin, "brewery_cultured_yeast_recipe")
     private val yeastKey = NamespacedKey(plugin, "brewery_cultured_yeast")
     private val intoxicationSchemaKey = NamespacedKey("cccontent", "intoxication_schema")
     private val intoxicationLevelKey = NamespacedKey("cccontent", "intoxication_level")
@@ -141,6 +143,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         barrelStore.save(barrelRegistry.all())
         loadState()
         registerSampleFilterRecipe()
+        registerCulturedYeastRecipe()
 
         tickerTask?.cancel()
         tickerTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable {
@@ -162,6 +165,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         settings = settingsLoader.loadSettings()
         recipes = settingsLoader.loadRecipes()
         registerSampleFilterRecipe()
+        registerCulturedYeastRecipe()
         flushNow()
     }
 
@@ -1265,7 +1269,9 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             state.elapsedSecondsInCurrentStep = 0
             state.sessionDistillationRuns += 1
             val brewerProfile = state.starterUuid?.let { rankManager?.getTypedProfessionProfile(it) } as? BrewerSkillProfile
-            val overPenalty = kotlin.math.round(5.0 * (1.0 - (brewerProfile?.failurePenaltyReduction ?: 0.0))).toInt()
+            val overPenalty = kotlin.math.round(
+                settings.distillationOverPenalty * (1.0 - (brewerProfile?.failurePenaltyReduction ?: 0.0))
+            ).toInt()
             DISTILL_INPUT_SLOTS.forEach { slot ->
                 val item = state.inventory.getItem(slot) ?: return@forEach
                 val parsed = codec.parse(item) ?: return@forEach
@@ -1305,15 +1311,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
 
             refreshDistillationDecor(state)
         }
-    }
-
-    private fun calculateFermentationQuality(state: FermentationState, recipe: BreweryRecipe?): Double {
-        val base = state.baseQuality
-        val optimal = recipe?.fermentationTime ?: 180
-        val timeScore = (20.0 - kotlin.math.abs(state.elapsedSeconds - optimal).toDouble() * 0.1).coerceIn(-20.0, 20.0)
-        val final = (base + timeScore).coerceIn(0.0, 100.0)
-        state.lastCalculatedQuality = final
-        return final
     }
 
     private fun calculateAgingYears(startedAt: Long, size: BarrelSize): Double {
@@ -1676,7 +1673,10 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             ?: return AgingFinalizeResult.BLOCKED
         if (state.size == BarrelSize.SMALL && slot !in state.lossEvaluatedSlots) {
             val profile = state.starterUuid?.let { rankManager?.getTypedProfessionProfile(it) } as? BrewerSkillProfile
-            val lossChance = kotlin.math.min(0.25, selectedOutput.targetUnits * 0.01) *
+            val lossChance = kotlin.math.min(
+                0.25,
+                selectedOutput.targetUnits * settings.angelSharePercentPerYear / 100.0
+            ) *
                 (1.0 - (profile?.materialLossReduction ?: 0.0))
             state.lossEvaluatedSlots += slot
             if (Math.random() < lossChance) state.lossResultSlots += slot
@@ -1838,16 +1838,6 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         }
     }
 
-    private fun firePowerFor(material: Material?): FirePower? {
-        if (material == null) return null
-        return when {
-            material == Material.DRIED_KELP_BLOCK -> FirePower.LOW
-            material == Material.BLAZE_ROD -> FirePower.HIGH
-            material in settings.allowedMediumFireMaterials -> FirePower.MEDIUM
-            else -> null
-        }
-    }
-
     private fun fermentationBarrelFor(block: org.bukkit.block.Block): org.bukkit.block.Block? {
         if (block.state is Barrel) {
             return listOf(
@@ -1887,6 +1877,15 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         recipe.setIngredient('P', Material.PAPER)
         recipe.setIngredient('S', Material.STRING)
         recipe.setIngredient('C', Material.CHARCOAL)
+        Bukkit.addRecipe(recipe)
+    }
+
+    private fun registerCulturedYeastRecipe() {
+        Bukkit.removeRecipe(yeastRecipeKey)
+        val recipe = ShapelessRecipe(yeastRecipeKey, BreweryCulturedYeastItem(plugin).createItem())
+        recipe.addIngredient(2, Material.WHEAT)
+        recipe.addIngredient(Material.SUGAR)
+        recipe.addIngredient(Material.BROWN_MUSHROOM)
         Bukkit.addRecipe(recipe)
     }
 
