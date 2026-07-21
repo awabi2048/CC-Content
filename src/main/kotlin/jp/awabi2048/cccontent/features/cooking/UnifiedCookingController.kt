@@ -6,6 +6,8 @@ import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import jp.awabi2048.cccontent.features.catalog.CatalogType
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.profession.profile.CookSkillProfile
+import jp.awabi2048.cccontent.features.rank.profession.profile.BrewerSkillProfile
+import jp.awabi2048.cccontent.features.brewery.item.BreweryItemCodec
 import jp.awabi2048.cccontent.gui.GuiMenuItems
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.persistence.ContentPdcKeys
@@ -47,15 +49,18 @@ import org.bukkit.scheduler.BukkitTask
 import java.io.File
 import java.util.Base64
 import java.util.UUID
+import kotlin.math.roundToInt
 
 internal class UnifiedCookingController(
     private val plugin: JavaPlugin,
     private val rankManagerProvider: () -> RankManager?,
     private val catalogStore: CatalogStore,
-    private val configuration: UnifiedCookingConfiguration
+    private val configuration: UnifiedCookingConfiguration,
+    private val breweryPreparations: Map<String, BreweryPreparationDefinition>
 ) : Listener {
     private val resolver = CookingIngredientResolver(configuration.ingredients.values)
     private val store = CookingStateStore(File(plugin.dataFolder, "data/cooking/state.yml"))
+    private val breweryCodec = BreweryItemCodec(plugin)
     private val stations = store.load()
     private val locks = mutableMapOf<CookingStationKey, UUID>()
     private var task: BukkitTask? = null
@@ -385,10 +390,29 @@ internal class UnifiedCookingController(
     }
 
     private fun outputItem(output: CookingOutputStack, player: Player?): ItemStack = when (output.kind) {
-        CookingOutputKind.CUSTOM_ITEM -> CustomItemManager.createItemForPlayer(output.customItemId, player, output.amount)
+        CookingOutputKind.CUSTOM_ITEM -> breweryOutput(output.customItemId, player, output.amount)
+            ?: CustomItemManager.createItemForPlayer(output.customItemId, player, output.amount)
             ?: error("Unknown cooking output: ${output.customItemId}")
         CookingOutputKind.SERIALIZED_ITEM -> decode(output.customItemId).also { it.amount = output.amount }
         CookingOutputKind.MATERIAL -> ItemStack(Material.valueOf(output.customItemId), output.amount)
+    }
+
+    private fun breweryOutput(id: String, player: Player?, amount: Int): ItemStack? {
+        if (id.startsWith("brewery.prepared:")) {
+            val parts = id.split(':')
+            require(parts.size == 4)
+            return breweryCodec.createPreparedBottle(parts[1], parts[2], parts[3].toInt(), player).also { it.amount = amount }
+        }
+        if (id.startsWith("brewery.failed_")) {
+            return ItemStack(Material.POTION, amount).also { item ->
+                item.editMeta { meta ->
+                    meta.displayName(Component.text(message(player ?: return@editMeta, "brewery.item.name.muddy")))
+                    meta.setItemModel(org.bukkit.NamespacedKey("kota_server", "custom_item/brewery/${id.removePrefix("brewery.")}"))
+                    meta.persistentDataContainer.set(ContentPdcKeys.customItemId, PersistentDataType.STRING, id)
+                }
+            }
+        }
+        return null
     }
 
     private fun canFit(player: Player, item: ItemStack): Boolean {
@@ -453,24 +477,43 @@ internal class UnifiedCookingController(
             player.sendMessage(message(player, "cooking.error.recipe_not_found")); return
         }
         val water = if (holder.equipment == CookingStation.CAULDRON) waterLevel(block) else 0
-        val profile = rankManagerProvider()?.getTypedProfessionProfile(player.uniqueId) as? CookSkillProfile
-        val match = CookingRecipeMatcher.select(
+        val typedProfile = rankManagerProvider()?.getTypedProfessionProfile(player.uniqueId)
+        val cookProfile = typedProfile as? CookSkillProfile
+        val brewerProfile = typedProfile as? BrewerSkillProfile
+        val cookingMatch = CookingRecipeMatcher.select(
             configuration.recipes.values.map { it.definition }, holder.equipment, actual, currentHeat, water,
-            profile?.mismatchPenaltyReduction ?: 0.0, configuration.settings.matching
+            cookProfile?.mismatchPenaltyReduction ?: 0.0, configuration.settings.matching
         )
-        val selected = when (match) {
-            is CookingMatchResult.Selected -> match.match
-            is CookingMatchResult.Ambiguous -> {
-                player.sendMessage(message(player, "cooking.error.ambiguous_recipe")); return
-            }
-            CookingMatchResult.NoMatch -> {
+        val breweryMatch = CookingRecipeMatcher.select(
+            breweryPreparations.values.map { it.recipe }, holder.equipment, actual, currentHeat, water, 0.0,
+            configuration.settings.matching.copy(
+                maximumTotalError = (configuration.settings.matching.maximumTotalError +
+                    (brewerProfile?.conditionToleranceBonus ?: 0.0)).coerceAtMost(0.50)
+            )
+        )
+        val candidates = listOf(cookingMatch, breweryMatch).mapNotNull { (it as? CookingMatchResult.Selected)?.match }
+            .sortedWith(compareByDescending<CookingRecipeMatch> { it.exact }.thenBy { it.effectiveError })
+        val selected = candidates.firstOrNull() ?: run {
+            if (cookingMatch is CookingMatchResult.Ambiguous || breweryMatch is CookingMatchResult.Ambiguous) {
+                player.sendMessage(message(player, "cooking.error.ambiguous_recipe"))
+            } else {
                 player.sendMessage(message(player, "cooking.error.recipe_not_found")); return
             }
+            return
         }
-        if (!tierAvailable(selected.recipe.tier, profile)) {
+        if (candidates.size > 1 &&
+            kotlin.math.abs(candidates[0].effectiveError - candidates[1].effectiveError) < configuration.settings.matching.ambiguityMargin) {
+            player.sendMessage(message(player, "cooking.error.ambiguous_recipe")); return
+        }
+        val preparation = selected.recipe.id.removePrefix("brewery:")
+            .takeIf { selected.recipe.id.startsWith("brewery:") }
+            ?.let(breweryPreparations::get)
+        if (preparation == null && !tierAvailable(selected.recipe.tier, cookProfile)) {
             player.sendMessage(message(player, "cooking.error.tier_locked")); return
         }
-        val configured = configuration.recipes.getValue(selected.recipe.id)
+        if (preparation != null && !breweryGroupAvailable(preparation.group, brewerProfile)) {
+            player.sendMessage(message(player, "cooking.error.tier_locked")); return
+        }
         val stored = items.map { item ->
             val ingredient = requireNotNull(resolver.resolve(item))
             val remainder = ingredient.containerRemainder
@@ -479,15 +522,27 @@ internal class UnifiedCookingController(
                 (remainder?.amount ?: 0) * item.amount
             )
         }
-        val snapshot = CookingRecipeSnapshot(
-            configured.result.customItemId, configured.result.amountPerScale, configured.failureResult.customItemId,
-            selected.recipe.durationSeconds, requireNotNull(selected.recipe.heat), selected.recipe.waterUnits,
-            selected.recipe.resultKind, configured.result.container?.name, configured.result.liquidPane?.name,
-            selected.recipe.experience
-        )
+        val snapshot = if (preparation != null) {
+            val quality = ((1.0 - selected.effectiveError) * 100.0).roundToInt() +
+                (brewerProfile?.qualityStabilityBonus ?: 0) +
+                (if (selected.exact) brewerProfile?.exactConditionQualityBonus ?: 0 else 0)
+            CookingRecipeSnapshot(
+                "brewery.prepared:${preparation.familyId}:${preparation.preparationId}:${quality.coerceIn(0, 100)}",
+                1, preparation.failureResultId, selected.recipe.durationSeconds, requireNotNull(selected.recipe.heat),
+                3, CookingResultKind.BOTTLE, Material.GLASS_BOTTLE.name, preparation.liquidPane.name, 0
+            )
+        } else {
+            val configured = configuration.recipes.getValue(selected.recipe.id)
+            CookingRecipeSnapshot(
+                configured.result.customItemId, configured.result.amountPerScale, configured.failureResult.customItemId,
+                selected.recipe.durationSeconds, requireNotNull(selected.recipe.heat), selected.recipe.waterUnits,
+                selected.recipe.resultKind, configured.result.container?.name, configured.result.liquidPane?.name,
+                selected.recipe.experience
+            )
+        }
         val session = CookingStationStateMachine.start(
             selected.recipe, snapshot, player.uniqueId.toString(), selected.scale, currentHeat, stored,
-            profile?.processingTimeReduction ?: 0.0
+            if (preparation != null) 0.0 else cookProfile?.processingTimeReduction ?: 0.0
         )
         holder.inputSlots.forEach(inventory::clear)
         if (holder.equipment == CookingStation.PAN) {
@@ -601,6 +656,16 @@ internal class UnifiedCookingController(
         CookingTier.INTERMEDIATE -> profile?.level?.let { it >= 15 } == true
         CookingTier.ADVANCED -> profile?.level?.let { it >= 35 } == true
         CookingTier.TOP -> profile?.level?.let { it >= 50 } == true
+    }
+
+    private fun breweryGroupAvailable(group: String, profile: BrewerSkillProfile?): Boolean = when (group) {
+        "BASIC" -> true
+        "INTERMEDIATE" -> profile?.intermediateRecipeUnlocked == true
+        "ADVANCED" -> profile?.advancedRecipeUnlocked == true
+        "TOP" -> profile?.topRecipeUnlocked == true
+        "HERBAL" -> profile?.herbalRecipeUnlocked == true
+        "WILD_AND_FUNGI" -> profile?.wildAndFungiRecipeUnlocked == true
+        else -> false
     }
 
     private fun damageTool(item: ItemStack, amount: Int): Boolean {

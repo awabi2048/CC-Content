@@ -26,10 +26,20 @@ ingredients:
       custom_item_id: cooking.butter
     display_name_key: custom_items.cooking.butter.name
     container_remainder: null
+  cactus:
+    matcher:
+      material: CACTUS
+    display_name_key: item.minecraft.cactus
+    container_remainder: null
   carrot:
     matcher:
       material: CARROT
     display_name_key: item.minecraft.carrot
+    container_remainder: null
+  carrot_cookie_dough:
+    matcher:
+      custom_item_id: cooking.carrot_cookie_dough
+    display_name_key: custom_items.cooking.carrot_cookie_dough.name
     container_remainder: null
   chicken:
     matcher:
@@ -50,6 +60,11 @@ ingredients:
     matcher:
       custom_item_id: cooking.cooked_rice
     display_name_key: custom_items.cooking.cooked_rice.name
+    container_remainder: null
+  cornflower:
+    matcher:
+      material: CORNFLOWER
+    display_name_key: item.minecraft.cornflower
     container_remainder: null
   crimson_fungus:
     matcher:
@@ -111,10 +126,20 @@ ingredients:
       custom_item_id: cooking.cut_tomato
     display_name_key: custom_items.cooking.cut_tomato.name
     container_remainder: null
+  dandelion:
+    matcher:
+      material: DANDELION
+    display_name_key: item.minecraft.dandelion
+    container_remainder: null
   dashi:
     matcher:
       custom_item_id: cooking.dashi
     display_name_key: custom_items.cooking.dashi.name
+    container_remainder: null
+  dough:
+    matcher:
+      custom_item_id: cooking.dough
+    display_name_key: custom_items.cooking.dough.name
     container_remainder: null
   dried_kelp:
     matcher:
@@ -125,6 +150,11 @@ ingredients:
     matcher:
       material: EGG
     display_name_key: item.minecraft.egg
+    container_remainder: null
+  fern:
+    matcher:
+      material: FERN
+    display_name_key: item.minecraft.fern
     container_remainder: null
   fillet_anglerfish:
     matcher:
@@ -276,6 +306,16 @@ ingredients:
       material: GHAST_TEAR
     display_name_key: item.minecraft.ghast_tear
     container_remainder: null
+  glass_bottle:
+    matcher:
+      material: GLASS_BOTTLE
+    display_name_key: item.minecraft.glass_bottle
+    container_remainder: null
+  glow_berries:
+    matcher:
+      material: GLOW_BERRIES
+    display_name_key: item.minecraft.glow_berries
+    container_remainder: null
   honey_bottle:
     matcher:
       material: HONEY_BOTTLE
@@ -294,6 +334,16 @@ ingredients:
     matcher:
       custom_item_id: cooking.miso
     display_name_key: custom_items.cooking.miso.name
+    container_remainder: null
+  oxeye_daisy:
+    matcher:
+      material: OXEYE_DAISY
+    display_name_key: item.minecraft.oxeye_daisy
+    container_remainder: null
+  poisonous_potato:
+    matcher:
+      material: POISONOUS_POTATO
+    display_name_key: item.minecraft.poisonous_potato
     container_remainder: null
   porkchop:
     matcher:
@@ -330,6 +380,11 @@ ingredients:
       resource_id: cocoa_pulp
     display_name_key: custom_items.resource.cocoa_pulp.name
     container_remainder: null
+  resource_coffee_bean:
+    matcher:
+      resource_id: coffee_bean
+    display_name_key: custom_items.resource.coffee_bean.name
+    container_remainder: null
   resource_daikon:
     matcher:
       resource_id: daikon
@@ -364,6 +419,16 @@ ingredients:
     matcher:
       resource_id: rock_salt
     display_name_key: custom_items.resource.rock_salt.name
+    container_remainder: null
+  resource_soybean:
+    matcher:
+      resource_id: soybean
+    display_name_key: custom_items.resource.soybean.name
+    container_remainder: null
+  resource_spice_leaf:
+    matcher:
+      resource_id: spice_leaf
+    display_name_key: custom_items.resource.spice_leaf.name
     container_remainder: null
   resource_strawberry:
     matcher:
@@ -410,6 +475,16 @@ ingredients:
       material: SUGAR
     display_name_key: item.minecraft.sugar
     container_remainder: null
+  sugar_cane:
+    matcher:
+      material: SUGAR_CANE
+    display_name_key: item.minecraft.sugar_cane
+    container_remainder: null
+  sweet_dough:
+    matcher:
+      custom_item_id: cooking.sweet_dough
+    display_name_key: custom_items.cooking.sweet_dough.name
+    container_remainder: null
   tofu:
     matcher:
       custom_item_id: cooking.tofu
@@ -424,4 +499,9 @@ ingredients:
     matcher:
       material: WARPED_FUNGUS
     display_name_key: item.minecraft.warped_fungus
+    container_remainder: null
+  wheat:
+    matcher:
+      material: WHEAT
+    display_name_key: item.minecraft.wheat
     container_remainder: null

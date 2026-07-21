@@ -200,7 +200,10 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
 
     fun loadRecipes(): Map<String, BreweryRecipe> {
         val file = File(plugin.dataFolder, "config/brewery/recipes.yml")
-        val yml = YamlConfiguration.loadConfiguration(file)
+        val yml = YamlConfiguration().also {
+            it.options().pathSeparator('/')
+            it.load(file)
+        }
         require(yml.getInt("config_version", -1) == 3) { "Breweryレシピ設定のconfig_versionが3ではありません" }
         val preparations = yml.getConfigurationSection("preparations")
             ?: error("Breweryレシピ設定にpreparationsセクションがありません")
@@ -232,8 +235,9 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
             ?: error("Unknown preparation $preparationId for $familyId")
         require(requiredString(preparation, "family") == familyId)
         require(preparation.getInt("water_units") == 3 && preparation.getInt("max_scale") == 1)
-        val ingredients = requireNotNull(preparation.getConfigurationSection("ingredients")).getKeys(false)
-            .associateWith { preparation.getInt("ingredients.$it").also { amount -> require(amount > 0) } }
+        val ingredientSection = requireNotNull(preparation.getConfigurationSection("ingredients"))
+        val ingredients = ingredientSection.getKeys(false)
+            .associateWith { ingredientSection.getInt(it).also { amount -> require(amount > 0) } }
         val fermentation = requireNotNull(family.getConfigurationSection("fermentation"))
         require(requiredString(fermentation, "yeast") == "brewery.cultured_yeast")
         val distillation = requireNotNull(family.getConfigurationSection("distillation"))

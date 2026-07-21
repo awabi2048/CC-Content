@@ -188,6 +188,14 @@ foreach ($tier in @('BASIC', 'INTERMEDIATE', 'ADVANCED', 'TOP')) {
     }
 }
 
+# CRAFTING/FURNACE/SMOKERとBrewery原液も同じ正規材料辞書を使う。
+foreach ($line in $lines) {
+    foreach ($match in [regex]::Matches($line, '`((?:minecraft:|resource\.|cooking\.|fishing\.)[^`]+)`×\d+')) {
+        $canonical = $match.Groups[1].Value
+        $canonicalByAlias[(Alias $canonical)] = $canonical
+    }
+}
+
 $ingredientsBuilder = [System.Text.StringBuilder]::new()
 [void]$ingredientsBuilder.AppendLine('config_version: 2')
 [void]$ingredientsBuilder.AppendLine('')

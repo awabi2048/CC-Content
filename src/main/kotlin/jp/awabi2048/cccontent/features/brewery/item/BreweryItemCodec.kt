@@ -10,6 +10,7 @@ import jp.awabi2048.cccontent.features.brewery.BreweryRecipe
 import jp.awabi2048.cccontent.features.brewery.breweryQualityIndex
 import jp.awabi2048.cccontent.features.brewery.breweryQualityTier
 import jp.awabi2048.cccontent.features.brewery.model.BrewStage
+import jp.awabi2048.cccontent.persistence.ContentPdcKeys
 import net.kyori.adventure.text.Component
 import org.bukkit.Color
 import org.bukkit.Material
@@ -24,12 +25,11 @@ import io.papermc.paper.datacomponent.item.CustomModelData
 import kotlin.math.roundToInt
 
 class BreweryItemCodec(private val plugin: JavaPlugin) {
-    private val schemaVersionKey = NamespacedKey(plugin, "brewery_schema_version")
-    private val stageKey = NamespacedKey(plugin, "brewery_stage")
-    private val recipeIdKey = NamespacedKey(plugin, "brewery_recipe_id")
-    private val qualityKey = NamespacedKey(plugin, "brewery_quality")
-    private val alcoholKey = NamespacedKey(plugin, "brewery_alcohol")
-    private val distillCountKey = NamespacedKey(plugin, "brewery_distill_count")
+    private val schemaVersionKey = NamespacedKey("cccontent", "brew_schema_version")
+    private val stageKey = ContentPdcKeys.brewStage
+    private val recipeIdKey = ContentPdcKeys.brewFamilyId
+    private val qualityKey = ContentPdcKeys.brewQuality
+    private val distillCountKey = ContentPdcKeys.distillationCount
     private val muddyKey = NamespacedKey(plugin, "brewery_muddy")
     private val ambiguousKey = NamespacedKey(plugin, "brewery_ambiguous")
     private val historyKey = NamespacedKey(plugin, "brewery_history")
@@ -53,6 +53,22 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         val finalStars: Int
     )
 
+    fun createPreparedBottle(familyId: String, preparationId: String, quality: Int, player: Player?): ItemStack {
+        val item = ItemStack(Material.POTION)
+        item.editMeta { meta ->
+            meta.displayName(Component.text(text(player, "brewery.preparation.$preparationId.name")))
+            meta.setItemModel(NamespacedKey("kota_server", "custom_item/brewery/$preparationId"))
+            val pdc = meta.persistentDataContainer
+            pdc.set(schemaVersionKey, PersistentDataType.INTEGER, 3)
+            pdc.set(recipeIdKey, PersistentDataType.STRING, familyId)
+            pdc.set(stageKey, PersistentDataType.STRING, BrewStage.PREPARED.name)
+            pdc.set(qualityKey, PersistentDataType.DOUBLE, quality.coerceIn(0, 100).toDouble())
+            pdc.set(distillCountKey, PersistentDataType.INTEGER, 0)
+            pdc.set(customItemIdKey, PersistentDataType.STRING, "brewery.prepared.$familyId")
+        }
+        return item
+    }
+
     fun createFermentedBottle(recipeId: String, quality: Double, muddy: Boolean, history: String, recipe: BreweryRecipe, player: Player?): ItemStack {
         val item = ItemStack(Material.POTION)
         val meta = item.itemMeta ?: return item
@@ -65,11 +81,10 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
             "brewery.item.data.quality" to "%.1f".format(quality)
         )))
         val pdc = meta.persistentDataContainer
-        pdc.set(schemaVersionKey, PersistentDataType.INTEGER, 2)
+        pdc.set(schemaVersionKey, PersistentDataType.INTEGER, 3)
         pdc.set(stageKey, PersistentDataType.STRING, if (muddy) BrewStage.FAILED.name else BrewStage.FERMENTED.name)
         pdc.set(recipeIdKey, PersistentDataType.STRING, recipeId)
         pdc.set(qualityKey, PersistentDataType.DOUBLE, quality)
-        pdc.set(alcoholKey, PersistentDataType.DOUBLE, 0.0)
         pdc.set(distillCountKey, PersistentDataType.INTEGER, 0)
         pdc.set(muddyKey, PersistentDataType.BYTE, if (muddy) 1 else 0)
         pdc.set(ambiguousKey, PersistentDataType.BYTE, 0)
@@ -95,12 +110,12 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     fun parse(item: ItemStack?): BreweryItemState? {
         if (item == null || item.type.isAir) return null
         val pdc = item.itemMeta?.persistentDataContainer ?: return null
-        if (pdc.get(schemaVersionKey, PersistentDataType.INTEGER) != 2) return null
+        if (pdc.get(schemaVersionKey, PersistentDataType.INTEGER) != 3) return null
         val stage = pdc.get(stageKey, PersistentDataType.STRING)?.let { runCatching { BrewStage.valueOf(it) }.getOrNull() } ?: return null
         val recipeId = pdc.get(recipeIdKey, PersistentDataType.STRING)?.takeIf { it.isNotBlank() } ?: return null
         return BreweryItemState(stage, recipeId,
             pdc.get(qualityKey, PersistentDataType.DOUBLE) ?: 0.0,
-            pdc.get(alcoholKey, PersistentDataType.DOUBLE) ?: 0.0,
+            0.0,
             pdc.get(distillCountKey, PersistentDataType.INTEGER) ?: 0,
             (pdc.get(muddyKey, PersistentDataType.BYTE)?.toInt() ?: 0) == 1,
             (pdc.get(ambiguousKey, PersistentDataType.BYTE)?.toInt() ?: 0) == 1,
@@ -132,14 +147,11 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         item.itemMeta = meta
     }
 
-    fun incrementDistillation(item: ItemStack, targetDistillCount: Int, targetAlcohol: Double) {
+    fun incrementDistillation(item: ItemStack, @Suppress("UNUSED_PARAMETER") targetDistillCount: Int, @Suppress("UNUSED_PARAMETER") targetAlcohol: Double) {
         val meta = item.itemMeta ?: return
         val pdc = meta.persistentDataContainer
         val count = (pdc.get(distillCountKey, PersistentDataType.INTEGER) ?: 0) + 1
-        val alcohol = pdc.get(alcoholKey, PersistentDataType.DOUBLE) ?: 0.0
-        val next = if (count <= targetDistillCount && targetDistillCount > 0) alcohol + targetAlcohol / targetDistillCount else alcohol + 5.0
         pdc.set(distillCountKey, PersistentDataType.INTEGER, count)
-        pdc.set(alcoholKey, PersistentDataType.DOUBLE, next.coerceIn(0.0, 100.0))
         item.itemMeta = meta
     }
 
@@ -158,11 +170,10 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         val stars = (rounded / 20).coerceIn(1, 5)
         val meta = item.itemMeta ?: return
         val pdc = meta.persistentDataContainer
-        pdc.set(stageKey, PersistentDataType.STRING, BrewStage.AGED.name)
+        pdc.set(stageKey, PersistentDataType.STRING, BrewStage.FINAL.name)
         pdc.set(qualityKey, PersistentDataType.DOUBLE, finalQuality.coerceIn(0.0, 100.0))
         val output = recipe.outputs[outputId]
         val alcohol = output?.alcoholPercent ?: recipe.finalOutputAlcohol
-        pdc.remove(alcoholKey)
         pdc.set(finalStarsKey, PersistentDataType.INTEGER, stars)
         val tier = breweryQualityTier(finalQuality)
         val product = text(player, "brewery.recipe.$outputId.final.$tier.name")

@@ -14,7 +14,7 @@ class UnifiedCookingResourceValidationTest {
     void bundledConfigurationContainsEverySpecifiedInteractiveRecipe() {
         UnifiedCookingConfiguration configuration = UnifiedCookingConfigurationLoader.load(ROOT);
 
-        assertEquals(84, configuration.getIngredients().size());
+        assertEquals(100, configuration.getIngredients().size());
         assertEquals(35, configuration.getCuttingRecipes().size());
         assertEquals(53, configuration.getRecipes().size());
         assertEquals(48, configuration.getRecipes().values().stream()
@@ -47,5 +47,16 @@ class UnifiedCookingResourceValidationTest {
         ), configuration.getRecipes().values().stream()
             .map(recipe -> recipe.getFailureResult().getCustomItemId())
             .collect(java.util.stream.Collectors.toSet()));
+    }
+
+    @Test
+    void breweryPreparationsShareTheCookingCauldronMatcher() {
+        UnifiedCookingConfiguration cooking = UnifiedCookingConfigurationLoader.load(ROOT);
+        var preparations = BreweryPreparationConfigurationLoader.INSTANCE.load(ROOT, cooking.getIngredients());
+        assertEquals(26, preparations.size());
+        assertTrue(preparations.values().stream().allMatch(it ->
+            it.getRecipe().getStation() == CookingStation.CAULDRON &&
+                it.getRecipe().getWaterUnits() == 3 && it.getRecipe().getResultKind() == CookingResultKind.BOTTLE));
+        assertEquals(CookingHeat.HIGH, preparations.get("chorus_spirit_wash").getRecipe().getHeat());
     }
 }

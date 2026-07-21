@@ -63,9 +63,10 @@ class CookingFeature(
 
     private fun start() {
         val loaded = UnifiedCookingConfigurationLoader.load(plugin.dataFolder)
+        val preparations = BreweryPreparationConfigurationLoader.load(plugin.dataFolder, loaded.ingredients)
         configuration = loaded
         items = CookingItems(loaded).also(CookingItems::register)
-        controller = UnifiedCookingController(plugin, rankManagerProvider, catalogStore, loaded)
+        controller = UnifiedCookingController(plugin, rankManagerProvider, catalogStore, loaded, preparations)
             .also(UnifiedCookingController::initialize)
         vanillaRecipes = CookingVanillaRecipeController(plugin, rankManagerProvider, catalogStore)
             .also(CookingVanillaRecipeController::initialize)
