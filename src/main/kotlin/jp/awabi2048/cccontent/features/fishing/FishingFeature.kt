@@ -79,6 +79,7 @@ class FishingFeature(
     private lateinit var settings: FishingSettings
     private lateinit var items: FishingItems
     private lateinit var fishdex: FishdexStore
+    private lateinit var catchJournal: CatchJournalStore
     private lateinit var searchStore: FishingSearchStore
     private lateinit var naturalFishingGrounds: NaturalFishingGroundService
     private val sessions = mutableMapOf<UUID, ActiveSession>()
@@ -92,6 +93,7 @@ class FishingFeature(
         items = FishingItems(plugin, settings)
         items.registerBaseItems()
         fishdex = FishdexStore(catalogStore)
+        catchJournal = CatchJournalStore(File(plugin.dataFolder, "data/fishing/catch_journal.yml"))
         searchStore = FishingSearchStore(File(plugin.dataFolder, "data/fishing/search.yml"))
         naturalFishingGrounds = NaturalFishingGroundService(
             plugin,
@@ -167,6 +169,7 @@ class FishingFeature(
         }
         searchReady.clear()
         if (::searchStore.isInitialized) searchStore.save()
+        if (::catchJournal.isInitialized) catchJournal.save()
         if (::naturalFishingGrounds.isInitialized) naturalFishingGrounds.stop()
         if (::items.isInitialized) items.unregister()
     }
@@ -580,10 +583,21 @@ class FishingFeature(
         val before = fishdex.load(player.uniqueId)[catchData.fishId]
         val catchLocation = session.hook.location.clone()
         clearSession(player.uniqueId, removeHook = true)
-        val catchItem = items.createCatch(player, catchData)
-        catchLocation.world?.dropItemNaturally(catchLocation, catchItem)
         val fisher = fisherContext(player)
         val recorded = fishdex.record(player.uniqueId, catchData)
+        catchJournal.add(CatchJournalRecord(
+            recordId = UUID.randomUUID(),
+            fishId = catchData.fishId,
+            weightGrams = catchData.weightGrams,
+            sizeCm = catchData.sizeCm,
+            quality = catchData.quality,
+            caughtAtEpochMillis = System.currentTimeMillis(),
+            anglerUuid = player.uniqueId,
+            anglerName = player.name,
+            worldKey = catchLocation.world?.key?.toString().orEmpty(),
+            biomeKey = catchLocation.block.biome.key.toString(),
+            season = CCSystem.getAPI().getSeasonService().currentSeason().name
+        ))
         if (fisher.active) {
             val experience = ProfessionExperience.NORMAL_ACTION +
                 (if (before?.discovered != true) ProfessionExperience.FIRST_DISCOVERY_BONUS else 0L) +
@@ -596,13 +610,18 @@ class FishingFeature(
             )
         }
         publishCatchAction(player, catchData, before?.discovered != true)
+        val catchItem = items.createCatch(player, catchData)
+        player.inventory.addItem(catchItem).values.forEach { overflow ->
+            catchLocation.world?.dropItem(catchLocation, overflow)
+        }
         val preserveDurability = fisher.active && random.nextDouble() < fisher.durabilitySaveChance
         if (!preserveDurability && items.damageRod(player)) {
             player.sendMessage(message(player, "fishing.error.rod_broken"))
             player.playSound(player.location, Sound.ENTITY_ITEM_BREAK, 0.9f, 0.9f)
         }
-        player.sendMessage(message(player, "fishing.caught"))
-        items.catchInformationLines(player, catchData).forEach(player::sendMessage)
+        player.sendMessage(message(player, "fishing.catch.completed")
+            .replace("{fish}", message(player, "fishing.catalog.item.${catchData.fishId}")))
+        player.sendMessage(message(player, "fishing.catch.recorded"))
         player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.4f)
         if (before?.discovered != true) {
             player.sendMessage(message(player, "fishing.dictionary.discovered"))
