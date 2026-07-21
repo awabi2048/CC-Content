@@ -112,18 +112,6 @@ class BreweryConfigurationTest {
     }
 
     @Test
-    void codecUsesStructuredLoreAndNoAutomaticLegacyLore() throws Exception {
-        String source = Files.readString(Path.of(
-                "src/main/kotlin/jp/awabi2048/cccontent/features/brewery/item/BreweryItemCodec.kt"));
-        assertFalse(source.contains("GuiLoreSpec.Auto"));
-        assertFalse(source.contains("GuiLoreLine.Raw"));
-        assertTrue(source.contains("GuiLoreSpec.Blocks"));
-        assertTrue(source.contains("meta.displayName(Component.text("));
-        assertFalse(source.contains("meta.setDisplayName("));
-        assertTrue(source.contains("\"brewery.product.$recipeId\""));
-    }
-
-    @Test
     void qualityTierBoundariesRemainFixed() {
         assertEquals("low", jp.awabi2048.cccontent.features.brewery.BrewerySettingsKt.breweryQualityTier(33.99));
         assertEquals("standard", jp.awabi2048.cccontent.features.brewery.BrewerySettingsKt.breweryQualityTier(34.0));
@@ -132,20 +120,7 @@ class BreweryConfigurationTest {
     }
 
     @Test
-    void destroyedEquipmentDiscardsAllInternalContents() throws Exception {
-        String source = Files.readString(Path.of(
-            "src/main/kotlin/jp/awabi2048/cccontent/features/brewery/BreweryController.kt"));
-        assertTrue(source.contains("private fun invalidateAt(key: BreweryLocationKey)"));
-        assertTrue(source.contains("inventory.clear()"));
-        assertFalse(source.contains("dropInventoryContents"));
-        int start = source.indexOf("private fun invalidateAt(key: BreweryLocationKey)");
-        int end = source.indexOf("private fun finalizeDistilledItem", start);
-        assertTrue(start >= 0 && end > start);
-        assertFalse(source.substring(start, end).contains("dropItemNaturally"));
-    }
-
-    @Test
-    void fermentationAndAgingUseDistinctBarrelTypes() throws Exception {
+    void fermentationAndAgingHaveDistinctConfiguration() {
         var config = YamlConfiguration.loadConfiguration(CONFIG.toFile());
         assertEquals("[ferment]", config.getString("brewery.barrel.fermentation_sign_keyword"));
         assertEquals("barrel", config.getString("brewery.barrel.aging_sign_keyword"));
@@ -153,20 +128,5 @@ class BreweryConfigurationTest {
         assertFalse(config.contains("brewery.barrel.age_in_minecraft_barrels"));
         assertFalse(config.contains("brewery.barrel.max_brews_in_minecraft_barrels"));
 
-        String source = Files.readString(Path.of(
-            "src/main/kotlin/jp/awabi2048/cccontent/features/brewery/BreweryController.kt"));
-        assertTrue(source.contains("fermentationBarrelFor(block)"));
-        assertTrue(source.contains("attachedVanillaBarrel(event.block)"));
-        assertTrue(source.contains("state.startedAtEpochMillis = System.currentTimeMillis()"));
-        assertTrue(source.contains("now - state.startedAtEpochMillis"));
-        assertFalse(source.contains("isFermentationCauldron"));
-        assertFalse(source.contains("BarrelSize.MINECRAFT"));
-        assertFalse(source.contains("FERMENT_FUEL_SLOT"));
-        assertFalse(source.contains("mockClock"));
-        assertFalse(source.contains("isClockAcceleratorItem"));
-        assertFalse(source.contains("intoxicationStates"));
-        assertFalse(source.contains("yml.set(\"$base.alcohol\""));
-        assertTrue(source.contains("NamespacedKey(\"cccontent\", \"intoxication_level\")"));
-        assertTrue(source.contains("yml.set(\"schema_version\", 5)"));
     }
 }

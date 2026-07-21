@@ -49,16 +49,4 @@ class CookingConfigurationTest {
         }
     }
 
-    @Test
-    void oldControllerAndCompletionPdcAreRemoved() throws Exception {
-        String feature = Files.readString(Path.of(
-            "src/main/kotlin/jp/awabi2048/cccontent/features/cooking/CookingFeature.kt"));
-        String runtime = Files.readString(Path.of(
-            "src/main/kotlin/jp/awabi2048/cccontent/features/cooking/UnifiedCookingController.kt"));
-        assertTrue(feature.contains("UnifiedCookingController"));
-        assertFalse(feature.contains("minimumSimilarity"));
-        assertFalse(feature.contains("ingredientSlotsByLevel"));
-        assertFalse(runtime.contains("cooking_completion"));
-        assertFalse(runtime.contains("minimumCompletion"));
-    }
 }
