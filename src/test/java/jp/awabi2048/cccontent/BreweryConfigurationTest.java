@@ -73,6 +73,35 @@ class BreweryConfigurationTest {
     }
 
     @Test
+    void everyFamilyHasCompleteVariantsOutputsAndEffects() {
+        var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
+        var families = recipes.getConfigurationSection("brew_families");
+        for (String familyId : families.getKeys(false)) {
+            var family = families.getConfigurationSection(familyId);
+            var outputs = family.getConfigurationSection("outputs");
+            assertFalse(outputs.getKeys(false).isEmpty(), familyId);
+            for (var variant : family.getMapList("aging.variants")) {
+                String outputId = String.valueOf(variant.get("output_id"));
+                assertTrue(outputs.contains(outputId), familyId + " -> " + outputId);
+                assertTrue(((Number) variant.get("target_units")).intValue() > 0, familyId);
+                assertFalse(((java.util.List<?>) variant.get("barrel_types")).isEmpty(), familyId);
+            }
+            for (String outputId : outputs.getKeys(false)) {
+                assertTrue(outputs.isBoolean(outputId + ".glint"), familyId + "/" + outputId);
+                assertTrue(outputs.isList(outputId + ".effects"), familyId + "/" + outputId);
+                for (String effect : outputs.getStringList(outputId + ".effects")) {
+                    assertTrue(effect.matches("[A-Z_]+/\\d+(?:-\\d+)?/\\d+(?:-\\d+)?"), effect);
+                }
+            }
+        }
+        var redVariants = recipes.getMapList("brew_families.red_wine.aging.variants");
+        assertEquals("redwine", redVariants.get(0).get("output_id"));
+        assertEquals(20, ((Number) redVariants.get(0).get("target_units")).intValue());
+        assertEquals("vintagewine", redVariants.get(1).get("output_id"));
+        assertEquals(202, ((Number) redVariants.get(1).get("target_units")).intValue());
+    }
+
+    @Test
     void recipeConfigKeepsDisplayTextOutOfGameplayConfig() {
         var recipes = YamlConfiguration.loadConfiguration(RECIPES.toFile());
         for (String key : recipes.getKeys(true)) {

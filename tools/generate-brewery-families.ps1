@@ -24,7 +24,8 @@ function Token([string]$text) { ([regex]::Match($text, '`([^`]+)`')).Groups[1].V
 
 $effects = @{}
 foreach ($row in Rows (Section '# 35. 醸造PotionEffect' '# 36. 赤ワイン分岐') 2) {
-    $effects[(Token $row[0])] = @([regex]::Matches($row[1], '`([^`]+)`') | ForEach-Object { $_.Groups[1].Value })
+    $effects[(Token $row[0])] = @([regex]::Matches($row[1], '`([^`]+)`') |
+        ForEach-Object { $_.Groups[1].Value } | Where-Object { $_ -ne '-' })
 }
 
 $consumption = @{}
@@ -80,8 +81,9 @@ foreach ($row in $families) {
         [void]$builder.AppendLine('      variants: []')
     } else {
         [void]$builder.AppendLine('      variants:')
-        foreach ($variant in $row[8].Split('<br>')) {
+        foreach ($variant in $row[8].Split([string[]]@('<br>'), [StringSplitOptions]::None)) {
             $parsed = [regex]::Match($variant, '`([^`]+)`: (\d+)単位 / ([A-Z_]+)')
+            if (-not $parsed.Success) { throw "Invalid aging variant: $variant" }
             [void]$builder.AppendLine("        - output_id: $($parsed.Groups[1].Value)")
             [void]$builder.AppendLine("          target_units: $($parsed.Groups[2].Value)")
             [void]$builder.AppendLine("          barrel_types: [$($parsed.Groups[3].Value)]")
@@ -91,7 +93,13 @@ foreach ($row in $families) {
     foreach ($outputId in $outputs) {
         $values = $consumption[$outputId]
         if ($null -eq $values) { throw "Missing consumption: $outputId" }
-        $glint = if ($outputId -eq 'vintagewine') { 'true' } else { $row[9].Split('<br>')[0].Replace('`','').Split(':')[-1].Trim() }
+        $glintParts = $row[9].Split([string[]]@('<br>'), [StringSplitOptions]::None)
+        $specificGlint = $glintParts | Where-Object { $_ -match "``$([regex]::Escape($outputId))``:" } | Select-Object -First 1
+        $glint = if ($specificGlint) {
+            $specificGlint.Replace('`','').Split(':')[-1].Trim()
+        } else {
+            $glintParts[0].Replace('`','').Split(':')[-1].Trim()
+        }
         [void]$builder.AppendLine("      ${outputId}:")
         [void]$builder.AppendLine("        glint: $glint")
         if ($effects[$outputId].Count -eq 0) { [void]$builder.AppendLine('        effects: []') }

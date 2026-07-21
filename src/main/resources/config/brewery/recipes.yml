@@ -318,20 +318,13 @@ brew_families:
       filter_consumption_per_run: 1
     aging:
       variants:
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
+        - output_id: wheatbeer
+          target_units: 2
+          barrel_types: [BIRCH]
     outputs:
       wheatbeer:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/wheatbeer
         consumption:
           alcohol_percent: 5.0
@@ -349,20 +342,13 @@ brew_families:
       filter_consumption_per_run: 1
     aging:
       variants:
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
+        - output_id: beer
+          target_units: 3
+          barrel_types: [ANY]
     outputs:
       beer:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/beer
         consumption:
           alcohol_percent: 6.0
@@ -380,23 +366,13 @@ brew_families:
       filter_consumption_per_run: 1
     aging:
       variants:
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
+        - output_id: darkbeer
+          target_units: 8
+          barrel_types: [SPRUCE]
     outputs:
       darkbeer:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/darkbeer
         consumption:
           alcohol_percent: 7.0
@@ -420,8 +396,7 @@ brew_families:
     outputs:
       mead:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/mead
         consumption:
           alcohol_percent: 11.0
@@ -464,29 +439,16 @@ brew_families:
       filter_consumption_per_run: 1
     aging:
       variants:
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
+        - output_id: redwine
+          target_units: 20
+          barrel_types: [ANY]
         - output_id: vintagewine
           target_units: 202
           barrel_types: [ANY]
     outputs:
       redwine:
-        glint: 
-        effects:
-          - -
+        glint: false
+        effects: []
         item_model: kota_server:custom_item/brewery/redwine
         consumption:
           alcohol_percent: 14.0
@@ -521,8 +483,7 @@ brew_families:
     outputs:
       whitewine:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/whitewine
         consumption:
           alcohol_percent: 12.0
@@ -540,17 +501,13 @@ brew_families:
       filter_consumption_per_run: 1
     aging:
       variants:
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
+        - output_id: cidre
+          target_units: 3
+          barrel_types: [ANY]
     outputs:
       cidre:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/cidre
         consumption:
           alcohol_percent: 7.0
@@ -568,17 +525,13 @@ brew_families:
       filter_consumption_per_run: 1
     aging:
       variants:
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
+        - output_id: apple_liquor
+          target_units: 6
+          barrel_types: [ACACIA]
     outputs:
       apple_liquor:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/apple_liquor
         consumption:
           alcohol_percent: 20.0
@@ -602,8 +555,7 @@ brew_families:
     outputs:
       whisky:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/whisky
         consumption:
           alcohol_percent: 40.0
@@ -621,12 +573,9 @@ brew_families:
       filter_consumption_per_run: 1
     aging:
       variants:
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
+        - output_id: rum
+          target_units: 14
+          barrel_types: [OAK]
     outputs:
       rum:
         glint: false
@@ -702,8 +651,7 @@ brew_families:
     outputs:
       tequila:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/tequila
         consumption:
           alcohol_percent: 38.0
@@ -745,7 +693,7 @@ brew_families:
       variants: []
     outputs:
       gr_absinthe:
-        glint: t
+        glint: true
         effects:
           - POISON/0/25-40
           - INSTANT_DAMAGE/2/1
@@ -825,8 +773,7 @@ brew_families:
     outputs:
       sake:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/sake
         consumption:
           alcohol_percent: 15.0
@@ -844,15 +791,12 @@ brew_families:
       filter_consumption_per_run: 1
     aging:
       variants:
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
+        - output_id: awamori
+          target_units: 14
+          barrel_types: [MANGROVE]
     outputs:
       awamori:
-        glint: t
+        glint: true
         effects:
           - DOLPHINS_GRACE/0/90
           - NIGHT_VISION/0/90
@@ -880,8 +824,7 @@ brew_families:
     outputs:
       shochu:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/shochu
         consumption:
           alcohol_percent: 25.0
@@ -899,20 +842,13 @@ brew_families:
       filter_consumption_per_run: 1
     aging:
       variants:
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
+        - output_id: brandy
+          target_units: 13
+          barrel_types: [DARK_OAK]
     outputs:
       brandy:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/brandy
         consumption:
           alcohol_percent: 40.0
@@ -935,7 +871,7 @@ brew_families:
           barrel_types: [WARPED]
     outputs:
       moonshine:
-        glint: t
+        glint: true
         effects:
           - LEVITATION/2/5-10
           - SLOW_FALLING/0/10-15
@@ -959,17 +895,13 @@ brew_families:
       filter_consumption_per_run: 1
     aging:
       variants:
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
+        - output_id: mushroom_ale
+          target_units: 3
+          barrel_types: [SPRUCE]
     outputs:
       mushroom_ale:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/mushroom_ale
         consumption:
           alcohol_percent: 7.0
@@ -987,18 +919,12 @@ brew_families:
       filter_consumption_per_run: 1
     aging:
       variants:
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
-        - output_id: 
-          target_units: 
-          barrel_types: []
+        - output_id: chorus_spirit
+          target_units: 8
+          barrel_types: [WARPED]
     outputs:
       chorus_spirit:
-        glint: t
+        glint: true
         effects:
           - LEVITATION/0/5
           - SLOW_FALLING/0/20
@@ -1025,8 +951,7 @@ brew_families:
     outputs:
       cacao_wine:
         glint: false
-        effects:
-          - -
+        effects: []
         item_model: kota_server:custom_item/brewery/cacao_wine
         consumption:
           alcohol_percent: 10.0
