@@ -31,7 +31,7 @@ class CookingStateStoreTest {
             2, 160, 73, CookingProcessState.PAUSED_NO_HEAT, List.of(), null, 0
         );
         PersistedCookingStation expected = new PersistedCookingStation(
-            CookingStation.CAULDRON, session, true, false, Set.of("collector")
+            CookingStation.CAULDRON, session, Map.of(20, "idle-item"), true, false, Set.of("collector")
         );
 
         store.save(Map.of(key, expected));
@@ -40,6 +40,18 @@ class CookingStateStoreTest {
         assertEquals(expected, loaded.get(key));
         assertTrue(Files.readString(file).contains("schema_version: 3"));
         assertTrue(Files.readString(file).contains("recipe_snapshot:"));
+    }
+
+    @Test
+    void roundTripsIdleWorkspaceWithoutSyntheticSession() {
+        Path file = temp.resolve("idle.yml");
+        CookingStateStore store = new CookingStateStore(file.toFile());
+        CookingStationKey key = new CookingStationKey(UUID.randomUUID(), 1, 2, 3);
+        PersistedCookingStation expected = new PersistedCookingStation(
+            CookingStation.CUTTING, null, Map.of(11, "input", 38, "knife"), false, false, Set.of()
+        );
+        store.save(Map.of(key, expected));
+        assertEquals(expected, store.load().get(key));
     }
 
     @Test

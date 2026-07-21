@@ -6,7 +6,8 @@ import java.io.File
 
 internal data class PersistedCookingStation(
     val equipment: CookingStation,
-    val session: CookingStationSession,
+    val session: CookingStationSession? = null,
+    val workspaceItems: Map<Int, String> = emptyMap(),
     val experienceAwarded: Boolean = false,
     val starterCatalogAwarded: Boolean = false,
     val collectorIds: Set<String> = emptySet()
@@ -40,9 +41,16 @@ internal class CookingStateStore(private val file: File) {
         key: CookingStationKey,
         persisted: PersistedCookingStation
     ) {
-        val session = persisted.session
         target.set("station", key.serialize())
         target.set("equipment", persisted.equipment.name)
+        target.set("workspace_items", persisted.workspaceItems.toSortedMap().map { (slot, item) ->
+            linkedMapOf("slot" to slot, "serialized_item" to item)
+        })
+        val session = persisted.session
+        if (session == null) {
+            target.set("status", CookingProcessState.IDLE.name)
+            return
+        }
         target.set("status", session.state.name)
         target.set("starter_uuid", session.starterId)
         target.set("recipe_or_preparation_id", session.recipeId)
@@ -94,6 +102,12 @@ internal class CookingStateStore(private val file: File) {
     }
 
     private fun loadStation(section: ConfigurationSection): PersistedCookingStation {
+        val equipment = enum<CookingStation>(section, "equipment")
+        val workspace = section.getMapList("workspace_items").associate { raw ->
+            mapInt(raw, "slot") to mapString(raw, "serialized_item")
+        }
+        val status = enum<CookingProcessState>(section, "status")
+        if (status == CookingProcessState.IDLE) return PersistedCookingStation(equipment, null, workspace)
         val snapshot = loadSnapshot(section(section, "recipe_snapshot"))
         val inputs = section.getMapList("original_inputs").map { raw ->
             CookingStoredInput(
@@ -116,11 +130,11 @@ internal class CookingStateStore(private val file: File) {
             string(section, "recipe_or_preparation_id"), snapshot, string(section, "starter_uuid"),
             integer(section, "scale"), enum(section, "start_heat"), string(section, "outcome") == "FAILURE",
             inputs, integer(section, "reserved_water_units"), long(section, "total_ticks"),
-            long(section, "remaining_ticks"), enum(section, "status"), outputs, reservoir,
+            long(section, "remaining_ticks"), status, outputs, reservoir,
             integer(section, "water_consumed")
         )
         return PersistedCookingStation(
-            enum(section, "equipment"), session,
+            equipment, session, workspace,
             boolean(section, "experience_awarded"), boolean(section, "starter_catalog_awarded"),
             section.getStringList("collector_uuids").toSet()
         )
