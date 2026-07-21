@@ -8,8 +8,10 @@ import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
+import jp.awabi2048.cccontent.persistence.ContentPdcKeys
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.TextDecoration
+import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.Sound
@@ -24,7 +26,8 @@ class FishingItems(
     private val plugin: JavaPlugin,
     private val settings: FishingSettings
 ) {
-    private val fishId = NamespacedKey(plugin, "fish_id")
+    private val fishId = ContentPdcKeys.fishId
+    private val fishItemSchema = ContentPdcKeys.fishItemSchema
     private val fishWeight = NamespacedKey(plugin, "fish_weight_grams")
     private val fishQuality = NamespacedKey(plugin, "fish_quality")
     private val fishSize = NamespacedKey(plugin, "fish_size_cm")
@@ -86,15 +89,17 @@ class FishingItems(
     }
 
     fun createCatch(player: Player, catch: FishCatch): ItemStack {
-        val item = ItemStack(catch.material)
+        val item = ItemStack(Material.POISONOUS_POTATO)
+        PoisonousPotatoComponentPack.applyNonConsumable(item)
         val meta = item.itemMeta
         meta.displayName(Component.text(message(player, "fishing.catalog.item.${catch.fishId}"))
             .decoration(TextDecoration.ITALIC, false))
-        meta.lore(CCSystem.getAPI().getLoreService().render(catchLoreSpec(player, catch, includeName = false)))
+        meta.lore(listOf(Component.text(message(player, "fishing.dictionary.description.${catch.fishId}"), NamedTextColor.GRAY)
+            .decoration(TextDecoration.ITALIC, false)))
+        meta.setItemModel(NamespacedKey("kota_server", "custom_item/fishing/fish/${catch.fishId}"))
+        meta.setMaxStackSize(64)
         meta.persistentDataContainer.set(fishId, PersistentDataType.STRING, catch.fishId)
-        meta.persistentDataContainer.set(fishWeight, PersistentDataType.INTEGER, catch.weightGrams)
-        meta.persistentDataContainer.set(fishQuality, PersistentDataType.STRING, catch.quality.id)
-        meta.persistentDataContainer.set(fishSize, PersistentDataType.INTEGER, catch.sizeCm)
+        meta.persistentDataContainer.set(fishItemSchema, PersistentDataType.INTEGER, 2)
         item.itemMeta = meta
         return item
     }

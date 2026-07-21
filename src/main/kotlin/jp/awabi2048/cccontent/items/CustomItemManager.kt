@@ -5,6 +5,7 @@ import org.bukkit.NamespacedKey
 import org.bukkit.entity.Player
 import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataType
+import jp.awabi2048.cccontent.persistence.ContentPdcKeys
 import java.util.logging.Logger
 
 /**
@@ -13,7 +14,7 @@ import java.util.logging.Logger
  */
 object CustomItemManager {
     private val items = mutableMapOf<String, CustomItem>()
-    private val customItemIdKey = NamespacedKey("cccontent", "custom_item_id")
+    private val customItemIdKey = ContentPdcKeys.customItemId
     private lateinit var logger: Logger
     
     fun setLogger(logger: Logger) {
@@ -84,7 +85,13 @@ object CustomItemManager {
     fun identify(item: ItemStack): CustomItem? {
         val meta = item.itemMeta
         if (meta != null) {
-            val fullId = meta.persistentDataContainer.get(customItemIdKey, PersistentDataType.STRING)
+            val migrated = ContentPdcKeys.readAndMigrate(
+                meta.persistentDataContainer,
+                "custom_item_id",
+                PersistentDataType.STRING
+            ) { key -> logger.warning("[PDC] 新旧キーの値が異なるためcccontent:${key}を優先します") }
+            if (migrated.changed) item.itemMeta = meta
+            val fullId = migrated.value
             if (fullId != null) {
                 items[fullId]?.let { return it }
             }

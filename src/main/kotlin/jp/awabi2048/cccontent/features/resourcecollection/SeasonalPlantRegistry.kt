@@ -13,24 +13,25 @@ data class SeasonalPlantDefinition(
     val customItemId: String,
     val useNameKey: String,
     val vegetationGroupNameKey: String,
-    val seasons: Set<Season>,
+    val weightsBySeason: Map<Season, Int>,
     val sourceMaterials: Set<Material>,
     val biomeKeys: Set<String>,
     val minimumY: Int,
     val maximumY: Int,
-    val weight: Int
+    val itemModel: String
 ) {
     fun matches(season: Season, material: Material, biomeKey: String, y: Int): Boolean =
-        season in seasons &&
+        weight(season) > 0 &&
             material in sourceMaterials &&
             y in minimumY..maximumY &&
             (biomeKeys.isEmpty() || biomeKey in biomeKeys)
+
+    fun weight(season: Season): Int = weightsBySeason[season] ?: 0
 }
 
 class SeasonalPlantRegistry private constructor(
     private val enabled: Boolean,
     private val definitions: List<SeasonalPlantDefinition>,
-    val surfaceRecoverySeconds: Long
 ) {
     fun select(
         season: Season,
@@ -41,11 +42,11 @@ class SeasonalPlantRegistry private constructor(
     ): SeasonalPlantDefinition? {
         if (!enabled) return null
         val candidates = definitions.filter { it.matches(season, material, biomeKey, y) }
-        val totalWeight = candidates.sumOf(SeasonalPlantDefinition::weight)
+        val totalWeight = candidates.sumOf { it.weight(season) }
         if (totalWeight <= 0) return null
         var cursor = random.nextInt(totalWeight)
         for (candidate in candidates) {
-            cursor -= candidate.weight
+            cursor -= candidate.weight(season)
             if (cursor < 0) return candidate
         }
         return null
@@ -59,14 +60,11 @@ class SeasonalPlantRegistry private constructor(
         fun load(plugin: JavaPlugin): SeasonalPlantRegistry {
             val file = ensureFile(plugin)
             val config = YamlConfiguration.loadConfiguration(file)
-            require(config.get("schema_version") is Number && config.getInt("schema_version") == 1) {
-                "$CONFIG_PATH.schema_version must be the integer 1"
+            require(config.get("schema_version") is Number && config.getInt("schema_version") == 2) {
+                "$CONFIG_PATH.schema_version must be the integer 2"
             }
             val enabled = requireBoolean(config, "enabled")
-            val surfaceRecoverySeconds = config.getLong("surface_recovery_seconds", -1L)
-            require(surfaceRecoverySeconds > 0L) {
-                "$CONFIG_PATH.surface_recovery_seconds must be a positive integer"
-            }
+            require(!config.contains("surface_recovery_seconds")) { "$CONFIG_PATH.surface_recovery_seconds is forbidden" }
             val rawDefinitions = config.getMapList("definitions")
             val definitions = rawDefinitions.mapIndexed { index, raw -> parseDefinition(raw, index) }
             val duplicateIds = definitions.groupingBy(SeasonalPlantDefinition::id).eachCount()
@@ -75,11 +73,11 @@ class SeasonalPlantRegistry private constructor(
             plugin.logger.info(
                 "Resource Collection: seasonal plant registry enabled=$enabled definitions=${definitions.size}"
             )
-            return SeasonalPlantRegistry(enabled, definitions, surfaceRecoverySeconds)
+            return SeasonalPlantRegistry(enabled, definitions)
         }
 
         fun of(enabled: Boolean, definitions: List<SeasonalPlantDefinition>): SeasonalPlantRegistry =
-            SeasonalPlantRegistry(enabled, definitions, 86_400L)
+            SeasonalPlantRegistry(enabled, definitions)
 
         private fun parseDefinition(raw: Map<*, *>, index: Int): SeasonalPlantDefinition {
             val path = "$CONFIG_PATH.definitions[$index]"
@@ -89,11 +87,14 @@ class SeasonalPlantRegistry private constructor(
             require(customItemId.matches(Regex("[a-z0-9_.-]+"))) { "$path.custom_item_id is invalid" }
             val useNameKey = requireLanguageKey(raw, "use_name_key", path)
             val vegetationGroupNameKey = requireLanguageKey(raw, "vegetation_group_name_key", path)
-            val seasons = requireStringList(raw, "seasons", path).map { rawSeason ->
-                runCatching { Season.valueOf(rawSeason.uppercase(Locale.ROOT)) }
-                    .getOrElse { throw IllegalArgumentException("$path.seasons contains invalid season: $rawSeason") }
-            }.toSet()
-            require(seasons.isNotEmpty()) { "$path.seasons must not be empty" }
+            val rawWeights = raw["weights_by_season"] as? Map<*, *>
+                ?: throw IllegalArgumentException("$path.weights_by_season must be a map")
+            val weights = Season.entries.associateWith { season ->
+                requireInt(rawWeights, season.name, "$path.weights_by_season").also {
+                    require(it >= 0) { "$path.weights_by_season.${season.name} must not be negative" }
+                }
+            }
+            require(weights.values.any { it > 0 }) { "$path.weights_by_season must contain a positive weight" }
             val sourceMaterials = requireStringList(raw, "source_materials", path).map { rawMaterial ->
                 runCatching { Material.valueOf(rawMaterial.uppercase(Locale.ROOT)) }
                     .getOrElse { throw IllegalArgumentException("$path.source_materials contains invalid material: $rawMaterial") }
@@ -106,19 +107,19 @@ class SeasonalPlantRegistry private constructor(
             val minimumY = requireInt(raw, "minimum_y", path)
             val maximumY = requireInt(raw, "maximum_y", path)
             require(minimumY <= maximumY) { "$path.minimum_y must not exceed maximum_y" }
-            val weight = requireInt(raw, "weight", path)
-            require(weight > 0) { "$path.weight must be positive" }
+            val itemModel = requireString(raw, "item_model", path)
+            require(itemModel.matches(Regex("[a-z0-9_.-]+:[a-z0-9_./-]+"))) { "$path.item_model is invalid" }
             return SeasonalPlantDefinition(
                 id,
                 customItemId,
                 useNameKey,
                 vegetationGroupNameKey,
-                seasons,
+                weights,
                 sourceMaterials,
                 biomeKeys,
                 minimumY,
                 maximumY,
-                weight
+                itemModel
             )
         }
 

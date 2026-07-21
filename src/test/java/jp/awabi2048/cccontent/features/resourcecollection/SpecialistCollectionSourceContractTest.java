@@ -39,7 +39,7 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("ResourceOperation.LUMBERJACK_FOREST_PRODUCTS"));
         assertTrue(source.contains("ResourceOperation.FARMER_WILD_GATHERING"));
         assertTrue(source.contains("ResourceOperation.FARMER_WORK_SPEED"));
-        assertTrue(source.contains("ResourceOperation.FARMER_SURFACE_GATHERING"));
+        assertFalse(source.contains("ResourceOperation.FARMER_SURFACE_GATHERING"));
         assertTrue(source.contains("ResourceOperation.FARMER_AREA_TILLING"));
         assertTrue(source.contains("ResourceOperation.FARMER_AREA_HARVEST"));
         assertTrue(source.contains("ResourceOperation.FARMER_AUTOMATIC_REPLANT"));
@@ -56,9 +56,8 @@ class SpecialistCollectionSourceContractTest {
         assertTrue(source.contains("blockData.soundGroup"));
         assertTrue(source.contains("resource.gathering_guide"));
         assertTrue(source.contains("resource.gathering_sickle"));
-        assertTrue(source.contains("handleSurfaceGathering"));
-        assertTrue(source.contains("surfaceGatheringStore.claim"));
-        assertTrue(source.contains("\"surface_gathering\" to target.surface.toString()"));
+        assertFalse(source.contains("handleSurfaceGathering"));
+        assertFalse(source.contains("surfaceGatheringStore.claim"));
         assertTrue(source.contains("resource.forest_guide"));
         assertTrue(source.contains("resource.woodworking_knife"));
         assertTrue(source.contains("forestTargets[player.uniqueId] = targets"));
