@@ -1,14 +1,12 @@
 package jp.awabi2048.cccontent.gui
 
-import io.papermc.paper.dialog.Dialog
-import io.papermc.paper.registry.data.dialog.ActionButton
-import io.papermc.paper.registry.data.dialog.DialogBase
-import io.papermc.paper.registry.data.dialog.action.DialogAction
-import io.papermc.paper.registry.data.dialog.action.DialogActionCallback
-import io.papermc.paper.registry.data.dialog.body.DialogBody
-import io.papermc.paper.registry.data.dialog.type.DialogType
+import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuDialogButton
+import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
+import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.event.ClickCallback
 import org.bukkit.entity.Player
 
 object SimpleConfirmationDialog {
@@ -21,45 +19,28 @@ object SimpleConfirmationDialog {
         onConfirm: (Player) -> Unit,
         onCancel: ((Player) -> Unit)? = null
     ) {
-        val confirmButton = ActionButton.builder(confirmText)
-            .width(150)
-            .action(
-                DialogAction.customClick(
-                    DialogActionCallback { _, audience ->
-                        val target = audience as? Player ?: return@DialogActionCallback
+        CCSystem.getAPI().getMenuDialogService().show(
+            player,
+            MenuDialogRequest(
+                owner = "cc-content",
+                id = "simple-confirmation",
+                title = title,
+                body = listOf(body),
+                confirm = MenuDialogButton(
+                    confirmText,
+                    MenuDialogHandler { target, _ ->
                         onConfirm(target)
-                    },
-                    ClickCallback.Options.builder().uses(1).build()
-                )
-            )
-            .build()
-
-        val cancelButton = ActionButton.builder(cancelText)
-            .width(150)
-            .action(
-                DialogAction.customClick(
-                    DialogActionCallback { _, audience ->
-                        val target = audience as? Player ?: return@DialogActionCallback
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    }
+                ),
+                cancel = MenuDialogButton(
+                    cancelText,
+                    MenuDialogHandler { target, _ ->
                         onCancel?.invoke(target)
-                    },
-                    ClickCallback.Options.builder().uses(1).build()
+                        MenuActionResult.Success(MenuUpdate.Close)
+                    }
                 )
             )
-            .build()
-
-        val dialog = Dialog.create { factory ->
-            factory.empty()
-                .base(
-                    DialogBase.builder(title)
-                        .body(listOf(DialogBody.plainMessage(body, 280)))
-                        .canCloseWithEscape(true)
-                        .pause(false)
-                        .afterAction(DialogBase.DialogAfterAction.CLOSE)
-                        .build()
-                )
-                .type(DialogType.confirmation(confirmButton, cancelButton))
-        }
-
-        player.showDialog(dialog)
+        )
     }
 }
