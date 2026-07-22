@@ -2961,118 +2961,28 @@ class RankCommand(
         val profession = rankManager.getPlayerProfession(player.uniqueId)?.profession ?: return
         val professionName = messageProvider.getProfessionName(profession)
         val prestigeLevel = rankManager.getPrestigeLevel(player.uniqueId)
-
-        val yesButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm")))
+        ConfirmationDialog.show(
+            player,
+            withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.first.title"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.first.body", "profession" to professionName, "level" to prestigeLevel))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel"))),
+            { target -> openPrestigeConfirmDialogSecond(target) },
         )
-            .width(150)
-            .action(
-                io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
-                    io.papermc.paper.registry.data.dialog.action.DialogActionCallback { _, audience ->
-                        val target = audience as? Player ?: return@DialogActionCallback
-                        openPrestigeConfirmDialogSecond(target)
-                    },
-                    net.kyori.adventure.text.event.ClickCallback.Options.builder().uses(1).build()
-                )
-            )
-            .build()
-
-        val noButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel")))
-        )
-            .width(150)
-            .build()
-
-        val dialog = io.papermc.paper.dialog.Dialog.create { factory ->
-            factory.empty()
-                .base(
-                    io.papermc.paper.registry.data.dialog.DialogBase.builder(
-                        withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.first.title")))
-                    )
-                        .body(
-                            listOf(
-                                io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(
-                                    withoutItalic(
-                                        toComponent(
-                                            messageProvider.getMessage(
-                                                "rank.prestige.dialog.first.body",
-                                                "profession" to professionName,
-                                                "level" to prestigeLevel
-                                            )
-                                        )
-                                    ),
-                                    280
-                                )
-                            )
-                        )
-                        .canCloseWithEscape(true)
-                        .pause(false)
-                        .afterAction(io.papermc.paper.registry.data.dialog.DialogBase.DialogAfterAction.CLOSE)
-                        .build()
-                )
-                .type(io.papermc.paper.registry.data.dialog.type.DialogType.confirmation(yesButton, noButton))
-        }
-
-        player.showDialog(dialog)
     }
 
     private fun openPrestigeConfirmDialogSecond(player: Player) {
         val profession = rankManager.getPlayerProfession(player.uniqueId)?.profession ?: return
         val professionName = messageProvider.getProfessionName(profession)
         val prestigeLevel = rankManager.getPrestigeLevel(player.uniqueId)
-
-        val yesButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm")))
+        ConfirmationDialog.show(
+            player,
+            withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.second.title"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.second.body", "profession" to professionName, "level" to prestigeLevel))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel"))),
+            { target -> executePrestige(target) },
         )
-            .width(150)
-            .action(
-                io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
-                    io.papermc.paper.registry.data.dialog.action.DialogActionCallback { _, audience ->
-                        val target = audience as? Player ?: return@DialogActionCallback
-                        executePrestige(target)
-                    },
-                    net.kyori.adventure.text.event.ClickCallback.Options.builder().uses(1).build()
-                )
-            )
-            .build()
-
-        val noButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel")))
-        )
-            .width(150)
-            .build()
-
-        val dialog = io.papermc.paper.dialog.Dialog.create { factory ->
-            factory.empty()
-                .base(
-                    io.papermc.paper.registry.data.dialog.DialogBase.builder(
-                        withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.second.title")))
-                    )
-                        .body(
-                            listOf(
-                                io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(
-                                    withoutItalic(
-                                        toComponent(
-                                            messageProvider.getMessage(
-                                                "rank.prestige.dialog.second.body",
-                                                "profession" to professionName,
-                                                "level" to prestigeLevel
-                                            )
-                                        )
-                                    ),
-                                    280
-                                )
-                            )
-                        )
-                        .canCloseWithEscape(true)
-                        .pause(false)
-                        .afterAction(io.papermc.paper.registry.data.dialog.DialogBase.DialogAfterAction.CLOSE)
-                        .build()
-                )
-                .type(io.papermc.paper.registry.data.dialog.type.DialogType.confirmation(yesButton, noButton))
-        }
-
-        player.showDialog(dialog)
     }
 
     private fun executePrestige(player: Player) {
