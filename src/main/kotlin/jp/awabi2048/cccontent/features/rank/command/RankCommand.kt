@@ -42,6 +42,11 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
@@ -57,6 +62,26 @@ class RankCommand(
     private var taskChecker: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskChecker? = null,
     private val translator: jp.awabi2048.cccontent.features.rank.tutorial.task.EntityBlockTranslator? = null
 ) : CommandExecutor, TabCompleter, Listener, ProfessionSelector {
+
+    init {
+        val runtime = CCSystem.getAPI().getMenuRuntimeService()
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = MENU_OWNER,
+                id = TUTORIAL_MENU_ID,
+                renderer = { context -> renderTutorialRankRuntimeView(context.player) },
+                actions = emptyMap(),
+            )
+        )
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = MENU_OWNER,
+                id = TASK_INFO_MENU_ID,
+                renderer = { context -> renderTaskInfoRuntimeView(context.player, context.route) },
+                actions = emptyMap(),
+            )
+        )
+    }
 
     fun setTutorialTaskSystem(
         loader: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader?,
@@ -439,14 +464,15 @@ class RankCommand(
     }
 
     private fun openTutorialRankMenu(viewer: Player): Boolean {
-        val holder = TutorialRankMenuGuiHolder()
-        val inventory = Bukkit.createInventory(holder, 45, "§8チュートリアルランク")
-        holder.backingInventory = inventory
-
-        renderTutorialRankMenu(inventory, viewer)
-        viewer.openInventory(inventory)
-        viewer.playSound(viewer.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
+        CCSystem.getAPI().getMenuRuntimeService().open(viewer, MenuRoute(MENU_OWNER, TUTORIAL_MENU_ID))
         return true
+    }
+
+    private fun renderTutorialRankRuntimeView(viewer: Player): InventoryMenuView {
+        val title = "§8チュートリアルランク"
+        val inventory = Bukkit.createInventory(null, 45, title)
+        renderTutorialRankMenu(inventory, viewer)
+        return inventory.toRuntimeView(title)
     }
 
     private fun renderTutorialRankMenu(inventory: Inventory, viewer: Player) {
@@ -2140,11 +2166,9 @@ class RankCommand(
         
         val uuid = targetPlayer.uniqueId
         val tutorial = rankManager.getPlayerTutorial(uuid)
-        val progress = tutorial.taskProgress
-        val requirement = loader.getRequirement(tutorial.currentRank.name)
         val viewer = if (sender is Player) sender else targetPlayer
 
-        openTaskInfoGui(viewer, targetPlayer, tutorial.currentRank.name, progress, requirement)
+        openTaskInfoGui(viewer, targetPlayer, tutorial.currentRank.name)
 
         if (sender !is Player) {
             sender.sendMessage(
@@ -2161,17 +2185,31 @@ class RankCommand(
         viewer: Player,
         targetPlayer: Player,
         rankName: String,
-        progress: TaskProgress,
-        requirement: TaskRequirement
     ) {
-        val holder = TaskInfoGuiHolder()
+        CCSystem.getAPI().getMenuRuntimeService().open(
+            viewer,
+            MenuRoute(
+                MENU_OWNER,
+                TASK_INFO_MENU_ID,
+                mapOf("target" to targetPlayer.uniqueId.toString(), "rank" to rankName),
+            )
+        )
+    }
+
+    private fun renderTaskInfoRuntimeView(viewer: Player, route: MenuRoute): InventoryMenuView {
+        val targetPlayer = route.payload["target"]
+            ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
+            ?.let(Bukkit::getPlayer)
+            ?: viewer
+        val rankName = route.payload["rank"] ?: rankManager.getTutorialRank(targetPlayer.uniqueId).name
+        val progress = rankManager.getPlayerTutorial(targetPlayer.uniqueId).taskProgress
+        val requirement = taskLoader?.getRequirement(rankName) ?: TaskRequirement()
         val title = messageProvider.getMessage(
             "rank.tutorial_task_info.title",
             "player" to targetPlayer.name,
             "rank" to rankName
         )
-        val inventory = Bukkit.createInventory(holder, 45, title)
-        holder.backingInventory = inventory
+        val inventory = Bukkit.createInventory(null, 45, title)
 
         val headerFooter = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
         val middle = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
@@ -2201,8 +2239,19 @@ class RankCommand(
             inventory.setItem(22, completeItem)
         }
 
-        viewer.openInventory(inventory)
+        return inventory.toRuntimeView(title)
     }
+
+    private fun Inventory.toRuntimeView(title: String): InventoryMenuView = InventoryMenuView(
+        size = size,
+        title = LEGACY_SERIALIZER.deserialize(title),
+        elements = (0 until size).mapNotNull { slot ->
+            getItem(slot)?.let { item ->
+                MenuElement(slot, item, GuiElementRole.CONTENT)
+            }
+        },
+        standardFrame = false,
+    )
 
     private fun buildTaskCategoryItems(
         targetPlayer: Player,
@@ -3185,48 +3234,6 @@ class RankCommand(
         event.isCancelled = true
     }
 
-    @EventHandler
-    fun onTutorialRankMenuClick(event: InventoryClickEvent) {
-        if (event.view.topInventory.holder !is TutorialRankMenuGuiHolder) return
-        event.cancelWithDebug("RankCommand.onTutorialRankMenuClick: tutorial_menu")
-    }
-
-    @EventHandler
-    fun onTutorialRankMenuDrag(event: InventoryDragEvent) {
-        if (event.view.topInventory.holder !is TutorialRankMenuGuiHolder) {
-            return
-        }
-        event.isCancelled = true
-    }
-
-    @EventHandler
-    fun onTaskInfoGuiClick(event: InventoryClickEvent) {
-        if (event.view.topInventory.holder !is TaskInfoGuiHolder) {
-            return
-        }
-        event.cancelWithDebug("RankCommand.onTaskInfoGuiClick: task_info")
-    }
-
-    @EventHandler
-    fun onTaskInfoGuiDrag(event: InventoryDragEvent) {
-        if (event.view.topInventory.holder !is TaskInfoGuiHolder) {
-            return
-        }
-        event.isCancelled = true
-    }
-
-    private class TutorialRankMenuGuiHolder : InventoryHolder {
-        lateinit var backingInventory: Inventory
-
-        override fun getInventory(): Inventory = backingInventory
-    }
-
-    private class TaskInfoGuiHolder : InventoryHolder {
-        lateinit var backingInventory: Inventory
-
-        override fun getInventory(): Inventory = backingInventory
-    }
-
     private enum class TutorialRankTaskDisplayMode {
         COMPLETED,
         CURRENT,
@@ -3310,6 +3317,9 @@ class RankCommand(
     }
 
     companion object {
+        private const val MENU_OWNER = "cc-content"
+        private const val TUTORIAL_MENU_ID = "rank-tutorial"
+        private const val TASK_INFO_MENU_ID = "rank-task-info"
         private val LEGACY_SERIALIZER: LegacyComponentSerializer = LegacyComponentSerializer.legacySection()
         private const val VIEWPORT_DEPTH_SPACING = 4
         private const val VIEWPORT_SELECTED_COLUMN = 2
