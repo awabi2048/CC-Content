@@ -7,23 +7,23 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.core.gui.GuiItemMarker
 import jp.awabi2048.cccontent.gui.GuiMenuItems
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.event.EventHandler
-import org.bukkit.event.Listener
-import org.bukkit.event.inventory.InventoryClickEvent
-import org.bukkit.event.inventory.InventoryCloseEvent
-import org.bukkit.event.inventory.InventoryDragEvent
 import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
-import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import java.util.UUID
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 
 object ArenaSessionInfoLayout {
     const val MENU_SIZE = 45
@@ -35,34 +35,30 @@ object ArenaSessionInfoLayout {
         get() = ArenaI18n.text(null, "arena.ui.broadcast.title")
 }
 
-class ArenaSessionInfoHolder(
-    val viewerId: UUID
-) : InventoryHolder {
-    var backingInventory: Inventory? = null
-
-    override fun getInventory(): Inventory {
-        return backingInventory ?: Bukkit.createInventory(this, ArenaSessionInfoLayout.MENU_SIZE, ArenaSessionInfoLayout.MENU_TITLE)
-    }
-}
-
 class ArenaSessionInfoMenu(
     private val plugin: JavaPlugin,
     private val arenaManager: ArenaManager
-) : Listener {
+) {
 
     private val activeUpdateTasks = mutableMapOf<UUID, BukkitRunnable>()
 
-    fun openMenu(player: Player) {
-        val holder = ArenaSessionInfoHolder(player.uniqueId)
-        val inventory = Bukkit.createInventory(holder, ArenaSessionInfoLayout.MENU_SIZE, ArenaSessionInfoLayout.MENU_TITLE)
-        holder.backingInventory = inventory
-        render(inventory)
-        player.openInventory(inventory)
-        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_session_info")
-        startUpdateTask(player, holder)
+    init {
+        CCSystem.getAPI().getMenuRuntimeService().register(
+            InventoryMenuDefinition(
+                owner = OWNER,
+                id = MENU_ID,
+                renderer = { renderView() },
+                actions = emptyMap()
+            )
+        )
     }
 
-    private fun startUpdateTask(player: Player, holder: ArenaSessionInfoHolder) {
+    fun openMenu(player: Player) {
+        CCSystem.getAPI().getMenuRuntimeService().open(player, MenuRoute(OWNER, MENU_ID))
+        startUpdateTask(player)
+    }
+
+    private fun startUpdateTask(player: Player) {
         stopUpdateTask(player.uniqueId)
         val task = object : BukkitRunnable() {
             override fun run() {
@@ -70,15 +66,12 @@ class ArenaSessionInfoMenu(
                     stopUpdateTask(player.uniqueId)
                     return
                 }
-                val inv = holder.backingInventory ?: run {
+                val route = CCSystem.getAPI().getMenuNavigationService().currentRoute(player)
+                if (route?.owner != OWNER || route.id != MENU_ID) {
                     stopUpdateTask(player.uniqueId)
                     return
                 }
-                if (player.openInventory.topInventory != inv) {
-                    stopUpdateTask(player.uniqueId)
-                    return
-                }
-                render(inv)
+                CCSystem.getAPI().getMenuRuntimeService().refresh(player)
             }
         }
         activeUpdateTasks[player.uniqueId] = task
@@ -105,6 +98,20 @@ class ArenaSessionInfoMenu(
 
         inventory.setItem(ArenaSessionInfoLayout.LIFT_SLOT, buildLiftItem())
         inventory.setItem(ArenaSessionInfoLayout.INFO_SLOT, buildInfoItem())
+    }
+
+    private fun renderView(): InventoryMenuView {
+        val inventory = Bukkit.createInventory(null, ArenaSessionInfoLayout.MENU_SIZE, ArenaSessionInfoLayout.MENU_TITLE)
+        render(inventory)
+        return InventoryMenuView(
+            size = ArenaSessionInfoLayout.MENU_SIZE,
+            title = LegacyComponentSerializer.legacySection().deserialize(ArenaSessionInfoLayout.MENU_TITLE),
+            elements = (0 until inventory.size).mapNotNull { slot ->
+                val item = inventory.getItem(slot) ?: return@mapNotNull null
+                MenuElement(slot, item, GuiItemMarker.role(item) ?: GuiElementRole.CONTENT)
+            },
+            standardFrame = false
+        )
     }
 
     private fun buildSessionItem(session: ArenaSession): ItemStack {
@@ -221,21 +228,8 @@ class ArenaSessionInfoMenu(
         return item
     }
 
-    @EventHandler
-    fun onInventoryClick(event: InventoryClickEvent) {
-        val holder = event.view.topInventory.holder as? ArenaSessionInfoHolder ?: return
-        event.cancelWithDebug("ArenaSessionInfoMenu.onInventoryClick: info_menu")
-    }
-
-    @EventHandler
-    fun onInventoryDrag(event: InventoryDragEvent) {
-        val holder = event.view.topInventory.holder as? ArenaSessionInfoHolder ?: return
-        event.isCancelled = true
-    }
-
-    @EventHandler
-    fun onInventoryClose(event: InventoryCloseEvent) {
-        val holder = event.view.topInventory.holder as? ArenaSessionInfoHolder ?: return
-        stopUpdateTask(holder.viewerId)
+    companion object {
+        private const val OWNER = "cc-content"
+        private const val MENU_ID = "arena-session-info"
     }
 }

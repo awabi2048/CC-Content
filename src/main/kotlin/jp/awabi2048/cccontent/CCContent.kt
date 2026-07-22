@@ -588,9 +588,6 @@ class CCContent : JavaPlugin(), Listener {
             arenaMissionService?.let {
                 server.pluginManager.registerEvents(it, this)
             }
-            arenaSessionInfoMenu?.let {
-                server.pluginManager.registerEvents(it, this)
-            }
             arenaEnchantPedestalMenu?.let {
                 server.pluginManager.registerEvents(it, this)
             }
@@ -1712,6 +1709,7 @@ class CCContent : JavaPlugin(), Listener {
         }
         registeredConfigOwners.clear()
         runCatching { CCSystem.getAPI().getMenuCommandService().unregisterOwner("cc-content") }
+        runCatching { CCSystem.getAPI().getMenuRuntimeService().unregisterOwner("cc-content") }
         logger.info("CC-Content v${pluginMeta.version} が無効化されました")
     }
 }
