@@ -2749,57 +2749,14 @@ class RankCommand(
         skill: SkillNode
     ) {
         val skillName = messageProvider.getSkillName(holder.state.profession, skill.skillId)
-        val yesButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm")))
+        ConfirmationDialog.show(
+            viewer,
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.title"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.body", "skill" to skillName))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel"))),
+            { target -> executeSkillUnlock(target, holder, skillTree, skill) },
         )
-            .width(150)
-            .action(
-                io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
-                    io.papermc.paper.registry.data.dialog.action.DialogActionCallback { _, audience ->
-                        val target = audience as? Player ?: return@DialogActionCallback
-                        executeSkillUnlock(target, holder, skillTree, skill)
-                    },
-                    net.kyori.adventure.text.event.ClickCallback.Options.builder().uses(1).build()
-                )
-            )
-            .build()
-
-        val noButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel")))
-        )
-            .width(150)
-            .build()
-
-        val dialog = io.papermc.paper.dialog.Dialog.create { factory ->
-            factory.empty()
-                .base(
-                    io.papermc.paper.registry.data.dialog.DialogBase.builder(
-                        withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.title")))
-                    )
-                        .body(
-                            listOf(
-                                io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(
-                                    withoutItalic(
-                                        toComponent(
-                                            messageProvider.getMessage(
-                                                "rank.skill.gui.dialog.body",
-                                                "skill" to skillName
-                                            )
-                                        )
-                                    ),
-                                    280
-                                )
-                            )
-                        )
-                        .canCloseWithEscape(true)
-                        .pause(false)
-                        .afterAction(io.papermc.paper.registry.data.dialog.DialogBase.DialogAfterAction.CLOSE)
-                        .build()
-                )
-                .type(io.papermc.paper.registry.data.dialog.type.DialogType.confirmation(yesButton, noButton))
-        }
-
-        viewer.showDialog(dialog)
     }
 
     private fun openPrestigeSkillUnlockDialog(
@@ -2809,57 +2766,14 @@ class RankCommand(
         skill: SkillNode
     ) {
         val skillName = messageProvider.getSkillName(holder.state.profession, skill.skillId)
-        val yesButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm")))
+        ConfirmationDialog.show(
+            viewer,
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.prestige.dialog.title"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.prestige.dialog.body", "skill" to skillName))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel"))),
+            { target -> executePrestigeSkillUnlock(target, holder, skillTree, skill) },
         )
-            .width(150)
-            .action(
-                io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
-                    io.papermc.paper.registry.data.dialog.action.DialogActionCallback { _, audience ->
-                        val target = audience as? Player ?: return@DialogActionCallback
-                        executePrestigeSkillUnlock(target, holder, skillTree, skill)
-                    },
-                    net.kyori.adventure.text.event.ClickCallback.Options.builder().uses(1).build()
-                )
-            )
-            .build()
-
-        val noButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel")))
-        )
-            .width(150)
-            .build()
-
-        val dialog = io.papermc.paper.dialog.Dialog.create { factory ->
-            factory.empty()
-                .base(
-                    io.papermc.paper.registry.data.dialog.DialogBase.builder(
-                        withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.prestige.dialog.title")))
-                    )
-                        .body(
-                            listOf(
-                                io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(
-                                    withoutItalic(
-                                        toComponent(
-                                            messageProvider.getMessage(
-                                                "rank.skill.gui.prestige.dialog.body",
-                                                "skill" to skillName
-                                            )
-                                        )
-                                    ),
-                                    280
-                                )
-                            )
-                        )
-                        .canCloseWithEscape(true)
-                        .pause(false)
-                        .afterAction(io.papermc.paper.registry.data.dialog.DialogBase.DialogAfterAction.CLOSE)
-                        .build()
-                )
-                .type(io.papermc.paper.registry.data.dialog.type.DialogType.confirmation(yesButton, noButton))
-        }
-
-        viewer.showDialog(dialog)
     }
 
     private fun executePrestigeSkillUnlock(
