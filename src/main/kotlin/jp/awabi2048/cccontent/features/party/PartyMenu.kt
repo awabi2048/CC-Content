@@ -7,39 +7,64 @@ import com.awabi2048.ccsystem.api.gui.GuiMenuIconData
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
-import io.papermc.paper.dialog.Dialog
-import io.papermc.paper.registry.data.dialog.ActionButton
-import io.papermc.paper.registry.data.dialog.DialogBase
-import io.papermc.paper.registry.data.dialog.action.DialogAction
-import io.papermc.paper.registry.data.dialog.action.DialogActionCallback
-import io.papermc.paper.registry.data.dialog.body.DialogBody
-import io.papermc.paper.registry.data.dialog.input.DialogInput
-import io.papermc.paper.registry.data.dialog.type.DialogType
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuDialogButton
+import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
+import com.awabi2048.ccsystem.api.gui.MenuDialogInput
+import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
+import com.awabi2048.ccsystem.core.gui.GuiItemMarker
 import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.event.ClickCallback
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.meta.SkullMeta
 
 class PartyMenu(private val controller: PartyController) {
     private val elements get() = CCSystem.getAPI().getGuiElementService()
+    private val runtime get() = CCSystem.getAPI().getMenuRuntimeService()
+
+    init {
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = OWNER,
+                id = MENU_ID,
+                renderer = { context -> render(context.player, context.route) },
+                actions = mapOf(
+                    "settings" to MenuActionHandler { context -> openSettings(context.player, context.route) },
+                    "recruiting" to MenuActionHandler { context -> toggleRecruiting(context.player, context.route) },
+                    "disband" to MenuActionHandler { context -> confirmDisband(context.player, context.route) },
+                    "chat" to MenuActionHandler { context -> toggleChat(context.player) },
+                    "invite" to MenuActionHandler { context -> invite(context.player, context.route, context.click.isRightClick) }
+                )
+            )
+        )
+    }
 
     fun open(player: Player) {
         val party = controller.service.partyOf(player.uniqueId) ?: controller.service.create(
             player.uniqueId,
             controller.text(player, "party.default_name", mapOf("player" to player.name))
         )
-        val holder = PartyMenuHolder(party.id)
+        runtime.open(player, MenuRoute(OWNER, MENU_ID, mapOf("partyId" to party.id.toString())))
+    }
+
+    private fun render(player: Player, route: MenuRoute): InventoryMenuView {
+        val partyId = route.payload["partyId"]?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
+        val party = partyId?.let(controller.service::get) ?: controller.service.partyOf(player.uniqueId)
+            ?: controller.service.create(player.uniqueId, controller.text(player, "party.default_name", mapOf("player" to player.name)))
         val inventory = Bukkit.createInventory(
-            holder,
+            null,
             45,
             elements.title(GuiNameSpec.Text(controller.text(player, "party.menu.title"), GuiNameStyle.DEFAULT))
         )
-        holder.attach(inventory)
         (0..8).forEach { inventory.setItem(it, elements.decoration(Material.BLACK_STAINED_GLASS_PANE)) }
         (9..35).forEach { inventory.setItem(it, elements.decoration(Material.GRAY_STAINED_GLASS_PANE)) }
         (36..44).forEach { inventory.setItem(it, elements.decoration(Material.BLACK_STAINED_GLASS_PANE)) }
@@ -53,7 +78,22 @@ class PartyMenu(private val controller: PartyController) {
         inventory.setItem(38, chatItem(player, chatActive))
         inventory.setItem(40, informationItem(player, party))
         inventory.setItem(42, inviteItem(player, full))
-        player.openInventory(inventory)
+        val actionBySlot = mapOf(20 to "settings", 22 to "recruiting", 24 to "disband", 38 to "chat", 42 to "invite")
+        return InventoryMenuView(
+            size = 45,
+            title = elements.title(GuiNameSpec.Text(controller.text(player, "party.menu.title"), GuiNameStyle.DEFAULT)),
+            elements = (0 until inventory.size).mapNotNull { slot ->
+                val item = inventory.getItem(slot) ?: return@mapNotNull null
+                val role = GuiItemMarker.role(item) ?: GuiElementRole.CONTENT
+                MenuElement(
+                    slot = slot,
+                    item = item,
+                    role = role,
+                    actionId = actionBySlot[slot]?.takeIf { role != GuiElementRole.CONTENT }
+                )
+            },
+            standardFrame = false
+        )
     }
 
     private fun settingsItem(player: Player, party: PartySnapshot, enabled: Boolean) = icon(
@@ -183,13 +223,71 @@ class PartyMenu(private val controller: PartyController) {
         )
     )
 
+    private fun party(player: Player, route: MenuRoute): PartySnapshot? {
+        val id = route.payload["partyId"]?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
+        return id?.let(controller.service::get) ?: controller.service.partyOf(player.uniqueId)
+    }
+
+    private fun openSettings(player: Player, route: MenuRoute): MenuActionResult {
+        val party = party(player, route) ?: return MenuActionResult.Rejected()
+        if (party.leader != player.uniqueId) return MenuActionResult.Rejected()
+        showSettingsDialog(player, party)
+        return MenuActionResult.Success(MenuUpdate.None)
+    }
+
+    private fun toggleRecruiting(player: Player, route: MenuRoute): MenuActionResult {
+        val party = party(player, route) ?: return MenuActionResult.Rejected()
+        if (party.leader != player.uniqueId) return MenuActionResult.Rejected()
+        val updated = controller.service.update(party.id, player.uniqueId, recruiting = !party.recruiting)
+        if (updated.recruiting) controller.broadcastRecruitment(updated)
+        return MenuActionResult.Success(MenuUpdate.Refresh)
+    }
+
+    private fun confirmDisband(player: Player, route: MenuRoute): MenuActionResult {
+        val party = party(player, route) ?: return MenuActionResult.Rejected()
+        if (party.leader != player.uniqueId) return MenuActionResult.Rejected()
+        jp.awabi2048.cccontent.gui.SimpleConfirmationDialog.show(
+            player,
+            Component.text(controller.text(player, "party.dialog.disband.title")),
+            Component.text(controller.text(player, "party.dialog.disband.body")),
+            Component.text(controller.text(player, "party.dialog.submit")),
+            Component.text(controller.text(player, "party.dialog.cancel")),
+            { target -> controller.service.disband(party.id, target.uniqueId); target.closeInventory() }
+        )
+        return MenuActionResult.Success(MenuUpdate.None)
+    }
+
+    private fun toggleChat(player: Player): MenuActionResult {
+        controller.message(
+            player,
+            if (controller.toggleChat(player)) "party.chat_channel.enabled" else "party.chat_channel.disabled"
+        )
+        return MenuActionResult.Success(MenuUpdate.Refresh)
+    }
+
+    private fun invite(player: Player, route: MenuRoute, typedInput: Boolean): MenuActionResult {
+        val party = party(player, route) ?: return MenuActionResult.Rejected()
+        if (party.members.size >= party.capacity) return MenuActionResult.Rejected()
+        if (typedInput) {
+            showInviteDialog(player)
+            return MenuActionResult.Success(MenuUpdate.None)
+        }
+        if (!controller.interactionClaims.tryClaim(player.uniqueId, PartyMenuListener.CLAIM_OWNER)) {
+            controller.message(player, "party.interaction.busy")
+            return MenuActionResult.Rejected()
+        }
+        player.closeInventory()
+        controller.message(player, "party.interaction.invite_waiting")
+        return MenuActionResult.Success(MenuUpdate.Close)
+    }
+
     fun showSettingsDialog(player: Player, party: PartySnapshot) {
         showTextDialog(player, "party.dialog.settings.title", listOf(
-            DialogInput.text("party_name", Component.text(controller.text(player, "party.dialog.settings.name"))).initial(party.name).maxLength(32).build(),
-            DialogInput.text("party_description", Component.text(controller.text(player, "party.dialog.settings.description"))).initial(party.description).maxLength(100).build()
+            MenuDialogInput.Text("party_name", Component.text(controller.text(player, "party.dialog.settings.name")), party.name, maxLength = 32),
+            MenuDialogInput.Text("party_description", Component.text(controller.text(player, "party.dialog.settings.description")), party.description, maxLength = 100)
         )) { view ->
-            val name = view.getText("party_name").orEmpty().trim()
-            val description = view.getText("party_description").orEmpty().trim()
+            val name = view.textValue("party_name").trim()
+            val description = view.textValue("party_description").trim()
             controller.service.update(party.id, player.uniqueId, name = name, description = description)
             open(player)
         }
@@ -197,9 +295,9 @@ class PartyMenu(private val controller: PartyController) {
 
     fun showInviteDialog(player: Player) {
         showTextDialog(player, "party.dialog.invite.title", listOf(
-            DialogInput.text("party_target", Component.text(controller.text(player, "party.dialog.invite.target"))).maxLength(32).build()
+            MenuDialogInput.Text("party_target", Component.text(controller.text(player, "party.dialog.invite.target")), maxLength = 32)
         )) { view ->
-            val targetName = view.getText("party_target").orEmpty().trim()
+            val targetName = view.textValue("party_target").trim()
             val target = controller.resolveOnline(targetName) ?: run {
                 controller.message(player, "party.player_not_online")
                 return@showTextDialog
@@ -211,29 +309,41 @@ class PartyMenu(private val controller: PartyController) {
         }
     }
 
-    private fun showTextDialog(player: Player, titleKey: String, inputs: List<DialogInput>, submit: (io.papermc.paper.dialog.DialogResponseView) -> Unit) {
-        val callback = DialogAction.customClick(DialogActionCallback { view, audience ->
-            if (audience !is Player) return@DialogActionCallback
-            runCatching { submit(view) }.onFailure { controller.message(audience, "party.error.invalid_action") }
-        }, ClickCallback.Options.builder().uses(1).build())
-        val dialog = Dialog.create { factory ->
-            factory.empty().base(
-                DialogBase.builder(Component.text(controller.text(player, titleKey)))
-                    .body(listOf(DialogBody.plainMessage(Component.text(controller.text(player, "party.dialog.body")), 280)))
-                    .inputs(inputs).canCloseWithEscape(true).build()
-            ).type(DialogType.confirmation(
-                ActionButton.builder(Component.text(controller.text(player, "party.dialog.submit"))).action(callback).build(),
-                ActionButton.builder(Component.text(controller.text(player, "party.dialog.cancel"))).build()
-            ))
-        }
-        player.showDialog(dialog)
+    private fun showTextDialog(
+        player: Player,
+        titleKey: String,
+        inputs: List<MenuDialogInput>,
+        submit: (com.awabi2048.ccsystem.api.gui.MenuDialogResponse) -> Unit
+    ) {
+        CCSystem.getAPI().getMenuDialogService().show(
+            player,
+            MenuDialogRequest(
+                owner = OWNER,
+                id = titleKey,
+                title = Component.text(controller.text(player, titleKey)),
+                body = listOf(Component.text(controller.text(player, "party.dialog.body"))),
+                inputs = inputs,
+                confirm = MenuDialogButton(
+                    Component.text(controller.text(player, "party.dialog.submit")),
+                    MenuDialogHandler { target, response ->
+                        runCatching { submit(response) }
+                            .onFailure { controller.message(target, "party.error.invalid_action") }
+                            .fold(
+                                onSuccess = { MenuActionResult.Success(MenuUpdate.None) },
+                                onFailure = { MenuActionResult.Rejected() }
+                            )
+                    }
+                ),
+                cancel = MenuDialogButton(
+                    Component.text(controller.text(player, "party.dialog.cancel")),
+                    MenuDialogHandler { _, _ -> MenuActionResult.Success(MenuUpdate.Close) }
+                )
+            )
+        )
     }
-}
 
-class PartyMenuHolder(val partyId: java.util.UUID) : InventoryHolder {
-    private lateinit var attachedInventory: Inventory
-    fun attach(inventory: Inventory) {
-        attachedInventory = inventory
+    companion object {
+        private const val OWNER = "cc-content"
+        private const val MENU_ID = "party"
     }
-    override fun getInventory(): Inventory = attachedInventory
 }
