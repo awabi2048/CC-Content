@@ -1,5 +1,5 @@
 name: CC-Content
-version: 1.4.0
+version: ${project.version}
 main: jp.awabi2048.cccontent.CCContent
 api-version: '26.1.2'
 author: awabi2048
