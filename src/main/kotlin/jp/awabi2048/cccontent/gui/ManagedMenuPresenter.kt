@@ -3,7 +3,10 @@ package jp.awabi2048.cccontent.gui
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiInventoryPolicy
 import com.awabi2048.ccsystem.api.gui.ManagedInventoryMenuRequest
+import com.awabi2048.ccsystem.api.gui.ManagedMenuInteraction
+import com.awabi2048.ccsystem.api.gui.ManagedMenuInteractionOutcome
 import com.awabi2048.ccsystem.api.gui.ManagedMenuTransition
+import com.awabi2048.ccsystem.api.gui.MenuClickType
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuRouteIds
 import com.awabi2048.ccsystem.api.gui.MenuSoundPolicy
@@ -31,6 +34,28 @@ object ManagedMenuPresenter {
 
     fun close(player: Player) {
         CCSystem.getAPI().getMenuRuntimeService().close(player)
+    }
+
+    fun success(
+        player: Player,
+        clickType: MenuClickType = MenuClickType.DEFAULT,
+        sound: MenuSoundPolicy = MenuSoundPolicy.Default,
+    ) {
+        CCSystem.getAPI().getMenuRuntimeService().feedback(
+            player,
+            ManagedMenuInteraction(ManagedMenuInteractionOutcome.SUCCESS, clickType, sound),
+        )
+    }
+
+    fun rejected(
+        player: Player,
+        clickType: MenuClickType = MenuClickType.DEFAULT,
+        sound: MenuSoundPolicy = MenuSoundPolicy.Default,
+    ) {
+        CCSystem.getAPI().getMenuRuntimeService().feedback(
+            player,
+            ManagedMenuInteraction(ManagedMenuInteractionOutcome.REJECTED, clickType, sound),
+        )
     }
 
     fun inputPolicy(

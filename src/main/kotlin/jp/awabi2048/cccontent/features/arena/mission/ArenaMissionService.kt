@@ -896,7 +896,7 @@ class ArenaMissionService(
     }
 
     private fun playUiClick(player: Player) {
-        CCSystem.getAPI().getMenuSoundService().onMenuClick(player, "arena_mission")
+        ManagedMenuPresenter.success(player)
     }
 
     private fun randomMissionMemo(player: Player): String {

@@ -974,11 +974,11 @@ class NpcMenuService(
     }
 
     private fun playClick(player: Player) {
-        CCSystem.getAPI().getMenuSoundService().onMenuClick(player, MENU_ID)
+        ManagedMenuPresenter.success(player)
     }
 
     private fun playError(player: Player) {
-        CCSystem.getAPI().getMenuSoundService().onMenuClick(player, MENU_ID, com.awabi2048.ccsystem.api.gui.MenuClickType.CANCEL)
+        ManagedMenuPresenter.success(player, com.awabi2048.ccsystem.api.gui.MenuClickType.CANCEL)
     }
 
     private fun formatAcorn(amount: Double, color: String = "§e"): String = ContentEconomyBridge.formatAcorn(amount, color)

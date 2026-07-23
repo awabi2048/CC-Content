@@ -2598,7 +2598,7 @@ class RankCommand(
     private fun onSkillTreeNavLeft(holder: SkillTreeGuiHolder, viewer: Player) {
         holder.state.lastAction = "nav_left"
         // 職業メインメニューに戻る
-        viewer.playSound(viewer.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.0f)
+        ManagedMenuPresenter.success(viewer)
         openProfessionMainMenu(viewer)
     }
 
@@ -2825,7 +2825,7 @@ class RankCommand(
             holder.state.lastAction = "route:scroll:${holder.state.viewportStartX}"
             renderSkillTreeGui(holder.backingInventory, skillTree, holder.state)
             if (viewer != null) {
-                viewer.playSound(viewer.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.2f)
+                ManagedMenuPresenter.success(viewer)
             }
             return
         }
@@ -2840,7 +2840,7 @@ class RankCommand(
         holder.state.lastAction = "route:$targetSkillId"
         renderSkillTreeGui(holder.backingInventory, skillTree, holder.state)
         if (viewer != null) {
-            viewer.playSound(viewer.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.2f)
+            ManagedMenuPresenter.success(viewer)
         }
     }
 
@@ -2863,7 +2863,7 @@ class RankCommand(
                     player.sendMessage(messageProvider.getMessage("release.skill_unavailable"))
                     return
                 }
-                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                ManagedMenuPresenter.success(player)
                 openSkillTreeGui(player)
             }
             MAIN_MENU_PROFESSION_OVERVIEW_SLOT -> {
@@ -2884,7 +2884,7 @@ class RankCommand(
 
                 if (event.isLeftClick) {
                     // 左クリック: スキル切替
-                    player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                    ManagedMenuPresenter.success(player)
                     ActiveSkillManager.rotateActiveSkill(player)
                     // メニューを更新
                     val profession = rankManager.getPlayerProfession(player.uniqueId) ?: return
@@ -2892,7 +2892,7 @@ class RankCommand(
                     renderProfessionMainMenu(holder.backingInventory, player, profession)
                 } else if (event.isRightClick) {
                     // 右クリック: 切替様式変更
-                    player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.5f)
+                    ManagedMenuPresenter.success(player)
                     ActiveSkillManager.rotateSwitchMode(player)
                     // メニューを更新
                     val profession = rankManager.getPlayerProfession(player.uniqueId) ?: return
@@ -2901,7 +2901,7 @@ class RankCommand(
                 }
             }
             MAIN_MENU_SETTINGS_SLOT -> {
-                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                ManagedMenuPresenter.success(player)
                 openProfessionSettingsMenu(player)
             }
             MAIN_MENU_PLAYER_INFO_SLOT, MAIN_MENU_HINT_SLOT -> {
@@ -2928,18 +2928,18 @@ class RankCommand(
                 val nextMode = currentMode.next()
                 rankManager.setProfessionBossBarDisplayMode(player.uniqueId, nextMode)
                 rankManager.savePlayerProfession(player.uniqueId)
-                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                ManagedMenuPresenter.success(player)
                 renderProfessionSettingsMenu(holder.backingInventory, playerProfession, player)
             }
             SETTINGS_MENU_LEVELUP_NOTIFY_SLOT -> {
                 val current = rankManager.isLevelUpNotificationEnabled(player.uniqueId)
                 rankManager.setLevelUpNotificationEnabled(player.uniqueId, !current)
                 rankManager.savePlayerProfession(player.uniqueId)
-                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                ManagedMenuPresenter.success(player)
                 renderProfessionSettingsMenu(holder.backingInventory, playerProfession, player)
             }
             SETTINGS_MENU_BACK_SLOT -> {
-                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.0f)
+                ManagedMenuPresenter.success(player)
                 openProfessionMainMenu(player)
             }
         }
@@ -2956,7 +2956,7 @@ class RankCommand(
     private fun openPrestigeConfirmDialogFirst(player: Player) {
         if (!rankManager.canPrestige(player.uniqueId)) {
             player.sendMessage(messageProvider.getMessage("rank.prestige.cannot"))
-            player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
+            ManagedMenuPresenter.rejected(player)
             return
         }
 
@@ -2991,7 +2991,7 @@ class RankCommand(
         val success = rankManager.executePrestige(player.uniqueId)
         if (!success) {
             player.sendMessage(messageProvider.getMessage("rank.prestige.failed"))
-            player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
+            ManagedMenuPresenter.rejected(player)
             return
         }
 
@@ -3021,7 +3021,7 @@ class RankCommand(
         
         // 既に職業を持っている場合は何もしない
         if (rankManager.hasProfession(player.uniqueId)) {
-            player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
+            ManagedMenuPresenter.rejected(player)
             return
         }
         

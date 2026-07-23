@@ -67,7 +67,7 @@ class TalismanListener(private val plugin: JavaPlugin) : Listener {
                 15 -> {
                     // Stay Button
                     ManagedMenuPresenter.close(player)
-                    player.playSound(player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.0f)
+                    ManagedMenuPresenter.success(player)
                 }
             }
             return

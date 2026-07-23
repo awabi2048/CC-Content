@@ -58,7 +58,7 @@ class CustomHeadGuiListener(private val plugin: JavaPlugin) : Listener {
         val headPreview = HeadDatabaseBridge.getHead(plugin, choice.hdbId)
         if (headPreview == null) {
             player.sendMessage("§cHeadDatabaseからヘッドを取得できませんでした: ${choice.hdbId}")
-            player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BASS, 0.7f, 0.8f)
+            ManagedMenuPresenter.rejected(player)
             return
         }
 
@@ -87,7 +87,7 @@ class CustomHeadGuiListener(private val plugin: JavaPlugin) : Listener {
         val tokenFullId = "misc.custom_head.${variant.variantId}"
         if (!consumeToken(player, tokenFullId)) {
             player.sendMessage("§c交換に必要なカスタムヘッド券が見つかりませんでした")
-            player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BASS, 0.7f, 0.8f)
+            ManagedMenuPresenter.rejected(player)
             return
         }
 
@@ -121,7 +121,7 @@ class CustomHeadGuiListener(private val plugin: JavaPlugin) : Listener {
         fun openSelectionGui(plugin: JavaPlugin, player: Player, variant: CustomHeadVariant) {
             if (!HeadDatabaseBridge.isAvailable(plugin)) {
                 player.sendMessage("§cHeadDatabase が有効でないため、このアイテムは使用できません")
-                player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BASS, 0.7f, 0.8f)
+                ManagedMenuPresenter.rejected(player)
                 return
             }
 

@@ -54,17 +54,17 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
             when (slot) {
                 43 -> {
                     // Theme Selector
-                    player.playSound(player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.2f)
+                    ManagedMenuPresenter.success(player)
                     holder.nextTheme(player)
                 }
                 37 -> {
                     // Play Style Selector
-                    player.playSound(player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.0f)
+                    ManagedMenuPresenter.success(player)
                     holder.togglePlayStyle(player)
                 }
                 38 -> {
                     // Size Selector
-                    player.playSound(player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.1f)
+                    ManagedMenuPresenter.success(player)
                     holder.nextSize(player)
                 }
                 22 -> {
@@ -74,7 +74,7 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
                     val isMultiplayer = holder.isMultiplayer
                     val tier = holder.tier
                     
-                    player.playSound(player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.0f)
+                    ManagedMenuPresenter.success(player)
                     DungeonConfirmGui(tier, themeName, sizeKey, isMultiplayer).open(player)
                 }
             }
@@ -90,12 +90,12 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
             when (slot) {
                 11 -> {
                     // Confirm
-                    player.playSound(player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.2f)
+                    ManagedMenuPresenter.success(player)
                     startDungeon(player, holder.tier, holder.themeName, holder.sizeKey, holder.isMultiplayer)
                 }
                 15 -> {
                     // Cancel
-                    player.playSound(player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.0f)
+                    ManagedMenuPresenter.success(player)
                     DungeonEntranceGui(loader, holder.tier).apply {
                         currentThemeIndex = if (holder.themeName == "random") 0 else (loader.getThemeNames().indexOf(holder.themeName) + 1).coerceAtLeast(0)
                         currentSizeIndex = tier.availableSizes.indexOf(holder.sizeKey).coerceAtLeast(0)
@@ -126,14 +126,14 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
                             portal.worldName!!, portal.minibossMarkers, portal.mobSpawnPoints, portal.restCells, true, themeMessages
                         )
                     } else {
-                        player.playSound(player.location, org.bukkit.Sound.BLOCK_NOTE_BLOCK_BASS, 0.5f, 1.0f)
+                        ManagedMenuPresenter.rejected(player)
                         player.sendMessage(MessageManager.getMessage(player, "prefix") + "§cダンジョンを生成中です。少々お待ちください。")
                     }
                 }
                 22 -> {
                     // Close Button
                     ManagedMenuPresenter.close(player)
-                    player.playSound(player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.0f)
+                    ManagedMenuPresenter.success(player)
                 }
             }
         } else if (holder is DungeonExitGui) {
@@ -153,7 +153,7 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
                 15 -> {
                     // Cancel Button
                     ManagedMenuPresenter.close(player)
-                    player.playSound(player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.0f)
+                    ManagedMenuPresenter.success(player)
                 }
             }
         }
@@ -177,7 +177,7 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
                 // Task 6: Open join menu
                 DungeonJoinGui(portal, loader).open(event.player)
             }
-            event.player.playSound(event.player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.0f)
+            ManagedMenuPresenter.success(event.player)
         }
     }
 

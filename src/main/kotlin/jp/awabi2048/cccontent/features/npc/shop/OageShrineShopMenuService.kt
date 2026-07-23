@@ -256,11 +256,11 @@ class OageShrineShopMenuService(
     }
 
     private fun playClick(player: Player) {
-        player.playSound(player.location, "minecraft:ui.button.click", 0.7f, 1.6f)
+        ManagedMenuPresenter.success(player)
     }
 
     private fun playError(player: Player) {
-        player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BASS, 0.7f, 0.7f)
+        ManagedMenuPresenter.rejected(player)
     }
 
     private fun canAcceptReward(player: Player, item: ItemStack): Boolean {

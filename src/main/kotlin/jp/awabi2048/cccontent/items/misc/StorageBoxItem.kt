@@ -1271,7 +1271,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
             return
         }
         lastMenuClickSoundAt[player.uniqueId] = now
-        player.playSound(player.location, Sound.UI_BUTTON_CLICK, 1.0f, 2.0f)
+        ManagedMenuPresenter.success(player)
     }
 
     private fun updateHoldActionBar(player: Player) {

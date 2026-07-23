@@ -714,7 +714,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
     }
 
     private fun playInputSound(player: Player) {
-        CCSystem.getAPI().getMenuSoundService().onMenuClick(player, "arena_token_exchange")
+        ManagedMenuPresenter.success(player)
     }
 
     private fun blockedClick(click: ClickType): Boolean = click in setOf(

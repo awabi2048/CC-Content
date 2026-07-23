@@ -1887,7 +1887,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
     }
 
     private fun playUiSuccessSound(player: Player) {
-        player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.9f, 1.1f)
+        ManagedMenuPresenter.success(player)
     }
 
     private fun playStartSound(player: Player) {
