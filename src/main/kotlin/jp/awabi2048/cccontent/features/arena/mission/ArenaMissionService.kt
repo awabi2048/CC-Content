@@ -162,8 +162,7 @@ class ArenaMissionService(
             val inventory = Bukkit.createInventory(holder, ArenaMissionLayout.MENU_SIZE, ArenaMissionLayout.MENU_TITLE)
             holder.backingInventory = inventory
             renderMenu(player, inventory, missionSet)
-            ManagedMenuPresenter.open(player, inventory)
-            CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_mission")
+            ManagedMenuPresenter.open(player, inventory, menuId = "arena_mission")
             true
         } catch (e: Exception) {
             plugin.logger.warning("[Arena] アリーナメニューの表示に失敗しました: message=${e.message}")
@@ -760,8 +759,7 @@ class ArenaMissionService(
         val inventory = Bukkit.createInventory(holder, ArenaMissionLayout.CONFIRM_SIZE, ArenaMissionLayout.CONFIRM_TITLE)
         holder.backingInventory = inventory
         renderConfirmMenu(player, inventory, mission)
-        ManagedMenuPresenter.open(player, inventory)
-        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_mission_confirm")
+        ManagedMenuPresenter.open(player, inventory, menuId = "arena_mission_confirm")
         return true
     }
 

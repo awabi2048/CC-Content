@@ -1082,8 +1082,12 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         val holder = StorageBoxMenuHolder(player.uniqueId, target.hand, target.mainSlot, instanceId, holderInventory)
         val inv = Bukkit.createInventory(holder, menuSize, menuTitle)
         renderMenu(player, inv, state)
-        ManagedMenuPresenter.open(player, inv)
-        player.playSound(player.location, Sound.UI_BUTTON_CLICK, 1.0f, 2.0f)
+        ManagedMenuPresenter.open(
+            player,
+            inv,
+            menuId = "storage_box",
+            policy = ManagedMenuPresenter.inputPolicy(getStorageSlots(state.capacity)),
+        )
     }
 
     private fun renderMenu(player: Player, inventory: Inventory, state: StorageBoxState) {

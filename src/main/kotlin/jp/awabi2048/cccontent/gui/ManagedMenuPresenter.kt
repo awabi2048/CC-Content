@@ -5,6 +5,7 @@ import com.awabi2048.ccsystem.api.gui.GuiInventoryPolicy
 import com.awabi2048.ccsystem.api.gui.ManagedInventoryMenuRequest
 import com.awabi2048.ccsystem.api.gui.ManagedMenuTransition
 import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuRouteIds
 import com.awabi2048.ccsystem.api.gui.MenuSoundPolicy
 import org.bukkit.entity.Player
 import org.bukkit.inventory.Inventory
@@ -13,9 +14,9 @@ object ManagedMenuPresenter {
     fun open(
         player: Player,
         inventory: Inventory,
-        menuId: String = inventory.holder?.javaClass?.simpleName ?: "inventory",
-        transition: ManagedMenuTransition = ManagedMenuTransition.PRESERVE_HISTORY,
-        policy: GuiInventoryPolicy = permissivePolicy(inventory),
+        menuId: String = MenuRouteIds.fromInventory(inventory),
+        transition: ManagedMenuTransition = ManagedMenuTransition.AUTOMATIC,
+        policy: GuiInventoryPolicy = GuiInventoryPolicy(),
         openSound: MenuSoundPolicy = MenuSoundPolicy.Default,
     ): Boolean = CCSystem.getAPI().getMenuRuntimeService().present(
         player,
@@ -32,10 +33,13 @@ object ManagedMenuPresenter {
         CCSystem.getAPI().getMenuRuntimeService().close(player)
     }
 
-    private fun permissivePolicy(inventory: Inventory): GuiInventoryPolicy =
+    fun inputPolicy(
+        inputSlots: Collection<Int>,
+        allowPlayerInventoryInteraction: Boolean = true,
+    ): GuiInventoryPolicy =
         GuiInventoryPolicy(
-            inputSlots = (0 until inventory.size).toSet(),
-            allowPlayerInventoryInteraction = true,
+            inputSlots = inputSlots.toSet(),
+            allowPlayerInventoryInteraction = allowPlayerInventoryInteraction,
         )
 
     private const val OWNER = "cc-content"

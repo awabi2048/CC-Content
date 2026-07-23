@@ -229,8 +229,12 @@ class ArenaEnchantPedestalMenu(
         holder.backingInventory = inventory
         runtimes[player.uniqueId] = ViewerRuntime()
         renderStatic(player, inventory)
-        ManagedMenuPresenter.open(player, inventory)
-        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_pedestal")
+        ManagedMenuPresenter.open(
+            player,
+            inventory,
+            menuId = "arena_pedestal",
+            policy = ManagedMenuPresenter.inputPolicy(inputSlots()),
+        )
     }
 
     @EventHandler

@@ -221,7 +221,12 @@ internal class UnifiedCookingController(
         val inventory = Bukkit.createInventory(holder, 45, Component.text(title))
         holder.backingInventory = inventory
         render(player, inventory, holder)
-        ManagedMenuPresenter.open(player, inventory)
+        ManagedMenuPresenter.open(
+            player,
+            inventory,
+            menuId = "cooking_${holder.equipment.name.lowercase()}",
+            policy = ManagedMenuPresenter.inputPolicy(holder.inputSlots),
+        )
     }
 
     private fun render(player: Player, inventory: Inventory, holder: UnifiedCookingHolder) {

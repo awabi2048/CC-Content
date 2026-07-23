@@ -169,8 +169,12 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
         activeMenuPlayers += player.uniqueId
         syncTemporaryHints(player)
         render(player, holder)
-        ManagedMenuPresenter.open(player, inventory)
-        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_token_exchange")
+        ManagedMenuPresenter.open(
+            player,
+            inventory,
+            menuId = "arena_token_exchange",
+            policy = ManagedMenuPresenter.inputPolicy(ArenaTokenExchangeLayout.INPUT_SLOTS),
+        )
     }
 
     @EventHandler
@@ -283,7 +287,12 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
                 activeMenuPlayers += player.uniqueId
                 syncTemporaryHints(player)
                 render(player, holder.sourceHolder)
-                ManagedMenuPresenter.open(player, holder.sourceHolder.backingInventory)
+                ManagedMenuPresenter.open(
+                    player,
+                    holder.sourceHolder.backingInventory,
+                    menuId = "arena_token_exchange",
+                    policy = ManagedMenuPresenter.inputPolicy(ArenaTokenExchangeLayout.INPUT_SLOTS),
+                )
             }
         }
     }
@@ -394,8 +403,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
             player.uniqueId, player.name, "token_exchange_confirm_opened",
             mode.id, quote.total.toDouble(), quote.stacks
         )
-        ManagedMenuPresenter.open(player, inventory)
-        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_token_exchange_confirm")
+        ManagedMenuPresenter.open(player, inventory, menuId = "arena_token_exchange_confirm")
     }
 
     private fun executeConfirmedExchange(player: Player, holder: ArenaTokenExchangeConfirmHolder) {
@@ -410,7 +418,12 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
             activeMenuPlayers += player.uniqueId
             syncTemporaryHints(player)
             render(player, sourceHolder)
-            ManagedMenuPresenter.open(player, sourceHolder.backingInventory)
+            ManagedMenuPresenter.open(
+                player,
+                sourceHolder.backingInventory,
+                menuId = "arena_token_exchange",
+                policy = ManagedMenuPresenter.inputPolicy(ArenaTokenExchangeLayout.INPUT_SLOTS),
+            )
             return
         }
         val removedFromInput = removeInputItemsForExchange(sourceHolder)
@@ -444,7 +457,12 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
             activeMenuPlayers += player.uniqueId
             syncTemporaryHints(player)
             render(player, sourceHolder)
-            ManagedMenuPresenter.open(player, sourceHolder.backingInventory)
+            ManagedMenuPresenter.open(
+                player,
+                sourceHolder.backingInventory,
+                menuId = "arena_token_exchange",
+                policy = ManagedMenuPresenter.inputPolicy(ArenaTokenExchangeLayout.INPUT_SLOTS),
+            )
             return
         }
         sourceHolder.escrowBySlot.values.toList().forEach { escrow.resolve(it) }

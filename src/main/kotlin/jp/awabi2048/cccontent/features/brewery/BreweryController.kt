@@ -731,7 +731,12 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             FermentationState(key, inv)
         }
         localizeInventory(player, state)
-        ManagedMenuPresenter.open(player, state.inventory)
+        ManagedMenuPresenter.open(
+            player,
+            state.inventory,
+            menuId = "brewery_fermentation",
+            policy = ManagedMenuPresenter.inputPolicy(FERMENT_INPUT_SLOTS + FERMENT_YEAST_SLOT),
+        )
         refreshFermentationDecor(state, player)
     }
 
@@ -744,7 +749,12 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             DistillationState(key, inv)
         }
         localizeInventory(player, state)
-        ManagedMenuPresenter.open(player, state.inventory)
+        ManagedMenuPresenter.open(
+            player,
+            state.inventory,
+            menuId = "brewery_distillation",
+            policy = ManagedMenuPresenter.inputPolicy(DISTILL_INPUT_SLOTS + DISTILL_FILTER_SLOT),
+        )
         refreshDistillationDecor(state, player)
     }
 
@@ -775,7 +785,17 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         state.barrelWoodType = context.woodType
         state.barrelId = context.barrelId
         localizeInventory(player, state)
-        ManagedMenuPresenter.open(player, state.inventory)
+        ManagedMenuPresenter.open(
+            player,
+            state.inventory,
+            menuId = "brewery_aging",
+            policy = ManagedMenuPresenter.inputPolicy(
+                agingInputSlots(state) + when (state.size) {
+                    BarrelSize.BIG -> BIG_AGING_BARREL_SLOT
+                    BarrelSize.SMALL -> SMALL_AGING_BARREL_SLOT
+                }
+            ),
+        )
         refreshAgingDecor(state, player)
     }
 

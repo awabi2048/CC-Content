@@ -305,8 +305,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, menuSize(view), title(player, view))
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        ManagedMenuPresenter.open(player, inventory)
-        playMenuOpen(player)
+        ManagedMenuPresenter.open(player, inventory, menuId = MENU_ID)
     }
 
     private fun openShopMenu(player: Player) {
@@ -319,8 +318,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, OAGE_BOX_SIZE, title(player, NpcMenuView.OAGE_BOX))
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        ManagedMenuPresenter.open(player, inventory)
-        playMenuOpen(player)
+        ManagedMenuPresenter.open(player, inventory, menuId = MENU_ID)
     }
 
     private fun openOageBoxConfirm(player: Player, reward: OageBoxReward) {
@@ -329,8 +327,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8おあげBOX - 確認")
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        ManagedMenuPresenter.open(player, inventory)
-        playMenuOpen(player)
+        ManagedMenuPresenter.open(player, inventory, menuId = MENU_ID)
     }
 
     private fun render(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
@@ -380,8 +377,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, DEAD_CHEST_SELECTION_LAYOUT.size, "§8失具還術 - 選択")
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        ManagedMenuPresenter.open(player, inventory)
-        playMenuOpen(player)
+        ManagedMenuPresenter.open(player, inventory, menuId = MENU_ID)
         return true
     }
 
@@ -395,8 +391,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8失具還術 - 確認")
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        ManagedMenuPresenter.open(player, inventory)
-        playMenuOpen(player)
+        ManagedMenuPresenter.open(player, inventory, menuId = MENU_ID)
         return true
     }
 
@@ -406,8 +401,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8奉納品 - 確認")
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        ManagedMenuPresenter.open(player, inventory)
-        playMenuOpen(player)
+        ManagedMenuPresenter.open(player, inventory, menuId = MENU_ID)
     }
 
     private fun renderDeadChestSelection(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
@@ -985,10 +979,6 @@ class NpcMenuService(
 
     private fun playError(player: Player) {
         CCSystem.getAPI().getMenuSoundService().onMenuClick(player, MENU_ID, com.awabi2048.ccsystem.api.gui.MenuClickType.CANCEL)
-    }
-
-    private fun playMenuOpen(player: Player) {
-        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, MENU_ID)
     }
 
     private fun formatAcorn(amount: Double, color: String = "§e"): String = ContentEconomyBridge.formatAcorn(amount, color)
