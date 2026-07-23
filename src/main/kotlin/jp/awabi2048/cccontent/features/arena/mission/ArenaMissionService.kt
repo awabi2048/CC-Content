@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.arena.mission
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import jp.awabi2048.cccontent.config.FeatureConfigManager
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
@@ -160,7 +162,7 @@ class ArenaMissionService(
             val inventory = Bukkit.createInventory(holder, ArenaMissionLayout.MENU_SIZE, ArenaMissionLayout.MENU_TITLE)
             holder.backingInventory = inventory
             renderMenu(player, inventory, missionSet)
-            player.openInventory(inventory)
+            ManagedMenuPresenter.open(player, inventory)
             CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_mission")
             true
         } catch (e: Exception) {
@@ -758,7 +760,7 @@ class ArenaMissionService(
         val inventory = Bukkit.createInventory(holder, ArenaMissionLayout.CONFIRM_SIZE, ArenaMissionLayout.CONFIRM_TITLE)
         holder.backingInventory = inventory
         renderConfirmMenu(player, inventory, mission)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_mission_confirm")
         return true
     }

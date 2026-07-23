@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.npc.shop
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -48,7 +50,7 @@ class OageShrineShopMenuService(
         val inventory = Bukkit.createInventory(holder, SIZE, legacy(text(player, "title.shop")))
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     fun reopenShop(player: Player, tabId: String) {
@@ -63,7 +65,7 @@ class OageShrineShopMenuService(
         inventory.setItem(CONFIRM_PREVIEW_SLOT, resolved.previewItem)
         inventory.setItem(CONFIRM_CONFIRM_SLOT, confirmButton(player, resolved))
         inventory.setItem(CONFIRM_CANCEL_SLOT, cancelButton(player))
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     fun confirmPurchase(player: Player, resolved: OageShrineShopResolvedItem) {

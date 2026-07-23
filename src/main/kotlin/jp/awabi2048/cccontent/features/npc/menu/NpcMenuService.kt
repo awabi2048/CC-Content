@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.npc.menu
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
@@ -303,7 +305,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, menuSize(view), title(player, view))
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         playMenuOpen(player)
     }
 
@@ -317,7 +319,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, OAGE_BOX_SIZE, title(player, NpcMenuView.OAGE_BOX))
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         playMenuOpen(player)
     }
 
@@ -327,7 +329,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8おあげBOX - 確認")
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         playMenuOpen(player)
     }
 
@@ -378,7 +380,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, DEAD_CHEST_SELECTION_LAYOUT.size, "§8失具還術 - 選択")
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         playMenuOpen(player)
         return true
     }
@@ -393,7 +395,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8失具還術 - 確認")
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         playMenuOpen(player)
         return true
     }
@@ -404,7 +406,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8奉納品 - 確認")
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         playMenuOpen(player)
     }
 

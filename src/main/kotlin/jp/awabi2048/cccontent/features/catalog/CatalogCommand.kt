@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.catalog
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
@@ -105,7 +107,7 @@ class CatalogCommand(
         if (page + 1 < totalPages) inventory.setItem(layout.nextPageSlot, navigationItem(layoutServiceElement(), Material.ARROW, text(player, "catalog.next")))
         inventory.setItem(layout.backSlot, navigationItem(layoutServiceElement(), Material.BARRIER, text(player, "catalog.close"), GuiElementRole.CANCEL))
         inventory.setItem(layout.infoSlot, pageInfoItem(layoutServiceElement(), player, page, totalPages))
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun openFishing(player: Player, definitions: List<CatalogItem>, requestedPage: Int) {
@@ -144,7 +146,7 @@ class CatalogCommand(
                 )),
                 glint = null
             )))
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun layoutServiceElement() = CCSystem.getAPI().getGuiElementService()
@@ -278,7 +280,7 @@ class CatalogCommand(
             listOf(text(player, "fishing.detail.uses_none")), emptyList(), emptyList(), null
         )))
         inventory.setItem(layout.backSlot, navigationItem(service, Material.ARROW, text(player, "fishing.detail.back"), GuiElementRole.BACK))
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<String>): Boolean {

@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.sukima_dungeon.gui
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.PortalSession
@@ -59,7 +61,7 @@ class DungeonJoinGui(val portal: PortalSession, private val loader: StructureLoa
         val closeItem = createGuiItem(Material.BARRIER, MessageManager.getMessage(player, "gui_join_cancel_button"))
         inv.setItem(22, closeItem)
         
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun createGuiItem(material: Material, name: String, lore: List<GuiLoreLine> = emptyList()) =

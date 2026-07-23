@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.items.misc
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -1080,7 +1082,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         val holder = StorageBoxMenuHolder(player.uniqueId, target.hand, target.mainSlot, instanceId, holderInventory)
         val inv = Bukkit.createInventory(holder, menuSize, menuTitle)
         renderMenu(player, inv, state)
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
         player.playSound(player.location, Sound.UI_BUTTON_CLICK, 1.0f, 2.0f)
     }
 

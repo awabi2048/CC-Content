@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.brewery
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
@@ -729,7 +731,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             FermentationState(key, inv)
         }
         localizeInventory(player, state)
-        player.openInventory(state.inventory)
+        ManagedMenuPresenter.open(player, state.inventory)
         refreshFermentationDecor(state, player)
     }
 
@@ -742,7 +744,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             DistillationState(key, inv)
         }
         localizeInventory(player, state)
-        player.openInventory(state.inventory)
+        ManagedMenuPresenter.open(player, state.inventory)
         refreshDistillationDecor(state, player)
     }
 
@@ -773,7 +775,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         state.barrelWoodType = context.woodType
         state.barrelId = context.barrelId
         localizeInventory(player, state)
-        player.openInventory(state.inventory)
+        ManagedMenuPresenter.open(player, state.inventory)
         refreshAgingDecor(state, player)
     }
 

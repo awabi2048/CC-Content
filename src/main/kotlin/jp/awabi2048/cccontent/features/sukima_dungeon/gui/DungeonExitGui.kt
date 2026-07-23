@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.sukima_dungeon.gui
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
@@ -40,7 +42,7 @@ class DungeonExitGui : InventoryHolder {
         )
         inv.setItem(15, cancelItem)
         
-        player.openInventory(inv)
+        ManagedMenuPresenter.open(player, inv)
     }
 
     private fun createGuiItem(material: Material, name: String, lore: List<GuiLoreLine> = emptyList()) =

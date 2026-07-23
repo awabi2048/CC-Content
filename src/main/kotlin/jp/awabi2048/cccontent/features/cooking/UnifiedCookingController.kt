@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.cooking
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
@@ -219,7 +221,7 @@ internal class UnifiedCookingController(
         val inventory = Bukkit.createInventory(holder, 45, Component.text(title))
         holder.backingInventory = inventory
         render(player, inventory, holder)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun render(player: Player, inventory: Inventory, holder: UnifiedCookingHolder) {

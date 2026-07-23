@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.sukima_dungeon.gui
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.DungeonTier
@@ -38,7 +40,7 @@ class DungeonEntranceGui(private val loader: StructureLoader, val tier: DungeonT
         val title = MessageManager.getMessage(player, "gui_entrance_title", mapOf("tier" to MessageManager.getTierName(player, tier.name)))
         inventory = Bukkit.createInventory(this, 45, title)
         update(player)
-        player.openInventory(inventory!!)
+        ManagedMenuPresenter.open(player, inventory!!)
     }
 
     fun update(player: Player) {

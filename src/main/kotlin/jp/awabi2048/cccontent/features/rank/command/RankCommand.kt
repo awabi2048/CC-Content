@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.rank.command
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.listener.ProfessionSelector
@@ -458,7 +460,7 @@ class RankCommand(
         holder.backingInventory = inventory
 
         renderProfessionMainMenu(inventory, viewer, playerProfession)
-        viewer.openInventory(inventory)
+        ManagedMenuPresenter.open(viewer, inventory)
         viewer.playSound(viewer.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
         return true
     }
@@ -832,7 +834,7 @@ class RankCommand(
         holder.backingInventory = inventory
 
         renderProfessionSelectionGui(inventory, player)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         player.playSound(player.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
         return true
     }
@@ -1217,7 +1219,7 @@ class RankCommand(
         holder.backingInventory = inventory
 
         renderSkillTreeGui(inventory, skillTree, state)
-        viewer.openInventory(inventory)
+        ManagedMenuPresenter.open(viewer, inventory)
         return true
     }
 
@@ -1231,7 +1233,7 @@ class RankCommand(
         )
         holder.backingInventory = inventory
         renderProfessionSettingsMenu(inventory, playerProfession, viewer)
-        viewer.openInventory(inventory)
+        ManagedMenuPresenter.open(viewer, inventory)
         viewer.playSound(viewer.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
         return true
     }

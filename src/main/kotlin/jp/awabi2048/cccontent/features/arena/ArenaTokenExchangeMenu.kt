@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -167,7 +169,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
         activeMenuPlayers += player.uniqueId
         syncTemporaryHints(player)
         render(player, holder)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_token_exchange")
     }
 
@@ -281,7 +283,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
                 activeMenuPlayers += player.uniqueId
                 syncTemporaryHints(player)
                 render(player, holder.sourceHolder)
-                player.openInventory(holder.sourceHolder.backingInventory)
+                ManagedMenuPresenter.open(player, holder.sourceHolder.backingInventory)
             }
         }
     }
@@ -392,7 +394,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
             player.uniqueId, player.name, "token_exchange_confirm_opened",
             mode.id, quote.total.toDouble(), quote.stacks
         )
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_token_exchange_confirm")
     }
 
@@ -408,7 +410,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
             activeMenuPlayers += player.uniqueId
             syncTemporaryHints(player)
             render(player, sourceHolder)
-            player.openInventory(sourceHolder.backingInventory)
+            ManagedMenuPresenter.open(player, sourceHolder.backingInventory)
             return
         }
         val removedFromInput = removeInputItemsForExchange(sourceHolder)
@@ -442,7 +444,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
             activeMenuPlayers += player.uniqueId
             syncTemporaryHints(player)
             render(player, sourceHolder)
-            player.openInventory(sourceHolder.backingInventory)
+            ManagedMenuPresenter.open(player, sourceHolder.backingInventory)
             return
         }
         sourceHolder.escrowBySlot.values.toList().forEach { escrow.resolve(it) }

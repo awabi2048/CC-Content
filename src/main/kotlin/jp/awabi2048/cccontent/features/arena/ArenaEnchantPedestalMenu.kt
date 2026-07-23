@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -227,7 +229,7 @@ class ArenaEnchantPedestalMenu(
         holder.backingInventory = inventory
         runtimes[player.uniqueId] = ViewerRuntime()
         renderStatic(player, inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_pedestal")
     }
 

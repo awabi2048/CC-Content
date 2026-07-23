@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.items.misc
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -184,7 +186,7 @@ class CustomHeadGuiListener(private val plugin: JavaPlugin) : Listener {
                 holderInventory.setItem(slot, inventory.getItem(slot))
             }
 
-            player.openInventory(holderInventory)
+            ManagedMenuPresenter.open(player, holderInventory)
         }
 
         private fun createPane(material: Material): ItemStack {
