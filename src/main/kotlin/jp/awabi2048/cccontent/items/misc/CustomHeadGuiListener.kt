@@ -42,7 +42,7 @@ class CustomHeadGuiListener(private val plugin: JavaPlugin) : Listener {
         val selectedItem = event.currentItem ?: return
         if (selectedItem.type == Material.AIR) return
 
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         showConfirmDialog(player, holder.variant, selected)
     }
 

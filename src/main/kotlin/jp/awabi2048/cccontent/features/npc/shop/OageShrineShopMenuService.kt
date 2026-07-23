@@ -32,7 +32,7 @@ import java.util.UUID
 class OageShrineShopMenuService(
     private val plugin: JavaPlugin,
     private val state: OageShrineShopState,
-    private val backToParent: (Player) -> Unit = { it.closeInventory() }
+    private val backToParent: (Player) -> Unit = ManagedMenuPresenter::close
 ) : Listener {
     private var tabs: List<OageShrineShopTabDefinition> = emptyList()
 
@@ -109,7 +109,7 @@ class OageShrineShopMenuService(
 
         state.recordPurchase(player.uniqueId, resolved.tab, resolved.item)
         playClick(player)
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         player.sendMessage(text(player, "messages.purchase_complete", "name" to resolved.displayName, "price" to ContentEconomyBridge.formatPrice(resolved.item.price)))
     }
 

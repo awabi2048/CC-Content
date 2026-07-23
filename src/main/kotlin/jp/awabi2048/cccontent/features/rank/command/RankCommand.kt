@@ -1018,7 +1018,7 @@ class RankCommand(
         player.playSound(player.location, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f)
         
         // GUIを閉じる
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
     }
 
     private class ProfessionSelectionGuiHolder : InventoryHolder {
@@ -2995,7 +2995,7 @@ class RankCommand(
             return
         }
 
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         openProfessionMainMenu(player)
     }
 

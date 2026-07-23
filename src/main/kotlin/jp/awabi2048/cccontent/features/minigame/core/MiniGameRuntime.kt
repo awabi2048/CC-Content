@@ -642,8 +642,8 @@ class MiniGameAdminMenu(
             is Holder -> {
                 val player = MenuEventGuards.ownedTopClick(event, holder, "MiniGameAdminMenu.onClick: menu_click") ?: return
                 when (event.rawSlot) {
-                    20 -> if (!runtime.isRunning(holder.itemData) && runtime.start(player, holder.itemData)) player.closeInventory()
-                    22 -> if (runtime.isRunning(holder.itemData) && runtime.stop(player, holder.itemData)) player.closeInventory()
+                    20 -> if (!runtime.isRunning(holder.itemData) && runtime.start(player, holder.itemData)) ManagedMenuPresenter.close(player)
+                    22 -> if (runtime.isRunning(holder.itemData) && runtime.stop(player, holder.itemData)) ManagedMenuPresenter.close(player)
                     24 -> openSelection(player, holder.itemData, 0)
                     29 -> {
                         runtime.adjustTimeLimit(player, holder.itemData, if (event.isLeftClick) 30 else -30)
@@ -659,7 +659,7 @@ class MiniGameAdminMenu(
                         if (event.isRightClick) HistoryView.TOP else HistoryView.RECENT,
                         0
                     )
-                    40 -> player.closeInventory()
+                    40 -> ManagedMenuPresenter.close(player)
                 }
             }
             is SelectionHolder -> {

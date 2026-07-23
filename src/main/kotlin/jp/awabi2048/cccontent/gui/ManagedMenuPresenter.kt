@@ -28,6 +28,10 @@ object ManagedMenuPresenter {
         )
     )
 
+    fun close(player: Player) {
+        CCSystem.getAPI().getMenuRuntimeService().close(player)
+    }
+
     private fun permissivePolicy(inventory: Inventory): GuiInventoryPolicy =
         GuiInventoryPolicy(
             inputSlots = (0 until inventory.size).toSet(),

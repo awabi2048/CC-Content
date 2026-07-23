@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.sukima_dungeon.listeners
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import jp.awabi2048.cccontent.features.sukima_dungeon.DungeonManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.DungeonSessionManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.CustomItemManager
@@ -115,7 +117,7 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
                     // Join Button
                     val portal = holder.portal
                     if (portal.isReady) {
-                        player.closeInventory()
+                        ManagedMenuPresenter.close(player)
                         val theme = loader.getTheme(portal.themeName)
                         val themeMessages = theme?.getOageMessages(player) ?: emptyList()
                         enterDungeon(
@@ -130,7 +132,7 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
                 }
                 22 -> {
                     // Close Button
-                    player.closeInventory()
+                    ManagedMenuPresenter.close(player)
                     player.playSound(player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.0f)
                 }
             }
@@ -145,12 +147,12 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
             when (slot) {
                 11 -> {
                     // Exit Button
-                    player.closeInventory()
+                    ManagedMenuPresenter.close(player)
                     DungeonManager.escapeDungeon(player.world)
                 }
                 15 -> {
                     // Cancel Button
-                    player.closeInventory()
+                    ManagedMenuPresenter.close(player)
                     player.playSound(player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.0f)
                 }
             }
@@ -198,7 +200,7 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
         
         val theme = loader.getTheme(themeName) ?: return
         
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         // Sound
         player.playSound(player.location, org.bukkit.Sound.BLOCK_PORTAL_TRIGGER, 0.5f, 1.0f)
 

@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon.listeners
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import jp.awabi2048.cccontent.features.sukima_dungeon.*
 import jp.awabi2048.cccontent.features.sukima_dungeon.gui.TalismanConfirmGui
 import org.bukkit.entity.Player
@@ -29,7 +31,7 @@ class TalismanListener(private val plugin: JavaPlugin) : Listener {
             when (slot) {
                 11 -> {
                     // Escape Button
-                    player.closeInventory()
+                    ManagedMenuPresenter.close(player)
                     
                     // Consume item
                     val inv = player.inventory
@@ -64,7 +66,7 @@ class TalismanListener(private val plugin: JavaPlugin) : Listener {
                 }
                 15 -> {
                     // Stay Button
-                    player.closeInventory()
+                    ManagedMenuPresenter.close(player)
                     player.playSound(player.location, org.bukkit.Sound.UI_BUTTON_CLICK, 0.5f, 1.0f)
                 }
             }

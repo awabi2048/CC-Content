@@ -811,7 +811,7 @@ class FishingFeature(
                 when (event.rawSlot) {
                     36 -> if (holder.page > 0) openJournal(player, holder.page - 1)
                     38 -> fishdexOpener?.invoke(player)
-                    42 -> player.closeInventory()
+                    42 -> ManagedMenuPresenter.close(player)
                     44 -> if (holder.page + 1 < holder.totalPages) openJournal(player, holder.page + 1)
                     else -> holder.recordIdsBySlot[event.rawSlot]?.let { openJournalDetail(player, it, holder.page) }
                 }

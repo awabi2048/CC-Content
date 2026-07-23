@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.party
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
@@ -252,7 +254,7 @@ class PartyMenu(private val controller: PartyController) {
             Component.text(controller.text(player, "party.dialog.disband.body")),
             Component.text(controller.text(player, "party.dialog.submit")),
             Component.text(controller.text(player, "party.dialog.cancel")),
-            { target -> controller.service.disband(party.id, target.uniqueId); target.closeInventory() }
+            { target -> controller.service.disband(party.id, target.uniqueId); ManagedMenuPresenter.close(target) }
         )
         return MenuActionResult.Success(MenuUpdate.None)
     }
@@ -276,7 +278,7 @@ class PartyMenu(private val controller: PartyController) {
             controller.message(player, "party.interaction.busy")
             return MenuActionResult.Rejected()
         }
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         controller.message(player, "party.interaction.invite_waiting")
         return MenuActionResult.Success(MenuUpdate.Close)
     }

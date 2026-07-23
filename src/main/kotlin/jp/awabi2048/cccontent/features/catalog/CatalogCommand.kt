@@ -342,7 +342,7 @@ class CatalogCommand(
             val layout = CCSystem.getAPI().getGuiLayoutService().pagedList54()
             if (event.rawSlot == layout.previousPageSlot && holder.page > 0) open(player, holder.type, holder.page - 1)
             if (event.rawSlot == layout.nextPageSlot && holder.page + 1 < holder.totalPages) open(player, holder.type, holder.page + 1)
-            if (event.rawSlot == layout.backSlot) player.closeInventory()
+            if (event.rawSlot == layout.backSlot) ManagedMenuPresenter.close(player)
         }
     }
 

@@ -857,7 +857,7 @@ class ArenaEnchantPedestalMenu(
         player.world.spawnParticle(Particle.SMOKE, center, 24, 0.25, 0.2, 0.25, 0.01)
         playSound(player, "minecraft:entity.generic.explode", 0.8f)
         playSound(player, "minecraft:block.beacon.deactivate", 0.6f)
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
     }
 
     private fun consumeExpUpfront(player: Player, runtime: ViewerRuntime, requiredLevel: Int): Boolean {

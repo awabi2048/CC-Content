@@ -366,7 +366,7 @@ class ArenaMissionService(
             return
         }
 
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
 
         Bukkit.getScheduler().runTask(plugin, Runnable {
             if (!player.isOnline) {

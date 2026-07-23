@@ -797,7 +797,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val state = fermentationStates[key] ?: return
         val slot = event.rawSlot
         if (slot == FERMENT_CLOSE_SLOT) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             return
         }
 
@@ -876,7 +876,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val state = distillationStates[key] ?: return
         val slot = event.rawSlot
         if (slot == DISTILL_CLOSE_SLOT) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             return
         }
 
@@ -937,7 +937,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val state = agingStates[key] ?: return
         val slot = event.rawSlot
         if (slot == if (state.size == BarrelSize.BIG) 45 else 36) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             return
         }
         val inputSlots = agingInputSlots(state)
@@ -1670,7 +1670,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         }
         machineLocks.remove(canonicalKey)
         inventories.forEach { inventory ->
-            inventory.viewers.toList().forEach { it.closeInventory() }
+            inventory.viewers.filterIsInstance<Player>().forEach(ManagedMenuPresenter::close)
             inventory.clear()
         }
         if (inventories.isNotEmpty() || registered != null) {

@@ -115,7 +115,7 @@ internal class UnifiedCookingController(
         }
         if (raw == UnifiedCookingLayout.CLOSE) {
             event.isCancelled = true
-            if (event.click == ClickType.LEFT) player.closeInventory()
+            if (event.click == ClickType.LEFT) ManagedMenuPresenter.close(player)
             return
         }
         if (raw == UnifiedCookingLayout.START) {
@@ -180,7 +180,7 @@ internal class UnifiedCookingController(
         val key = CookingStationKey.from(event.block)
         val data = stations[key] ?: return
         stations.remove(key)
-        locks.remove(key)?.let { Bukkit.getPlayer(it)?.closeInventory() }
+        locks.remove(key)?.let { Bukkit.getPlayer(it)?.let(ManagedMenuPresenter::close) }
         dropContents(event.block, data)
         dirty = true
         flush()
@@ -681,7 +681,7 @@ internal class UnifiedCookingController(
     }
 
     private fun closeIfOpen(player: Player) {
-        if (player.openInventory.topInventory.holder is UnifiedCookingHolder) player.closeInventory()
+        if (player.openInventory.topInventory.holder is UnifiedCookingHolder) ManagedMenuPresenter.close(player)
     }
 
     private fun flush() {

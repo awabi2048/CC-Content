@@ -488,7 +488,7 @@ class NpcMenuService(
     private fun confirmDeadChestRecovery(player: Player, snapshot: DeadChestSnapshot) {
         if (!prepareDeadChestRecovery(player, snapshot)) return
 
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         player.playSound(player.location, "minecraft:entity.fox.ambient", 1.0f, 1.0f)
         player.sendMessage(OageMessageSender.getPrefix(plugin) + "ほにゃらら～ ⋯")
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
@@ -499,7 +499,7 @@ class NpcMenuService(
     private fun prepareDeadChestRecovery(player: Player, snapshot: DeadChestSnapshot): Boolean {
         if (!deadChestRecoveryService.isAvailable()) {
             playError(player)
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             player.sendMessage("§cDeadChestが利用できないため、失具還術を行えません。")
             return false
         }
@@ -510,7 +510,7 @@ class NpcMenuService(
         }
         val current = deadChestRecoveryService.getActiveChests(player).firstOrNull { sameDeadChest(it, snapshot) } ?: run {
             playError(player)
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             player.sendMessage("§c回収対象のデスチェストが見つかりませんでした。")
             return false
         }
@@ -561,7 +561,7 @@ class NpcMenuService(
         if (!recovered) {
             ContentEconomyBridge.deposit(plugin, player, DEAD_CHEST_RECOVERY_COST)
             playError(player)
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             player.sendMessage("§c回収に失敗したため、初穂料を返しました。")
             return
         }
@@ -798,7 +798,7 @@ class NpcMenuService(
 
     private fun confirmDelivery(player: Player, selected: DeliveryItemMatch) {
         if (professionProvider(player.uniqueId) != Profession.BREWER || isDeliveryCompleted(player.uniqueId)) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             return
         }
 
@@ -816,7 +816,7 @@ class NpcMenuService(
         grantWorldPoint(player.uniqueId, DELIVERY_WORLD_POINT_REWARD) ?: return
         consumeOneDeliveryItem(player, target.slot)
         markDeliveryCompleted(player.uniqueId)
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.5f)
         player.playSound(player.location, Sound.ENTITY_CHICKEN_AMBIENT, 0.8f, 1.5f)
         player.sendMessage("${target.displayName}§7を奉納して、§6🛖 §e$DELIVERY_WORLD_POINT_REWARD ワールドポイント§7を手に入れました！")
@@ -858,7 +858,7 @@ class NpcMenuService(
     private fun handlePartTimeClick(player: Player) {
         if (isPartTimeOpened(player.uniqueId) || !isPartTimeTaskCompleted(player.uniqueId, PART_TIME_TASK_ARENA)) return
         playClick(player)
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         OageMessageSender.send(player, "§f今日もありがとうございます！好きなものを持っていってね", plugin, sound = null, volume = 1f, pitch = 1.5f)
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             if (player.isOnline && !isPartTimeOpened(player.uniqueId)) {
@@ -870,7 +870,7 @@ class NpcMenuService(
     private fun handleOageBoxRewardClick(player: Player, holder: NpcMenuHolder, slot: Int) {
         if (isPartTimeOpened(player.uniqueId)) {
             playError(player)
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             player.sendMessage("§7今日のご褒美は受け取り済みです。")
             return
         }
@@ -882,7 +882,7 @@ class NpcMenuService(
     private fun confirmOageBoxReward(player: Player, reward: OageBoxReward) {
         if (isPartTimeOpened(player.uniqueId)) {
             playError(player)
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             player.sendMessage("§7今日のご褒美は受け取り済みです。")
             return
         }
@@ -901,7 +901,7 @@ class NpcMenuService(
         playClick(player)
         player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 2.0f)
         player.sendMessage("§aおあげBOXから ${reward.receivedDisplayName(player)} を入手しました！")
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
     }
 
     private fun validateOageBoxRewardGrant(player: Player, reward: OageBoxReward): String? = when (reward) {

@@ -126,7 +126,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
             if (player.openInventory.topInventory.holder is ArenaTokenExchangeHolder ||
                 player.openInventory.topInventory.holder is ArenaTokenExchangeConfirmHolder
             ) {
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
             }
         }
         maintenanceTask?.cancel()
@@ -160,7 +160,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
         if (player.openInventory.topInventory.holder is ArenaTokenExchangeHolder ||
             player.openInventory.topInventory.holder is ArenaTokenExchangeConfirmHolder
         ) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
         }
         recoverPendingItems(player, "menu_open")
         val holder = ArenaTokenExchangeHolder(player.uniqueId)
@@ -430,7 +430,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
                 holder.mode.id, current.total.toDouble(), current.stacks, "consume_mismatch"
             )
             closeExchangeFlow(player, sourceHolder, "consume_mismatch")
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             return
         }
         if (!ContentEconomyBridge.deposit(plugin, player, current.total.toDouble())) {
@@ -457,7 +457,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
         activeMenuPlayers -= player.uniqueId
         removeTemporaryHints(player, "exchange_completed", false)
         player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 2.0f)
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         player.sendMessage(ArenaI18n.text(player, "arena.messages.token_exchange.completed", "amount" to formatAcorn(current.total)))
     }
 

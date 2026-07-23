@@ -908,7 +908,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
             }
 
             val box = resolveOpenedStorageBox(player, holder) ?: run {
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 player.sendMessage(storageText(player, "message.box_not_found"))
                 return
             }
@@ -1003,7 +1003,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         if (!isValidStoreTarget(source)) return false
 
         val box = resolveOpenedStorageBox(player, holder) ?: run {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             player.sendMessage(storageText(player, "message.box_not_found"))
             return true
         }
