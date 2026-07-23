@@ -84,7 +84,7 @@ class SpecialistCollectionService(
         var scoreTotal: Double = 0.0,
         var ignoredFailures: Int = 0,
         var timeout: BukkitTask? = null,
-        var aimIndicator: BukkitTask? = null
+        var displayTask: BukkitTask? = null
     )
     private data class GatheringPlantSnapshot(
         val anchor: BlockKey,
@@ -957,7 +957,7 @@ class SpecialistCollectionService(
             chiselSessions[player.uniqueId] = session
             occupiedBlocks[key] = player.uniqueId
             showChiselTarget(player, session)
-            startChiselAimIndicator(session)
+            startChiselDisplayTask(session)
             scheduleChiselTimeout(session)
             return
         }
@@ -1011,7 +1011,7 @@ class SpecialistCollectionService(
             profile.topEvaluationThreshold
         )
         session.timeout?.cancel()
-        session.aimIndicator?.cancel()
+        session.displayTask?.cancel()
         chiselSessions.remove(player.uniqueId)
         occupiedBlocks.remove(session.blockKey)
         playNaturalBreakEffect(block)
@@ -1076,12 +1076,21 @@ class SpecialistCollectionService(
         player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BELL, 0.55f, 1.65f)
     }
 
-    private fun startChiselAimIndicator(session: ChiselSession) {
-        session.aimIndicator = plugin.server.scheduler.runTaskTimer(
+    private fun startChiselDisplayTask(session: ChiselSession) {
+        session.displayTask = plugin.server.scheduler.runTaskTimer(
             plugin,
             Runnable {
                 val player = Bukkit.getPlayer(session.playerId) ?: return@Runnable
                 val block = session.blockKey.resolve() ?: return@Runnable
+                player.spawnParticle(
+                    Particle.CRIT,
+                    chiselDisplayLocation(session.target, session.face),
+                    1,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                )
                 val interaction = resolveChiselGazePoint(player, block, session.face) ?: return@Runnable
                 player.spawnParticle(
                     Particle.DUST,
@@ -1400,7 +1409,7 @@ class SpecialistCollectionService(
     private fun cancelChisel(playerId: UUID) {
         val session = chiselSessions.remove(playerId) ?: return
         session.timeout?.cancel()
-        session.aimIndicator?.cancel()
+        session.displayTask?.cancel()
         occupiedBlocks.remove(session.blockKey)
     }
 
