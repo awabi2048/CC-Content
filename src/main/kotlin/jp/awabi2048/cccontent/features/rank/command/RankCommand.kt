@@ -44,6 +44,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiStatusTone
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
@@ -2005,6 +2006,7 @@ class RankCommand(
             items += createTaskCategoryItem(
                 Material.CLOCK,
                 "rank.tutorial_task_info.category.play_time",
+                "rank.tutorial_task_info.comment.play_time",
                 done,
                 listOf(taskProgressLine(
                     messageProvider.getMessage("tutorial_rank.task.label.play_time"),
@@ -2045,6 +2047,7 @@ class RankCommand(
             items += createTaskCategoryItem(
                 Material.COMPASS,
                 "rank.tutorial_task_info.category.exploration",
+                "rank.tutorial_task_info.comment.exploration",
                 allDone,
                 details
             )
@@ -2098,6 +2101,7 @@ class RankCommand(
             items += createTaskCategoryItem(
                 Material.DIAMOND_SWORD,
                 "rank.tutorial_task_info.category.combat",
+                "rank.tutorial_task_info.comment.combat",
                 allDone,
                 details.take(7)
             )
@@ -2142,6 +2146,7 @@ class RankCommand(
             items += createTaskCategoryItem(
                 Material.IRON_PICKAXE,
                 "rank.tutorial_task_info.category.mining",
+                "rank.tutorial_task_info.comment.mining",
                 allDone,
                 details.take(7)
             )
@@ -2154,6 +2159,7 @@ class RankCommand(
             items += createTaskCategoryItem(
                 Material.EXPERIENCE_BOTTLE,
                 "rank.tutorial_task_info.category.vanilla_exp",
+                "rank.tutorial_task_info.comment.vanilla_exp",
                 done,
                 listOf(taskProgressLine(
                     messageProvider.getMessage("tutorial_rank.task.label.exp"),
@@ -2203,6 +2209,7 @@ class RankCommand(
             items += createTaskCategoryItem(
                 Material.BUNDLE,
                 "rank.tutorial_task_info.category.items",
+                "rank.tutorial_task_info.comment.items",
                 allDone,
                 details.take(7)
             )
@@ -2238,6 +2245,7 @@ class RankCommand(
             items += createTaskCategoryItem(
                 Material.LIME_BANNER,
                 "rank.tutorial_task_info.category.milestones",
+                "rank.tutorial_task_info.comment.milestones",
                 allDone,
                 details
             )
@@ -2295,21 +2303,17 @@ class RankCommand(
     private fun createTaskCategoryItem(
         material: Material,
         categoryNameKey: String,
+        commentKey: String,
         completed: Boolean,
         details: List<GuiLoreLine>
     ): ItemStack {
-        val status = messageProvider.getMessage(
-            if (completed) "tutorial_rank.task.status.completed" else "tutorial_rank.task.status.incomplete"
-        )
-        val statusColor = if (completed) "§a" else "§c"
         return createGuiBlockItem(
             material,
             toComponent(messageProvider.getMessage(categoryNameKey)),
             listOf(
-                listOf(GuiLoreLine.Data(
-                    messageProvider.getMessage("rank.tutorial_task_info.status_label"),
-                    status,
-                    statusColor
+                listOf(GuiLoreLine.StatusComment(
+                    messageProvider.getMessage(commentKey),
+                    if (completed) GuiStatusTone.COMPLETE else GuiStatusTone.INCOMPLETE
                 )),
                 details
             )
