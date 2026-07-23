@@ -2007,7 +2007,6 @@ class RankCommand(
                 Material.CLOCK,
                 "rank.tutorial_task_info.category.play_time",
                 "rank.tutorial_task_info.comment.play_time",
-                done,
                 listOf(taskProgressLine(
                     messageProvider.getMessage("tutorial_rank.task.label.play_time"),
                     formatPlayTime(current),
@@ -2019,12 +2018,10 @@ class RankCommand(
 
         if (requirement.activeOverworldMin > 0 || requirement.activeNetherResourceMin > 0) {
             val details = mutableListOf<GuiLoreLine>()
-            var allDone = true
             if (requirement.activeOverworldMin > 0) {
                 val required = requirement.activeOverworldMin.toLong()
                 val current = minOf(progress.activeOverworldTime, required)
                 val done = progress.activeOverworldTime >= required
-                allDone = allDone && done
                 details += taskProgressLine(
                     messageProvider.getMessage("tutorial_rank.task.label.active_overworld"),
                     formatPlayTime(current),
@@ -2036,7 +2033,6 @@ class RankCommand(
                 val required = requirement.activeNetherResourceMin.toLong()
                 val current = minOf(progress.activeNetherResourceTime, required)
                 val done = progress.activeNetherResourceTime >= required
-                allDone = allDone && done
                 details += taskProgressLine(
                     messageProvider.getMessage("tutorial_rank.task.label.active_nether_resource"),
                     formatPlayTime(current),
@@ -2048,22 +2044,16 @@ class RankCommand(
                 Material.COMPASS,
                 "rank.tutorial_task_info.category.exploration",
                 "rank.tutorial_task_info.comment.exploration",
-                allDone,
                 details
             )
         }
 
         if (requirement.mobKills.isNotEmpty() || requirement.bossKills.isNotEmpty()) {
             val details = mutableListOf<GuiLoreLine>()
-            var allDone = true
 
             requirement.mobKills.forEach { (mobType, required) ->
                 val current = progress.getMobKillCount(mobType)
                 val done = current >= required
-                if (!done) {
-                    allDone = false
-                }
-
                 val nameComponent = if (translator != null) {
                     Component.translatable(translator.translateEntity(mobType))
                 } else {
@@ -2080,10 +2070,6 @@ class RankCommand(
             requirement.bossKills.forEach { (bossType, required) ->
                 val current = progress.getBossKillCount(bossType)
                 val done = current >= required
-                if (!done) {
-                    allDone = false
-                }
-
                 val nameComponent = if (translator != null) {
                     Component.translatable(translator.translateBoss(bossType))
                 } else {
@@ -2102,19 +2088,16 @@ class RankCommand(
                 Material.DIAMOND_SWORD,
                 "rank.tutorial_task_info.category.combat",
                 "rank.tutorial_task_info.comment.combat",
-                allDone,
                 details.take(7)
             )
         }
 
         if (requirement.diamondOreMines > 0 || requirement.blockMines.isNotEmpty()) {
             val details = mutableListOf<GuiLoreLine>()
-            var allDone = true
             if (requirement.diamondOreMines > 0) {
                 val required = requirement.diamondOreMines
                 val current = minOf(progress.diamondOresMined, required)
                 val done = progress.diamondOresMined >= required
-                allDone = allDone && done
                 details += taskProgressLine(
                     messageProvider.getMessage("tutorial_rank.task.label.diamond_ore"),
                     current,
@@ -2125,10 +2108,6 @@ class RankCommand(
             requirement.blockMines.forEach { (blockType, required) ->
                 val current = progress.getBlockMineCount(blockType)
                 val done = current >= required
-                if (!done) {
-                    allDone = false
-                }
-
                 val nameComponent = if (translator != null) {
                     Component.translatable(translator.translateBlock(blockType))
                 } else {
@@ -2147,7 +2126,6 @@ class RankCommand(
                 Material.IRON_PICKAXE,
                 "rank.tutorial_task_info.category.mining",
                 "rank.tutorial_task_info.comment.mining",
-                allDone,
                 details.take(7)
             )
         }
@@ -2160,7 +2138,6 @@ class RankCommand(
                 Material.EXPERIENCE_BOTTLE,
                 "rank.tutorial_task_info.category.vanilla_exp",
                 "rank.tutorial_task_info.comment.vanilla_exp",
-                done,
                 listOf(taskProgressLine(
                     messageProvider.getMessage("tutorial_rank.task.label.exp"),
                     current,
@@ -2172,12 +2149,10 @@ class RankCommand(
 
         if (requirement.enderEyeCrafts > 0 || requirement.itemsRequired.isNotEmpty()) {
             val details = mutableListOf<GuiLoreLine>()
-            var allDone = true
             if (requirement.enderEyeCrafts > 0) {
                 val required = requirement.enderEyeCrafts
                 val current = minOf(progress.enderEyesCrafted, required)
                 val done = progress.enderEyesCrafted >= required
-                allDone = allDone && done
                 details += taskProgressLine(
                     messageProvider.getMessage("tutorial_rank.task.label.ender_eye"),
                     current,
@@ -2188,10 +2163,6 @@ class RankCommand(
             requirement.itemsRequired.forEach { (material, required) ->
                 val current = TutorialInventoryHelper.countItemInInventory(targetPlayer, material.uppercase())
                 val done = current >= required
-                if (!done) {
-                    allDone = false
-                }
-
                 val nameComponent = if (translator != null) {
                     Component.translatable(translator.translateItem(material))
                 } else {
@@ -2210,7 +2181,6 @@ class RankCommand(
                 Material.BUNDLE,
                 "rank.tutorial_task_info.category.items",
                 "rank.tutorial_task_info.comment.items",
-                allDone,
                 details.take(7)
             )
         }
@@ -2221,10 +2191,8 @@ class RankCommand(
             requirement.requiresEndPortalOpened
         ) {
             val details = mutableListOf<GuiLoreLine>()
-            var allDone = true
             fun addMilestone(required: Boolean, completed: Boolean, labelKey: String) {
                 if (!required) return
-                allDone = allDone && completed
                 details += taskStateLine(messageProvider.getMessage(labelKey), completed)
             }
             addMilestone(
@@ -2246,15 +2214,12 @@ class RankCommand(
                 Material.LIME_BANNER,
                 "rank.tutorial_task_info.category.milestones",
                 "rank.tutorial_task_info.comment.milestones",
-                allDone,
                 details
             )
         }
 
         return items
     }
-
-    private fun statusIcon(done: Boolean): String = if (done) "§a✓" else "§c✗"
 
     private fun createBackgroundItem(material: Material): ItemStack {
         val item = ItemStack(material)
@@ -2304,17 +2269,13 @@ class RankCommand(
         material: Material,
         categoryNameKey: String,
         commentKey: String,
-        completed: Boolean,
         details: List<GuiLoreLine>
     ): ItemStack {
         return createGuiBlockItem(
             material,
             toComponent(messageProvider.getMessage(categoryNameKey)),
             listOf(
-                listOf(GuiLoreLine.StatusComment(
-                    messageProvider.getMessage(commentKey),
-                    if (completed) GuiStatusTone.COMPLETE else GuiStatusTone.INCOMPLETE
-                )),
+                listOf(GuiLoreLine.Text(messageProvider.getMessage(commentKey))),
                 details
             )
         )
@@ -2325,21 +2286,23 @@ class RankCommand(
         current: Any,
         required: Any,
         completed: Boolean
-    ): GuiLoreLine.Data {
-        return GuiLoreLine.Data(
+    ): GuiLoreLine.StatusData {
+        return GuiLoreLine.StatusData(
             label,
             "$current / $required",
-            if (completed) "§a" else "§c"
+            if (completed) "§a" else "§c",
+            if (completed) GuiStatusTone.COMPLETE else GuiStatusTone.INCOMPLETE
         )
     }
 
-    private fun taskStateLine(label: String, completed: Boolean): GuiLoreLine.Data {
-        return GuiLoreLine.Data(
+    private fun taskStateLine(label: String, completed: Boolean): GuiLoreLine.StatusData {
+        return GuiLoreLine.StatusData(
             label,
             messageProvider.getMessage(
                 if (completed) "tutorial_rank.task.status.completed" else "tutorial_rank.task.status.incomplete"
             ),
-            if (completed) "§a" else "§c"
+            if (completed) "§a" else "§c",
+            if (completed) GuiStatusTone.COMPLETE else GuiStatusTone.INCOMPLETE
         )
     }
 
@@ -2349,12 +2312,16 @@ class RankCommand(
         current: Int,
         required: Int,
         actionSuffix: String
-    ): GuiLoreLine.ComponentData {
+    ): GuiLoreLine.StatusComponentData {
         val numberColor = progressColorCode(current.toLong(), required.toLong())
-        val value = toComponent("${statusIcon(done)} ")
-            .append(nameComponent.color(NamedTextColor.GRAY))
-            .append(toComponent("§7${actionSuffix} (§r${numberColor}${current}§7/${required}§7)"))
-        return GuiLoreLine.ComponentData("", value, "")
+        val label = nameComponent.color(NamedTextColor.GRAY)
+            .append(toComponent("§7$actionSuffix"))
+        val value = toComponent("$numberColor$current§7 / $required")
+        return GuiLoreLine.StatusComponentData(
+            label,
+            value,
+            if (done) GuiStatusTone.COMPLETE else GuiStatusTone.INCOMPLETE
+        )
     }
 
     private fun toComponent(text: String): Component = LEGACY_SERIALIZER.deserialize(text)
