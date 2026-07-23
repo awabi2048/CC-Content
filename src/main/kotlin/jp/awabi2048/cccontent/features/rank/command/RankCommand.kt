@@ -2002,26 +2002,16 @@ class RankCommand(
             val current = minOf(progress.playTime, requirement.playTimeMin.toLong())
             val required = requirement.playTimeMin.toLong()
             val done = progress.playTime >= requirement.playTimeMin
-            val lore = listOf(
-                GuiLoreLine.Text(
-                    messageProvider.getMessage(
-                        "rank.tutorial_task_info.line.progress_time",
-                        "status" to statusIcon(done),
-                        "current" to formatPlayTime(current),
-                        "required" to formatPlayTime(required)
-                    )
-                ),
-                GuiLoreLine.Text(
-                    messageProvider.getMessage(
-                        "rank.tutorial_task_info.line.percent",
-                        "percent" to percent(current, required)
-                    )
-                )
-            )
-            items += createGuiItem(
+            items += createTaskCategoryItem(
                 Material.CLOCK,
-                toComponent(messageProvider.getMessage("rank.tutorial_task_info.category.play_time")),
-                lore
+                "rank.tutorial_task_info.category.play_time",
+                done,
+                listOf(taskProgressLine(
+                    messageProvider.getMessage("tutorial_rank.task.label.play_time"),
+                    formatPlayTime(current),
+                    formatPlayTime(required),
+                    done
+                ))
             )
         }
 
@@ -2033,33 +2023,29 @@ class RankCommand(
                 val current = minOf(progress.activeOverworldTime, required)
                 val done = progress.activeOverworldTime >= required
                 allDone = allDone && done
-                details += GuiLoreLine.Text(messageProvider.getMessage(
-                    "rank.tutorial_task_info.line.named_progress_time",
-                    "status" to statusIcon(done),
-                    "label" to messageProvider.getMessage("tutorial_rank.task.label.active_overworld"),
-                    "current" to formatPlayTime(current),
-                    "required" to formatPlayTime(required)
-                ))
+                details += taskProgressLine(
+                    messageProvider.getMessage("tutorial_rank.task.label.active_overworld"),
+                    formatPlayTime(current),
+                    formatPlayTime(required),
+                    done
+                )
             }
             if (requirement.activeNetherResourceMin > 0) {
                 val required = requirement.activeNetherResourceMin.toLong()
                 val current = minOf(progress.activeNetherResourceTime, required)
                 val done = progress.activeNetherResourceTime >= required
                 allDone = allDone && done
-                details += GuiLoreLine.Text(messageProvider.getMessage(
-                    "rank.tutorial_task_info.line.named_progress_time",
-                    "status" to statusIcon(done),
-                    "label" to messageProvider.getMessage("tutorial_rank.task.label.active_nether_resource"),
-                    "current" to formatPlayTime(current),
-                    "required" to formatPlayTime(required)
-                ))
+                details += taskProgressLine(
+                    messageProvider.getMessage("tutorial_rank.task.label.active_nether_resource"),
+                    formatPlayTime(current),
+                    formatPlayTime(required),
+                    done
+                )
             }
-            items += createGuiItem(
+            items += createTaskCategoryItem(
                 Material.COMPASS,
-                toComponent(messageProvider.getMessage(
-                    "rank.tutorial_task_info.category.exploration",
-                    "status" to statusIcon(allDone)
-                )),
+                "rank.tutorial_task_info.category.exploration",
+                allDone,
                 details
             )
         }
@@ -2109,14 +2095,10 @@ class RankCommand(
                 )
             }
 
-            items += createGuiItem(
+            items += createTaskCategoryItem(
                 Material.DIAMOND_SWORD,
-                toComponent(
-                    messageProvider.getMessage(
-                        "rank.tutorial_task_info.category.combat",
-                        "status" to statusIcon(allDone)
-                    )
-                ),
+                "rank.tutorial_task_info.category.combat",
+                allDone,
                 details.take(7)
             )
         }
@@ -2129,13 +2111,12 @@ class RankCommand(
                 val current = minOf(progress.diamondOresMined, required)
                 val done = progress.diamondOresMined >= required
                 allDone = allDone && done
-                details += GuiLoreLine.Text(messageProvider.getMessage(
-                    "rank.tutorial_task_info.line.named_progress",
-                    "status" to statusIcon(done),
-                    "label" to messageProvider.getMessage("tutorial_rank.task.label.diamond_ore"),
-                    "current" to current,
-                    "required" to required
-                ))
+                details += taskProgressLine(
+                    messageProvider.getMessage("tutorial_rank.task.label.diamond_ore"),
+                    current,
+                    required,
+                    done
+                )
             }
             requirement.blockMines.forEach { (blockType, required) ->
                 val current = progress.getBlockMineCount(blockType)
@@ -2158,14 +2139,10 @@ class RankCommand(
                 )
             }
 
-            items += createGuiItem(
+            items += createTaskCategoryItem(
                 Material.IRON_PICKAXE,
-                toComponent(
-                    messageProvider.getMessage(
-                        "rank.tutorial_task_info.category.mining",
-                        "status" to statusIcon(allDone)
-                    )
-                ),
+                "rank.tutorial_task_info.category.mining",
+                allDone,
                 details.take(7)
             )
         }
@@ -2174,26 +2151,16 @@ class RankCommand(
             val current = minOf(progress.vanillaExp, requirement.vanillaExp)
             val required = requirement.vanillaExp
             val done = progress.vanillaExp >= required
-            val lore = listOf(
-                GuiLoreLine.Text(
-                    messageProvider.getMessage(
-                        "rank.tutorial_task_info.line.progress_exp",
-                        "status" to statusIcon(done),
-                        "current" to current,
-                        "required" to required
-                    )
-                ),
-                GuiLoreLine.Text(
-                    messageProvider.getMessage(
-                        "rank.tutorial_task_info.line.percent",
-                        "percent" to percent(current, required)
-                    )
-                )
-            )
-            items += createGuiItem(
+            items += createTaskCategoryItem(
                 Material.EXPERIENCE_BOTTLE,
-                toComponent(messageProvider.getMessage("rank.tutorial_task_info.category.vanilla_exp")),
-                lore
+                "rank.tutorial_task_info.category.vanilla_exp",
+                done,
+                listOf(taskProgressLine(
+                    messageProvider.getMessage("tutorial_rank.task.label.exp"),
+                    current,
+                    required,
+                    done
+                ))
             )
         }
 
@@ -2205,13 +2172,12 @@ class RankCommand(
                 val current = minOf(progress.enderEyesCrafted, required)
                 val done = progress.enderEyesCrafted >= required
                 allDone = allDone && done
-                details += GuiLoreLine.Text(messageProvider.getMessage(
-                    "rank.tutorial_task_info.line.named_progress",
-                    "status" to statusIcon(done),
-                    "label" to messageProvider.getMessage("tutorial_rank.task.label.ender_eye"),
-                    "current" to current,
-                    "required" to required
-                ))
+                details += taskProgressLine(
+                    messageProvider.getMessage("tutorial_rank.task.label.ender_eye"),
+                    current,
+                    required,
+                    done
+                )
             }
             requirement.itemsRequired.forEach { (material, required) ->
                 val current = TutorialInventoryHelper.countItemInInventory(targetPlayer, material.uppercase())
@@ -2234,14 +2200,10 @@ class RankCommand(
                 )
             }
 
-            items += createGuiItem(
+            items += createTaskCategoryItem(
                 Material.BUNDLE,
-                toComponent(
-                    messageProvider.getMessage(
-                        "rank.tutorial_task_info.category.items",
-                        "status" to statusIcon(allDone)
-                    )
-                ),
+                "rank.tutorial_task_info.category.items",
+                allDone,
                 details.take(7)
             )
         }
@@ -2256,11 +2218,7 @@ class RankCommand(
             fun addMilestone(required: Boolean, completed: Boolean, labelKey: String) {
                 if (!required) return
                 allDone = allDone && completed
-                details += GuiLoreLine.Text(messageProvider.getMessage(
-                    "rank.tutorial_task_info.line.state",
-                    "status" to statusIcon(completed),
-                    "label" to messageProvider.getMessage(labelKey)
-                ))
+                details += taskStateLine(messageProvider.getMessage(labelKey), completed)
             }
             addMilestone(
                 requirement.requiresMyWorldCreated,
@@ -2277,12 +2235,10 @@ class RankCommand(
                 progress.endPortalOpened,
                 "tutorial_rank.task.label.end_portal"
             )
-            items += createGuiItem(
+            items += createTaskCategoryItem(
                 Material.LIME_BANNER,
-                toComponent(messageProvider.getMessage(
-                    "rank.tutorial_task_info.category.milestones",
-                    "status" to statusIcon(allDone)
-                )),
+                "rank.tutorial_task_info.category.milestones",
+                allDone,
                 details
             )
         }
@@ -2291,13 +2247,6 @@ class RankCommand(
     }
 
     private fun statusIcon(done: Boolean): String = if (done) "§a✓" else "§c✗"
-
-    private fun percent(current: Long, required: Long): Int {
-        if (required <= 0L) {
-            return 100
-        }
-        return ((current.toDouble() / required.toDouble()) * 100).toInt().coerceIn(0, 100)
-    }
 
     private fun createBackgroundItem(material: Material): ItemStack {
         val item = ItemStack(material)
@@ -2341,6 +2290,53 @@ class RankCommand(
             item.itemMeta = meta
         }
         return item
+    }
+
+    private fun createTaskCategoryItem(
+        material: Material,
+        categoryNameKey: String,
+        completed: Boolean,
+        details: List<GuiLoreLine>
+    ): ItemStack {
+        val status = messageProvider.getMessage(
+            if (completed) "tutorial_rank.task.status.completed" else "tutorial_rank.task.status.incomplete"
+        )
+        val statusColor = if (completed) "§a" else "§c"
+        return createGuiBlockItem(
+            material,
+            toComponent(messageProvider.getMessage(categoryNameKey)),
+            listOf(
+                listOf(GuiLoreLine.Data(
+                    messageProvider.getMessage("rank.tutorial_task_info.status_label"),
+                    status,
+                    statusColor
+                )),
+                details
+            )
+        )
+    }
+
+    private fun taskProgressLine(
+        label: String,
+        current: Any,
+        required: Any,
+        completed: Boolean
+    ): GuiLoreLine.Data {
+        return GuiLoreLine.Data(
+            label,
+            "$current / $required",
+            if (completed) "§a" else "§c"
+        )
+    }
+
+    private fun taskStateLine(label: String, completed: Boolean): GuiLoreLine.Data {
+        return GuiLoreLine.Data(
+            label,
+            messageProvider.getMessage(
+                if (completed) "tutorial_rank.task.status.completed" else "tutorial_rank.task.status.incomplete"
+            ),
+            if (completed) "§a" else "§c"
+        )
     }
 
     private fun buildTranslatedTargetLine(
