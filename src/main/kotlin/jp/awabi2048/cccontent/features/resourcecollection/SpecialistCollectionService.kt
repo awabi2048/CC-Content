@@ -16,6 +16,7 @@ import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionExperie
 import jp.awabi2048.cccontent.items.CustomItemManager
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
+import org.bukkit.Color
 import org.bukkit.FluidCollisionMode
 import org.bukkit.GameMode
 import org.bukkit.Location
@@ -82,7 +83,8 @@ class SpecialistCollectionService(
         var attempts: Int = 0,
         var scoreTotal: Double = 0.0,
         var ignoredFailures: Int = 0,
-        var timeout: BukkitTask? = null
+        var timeout: BukkitTask? = null,
+        var aimIndicator: BukkitTask? = null
     )
     private data class GatheringPlantSnapshot(
         val anchor: BlockKey,
@@ -955,6 +957,7 @@ class SpecialistCollectionService(
             chiselSessions[player.uniqueId] = session
             occupiedBlocks[key] = player.uniqueId
             showChiselTarget(player, session)
+            startChiselAimIndicator(session)
             scheduleChiselTimeout(session)
             return
         }
@@ -1008,6 +1011,7 @@ class SpecialistCollectionService(
             profile.topEvaluationThreshold
         )
         session.timeout?.cancel()
+        session.aimIndicator?.cancel()
         chiselSessions.remove(player.uniqueId)
         occupiedBlocks.remove(session.blockKey)
         playNaturalBreakEffect(block)
@@ -1062,7 +1066,7 @@ class SpecialistCollectionService(
     private fun showChiselTarget(player: Player, session: ChiselSession) {
         player.spawnParticle(
             Particle.CRIT,
-            session.target,
+            chiselDisplayLocation(session.target, session.face),
             settings.chisel.particleCount,
             0.02,
             0.02,
@@ -1071,6 +1075,28 @@ class SpecialistCollectionService(
         )
         player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BELL, 0.55f, 1.65f)
     }
+
+    private fun startChiselAimIndicator(session: ChiselSession) {
+        session.aimIndicator = plugin.server.scheduler.runTaskTimer(
+            plugin,
+            Runnable {
+                val player = Bukkit.getPlayer(session.playerId) ?: return@Runnable
+                val block = session.blockKey.resolve() ?: return@Runnable
+                val interaction = resolveChiselGazePoint(player, block, session.face) ?: return@Runnable
+                player.spawnParticle(
+                    Particle.DUST,
+                    chiselDisplayLocation(interaction, session.face),
+                    1,
+                    Particle.DustOptions(Color.fromRGB(255, 85, 85), 0.3f)
+                )
+            },
+            0L,
+            2L
+        )
+    }
+
+    private fun chiselDisplayLocation(surfaceLocation: Location, face: BlockFace): Location =
+        surfaceLocation.clone().add(face.direction.normalize().multiply(0.03))
 
     private fun randomTarget(block: Block, face: BlockFace): Location {
         val center = block.location.add(0.5, 0.5, 0.5)
@@ -1098,7 +1124,15 @@ class SpecialistCollectionService(
         expectedFace: BlockFace
     ): Location? {
         event.interactionPoint?.let { return it }
-        val eye = event.player.eyeLocation
+        return resolveChiselGazePoint(event.player, block, expectedFace)
+    }
+
+    private fun resolveChiselGazePoint(
+        player: Player,
+        block: Block,
+        expectedFace: BlockFace
+    ): Location? {
+        val eye = player.eyeLocation
         val hit = block.world.rayTraceBlocks(
             eye,
             eye.direction,
@@ -1366,6 +1400,7 @@ class SpecialistCollectionService(
     private fun cancelChisel(playerId: UUID) {
         val session = chiselSessions.remove(playerId) ?: return
         session.timeout?.cancel()
+        session.aimIndicator?.cancel()
         occupiedBlocks.remove(session.blockKey)
     }
 
