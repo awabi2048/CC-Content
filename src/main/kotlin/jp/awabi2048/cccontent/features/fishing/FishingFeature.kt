@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.fishing
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -143,7 +145,7 @@ class FishingFeature(
         inventory.setItem(40, service.item(com.awabi2048.ccsystem.api.gui.GuiItemSpec(Material.PAPER, com.awabi2048.ccsystem.api.gui.GuiNameSpec.Text(message(player, "fishing.journal.status", "count" to records.size, "page" to (page + 1), "pages" to totalPages), GuiNameStyle.DEFAULT), GuiLoreSpec.None, com.awabi2048.ccsystem.api.gui.GuiElementRole.CONTENT, 1)))
         inventory.setItem(42, service.item(com.awabi2048.ccsystem.api.gui.GuiItemSpec(Material.BARRIER, com.awabi2048.ccsystem.api.gui.GuiNameSpec.Text(message(player, "fishing.journal.close"), GuiNameStyle.DEFAULT), GuiLoreSpec.None, com.awabi2048.ccsystem.api.gui.GuiElementRole.CANCEL, 1)))
         if (page + 1 < totalPages) inventory.setItem(44, service.item(com.awabi2048.ccsystem.api.gui.GuiItemSpec(Material.ARROW, com.awabi2048.ccsystem.api.gui.GuiNameSpec.Text(message(player, "fishing.journal.next"), GuiNameStyle.DEFAULT), GuiLoreSpec.None, com.awabi2048.ccsystem.api.gui.GuiElementRole.NAVIGATION, 1)))
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun journalRecordIcon(player: Player, record: CatchJournalRecord): ItemStack {
@@ -178,7 +180,7 @@ class FishingFeature(
         inventory.setItem(24, journalInfoItem(player, Material.CLOCK, "fishing.journal.record_info", record))
         val service = CCSystem.getAPI().getGuiElementService()
         inventory.setItem(40, service.item(com.awabi2048.ccsystem.api.gui.GuiItemSpec(Material.ARROW, com.awabi2048.ccsystem.api.gui.GuiNameSpec.Text(message(player, "fishing.journal.back"), GuiNameStyle.DEFAULT), GuiLoreSpec.None, com.awabi2048.ccsystem.api.gui.GuiElementRole.BACK, 1)))
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun journalInfoItem(player: Player, material: Material, nameKey: String, record: CatchJournalRecord): ItemStack =
@@ -809,7 +811,7 @@ class FishingFeature(
                 when (event.rawSlot) {
                     36 -> if (holder.page > 0) openJournal(player, holder.page - 1)
                     38 -> fishdexOpener?.invoke(player)
-                    42 -> player.closeInventory()
+                    42 -> ManagedMenuPresenter.close(player)
                     44 -> if (holder.page + 1 < holder.totalPages) openJournal(player, holder.page + 1)
                     else -> holder.recordIdsBySlot[event.rawSlot]?.let { openJournalDetail(player, it, holder.page) }
                 }

@@ -27,6 +27,7 @@ class PartyController(
         store = PartyStore(plugin.dataFolder.toPath().resolve("data/party.yml"))
     )
     val service: PartyService get() = feature.service
+    private val menu = PartyMenu(this)
 
     fun processExpiredDepartures() {
         service.processExpiredDepartures(Bukkit.getOnlinePlayers().mapTo(HashSet(), Player::getUniqueId))
@@ -47,7 +48,7 @@ class PartyController(
     fun text(player: Player, key: String, placeholders: Map<String, Any> = emptyMap()): String =
         CCSystem.getAPI().getI18nString(player, key, placeholders)
 
-    fun openMenu(player: Player) = PartyMenu(this).open(player)
+    fun openMenu(player: Player) = menu.open(player)
 
     fun toggleChat(player: Player): Boolean {
         val party = service.partyOf(player.uniqueId) ?: error("not_in_party")
@@ -119,6 +120,7 @@ class PartyController(
     }
 
     override fun close() {
+        CCSystem.getAPI().getMenuRuntimeService().unregister("cc-content", "party")
         expiryTask?.cancel()
         expiryTask = null
         chatChannel.close()

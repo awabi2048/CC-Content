@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.arena.mission
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import jp.awabi2048.cccontent.config.FeatureConfigManager
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
@@ -160,8 +162,7 @@ class ArenaMissionService(
             val inventory = Bukkit.createInventory(holder, ArenaMissionLayout.MENU_SIZE, ArenaMissionLayout.MENU_TITLE)
             holder.backingInventory = inventory
             renderMenu(player, inventory, missionSet)
-            player.openInventory(inventory)
-            CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_mission")
+            ManagedMenuPresenter.open(player, inventory, menuId = "arena_mission")
             true
         } catch (e: Exception) {
             plugin.logger.warning("[Arena] アリーナメニューの表示に失敗しました: message=${e.message}")
@@ -364,7 +365,7 @@ class ArenaMissionService(
             return
         }
 
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
 
         Bukkit.getScheduler().runTask(plugin, Runnable {
             if (!player.isOnline) {
@@ -758,8 +759,7 @@ class ArenaMissionService(
         val inventory = Bukkit.createInventory(holder, ArenaMissionLayout.CONFIRM_SIZE, ArenaMissionLayout.CONFIRM_TITLE)
         holder.backingInventory = inventory
         renderConfirmMenu(player, inventory, mission)
-        player.openInventory(inventory)
-        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, "arena_mission_confirm")
+        ManagedMenuPresenter.open(player, inventory, menuId = "arena_mission_confirm")
         return true
     }
 
@@ -896,7 +896,7 @@ class ArenaMissionService(
     }
 
     private fun playUiClick(player: Player) {
-        CCSystem.getAPI().getMenuSoundService().onMenuClick(player, "arena_mission")
+        ManagedMenuPresenter.success(player)
     }
 
     private fun randomMissionMemo(player: Player): String {

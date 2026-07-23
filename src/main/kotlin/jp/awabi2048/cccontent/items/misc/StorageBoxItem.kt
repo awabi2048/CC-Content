@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.items.misc
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -906,7 +908,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
             }
 
             val box = resolveOpenedStorageBox(player, holder) ?: run {
-                player.closeInventory()
+                ManagedMenuPresenter.close(player)
                 player.sendMessage(storageText(player, "message.box_not_found"))
                 return
             }
@@ -1001,7 +1003,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         if (!isValidStoreTarget(source)) return false
 
         val box = resolveOpenedStorageBox(player, holder) ?: run {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             player.sendMessage(storageText(player, "message.box_not_found"))
             return true
         }
@@ -1080,8 +1082,12 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
         val holder = StorageBoxMenuHolder(player.uniqueId, target.hand, target.mainSlot, instanceId, holderInventory)
         val inv = Bukkit.createInventory(holder, menuSize, menuTitle)
         renderMenu(player, inv, state)
-        player.openInventory(inv)
-        player.playSound(player.location, Sound.UI_BUTTON_CLICK, 1.0f, 2.0f)
+        ManagedMenuPresenter.open(
+            player,
+            inv,
+            menuId = "storage_box",
+            policy = ManagedMenuPresenter.inputPolicy(getStorageSlots(state.capacity)),
+        )
     }
 
     private fun renderMenu(player: Player, inventory: Inventory, state: StorageBoxState) {
@@ -1265,7 +1271,7 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
             return
         }
         lastMenuClickSoundAt[player.uniqueId] = now
-        player.playSound(player.location, Sound.UI_BUTTON_CLICK, 1.0f, 2.0f)
+        ManagedMenuPresenter.success(player)
     }
 
     private fun updateHoldActionBar(player: Player) {

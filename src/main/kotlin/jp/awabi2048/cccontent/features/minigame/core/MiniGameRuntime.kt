@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.minigame.core
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import jp.awabi2048.cccontent.features.minigame.race.RaceCourse
 import jp.awabi2048.cccontent.features.minigame.race.RaceSession
 import jp.awabi2048.cccontent.features.minigame.race.RaceVisitStatus
@@ -631,7 +633,7 @@ class MiniGameAdminMenu(
         val inventory = Bukkit.createInventory(holder, 45, MiniGameMessages.text(player, "gui.title"))
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     @EventHandler
@@ -640,8 +642,8 @@ class MiniGameAdminMenu(
             is Holder -> {
                 val player = MenuEventGuards.ownedTopClick(event, holder, "MiniGameAdminMenu.onClick: menu_click") ?: return
                 when (event.rawSlot) {
-                    20 -> if (!runtime.isRunning(holder.itemData) && runtime.start(player, holder.itemData)) player.closeInventory()
-                    22 -> if (runtime.isRunning(holder.itemData) && runtime.stop(player, holder.itemData)) player.closeInventory()
+                    20 -> if (!runtime.isRunning(holder.itemData) && runtime.start(player, holder.itemData)) ManagedMenuPresenter.close(player)
+                    22 -> if (runtime.isRunning(holder.itemData) && runtime.stop(player, holder.itemData)) ManagedMenuPresenter.close(player)
                     24 -> openSelection(player, holder.itemData, 0)
                     29 -> {
                         runtime.adjustTimeLimit(player, holder.itemData, if (event.isLeftClick) 30 else -30)
@@ -657,7 +659,7 @@ class MiniGameAdminMenu(
                         if (event.isRightClick) HistoryView.TOP else HistoryView.RECENT,
                         0
                     )
-                    40 -> player.closeInventory()
+                    40 -> ManagedMenuPresenter.close(player)
                 }
             }
             is SelectionHolder -> {
@@ -763,7 +765,7 @@ class MiniGameAdminMenu(
         if (page > 0) inventory.setItem(layout.previousPageSlot, GuiMenuItems.icon(Material.ARROW, MiniGameMessages.text(player, "gui.previous")))
         if (page + 1 < pages) inventory.setItem(layout.nextPageSlot, GuiMenuItems.icon(Material.ARROW, MiniGameMessages.text(player, "gui.next")))
         inventory.setItem(layout.backSlot, GuiMenuItems.icon(Material.BARRIER, MiniGameMessages.text(player, "gui.back")))
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun participantItem(viewer: Player, playerUuid: UUID, selected: Boolean): ItemStack {
@@ -851,7 +853,7 @@ class MiniGameAdminMenu(
         if (page > 0) inventory.setItem(layout.previousPageSlot, GuiMenuItems.icon(Material.ARROW, MiniGameMessages.text(player, "gui.previous")))
         if (page + 1 < pages) inventory.setItem(layout.nextPageSlot, GuiMenuItems.icon(Material.ARROW, MiniGameMessages.text(player, "gui.next")))
         inventory.setItem(layout.backSlot, GuiMenuItems.icon(Material.BARRIER, MiniGameMessages.text(player, "gui.back")))
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     private fun historyItem(player: Player, record: MiniGameHistoryRecord): ItemStack = GuiMenuItems.icon(

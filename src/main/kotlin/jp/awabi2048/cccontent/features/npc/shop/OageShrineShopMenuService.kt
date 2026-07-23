@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.npc.shop
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -30,7 +32,7 @@ import java.util.UUID
 class OageShrineShopMenuService(
     private val plugin: JavaPlugin,
     private val state: OageShrineShopState,
-    private val backToParent: (Player) -> Unit = { it.closeInventory() }
+    private val backToParent: (Player) -> Unit = ManagedMenuPresenter::close
 ) : Listener {
     private var tabs: List<OageShrineShopTabDefinition> = emptyList()
 
@@ -48,7 +50,7 @@ class OageShrineShopMenuService(
         val inventory = Bukkit.createInventory(holder, SIZE, legacy(text(player, "title.shop")))
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     fun reopenShop(player: Player, tabId: String) {
@@ -63,7 +65,7 @@ class OageShrineShopMenuService(
         inventory.setItem(CONFIRM_PREVIEW_SLOT, resolved.previewItem)
         inventory.setItem(CONFIRM_CONFIRM_SLOT, confirmButton(player, resolved))
         inventory.setItem(CONFIRM_CANCEL_SLOT, cancelButton(player))
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
     }
 
     fun confirmPurchase(player: Player, resolved: OageShrineShopResolvedItem) {
@@ -107,7 +109,7 @@ class OageShrineShopMenuService(
 
         state.recordPurchase(player.uniqueId, resolved.tab, resolved.item)
         playClick(player)
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         player.sendMessage(text(player, "messages.purchase_complete", "name" to resolved.displayName, "price" to ContentEconomyBridge.formatPrice(resolved.item.price)))
     }
 
@@ -254,11 +256,11 @@ class OageShrineShopMenuService(
     }
 
     private fun playClick(player: Player) {
-        player.playSound(player.location, "minecraft:ui.button.click", 0.7f, 1.6f)
+        ManagedMenuPresenter.success(player)
     }
 
     private fun playError(player: Player) {
-        player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BASS, 0.7f, 0.7f)
+        ManagedMenuPresenter.rejected(player)
     }
 
     private fun canAcceptReward(player: Player, item: ItemStack): Boolean {

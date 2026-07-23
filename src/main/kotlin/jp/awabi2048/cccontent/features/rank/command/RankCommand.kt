@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.rank.command
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.listener.ProfessionSelector
@@ -42,6 +44,11 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
+import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
+import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuElement
+import com.awabi2048.ccsystem.api.gui.MenuRoute
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
@@ -57,6 +64,26 @@ class RankCommand(
     private var taskChecker: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskChecker? = null,
     private val translator: jp.awabi2048.cccontent.features.rank.tutorial.task.EntityBlockTranslator? = null
 ) : CommandExecutor, TabCompleter, Listener, ProfessionSelector {
+
+    init {
+        val runtime = CCSystem.getAPI().getMenuRuntimeService()
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = MENU_OWNER,
+                id = TUTORIAL_MENU_ID,
+                renderer = { context -> renderTutorialRankRuntimeView(context.player) },
+                actions = emptyMap(),
+            )
+        )
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = MENU_OWNER,
+                id = TASK_INFO_MENU_ID,
+                renderer = { context -> renderTaskInfoRuntimeView(context.player, context.route) },
+                actions = emptyMap(),
+            )
+        )
+    }
 
     fun setTutorialTaskSystem(
         loader: jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader?,
@@ -433,20 +460,21 @@ class RankCommand(
         holder.backingInventory = inventory
 
         renderProfessionMainMenu(inventory, viewer, playerProfession)
-        viewer.openInventory(inventory)
+        ManagedMenuPresenter.open(viewer, inventory)
         viewer.playSound(viewer.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
         return true
     }
 
     private fun openTutorialRankMenu(viewer: Player): Boolean {
-        val holder = TutorialRankMenuGuiHolder()
-        val inventory = Bukkit.createInventory(holder, 45, "§8チュートリアルランク")
-        holder.backingInventory = inventory
-
-        renderTutorialRankMenu(inventory, viewer)
-        viewer.openInventory(inventory)
-        viewer.playSound(viewer.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
+        CCSystem.getAPI().getMenuRuntimeService().open(viewer, MenuRoute(MENU_OWNER, TUTORIAL_MENU_ID))
         return true
+    }
+
+    private fun renderTutorialRankRuntimeView(viewer: Player): InventoryMenuView {
+        val title = "§8チュートリアルランク"
+        val inventory = Bukkit.createInventory(null, 45, title)
+        renderTutorialRankMenu(inventory, viewer)
+        return inventory.toRuntimeView(title)
     }
 
     private fun renderTutorialRankMenu(inventory: Inventory, viewer: Player) {
@@ -806,7 +834,7 @@ class RankCommand(
         holder.backingInventory = inventory
 
         renderProfessionSelectionGui(inventory, player)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(player, inventory)
         player.playSound(player.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
         return true
     }
@@ -990,7 +1018,7 @@ class RankCommand(
         player.playSound(player.location, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f)
         
         // GUIを閉じる
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
     }
 
     private class ProfessionSelectionGuiHolder : InventoryHolder {
@@ -1191,7 +1219,7 @@ class RankCommand(
         holder.backingInventory = inventory
 
         renderSkillTreeGui(inventory, skillTree, state)
-        viewer.openInventory(inventory)
+        ManagedMenuPresenter.open(viewer, inventory)
         return true
     }
 
@@ -1205,7 +1233,7 @@ class RankCommand(
         )
         holder.backingInventory = inventory
         renderProfessionSettingsMenu(inventory, playerProfession, viewer)
-        viewer.openInventory(inventory)
+        ManagedMenuPresenter.open(viewer, inventory)
         viewer.playSound(viewer.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
         return true
     }
@@ -2140,11 +2168,9 @@ class RankCommand(
         
         val uuid = targetPlayer.uniqueId
         val tutorial = rankManager.getPlayerTutorial(uuid)
-        val progress = tutorial.taskProgress
-        val requirement = loader.getRequirement(tutorial.currentRank.name)
         val viewer = if (sender is Player) sender else targetPlayer
 
-        openTaskInfoGui(viewer, targetPlayer, tutorial.currentRank.name, progress, requirement)
+        openTaskInfoGui(viewer, targetPlayer, tutorial.currentRank.name)
 
         if (sender !is Player) {
             sender.sendMessage(
@@ -2161,17 +2187,31 @@ class RankCommand(
         viewer: Player,
         targetPlayer: Player,
         rankName: String,
-        progress: TaskProgress,
-        requirement: TaskRequirement
     ) {
-        val holder = TaskInfoGuiHolder()
+        CCSystem.getAPI().getMenuRuntimeService().open(
+            viewer,
+            MenuRoute(
+                MENU_OWNER,
+                TASK_INFO_MENU_ID,
+                mapOf("target" to targetPlayer.uniqueId.toString(), "rank" to rankName),
+            )
+        )
+    }
+
+    private fun renderTaskInfoRuntimeView(viewer: Player, route: MenuRoute): InventoryMenuView {
+        val targetPlayer = route.payload["target"]
+            ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
+            ?.let(Bukkit::getPlayer)
+            ?: viewer
+        val rankName = route.payload["rank"] ?: rankManager.getTutorialRank(targetPlayer.uniqueId).name
+        val progress = rankManager.getPlayerTutorial(targetPlayer.uniqueId).taskProgress
+        val requirement = taskLoader?.getRequirement(rankName) ?: TaskRequirement()
         val title = messageProvider.getMessage(
             "rank.tutorial_task_info.title",
             "player" to targetPlayer.name,
             "rank" to rankName
         )
-        val inventory = Bukkit.createInventory(holder, 45, title)
-        holder.backingInventory = inventory
+        val inventory = Bukkit.createInventory(null, 45, title)
 
         val headerFooter = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
         val middle = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
@@ -2201,8 +2241,19 @@ class RankCommand(
             inventory.setItem(22, completeItem)
         }
 
-        viewer.openInventory(inventory)
+        return inventory.toRuntimeView(title)
     }
+
+    private fun Inventory.toRuntimeView(title: String): InventoryMenuView = InventoryMenuView(
+        size = size,
+        title = LEGACY_SERIALIZER.deserialize(title),
+        elements = (0 until size).mapNotNull { slot ->
+            getItem(slot)?.let { item ->
+                MenuElement(slot, item, GuiElementRole.CONTENT)
+            }
+        },
+        standardFrame = false,
+    )
 
     private fun buildTaskCategoryItems(
         targetPlayer: Player,
@@ -2547,7 +2598,7 @@ class RankCommand(
     private fun onSkillTreeNavLeft(holder: SkillTreeGuiHolder, viewer: Player) {
         holder.state.lastAction = "nav_left"
         // 職業メインメニューに戻る
-        viewer.playSound(viewer.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.0f)
+        ManagedMenuPresenter.success(viewer)
         openProfessionMainMenu(viewer)
     }
 
@@ -2700,57 +2751,14 @@ class RankCommand(
         skill: SkillNode
     ) {
         val skillName = messageProvider.getSkillName(holder.state.profession, skill.skillId)
-        val yesButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm")))
+        ConfirmationDialog.show(
+            viewer,
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.title"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.body", "skill" to skillName))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel"))),
+            { target -> executeSkillUnlock(target, holder, skillTree, skill) },
         )
-            .width(150)
-            .action(
-                io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
-                    io.papermc.paper.registry.data.dialog.action.DialogActionCallback { _, audience ->
-                        val target = audience as? Player ?: return@DialogActionCallback
-                        executeSkillUnlock(target, holder, skillTree, skill)
-                    },
-                    net.kyori.adventure.text.event.ClickCallback.Options.builder().uses(1).build()
-                )
-            )
-            .build()
-
-        val noButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel")))
-        )
-            .width(150)
-            .build()
-
-        val dialog = io.papermc.paper.dialog.Dialog.create { factory ->
-            factory.empty()
-                .base(
-                    io.papermc.paper.registry.data.dialog.DialogBase.builder(
-                        withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.title")))
-                    )
-                        .body(
-                            listOf(
-                                io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(
-                                    withoutItalic(
-                                        toComponent(
-                                            messageProvider.getMessage(
-                                                "rank.skill.gui.dialog.body",
-                                                "skill" to skillName
-                                            )
-                                        )
-                                    ),
-                                    280
-                                )
-                            )
-                        )
-                        .canCloseWithEscape(true)
-                        .pause(false)
-                        .afterAction(io.papermc.paper.registry.data.dialog.DialogBase.DialogAfterAction.CLOSE)
-                        .build()
-                )
-                .type(io.papermc.paper.registry.data.dialog.type.DialogType.confirmation(yesButton, noButton))
-        }
-
-        viewer.showDialog(dialog)
     }
 
     private fun openPrestigeSkillUnlockDialog(
@@ -2760,57 +2768,14 @@ class RankCommand(
         skill: SkillNode
     ) {
         val skillName = messageProvider.getSkillName(holder.state.profession, skill.skillId)
-        val yesButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm")))
+        ConfirmationDialog.show(
+            viewer,
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.prestige.dialog.title"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.prestige.dialog.body", "skill" to skillName))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel"))),
+            { target -> executePrestigeSkillUnlock(target, holder, skillTree, skill) },
         )
-            .width(150)
-            .action(
-                io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
-                    io.papermc.paper.registry.data.dialog.action.DialogActionCallback { _, audience ->
-                        val target = audience as? Player ?: return@DialogActionCallback
-                        executePrestigeSkillUnlock(target, holder, skillTree, skill)
-                    },
-                    net.kyori.adventure.text.event.ClickCallback.Options.builder().uses(1).build()
-                )
-            )
-            .build()
-
-        val noButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel")))
-        )
-            .width(150)
-            .build()
-
-        val dialog = io.papermc.paper.dialog.Dialog.create { factory ->
-            factory.empty()
-                .base(
-                    io.papermc.paper.registry.data.dialog.DialogBase.builder(
-                        withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.prestige.dialog.title")))
-                    )
-                        .body(
-                            listOf(
-                                io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(
-                                    withoutItalic(
-                                        toComponent(
-                                            messageProvider.getMessage(
-                                                "rank.skill.gui.prestige.dialog.body",
-                                                "skill" to skillName
-                                            )
-                                        )
-                                    ),
-                                    280
-                                )
-                            )
-                        )
-                        .canCloseWithEscape(true)
-                        .pause(false)
-                        .afterAction(io.papermc.paper.registry.data.dialog.DialogBase.DialogAfterAction.CLOSE)
-                        .build()
-                )
-                .type(io.papermc.paper.registry.data.dialog.type.DialogType.confirmation(yesButton, noButton))
-        }
-
-        viewer.showDialog(dialog)
     }
 
     private fun executePrestigeSkillUnlock(
@@ -2860,7 +2825,7 @@ class RankCommand(
             holder.state.lastAction = "route:scroll:${holder.state.viewportStartX}"
             renderSkillTreeGui(holder.backingInventory, skillTree, holder.state)
             if (viewer != null) {
-                viewer.playSound(viewer.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.2f)
+                ManagedMenuPresenter.success(viewer)
             }
             return
         }
@@ -2875,7 +2840,7 @@ class RankCommand(
         holder.state.lastAction = "route:$targetSkillId"
         renderSkillTreeGui(holder.backingInventory, skillTree, holder.state)
         if (viewer != null) {
-            viewer.playSound(viewer.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.2f)
+            ManagedMenuPresenter.success(viewer)
         }
     }
 
@@ -2898,7 +2863,7 @@ class RankCommand(
                     player.sendMessage(messageProvider.getMessage("release.skill_unavailable"))
                     return
                 }
-                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                ManagedMenuPresenter.success(player)
                 openSkillTreeGui(player)
             }
             MAIN_MENU_PROFESSION_OVERVIEW_SLOT -> {
@@ -2919,7 +2884,7 @@ class RankCommand(
 
                 if (event.isLeftClick) {
                     // 左クリック: スキル切替
-                    player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                    ManagedMenuPresenter.success(player)
                     ActiveSkillManager.rotateActiveSkill(player)
                     // メニューを更新
                     val profession = rankManager.getPlayerProfession(player.uniqueId) ?: return
@@ -2927,7 +2892,7 @@ class RankCommand(
                     renderProfessionMainMenu(holder.backingInventory, player, profession)
                 } else if (event.isRightClick) {
                     // 右クリック: 切替様式変更
-                    player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.5f)
+                    ManagedMenuPresenter.success(player)
                     ActiveSkillManager.rotateSwitchMode(player)
                     // メニューを更新
                     val profession = rankManager.getPlayerProfession(player.uniqueId) ?: return
@@ -2936,7 +2901,7 @@ class RankCommand(
                 }
             }
             MAIN_MENU_SETTINGS_SLOT -> {
-                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                ManagedMenuPresenter.success(player)
                 openProfessionSettingsMenu(player)
             }
             MAIN_MENU_PLAYER_INFO_SLOT, MAIN_MENU_HINT_SLOT -> {
@@ -2963,18 +2928,18 @@ class RankCommand(
                 val nextMode = currentMode.next()
                 rankManager.setProfessionBossBarDisplayMode(player.uniqueId, nextMode)
                 rankManager.savePlayerProfession(player.uniqueId)
-                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                ManagedMenuPresenter.success(player)
                 renderProfessionSettingsMenu(holder.backingInventory, playerProfession, player)
             }
             SETTINGS_MENU_LEVELUP_NOTIFY_SLOT -> {
                 val current = rankManager.isLevelUpNotificationEnabled(player.uniqueId)
                 rankManager.setLevelUpNotificationEnabled(player.uniqueId, !current)
                 rankManager.savePlayerProfession(player.uniqueId)
-                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 2.0f)
+                ManagedMenuPresenter.success(player)
                 renderProfessionSettingsMenu(holder.backingInventory, playerProfession, player)
             }
             SETTINGS_MENU_BACK_SLOT -> {
-                player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.8f, 1.0f)
+                ManagedMenuPresenter.success(player)
                 openProfessionMainMenu(player)
             }
         }
@@ -2991,136 +2956,46 @@ class RankCommand(
     private fun openPrestigeConfirmDialogFirst(player: Player) {
         if (!rankManager.canPrestige(player.uniqueId)) {
             player.sendMessage(messageProvider.getMessage("rank.prestige.cannot"))
-            player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
+            ManagedMenuPresenter.rejected(player)
             return
         }
 
         val profession = rankManager.getPlayerProfession(player.uniqueId)?.profession ?: return
         val professionName = messageProvider.getProfessionName(profession)
         val prestigeLevel = rankManager.getPrestigeLevel(player.uniqueId)
-
-        val yesButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm")))
+        ConfirmationDialog.show(
+            player,
+            withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.first.title"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.first.body", "profession" to professionName, "level" to prestigeLevel))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel"))),
+            { target -> openPrestigeConfirmDialogSecond(target) },
         )
-            .width(150)
-            .action(
-                io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
-                    io.papermc.paper.registry.data.dialog.action.DialogActionCallback { _, audience ->
-                        val target = audience as? Player ?: return@DialogActionCallback
-                        openPrestigeConfirmDialogSecond(target)
-                    },
-                    net.kyori.adventure.text.event.ClickCallback.Options.builder().uses(1).build()
-                )
-            )
-            .build()
-
-        val noButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel")))
-        )
-            .width(150)
-            .build()
-
-        val dialog = io.papermc.paper.dialog.Dialog.create { factory ->
-            factory.empty()
-                .base(
-                    io.papermc.paper.registry.data.dialog.DialogBase.builder(
-                        withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.first.title")))
-                    )
-                        .body(
-                            listOf(
-                                io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(
-                                    withoutItalic(
-                                        toComponent(
-                                            messageProvider.getMessage(
-                                                "rank.prestige.dialog.first.body",
-                                                "profession" to professionName,
-                                                "level" to prestigeLevel
-                                            )
-                                        )
-                                    ),
-                                    280
-                                )
-                            )
-                        )
-                        .canCloseWithEscape(true)
-                        .pause(false)
-                        .afterAction(io.papermc.paper.registry.data.dialog.DialogBase.DialogAfterAction.CLOSE)
-                        .build()
-                )
-                .type(io.papermc.paper.registry.data.dialog.type.DialogType.confirmation(yesButton, noButton))
-        }
-
-        player.showDialog(dialog)
     }
 
     private fun openPrestigeConfirmDialogSecond(player: Player) {
         val profession = rankManager.getPlayerProfession(player.uniqueId)?.profession ?: return
         val professionName = messageProvider.getProfessionName(profession)
         val prestigeLevel = rankManager.getPrestigeLevel(player.uniqueId)
-
-        val yesButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm")))
+        ConfirmationDialog.show(
+            player,
+            withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.second.title"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.second.body", "profession" to professionName, "level" to prestigeLevel))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm"))),
+            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel"))),
+            { target -> executePrestige(target) },
         )
-            .width(150)
-            .action(
-                io.papermc.paper.registry.data.dialog.action.DialogAction.customClick(
-                    io.papermc.paper.registry.data.dialog.action.DialogActionCallback { _, audience ->
-                        val target = audience as? Player ?: return@DialogActionCallback
-                        executePrestige(target)
-                    },
-                    net.kyori.adventure.text.event.ClickCallback.Options.builder().uses(1).build()
-                )
-            )
-            .build()
-
-        val noButton = io.papermc.paper.registry.data.dialog.ActionButton.builder(
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel")))
-        )
-            .width(150)
-            .build()
-
-        val dialog = io.papermc.paper.dialog.Dialog.create { factory ->
-            factory.empty()
-                .base(
-                    io.papermc.paper.registry.data.dialog.DialogBase.builder(
-                        withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.second.title")))
-                    )
-                        .body(
-                            listOf(
-                                io.papermc.paper.registry.data.dialog.body.DialogBody.plainMessage(
-                                    withoutItalic(
-                                        toComponent(
-                                            messageProvider.getMessage(
-                                                "rank.prestige.dialog.second.body",
-                                                "profession" to professionName,
-                                                "level" to prestigeLevel
-                                            )
-                                        )
-                                    ),
-                                    280
-                                )
-                            )
-                        )
-                        .canCloseWithEscape(true)
-                        .pause(false)
-                        .afterAction(io.papermc.paper.registry.data.dialog.DialogBase.DialogAfterAction.CLOSE)
-                        .build()
-                )
-                .type(io.papermc.paper.registry.data.dialog.type.DialogType.confirmation(yesButton, noButton))
-        }
-
-        player.showDialog(dialog)
     }
 
     private fun executePrestige(player: Player) {
         val success = rankManager.executePrestige(player.uniqueId)
         if (!success) {
             player.sendMessage(messageProvider.getMessage("rank.prestige.failed"))
-            player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
+            ManagedMenuPresenter.rejected(player)
             return
         }
 
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         openProfessionMainMenu(player)
     }
 
@@ -3146,7 +3021,7 @@ class RankCommand(
         
         // 既に職業を持っている場合は何もしない
         if (rankManager.hasProfession(player.uniqueId)) {
-            player.playSound(player.location, Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f)
+            ManagedMenuPresenter.rejected(player)
             return
         }
         
@@ -3183,48 +3058,6 @@ class RankCommand(
             return
         }
         event.isCancelled = true
-    }
-
-    @EventHandler
-    fun onTutorialRankMenuClick(event: InventoryClickEvent) {
-        if (event.view.topInventory.holder !is TutorialRankMenuGuiHolder) return
-        event.cancelWithDebug("RankCommand.onTutorialRankMenuClick: tutorial_menu")
-    }
-
-    @EventHandler
-    fun onTutorialRankMenuDrag(event: InventoryDragEvent) {
-        if (event.view.topInventory.holder !is TutorialRankMenuGuiHolder) {
-            return
-        }
-        event.isCancelled = true
-    }
-
-    @EventHandler
-    fun onTaskInfoGuiClick(event: InventoryClickEvent) {
-        if (event.view.topInventory.holder !is TaskInfoGuiHolder) {
-            return
-        }
-        event.cancelWithDebug("RankCommand.onTaskInfoGuiClick: task_info")
-    }
-
-    @EventHandler
-    fun onTaskInfoGuiDrag(event: InventoryDragEvent) {
-        if (event.view.topInventory.holder !is TaskInfoGuiHolder) {
-            return
-        }
-        event.isCancelled = true
-    }
-
-    private class TutorialRankMenuGuiHolder : InventoryHolder {
-        lateinit var backingInventory: Inventory
-
-        override fun getInventory(): Inventory = backingInventory
-    }
-
-    private class TaskInfoGuiHolder : InventoryHolder {
-        lateinit var backingInventory: Inventory
-
-        override fun getInventory(): Inventory = backingInventory
     }
 
     private enum class TutorialRankTaskDisplayMode {
@@ -3310,6 +3143,9 @@ class RankCommand(
     }
 
     companion object {
+        private const val MENU_OWNER = "cc-content"
+        private const val TUTORIAL_MENU_ID = "rank-tutorial"
+        private const val TASK_INFO_MENU_ID = "rank-task-info"
         private val LEGACY_SERIALIZER: LegacyComponentSerializer = LegacyComponentSerializer.legacySection()
         private const val VIEWPORT_DEPTH_SPACING = 4
         private const val VIEWPORT_SELECTED_COLUMN = 2

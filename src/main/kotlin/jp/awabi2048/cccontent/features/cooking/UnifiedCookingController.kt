@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.cooking
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
@@ -113,7 +115,7 @@ internal class UnifiedCookingController(
         }
         if (raw == UnifiedCookingLayout.CLOSE) {
             event.isCancelled = true
-            if (event.click == ClickType.LEFT) player.closeInventory()
+            if (event.click == ClickType.LEFT) ManagedMenuPresenter.close(player)
             return
         }
         if (raw == UnifiedCookingLayout.START) {
@@ -178,7 +180,7 @@ internal class UnifiedCookingController(
         val key = CookingStationKey.from(event.block)
         val data = stations[key] ?: return
         stations.remove(key)
-        locks.remove(key)?.let { Bukkit.getPlayer(it)?.closeInventory() }
+        locks.remove(key)?.let { Bukkit.getPlayer(it)?.let(ManagedMenuPresenter::close) }
         dropContents(event.block, data)
         dirty = true
         flush()
@@ -219,7 +221,12 @@ internal class UnifiedCookingController(
         val inventory = Bukkit.createInventory(holder, 45, Component.text(title))
         holder.backingInventory = inventory
         render(player, inventory, holder)
-        player.openInventory(inventory)
+        ManagedMenuPresenter.open(
+            player,
+            inventory,
+            menuId = "cooking_${holder.equipment.name.lowercase()}",
+            policy = ManagedMenuPresenter.inputPolicy(holder.inputSlots),
+        )
     }
 
     private fun render(player: Player, inventory: Inventory, holder: UnifiedCookingHolder) {
@@ -679,7 +686,7 @@ internal class UnifiedCookingController(
     }
 
     private fun closeIfOpen(player: Player) {
-        if (player.openInventory.topInventory.holder is UnifiedCookingHolder) player.closeInventory()
+        if (player.openInventory.topInventory.holder is UnifiedCookingHolder) ManagedMenuPresenter.close(player)
     }
 
     private fun flush() {

@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.npc.menu
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
@@ -303,8 +305,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, menuSize(view), title(player, view))
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
-        playMenuOpen(player)
+        ManagedMenuPresenter.open(player, inventory, menuId = MENU_ID)
     }
 
     private fun openShopMenu(player: Player) {
@@ -317,8 +318,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, OAGE_BOX_SIZE, title(player, NpcMenuView.OAGE_BOX))
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
-        playMenuOpen(player)
+        ManagedMenuPresenter.open(player, inventory, menuId = MENU_ID)
     }
 
     private fun openOageBoxConfirm(player: Player, reward: OageBoxReward) {
@@ -327,8 +327,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8おあげBOX - 確認")
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
-        playMenuOpen(player)
+        ManagedMenuPresenter.open(player, inventory, menuId = MENU_ID)
     }
 
     private fun render(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
@@ -378,8 +377,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, DEAD_CHEST_SELECTION_LAYOUT.size, "§8失具還術 - 選択")
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
-        playMenuOpen(player)
+        ManagedMenuPresenter.open(player, inventory, menuId = MENU_ID)
         return true
     }
 
@@ -393,8 +391,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8失具還術 - 確認")
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
-        playMenuOpen(player)
+        ManagedMenuPresenter.open(player, inventory, menuId = MENU_ID)
         return true
     }
 
@@ -404,8 +401,7 @@ class NpcMenuService(
         val inventory = Bukkit.createInventory(holder, MENU_SIZE, "§8奉納品 - 確認")
         holder.backingInventory = inventory
         render(player, holder, inventory)
-        player.openInventory(inventory)
-        playMenuOpen(player)
+        ManagedMenuPresenter.open(player, inventory, menuId = MENU_ID)
     }
 
     private fun renderDeadChestSelection(player: Player, holder: NpcMenuHolder, inventory: Inventory) {
@@ -486,7 +482,7 @@ class NpcMenuService(
     private fun confirmDeadChestRecovery(player: Player, snapshot: DeadChestSnapshot) {
         if (!prepareDeadChestRecovery(player, snapshot)) return
 
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         player.playSound(player.location, "minecraft:entity.fox.ambient", 1.0f, 1.0f)
         player.sendMessage(OageMessageSender.getPrefix(plugin) + "ほにゃらら～ ⋯")
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
@@ -497,7 +493,7 @@ class NpcMenuService(
     private fun prepareDeadChestRecovery(player: Player, snapshot: DeadChestSnapshot): Boolean {
         if (!deadChestRecoveryService.isAvailable()) {
             playError(player)
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             player.sendMessage("§cDeadChestが利用できないため、失具還術を行えません。")
             return false
         }
@@ -508,7 +504,7 @@ class NpcMenuService(
         }
         val current = deadChestRecoveryService.getActiveChests(player).firstOrNull { sameDeadChest(it, snapshot) } ?: run {
             playError(player)
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             player.sendMessage("§c回収対象のデスチェストが見つかりませんでした。")
             return false
         }
@@ -559,7 +555,7 @@ class NpcMenuService(
         if (!recovered) {
             ContentEconomyBridge.deposit(plugin, player, DEAD_CHEST_RECOVERY_COST)
             playError(player)
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             player.sendMessage("§c回収に失敗したため、初穂料を返しました。")
             return
         }
@@ -796,7 +792,7 @@ class NpcMenuService(
 
     private fun confirmDelivery(player: Player, selected: DeliveryItemMatch) {
         if (professionProvider(player.uniqueId) != Profession.BREWER || isDeliveryCompleted(player.uniqueId)) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             return
         }
 
@@ -814,7 +810,7 @@ class NpcMenuService(
         grantWorldPoint(player.uniqueId, DELIVERY_WORLD_POINT_REWARD) ?: return
         consumeOneDeliveryItem(player, target.slot)
         markDeliveryCompleted(player.uniqueId)
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 1.5f)
         player.playSound(player.location, Sound.ENTITY_CHICKEN_AMBIENT, 0.8f, 1.5f)
         player.sendMessage("${target.displayName}§7を奉納して、§6🛖 §e$DELIVERY_WORLD_POINT_REWARD ワールドポイント§7を手に入れました！")
@@ -856,7 +852,7 @@ class NpcMenuService(
     private fun handlePartTimeClick(player: Player) {
         if (isPartTimeOpened(player.uniqueId) || !isPartTimeTaskCompleted(player.uniqueId, PART_TIME_TASK_ARENA)) return
         playClick(player)
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
         OageMessageSender.send(player, "§f今日もありがとうございます！好きなものを持っていってね", plugin, sound = null, volume = 1f, pitch = 1.5f)
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             if (player.isOnline && !isPartTimeOpened(player.uniqueId)) {
@@ -868,7 +864,7 @@ class NpcMenuService(
     private fun handleOageBoxRewardClick(player: Player, holder: NpcMenuHolder, slot: Int) {
         if (isPartTimeOpened(player.uniqueId)) {
             playError(player)
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             player.sendMessage("§7今日のご褒美は受け取り済みです。")
             return
         }
@@ -880,7 +876,7 @@ class NpcMenuService(
     private fun confirmOageBoxReward(player: Player, reward: OageBoxReward) {
         if (isPartTimeOpened(player.uniqueId)) {
             playError(player)
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             player.sendMessage("§7今日のご褒美は受け取り済みです。")
             return
         }
@@ -899,7 +895,7 @@ class NpcMenuService(
         playClick(player)
         player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 0.8f, 2.0f)
         player.sendMessage("§aおあげBOXから ${reward.receivedDisplayName(player)} を入手しました！")
-        player.closeInventory()
+        ManagedMenuPresenter.close(player)
     }
 
     private fun validateOageBoxRewardGrant(player: Player, reward: OageBoxReward): String? = when (reward) {
@@ -978,15 +974,11 @@ class NpcMenuService(
     }
 
     private fun playClick(player: Player) {
-        CCSystem.getAPI().getMenuSoundService().onMenuClick(player, MENU_ID)
+        ManagedMenuPresenter.success(player)
     }
 
     private fun playError(player: Player) {
-        CCSystem.getAPI().getMenuSoundService().onMenuClick(player, MENU_ID, com.awabi2048.ccsystem.api.gui.MenuClickType.CANCEL)
-    }
-
-    private fun playMenuOpen(player: Player) {
-        CCSystem.getAPI().getMenuSoundService().onMenuOpen(player, MENU_ID)
+        ManagedMenuPresenter.success(player, com.awabi2048.ccsystem.api.gui.MenuClickType.CANCEL)
     }
 
     private fun formatAcorn(amount: Double, color: String = "§e"): String = ContentEconomyBridge.formatAcorn(amount, color)

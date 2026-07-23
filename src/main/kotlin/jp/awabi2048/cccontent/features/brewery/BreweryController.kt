@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.brewery
 
+import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
@@ -729,7 +731,12 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             FermentationState(key, inv)
         }
         localizeInventory(player, state)
-        player.openInventory(state.inventory)
+        ManagedMenuPresenter.open(
+            player,
+            state.inventory,
+            menuId = "brewery_fermentation",
+            policy = ManagedMenuPresenter.inputPolicy(FERMENT_INPUT_SLOTS + FERMENT_YEAST_SLOT),
+        )
         refreshFermentationDecor(state, player)
     }
 
@@ -742,7 +749,12 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             DistillationState(key, inv)
         }
         localizeInventory(player, state)
-        player.openInventory(state.inventory)
+        ManagedMenuPresenter.open(
+            player,
+            state.inventory,
+            menuId = "brewery_distillation",
+            policy = ManagedMenuPresenter.inputPolicy(DISTILL_INPUT_SLOTS + DISTILL_FILTER_SLOT),
+        )
         refreshDistillationDecor(state, player)
     }
 
@@ -773,7 +785,17 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         state.barrelWoodType = context.woodType
         state.barrelId = context.barrelId
         localizeInventory(player, state)
-        player.openInventory(state.inventory)
+        ManagedMenuPresenter.open(
+            player,
+            state.inventory,
+            menuId = "brewery_aging",
+            policy = ManagedMenuPresenter.inputPolicy(
+                agingInputSlots(state) + when (state.size) {
+                    BarrelSize.BIG -> BIG_AGING_BARREL_SLOT
+                    BarrelSize.SMALL -> SMALL_AGING_BARREL_SLOT
+                }
+            ),
+        )
         refreshAgingDecor(state, player)
     }
 
@@ -795,7 +817,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val state = fermentationStates[key] ?: return
         val slot = event.rawSlot
         if (slot == FERMENT_CLOSE_SLOT) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             return
         }
 
@@ -874,7 +896,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val state = distillationStates[key] ?: return
         val slot = event.rawSlot
         if (slot == DISTILL_CLOSE_SLOT) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             return
         }
 
@@ -935,7 +957,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val state = agingStates[key] ?: return
         val slot = event.rawSlot
         if (slot == if (state.size == BarrelSize.BIG) 45 else 36) {
-            player.closeInventory()
+            ManagedMenuPresenter.close(player)
             return
         }
         val inputSlots = agingInputSlots(state)
@@ -1668,7 +1690,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         }
         machineLocks.remove(canonicalKey)
         inventories.forEach { inventory ->
-            inventory.viewers.toList().forEach { it.closeInventory() }
+            inventory.viewers.filterIsInstance<Player>().forEach(ManagedMenuPresenter::close)
             inventory.clear()
         }
         if (inventories.isNotEmpty() || registered != null) {
@@ -1865,7 +1887,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
     }
 
     private fun playUiSuccessSound(player: Player) {
-        player.playSound(player.location, Sound.UI_BUTTON_CLICK, 0.9f, 1.1f)
+        ManagedMenuPresenter.success(player)
     }
 
     private fun playStartSound(player: Player) {
