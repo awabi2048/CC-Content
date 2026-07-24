@@ -23,6 +23,10 @@ class RankMenuCommand(
             sender.sendMessage("§cこのコマンドはプレイヤーのみ実行できます")
             return false
         }
+        if (args.isNotEmpty()) {
+            sender.sendMessage("§c使用法: /rankmenu")
+            return false
+        }
 
         return CCSystem.getAPI().getMenuCommandService().open(
             sender,

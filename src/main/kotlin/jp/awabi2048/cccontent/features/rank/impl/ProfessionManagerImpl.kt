@@ -157,7 +157,7 @@ class ProfessionManagerImpl(
                         )
                             .color(NamedTextColor.LIGHT_PURPLE)
                             .decoration(TextDecoration.ITALIC, false)
-                            .clickEvent(ClickEvent.runCommand("/rankmenu skill"))
+                            .clickEvent(ClickEvent.runCommand("/rankmenu"))
                         player.sendMessage(message)
                     }
                 }

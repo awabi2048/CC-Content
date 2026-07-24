@@ -123,9 +123,33 @@ class RankCommand(
         }
         
         return when (args[0].lowercase()) {
-            "add-exp" -> handleAddExp(sender, args)
-            "set-prof-level" -> handleSetProfLevel(sender, args)
-            "set" -> handleSet(sender, args)
+            "exp" -> {
+                if (args.getOrNull(1).equals("add", ignoreCase = true)) {
+                    handleAddExp(sender, arrayOf("add-exp", *args.drop(2).toTypedArray()))
+                } else {
+                    sendUsage(sender)
+                    false
+                }
+            }
+            "profession" -> when {
+                args.getOrNull(1).equals("level", ignoreCase = true) &&
+                    args.getOrNull(2).equals("set", ignoreCase = true) ->
+                    handleSetProfLevel(sender, arrayOf("set-prof-level", *args.drop(3).toTypedArray()))
+                args.getOrNull(1).equals("set", ignoreCase = true) ->
+                    handleSetProfession(sender, args.drop(2))
+                else -> {
+                    sendUsage(sender)
+                    false
+                }
+            }
+            "tutorial" -> {
+                if (args.getOrNull(1).equals("set", ignoreCase = true)) {
+                    handleSetTutorialRank(sender, args.drop(2))
+                } else {
+                    sendUsage(sender)
+                    false
+                }
+            }
             "reset" -> handleReset(sender, args)
             else -> {
                 sendUsage(sender)
@@ -136,7 +160,7 @@ class RankCommand(
     
     private fun handleAddExp(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 3) {
-            sender.sendMessage("§c使用法: /ccc rank add-exp <player> <amount>")
+            sender.sendMessage("§c使用法: /ccc rank exp add <player> <amount>")
             return false
         }
         
@@ -165,7 +189,7 @@ class RankCommand(
 
     private fun handleSetProfLevel(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 3) {
-            sender.sendMessage("§c使用法: /ccc rank set-prof-level <player> <level>")
+            sender.sendMessage("§c使用法: /ccc rank profession level set <player> <level>")
             return false
         }
 
@@ -192,35 +216,19 @@ class RankCommand(
         return success
     }
 
-    private fun handleSet(sender: CommandSender, args: Array<out String>): Boolean {
-        if (args.size < 3) {
-            sender.sendMessage("§c使用法: /ccc rank set <player> <ランク名>")
+    private fun handleSetProfession(sender: CommandSender, args: List<String>): Boolean {
+        if (args.size < 2) {
+            sender.sendMessage("§c使用法: /ccc rank profession set <player> <profession>")
             return false
         }
 
-        val player = resolveKnownPlayer(args[1])
+        val player = resolveKnownPlayer(args[0])
         if (player == null) {
-            sender.sendMessage("§cプレイヤーが見つかりません: ${args[1]}")
+            sender.sendMessage("§cプレイヤーが見つかりません: ${args[0]}")
             return false
         }
-        val targetName = args[2]
+        val targetName = args[1]
         val uuid = player.uniqueId
-
-        val tutorialRank = TutorialRank.entries.firstOrNull { it.name.equals(targetName, ignoreCase = true) }
-        if (tutorialRank != null) {
-            rankManager.resetProfession(uuid)
-            rankManager.setTutorialRank(uuid, tutorialRank)
-
-            val tutorial = rankManager.getPlayerTutorial(uuid)
-            tutorial.taskProgress = TaskProgress(uuid, tutorialRank.name)
-            tutorial.lastUpdated = System.currentTimeMillis()
-            tutorial.lastPlayTime = System.currentTimeMillis()
-            rankManager.saveData()
-            Bukkit.getPlayer(uuid)?.let(::refreshSkillEffectCache)
-
-            sender.sendMessage("§a${player.name ?: args[1]} のランクを ${tutorialRank.name} に設定しました")
-            return true
-        }
 
         val profession = Profession.entries.firstOrNull {
             it.id.equals(targetName, ignoreCase = true) || it.name.equals(targetName, ignoreCase = true)
@@ -245,15 +253,44 @@ class RankCommand(
 
             Bukkit.getPlayer(uuid)?.let(::refreshSkillEffectCache)
 
-            sender.sendMessage("§a${player.name ?: args[1]} のランクを職業 ${profession.id} に設定しました")
+            sender.sendMessage("§a${player.name ?: args[0]} の職業を ${profession.id} に設定しました")
             return true
         }
 
-        sender.sendMessage("§c無効なランク名です: $targetName")
-        sender.sendMessage(
-            "§7使用可能: ${TutorialRank.entries.joinToString(", ") { it.name }} / ${Profession.entries.joinToString(", ") { it.id }}"
-        )
+        sender.sendMessage("§c無効な職業IDです: $targetName")
+        sender.sendMessage("§7使用可能: ${Profession.entries.joinToString(", ") { it.id }}")
         return false
+    }
+
+    private fun handleSetTutorialRank(sender: CommandSender, args: List<String>): Boolean {
+        if (args.size < 2) {
+            sender.sendMessage("§c使用法: /ccc rank tutorial set <player> <rank>")
+            return false
+        }
+
+        val player = resolveKnownPlayer(args[0])
+        if (player == null) {
+            sender.sendMessage("§cプレイヤーが見つかりません: ${args[0]}")
+            return false
+        }
+        val tutorialRank = TutorialRank.entries.firstOrNull { it.name.equals(args[1], ignoreCase = true) }
+        if (tutorialRank == null) {
+            sender.sendMessage("§c無効なチュートリアルランクです: ${args[1]}")
+            sender.sendMessage("§7使用可能: ${TutorialRank.entries.joinToString(", ") { it.name.lowercase() }}")
+            return false
+        }
+
+        val uuid = player.uniqueId
+        rankManager.resetProfession(uuid)
+        rankManager.setTutorialRank(uuid, tutorialRank)
+        val tutorial = rankManager.getPlayerTutorial(uuid)
+        tutorial.taskProgress = TaskProgress(uuid, tutorialRank.name)
+        tutorial.lastUpdated = System.currentTimeMillis()
+        tutorial.lastPlayTime = System.currentTimeMillis()
+        rankManager.saveData()
+        Bukkit.getPlayer(uuid)?.let(::refreshSkillEffectCache)
+        sender.sendMessage("§a${player.name ?: args[0]} のチュートリアルランクを ${tutorialRank.name} に設定しました")
+        return true
     }
 
     private fun refreshSkillEffectCache(player: Player) {
@@ -275,9 +312,9 @@ class RankCommand(
         )
     }
     
-    private fun handleRankUp(sender: CommandSender, args: Array<out String>): Boolean {
+    private fun handleReset(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 2) {
-            sender.sendMessage("§c使用法: /rank rankup <player>")
+            sender.sendMessage("§c使用法: /ccc rank reset <player>")
             return false
         }
         
@@ -287,86 +324,13 @@ class RankCommand(
             return false
         }
         
-        val currentRank = rankManager.getTutorialRank(player.uniqueId)
-        val nextRank = TutorialRank.values().getOrNull(currentRank.ordinal + 1)
-        
-        if (nextRank == null) {
-            sender.sendMessage("§c${player.name} は既に最高ランクです")
-            return false
-        }
-        
-        rankManager.setTutorialRank(player.uniqueId, nextRank)
-        sender.sendMessage("§a${player.name} を $nextRank にランクアップしました")
-        Bukkit.getPlayer(player.uniqueId)?.sendMessage("§aランクアップ！§6${nextRank.name}§aになりました")
-        
-        return true
-    }
-    
-    private fun handleProfession(sender: CommandSender, args: Array<out String>): Boolean {
-        if (args.size < 3) {
-            sender.sendMessage("§c使用法: /rank profession <player> <profession_id>")
-            sender.sendMessage("§6職業ID: lumberjack, brewer, miner")
-            return false
-        }
-        
-        val player = Bukkit.getPlayer(args[1])
-        if (player == null) {
-            sender.sendMessage("§cプレイヤーが見つかりません: ${args[1]}")
-            return false
-        }
-        
-        val professionId = args[2]
-        val profession = Profession.fromId(professionId)
-        if (profession == null) {
-            sender.sendMessage("§c無効な職業ID: $professionId")
-            return false
-        }
-        
-        val success = if (rankManager.hasProfession(player.uniqueId)) {
-            rankManager.changeProfession(player.uniqueId, profession)
-        } else {
-            rankManager.selectProfession(player.uniqueId, profession)
-        }
-        
-        if (success) {
-            sender.sendMessage("§a${player.name} の職業を変更/選択しました: ${profession.id}")
-        } else {
-            sender.sendMessage("§c職業の変更/選択に失敗しました")
-        }
-        
-        return success
-    }
-    
-    private fun handleSkill(sender: CommandSender, args: Array<out String>): Boolean {
-        if (args.size == 1) {
-            if (sender !is Player) {
-                sender.sendMessage(messageProvider.getMessage("rank.skill.player_only"))
-                return false
-            }
-            return openSkillTreeGui(sender)
-        }
-
-        sender.sendMessage(messageProvider.getMessage("rank.skill.usage"))
-        return false
-    }
-    
-    private fun handleReset(sender: CommandSender, args: Array<out String>): Boolean {
-        if (args.size < 2) {
-            sender.sendMessage("§c使用法: /ccc rank reset <player>")
-            return false
-        }
-        
-        val player = Bukkit.getPlayer(args[1])
-        if (player == null) {
-            sender.sendMessage("§cプレイヤーが見つかりません: ${args[1]}")
-            return false
-        }
-        
         val uuid = player.uniqueId
         rankManager.resetProfession(uuid)
         SkillEffectEngine.clearCache(uuid)
-        AttackReachBoostHandler.removeModifier(uuid)
-        rankManager.hideProfessionBossBar(uuid)
+        Bukkit.getPlayer(uuid)?.let {
+            AttackReachBoostHandler.removeModifier(uuid)
+            rankManager.hideProfessionBossBar(uuid)
+        }
 
         val resetRank = resolveLowestDefinedTutorialRank()
         val tutorial = rankManager.getPlayerTutorial(uuid)
@@ -377,74 +341,6 @@ class RankCommand(
         rankManager.saveData()
 
         sender.sendMessage("§a${player.name} を ${resetRank.name} にリセットしました")
-        return true
-    }
-
-    private fun handleBossbar(sender: CommandSender, args: Array<out String>): Boolean {
-        if (sender !is Player) {
-            sender.sendMessage("§cこのコマンドはプレイヤーのみ実行できます")
-            return false
-        }
-
-        if (args.size < 2) {
-            val currentState = if (rankManager.isProfessionBossBarEnabled(sender.uniqueId)) "有効" else "無効"
-            sender.sendMessage("§a職業経験値ボスバー: §f$currentState")
-            sender.sendMessage("§7使用法: /rank bossbar <on|off>")
-            return true
-        }
-
-        val enabled = when (args[1].lowercase()) {
-            "on", "true", "enable" -> true
-            "off", "false", "disable" -> false
-            else -> {
-                sender.sendMessage("§c使用法: /rank bossbar <on|off>")
-                return false
-            }
-        }
-
-        rankManager.setProfessionBossBarEnabled(sender.uniqueId, enabled)
-        val stateText = if (enabled) "有効" else "無効"
-        sender.sendMessage("§a職業経験値ボスバーを${stateText}にしました")
-        return true
-    }
-    
-    private fun handleInfo(sender: CommandSender, args: Array<out String>): Boolean {
-        val targetPlayer = if (args.size >= 2) {
-            Bukkit.getPlayer(args[1])
-        } else if (sender is Player) {
-            sender
-        } else {
-            sender.sendMessage("§cプレイヤーを指定してください")
-            return false
-        }
-
-        if (targetPlayer == null) {
-            sender.sendMessage("§cプレイヤーが見つかりません")
-            return false
-        }
-
-        val uuid = targetPlayer.uniqueId
-        val tutorial = rankManager.getPlayerTutorial(uuid)
-        val currentRank = rankManager.getPlayerRank(uuid)
-
-        sender.sendMessage("§6=== ${targetPlayer.name} のランク情報 ===")
-        sender.sendMessage("§a現在のランク: §e$currentRank")
-
-        if (currentRank == "ATTAINER") {
-            sender.sendMessage("§7職業を選択してください")
-        } else if (rankManager.getPlayerProfession(uuid) != null) {
-            val profession = rankManager.getPlayerProfession(uuid)
-            val currentLevel = rankManager.getCurrentProfessionLevel(uuid)
-            sender.sendMessage("§a職業レベル: $currentLevel")
-            sender.sendMessage("§a習得スキル: ${profession?.acquiredSkills?.joinToString(", ") ?: "なし"}")
-            sender.sendMessage("§a職業経験値: ${profession?.currentExp ?: 0}")
-        } else {
-            val nextRank = tutorial.getNextRank()
-            if (nextRank != null) {
-                sender.sendMessage("§7次のランク: §f${nextRank.name}")
-            }
-        }
-
         return true
     }
 
@@ -1944,60 +1840,6 @@ class RankCommand(
         return Material.matchMaterial(normalized) ?: Material.BARRIER
     }
     
-    /**
-     * タスク進捗情報を表示
-     */
-    private fun handleTaskInfo(sender: CommandSender, args: Array<out String>): Boolean {
-        if (args.size < 2) {
-            sender.sendMessage(messageProvider.getMessage("rank.tutorial_task_info.usage"))
-            return false
-        }
-
-        val targetPlayer = Bukkit.getPlayer(args[1])
-        if (targetPlayer == null) {
-            sender.sendMessage(messageProvider.getMessage("rank.tutorial_task_info.player_not_found"))
-            return false
-        }
-        
-        val loader = taskLoader
-        val checker = taskChecker
-        if (loader == null || checker == null) {
-            sender.sendMessage(messageProvider.getMessage("rank.tutorial_task_info.system_not_initialized"))
-            return false
-        }
-        
-        val uuid = targetPlayer.uniqueId
-        val tutorial = rankManager.getPlayerTutorial(uuid)
-        val viewer = if (sender is Player) sender else targetPlayer
-
-        openTaskInfoGui(viewer, targetPlayer, tutorial.currentRank.name)
-
-        if (sender !is Player) {
-            sender.sendMessage(
-                messageProvider.getMessage(
-                    "rank.tutorial_task_info.opened_for_player",
-                    "player" to targetPlayer.name
-                )
-            )
-        }
-        return true
-    }
-
-    private fun openTaskInfoGui(
-        viewer: Player,
-        targetPlayer: Player,
-        rankName: String,
-    ) {
-        CCSystem.getAPI().getMenuRuntimeService().open(
-            viewer,
-            MenuRoute(
-                MENU_OWNER,
-                TASK_INFO_MENU_ID,
-                mapOf("target" to targetPlayer.uniqueId.toString(), "rank" to rankName),
-            )
-        )
-    }
-
     private fun renderTaskInfoRuntimeView(viewer: Player, route: MenuRoute): InventoryMenuView {
         val targetPlayer = route.payload["target"]
             ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
@@ -3019,65 +2861,6 @@ class RankCommand(
     }
     
     /**
-     * タスク進捗をリセット
-     */
-    private fun handleTaskReset(sender: CommandSender, args: Array<out String>): Boolean {
-        if (args.size < 2) {
-            sender.sendMessage("§c使用法: /rank task-reset <player>")
-            return false
-        }
-        
-        val targetPlayer = Bukkit.getPlayer(args[1])
-        if (targetPlayer == null) {
-            sender.sendMessage("§cプレイヤーが見つかりません")
-            return false
-        }
-        
-        val uuid = targetPlayer.uniqueId
-        val tutorial = rankManager.getPlayerTutorial(uuid)
-        tutorial.taskProgress.reset()
-        
-        sender.sendMessage("§a${targetPlayer.name} のタスク進捗をリセットしました")
-        return true
-    }
-    
-    /**
-     * 現在のランクのすべてのタスクを完了扱いに
-     */
-    private fun handleCompleteTask(sender: CommandSender, args: Array<out String>): Boolean {
-        if (args.size < 2) {
-            sender.sendMessage("§c使用法: /rank complete-task <player>")
-            return false
-        }
-        
-        val targetPlayer = Bukkit.getPlayer(args[1])
-        if (targetPlayer == null) {
-            sender.sendMessage("§cプレイヤーが見つかりません")
-            return false
-        }
-        
-        val uuid = targetPlayer.uniqueId
-        val tutorial = rankManager.getPlayerTutorial(uuid)
-        
-        // 非常に大きな値を設定してすべてのタスクを完了扱いに
-        tutorial.taskProgress.playTime = Int.MAX_VALUE.toLong()
-        tutorial.taskProgress.vanillaExp = Long.MAX_VALUE
-        tutorial.taskProgress.mobKills.clear()
-        tutorial.taskProgress.blockMines.clear()
-        tutorial.taskProgress.bossKills.clear()
-        tutorial.taskProgress.items.clear()
-        
-        sender.sendMessage("§a${targetPlayer.name} のタスクをすべて完了扱いにしました")
-        
-        // ランクアップを試みる
-        if (rankManager.rankUpByTask(uuid)) {
-            sender.sendMessage("§a${targetPlayer.name} がランクアップしました！")
-        }
-        
-        return true
-    }
-    
-    /**
      * プレイ時間（分）を時間と分に変換
      * @param minutes プレイ時間（分）
      * @return "X時間Y分" または "Y分" の形式
@@ -3103,10 +2886,11 @@ class RankCommand(
     }
     
     private fun sendUsage(sender: CommandSender) {
-        sender.sendMessage("§6=== ランクシステムコマンド ===")
-        sender.sendMessage("§a/ccc rank add-exp <player> <amount> §7- 職業経験値を追加")
-        sender.sendMessage("§a/ccc rank set-prof-level <player> <level> §7- 職業レベルを設定")
-        sender.sendMessage("§a/ccc rank set <player> <ランク名> §7- ランクまたは職業を設定")
+        sender.sendMessage("§6=== ランク管理コマンド ===")
+        sender.sendMessage("§a/ccc rank exp add <player> <amount> §7- 職業経験値を追加")
+        sender.sendMessage("§a/ccc rank profession level set <player> <level> §7- 職業レベルを設定")
+        sender.sendMessage("§a/ccc rank profession set <player> <profession> §7- 職業を設定")
+        sender.sendMessage("§a/ccc rank tutorial set <player> <rank> §7- チュートリアルランクを設定")
         sender.sendMessage("§a/ccc rank reset <player> §7- 最低ランクにリセット")
     }
 
@@ -3117,16 +2901,7 @@ class RankCommand(
 
     fun completeAdmin(sender: CommandSender, args: Array<out String>): List<String> {
         if (!sender.hasPermission("cc-content.admin")) return emptyList()
-        return when {
-            args.size == 1 -> listOf("add-exp", "set-prof-level", "set", "reset")
-                .filter { it.startsWith(args[0], ignoreCase = true) }
-            args.size == 2 -> Bukkit.getOfflinePlayers().mapNotNull { it.name }
-                .filter { it.startsWith(args[1], ignoreCase = true) }
-            args.size == 3 && args[0].equals("set", ignoreCase = true) ->
-                (TutorialRank.entries.map { it.name.lowercase() } + Profession.entries.map { it.id })
-                    .filter { it.startsWith(args[2], ignoreCase = true) }
-            else -> emptyList()
-        }
+        return completeAdminArguments(args)
     }
     
     override fun onTabComplete(
@@ -3135,15 +2910,32 @@ class RankCommand(
         label: String,
         args: Array<out String>
     ): List<String> {
-        return when {
-            args.size == 1 -> listOf("add-exp", "set-prof-level", "set", "reset")
-                .filter { it.startsWith(args[0].lowercase()) }
-            args.size == 2 && args[0].equals("set", ignoreCase = true) ->
-                (TutorialRank.entries.map { it.name.lowercase() } + Profession.entries.map { it.id })
-                    .filter { it.startsWith(args[1].lowercase()) }
-            args.size == 2 -> Bukkit.getOnlinePlayers().map { it.name }
-                .filter { it.startsWith(args[1], ignoreCase = true) }
+        if (!sender.hasPermission("cc-content.admin")) return emptyList()
+        return completeAdminArguments(args)
+    }
+
+    private fun completeAdminArguments(args: Array<out String>): List<String> {
+        val candidates = when {
+            args.size == 1 -> listOf("exp", "profession", "tutorial", "reset")
+            args.size == 2 && args[0].equals("exp", true) -> listOf("add")
+            args.size == 2 && args[0].equals("profession", true) -> listOf("level", "set")
+            args.size == 2 && args[0].equals("tutorial", true) -> listOf("set")
+            args.size == 3 && args[0].equals("profession", true) && args[1].equals("level", true) -> listOf("set")
+            args.size == 2 && args[0].equals("reset", true) -> knownPlayerNames()
+            args.size == 3 && args[0].equals("exp", true) && args[1].equals("add", true) -> knownPlayerNames()
+            args.size == 3 && args[0].equals("profession", true) && args[1].equals("set", true) -> knownPlayerNames()
+            args.size == 3 && args[0].equals("tutorial", true) && args[1].equals("set", true) -> knownPlayerNames()
+            args.size == 4 && args[0].equals("profession", true) &&
+                args[1].equals("level", true) && args[2].equals("set", true) -> knownPlayerNames()
+            args.size == 4 && args[0].equals("profession", true) && args[1].equals("set", true) ->
+                Profession.entries.map { it.id }
+            args.size == 4 && args[0].equals("tutorial", true) && args[1].equals("set", true) ->
+                TutorialRank.entries.map { it.name.lowercase() }
             else -> emptyList()
         }
+        return candidates.filter { it.startsWith(args.last(), ignoreCase = true) }
     }
+
+    private fun knownPlayerNames(): List<String> =
+        Bukkit.getOfflinePlayers().mapNotNull { it.name }.distinct().sorted()
 }
