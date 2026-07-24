@@ -28,8 +28,8 @@ object TypedProfessionProfileResolver {
     }
 
     private fun miner(level: Int, skills: Set<String>, toggles: ProfessionFeatureToggles): MinerSkillProfile {
-        val tunnel = skills.any { it.startsWith("mineall_") || it.startsWith("blastmine_") }
-        val precision = skills.any { it.startsWith("fortune_") }
+        val precision = "fortune_2" in skills || "fortune_3" in skills
+        val tunnel = !precision && skills.any { it == "speed_2" || it.startsWith("mineall_") || it.startsWith("blastmine_") }
         return MinerSkillProfile(
             level = level,
             specialization = when {
@@ -60,8 +60,8 @@ object TypedProfessionProfileResolver {
     }
 
     private fun lumberjack(level: Int, skills: Set<String>, toggles: ProfessionFeatureToggles): LumberjackSkillProfile {
-        val felling = skills.any { it.startsWith("cut_all_") || it == "wind_gust" || it == "replant" }
-        val utilization = skills.any { it.startsWith("harvest_") }
+        val utilization = "harvest_2" in skills || "harvest_3" in skills
+        val felling = !utilization && skills.any { it == "speed_2" || it.startsWith("cut_all_") || it == "wind_gust" || it == "replant" }
         return LumberjackSkillProfile(
             level = level,
             specialization = when {
@@ -95,7 +95,7 @@ object TypedProfessionProfileResolver {
 
     private fun farmer(level: Int, skills: Set<String>, toggles: ProfessionFeatureToggles): FarmerSkillProfile {
         val cultivation = skills.any { it == "area_tilling" || it == "area_harvesting" || it == "auto_replanting" }
-        val wild = skills.any { it == "tool" || it.startsWith("special_loot_table_") }
+        val wild = "tool" in skills
         return FarmerSkillProfile(
             level = level,
             specialization = when {
