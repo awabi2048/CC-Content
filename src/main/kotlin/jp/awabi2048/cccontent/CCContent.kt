@@ -193,6 +193,7 @@ class CCContent : JavaPlugin(), Listener {
     private var minigameRuntime: MiniGameRuntime? = null
     private lateinit var npcMenuService: NpcMenuService
     private var rankManagerInstance: RankManagerImpl? = null
+    private var rankCommandInstance: RankCommand? = null
     private var ignoreBlockStoreInstance: IgnoreBlockStore? = null
     private lateinit var activeContentEnabledSettings: Map<String, Boolean>
     private var arenaFeatureReady: Boolean = false
@@ -535,7 +536,8 @@ class CCContent : JavaPlugin(), Listener {
                     }.onFailure(changeFailure::addSuppressed)
                     throw changeFailure
                 }
-            }
+            },
+            rankCommandProvider = { rankCommandInstance }
         )
 
         getCommand("cc-content")?.setExecutor(ccCommand)
@@ -814,6 +816,7 @@ class CCContent : JavaPlugin(), Listener {
 
             val translator = jp.awabi2048.cccontent.features.rank.tutorial.task.EntityBlockTranslator(messageProvider)
             val rankCommand = RankCommand(rankManager, messageProvider, null, null, translator)
+            rankCommandInstance = rankCommand
 
             val ignoreBlockStore = IgnoreBlockStore(File(dataFolder, "data/rank/ignore_blocks.yml"))
             ignoreBlockStoreInstance = ignoreBlockStore
@@ -869,6 +872,7 @@ class CCContent : JavaPlugin(), Listener {
             setFeatureUnavailableCommand("rank", "rank")
             setFeatureUnavailableCommand("rankmenu", "rank")
             rankManagerInstance = null
+            rankCommandInstance = null
             featureInitLogger.setStatus("Rank System", FeatureInitializationLogger.Status.FAILURE)
             featureInitLogger.addDetailMessage("Rank System", "[Rank System] 初期化失敗: ${e.message}")
             logger.warning("ランクシステムの初期化に失敗しました: ${e.message}")
@@ -897,14 +901,6 @@ class CCContent : JavaPlugin(), Listener {
                 opener = { player, _ -> rankCommand.openProfessionSelectionGui(player) }
             )
         )
-        val rankPluginCommand = getCommand("rank")
-        if (rankPluginCommand == null) {
-            logger.severe("/rank コマンドの登録に失敗しました（plugin.yml の commands.rank を確認してください）")
-        } else {
-            rankPluginCommand.setExecutor(rankCommand)
-            rankPluginCommand.tabCompleter = rankCommand
-        }
-
         val rankMenuPluginCommand = getCommand("rankmenu")
         if (rankMenuPluginCommand == null) {
             logger.severe("/rankmenu コマンドの登録に失敗しました（plugin.yml の commands.rankmenu を確認してください）")
@@ -1021,7 +1017,7 @@ class CCContent : JavaPlugin(), Listener {
             }
         }
 
-        for (profession in Profession.values().filterNot { it.usesTypedProfile }) {
+        for (profession in Profession.values()) {
             try {
                 val skillTree = CodeDefinedSkillTree.create(profession)
                 skillTree.getAllSkills().values.mapNotNull { it.effect?.type }.distinct().forEach { effectType ->

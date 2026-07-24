@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -64,7 +65,7 @@ class YamlRankStorageV2Test {
     }
 
     @Test
-    void typedProfessionRoundTripDoesNotPersistLegacySkillState() {
+    void typedProfessionRoundTripPersistsSkillTreeStateAndTypedOptions() {
         UUID uuid = UUID.randomUUID();
         YamlRankStorage storage = new YamlRankStorage(tempDirectory.toFile());
         storage.init();
@@ -77,14 +78,14 @@ class YamlRankStorageV2Test {
         PlayerProfession profession = new PlayerProfession(
             uuid,
             Profession.FISHER,
-            new HashSet<>(List.of("must_not_be_saved")),
+            new HashSet<>(List.of("initial", "patient_cast")),
             123L,
             999L,
             true,
             BossBarDisplayMode.LONG,
             false,
-            new HashSet<>(List.of("must_not_be_saved")),
-            "must_not_be_saved",
+            new HashSet<>(List.of("master_angler")),
+            "master_angler",
             SkillSwitchMode.MENU_ONLY,
             new HashMap<>(),
             "rod_handling",
@@ -101,16 +102,16 @@ class YamlRankStorageV2Test {
         assertEquals(FishingInformationMode.DETAIL, loaded.getFeatureToggles().getFishingInformationMode());
         assertEquals(12, loaded.getCycleStatistics().getValidActions());
         assertEquals(1, loaded.getPrestigeRecords().size());
-        assertTrue(loaded.getAcquiredSkills().isEmpty());
-        assertTrue(loaded.getPrestigeSkills().isEmpty());
-        assertNull(loaded.getActiveSkillId());
+        assertEquals(Set.of("initial", "patient_cast"), loaded.getAcquiredSkills());
+        assertEquals(Set.of("master_angler"), loaded.getPrestigeSkills());
+        assertEquals("master_angler", loaded.getActiveSkillId());
 
         File file = tempDirectory.resolve("playerdata/" + uuid + ".yml").toFile();
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
         assertEquals(2, yaml.getInt("rank.profession.schemaVersion"));
-        assertFalse(yaml.contains("rank.profession.acquiredSkills"));
-        assertFalse(yaml.contains("rank.profession.prestigeSkills"));
-        assertFalse(yaml.contains("rank.profession.activeSkillId"));
+        assertTrue(yaml.contains("rank.profession.acquiredSkills"));
+        assertTrue(yaml.contains("rank.profession.prestigeSkills"));
+        assertTrue(yaml.contains("rank.profession.activeSkillId"));
         assertEquals("fisher", yaml.getString("rank.professionPrestige.0.professionId"));
 
         storage.deleteProfession(uuid);

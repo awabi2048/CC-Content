@@ -219,9 +219,6 @@ class RankManagerImpl(
 
     override fun isMaxProfessionLevel(playerUuid: UUID): Boolean {
         val playerProf = getProfessionManager().getPlayerProfession(playerUuid) ?: return false
-        if (playerProf.profession.usesTypedProfile) {
-            return getProfessionManager().getCurrentLevel(playerUuid) >= TypedProfessionLevelCurve.MAX_LEVEL
-        }
         val skillTree = jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry.getSkillTree(playerProf.profession) ?: return false
         return playerProf.isMaxLevel(skillTree)
     }

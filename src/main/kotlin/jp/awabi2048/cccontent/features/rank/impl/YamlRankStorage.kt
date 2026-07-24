@@ -229,8 +229,16 @@ class YamlRankStorage(
         professionSection.set("bossBarDisplayMode", profession.bossBarDisplayMode.id)
         professionSection.set("levelUpNotificationEnabled", profession.levelUpNotificationEnabled)
 
+        professionSection.set("acquiredSkills", profession.acquiredSkills.toList())
+        professionSection.set("prestigeSkills", profession.prestigeSkills.toList())
+        professionSection.set("activeSkillId", profession.activeSkillId)
+        professionSection.set("skillSwitchMode", profession.skillSwitchMode.id)
+        professionSection.set("skillActivationStates", null)
+        profession.skillActivationStates.forEach { (skillId, enabled) ->
+            professionSection.set("skillActivationStates.$skillId", enabled)
+        }
+
         if (profession.profession.usesTypedProfile) {
-            clearLegacyProfessionFields(professionSection)
             professionSection.set("specializationId", profession.specializationId)
             professionSection.set("featureToggles.batchProcessingEnabled", profession.featureToggles.batchProcessingEnabled)
             professionSection.set("featureToggles.leafCleanupEnabled", profession.featureToggles.leafCleanupEnabled)
@@ -244,14 +252,6 @@ class YamlRankStorage(
             professionSection.set("cycleStatistics.firstDiscoveries", profession.cycleStatistics.firstDiscoveries)
         } else {
             clearTypedProfessionFields(professionSection)
-            professionSection.set("acquiredSkills", profession.acquiredSkills.toList())
-            professionSection.set("prestigeSkills", profession.prestigeSkills.toList())
-            professionSection.set("activeSkillId", profession.activeSkillId)
-            professionSection.set("skillSwitchMode", profession.skillSwitchMode.id)
-            professionSection.set("skillActivationStates", null)
-            profession.skillActivationStates.forEach { (skillId, enabled) ->
-                professionSection.set("skillActivationStates.$skillId", enabled)
-            }
         }
         savePrestigeRecords(config, profession.prestigeRecords)
 
@@ -285,16 +285,13 @@ class YamlRankStorage(
             val levelUpNotificationEnabled = professionSection.getBoolean("levelUpNotificationEnabled", true)
             val effectiveBossBarEnabled = bossBarDisplayMode.visible
 
-            val acquiredSkills = if (profession.usesTypedProfile) mutableSetOf() else professionSection.getStringList("acquiredSkills").toMutableSet()
-            val prestigeSkills = if (profession.usesTypedProfile) mutableSetOf() else professionSection.getStringList("prestigeSkills").toMutableSet()
-            val activeSkillId = if (profession.usesTypedProfile) null else professionSection.getString("activeSkillId")
-            val skillSwitchMode = if (profession.usesTypedProfile) {
-                SkillSwitchMode.MENU_ONLY
-            } else {
-                val id = professionSection.getString("skillSwitchMode") ?: SkillSwitchMode.MENU_ONLY.id
-                SkillSwitchMode.fromId(id) ?: throw IllegalStateException("Unknown skillSwitchMode '$id' for player $playerUuid")
-            }
-            val skillActivationStates = if (profession.usesTypedProfile) mutableMapOf() else loadSkillActivationStates(professionSection)
+            val acquiredSkills = professionSection.getStringList("acquiredSkills").toMutableSet()
+            val prestigeSkills = professionSection.getStringList("prestigeSkills").toMutableSet()
+            val activeSkillId = professionSection.getString("activeSkillId")
+            val skillSwitchModeId = professionSection.getString("skillSwitchMode") ?: SkillSwitchMode.MENU_ONLY.id
+            val skillSwitchMode = SkillSwitchMode.fromId(skillSwitchModeId)
+                ?: throw IllegalStateException("Unknown skillSwitchMode '$skillSwitchModeId' for player $playerUuid")
+            val skillActivationStates = loadSkillActivationStates(professionSection)
 
             val specializationId = professionSection.getString("specializationId")
             if (profession.usesTypedProfile && specializationId != null &&

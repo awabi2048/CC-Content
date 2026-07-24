@@ -13,6 +13,7 @@ import org.bukkit.util.Vector
 import jp.awabi2048.cccontent.featurestate.ContentFeatureCatalog
 import jp.awabi2048.cccontent.featurestate.ContentFeatureState
 import jp.awabi2048.cccontent.featurestate.FeatureStateResultType
+import jp.awabi2048.cccontent.features.rank.command.RankCommand
 
 enum class ContentOperationalState {
     ENABLED,
@@ -46,7 +47,8 @@ class CCCommand(
     private val onOpenNpcMenu: ((String, Player) -> Boolean)? = null,
     private val onNpcMenuMaintenance: ((String, String) -> Boolean)? = null,
     private val contentStatusProvider: (() -> Map<String, ContentFeatureStatus>)? = null,
-    private val onSetContentEnabled: ((String, Boolean) -> Unit)? = null
+    private val onSetContentEnabled: ((String, Boolean) -> Unit)? = null,
+    private val rankCommandProvider: (() -> RankCommand?)? = null
 ) : CommandExecutor, TabCompleter {
     
     override fun onCommand(
@@ -94,6 +96,15 @@ class CCCommand(
             }
             "npc-menu" -> {
                 handleNpcMenu(sender, args)
+            }
+            "rank" -> {
+                val rankCommand = rankCommandProvider?.invoke()
+                if (rankCommand == null) {
+                    sender.sendMessage("§cランク管理機能が利用できません")
+                    true
+                } else {
+                    rankCommand.executeAdmin(sender, args.drop(1).toTypedArray())
+                }
             }
             "help" -> {
                 showHelp(sender)
@@ -630,6 +641,7 @@ class CCCommand(
                  if (hasManagementPermission(sender, "enable")) candidates.add("enable")
                  if (hasManagementPermission(sender, "disable")) candidates.add("disable")
                  if (sender.hasPermission("cc-content.admin")) {
+                     candidates.add("rank")
                      candidates.add("reload")
                      candidates.add("restart")
                      candidates.add("summon")
@@ -710,6 +722,12 @@ class CCCommand(
                        else -> emptyList()
                    }
                }
+              "rank" -> {
+                  if (!hasAdminPermission(sender)) return emptyList()
+                  rankCommandProvider?.invoke()
+                      ?.completeAdmin(sender, args.drop(1).toTypedArray())
+                      .orEmpty()
+              }
               else -> emptyList()
           }
       }

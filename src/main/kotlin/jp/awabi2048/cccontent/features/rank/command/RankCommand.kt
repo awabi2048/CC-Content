@@ -108,7 +108,9 @@ class RankCommand(
         command: Command,
         label: String,
         args: Array<out String>
-    ): Boolean {
+    ): Boolean = executeAdmin(sender, args)
+
+    fun executeAdmin(sender: CommandSender, args: Array<out String>): Boolean {
         // 権限確認
         if (!sender.hasPermission("cc-content.admin")) {
             sender.sendMessage("§c権限がありません")
@@ -134,11 +136,11 @@ class RankCommand(
     
     private fun handleAddExp(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 3) {
-            sender.sendMessage("§c使用法: /rank add-exp <player> <amount>")
+            sender.sendMessage("§c使用法: /ccc rank add-exp <player> <amount>")
             return false
         }
         
-        val player = Bukkit.getPlayer(args[1])
+        val player = resolveKnownPlayer(args[1])
         if (player == null) {
             sender.sendMessage("§cプレイヤーが見つかりません: ${args[1]}")
             return false
@@ -163,11 +165,11 @@ class RankCommand(
 
     private fun handleSetProfLevel(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 3) {
-            sender.sendMessage("§c使用法: /rank set-prof-level <player> <level>")
+            sender.sendMessage("§c使用法: /ccc rank set-prof-level <player> <level>")
             return false
         }
 
-        val player = Bukkit.getPlayer(args[1])
+        val player = resolveKnownPlayer(args[1])
         if (player == null) {
             sender.sendMessage("§cプレイヤーが見つかりません: ${args[1]}")
             return false
@@ -191,18 +193,18 @@ class RankCommand(
     }
 
     private fun handleSet(sender: CommandSender, args: Array<out String>): Boolean {
-        if (sender !is Player) {
-            sender.sendMessage("§cこのコマンドはプレイヤーのみ実行できます")
+        if (args.size < 3) {
+            sender.sendMessage("§c使用法: /ccc rank set <player> <ランク名>")
             return false
         }
 
-        if (args.size < 2) {
-            sender.sendMessage("§c使用法: /rank set <ランク名>")
+        val player = resolveKnownPlayer(args[1])
+        if (player == null) {
+            sender.sendMessage("§cプレイヤーが見つかりません: ${args[1]}")
             return false
         }
-
-        val targetName = args[1]
-        val uuid = sender.uniqueId
+        val targetName = args[2]
+        val uuid = player.uniqueId
 
         val tutorialRank = TutorialRank.entries.firstOrNull { it.name.equals(targetName, ignoreCase = true) }
         if (tutorialRank != null) {
@@ -214,9 +216,9 @@ class RankCommand(
             tutorial.lastUpdated = System.currentTimeMillis()
             tutorial.lastPlayTime = System.currentTimeMillis()
             rankManager.saveData()
-            refreshSkillEffectCache(sender)
+            Bukkit.getPlayer(uuid)?.let(::refreshSkillEffectCache)
 
-            sender.sendMessage("§aランクを ${tutorialRank.name} に設定しました")
+            sender.sendMessage("§a${player.name ?: args[1]} のランクを ${tutorialRank.name} に設定しました")
             return true
         }
 
@@ -241,9 +243,9 @@ class RankCommand(
                 return false
             }
 
-            refreshSkillEffectCache(sender)
+            Bukkit.getPlayer(uuid)?.let(::refreshSkillEffectCache)
 
-            sender.sendMessage("§aランクを職業 ${profession.id} に設定しました")
+            sender.sendMessage("§a${player.name ?: args[1]} のランクを職業 ${profession.id} に設定しました")
             return true
         }
 
@@ -279,7 +281,7 @@ class RankCommand(
             return false
         }
         
-        val player = Bukkit.getPlayer(args[1])
+        val player = resolveKnownPlayer(args[1])
         if (player == null) {
             sender.sendMessage("§cプレイヤーが見つかりません: ${args[1]}")
             return false
@@ -295,7 +297,7 @@ class RankCommand(
         
         rankManager.setTutorialRank(player.uniqueId, nextRank)
         sender.sendMessage("§a${player.name} を $nextRank にランクアップしました")
-        player.sendMessage("§aランクアップ！§6${nextRank.name}§aになりました")
+        Bukkit.getPlayer(player.uniqueId)?.sendMessage("§aランクアップ！§6${nextRank.name}§aになりました")
         
         return true
     }
@@ -350,7 +352,7 @@ class RankCommand(
     
     private fun handleReset(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 2) {
-            sender.sendMessage("§c使用法: /rank reset <player>")
+            sender.sendMessage("§c使用法: /ccc rank reset <player>")
             return false
         }
         
@@ -362,6 +364,9 @@ class RankCommand(
         
         val uuid = player.uniqueId
         rankManager.resetProfession(uuid)
+        SkillEffectEngine.clearCache(uuid)
+        AttackReachBoostHandler.removeModifier(uuid)
+        rankManager.hideProfessionBossBar(uuid)
 
         val resetRank = resolveLowestDefinedTutorialRank()
         val tutorial = rankManager.getPlayerTutorial(uuid)
@@ -746,7 +751,10 @@ class RankCommand(
             return
         }
         
-        rankManager.selectProfession(player.uniqueId, profession)
+        if (!rankManager.selectProfession(player.uniqueId, profession)) {
+            player.sendMessage(messageProvider.getMessage("gui.profession.error.selection_failed"))
+            return
+        }
         player.sendMessage(messageProvider.getMessage("message.profession_selected", "profession" to messageProvider.getProfessionName(profession)))
         player.playSound(player.location, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f)
         
@@ -795,10 +803,16 @@ class RankCommand(
         val requiredTotalExp = skillTree?.getRequiredTotalExpForLevel(currentLevel + 1) ?: 0L
         val previousLevelExp = skillTree?.getRequiredTotalExpForLevel(currentLevel) ?: 0L
         val currentLevelExp = currentExp - previousLevelExp
-        val levelExp = if (currentLevel >= (skillTree?.getMaxLevel() ?: 50)) {
-            currentLevelExp
+        val isMaxLevel = currentLevel >= (skillTree?.getMaxLevel() ?: 1)
+        val levelExp = if (isMaxLevel) {
+            0L
         } else {
             requiredTotalExp - previousLevelExp
+        }
+        val experienceDisplay = if (isMaxLevel) {
+            messageProvider.getMessage("rank.gui.max_level")
+        } else {
+            "${String.format("%,d", currentLevelExp)}/${String.format("%,d", levelExp)}"
         }
         
         val professionIcon = getProfessionOverviewIcon(playerProfession.profession)
@@ -810,7 +824,7 @@ class RankCommand(
                 listOf(GuiLoreLine.Text(professionDescription)),
                 listOf(
                     GuiLoreLine.Data("Lv.", currentLevel, "§e"),
-                    GuiLoreLine.Data("経験値", "${String.format("%,d", currentLevelExp)}/${String.format("%,d", levelExp)}", "§a")
+                    GuiLoreLine.Data("経験値", experienceDisplay, "§a")
                 )
             )
         )
@@ -830,9 +844,20 @@ class RankCommand(
         if (skullMeta != null) {
             skullMeta.owningPlayer = viewer
             skullMeta.displayName(withoutItalic(toComponent("§e${viewer.name}")))
-            skullMeta.lore(CCSystem.getAPI().getLoreService().render(
-                GuiLoreSpec.Blocks(listOf(GuiLoreBlock(settingsLore.map(GuiLoreLine::Text))))
-            ))
+            skullMeta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(
+                GuiLoreBlock(listOf(
+                    GuiLoreLine.Data(
+                        messageProvider.getMessage("rank.gui.player_info.profession"),
+                        professionName,
+                        playerProfession.profession.displayColorCode
+                    ),
+                    GuiLoreLine.Data(
+                        messageProvider.getMessage("rank.gui.player_info.level"),
+                        currentLevel,
+                        "§e"
+                    )
+                ))
+            ))))
             skullMeta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
             playerHead.itemMeta = skullMeta
         }
@@ -3037,10 +3062,29 @@ class RankCommand(
     
     private fun sendUsage(sender: CommandSender) {
         sender.sendMessage("§6=== ランクシステムコマンド ===")
-        sender.sendMessage("§a/rank add-exp <player> <amount> §7- 職業経験値を追加")
-        sender.sendMessage("§a/rank set-prof-level <player> <level> §7- 職業レベルを設定")
-        sender.sendMessage("§a/rank set <ランク名> §7- 自分のランクを設定")
-        sender.sendMessage("§a/rank reset <player> §7- 最低ランクにリセット")
+        sender.sendMessage("§a/ccc rank add-exp <player> <amount> §7- 職業経験値を追加")
+        sender.sendMessage("§a/ccc rank set-prof-level <player> <level> §7- 職業レベルを設定")
+        sender.sendMessage("§a/ccc rank set <player> <ランク名> §7- ランクまたは職業を設定")
+        sender.sendMessage("§a/ccc rank reset <player> §7- 最低ランクにリセット")
+    }
+
+    private fun resolveKnownPlayer(name: String): org.bukkit.OfflinePlayer? {
+        Bukkit.getPlayerExact(name)?.let { return it }
+        return Bukkit.getOfflinePlayers().firstOrNull { it.name.equals(name, ignoreCase = true) }
+    }
+
+    fun completeAdmin(sender: CommandSender, args: Array<out String>): List<String> {
+        if (!sender.hasPermission("cc-content.admin")) return emptyList()
+        return when {
+            args.size == 1 -> listOf("add-exp", "set-prof-level", "set", "reset")
+                .filter { it.startsWith(args[0], ignoreCase = true) }
+            args.size == 2 -> Bukkit.getOfflinePlayers().mapNotNull { it.name }
+                .filter { it.startsWith(args[1], ignoreCase = true) }
+            args.size == 3 && args[0].equals("set", ignoreCase = true) ->
+                (TutorialRank.entries.map { it.name.lowercase() } + Profession.entries.map { it.id })
+                    .filter { it.startsWith(args[2], ignoreCase = true) }
+            else -> emptyList()
+        }
     }
     
     override fun onTabComplete(

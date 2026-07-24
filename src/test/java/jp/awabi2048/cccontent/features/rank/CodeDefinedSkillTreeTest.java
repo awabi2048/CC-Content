@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CodeDefinedSkillTreeTest {
     @Test
     void allProfessionTreesAreConnectedAndWithinTheirLevelCap() {
-        for (Profession profession : legacyProfessions()) {
+        for (Profession profession : java.util.Arrays.asList(Profession.values())) {
             SkillTree tree = CodeDefinedSkillTree.Companion.create(profession);
             Set<String> visited = new HashSet<>();
             visit(tree, tree.getStartSkillId(), visited);
@@ -28,7 +28,7 @@ class CodeDefinedSkillTreeTest {
 
     @Test
     void onlyCreativeProfessionsUseTheLevel25Cap() {
-        for (Profession profession : legacyProfessions()) {
+        for (Profession profession : java.util.Arrays.asList(Profession.values())) {
             int maxLevel = CodeDefinedSkillTree.Companion.create(profession).getMaxLevel();
             if (profession.getType() == ProfessionType.CREATIVE) {
                 assertEquals(25, maxLevel, profession.getId());
@@ -39,22 +39,11 @@ class CodeDefinedSkillTreeTest {
     }
 
     @Test
-    void typedProfessionsCannotCreateLegacySkillTrees() {
+    void everyProfessionHasACodeDefinedSkillTree() {
         for (Profession profession : Profession.values()) {
-            if (profession.getUsesTypedProfile()) {
-                org.junit.jupiter.api.Assertions.assertThrows(
-                    IllegalArgumentException.class,
-                    () -> CodeDefinedSkillTree.Companion.create(profession),
-                    profession.getId()
-                );
-            }
+            SkillTree tree = CodeDefinedSkillTree.Companion.create(profession);
+            assertEquals(profession.getId(), tree.getProfessionId());
         }
-    }
-
-    private static java.util.List<Profession> legacyProfessions() {
-        return java.util.Arrays.stream(Profession.values())
-            .filter(profession -> !profession.getUsesTypedProfile())
-            .toList();
     }
 
     private static void visit(SkillTree tree, String skillId, Set<String> visited) {

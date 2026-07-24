@@ -10,12 +10,8 @@ softdepend: [HeadDatabase, Vault, MyWorldManager, DeadChest, LuckPerms, FastAsyn
 commands:
   cc-content:
     description: CC-Contentメインコマンド
-    usage: /ccc <status|enable|disable|reload|restart|summon|structure|debug|update_day|npc-menu|help>
+    usage: /ccc <status|enable|disable|reload|restart|summon|structure|debug|update_day|npc-menu|rank|help>
     aliases: [ccc]
-  rank:
-    description: ランクシステムコマンド（デバッグ用）
-    usage: /rank <subcommand> [args]
-    permission: cc-content.admin
   sukima_dungeon:
     description: スキマダンジョンコマンド
     usage: /sukima_dungeon

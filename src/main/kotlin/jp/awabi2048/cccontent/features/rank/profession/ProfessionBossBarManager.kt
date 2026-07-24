@@ -1,7 +1,6 @@
 package jp.awabi2048.cccontent.features.rank.profession
 
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
-import jp.awabi2048.cccontent.features.rank.profession.profile.TypedProfessionLevelCurve
 import net.kyori.adventure.bossbar.BossBar
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -35,26 +34,15 @@ class ProfessionBossBarManager(
         if (!displayMode.visible) {
             return
         }
-        val skillTree = if (prof.profession.usesTypedProfile) null else SkillTreeRegistry.getSkillTree(prof.profession)
-        if (!prof.profession.usesTypedProfile && skillTree == null) return
-        val currentLevel = if (prof.profession.usesTypedProfile) {
-            TypedProfessionLevelCurve.calculateLevel(prof.profession, prof.currentExp)
-        } else {
-            skillTree!!.calculateLevelByExp(prof.currentExp)
-        }
+        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return
+        val currentLevel = skillTree.calculateLevelByExp(prof.currentExp)
         val currentExp = prof.currentExp
-        val maxLevel = if (prof.profession.usesTypedProfile) TypedProfessionLevelCurve.MAX_LEVEL else skillTree!!.getMaxLevel()
-        val previousLevelExp = if (prof.profession.usesTypedProfile) {
-            TypedProfessionLevelCurve.requiredTotalExp(prof.profession, currentLevel)
-        } else {
-            skillTree!!.getRequiredTotalExpForLevel(currentLevel)
-        }
+        val maxLevel = skillTree.getMaxLevel()
+        val previousLevelExp = skillTree.getRequiredTotalExpForLevel(currentLevel)
         val requiredExp = if (currentLevel >= maxLevel) {
             previousLevelExp
-        } else if (prof.profession.usesTypedProfile) {
-            TypedProfessionLevelCurve.requiredTotalExp(prof.profession, currentLevel + 1)
         } else {
-            skillTree!!.getRequiredTotalExpForLevel(currentLevel + 1)
+            skillTree.getRequiredTotalExpForLevel(currentLevel + 1)
         }
 
         val levelExp = if (currentLevel >= maxLevel) {
@@ -86,7 +74,7 @@ class ProfessionBossBarManager(
 
         // 職業設定からボスバー色を取得
         val bossBarColor = try {
-            BossBar.Color.valueOf(skillTree?.getBossBarColor()?.uppercase() ?: "GREEN")
+            BossBar.Color.valueOf(skillTree.getBossBarColor().uppercase())
         } catch (e: IllegalArgumentException) {
             BossBar.Color.GREEN
         }

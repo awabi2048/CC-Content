@@ -143,11 +143,7 @@ class CodeDefinedSkillTree private constructor(
         fun create(profession: Profession): CodeDefinedSkillTree =
             CodeDefinedSkillTree(
                 profession,
-                ProfessionSkillTreeDefinitions.get(
-                    profession.also {
-                        require(!it.usesTypedProfile) { "${it.id} uses typed profession progression" }
-                    }
-                )
+                ProfessionSkillTreeDefinitions.get(profession)
             )
     }
 }

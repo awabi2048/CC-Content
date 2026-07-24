@@ -49,6 +49,13 @@ class ProfessionManagerImpl(
     override fun getPlayerProfession(playerUuid: UUID): PlayerProfession? {
         professionCache[playerUuid]?.let { return it }
         val loaded = storage.loadProfession(playerUuid) ?: return null
+        if (loaded.acquiredSkills.isEmpty()) {
+            SkillTreeRegistry.getSkillTree(loaded.profession)?.let { skillTree ->
+                loaded.acquiredSkills += skillTree.getStartSkillId()
+                loaded.acquiredSkills += collectLevel0Skills(skillTree, loaded.acquiredSkills)
+                storage.saveProfession(loaded)
+            }
+        }
         professionCache[playerUuid] = loaded
         return loaded
     }
@@ -106,8 +113,7 @@ class ProfessionManagerImpl(
         if (!RankReleasePolicy.canAccessProfession(playerUuid, prof.profession)) {
             return false
         }
-        val skillTree = if (prof.profession.usesTypedProfile) null else SkillTreeRegistry.getSkillTree(prof.profession)
-        if (!prof.profession.usesTypedProfile && skillTree == null) return false
+        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
         val oldLevel = calculateLevel(prof)
 
         prof.addExperience(amount)
@@ -122,13 +128,9 @@ class ProfessionManagerImpl(
 
             if (levelUp) {
                 val gainedLevel = newLevel - oldLevel
-                val newlyUnlockedSkills = if (skillTree == null) {
-                    emptyList()
-                } else {
-                    val availableBefore = skillTree.getAvailableSkills(prof.acquiredSkills, oldLevel).toSet()
-                    val availableAfter = skillTree.getAvailableSkills(prof.acquiredSkills, newLevel).toSet()
-                    (availableAfter - availableBefore).mapNotNull { skillTree.getSkill(it) }
-                }
+                val availableBefore = skillTree.getAvailableSkills(prof.acquiredSkills, oldLevel).toSet()
+                val availableAfter = skillTree.getAvailableSkills(prof.acquiredSkills, newLevel).toSet()
+                val newlyUnlockedSkills = (availableAfter - availableBefore).mapNotNull { skillTree.getSkill(it) }
 
                 if (prof.levelUpNotificationEnabled) {
                     player.sendMessage(
@@ -170,7 +172,6 @@ class ProfessionManagerImpl(
 
     override fun acquireSkill(playerUuid: UUID, skillId: String): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
-        if (prof.profession.usesTypedProfile) return false
         if (!RankReleasePolicy.canUseSkills(playerUuid)) {
             return false
         }
@@ -208,7 +209,6 @@ class ProfessionManagerImpl(
     override fun getAvailableSkills(playerUuid: UUID): List<String> {
         if (!RankReleasePolicy.canUseSkills(playerUuid)) return emptyList()
         val prof = getPlayerProfession(playerUuid) ?: return emptyList()
-        if (prof.profession.usesTypedProfile) return emptyList()
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return emptyList()
         val currentLevel = skillTree.calculateLevelByExp(prof.currentExp)
         return skillTree.getAvailableSkills(prof.acquiredSkills, currentLevel)
@@ -217,7 +217,6 @@ class ProfessionManagerImpl(
     override fun getAcquiredSkills(playerUuid: UUID): Set<String> {
         if (!RankReleasePolicy.canUseSkills(playerUuid)) return emptySet()
         val profession = getPlayerProfession(playerUuid) ?: return emptySet()
-        if (profession.profession.usesTypedProfile) return emptySet()
         return profession.acquiredSkills.toSet()
     }
 
@@ -232,13 +231,9 @@ class ProfessionManagerImpl(
 
     override fun setLevel(playerUuid: UUID, level: Int): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
-        prof.currentExp = if (prof.profession.usesTypedProfile) {
-            TypedProfessionLevelCurve.requiredTotalExp(prof.profession, level.coerceIn(0, TypedProfessionLevelCurve.MAX_LEVEL))
-        } else {
-            val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
-            val clampedLevel = level.coerceIn(1, skillTree.getMaxLevel())
-            skillTree.getRequiredTotalExpForLevel(clampedLevel)
-        }
+        val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
+        val clampedLevel = level.coerceIn(1, skillTree.getMaxLevel())
+        prof.currentExp = skillTree.getRequiredTotalExpForLevel(clampedLevel)
         prof.lastUpdated = System.currentTimeMillis()
         storage.saveProfession(prof)
         return true
@@ -264,7 +259,7 @@ class ProfessionManagerImpl(
         return TypedProfessionProfileResolver.resolve(
             prof.profession,
             calculateLevel(prof),
-            prof.specializationId,
+            prof.acquiredSkills,
             prof.featureToggles
         )
     }
@@ -351,25 +346,18 @@ class ProfessionManagerImpl(
 
     override fun getPrestigeLevel(playerUuid: UUID): Int {
         val prof = getPlayerProfession(playerUuid) ?: return 0
-        if (prof.profession.usesTypedProfile) {
-            return prof.prestigeRecords.count { it.professionId == prof.profession.id }
-        }
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return 0
         return prof.getPrestigeLevel(skillTree)
     }
 
     override fun canPrestige(playerUuid: UUID): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
-        if (prof.profession.usesTypedProfile) {
-            return calculateLevel(prof) >= TypedProfessionLevelCurve.MAX_LEVEL
-        }
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
         return prof.canPrestige(skillTree)
     }
 
     override fun acquirePrestigeSkill(playerUuid: UUID, skillId: String): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
-        if (prof.profession.usesTypedProfile) return false
         if (!RankReleasePolicy.canUseSkills(playerUuid)) {
             return false
         }
@@ -400,26 +388,22 @@ class ProfessionManagerImpl(
 
     override fun getAvailablePrestigeSkills(playerUuid: UUID): List<String> {
         val prof = getPlayerProfession(playerUuid) ?: return emptyList()
-        if (prof.profession.usesTypedProfile) return emptyList()
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return emptyList()
         return prof.getNextPrestigeSkillOptions(skillTree)
     }
 
     override fun getAcquiredPrestigeSkills(playerUuid: UUID): Set<String> {
         val prof = getPlayerProfession(playerUuid) ?: return emptySet()
-        if (prof.profession.usesTypedProfile) return emptySet()
         return prof.prestigeSkills.toSet()
     }
 
     override fun hasPrestigeSkill(playerUuid: UUID, skillId: String): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
-        if (prof.profession.usesTypedProfile) return false
         return prof.hasPrestigeSkillUnlocked(skillId)
     }
 
     override fun executePrestige(playerUuid: UUID): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
-        if (prof.profession.usesTypedProfile) return executeTypedPrestige(playerUuid, prof)
         val skillTree = SkillTreeRegistry.getSkillTree(prof.profession) ?: return false
 
         if (!prof.canPrestige(skillTree)) {
@@ -488,13 +472,9 @@ class ProfessionManagerImpl(
     }
 
     private fun createInitialProfession(playerUuid: UUID, profession: Profession): PlayerProfession? {
-        val acquiredSkills = if (profession.usesTypedProfile) {
-            mutableSetOf()
-        } else {
-            val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return null
-            mutableSetOf(skillTree.getStartSkillId()).also {
-                it.addAll(collectLevel0Skills(skillTree, it))
-            }
+        val skillTree = SkillTreeRegistry.getSkillTree(profession) ?: return null
+        val acquiredSkills = mutableSetOf(skillTree.getStartSkillId()).also {
+            it.addAll(collectLevel0Skills(skillTree, it))
         }
         return PlayerProfession(
             playerUuid = playerUuid,
@@ -506,11 +486,7 @@ class ProfessionManagerImpl(
     }
 
     private fun calculateLevel(profession: PlayerProfession): Int =
-        if (profession.profession.usesTypedProfile) {
-            TypedProfessionLevelCurve.calculateLevel(profession.profession, profession.currentExp)
-        } else {
-            SkillTreeRegistry.getSkillTree(profession.profession)?.calculateLevelByExp(profession.currentExp) ?: 1
-        }
+        SkillTreeRegistry.getSkillTree(profession.profession)?.calculateLevelByExp(profession.currentExp) ?: 1
 
     private fun executeTypedPrestige(playerUuid: UUID, profession: PlayerProfession): Boolean {
         if (calculateLevel(profession) < TypedProfessionLevelCurve.MAX_LEVEL) return false

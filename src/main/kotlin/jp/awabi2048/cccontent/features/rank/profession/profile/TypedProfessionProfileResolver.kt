@@ -2,228 +2,182 @@ package jp.awabi2048.cccontent.features.rank.profession.profile
 
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 
+/**
+ * 取得済みスキルを、各専門コンテンツが扱う型付きプロフィールへ変換します。
+ *
+ * レベルは表示用の値であり、能力の解放判定には使用しません。
+ */
 object TypedProfessionProfileResolver {
     fun resolve(
         profession: Profession,
         level: Int,
-        specializationId: String?,
+        acquiredSkills: Set<String>,
         toggles: ProfessionFeatureToggles = ProfessionFeatureToggles.defaultsFor(profession)
     ): TypedProfessionProfile {
         require(profession.usesTypedProfile) { "${profession.id} does not use a typed profile" }
-        val safeLevel = level.coerceIn(0, TypedProfessionLevelCurve.MAX_LEVEL)
-        val specialization = resolveSpecialization(profession, safeLevel, specializationId)
+        val skills = acquiredSkills.map(String::lowercase).toSet()
         return when (profession) {
-            Profession.MINER -> miner(safeLevel, specialization, toggles)
-            Profession.LUMBERJACK -> lumberjack(safeLevel, specialization, toggles)
-            Profession.FARMER -> farmer(safeLevel, specialization, toggles)
-            Profession.FISHER -> fisher(safeLevel, specialization, toggles)
-            Profession.BREWER -> brewer(safeLevel, specialization)
-            Profession.COOK -> cook(safeLevel, specialization)
+            Profession.MINER -> miner(level, skills, toggles)
+            Profession.LUMBERJACK -> lumberjack(level, skills, toggles)
+            Profession.FARMER -> farmer(level, skills, toggles)
+            Profession.FISHER -> fisher(level, skills, toggles)
+            Profession.BREWER -> brewer(level, skills)
+            Profession.COOK -> cook(level, skills)
             else -> error("unsupported typed profession: ${profession.id}")
         }
     }
 
-    private fun resolveSpecialization(
-        profession: Profession,
-        level: Int,
-        specializationId: String?
-    ): ProfessionSpecialization? {
-        if (specializationId == null) return null
-        require(level >= ProfessionSpecialization.UNLOCK_LEVEL) {
-            "specialization requires level ${ProfessionSpecialization.UNLOCK_LEVEL}"
-        }
-        return requireNotNull(ProfessionSpecialization.fromId(profession, specializationId)) {
-            "unknown specialization for ${profession.id}: $specializationId"
-        }
-    }
-
-    private fun miner(level: Int, spec: ProfessionSpecialization?, toggles: ProfessionFeatureToggles): MinerSkillProfile {
-        val tunnel = spec == ProfessionSpecialization.TUNNEL_MINING
-        val precision = spec == ProfessionSpecialization.PRECISION_MINING
+    private fun miner(level: Int, skills: Set<String>, toggles: ProfessionFeatureToggles): MinerSkillProfile {
+        val tunnel = skills.any { it.startsWith("mineall_") || it.startsWith("blastmine_") }
+        val precision = skills.any { it.startsWith("fortune_") }
         return MinerSkillProfile(
             level = level,
-            specialization = spec,
-            expertOperationUnlocked = level >= 5,
-            batchProcessingEnabled = level >= 5 && toggles.batchProcessingEnabled,
-            maximumBatchSize = when {
-                !tunnel -> if (level >= 5) 8 else 1
-                level >= 45 -> 24
-                level >= 35 -> 20
-                level >= 25 -> 16
-                else -> 12
+            specialization = when {
+                tunnel -> ProfessionSpecialization.TUNNEL_MINING
+                precision -> ProfessionSpecialization.PRECISION_MINING
+                else -> null
             },
-            workSpeedLevel = tier(level, 5, 10, 45),
-            durabilitySaveChance = stepped(level, 25 to 0.10, 50 to 0.20),
-            ordinaryExtraDropChance = stepped(level, 0 to 0.02, 35 to 0.035, 50 to 0.05),
-            automaticCollectionEnabled = tunnel && level >= 50,
-            optimizedSearchEnabled = tunnel && level >= 50,
-            precisionToleranceBonus = if (!precision) 0.0 else stepped(level, 15 to 0.02, 45 to 0.04),
-            topEvaluationThreshold = if (precision && level >= 45) 0.88 else 0.90,
-            detailedInspectionEnabled = precision && level >= 25,
-            minimumSpecialMaterialStandardEnabled = precision && level >= 35,
-            topEvaluationExtraMaterial = if (precision && level >= 50) 1 else 0,
-            ignoredMinorFailures = if (precision && level >= 50) 1 else 0
+            expertOperationUnlocked = "mineall_1" in skills,
+            batchProcessingEnabled = "mineall_1" in skills && toggles.batchProcessingEnabled,
+            maximumBatchSize = when {
+                "mineall_3" in skills -> 24
+                "mineall_2" in skills -> 16
+                "mineall_1" in skills -> 8
+                else -> 1
+            },
+            workSpeedLevel = listOf("speed_1", "speed_2").count { it in skills },
+            durabilitySaveChance = if ("durability_1" in skills) 0.10 else 0.0,
+            ordinaryExtraDropChance = listOf("fortune_1", "fortune_2", "fortune_3").count { it in skills } * 0.01,
+            automaticCollectionEnabled = "mineall_3" in skills,
+            optimizedSearchEnabled = "mineall_3" in skills,
+            precisionToleranceBonus = if ("fortune_3" in skills) 0.04 else if ("fortune_2" in skills) 0.02 else 0.0,
+            topEvaluationThreshold = if ("fortune_3" in skills) 0.88 else 0.90,
+            detailedInspectionEnabled = "fortune_2" in skills,
+            minimumSpecialMaterialStandardEnabled = "fortune_3" in skills,
+            topEvaluationExtraMaterial = if ("fortune_3" in skills) 1 else 0,
+            ignoredMinorFailures = if ("fortune_3" in skills) 1 else 0
         )
     }
 
-    private fun lumberjack(level: Int, spec: ProfessionSpecialization?, toggles: ProfessionFeatureToggles): LumberjackSkillProfile {
-        val felling = spec == ProfessionSpecialization.FELLING
-        val utilization = spec == ProfessionSpecialization.WOOD_UTILIZATION
+    private fun lumberjack(level: Int, skills: Set<String>, toggles: ProfessionFeatureToggles): LumberjackSkillProfile {
+        val felling = skills.any { it.startsWith("cut_all_") || it == "wind_gust" || it == "replant" }
+        val utilization = skills.any { it.startsWith("harvest_") }
         return LumberjackSkillProfile(
             level = level,
-            specialization = spec,
-            expertOperationUnlocked = level >= 5,
-            batchProcessingEnabled = level >= 5 && toggles.batchProcessingEnabled,
-            maximumBatchSize = when {
-                !felling -> if (level >= 5) 8 else 1
-                level >= 45 -> 24
-                level >= 25 -> 16
-                else -> 12
+            specialization = when {
+                felling -> ProfessionSpecialization.FELLING
+                utilization -> ProfessionSpecialization.WOOD_UTILIZATION
+                else -> null
             },
-            workSpeedLevel = tier(level, 5, 10, 45),
-            durabilitySaveChance = stepped(level, 25 to 0.10, 50 to 0.20),
-            ordinaryExtraDropChance = stepped(level, 0 to 0.02, 35 to 0.035, 50 to 0.05),
-            leafCleanupEnabled = felling && level >= 50 && toggles.leafCleanupEnabled,
-            automaticReplantEnabled = felling && level >= 35 && toggles.automaticReplantEnabled,
-            multiTrunkRecognitionImproved = felling && level >= 50,
-            plankYield = if (!utilization) 0 else if (level >= 45) 6 else 5,
-            timberYield = if (!utilization) 0 else if (level >= 45) 2 else 1,
-            inspectionRadius = if (utilization && level >= 25) 4 else 0,
-            inspectionCooldownSeconds = if (utilization && level >= 25) 45 else 0,
-            discoveryChanceBonus = if (utilization && level >= 35) 0.10 else 0.0,
-            extraForestProductChance = if (utilization && level >= 50) 0.20 else 0.0,
-            exactMaterialInspectionEnabled = utilization && level >= 50
+            expertOperationUnlocked = "cut_all_1" in skills,
+            batchProcessingEnabled = "cut_all_1" in skills && toggles.batchProcessingEnabled,
+            maximumBatchSize = when {
+                "cut_all_3" in skills -> 24
+                "cut_all_2" in skills -> 16
+                "cut_all_1" in skills -> 8
+                else -> 1
+            },
+            workSpeedLevel = listOf("speed_1", "speed_2").count { it in skills },
+            durabilitySaveChance = if ("cut_all_3" in skills) 0.20 else if ("cut_all_2" in skills) 0.10 else 0.0,
+            ordinaryExtraDropChance = listOf("harvest_1", "harvest_2", "harvest_3").count { it in skills } * 0.01,
+            leafCleanupEnabled = "cut_all_3" in skills && toggles.leafCleanupEnabled,
+            automaticReplantEnabled = "replant" in skills && toggles.automaticReplantEnabled,
+            multiTrunkRecognitionImproved = "cut_all_3" in skills,
+            plankYield = if ("harvest_3" in skills) 6 else if ("harvest_2" in skills) 5 else 0,
+            timberYield = if ("harvest_3" in skills) 2 else if ("harvest_2" in skills) 1 else 0,
+            inspectionRadius = if ("harvest_2" in skills) 4 else 0,
+            inspectionCooldownSeconds = if ("harvest_2" in skills) 45 else 0,
+            discoveryChanceBonus = if ("harvest_3" in skills) 0.10 else 0.0,
+            extraForestProductChance = if ("harvest_3" in skills) 0.20 else 0.0,
+            exactMaterialInspectionEnabled = "harvest_3" in skills
         )
     }
 
-    private fun farmer(level: Int, spec: ProfessionSpecialization?, toggles: ProfessionFeatureToggles): FarmerSkillProfile {
-        val cultivation = spec == ProfessionSpecialization.CULTIVATION
-        val wild = spec == ProfessionSpecialization.WILD_GATHERING
+    private fun farmer(level: Int, skills: Set<String>, toggles: ProfessionFeatureToggles): FarmerSkillProfile {
+        val cultivation = skills.any { it == "area_tilling" || it == "area_harvesting" || it == "auto_replanting" }
+        val wild = skills.any { it == "tool" || it.startsWith("special_loot_table_") }
         return FarmerSkillProfile(
             level = level,
-            specialization = spec,
-            expertOperationUnlocked = level >= 5,
-            cropExtraDropChance = stepped(level, 5 to 0.05, 10 to 0.075, 45 to 0.125),
-            byproductChance = stepped(level, 0 to 0.05, 35 to 0.10, 50 to 0.15),
-            workSpeedLevel = if (level >= 5) 1 else 0,
-            durabilitySaveChance = stepped(level, 25 to 0.10, 50 to 0.20),
-            areaTillingEnabled = level >= 5 && toggles.areaTillingEnabled,
-            areaHarvestEnabled = level >= 5 && toggles.areaHarvestEnabled,
-            automaticReplantEnabled = level >= 5 && toggles.automaticReplantEnabled,
-            operationRadius = when {
-                cultivation && level >= 45 -> 3
-                cultivation && level >= 15 -> 2
-                level >= 5 -> 1
-                else -> 0
+            specialization = when {
+                wild -> ProfessionSpecialization.WILD_GATHERING
+                cultivation -> ProfessionSpecialization.CULTIVATION
+                else -> null
             },
-            seedReserveEnabled = cultivation && level >= 25,
-            matureCropSelectionEnabled = cultivation && level >= 35,
-            batchExperiencePenaltyReduced = cultivation && level >= 35,
-            seedSaveChance = if (cultivation && level >= 50) 0.20 else 0.0,
-            inspectionRadius = if (wild && level >= 15) 4 else 0,
-            inspectionCooldownSeconds = when {
-                wild && level >= 45 -> 22
-                wild -> 45
-                else -> 0
-            },
-            specialistPlantExtraChance = if (!wild) 0.0 else stepped(level, 25 to 0.10, 50 to 0.20),
-            detailedInspectionEnabled = wild && level >= 35,
-            guaranteedSpecialistPlantYield = if (wild && level >= 50) 1 else 0
+            expertOperationUnlocked = "area_tilling" in skills,
+            cropExtraDropChance = listOf("harvest_1", "harvest_2", "harvest_3").count { it in skills } * 0.04,
+            byproductChance = if ("special_loot_table_2" in skills) 0.15 else if ("special_loot_table_1" in skills) 0.10 else 0.05,
+            workSpeedLevel = if ("harvest_1" in skills) 1 else 0,
+            durabilitySaveChance = if ("harvest_3" in skills) 0.20 else if ("harvest_2" in skills) 0.10 else 0.0,
+            areaTillingEnabled = "area_tilling" in skills && toggles.areaTillingEnabled,
+            areaHarvestEnabled = "area_harvesting" in skills && toggles.areaHarvestEnabled,
+            automaticReplantEnabled = "auto_replanting" in skills && toggles.automaticReplantEnabled,
+            operationRadius = if ("harvest_3" in skills) 3 else if ("harvest_2" in skills) 2 else if ("area_tilling" in skills) 1 else 0,
+            seedReserveEnabled = "auto_replanting" in skills,
+            matureCropSelectionEnabled = "harvest_2" in skills,
+            batchExperiencePenaltyReduced = "harvest_3" in skills,
+            seedSaveChance = if ("harvest_3" in skills) 0.20 else 0.0,
+            inspectionRadius = if ("tool" in skills) 4 else 0,
+            inspectionCooldownSeconds = if ("special_loot_table_2" in skills) 22 else if ("tool" in skills) 45 else 0,
+            specialistPlantExtraChance = if ("special_loot_table_2" in skills) 0.20 else if ("special_loot_table_1" in skills) 0.10 else 0.0,
+            detailedInspectionEnabled = "special_loot_table_1" in skills,
+            guaranteedSpecialistPlantYield = if ("special_loot_table_2" in skills) 1 else 0
         )
     }
 
-    private fun fisher(level: Int, spec: ProfessionSpecialization?, toggles: ProfessionFeatureToggles): FisherSkillProfile {
-        val rod = spec == ProfessionSpecialization.ROD_HANDLING
-        val knowledge = spec == ProfessionSpecialization.FISHING_GROUND_KNOWLEDGE
-        return FisherSkillProfile(
-            level = level,
-            specialization = spec,
-            vanillaExtraCatchChance = if (level >= 0) 0.02 else 0.0,
-            waitTimeReduction = stepped(level, 5 to 0.05, 10 to 0.10, 35 to 0.15, 50 to 0.20),
-            hookWindowBonus = stepped(level, 5 to 0.10, 25 to 0.15, 45 to 0.20),
-            baitSaveChance = stepped(level, 10 to 0.05, 35 to 0.10, 50 to 0.15),
-            durabilitySaveChance = stepped(level, 25 to 0.10, 45 to 0.20),
-            fightStabilityBonus = if (!rod) 0.0 else stepped(level, 15 to 0.10, 50 to 0.25),
-            fightDurationReduction = if (!rod) 0.0 else stepped(level, 25 to 0.10, 45 to 0.20),
-            ignoredInstabilityEvents = if (rod && level >= 35) 1 else 0,
-            baitHintEnabled = knowledge && level >= 15,
-            candidateCategoryDisplayEnabled = knowledge && level >= 25,
-            matchingCandidateWeightMultiplier = if (!knowledge) 1.0 else stepped(level, 35 to 1.10, 50 to 1.20),
-            detailedCandidateDisplayEnabled = knowledge && level >= 45,
-            incompatibleBaitWarningEnabled = knowledge && level >= 50,
-            informationMode = toggles.fishingInformationMode
-        )
-    }
+    private fun fisher(level: Int, skills: Set<String>, toggles: ProfessionFeatureToggles) = FisherSkillProfile(
+        level = level,
+        specialization = if ("deep_water" in skills) ProfessionSpecialization.FISHING_GROUND_KNOWLEDGE else null,
+        vanillaExtraCatchChance = 0.02,
+        waitTimeReduction = if ("master_angler" in skills) 0.20 else if ("patient_cast" in skills) 0.10 else 0.0,
+        hookWindowBonus = if ("patient_cast" in skills) 0.20 else 0.0,
+        baitSaveChance = if ("master_angler" in skills) 0.15 else 0.0,
+        durabilitySaveChance = if ("master_angler" in skills) 0.20 else 0.0,
+        fightStabilityBonus = if ("deep_water" in skills) 0.15 else 0.0,
+        fightDurationReduction = if ("master_angler" in skills) 0.15 else 0.0,
+        ignoredInstabilityEvents = if ("master_angler" in skills) 1 else 0,
+        baitHintEnabled = "deep_water" in skills,
+        candidateCategoryDisplayEnabled = "deep_water" in skills,
+        matchingCandidateWeightMultiplier = if ("master_angler" in skills) 1.20 else 1.0,
+        detailedCandidateDisplayEnabled = "master_angler" in skills,
+        incompatibleBaitWarningEnabled = "master_angler" in skills,
+        informationMode = toggles.fishingInformationMode
+    )
 
-    private fun brewer(level: Int, spec: ProfessionSpecialization?): BrewerSkillProfile {
-        val fermentation = spec == ProfessionSpecialization.FERMENTATION
-        val distillation = spec == ProfessionSpecialization.DISTILLATION_AGING
-        return BrewerSkillProfile(
-            level = level,
-            specialization = spec,
-            basicRecipeUnlocked = true,
-            intermediateRecipeUnlocked = spec != null && level >= 15,
-            advancedRecipeUnlocked = spec != null && level >= 35,
-            topRecipeUnlocked = spec != null && level >= 50,
-            processingTimeReduction = stepped(level, 0 to 0.05, 5 to 0.10, 25 to 0.15, 45 to 0.20),
-            failurePenaltyReduction = stepped(level, 5 to 0.10, 50 to 0.20),
-            qualityStabilityBonus = steppedInt(level, 10 to 3, 35 to 5, 50 to 8),
-            materialLossReduction = if (level >= 25) 0.10 else 0.0,
-            conditionToleranceBonus = if (spec == null) 0.0 else stepped(level, 15 to 0.10, 35 to 0.20),
-            exactConditionQualityBonus = if (!fermentation) 0 else steppedInt(level, 25 to 5, 50 to 10),
-            herbalRecipeUnlocked = fermentation && level >= 25,
-            wildAndFungiRecipeUnlocked = fermentation && level >= 35,
-            minimumQuality = when {
-                spec == null -> 0
-                level >= 50 -> 85
-                level >= 45 -> 75
-                else -> 0
-            },
-            fuelReduction = if (distillation && level >= 25) 0.10 else 0.0,
-            agingTimeReduction = if (distillation && level >= 45) 0.10 else 0.0,
-            distillationYieldBonus = if (distillation && level >= 50) 1 else 0
-        )
-    }
+    private fun brewer(level: Int, skills: Set<String>) = BrewerSkillProfile(
+        level = level,
+        specialization = null,
+        basicRecipeUnlocked = "skill1" in skills,
+        intermediateRecipeUnlocked = "skill2" in skills || "skill3" in skills,
+        advancedRecipeUnlocked = "skill7" in skills || "skill8" in skills || "skill9" in skills,
+        topRecipeUnlocked = "skill12" in skills,
+        processingTimeReduction = listOf("skill5", "skill10").count { it in skills } * 0.10,
+        failurePenaltyReduction = if ("skill10" in skills) 0.20 else if ("skill5" in skills) 0.10 else 0.0,
+        qualityStabilityBonus = if ("skill11" in skills) 8 else if ("skill8" in skills) 5 else 0,
+        materialLossReduction = if ("skill6" in skills) 0.10 else 0.0,
+        conditionToleranceBonus = if ("skill7" in skills) 0.20 else 0.0,
+        exactConditionQualityBonus = if ("skill8" in skills) 10 else 0,
+        herbalRecipeUnlocked = "skill7" in skills,
+        wildAndFungiRecipeUnlocked = "skill9" in skills,
+        minimumQuality = if ("skill12" in skills) 85 else if ("skill11" in skills) 75 else 0,
+        fuelReduction = if ("skill6" in skills) 0.10 else 0.0,
+        agingTimeReduction = if ("skill10" in skills) 0.10 else 0.0,
+        distillationYieldBonus = if ("skill12" in skills) 1 else 0
+    )
 
-    private fun cook(level: Int, spec: ProfessionSpecialization?): CookSkillProfile {
-        val bulk = spec == ProfessionSpecialization.BULK_COOKING
-        val precision = spec == ProfessionSpecialization.PRECISION_COOKING
-        return CookSkillProfile(
-            level = level,
-            specialization = spec,
-            basicRecipeUnlocked = true,
-            intermediateRecipeUnlocked = spec != null && level >= 15,
-            advancedRecipeUnlocked = spec != null && level >= 35,
-            topRecipeUnlocked = spec != null && level >= 50,
-            processingTimeReduction = stepped(level, 0 to 0.05, 5 to 0.10, 25 to 0.15, 45 to 0.20),
-            minimumCompletion = when {
-                bulk && level >= 50 -> 80
-                bulk && level >= 45 -> 75
-                precision && level >= 50 -> 85
-                precision && level >= 45 -> 80
-                level >= 50 -> 60
-                level >= 5 -> 40
-                else -> 0
-            },
-            ingredientSlots = when {
-                level >= 40 -> 5
-                level >= 25 -> 4
-                level >= 10 -> 3
-                else -> 2
-            },
-            mismatchPenaltyReduction = stepped(level, 35 to 0.10, 50 to 0.20),
-            materialSaveChance = if (!bulk) 0.0 else stepped(level, 15 to 0.05, 25 to 0.10, 50 to 0.15),
-            extraCompletionChance = if (!bulk) 0.0 else stepped(level, 35 to 0.10, 45 to 0.15, 50 to 0.25),
-            seasoningEffectMultiplier = if (precision && level >= 15) 1.10 else 1.0,
-            exactMatchCompletionBonus = if (!precision) 0 else steppedInt(level, 25 to 5, 35 to 10, 50 to 15)
-        )
-    }
-
-    private fun tier(level: Int, vararg thresholds: Int): Int = thresholds.count { level >= it }
-
-    private fun stepped(level: Int, vararg values: Pair<Int, Double>): Double =
-        values.filter { level >= it.first }.maxByOrNull { it.first }?.second ?: 0.0
-
-    private fun steppedInt(level: Int, vararg values: Pair<Int, Int>): Int =
-        values.filter { level >= it.first }.maxByOrNull { it.first }?.second ?: 0
+    private fun cook(level: Int, skills: Set<String>) = CookSkillProfile(
+        level = level,
+        specialization = null,
+        basicRecipeUnlocked = "skill1" in skills,
+        intermediateRecipeUnlocked = "skill2" in skills || "skill4" in skills,
+        advancedRecipeUnlocked = "skill6" in skills || "skill8" in skills,
+        topRecipeUnlocked = "skill9" in skills,
+        processingTimeReduction = if ("skill8" in skills) 0.20 else if ("skill3" in skills) 0.10 else 0.0,
+        minimumCompletion = if ("skill9" in skills) 85 else if ("skill8" in skills) 75 else if ("skill1" in skills) 40 else 0,
+        ingredientSlots = if ("skill9" in skills) 5 else if ("skill6" in skills) 4 else if ("skill2" in skills) 3 else 2,
+        mismatchPenaltyReduction = if ("skill9" in skills) 0.20 else if ("skill7" in skills) 0.10 else 0.0,
+        materialSaveChance = if ("skill5" in skills) 0.15 else 0.0,
+        extraCompletionChance = if ("skill8" in skills) 0.25 else 0.0,
+        seasoningEffectMultiplier = if ("skill4" in skills) 1.10 else 1.0,
+        exactMatchCompletionBonus = if ("skill7" in skills) 15 else if ("skill6" in skills) 10 else 0
+    )
 }
