@@ -102,10 +102,6 @@ interface RankManager {
      */
     fun setProfessionLevel(playerUuid: UUID, level: Int): Boolean
 
-    fun selectProfessionSpecialization(playerUuid: UUID, specializationId: String): Boolean
-
-    fun getProfessionSpecializationId(playerUuid: UUID): String?
-
     fun getTypedProfessionProfile(playerUuid: UUID): TypedProfessionProfile?
 
     fun getProfessionFeatureToggles(playerUuid: UUID): ProfessionFeatureToggles?

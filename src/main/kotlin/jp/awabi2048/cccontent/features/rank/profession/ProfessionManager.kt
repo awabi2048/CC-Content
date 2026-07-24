@@ -84,11 +84,6 @@ interface ProfessionManager {
      */
     fun setLevel(playerUuid: UUID, level: Int): Boolean
 
-    /** Lv15以降の再設計職業で、未選択の分岐を一度だけ確定する。 */
-    fun selectSpecialization(playerUuid: UUID, specializationId: String): Boolean
-
-    fun getSpecializationId(playerUuid: UUID): String?
-
     fun getTypedProfile(playerUuid: UUID): TypedProfessionProfile?
 
     fun getFeatureToggles(playerUuid: UUID): ProfessionFeatureToggles?

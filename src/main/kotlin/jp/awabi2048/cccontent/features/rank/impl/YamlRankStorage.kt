@@ -10,7 +10,6 @@ import jp.awabi2048.cccontent.features.rank.profession.profile.FishingInformatio
 import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionCycleStatistics
 import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionFeatureToggles
 import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionPrestigeRecord
-import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionSpecialization
 import jp.awabi2048.cccontent.features.rank.skill.SkillSwitchMode
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
@@ -29,8 +28,8 @@ class YamlRankStorage(
 ) : RankStorage {
 
     companion object {
-        private const val PROFESSION_SCHEMA_VERSION = 2
-        private const val SCHEMA_MARKER_FILE = "rank-profession-schema-v2.applied"
+        private const val PROFESSION_SCHEMA_VERSION = 3
+        private const val SCHEMA_MARKER_FILE = "rank-profession-schema-v3.applied"
     }
 
     private val logger = Logger.getLogger("CC-Content")
@@ -238,8 +237,7 @@ class YamlRankStorage(
             professionSection.set("skillActivationStates.$skillId", enabled)
         }
 
-        if (profession.profession.usesTypedProfile) {
-            professionSection.set("specializationId", profession.specializationId)
+        if (profession.profession.usesTypedAbilityAdapter) {
             professionSection.set("featureToggles.batchProcessingEnabled", profession.featureToggles.batchProcessingEnabled)
             professionSection.set("featureToggles.leafCleanupEnabled", profession.featureToggles.leafCleanupEnabled)
             professionSection.set("featureToggles.automaticReplantEnabled", profession.featureToggles.automaticReplantEnabled)
@@ -293,13 +291,7 @@ class YamlRankStorage(
                 ?: throw IllegalStateException("Unknown skillSwitchMode '$skillSwitchModeId' for player $playerUuid")
             val skillActivationStates = loadSkillActivationStates(professionSection)
 
-            val specializationId = professionSection.getString("specializationId")
-            if (profession.usesTypedProfile && specializationId != null &&
-                ProfessionSpecialization.fromId(profession, specializationId) == null
-            ) {
-                throw IllegalStateException("Unknown specialization '$specializationId' for ${profession.id}")
-            }
-            val featureToggles = if (profession.usesTypedProfile) {
+            val featureToggles = if (profession.usesTypedAbilityAdapter) {
                 loadFeatureToggles(professionSection, profession)
             } else {
                 ProfessionFeatureToggles.defaultsFor(profession)
@@ -325,7 +317,6 @@ class YamlRankStorage(
                 activeSkillId,
                 skillSwitchMode,
                 skillActivationStates,
-                specializationId,
                 featureToggles,
                 cycleStatistics,
                 prestigeRecords

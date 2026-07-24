@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class YamlRankStorageV2Test {
+class YamlRankStorageV3Test {
     @TempDir
     Path tempDirectory;
 
@@ -56,7 +56,7 @@ class YamlRankStorageV2Test {
         assertEquals("NEWBIE", current.getString("rank.tutorial.currentRank"));
         assertEquals(42, current.getInt("arena.unrelated"));
         assertFalse(current.isConfigurationSection("rank.profession"));
-        assertTrue(tempDirectory.resolve("rank-profession-schema-v2.applied").toFile().isFile());
+        assertTrue(tempDirectory.resolve("rank-profession-schema-v3.applied").toFile().isFile());
         assertFalse(tempDirectory.resolve("profession").toFile().exists());
         assertTrue(tempDirectory.resolve("discarded").toFile().isDirectory());
 
@@ -88,7 +88,6 @@ class YamlRankStorageV2Test {
             "master_angler",
             SkillSwitchMode.MENU_ONLY,
             new HashMap<>(),
-            "rod_handling",
             toggles,
             statistics,
             records
@@ -98,7 +97,6 @@ class YamlRankStorageV2Test {
         PlayerProfession loaded = storage.loadProfession(uuid);
         assertNotNull(loaded);
         assertEquals(Profession.FISHER, loaded.getProfession());
-        assertEquals("rod_handling", loaded.getSpecializationId());
         assertEquals(FishingInformationMode.DETAIL, loaded.getFeatureToggles().getFishingInformationMode());
         assertEquals(12, loaded.getCycleStatistics().getValidActions());
         assertEquals(1, loaded.getPrestigeRecords().size());
@@ -108,7 +106,7 @@ class YamlRankStorageV2Test {
 
         File file = tempDirectory.resolve("playerdata/" + uuid + ".yml").toFile();
         YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-        assertEquals(2, yaml.getInt("rank.profession.schemaVersion"));
+        assertEquals(3, yaml.getInt("rank.profession.schemaVersion"));
         assertTrue(yaml.contains("rank.profession.acquiredSkills"));
         assertTrue(yaml.contains("rank.profession.prestigeSkills"));
         assertTrue(yaml.contains("rank.profession.activeSkillId"));

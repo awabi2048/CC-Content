@@ -49,7 +49,7 @@ class CodeDefinedSkillTreeTest {
     @Test
     void typedProfessionNodesUseProfilesInsteadOfLegacyEffectHandlers() {
         for (Profession profession : Profession.values()) {
-            if (!profession.getUsesTypedProfile()) continue;
+            if (!profession.getUsesTypedAbilityAdapter()) continue;
             SkillTree tree = CodeDefinedSkillTree.Companion.create(profession);
             assertTrue(
                 tree.getAllSkills().values().stream().allMatch(skill -> skill.getEffect() == null),

@@ -19,7 +19,7 @@ object TypedProfessionLevelCurve {
     )
 
     fun requiredTotalExp(profession: Profession, level: Int): Long {
-        require(profession.usesTypedProfile) { "${profession.id} does not use typed progression" }
+        require(profession.usesTypedAbilityAdapter) { "${profession.id} does not use a typed ability adapter" }
         val target = level.coerceIn(0, MAX_LEVEL)
         if (target == 0) return 0L
         val definition = definitions.getValue(profession)
@@ -34,7 +34,7 @@ object TypedProfessionLevelCurve {
     }
 
     fun calculateLevel(profession: Profession, totalExp: Long): Int {
-        require(profession.usesTypedProfile) { "${profession.id} does not use typed progression" }
+        require(profession.usesTypedAbilityAdapter) { "${profession.id} does not use a typed ability adapter" }
         val exp = totalExp.coerceAtLeast(0L)
         var low = 1
         var high = MAX_LEVEL

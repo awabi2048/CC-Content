@@ -118,12 +118,6 @@ class RankManagerImpl(
         return getProfessionManager().setLevel(playerUuid, level)
     }
 
-    override fun selectProfessionSpecialization(playerUuid: UUID, specializationId: String): Boolean =
-        getProfessionManager().selectSpecialization(playerUuid, specializationId)
-
-    override fun getProfessionSpecializationId(playerUuid: UUID): String? =
-        getProfessionManager().getSpecializationId(playerUuid)
-
     override fun getTypedProfessionProfile(playerUuid: UUID): TypedProfessionProfile? =
         getProfessionManager().getTypedProfile(playerUuid)
 

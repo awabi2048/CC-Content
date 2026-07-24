@@ -239,23 +239,9 @@ class ProfessionManagerImpl(
         return true
     }
 
-    override fun selectSpecialization(playerUuid: UUID, specializationId: String): Boolean {
-        val prof = getPlayerProfession(playerUuid) ?: return false
-        if (!prof.profession.usesTypedProfile || prof.specializationId != null) return false
-        if (calculateLevel(prof) < ProfessionSpecialization.UNLOCK_LEVEL) return false
-        val specialization = ProfessionSpecialization.fromId(prof.profession, specializationId) ?: return false
-        prof.specializationId = specialization.id
-        prof.lastUpdated = System.currentTimeMillis()
-        storage.saveProfession(prof)
-        return true
-    }
-
-    override fun getSpecializationId(playerUuid: UUID): String? =
-        getPlayerProfession(playerUuid)?.specializationId
-
     override fun getTypedProfile(playerUuid: UUID): TypedProfessionProfile? {
         val prof = getPlayerProfession(playerUuid) ?: return null
-        if (!prof.profession.usesTypedProfile) return null
+        if (!prof.profession.usesTypedAbilityAdapter) return null
         return TypedProfessionProfileResolver.resolve(
             prof.profession,
             calculateLevel(prof),
@@ -265,11 +251,11 @@ class ProfessionManagerImpl(
     }
 
     override fun getFeatureToggles(playerUuid: UUID): ProfessionFeatureToggles? =
-        getPlayerProfession(playerUuid)?.takeIf { it.profession.usesTypedProfile }?.featureToggles?.copy()
+        getPlayerProfession(playerUuid)?.takeIf { it.profession.usesTypedAbilityAdapter }?.featureToggles?.copy()
 
     override fun updateFeatureToggles(playerUuid: UUID, toggles: ProfessionFeatureToggles): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
-        if (!prof.profession.usesTypedProfile) return false
+        if (!prof.profession.usesTypedAbilityAdapter) return false
         prof.featureToggles = toggles.copy()
         prof.lastUpdated = System.currentTimeMillis()
         storage.saveProfession(prof)
@@ -283,7 +269,7 @@ class ProfessionManagerImpl(
         firstDiscovery: Boolean
     ): Boolean {
         val prof = getPlayerProfession(playerUuid) ?: return false
-        if (!prof.profession.usesTypedProfile) return false
+        if (!prof.profession.usesTypedAbilityAdapter) return false
         prof.cycleStatistics.validActions++
         if (specialist) prof.cycleStatistics.specialistActions++
         if (highQuality) prof.cycleStatistics.highQualityActions++
@@ -499,9 +485,10 @@ class ProfessionManagerImpl(
             profession.cycleStatistics.firstDiscoveries
         )
         val completedAt = System.currentTimeMillis()
+        val specializationId = getTypedProfile(playerUuid)?.specialization?.id
         profession.prestigeRecords += jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionPrestigeRecord(
             professionId = profession.profession.id,
-            specializationId = profession.specializationId,
+            specializationId = specializationId,
             completedAtEpochMillis = completedAt,
             cycleNumber = cycleNumber,
             representativeStatistic = representativeStatistic
@@ -514,7 +501,7 @@ class ProfessionManagerImpl(
                 cycleNumber = cycleNumber,
                 owner = player,
                 messageProvider = messageProvider,
-                specializationId = profession.specializationId,
+                specializationId = specializationId,
                 completedAtEpochMillis = completedAt,
                 representativeStatistic = representativeStatistic
             )

@@ -144,7 +144,7 @@ class CodeDefinedSkillTree private constructor(
             ProfessionSkillTreeDefinitions.get(profession).let { definition ->
                 CodeDefinedSkillTree(
                     profession,
-                    if (profession.usesTypedProfile) {
+                    if (profession.usesTypedAbilityAdapter) {
                         definition.copy(nodes = definition.nodes.map { it.copy(effect = null) })
                     } else {
                         definition

@@ -14,7 +14,7 @@ object TypedProfessionProfileResolver {
         acquiredSkills: Set<String>,
         toggles: ProfessionFeatureToggles = ProfessionFeatureToggles.defaultsFor(profession)
     ): TypedProfessionProfile {
-        require(profession.usesTypedProfile) { "${profession.id} does not use a typed profile" }
+        require(profession.usesTypedAbilityAdapter) { "${profession.id} does not use a typed ability adapter" }
         val skills = acquiredSkills.map(String::lowercase).toSet()
         return when (profession) {
             Profession.MINER -> miner(level, skills, toggles)

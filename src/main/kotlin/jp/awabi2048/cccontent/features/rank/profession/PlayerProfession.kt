@@ -44,8 +44,6 @@ data class PlayerProfession(
      */
     var skillActivationStates: MutableMap<String, Boolean> = mutableMapOf(),
 
-    var specializationId: String? = null,
-
     var featureToggles: ProfessionFeatureToggles = ProfessionFeatureToggles.defaultsFor(profession),
 
     var cycleStatistics: ProfessionCycleStatistics = ProfessionCycleStatistics(),
