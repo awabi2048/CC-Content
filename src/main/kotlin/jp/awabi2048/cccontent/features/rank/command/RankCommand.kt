@@ -51,8 +51,11 @@ import com.awabi2048.ccsystem.api.gui.GuiStatusTone
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
+import com.awabi2048.ccsystem.api.gui.MenuActionHandler
+import com.awabi2048.ccsystem.api.gui.MenuActionResult
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
+import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
@@ -77,6 +80,33 @@ class RankCommand(
                 id = TUTORIAL_MENU_ID,
                 renderer = { context -> renderTutorialRankRuntimeView(context.player) },
                 actions = emptyMap(),
+            )
+        )
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = MENU_OWNER,
+                id = PROFESSION_GUILD_MENU_ID,
+                renderer = { context -> renderProfessionSelectionRuntimeView(context.player) },
+                actions = mapOf(
+                    PROFESSION_SELECT_ACTION to MenuActionHandler { context ->
+                        handleProfessionSelectionAction(context.player, context.payload["profession"])
+                    }
+                ),
+            )
+        )
+        runtime.register(
+            InventoryMenuDefinition(
+                owner = MENU_OWNER,
+                id = PROFESSION_CONFIRM_MENU_ID,
+                renderer = { context -> renderProfessionConfirmationRuntimeView(context.player, context.route) },
+                actions = mapOf(
+                    PROFESSION_CONFIRM_ACTION to MenuActionHandler { context ->
+                        handleProfessionConfirmationAction(context.player, context.route)
+                    },
+                    PROFESSION_CANCEL_ACTION to MenuActionHandler {
+                        MenuActionResult.Success(MenuUpdate.Back)
+                    },
+                ),
             )
         )
     }
@@ -476,18 +506,41 @@ class RankCommand(
      * 職業選択GUIを開く
      */
     override fun openProfessionSelectionGui(player: Player): Boolean {
-        val holder = ProfessionSelectionGuiHolder()
-        val inventory = Bukkit.createInventory(
-            holder,
-            54,
-            messageProvider.getMessage("gui.profession.guild.title")
+        return CCSystem.getAPI().getMenuRuntimeService().open(
+            player,
+            MenuRoute(MENU_OWNER, PROFESSION_GUILD_MENU_ID),
         )
-        holder.backingInventory = inventory
+    }
 
-        renderProfessionSelectionGui(inventory, player)
-        ManagedMenuPresenter.open(player, inventory)
-        player.playSound(player.location, Sound.BLOCK_CHEST_OPEN, 1.0f, 1.0f)
-        return true
+    private fun renderProfessionSelectionRuntimeView(viewer: Player): InventoryMenuView {
+        val inventory = Bukkit.createInventory(null, 54)
+        renderProfessionSelectionGui(inventory, viewer)
+        val hasProfession = rankManager.hasProfession(viewer.uniqueId)
+        return InventoryMenuView(
+            size = inventory.size,
+            title = LEGACY_SERIALIZER.deserialize(messageProvider.getMessage("gui.profession.guild.title")),
+            elements = (0 until inventory.size).mapNotNull { slot ->
+                val item = inventory.getItem(slot) ?: return@mapNotNull null
+                val profession = ProfessionGuildLayout.PROFESSION_SLOTS[slot]
+                val selectable = profession != null &&
+                    !hasProfession &&
+                    RankReleasePolicy.canAccessProfession(viewer, profession)
+                MenuElement(
+                    slot = slot,
+                    item = item,
+                    role = when {
+                        selectable -> GuiElementRole.ACTION
+                        profession != null || slot == 4 || slot == 49 -> GuiElementRole.CONTENT
+                        else -> GuiElementRole.DECORATION
+                    },
+                    actionId = PROFESSION_SELECT_ACTION.takeIf { selectable },
+                    actionPayload = profession?.takeIf { selectable }
+                        ?.let { mapOf("profession" to it.id) }
+                        .orEmpty(),
+                )
+            },
+            standardFrame = false,
+        )
     }
 
     private fun renderProfessionSelectionGui(inventory: Inventory, viewer: Player) {
@@ -535,7 +588,7 @@ class RankCommand(
         val meta = head.itemMeta as? org.bukkit.inventory.meta.SkullMeta
         meta?.let {
             it.owningPlayer = player
-            it.displayName(toComponent("§a§l${player.name}"))
+            it.displayName(CCSystem.getAPI().getGuiElementService().name("§a§l${player.name}"))
             val playerHeadLore = messageProvider.getMessageList("gui.profession.selection.player_head.lore")
             it.lore(CCSystem.getAPI().getLoreService().render(
                 GuiLoreSpec.Rich(playerHeadLore.map(GuiLoreLine::Text), GuiLoreFrame.NONE)
@@ -615,46 +668,104 @@ class RankCommand(
         }
     }
     
-    private fun showProfessionConfirmDialog(player: Player, profession: Profession) {
-        val professionName = messageProvider.getProfessionName(profession)
-        val professionDesc = messageProvider.getProfessionDescription(profession)
-        
-        ConfirmationDialog.show(
-            player = player,
-            title = withoutItalic(toComponent(messageProvider.getMessage("gui.profession.confirm_dialog.title"))),
-            bodyMessage = withoutItalic(toComponent(messageProvider.getMessage("gui.profession.confirm_dialog.body", "profession" to professionName, "description" to professionDesc))),
-            confirmText = withoutItalic(toComponent(messageProvider.getMessage("gui.profession.confirm_dialog.confirm_button"))),
-            cancelText = withoutItalic(toComponent(messageProvider.getMessage("gui.profession.confirm_dialog.cancel_button"))),
-            onConfirm = { target ->
-                executeProfessionSelect(target, profession)
-            }
+    private fun handleProfessionSelectionAction(player: Player, professionId: String?): MenuActionResult {
+        val profession = professionId?.let(Profession::fromId)
+            ?: return MenuActionResult.Rejected()
+        if (rankManager.hasProfession(player.uniqueId)) {
+            return MenuActionResult.Rejected(
+                toComponent(messageProvider.getMessage("gui.profession.error.already_has_profession"))
+            )
+        }
+        if (!RankReleasePolicy.canAccessProfession(player, profession)) {
+            return MenuActionResult.Rejected(
+                toComponent(messageProvider.getMessage("release.profession_unavailable"))
+            )
+        }
+        return MenuActionResult.Success(
+            MenuUpdate.Navigate(
+                MenuRoute(
+                    MENU_OWNER,
+                    PROFESSION_CONFIRM_MENU_ID,
+                    mapOf("profession" to profession.id),
+                )
+            )
         )
     }
-    
-    private fun executeProfessionSelect(player: Player, profession: Profession) {
-        if (!RankReleasePolicy.canAccessProfession(player, profession)) {
-            player.sendMessage(messageProvider.getMessage("release.profession_unavailable"))
-            return
+
+    private fun renderProfessionConfirmationRuntimeView(player: Player, route: MenuRoute): InventoryMenuView {
+        val profession = route.payload["profession"]?.let(Profession::fromId)
+        val layout = CCSystem.getAPI().getGuiLayoutService().confirmation45()
+        val gui = CCSystem.getAPI().getGuiElementService()
+        val title = gui.title(
+                com.awabi2048.ccsystem.api.gui.GuiNameSpec.Text(
+                    messageProvider.getMessage("gui.profession.confirm_dialog.title"),
+                    com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT,
+                )
+        )
+        if (profession == null) {
+            return InventoryMenuView(layout.size, title, emptyList())
         }
-        if (rankManager.hasProfession(player.uniqueId)) {
-            player.sendMessage(messageProvider.getMessage("gui.profession.error.already_has_profession"))
-            return
-        }
-        
-        if (!rankManager.selectProfession(player.uniqueId, profession)) {
-            player.sendMessage(messageProvider.getMessage("gui.profession.error.selection_failed"))
-            return
-        }
-        player.sendMessage(messageProvider.getMessage("message.profession_selected", "profession" to messageProvider.getProfessionName(profession)))
-        player.playSound(player.location, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f)
-        
-        // GUIを閉じる
-        ManagedMenuPresenter.close(player)
+        val professionName = messageProvider.getProfessionName(profession)
+        val professionDesc = messageProvider.getProfessionDescription(profession)
+        val skillTree = SkillTreeRegistry.getSkillTree(profession)
+        val startSkill = skillTree?.getStartSkillId()?.let(skillTree::getSkill)
+        val icon = startSkill?.icon?.let { Material.matchMaterial(it.uppercase()) } ?: Material.BOOK
+        val preview = createGuiBlockItem(
+            icon,
+            toComponent("${profession.displayColorCode}§l$professionName"),
+            listOf(
+                listOf(
+                    GuiLoreLine.Text(
+                        messageProvider.getMessage(
+                            "gui.profession.confirm_dialog.body",
+                            "profession" to professionName,
+                            "description" to professionDesc,
+                        )
+                    )
+                )
+            ),
+        )
+        return InventoryMenuView(
+            size = layout.size,
+            title = title,
+            elements = listOf(
+                MenuElement(layout.previewSlot, preview, GuiElementRole.CONTENT),
+                MenuElement(
+                    layout.confirmSlot,
+                    gui.confirmItem(messageProvider.getMessage("gui.profession.confirm_dialog.confirm_button"), true),
+                    GuiElementRole.CONFIRM,
+                    PROFESSION_CONFIRM_ACTION,
+                ),
+                MenuElement(
+                    layout.cancelSlot,
+                    gui.confirmItem(messageProvider.getMessage("gui.profession.confirm_dialog.cancel_button"), false),
+                    GuiElementRole.CANCEL,
+                    PROFESSION_CANCEL_ACTION,
+                ),
+            ),
+        )
     }
 
-    private class ProfessionSelectionGuiHolder : InventoryHolder {
-        lateinit var backingInventory: Inventory
-        override fun getInventory(): Inventory = backingInventory
+    private fun handleProfessionConfirmationAction(player: Player, route: MenuRoute): MenuActionResult {
+        val profession = route.payload["profession"]?.let(Profession::fromId)
+            ?: return MenuActionResult.Rejected()
+        if (!RankReleasePolicy.canAccessProfession(player, profession)) {
+            return MenuActionResult.Rejected(
+                toComponent(messageProvider.getMessage("release.profession_unavailable"))
+            )
+        }
+        if (rankManager.hasProfession(player.uniqueId)) {
+            return MenuActionResult.Rejected(
+                toComponent(messageProvider.getMessage("gui.profession.error.already_has_profession"))
+            )
+        }
+        if (!rankManager.selectProfession(player.uniqueId, profession)) {
+            return MenuActionResult.Rejected(
+                toComponent(messageProvider.getMessage("gui.profession.error.selection_failed"))
+            )
+        }
+        player.sendMessage(messageProvider.getMessage("message.profession_selected", "profession" to messageProvider.getProfessionName(profession)))
+        return MenuActionResult.Success(MenuUpdate.Close)
     }
 
     private fun renderProfessionMainMenu(
@@ -2726,44 +2837,6 @@ class RankCommand(
         event.isCancelled = true
     }
 
-    @EventHandler
-    fun onProfessionSelectionGuiClick(event: InventoryClickEvent) {
-        val holder = event.view.topInventory.holder as? ProfessionSelectionGuiHolder ?: return
-        event.cancelWithDebug("RankCommand.onProfessionSelectionGuiClick: selection_gui")
-
-        val clickedSlot = event.rawSlot
-        if (clickedSlot !in 0 until event.view.topInventory.size) {
-            return
-        }
-
-        val player = event.whoClicked as? Player ?: return
-        
-        // 既に職業を持っている場合は何もしない
-        if (rankManager.hasProfession(player.uniqueId)) {
-            ManagedMenuPresenter.rejected(player)
-            return
-        }
-        
-        // 職業スロットの定義
-        val selectedProfession = ProfessionGuildLayout.PROFESSION_SLOTS[clickedSlot] ?: return
-
-        if (!RankReleasePolicy.canAccessProfession(player, selectedProfession)) {
-            player.sendMessage(messageProvider.getMessage("release.profession_unavailable"))
-            return
-        }
-        
-        // 確認ダイアログを表示
-        showProfessionConfirmDialog(player, selectedProfession)
-    }
-
-    @EventHandler
-    fun onProfessionSelectionGuiDrag(event: InventoryDragEvent) {
-        if (event.view.topInventory.holder !is ProfessionSelectionGuiHolder) {
-            return
-        }
-        event.isCancelled = true
-    }
-
     private data class SkillTreeGuiState(
         val profession: Profession,
         var selectedSkillId: String,
@@ -2854,6 +2927,11 @@ class RankCommand(
     companion object {
         private const val MENU_OWNER = "cc-content"
         private const val TUTORIAL_MENU_ID = "rank-tutorial"
+        private const val PROFESSION_GUILD_MENU_ID = "profession-guild"
+        private const val PROFESSION_CONFIRM_MENU_ID = "profession-confirm"
+        private const val PROFESSION_SELECT_ACTION = "select-profession"
+        private const val PROFESSION_CONFIRM_ACTION = "confirm-profession"
+        private const val PROFESSION_CANCEL_ACTION = "cancel-profession"
         private val LEGACY_SERIALIZER: LegacyComponentSerializer = LegacyComponentSerializer.legacySection()
         private const val VIEWPORT_DEPTH_SPACING = 4
         private const val VIEWPORT_SELECTED_COLUMN = 2
