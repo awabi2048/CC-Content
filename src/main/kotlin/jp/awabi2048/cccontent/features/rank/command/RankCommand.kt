@@ -17,6 +17,8 @@ import jp.awabi2048.cccontent.features.rank.profession.ProfessionType
 import jp.awabi2048.cccontent.features.rank.profession.SkillNode
 import jp.awabi2048.cccontent.features.rank.profession.SkillTreeRegistry
 import jp.awabi2048.cccontent.features.rank.profession.BossBarDisplayMode
+import jp.awabi2048.cccontent.features.rank.profession.profile.FishingInformationMode
+import jp.awabi2048.cccontent.features.rank.profession.profile.ProfessionFeatureToggles
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
 import jp.awabi2048.cccontent.features.rank.gui.ConfirmationDialog
 import jp.awabi2048.cccontent.features.rank.skill.ActiveSkillManager
@@ -759,15 +761,6 @@ class RankCommand(
         }
         inventory.setItem(MAIN_MENU_PLAYER_INFO_SLOT, playerHead)
 
-        // 職業のヒントアイコン (スロット42) - モック実装
-        val hintLoreMain = messageProvider.getMessageList("rank.gui.hint_button_lore")
-        val hintItem = createGuiBlockItem(
-            Material.COMPASS,
-            toComponent(messageProvider.getMessage("rank.gui.hint_button")),
-            listOf(hintLoreMain.map(GuiLoreLine::Text))
-        )
-        inventory.setItem(MAIN_MENU_HINT_SLOT, hintItem)
-
         // モード切替ボタン (スロット38)
         if (ActiveSkillIdentifier.hasAnyToggleableSkill(viewer)) {
             val modeSwitchItem = ActiveSkillManager.createModeSwitchButton(viewer)
@@ -897,6 +890,7 @@ class RankCommand(
         playerProfession: jp.awabi2048.cccontent.features.rank.profession.PlayerProfession,
         player: Player
     ) {
+        val holder = inventory.holder as? ProfessionSettingsGuiHolder ?: return
         val headerFooterPane = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
         val basePane = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
 
@@ -924,8 +918,6 @@ class RankCommand(
                 settingsSingleAction(player, messageProvider.getMessage("rank.gui.settings.bossbar.action"))
             ))
         )
-        inventory.setItem(SETTINGS_MENU_BOSSBAR_SLOT, bossBarItem)
-
         val levelUpEnabled = rankManager.isLevelUpNotificationEnabled(playerProfession.playerUuid)
         val levelUpValue = if (levelUpEnabled) {
             "§a${messageProvider.getMessage("rank.gui.settings.level_up.enabled")}"
@@ -940,7 +932,58 @@ class RankCommand(
                 settingsSingleAction(player, messageProvider.getMessage("rank.gui.settings.level_up.action"))
             ))
         )
-        inventory.setItem(SETTINGS_MENU_LEVELUP_NOTIFY_SLOT, levelUpItem)
+        val settingItems = mutableListOf(
+            ProfessionSettingAction.BOSSBAR to bossBarItem,
+            ProfessionSettingAction.LEVEL_UP_NOTIFICATION to levelUpItem
+        )
+        val toggles = playerProfession.featureToggles
+        when (playerProfession.profession) {
+            Profession.MINER -> settingItems += ProfessionSettingAction.BATCH to
+                createFeatureToggleItem(player, Material.IRON_PICKAXE, "batch", toggles.batchProcessingEnabled)
+            Profession.LUMBERJACK -> {
+                settingItems += ProfessionSettingAction.BATCH to
+                    createFeatureToggleItem(player, Material.IRON_AXE, "batch", toggles.batchProcessingEnabled)
+                settingItems += ProfessionSettingAction.LEAF_CLEANUP to
+                    createFeatureToggleItem(player, Material.SHEARS, "leaf_cleanup", toggles.leafCleanupEnabled)
+                settingItems += ProfessionSettingAction.AUTOMATIC_REPLANT to
+                    createFeatureToggleItem(player, Material.OAK_SAPLING, "automatic_replant", toggles.automaticReplantEnabled)
+            }
+            Profession.FARMER -> {
+                settingItems += ProfessionSettingAction.AUTOMATIC_REPLANT to
+                    createFeatureToggleItem(player, Material.WHEAT_SEEDS, "automatic_replant", toggles.automaticReplantEnabled)
+                settingItems += ProfessionSettingAction.AREA_TILLING to
+                    createFeatureToggleItem(player, Material.IRON_HOE, "area_tilling", toggles.areaTillingEnabled)
+                settingItems += ProfessionSettingAction.AREA_HARVEST to
+                    createFeatureToggleItem(player, Material.WHEAT, "area_harvest", toggles.areaHarvestEnabled)
+            }
+            Profession.FISHER -> {
+                val mode = toggles.fishingInformationMode.name.lowercase()
+                settingItems += ProfessionSettingAction.FISHING_INFORMATION to
+                    createGuiBlockItem(
+                        Material.COMPASS,
+                        toComponent(messageProvider.getMessage("rank.gui.settings.feature.fishing_information.title")),
+                        listOf(listOf(
+                            GuiLoreLine.Data(
+                                messageProvider.getMessage("rank.gui.settings.current_label"),
+                                messageProvider.getMessage("rank.gui.settings.feature.fishing_information.mode.$mode"),
+                                "§e"
+                            ),
+                            settingsSingleAction(
+                                player,
+                                messageProvider.getMessage("rank.gui.settings.feature.fishing_information.action")
+                            )
+                        ))
+                    )
+            }
+            else -> Unit
+        }
+        holder.actionBySlot.clear()
+        val settingSlots = CCSystem.getAPI().getGuiLayoutService()
+            .centeredSevenColumnSlots(1, settingItems.size)
+        settingSlots.zip(settingItems).forEach { (slot, entry) ->
+            holder.actionBySlot[slot] = entry.first
+            inventory.setItem(slot, entry.second)
+        }
 
         val backItem = createGuiItem(
             Material.REDSTONE,
@@ -948,6 +991,28 @@ class RankCommand(
             emptyList()
         )
         inventory.setItem(SETTINGS_MENU_BACK_SLOT, backItem)
+    }
+
+    private fun createFeatureToggleItem(
+        player: Player,
+        material: Material,
+        key: String,
+        enabled: Boolean
+    ): ItemStack {
+        val stateKey = if (enabled) "enabled" else "disabled"
+        val stateColor = if (enabled) "§a" else "§c"
+        return createGuiBlockItem(
+            material,
+            toComponent(messageProvider.getMessage("rank.gui.settings.feature.$key.title")),
+            listOf(listOf(
+                GuiLoreLine.Data(
+                    messageProvider.getMessage("rank.gui.settings.current_label"),
+                    messageProvider.getMessage("rank.gui.settings.feature.state.$stateKey"),
+                    stateColor
+                ),
+                settingsSingleAction(player, messageProvider.getMessage("rank.gui.settings.feature.$key.action"))
+            ))
+        )
     }
 
     private fun settingsSingleAction(player: Player, action: String): GuiLoreLine.SingleAction {
@@ -2587,7 +2652,7 @@ class RankCommand(
                 ManagedMenuPresenter.success(player)
                 openProfessionSettingsMenu(player)
             }
-            MAIN_MENU_PLAYER_INFO_SLOT, MAIN_MENU_HINT_SLOT -> {
+            MAIN_MENU_PLAYER_INFO_SLOT -> {
             }
         }
     }
@@ -2605,8 +2670,14 @@ class RankCommand(
         val player = event.whoClicked as? Player ?: return
         val playerProfession = rankManager.getPlayerProfession(player.uniqueId) ?: return
 
-        when (clickedSlot) {
-            SETTINGS_MENU_BOSSBAR_SLOT -> {
+        if (clickedSlot == SETTINGS_MENU_BACK_SLOT) {
+            ManagedMenuPresenter.success(player)
+            openProfessionMainMenu(player)
+            return
+        }
+
+        when (holder.actionBySlot[clickedSlot]) {
+            ProfessionSettingAction.BOSSBAR -> {
                 val currentMode = rankManager.getProfessionBossBarDisplayMode(player.uniqueId)
                 val nextMode = currentMode.next()
                 rankManager.setProfessionBossBarDisplayMode(player.uniqueId, nextMode)
@@ -2614,18 +2685,52 @@ class RankCommand(
                 ManagedMenuPresenter.success(player)
                 renderProfessionSettingsMenu(holder.backingInventory, playerProfession, player)
             }
-            SETTINGS_MENU_LEVELUP_NOTIFY_SLOT -> {
+            ProfessionSettingAction.LEVEL_UP_NOTIFICATION -> {
                 val current = rankManager.isLevelUpNotificationEnabled(player.uniqueId)
                 rankManager.setLevelUpNotificationEnabled(player.uniqueId, !current)
                 rankManager.savePlayerProfession(player.uniqueId)
                 ManagedMenuPresenter.success(player)
                 renderProfessionSettingsMenu(holder.backingInventory, playerProfession, player)
             }
-            SETTINGS_MENU_BACK_SLOT -> {
-                ManagedMenuPresenter.success(player)
-                openProfessionMainMenu(player)
+            ProfessionSettingAction.BATCH -> updateFeatureToggles(player, playerProfession) {
+                batchProcessingEnabled = !batchProcessingEnabled
             }
+            ProfessionSettingAction.LEAF_CLEANUP -> updateFeatureToggles(player, playerProfession) {
+                leafCleanupEnabled = !leafCleanupEnabled
+            }
+            ProfessionSettingAction.AUTOMATIC_REPLANT -> updateFeatureToggles(player, playerProfession) {
+                automaticReplantEnabled = !automaticReplantEnabled
+            }
+            ProfessionSettingAction.AREA_TILLING -> updateFeatureToggles(player, playerProfession) {
+                areaTillingEnabled = !areaTillingEnabled
+            }
+            ProfessionSettingAction.AREA_HARVEST -> updateFeatureToggles(player, playerProfession) {
+                areaHarvestEnabled = !areaHarvestEnabled
+            }
+            ProfessionSettingAction.FISHING_INFORMATION -> updateFeatureToggles(player, playerProfession) {
+                fishingInformationMode = when (fishingInformationMode) {
+                    FishingInformationMode.BRIEF -> FishingInformationMode.DETAIL
+                    FishingInformationMode.DETAIL -> FishingInformationMode.HIDDEN
+                    FishingInformationMode.HIDDEN -> FishingInformationMode.BRIEF
+                }
+            }
+            null -> Unit
         }
+    }
+
+    private fun updateFeatureToggles(
+        player: Player,
+        playerProfession: jp.awabi2048.cccontent.features.rank.profession.PlayerProfession,
+        update: ProfessionFeatureToggles.() -> Unit
+    ) {
+        if (!playerProfession.profession.usesTypedAbilityAdapter) return
+        val toggles = playerProfession.featureToggles.copy().apply(update)
+        if (toggles == playerProfession.featureToggles) return
+        if (!rankManager.updateProfessionFeatureToggles(player.uniqueId, toggles)) return
+        ManagedMenuPresenter.success(player)
+        val holder = player.openInventory.topInventory.holder as? ProfessionSettingsGuiHolder ?: return
+        val refreshed = rankManager.getPlayerProfession(player.uniqueId) ?: return
+        renderProfessionSettingsMenu(holder.backingInventory, refreshed, player)
     }
 
     @EventHandler
@@ -2787,8 +2892,20 @@ class RankCommand(
 
     private class ProfessionSettingsGuiHolder : InventoryHolder {
         lateinit var backingInventory: Inventory
+        val actionBySlot: MutableMap<Int, ProfessionSettingAction> = mutableMapOf()
 
         override fun getInventory(): Inventory = backingInventory
+    }
+
+    private enum class ProfessionSettingAction {
+        BOSSBAR,
+        LEVEL_UP_NOTIFICATION,
+        BATCH,
+        LEAF_CLEANUP,
+        AUTOMATIC_REPLANT,
+        AREA_TILLING,
+        AREA_HARVEST,
+        FISHING_INFORMATION
     }
 
     private enum class SkillTreeLane {
@@ -2850,10 +2967,7 @@ class RankCommand(
         private const val MAIN_MENU_SETTINGS_SLOT = 24
         private const val MAIN_MENU_PLAYER_INFO_SLOT = 40
         private const val MAIN_MENU_MODE_SWITCH_SLOT = 38
-        private const val MAIN_MENU_HINT_SLOT = 42
 
-        private const val SETTINGS_MENU_BOSSBAR_SLOT = 10
-        private const val SETTINGS_MENU_LEVELUP_NOTIFY_SLOT = 11
         private const val SETTINGS_MENU_BACK_SLOT = 18
 
         private const val TUTORIAL_MENU_TASK_ROW = 2
