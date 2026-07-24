@@ -177,7 +177,8 @@ class SpecialistCollectionService(
     fun onChiselBlockDamage(event: BlockDamageEvent) {
         val customId = CustomItemManager.identify(event.player.inventory.itemInMainHand)?.fullId
         val shouldCancel = customId == "resource.chisel" &&
-            settings.isOperationEnabled(ResourceOperation.MINER_CHISEL)
+            settings.isOperationEnabled(ResourceOperation.MINER_CHISEL) &&
+            resolveChiselProfile(event.player, event.block) != null
         if (shouldCancel) {
             event.isCancelled = true
         }
@@ -929,17 +930,9 @@ class SpecialistCollectionService(
     }
 
     private fun handleChiselClick(event: PlayerInteractEvent, block: Block) {
-        event.isCancelled = true
         val player = event.player
-        val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? MinerSkillProfile
-        if (profile == null || !profile.expertOperationUnlocked ||
-            !RankReleasePolicy.canAccessProfession(player, Profession.MINER)) {
-            return
-        }
-        if (ResourceMaterialPolicy.classify(block.type, block.blockData) != ResourceCollectionKind.MINERAL ||
-            !isReadyNatural(block)) {
-            return
-        }
+        val profile = resolveChiselProfile(player, block) ?: return
+        event.isCancelled = true
         val key = block.key()
         val current = chiselSessions[player.uniqueId]
         if (current == null) {
@@ -1078,6 +1071,18 @@ class SpecialistCollectionService(
             0.0
         )
         player.playSound(player.location, Sound.BLOCK_NOTE_BLOCK_BELL, 0.55f, 1.65f)
+    }
+
+    private fun resolveChiselProfile(player: Player, block: Block): MinerSkillProfile? {
+        val profile = rankManager.getTypedProfessionProfile(player.uniqueId) as? MinerSkillProfile
+            ?: return null
+        if (!profile.expertOperationUnlocked ||
+            !RankReleasePolicy.canAccessProfession(player, Profession.MINER) ||
+            ResourceMaterialPolicy.classify(block.type, block.blockData) != ResourceCollectionKind.MINERAL ||
+            !isReadyNatural(block)) {
+            return null
+        }
+        return profile
     }
 
     private fun startChiselDisplayTask(session: ChiselSession) {
