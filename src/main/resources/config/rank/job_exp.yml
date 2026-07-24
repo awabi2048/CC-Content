@@ -34,9 +34,6 @@ lumberjack:
   crimson_stem: 3
   warped_stem: 3
 
-brewer:
-  mock_exp: 5
-
 combat_shared:
   zombie: 3
   skeleton: 4

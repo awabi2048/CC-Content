@@ -79,14 +79,6 @@ class RankCommand(
                 actions = emptyMap(),
             )
         )
-        runtime.register(
-            InventoryMenuDefinition(
-                owner = MENU_OWNER,
-                id = TASK_INFO_MENU_ID,
-                renderer = { context -> renderTaskInfoRuntimeView(context.player, context.route) },
-                actions = emptyMap(),
-            )
-        )
     }
 
     fun setTutorialTaskSystem(
@@ -1290,7 +1282,6 @@ class RankCommand(
             emptyList()
         )
         inventory.setItem(NAV_LEFT_SLOT, backButton)
-        // NAV_CENTER_SLOT, NAV_RIGHT_SLOTはモック削除のため背景のまま（既にheaderFooterPaneが設定済み）
     }
 
     private fun renderSkillTreeGuiViewport(
@@ -1398,7 +1389,6 @@ class RankCommand(
             emptyList()
         )
         inventory.setItem(NAV_LEFT_SLOT, backButton)
-        // NAV_CENTER_SLOT, NAV_RIGHT_SLOTはモック削除のため背景のまま（既にheaderFooterPaneが設定済み）
     }
 
     private fun buildSkillTreeRenderModel(
@@ -1905,53 +1895,6 @@ class RankCommand(
         return Material.matchMaterial(normalized) ?: Material.BARRIER
     }
     
-    private fun renderTaskInfoRuntimeView(viewer: Player, route: MenuRoute): InventoryMenuView {
-        val targetPlayer = route.payload["target"]
-            ?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
-            ?.let(Bukkit::getPlayer)
-            ?: viewer
-        val rankName = route.payload["rank"] ?: rankManager.getTutorialRank(targetPlayer.uniqueId).name
-        val progress = rankManager.getPlayerTutorial(targetPlayer.uniqueId).taskProgress
-        val requirement = taskLoader?.getRequirement(rankName) ?: TaskRequirement()
-        val title = messageProvider.getMessage(
-            "rank.tutorial_task_info.title",
-            "player" to targetPlayer.name,
-            "rank" to rankName
-        )
-        val inventory = Bukkit.createInventory(null, 45, title)
-
-        val headerFooter = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
-        val middle = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
-
-        for (slot in 0..8) {
-            inventory.setItem(slot, headerFooter)
-        }
-        for (slot in 36..44) {
-            inventory.setItem(slot, headerFooter)
-        }
-        for (slot in 9..35) {
-            inventory.setItem(slot, middle)
-        }
-
-        val categories = buildTaskCategoryItems(targetPlayer, progress, requirement)
-        val targetSlots = CCSystem.getAPI().getGuiLayoutService()
-            .centeredSevenColumnSlots(TUTORIAL_MENU_TASK_ROW, categories.size)
-        categories.zip(targetSlots).forEach { (item, slot) ->
-            inventory.setItem(slot, item)
-        }
-
-        if (categories.isEmpty()) {
-            val completeItem = createGuiItem(
-                Material.LIME_STAINED_GLASS_PANE,
-                toComponent(messageProvider.getMessage("rank.tutorial_task_info.complete_title")),
-                listOf(GuiLoreLine.Text(messageProvider.getMessage("rank.tutorial_task_info.complete_lore")))
-            )
-            inventory.setItem(22, completeItem)
-        }
-
-        return inventory.toRuntimeView(title)
-    }
-
     private fun Inventory.toRuntimeView(title: String): InventoryMenuView = InventoryMenuView(
         size = size,
         title = LEGACY_SERIALIZER.deserialize(title),
@@ -2325,8 +2268,6 @@ class RankCommand(
                     onSkillTreeNavLeft(holder, player)
                 }
             }
-            NAV_CENTER_SLOT -> onSkillTreeNavCenter(holder)
-            NAV_RIGHT_SLOT -> onSkillTreeNavRight(holder)
             else -> {
                 val skillId = holder.state.slotToSkillId[clickedSlot] ?: return
                 if (player == null) return
@@ -2348,16 +2289,6 @@ class RankCommand(
         // 職業メインメニューに戻る
         ManagedMenuPresenter.success(viewer)
         openProfessionMainMenu(viewer)
-    }
-
-    private fun onSkillTreeNavCenter(holder: SkillTreeGuiHolder) {
-        // モック削除のため何もしない
-        holder.state.lastAction = "nav_center"
-    }
-
-    private fun onSkillTreeNavRight(holder: SkillTreeGuiHolder) {
-        // モック削除のため何もしない
-        holder.state.lastAction = "nav_right"
     }
 
     private fun onSkillTreeSkillNodeClicked(holder: SkillTreeGuiHolder, skillId: String, viewer: Player) {
@@ -2923,14 +2854,11 @@ class RankCommand(
     companion object {
         private const val MENU_OWNER = "cc-content"
         private const val TUTORIAL_MENU_ID = "rank-tutorial"
-        private const val TASK_INFO_MENU_ID = "rank-task-info"
         private val LEGACY_SERIALIZER: LegacyComponentSerializer = LegacyComponentSerializer.legacySection()
         private const val VIEWPORT_DEPTH_SPACING = 4
         private const val VIEWPORT_SELECTED_COLUMN = 2
 
         private const val NAV_LEFT_SLOT = 36
-        private const val NAV_CENTER_SLOT = 40
-        private const val NAV_RIGHT_SLOT = 44
 
         private const val SELECTED_SLOT_CHILD_ONE = 20
         private const val CHILD_SLOT_CHILD_ONE = 24
