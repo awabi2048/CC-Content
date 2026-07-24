@@ -23,6 +23,7 @@ class ProfessionGuildRuntimeContractTest {
         assertTrue(source.contains("id = PROFESSION_CONFIRM_MENU_ID"));
         assertTrue(source.contains("getGuiLayoutService().confirmation45()"));
         assertTrue(source.contains("gui.confirmItem("));
+        assertTrue(source.contains(").lines().map { line ->"));
         assertFalse(source.contains("ProfessionSelectionGuiHolder"));
         assertFalse(source.contains("showProfessionConfirmDialog"));
     }

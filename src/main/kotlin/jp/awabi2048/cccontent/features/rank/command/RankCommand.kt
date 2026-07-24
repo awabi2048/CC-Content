@@ -710,20 +710,17 @@ class RankCommand(
         val skillTree = SkillTreeRegistry.getSkillTree(profession)
         val startSkill = skillTree?.getStartSkillId()?.let(skillTree::getSkill)
         val icon = startSkill?.icon?.let { Material.matchMaterial(it.uppercase()) } ?: Material.BOOK
+        val bodyLines = messageProvider.getMessage(
+            "gui.profession.confirm_dialog.body",
+            "profession" to professionName,
+            "description" to professionDesc,
+        ).lines().map { line ->
+            if (line.isBlank()) GuiLoreLine.Spacer else GuiLoreLine.Text(line)
+        }
         val preview = createGuiBlockItem(
             icon,
             toComponent("${profession.displayColorCode}§l$professionName"),
-            listOf(
-                listOf(
-                    GuiLoreLine.Text(
-                        messageProvider.getMessage(
-                            "gui.profession.confirm_dialog.body",
-                            "profession" to professionName,
-                            "description" to professionDesc,
-                        )
-                    )
-                )
-            ),
+            listOf(bodyLines),
         )
         return InventoryMenuView(
             size = layout.size,
