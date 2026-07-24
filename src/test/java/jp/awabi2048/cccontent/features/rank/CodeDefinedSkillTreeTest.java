@@ -46,6 +46,18 @@ class CodeDefinedSkillTreeTest {
         }
     }
 
+    @Test
+    void typedProfessionNodesUseProfilesInsteadOfLegacyEffectHandlers() {
+        for (Profession profession : Profession.values()) {
+            if (!profession.getUsesTypedProfile()) continue;
+            SkillTree tree = CodeDefinedSkillTree.Companion.create(profession);
+            assertTrue(
+                tree.getAllSkills().values().stream().allMatch(skill -> skill.getEffect() == null),
+                profession.getId()
+            );
+        }
+    }
+
     private static void visit(SkillTree tree, String skillId, Set<String> visited) {
         if (!visited.add(skillId)) return;
         tree.getChildren(skillId).forEach(child -> visit(tree, child, visited));

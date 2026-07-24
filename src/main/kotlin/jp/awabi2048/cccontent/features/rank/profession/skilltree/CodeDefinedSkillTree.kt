@@ -141,10 +141,16 @@ class CodeDefinedSkillTree private constructor(
 
     companion object {
         fun create(profession: Profession): CodeDefinedSkillTree =
-            CodeDefinedSkillTree(
-                profession,
-                ProfessionSkillTreeDefinitions.get(profession)
-            )
+            ProfessionSkillTreeDefinitions.get(profession).let { definition ->
+                CodeDefinedSkillTree(
+                    profession,
+                    if (profession.usesTypedProfile) {
+                        definition.copy(nodes = definition.nodes.map { it.copy(effect = null) })
+                    } else {
+                        definition
+                    }
+                )
+            }
     }
 }
 
