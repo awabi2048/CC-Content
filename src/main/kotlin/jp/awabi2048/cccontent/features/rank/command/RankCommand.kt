@@ -1850,31 +1850,73 @@ class RankCommand(
                                 acquired &&
                                 state.prestigeLevel >= skill.requiredLevel
 
-        val status = when {
-            prestigeUnlocked -> messageProvider.getMessage("rank.skill.gui.status.prestige_unlocked")
-            acquired -> messageProvider.getMessage("rank.skill.gui.status.acquired")
-            available -> messageProvider.getMessage("rank.skill.gui.status.available")
-            else -> messageProvider.getMessage("rank.skill.gui.status.locked")
-        }
-
         val material = resolveSkillIconMaterial(skill.icon)
-        val lore = mutableListOf<GuiLoreLine>(
-            GuiLoreLine.Text(messageProvider.getSkillDescription(state.profession, skill.skillId)),
-            GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.lore.required_level", "level" to skill.requiredLevel)),
-            GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.lore.current_level", "level" to state.currentLevel)),
-            GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.lore.status", "status" to status))
+        val parents = skillTree.getParents(skill.skillId)
+        val acquiredParents = parents.filter { it in state.acquiredSkills }
+        val blockedByBranch = acquiredParents.any { parentId ->
+            val parentSkill = skillTree.getSkill(parentId)
+            if (parentSkill?.exclusiveBranch != true) return@any false
+            val siblings = skillTree.getChildren(parentId)
+            siblings.size >= 2 && siblings.any { it in state.acquiredSkills && it != skill.skillId }
+        }
+        val missingPrerequisite = parents.isNotEmpty() && acquiredParents.isEmpty()
+
+        val blocks = mutableListOf<List<GuiLoreLine>>()
+        blocks += listOf(
+            GuiLoreLine.Text(messageProvider.getSkillDescription(state.profession, skill.skillId))
+        )
+        blocks += listOf(
+            GuiLoreLine.Data(
+                messageProvider.getMessage("rank.skill.gui.lore.required_level_label"),
+                messageProvider.getMessage("rank.skill.gui.lore.level_value", "level" to skill.requiredLevel),
+                if (state.currentLevel >= skill.requiredLevel) "§f" else "§c"
+            )
         )
 
-        // プレステージアンロック可能な場合、Loreに追加情報を表示
-        if (prestigeAvailable) {
-            lore.add(GuiLoreLine.Spacer)
-            lore.add(GuiLoreLine.Warning(messageProvider.getMessage("rank.skill.gui.lore.prestige_available")))
+        val stateLine = when {
+            prestigeUnlocked ->
+                GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.status.prestige_unlocked"))
+            prestigeAvailable ->
+                GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.status.prestige_available"))
+            acquired ->
+                GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.status.acquired"))
+            available ->
+                GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.status.available"))
+            blockedByBranch ->
+                GuiLoreLine.Warning(messageProvider.getMessage("rank.skill.gui.lore.branch_locked"))
+            missingPrerequisite ->
+                GuiLoreLine.Warning(messageProvider.getMessage("rank.skill.gui.lore.prerequisite_locked"))
+            state.currentLevel < skill.requiredLevel ->
+                GuiLoreLine.Warning(
+                    messageProvider.getMessage(
+                        "rank.skill.gui.lore.level_locked",
+                        "level" to skill.requiredLevel
+                    )
+                )
+            else ->
+                GuiLoreLine.Warning(messageProvider.getMessage("rank.skill.gui.status.locked"))
+        }
+        blocks += listOf(stateLine)
+
+        when {
+            prestigeAvailable -> blocks += listOf(
+                GuiLoreLine.Action(
+                    messageProvider.getMessage("rank.skill.gui.lore.click_operation"),
+                    messageProvider.getMessage("rank.skill.gui.lore.acquire_prestige_action")
+                )
+            )
+            available -> blocks += listOf(
+                GuiLoreLine.Action(
+                    messageProvider.getMessage("rank.skill.gui.lore.click_operation"),
+                    messageProvider.getMessage("rank.skill.gui.lore.acquire_action")
+                )
+            )
         }
 
-        return createGuiItem(
+        return createGuiBlockItem(
             material,
             toComponent(messageProvider.getSkillName(state.profession, skill.skillId)),
-            lore
+            blocks
         )
     }
 
