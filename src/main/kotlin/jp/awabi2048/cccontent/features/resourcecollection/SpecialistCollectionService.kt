@@ -84,7 +84,8 @@ class SpecialistCollectionService(
         var scoreTotal: Double = 0.0,
         var ignoredFailures: Int = 0,
         var timeout: BukkitTask? = null,
-        var displayTask: BukkitTask? = null
+        var displayTask: BukkitTask? = null,
+        val damageViewers: MutableSet<UUID> = mutableSetOf()
     )
     private data class GatheringPlantSnapshot(
         val anchor: BlockKey,
@@ -957,6 +958,7 @@ class SpecialistCollectionService(
             chiselSessions[player.uniqueId] = session
             occupiedBlocks[key] = player.uniqueId
             showChiselTarget(player, session)
+            showChiselBlockDamage(session)
             startChiselDisplayTask(session)
             scheduleChiselTimeout(session)
             return
@@ -984,6 +986,7 @@ class SpecialistCollectionService(
         } else {
             current.target = randomTarget(block, current.face)
             showChiselTarget(player, current)
+            showChiselBlockDamage(current)
             scheduleChiselTimeout(current)
             player.playSound(player.location, Sound.BLOCK_STONE_HIT, 0.65f, 1.35f)
         }
@@ -1012,6 +1015,7 @@ class SpecialistCollectionService(
         )
         session.timeout?.cancel()
         session.displayTask?.cancel()
+        clearChiselBlockDamage(session)
         chiselSessions.remove(player.uniqueId)
         occupiedBlocks.remove(session.blockKey)
         playNaturalBreakEffect(block)
@@ -1106,6 +1110,25 @@ class SpecialistCollectionService(
 
     private fun chiselDisplayLocation(surfaceLocation: Location, face: BlockFace): Location =
         surfaceLocation.clone().add(face.direction.normalize().multiply(0.03))
+
+    private fun showChiselBlockDamage(session: ChiselSession) {
+        val block = session.blockKey.resolve() ?: return
+        val progress = ChiselHitPolicy.blockDamageProgress(session.attempts, settings.chisel.targetCount)
+        block.world.players
+            .filter { it.location.distanceSquared(block.location) <= 4096.0 }
+            .forEach { viewer ->
+                viewer.sendBlockDamage(block.location, progress, session.playerId.hashCode())
+                session.damageViewers.add(viewer.uniqueId)
+            }
+    }
+
+    private fun clearChiselBlockDamage(session: ChiselSession) {
+        val location = session.blockKey.location() ?: return
+        session.damageViewers.forEach { viewerId ->
+            Bukkit.getPlayer(viewerId)?.sendBlockDamage(location, 0.0f, session.playerId.hashCode())
+        }
+        session.damageViewers.clear()
+    }
 
     private fun randomTarget(block: Block, face: BlockFace): Location {
         val center = block.location.add(0.5, 0.5, 0.5)
@@ -1410,6 +1433,7 @@ class SpecialistCollectionService(
         val session = chiselSessions.remove(playerId) ?: return
         session.timeout?.cancel()
         session.displayTask?.cancel()
+        clearChiselBlockDamage(session)
         occupiedBlocks.remove(session.blockKey)
     }
 
@@ -1445,6 +1469,9 @@ class SpecialistCollectionService(
 
     private fun Block.key(): BlockKey = BlockKey(world.uid, x, y, z)
     private fun BlockKey.resolve(): Block? = Bukkit.getWorld(worldId)?.getBlockAt(x, y, z)
+
+    private fun BlockKey.location(): Location? =
+        Bukkit.getWorld(worldId)?.let { Location(it, x.toDouble(), y.toDouble(), z.toDouble()) }
 
     private fun strippedType(material: Material): Material? = runCatching {
         Material.valueOf(

@@ -202,6 +202,13 @@ object ChiselHitPolicy {
         val secondPixels = round(secondAxisDeltaBlocks / PIXEL_SIZE_BLOCKS)
         return hypot(firstPixels, secondPixels)
     }
+
+    fun blockDamageProgress(completedAttempts: Int, targetCount: Int): Float {
+        require(completedAttempts >= 0) { "Completed chisel attempts must not be negative" }
+        require(targetCount > 0) { "Chisel target count must be positive" }
+        if (completedAttempts == 0) return 0.1f
+        return (completedAttempts.toFloat() / targetCount).coerceIn(0.0f, 1.0f)
+    }
 }
 
 enum class MineralAltitudeBand {
