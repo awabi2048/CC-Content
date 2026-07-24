@@ -27,7 +27,7 @@ commands:
     permission: cc-content.arena.admin
   rankmenu:
     description: 職業メインメニューを開く
-    usage: /rankmenu [skill]
+    usage: /rankmenu
     permission: cc-content.rank
   catalog:
     description: 釣り・料理・醸造の図鑑を開く

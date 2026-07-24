@@ -883,14 +883,18 @@ class CCContent : JavaPlugin(), Listener {
                 id = "rank",
                 permission = "cc-content.rank",
                 targetPolicy = MenuTargetPolicy.SELF_ONLY,
-                argumentKeys = setOf("view"),
-                opener = { player, arguments ->
-                    if (arguments["view"].equals("skill", ignoreCase = true)) {
-                        rankCommand.openSkillTreeDirect(player)
-                    } else {
-                        rankCommand.openRankMenu(player)
-                    }
-                }
+                argumentKeys = emptySet(),
+                opener = { player, _ -> rankCommand.openRankMenu(player) }
+            )
+        )
+        CCSystem.getAPI().getMenuCommandService().register(
+            PublicMenuDefinition(
+                owner = "cc-content",
+                id = "guild",
+                permission = "cc-content.rank",
+                targetPolicy = MenuTargetPolicy.SELF_ONLY,
+                argumentKeys = emptySet(),
+                opener = { player, _ -> rankCommand.openProfessionSelectionGui(player) }
             )
         )
         val rankPluginCommand = getCommand("rank")

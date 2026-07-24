@@ -24,16 +24,11 @@ class RankMenuCommand(
             return false
         }
 
-        val arguments = if (args.firstOrNull().equals("skill", ignoreCase = true)) {
-            mapOf("view" to "skill")
-        } else {
-            emptyMap()
-        }
         return CCSystem.getAPI().getMenuCommandService().open(
             sender,
             sender,
             "cc-content:rank",
-            arguments
+            emptyMap()
         )
     }
 }

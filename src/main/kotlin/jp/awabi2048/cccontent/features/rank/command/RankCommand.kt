@@ -7,6 +7,7 @@ import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.listener.ProfessionSelector
+import jp.awabi2048.cccontent.features.rank.gui.ProfessionGuildLayout
 import jp.awabi2048.cccontent.features.rank.listener.TutorialInventoryHelper
 import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TaskProgress
@@ -95,7 +96,11 @@ class RankCommand(
     }
 
     fun openRankMenu(viewer: Player): Boolean {
-        return openTutorialRankMenu(viewer)
+        return if (rankManager.hasProfession(viewer.uniqueId)) {
+            openProfessionMainMenu(viewer)
+        } else {
+            openTutorialRankMenu(viewer)
+        }
     }
     
     override fun onCommand(
@@ -501,10 +506,25 @@ class RankCommand(
             inventory.setItem(slot, item)
         }
 
-        if (currentRank != TutorialRank.ATTAINER) {
+        if (currentRank == TutorialRank.ATTAINER) {
+            inventory.setItem(TUTORIAL_MENU_INFO_SLOT, createAttainerGuildGuideItem())
+        } else {
             inventory.setItem(TUTORIAL_MENU_INFO_SLOT, createTutorialProgressInfoItem(currentRank))
         }
     }
+
+    private fun createAttainerGuildGuideItem(): ItemStack =
+        createGuiBlockItem(
+            Material.WRITABLE_BOOK,
+            toComponent(messageProvider.getMessage("tutorial_rank.attainer.guild_guide.name")),
+            listOf(
+                listOf(GuiLoreLine.Text(messageProvider.getMessage("tutorial_rank.attainer.guild_guide.completed"))),
+                listOf(
+                    GuiLoreLine.Text(messageProvider.getMessage("tutorial_rank.attainer.guild_guide.description")),
+                    GuiLoreLine.Text(messageProvider.getMessage("tutorial_rank.attainer.guild_guide.location"))
+                )
+            )
+        )
 
     private fun progressColorCode(current: Long, required: Long): String {
         if (required <= 0L) {
@@ -565,7 +585,7 @@ class RankCommand(
         val inventory = Bukkit.createInventory(
             holder,
             54,
-            messageProvider.getMessage("gui.profession.selection.title")
+            messageProvider.getMessage("gui.profession.guild.title")
         )
         holder.backingInventory = inventory
 
@@ -597,10 +617,10 @@ class RankCommand(
         inventory.setItem(4, playerHead)
         
         // ヒントアイコン（Row6, Column5 = slot 49）
-        val hintLore = messageProvider.getMessageList("gui.profession.selection.hint.lore")
+        val hintLore = messageProvider.getMessageList("gui.profession.guild.info.lore")
         val hintItem = createGuiItem(
             Material.BOOK,
-            toComponent(messageProvider.getMessage("gui.profession.selection.hint.title")),
+            toComponent(messageProvider.getMessage("gui.profession.guild.info.name")),
             hintLore.map(GuiLoreLine::Text)
         )
         inventory.setItem(49, hintItem)
@@ -608,30 +628,7 @@ class RankCommand(
         // 現在の職業を取得
         val currentProfession = rankManager.getPlayerProfession(viewer.uniqueId)?.profession
         
-        // 職業をタイプ別に分類
-        val professionsByType = Profession.values().groupBy { it.type }
-        
-        // Row3 (slots 20-24): GATHERING + CRAFTING
-        val row3Professions = mutableListOf<Profession>()
-        professionsByType[ProfessionType.GATHERING]?.let { row3Professions.addAll(it) }
-        professionsByType[ProfessionType.CRAFTING]?.let { row3Professions.addAll(it) }
-        
-        val row3Slots = listOf(20, 21, 22, 23, 24)
-        row3Professions.take(5).forEachIndexed { index, profession ->
-            val slot = row3Slots.getOrNull(index) ?: return@forEachIndexed
-            val isCurrent = profession == currentProfession
-            val item = createProfessionItem(viewer, profession, isCurrent, currentProfession != null)
-            inventory.setItem(slot, item)
-        }
-        
-        // Row4 (slots 29-33): COMBAT + CREATIVE
-        val row4Professions = mutableListOf<Profession>()
-        professionsByType[ProfessionType.COMBAT]?.let { row4Professions.addAll(it) }
-        professionsByType[ProfessionType.CREATIVE]?.let { row4Professions.addAll(it) }
-        
-        val row4Slots = listOf(29, 30, 31, 32, 33)
-        row4Professions.take(5).forEachIndexed { index, profession ->
-            val slot = row4Slots.getOrNull(index) ?: return@forEachIndexed
+        ProfessionGuildLayout.PROFESSION_SLOTS.forEach { (slot, profession) ->
             val isCurrent = profession == currentProfession
             val item = createProfessionItem(viewer, profession, isCurrent, currentProfession != null)
             inventory.setItem(slot, item)
@@ -672,7 +669,7 @@ class RankCommand(
             // 現在の職業（選択済み）
             createGuiItem(
                 icon,
-                toComponent("${profession.displayColorCode}§l$professionName ${messageProvider.getMessage("gui.profession.selection.profession_item.selected")}"),
+                toComponent("${profession.displayColorCode}§l$professionName"),
                 listOf(
                     GuiLoreLine.Text(professionDesc),
                     GuiLoreLine.Spacer,
@@ -699,8 +696,8 @@ class RankCommand(
                 loreList.add(GuiLoreLine.Warning(lore))
             }
             createGuiItem(
-                Material.BARRIER,
-                toComponent(messageProvider.getMessage("gui.profession.selection.profession_item.already_selected_title", "profession" to professionName)),
+                icon,
+                toComponent("${profession.displayColorCode}§l$professionName"),
                 loreList
             )
         } else {
@@ -2803,22 +2800,7 @@ class RankCommand(
         }
         
         // 職業スロットの定義
-        val professionSlots = mapOf(
-            // Row3: GATHERING + CRAFTING
-            20 to Profession.LUMBERJACK,
-            21 to Profession.MINER,
-            22 to Profession.FARMER,
-            23 to Profession.BREWER,
-            24 to Profession.COOK,
-            // Row4: COMBAT + CREATIVE
-            29 to Profession.SWORDSMAN,
-            30 to Profession.WARRIOR,
-            31 to Profession.GARDENER,
-            32 to Profession.CARPENTER,
-            33 to Profession.FISHER
-        )
-        
-        val selectedProfession = professionSlots[clickedSlot] ?: return
+        val selectedProfession = ProfessionGuildLayout.PROFESSION_SLOTS[clickedSlot] ?: return
 
         if (!RankReleasePolicy.canAccessProfession(player, selectedProfession)) {
             player.sendMessage(messageProvider.getMessage("release.profession_unavailable"))
@@ -2967,7 +2949,6 @@ class RankCommand(
 
         private const val TUTORIAL_MENU_TASK_ROW = 2
         private const val TUTORIAL_MENU_INFO_SLOT = 40
-
     }
     
     /**
