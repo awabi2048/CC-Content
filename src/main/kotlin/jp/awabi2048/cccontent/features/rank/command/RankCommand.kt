@@ -451,6 +451,18 @@ class RankCommand(
             )
         )
 
+    private fun progressColorCode(current: Long, required: Long): String {
+        if (required <= 0L) {
+            return "§a"
+        }
+        val percent = ((current.toDouble() / required.toDouble()) * 100.0).toInt().coerceIn(0, 100)
+        return when {
+            percent >= 100 -> "§a"
+            percent >= 50 -> "§e"
+            else -> "§c"
+        }
+    }
+
     private fun createTutorialProgressInfoItem(currentRank: TutorialRank): ItemStack {
         val item = ItemStack(Material.WRITABLE_BOOK)
         val meta = item.itemMeta
@@ -2291,15 +2303,15 @@ class RankCommand(
 
     private fun taskProgressLine(
         label: String,
-        current: Any,
-        required: Any,
+        current: Number,
+        required: Number,
         unit: String,
         completed: Boolean
     ): GuiLoreLine.StatusData {
         return GuiLoreLine.StatusData(
             label,
             "$current §7/ $required $unit",
-            "§c",
+            progressColorCode(current.toLong(), required.toLong()),
             if (completed) GuiStatusTone.COMPLETE else GuiStatusTone.INCOMPLETE
         )
     }
@@ -2323,9 +2335,10 @@ class RankCommand(
         actionSuffix: String,
         unit: String
     ): GuiLoreLine.StatusComponentData {
+        val numberColor = progressColorCode(current.toLong(), required.toLong())
         val label = nameComponent.color(NamedTextColor.GRAY)
             .append(toComponent("§7$actionSuffix"))
-        val value = toComponent("§c$current §7/ $required $unit")
+        val value = toComponent("$numberColor$current §7/ $required $unit")
         return GuiLoreLine.StatusComponentData(
             label,
             value,
