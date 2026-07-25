@@ -451,18 +451,6 @@ class RankCommand(
             )
         )
 
-    private fun progressColorCode(current: Long, required: Long): String {
-        if (required <= 0L) {
-            return "§a"
-        }
-        val percent = ((current.toDouble() / required.toDouble()) * 100.0).toInt().coerceIn(0, 100)
-        return when {
-            percent >= 100 -> "§a"
-            percent >= 50 -> "§e"
-            else -> "§c"
-        }
-    }
-
     private fun createTutorialProgressInfoItem(currentRank: TutorialRank): ItemStack {
         val item = ItemStack(Material.WRITABLE_BOOK)
         val meta = item.itemMeta
@@ -470,9 +458,8 @@ class RankCommand(
             val rankLabels = TutorialRank.entries.map { rank ->
                 messageProvider.getMessage("tutorial_rank.progress.rank.${rank.name.lowercase()}")
             }
-            val nextRank = TutorialRank.entries[currentRank.ordinal + 1]
             meta.displayName(withoutItalic(toComponent(
-                "§e§l${messageProvider.getMessage("tutorial_rank.progress.name")}"
+                "§e${messageProvider.getMessage("tutorial_rank.progress.name")}"
             )))
             meta.lore(CCSystem.getAPI().getLoreService().render(
                 GuiLoreSpec.Blocks(listOf(
@@ -481,18 +468,6 @@ class RankCommand(
                     )),
                     GuiLoreBlock(listOf(
                         GuiLoreLine.ProgressPath(rankLabels, currentRank.ordinal)
-                    )),
-                    GuiLoreBlock(listOf(
-                        GuiLoreLine.Data(
-                            messageProvider.getMessage("tutorial_rank.progress.current_rank"),
-                            rankLabels[currentRank.ordinal],
-                            "§e"
-                        ),
-                        GuiLoreLine.Data(
-                            messageProvider.getMessage("tutorial_rank.progress.next_rank"),
-                            rankLabels[nextRank.ordinal],
-                            "§f"
-                        )
                     ))
                 ))
             ))
@@ -2031,8 +2006,9 @@ class RankCommand(
                 "rank.tutorial_task_info.comment.play_time",
                 listOf(taskProgressLine(
                     messageProvider.getMessage("tutorial_rank.task.label.play_time"),
-                    formatPlayTime(current),
-                    formatPlayTime(required),
+                    current,
+                    required,
+                    messageProvider.getMessage("tutorial_rank.task.unit.minute"),
                     done
                 ))
             )
@@ -2046,8 +2022,9 @@ class RankCommand(
                 val done = progress.activeOverworldTime >= required
                 details += taskProgressLine(
                     messageProvider.getMessage("tutorial_rank.task.label.active_overworld"),
-                    formatPlayTime(current),
-                    formatPlayTime(required),
+                    current,
+                    required,
+                    messageProvider.getMessage("tutorial_rank.task.unit.minute"),
                     done
                 )
             }
@@ -2057,8 +2034,9 @@ class RankCommand(
                 val done = progress.activeNetherResourceTime >= required
                 details += taskProgressLine(
                     messageProvider.getMessage("tutorial_rank.task.label.active_nether_resource"),
-                    formatPlayTime(current),
-                    formatPlayTime(required),
+                    current,
+                    required,
+                    messageProvider.getMessage("tutorial_rank.task.unit.minute"),
                     done
                 )
             }
@@ -2086,7 +2064,8 @@ class RankCommand(
                     done,
                     minOf(current, required),
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.suffix.defeat")
+                    messageProvider.getMessage("tutorial_rank.task.suffix.defeat"),
+                    messageProvider.getMessage("tutorial_rank.task.unit.entity")
                 )
             }
             requirement.bossKills.forEach { (bossType, required) ->
@@ -2102,7 +2081,8 @@ class RankCommand(
                     done,
                     minOf(current, required),
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.suffix.defeat")
+                    messageProvider.getMessage("tutorial_rank.task.suffix.defeat"),
+                    messageProvider.getMessage("tutorial_rank.task.unit.entity")
                 )
             }
 
@@ -2121,9 +2101,11 @@ class RankCommand(
                 val current = minOf(progress.diamondOresMined, required)
                 val done = progress.diamondOresMined >= required
                 details += taskProgressLine(
-                    messageProvider.getMessage("tutorial_rank.task.label.diamond_ore"),
+                    messageProvider.getMessage("tutorial_rank.task.label.diamond_ore") +
+                        messageProvider.getMessage("tutorial_rank.task.suffix.collect"),
                     current,
                     required,
+                    messageProvider.getMessage("tutorial_rank.task.unit.item"),
                     done
                 )
             }
@@ -2140,7 +2122,8 @@ class RankCommand(
                     done,
                     minOf(current, required),
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.suffix.collect")
+                    messageProvider.getMessage("tutorial_rank.task.suffix.collect"),
+                    messageProvider.getMessage("tutorial_rank.task.unit.item")
                 )
             }
 
@@ -2164,6 +2147,7 @@ class RankCommand(
                     messageProvider.getMessage("tutorial_rank.task.label.exp"),
                     current,
                     required,
+                    messageProvider.getMessage("tutorial_rank.task.unit.experience"),
                     done
                 ))
             )
@@ -2179,6 +2163,7 @@ class RankCommand(
                     messageProvider.getMessage("tutorial_rank.task.label.ender_eye"),
                     current,
                     required,
+                    messageProvider.getMessage("tutorial_rank.task.unit.item"),
                     done
                 )
             }
@@ -2195,7 +2180,8 @@ class RankCommand(
                     done,
                     minOf(current, required),
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.suffix.collect")
+                    messageProvider.getMessage("tutorial_rank.task.suffix.collect"),
+                    messageProvider.getMessage("tutorial_rank.task.unit.item")
                 )
             }
 
@@ -2307,12 +2293,13 @@ class RankCommand(
         label: String,
         current: Any,
         required: Any,
+        unit: String,
         completed: Boolean
     ): GuiLoreLine.StatusData {
         return GuiLoreLine.StatusData(
             label,
-            "$current / $required",
-            if (completed) "§a" else "§c",
+            "$current §7/ $required $unit",
+            "§c",
             if (completed) GuiStatusTone.COMPLETE else GuiStatusTone.INCOMPLETE
         )
     }
@@ -2333,12 +2320,12 @@ class RankCommand(
         done: Boolean,
         current: Int,
         required: Int,
-        actionSuffix: String
+        actionSuffix: String,
+        unit: String
     ): GuiLoreLine.StatusComponentData {
-        val numberColor = progressColorCode(current.toLong(), required.toLong())
         val label = nameComponent.color(NamedTextColor.GRAY)
             .append(toComponent("§7$actionSuffix"))
-        val value = toComponent("$numberColor$current§7 / $required")
+        val value = toComponent("§c$current §7/ $required $unit")
         return GuiLoreLine.StatusComponentData(
             label,
             value,
@@ -2977,25 +2964,6 @@ class RankCommand(
         private const val TUTORIAL_MENU_INFO_SLOT = 40
     }
     
-    /**
-     * プレイ時間（分）を時間と分に変換
-     * @param minutes プレイ時間（分）
-     * @return "X時間Y分" または "Y分" の形式
-     */
-    private fun formatPlayTime(minutes: Long): String {
-        return if (minutes >= 60) {
-            val hours = minutes / 60
-            val mins = minutes % 60
-            if (mins == 0L) {
-                "${hours}時間"
-            } else {
-                "${hours}時間${mins}分"
-            }
-        } else {
-            "${minutes}分"
-        }
-    }
-
     private fun resolveLowestDefinedTutorialRank(): TutorialRank {
         val lowestRankId = taskLoader?.getLowestDefinedRankId() ?: return TutorialRank.NEWBIE
         return TutorialRank.entries.firstOrNull { it.name.equals(lowestRankId, ignoreCase = true) }
