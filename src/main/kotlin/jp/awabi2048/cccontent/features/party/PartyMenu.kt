@@ -23,11 +23,8 @@ import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import net.kyori.adventure.text.Component
-import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.ItemStack
 
 class PartyMenu(private val controller: PartyController) {
     private val elements get() = CCSystem.getAPI().getGuiElementService()
@@ -62,15 +59,6 @@ class PartyMenu(private val controller: PartyController) {
         val partyId = route.payload["partyId"]?.let { runCatching { java.util.UUID.fromString(it) }.getOrNull() }
         val party = partyId?.let(controller.service::get) ?: controller.service.partyOf(player.uniqueId)
             ?: controller.service.create(player.uniqueId, controller.text(player, "party.default_name", mapOf("player" to player.name)))
-        val inventory = Bukkit.createInventory(
-            null,
-            45,
-            elements.title(GuiNameSpec.Text(controller.text(player, "party.menu.title"), GuiNameStyle.DEFAULT))
-        )
-        (0..8).forEach { inventory.setItem(it, elements.decoration(Material.BLACK_STAINED_GLASS_PANE)) }
-        (9..35).forEach { inventory.setItem(it, elements.decoration(Material.GRAY_STAINED_GLASS_PANE)) }
-        (36..44).forEach { inventory.setItem(it, elements.decoration(Material.BLACK_STAINED_GLASS_PANE)) }
-
         val leader = party.leader == player.uniqueId
         val full = party.members.size >= party.capacity
         val chatActive = controller.isPartyChatActive(player, party)
@@ -82,17 +70,11 @@ class PartyMenu(private val controller: PartyController) {
             informationItem(player, party),
             inviteItem(player, full),
         )
-        semanticElements.forEach { inventory.setItem(it.slot, it.item) }
-        val semanticBySlot = semanticElements.associateBy(MenuElement::slot)
         return InventoryMenuView(
             size = 45,
             title = elements.title(GuiNameSpec.Text(controller.text(player, "party.menu.title"), GuiNameStyle.DEFAULT)),
-            elements = (0 until inventory.size).mapNotNull { slot ->
-                semanticBySlot[slot]?.let { return@mapNotNull it }
-                val item = inventory.getItem(slot) ?: return@mapNotNull null
-                MenuElement(slot, item, GuiElementRole.DECORATION)
-            },
-            standardFrame = false
+            elements = semanticElements,
+            standardFrame = true
         )
     }
 

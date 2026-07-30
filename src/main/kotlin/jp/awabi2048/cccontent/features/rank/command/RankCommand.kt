@@ -50,10 +50,18 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiStatusTone
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -61,6 +69,7 @@ import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.kyori.adventure.text.format.TextDecoration
+import java.util.UUID
 
 /**
  * ランクシステムのデバッグコマンド実装
@@ -404,52 +413,39 @@ class RankCommand(
 
     private fun renderTutorialRankRuntimeView(viewer: Player): InventoryMenuView {
         val title = "§8チュートリアルランク"
-        val inventory = Bukkit.createInventory(null, 45, title)
-        renderTutorialRankMenu(inventory, viewer)
-        return inventory.toRuntimeView(title)
-    }
-
-    private fun renderTutorialRankMenu(inventory: Inventory, viewer: Player) {
-        val headerFooterPane = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
-        val basePane = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
-
-        for (slot in 0 until inventory.size) {
-            inventory.setItem(slot, basePane)
-        }
-        for (slot in 0..8) {
-            inventory.setItem(slot, headerFooterPane)
-        }
-        for (slot in 36..44) {
-            inventory.setItem(slot, headerFooterPane)
-        }
         val tutorial = rankManager.getPlayerTutorial(viewer.uniqueId)
         val currentRank = tutorial.currentRank
         val requirement = taskLoader?.getRequirement(currentRank.name) ?: TaskRequirement()
         val taskItems = buildTaskCategoryItems(viewer, tutorial.taskProgress, requirement)
         val taskSlots = CCSystem.getAPI().getGuiLayoutService()
             .centeredSevenColumnSlots(TUTORIAL_MENU_TASK_ROW, taskItems.size)
-        taskItems.zip(taskSlots).forEach { (item, slot) ->
-            inventory.setItem(slot, item)
-        }
-
-        if (currentRank == TutorialRank.ATTAINER) {
-            inventory.setItem(TUTORIAL_MENU_INFO_SLOT, createAttainerGuildGuideItem())
+        val info = if (currentRank == TutorialRank.ATTAINER) {
+            createAttainerGuildGuideItem()
         } else {
-            inventory.setItem(TUTORIAL_MENU_INFO_SLOT, createTutorialProgressInfoItem(currentRank))
+            createTutorialProgressInfoItem(currentRank)
         }
+        return InventoryMenuView(
+            size = 45,
+            title = guiElements().title(GuiNameSpec.Text(title, GuiNameStyle.DEFAULT)),
+            elements = taskItems.zip(taskSlots).map { (item, slot) -> displayElement(slot, item) } +
+                displayElement(TUTORIAL_MENU_INFO_SLOT, info),
+            standardFrame = true,
+        )
     }
 
-    private fun createAttainerGuildGuideItem(): ItemStack =
-        createGuiBlockItem(
-            Material.WRITABLE_BOOK,
-            toComponent(messageProvider.getMessage("tutorial_rank.attainer.guild_guide.name")),
-            listOf(
+    private fun createAttainerGuildGuideItem(): DisplayItemSpec =
+        DisplayItemSpec(
+            material = Material.WRITABLE_BOOK,
+            name = toComponent(messageProvider.getMessage("tutorial_rank.attainer.guild_guide.name")),
+            lore = blockLore(
+                listOf(
                 listOf(GuiLoreLine.Text(messageProvider.getMessage("tutorial_rank.attainer.guild_guide.completed"))),
                 listOf(
                     GuiLoreLine.Text(messageProvider.getMessage("tutorial_rank.attainer.guild_guide.description")),
                     GuiLoreLine.Text(messageProvider.getMessage("tutorial_rank.attainer.guild_guide.location"))
                 )
-            )
+                )
+            ),
         )
 
     private fun progressColorCode(current: Long, required: Long): String {
@@ -464,30 +460,22 @@ class RankCommand(
         }
     }
 
-    private fun createTutorialProgressInfoItem(currentRank: TutorialRank): ItemStack {
-        val item = ItemStack(Material.WRITABLE_BOOK)
-        val meta = item.itemMeta
-        if (meta != null) {
-            val rankLabels = TutorialRank.entries.map { rank ->
-                messageProvider.getMessage("tutorial_rank.progress.rank.${rank.name.lowercase()}")
-            }
-            meta.displayName(withoutItalic(toComponent(
-                "§e${messageProvider.getMessage("tutorial_rank.progress.name")}"
-            )))
-            meta.lore(CCSystem.getAPI().getLoreService().render(
-                GuiLoreSpec.Blocks(listOf(
+    private fun createTutorialProgressInfoItem(currentRank: TutorialRank): DisplayItemSpec {
+        val rankLabels = TutorialRank.entries.map { rank ->
+            messageProvider.getMessage("tutorial_rank.progress.rank.${rank.name.lowercase()}")
+        }
+        return DisplayItemSpec(
+            material = Material.WRITABLE_BOOK,
+            name = toComponent("§e${messageProvider.getMessage("tutorial_rank.progress.name")}"),
+            lore = GuiLoreSpec.Blocks(listOf(
                     GuiLoreBlock(listOf(
                         GuiLoreLine.Text(messageProvider.getMessage("tutorial_rank.progress.description"))
                     )),
                     GuiLoreBlock(listOf(
                         GuiLoreLine.ProgressPath(rankLabels, currentRank.ordinal)
                     ))
-                ))
-            ))
-            meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-            item.itemMeta = meta
-        }
-        return item
+                )),
+        )
     }
 
     /**
@@ -501,92 +489,56 @@ class RankCommand(
     }
 
     private fun renderProfessionSelectionRuntimeView(viewer: Player): InventoryMenuView {
-        val inventory = Bukkit.createInventory(null, 54)
-        renderProfessionSelectionGui(inventory, viewer)
-        val hasProfession = rankManager.hasProfession(viewer.uniqueId)
+        val currentProfession = rankManager.getPlayerProfession(viewer.uniqueId)?.profession
+        val entries = buildList {
+            add(displayElement(4, createPlayerHeadDisplay(viewer)))
+            add(displayElement(
+                49,
+                DisplayItemSpec(
+                    Material.BOOK,
+                    toComponent(messageProvider.getMessage("gui.profession.guild.info.name")),
+                    GuiLoreSpec.Rich(
+                        messageProvider.getMessageList("gui.profession.guild.info.lore").map(GuiLoreLine::Text),
+                        GuiLoreFrame.NONE,
+                    ),
+                ),
+            ))
+            ProfessionGuildLayout.PROFESSION_SLOTS.forEach { (slot, profession) ->
+                add(createProfessionElement(
+                    viewer,
+                    slot,
+                    profession,
+                    profession == currentProfession,
+                    currentProfession != null,
+                ))
+            }
+        }
         return InventoryMenuView(
-            size = inventory.size,
+            size = 54,
             title = LEGACY_SERIALIZER.deserialize(messageProvider.getMessage("gui.profession.guild.title")),
-            elements = (0 until inventory.size).mapNotNull { slot ->
-                val item = inventory.getItem(slot) ?: return@mapNotNull null
-                val profession = ProfessionGuildLayout.PROFESSION_SLOTS[slot]
-                val selectable = profession != null &&
-                    !hasProfession &&
-                    RankReleasePolicy.canAccessProfession(viewer, profession)
-                MenuElement(
-                    slot = slot,
-                    item = item,
-                    role = when {
-                        selectable -> GuiElementRole.ACTION
-                        profession != null || slot == 4 || slot == 49 -> GuiElementRole.CONTENT
-                        else -> GuiElementRole.DECORATION
-                    },
-                    actionId = PROFESSION_SELECT_ACTION.takeIf { selectable },
-                    actionPayload = profession?.takeIf { selectable }
-                        ?.let { mapOf("profession" to it.id) }
-                        .orEmpty(),
-                )
-            },
-            standardFrame = false,
+            elements = entries,
+            standardFrame = true,
         )
     }
 
-    private fun renderProfessionSelectionGui(inventory: Inventory, viewer: Player) {
-        val headerFooterPane = createBackgroundItem(Material.BLACK_STAINED_GLASS_PANE)
-        val basePane = createBackgroundItem(Material.GRAY_STAINED_GLASS_PANE)
-        
-        // ベース埋め
-        for (slot in 0 until inventory.size) {
-            inventory.setItem(slot, basePane)
-        }
-        
-        // ヘッダーとフッター（黒）
-        for (slot in 0..8) {
-            inventory.setItem(slot, headerFooterPane)
-        }
-        for (slot in 45..53) {
-            inventory.setItem(slot, headerFooterPane)
-        }
-        
-        // プレイヤーアイコン（Row1, Column5 = slot 4）
-        val playerHead = createPlayerHeadItem(viewer)
-        inventory.setItem(4, playerHead)
-        
-        // ヒントアイコン（Row6, Column5 = slot 49）
-        val hintLore = messageProvider.getMessageList("gui.profession.guild.info.lore")
-        val hintItem = createGuiItem(
-            Material.BOOK,
-            toComponent(messageProvider.getMessage("gui.profession.guild.info.name")),
-            hintLore.map(GuiLoreLine::Text)
+    private fun createPlayerHeadDisplay(player: Player): DisplayItemSpec =
+        DisplayItemSpec(
+            Material.PLAYER_HEAD,
+            toComponent("§a§l${player.name}"),
+            GuiLoreSpec.Rich(
+                messageProvider.getMessageList("gui.profession.selection.player_head.lore").map(GuiLoreLine::Text),
+                GuiLoreFrame.NONE,
+            ),
+            player.uniqueId,
         )
-        inventory.setItem(49, hintItem)
-        
-        // 現在の職業を取得
-        val currentProfession = rankManager.getPlayerProfession(viewer.uniqueId)?.profession
-        
-        ProfessionGuildLayout.PROFESSION_SLOTS.forEach { (slot, profession) ->
-            val isCurrent = profession == currentProfession
-            val item = createProfessionItem(viewer, profession, isCurrent, currentProfession != null)
-            inventory.setItem(slot, item)
-        }
-    }
     
-    private fun createPlayerHeadItem(player: Player): ItemStack {
-        val head = ItemStack(Material.PLAYER_HEAD)
-        val meta = head.itemMeta as? org.bukkit.inventory.meta.SkullMeta
-        meta?.let {
-            it.owningPlayer = player
-            it.displayName(CCSystem.getAPI().getGuiElementService().name("§a§l${player.name}"))
-            val playerHeadLore = messageProvider.getMessageList("gui.profession.selection.player_head.lore")
-            it.lore(CCSystem.getAPI().getLoreService().render(
-                GuiLoreSpec.Rich(playerHeadLore.map(GuiLoreLine::Text), GuiLoreFrame.NONE)
-            ))
-            head.itemMeta = it
-        }
-        return head
-    }
-    
-    private fun createProfessionItem(viewer: Player, profession: Profession, isCurrent: Boolean, hasProfession: Boolean): ItemStack {
+    private fun createProfessionElement(
+        viewer: Player,
+        slot: Int,
+        profession: Profession,
+        isCurrent: Boolean,
+        hasProfession: Boolean,
+    ): MenuElement {
         val skillTree = SkillTreeRegistry.getSkillTree(profession)
         val startSkill = skillTree?.getStartSkillId()?.let { skillTree.getSkill(it) }
         val icon = startSkill?.icon?.let { Material.matchMaterial(it.uppercase()) } ?: Material.BOOK
@@ -601,57 +553,58 @@ class RankCommand(
             ProfessionType.GENERAL -> messageProvider.getMessage("gui.profession.type.general")
         }
         
+        val name = toComponent("${profession.displayColorCode}§l$professionName")
         return if (isCurrent) {
-            // 現在の職業（選択済み）
-            createGuiItem(
+            displayElement(slot, DisplayItemSpec(
                 icon,
-                toComponent("${profession.displayColorCode}§l$professionName"),
-                listOf(
+                name,
+                blockLore(listOf(listOf(
                     GuiLoreLine.Text(professionDesc),
                     GuiLoreLine.Spacer,
                     GuiLoreLine.Data(messageProvider.getMessage("gui.profession.selection.profession_item.type_label_name"), typeName, "§f"),
                     GuiLoreLine.Spacer,
                     GuiLoreLine.Text(messageProvider.getMessage("gui.profession.selection.profession_item.current_profession"))
-                )
-            )
+                ))),
+            ))
         } else if (!RankReleasePolicy.canAccessProfession(viewer, profession)) {
-            createGuiItem(
+            displayElement(slot, DisplayItemSpec(
                 Material.BARRIER,
                 toComponent(messageProvider.getMessage("release.profession_unavailable")),
-                listOf(GuiLoreLine.Warning(messageProvider.getMessage("release.profession_unavailable_lore")))
-            )
+                blockLore(listOf(listOf(GuiLoreLine.Warning(messageProvider.getMessage("release.profession_unavailable_lore"))))),
+            ))
         } else if (hasProfession) {
-            // 他の職業（既に職業を持っている場合は選択不可）
             val alreadySelectedLore = messageProvider.getMessageList("gui.profession.selection.profession_item.already_selected_lore")
-            val loreList = mutableListOf<GuiLoreLine>()
-            loreList.add(GuiLoreLine.Text(professionDesc))
-            loreList.add(GuiLoreLine.Spacer)
-            loreList.add(GuiLoreLine.Data(messageProvider.getMessage("gui.profession.selection.profession_item.type_label_name"), typeName, "§f"))
-            loreList.add(GuiLoreLine.Spacer)
-            alreadySelectedLore.forEach { lore ->
-                loreList.add(GuiLoreLine.Warning(lore))
-            }
-            createGuiItem(
+            displayElement(slot, DisplayItemSpec(
                 icon,
-                toComponent("${profession.displayColorCode}§l$professionName"),
-                loreList
-            )
+                name,
+                blockLore(listOf(buildList {
+                    add(GuiLoreLine.Text(professionDesc))
+                    add(GuiLoreLine.Spacer)
+                    add(GuiLoreLine.Data(messageProvider.getMessage("gui.profession.selection.profession_item.type_label_name"), typeName, "§f"))
+                    add(GuiLoreLine.Spacer)
+                    alreadySelectedLore.forEach { add(GuiLoreLine.Warning(it)) }
+                })),
+            ))
         } else {
-            // 選択可能
-            createGuiItem(
-                icon,
-                toComponent("${profession.displayColorCode}§l$professionName"),
-                listOf(
-                    GuiLoreLine.Text(professionDesc),
-                    GuiLoreLine.Spacer,
-                    GuiLoreLine.Data(messageProvider.getMessage("gui.profession.selection.profession_item.type_label_name"), typeName, "§f"),
-                    GuiLoreLine.Spacer,
-                    GuiLoreLine.Interaction(
-                        viewer,
-                        GuiInputGesture.Described(messageProvider.getMessage("gui.profession.selection.profession_item.click_operation")),
-                        messageProvider.getMessage("gui.profession.selection.profession_item.select_action")
-                    )
-                )
+            guiElements().menuEntry(
+                viewer,
+                GuiMenuEntrySpec(
+                    slot = slot,
+                    material = icon,
+                    name = GuiNameSpec.Component(name),
+                    role = GuiElementRole.ACTION,
+                    description = listOf(professionDesc),
+                    data = listOf(GuiMenuEntryData(
+                        messageProvider.getMessage("gui.profession.selection.profession_item.type_label_name"),
+                        typeName,
+                    )),
+                    actions = listOf(GuiMenuEntryAction(
+                        PROFESSION_SELECT_ACTION,
+                        MenuAcceptedClicks.STANDARD,
+                        messageProvider.getMessage("gui.profession.selection.profession_item.select_action"),
+                        mapOf("profession" to profession.id),
+                    )),
+                ),
             )
         }
     }
@@ -705,27 +658,48 @@ class RankCommand(
         ).lines().map { line ->
             if (line.isBlank()) GuiLoreLine.Spacer else GuiLoreLine.Text(line)
         }
-        val preview = createGuiBlockItem(
-            icon,
-            toComponent("${profession.displayColorCode}§l$professionName"),
-            listOf(bodyLines),
+        val preview = displayElement(
+            layout.previewSlot,
+            DisplayItemSpec(
+                icon,
+                toComponent("${profession.displayColorCode}§l$professionName"),
+                blockLore(listOf(bodyLines)),
+            ),
         )
+        val confirmLabel = messageProvider.getMessage("gui.profession.confirm_dialog.confirm_button")
+        val cancelLabel = messageProvider.getMessage("gui.profession.confirm_dialog.cancel_button")
         return InventoryMenuView(
             size = layout.size,
             title = title,
             elements = listOf(
-                MenuElement(layout.previewSlot, preview, GuiElementRole.CONTENT),
-                MenuElement(
-                    layout.confirmSlot,
-                    gui.confirmItem(messageProvider.getMessage("gui.profession.confirm_dialog.confirm_button"), true),
-                    GuiElementRole.CONFIRM,
-                    PROFESSION_CONFIRM_ACTION,
+                preview,
+                gui.menuEntry(
+                    player,
+                    GuiMenuEntrySpec(
+                        slot = layout.confirmSlot,
+                        material = Material.LIME_CONCRETE,
+                        name = GuiNameSpec.Text(confirmLabel, GuiNameStyle.DEFAULT),
+                        role = GuiElementRole.CONFIRM,
+                        actions = listOf(GuiMenuEntryAction(
+                            PROFESSION_CONFIRM_ACTION,
+                            MenuAcceptedClicks.STANDARD,
+                            confirmLabel,
+                        )),
+                    ),
                 ),
-                MenuElement(
-                    layout.cancelSlot,
-                    gui.confirmItem(messageProvider.getMessage("gui.profession.confirm_dialog.cancel_button"), false),
-                    GuiElementRole.CANCEL,
-                    PROFESSION_CANCEL_ACTION,
+                gui.menuEntry(
+                    player,
+                    GuiMenuEntrySpec(
+                        slot = layout.cancelSlot,
+                        material = Material.RED_CONCRETE,
+                        name = GuiNameSpec.Text(cancelLabel, GuiNameStyle.DEFAULT),
+                        role = GuiElementRole.CANCEL,
+                        actions = listOf(GuiMenuEntryAction(
+                            PROFESSION_CANCEL_ACTION,
+                            MenuAcceptedClicks.STANDARD,
+                            cancelLabel,
+                        )),
+                    ),
                 ),
             ),
         )
@@ -1988,23 +1962,12 @@ class RankCommand(
         return Material.matchMaterial(normalized) ?: Material.BARRIER
     }
     
-    private fun Inventory.toRuntimeView(title: String): InventoryMenuView = InventoryMenuView(
-        size = size,
-        title = LEGACY_SERIALIZER.deserialize(title),
-        elements = (0 until size).mapNotNull { slot ->
-            getItem(slot)?.let { item ->
-                MenuElement(slot, item, GuiElementRole.CONTENT)
-            }
-        },
-        standardFrame = false,
-    )
-
     private fun buildTaskCategoryItems(
         targetPlayer: Player,
         progress: TaskProgress,
         requirement: TaskRequirement
-    ): List<ItemStack> {
-        val items = mutableListOf<ItemStack>()
+    ): List<DisplayItemSpec> {
+        val items = mutableListOf<DisplayItemSpec>()
 
         if (requirement.playTimeMin > 0) {
             val current = minOf(progress.playTime, requirement.playTimeMin.toLong())
@@ -2288,14 +2251,16 @@ class RankCommand(
         categoryNameKey: String,
         commentKey: String,
         details: List<GuiLoreLine>
-    ): ItemStack {
-        return createGuiBlockItem(
-            material,
-            toComponent(messageProvider.getMessage(categoryNameKey)),
-            listOf(
+    ): DisplayItemSpec {
+        return DisplayItemSpec(
+            material = material,
+            name = toComponent(messageProvider.getMessage(categoryNameKey)),
+            lore = blockLore(
+                listOf(
                 listOf(GuiLoreLine.Text(messageProvider.getMessage(commentKey))),
                 details
-            )
+                )
+            ),
         )
     }
 
@@ -2343,6 +2308,26 @@ class RankCommand(
             if (done) GuiStatusTone.COMPLETE else GuiStatusTone.INCOMPLETE
         )
     }
+
+    private fun blockLore(blocks: List<List<GuiLoreLine>>): GuiLoreSpec =
+        GuiLoreSpec.Blocks(blocks.filter { it.isNotEmpty() }.map(::GuiLoreBlock))
+
+    private fun displayElement(slot: Int, spec: DisplayItemSpec): MenuElement =
+        guiElements().menuDisplay(
+            GuiMenuDisplaySpec(
+                slot = slot,
+                item = GuiItemSpec(
+                    material = spec.material,
+                    name = GuiNameSpec.Component(spec.name),
+                    lore = spec.lore,
+                    role = GuiElementRole.CONTENT,
+                    amount = 1,
+                ),
+                playerHeadOwner = spec.playerHeadOwner,
+            ),
+        )
+
+    private fun guiElements() = CCSystem.getAPI().getGuiElementService()
 
     private fun toComponent(text: String): Component = LEGACY_SERIALIZER.deserialize(text)
 
@@ -2848,6 +2833,13 @@ class RankCommand(
         var prestigeSkills: Set<String> = emptySet(),
         var prestigeLevel: Int = 0,
         var isMaxLevel: Boolean = false
+    )
+
+    private data class DisplayItemSpec(
+        val material: Material,
+        val name: Component,
+        val lore: GuiLoreSpec,
+        val playerHeadOwner: UUID? = null,
     )
 
     private data class RouteTransition(
