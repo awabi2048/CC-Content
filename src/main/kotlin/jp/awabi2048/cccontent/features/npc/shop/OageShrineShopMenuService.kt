@@ -215,7 +215,7 @@ class OageShrineShopMenuService(
             Material.LIME_CONCRETE,
             text(player, "confirm.confirm_button.name"),
             list(player, "confirm.confirm_button.lore").map(GuiLoreLine::Text) + listOf(
-                GuiLoreLine.Component(legacy(resolved.displayName)),
+                GuiLoreLine.Text(resolved.displayName),
                 GuiLoreLine.Data(text(player, "shop.item.offering_label"), ContentEconomyBridge.formatAcorn(resolved.item.price), "§e")
             )
         )
