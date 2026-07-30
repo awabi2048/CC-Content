@@ -8,10 +8,12 @@ import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
-import com.awabi2048.ccsystem.api.gui.GuiMenuIconData
-import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiValueTone
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.brewery.item.BreweryItemCodec
 import jp.awabi2048.cccontent.features.brewery.barrel.BarrelMatchResult
@@ -1379,16 +1381,15 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val recipeName = recipes[state.recipeId]?.let { i18n(localePlayer, "brewery.recipe.${it.id}.name") }
             ?: i18n(localePlayer, "brewery.ui.data.none")
         val data = listOf(
-            GuiMenuIconData(
+            GuiMenuEntryData(
                 i18n(localePlayer, "brewery.ui.data.current"),
                 if (state.running) recipeName else i18n(localePlayer, "brewery.ui.data.none"),
-                "§f"
             )
         )
         state.inventory.setItem(
             FERMENT_START_SLOT,
             if (state.running) {
-                menuIcon(localePlayer, Material.BARREL, "brewery.ui.action.fermentation_running", "fermentation_running", data)
+                entryItem(localePlayer, Material.BARREL, "brewery.ui.action.fermentation_running", "fermentation_running", data)
             } else {
                 actionIcon(
                     localePlayer,
@@ -1454,48 +1455,43 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         ).also { markUi(it, kind) }
     }
 
-    private fun menuIcon(player: Player?, material: Material, nameKey: String, kind: String, data: List<GuiMenuIconData>, role: GuiElementRole = GuiElementRole.CONTENT): ItemStack {
-        return CCSystem.getAPI().getGuiElementService().menuIcon(
-            GuiMenuIconSpec(
+    private fun entryItem(player: Player?, material: Material, nameKey: String, kind: String, data: List<GuiMenuEntryData>, role: GuiElementRole = GuiElementRole.CONTENT): ItemStack {
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = 0,
                 material = material,
                 name = GuiNameSpec.Text(i18n(player, nameKey), com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
                 role = role,
-                amount = 1,
-                description = emptyList(),
                 data = data,
-                options = emptyList(),
-                warnings = emptyList(),
-                dangers = emptyList(),
-                actions = emptyList(),
-                glint = null
             )
-        ).also { markUi(it, kind) }
+        ).item.also { markUi(it, kind) }
     }
 
     private fun actionIcon(
         player: Player?,
         material: Material,
         nameKey: String,
-        data: List<GuiMenuIconData>,
+        data: List<GuiMenuEntryData>,
         actionKey: String
     ): ItemStack {
-        val operation = i18n(player, "lore.click.any")
-        val action = i18n(player, actionKey)
-        return CCSystem.getAPI().getGuiElementService().menuIcon(
-            GuiMenuIconSpec(
+        return CCSystem.getAPI().getGuiElementService().menuEntry(
+            player,
+            GuiMenuEntrySpec(
+                slot = 0,
                 material = material,
                 name = GuiNameSpec.Text(i18n(player, nameKey), com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT),
                 role = GuiElementRole.ACTION,
-                amount = 1,
-                description = emptyList(),
                 data = data,
-                options = emptyList(),
-                warnings = emptyList(),
-                dangers = emptyList(),
-                actions = listOf(GuiMenuIconAction(operation, action, i18n(player, "lore.action_single_with_operation", "operation" to operation, "action" to action), true)),
-                glint = null
+                actions = listOf(
+                    GuiMenuEntryAction(
+                        actionId = "brewery_action",
+                        acceptedClicks = MenuAcceptedClicks.LEFT_RIGHT,
+                        label = i18n(player, actionKey),
+                    ),
+                ),
             )
-        ).also { markUi(it, "action") }
+        ).item.also { markUi(it, "action") }
     }
 
     private fun markUi(item: ItemStack, kind: String) {
@@ -1520,9 +1516,9 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             Material.BREWING_STAND,
             if (state.running) "brewery.ui.action.distillation_stop" else "brewery.ui.action.distillation_start",
             listOf(
-                GuiMenuIconData(i18n(localePlayer, "brewery.ui.data.step_elapsed"), "${state.elapsedSecondsInCurrentStep}s", "§f"),
-                GuiMenuIconData(i18n(localePlayer, "brewery.ui.data.session_runs"), state.sessionDistillationRuns, "§f"),
-                GuiMenuIconData(i18n(localePlayer, "brewery.ui.data.duration"), "${state.lastRequiredSeconds}s", "§e")
+                GuiMenuEntryData(i18n(localePlayer, "brewery.ui.data.step_elapsed"), "${state.elapsedSecondsInCurrentStep}s"),
+                GuiMenuEntryData(i18n(localePlayer, "brewery.ui.data.session_runs"), state.sessionDistillationRuns),
+                GuiMenuEntryData(i18n(localePlayer, "brewery.ui.data.duration"), "${state.lastRequiredSeconds}s", GuiValueTone.PRIMARY)
             ),
             if (state.running) "brewery.ui.action.stop" else "brewery.ui.action.start"
         ))
@@ -1622,9 +1618,9 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             ))
         }
         if (state.inventory.getItem(coreSlot).isEmptyOrAir() || uiKind(state.inventory.getItem(coreSlot)) == "aging_core") {
-            state.inventory.setItem(coreSlot, menuIcon(
+            state.inventory.setItem(coreSlot, entryItem(
                 localePlayer, Material.BARREL, "brewery.ui.aging_core", "aging_core",
-                listOf(GuiMenuIconData(i18n(localePlayer, "brewery.ui.data.items"), inputSlots.count { !state.inventory.getItem(it).isEmptyOrAir() }, "§f")),
+                listOf(GuiMenuEntryData(i18n(localePlayer, "brewery.ui.data.items"), inputSlots.count { !state.inventory.getItem(it).isEmptyOrAir() })),
                 GuiElementRole.CONTENT
             ))
         }
