@@ -44,6 +44,7 @@ import org.bukkit.inventory.ItemFlag
 import org.bukkit.inventory.ItemStack
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiInputGesture
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -645,10 +646,10 @@ class RankCommand(
                     GuiLoreLine.Spacer,
                     GuiLoreLine.Data(messageProvider.getMessage("gui.profession.selection.profession_item.type_label_name"), typeName, "§f"),
                     GuiLoreLine.Spacer,
-                    GuiLoreLine.SingleAction(
-                        messageProvider.getMessage("gui.profession.selection.profession_item.click_operation"),
-                        messageProvider.getMessage("gui.profession.selection.profession_item.select_action"),
-                        messageProvider.getMessage("gui.profession.selection.profession_item.click_to_select")
+                    GuiLoreLine.Interaction(
+                        viewer,
+                        GuiInputGesture.Described(messageProvider.getMessage("gui.profession.selection.profession_item.click_operation")),
+                        messageProvider.getMessage("gui.profession.selection.profession_item.select_action")
                     )
                 )
             )
@@ -1102,14 +1103,9 @@ class RankCommand(
         )
     }
 
-    private fun settingsSingleAction(player: Player, action: String): GuiLoreLine.SingleAction {
+    private fun settingsSingleAction(player: Player, action: String): GuiLoreLine.Interaction {
         val operation = CCSystem.getAPI().getI18nString(player, "lore.click.any")
-        val resolved = CCSystem.getAPI().getI18nString(
-            player,
-            "lore.action_single_with_operation",
-            mapOf("operation" to operation, "action" to action)
-        )
-        return GuiLoreLine.SingleAction(operation, action, resolved)
+        return GuiLoreLine.Interaction(player, GuiInputGesture.Described(operation), action)
     }
 
     private fun renderSkillTreeGui(inventory: Inventory, skillTree: jp.awabi2048.cccontent.features.rank.profession.SkillTree, state: SkillTreeGuiState) {
@@ -1946,14 +1942,16 @@ class RankCommand(
 
         when {
             prestigeAvailable -> blocks += listOf(
-                GuiLoreLine.Action(
-                    messageProvider.getMessage("rank.skill.gui.lore.click_operation"),
+                GuiLoreLine.Interaction(
+                    null,
+                    GuiInputGesture.Described(messageProvider.getMessage("rank.skill.gui.lore.click_operation")),
                     messageProvider.getMessage("rank.skill.gui.lore.acquire_prestige_action")
                 )
             )
             available -> blocks += listOf(
-                GuiLoreLine.Action(
-                    messageProvider.getMessage("rank.skill.gui.lore.click_operation"),
+                GuiLoreLine.Interaction(
+                    null,
+                    GuiInputGesture.Described(messageProvider.getMessage("rank.skill.gui.lore.click_operation")),
                     messageProvider.getMessage("rank.skill.gui.lore.acquire_action")
                 )
             )

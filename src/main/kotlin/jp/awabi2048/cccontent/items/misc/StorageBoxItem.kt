@@ -6,6 +6,7 @@ import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiInputGesture
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -62,17 +63,17 @@ private fun commonText(player: Player?, key: String, vararg placeholders: Pair<S
         placeholders.associate { (name, value) -> name to (value ?: "null") }
     ).replace('&', '§')
 
-private fun storageAction(player: Player, operationKey: String, actionKey: String): GuiLoreLine.Action =
-    GuiLoreLine.Action(commonText(player, "lore.click.$operationKey"), storageText(player, actionKey))
+private fun storageAction(player: Player, operationKey: String, actionKey: String): GuiLoreLine.Interaction =
+    GuiLoreLine.Interaction(
+        player,
+        GuiInputGesture.Described(commonText(player, "lore.click.$operationKey")),
+        storageText(player, actionKey)
+    )
 
-private fun storageSingleAction(player: Player, actionKey: String): GuiLoreLine.SingleAction {
+private fun storageSingleAction(player: Player, actionKey: String): GuiLoreLine.Interaction {
     val operation = commonText(player, "lore.click.any")
     val action = storageText(player, actionKey)
-    return GuiLoreLine.SingleAction(
-        operation,
-        action,
-        commonText(player, "lore.action_single_with_operation", "operation" to operation, "action" to action)
-    )
+    return GuiLoreLine.Interaction(player, GuiInputGesture.Described(operation), action)
 }
 
 private object StorageBoxKeys {

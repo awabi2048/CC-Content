@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.fishing
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
+import com.awabi2048.ccsystem.api.gui.GuiInputGesture
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.items.CustomItem
@@ -236,12 +237,14 @@ class FishingItems(
             meta.lore(CCSystem.getAPI().getLoreService().render(
                 GuiLoreSpec.Blocks(listOf(GuiLoreBlock(listOf(
                     GuiLoreLine.Text(message(player, "custom_items.fishing.dictionary.description")),
-                    GuiLoreLine.Action(
-                        message(player, "custom_items.fishing.dictionary.operation"),
+                    GuiLoreLine.Interaction(
+                        player,
+                        GuiInputGesture.Described(message(player, "custom_items.fishing.dictionary.operation")),
                         message(player, "custom_items.fishing.dictionary.action")
                     ),
-                    GuiLoreLine.Action(
-                        message(player, "custom_items.fishing.dictionary.hint_operation"),
+                    GuiLoreLine.Interaction(
+                        player,
+                        GuiInputGesture.Described(message(player, "custom_items.fishing.dictionary.hint_operation")),
                         message(player, "custom_items.fishing.dictionary.hint_action")
                     )
                 ))))
