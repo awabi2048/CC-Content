@@ -21,12 +21,14 @@ import jp.awabi2048.cccontent.gui.MenuEventGuards
 import jp.awabi2048.cccontent.gui.OwnedMenuHolder
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
-import com.awabi2048.ccsystem.api.gui.GuiMenuIconAction
-import com.awabi2048.ccsystem.api.gui.GuiMenuIconData
-import com.awabi2048.ccsystem.api.gui.GuiMenuIconSpec
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
+import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
+import com.awabi2048.ccsystem.api.gui.GuiValueTone
+import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -44,7 +46,6 @@ import org.bukkit.entity.EnderPearl
 import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
-import org.bukkit.inventory.meta.SkullMeta
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
 import java.util.UUID
@@ -696,50 +697,50 @@ class MiniGameAdminMenu(
     private fun render(player: Player, holder: Holder, inventory: Inventory) {
         GuiMenuItems.fillFramed(inventory)
         val game = MiniGameId(holder.itemData.worldUuid, holder.itemData.gameId)
-        inventory.setItem(13, menuIcon(player, Material.CLOCK, "gui.game_info", data = listOf(data(player, "gui.game_label", game.gameId)), role = GuiElementRole.CONTENT))
+        inventory.setItem(13, entryItem(player, Material.CLOCK, "gui.game_info", data = listOf(data(player, "gui.game_label", game.gameId)), role = GuiElementRole.CONTENT))
         if (runtime.isRunning(holder.itemData)) {
-            inventory.setItem(22, menuIcon(player, Material.RED_WOOL, "gui.stop", actions = singleAction(player, "gui.stop_action")))
+            inventory.setItem(22, entryItem(player, Material.RED_WOOL, "gui.stop", actions = singleAction("stop", player, "gui.stop_action")))
         } else {
-            inventory.setItem(20, menuIcon(player, Material.LIME_WOOL, "gui.start", actions = singleAction(player, "gui.start_action")))
+            inventory.setItem(20, entryItem(player, Material.LIME_WOOL, "gui.start", actions = singleAction("start", player, "gui.start_action")))
         }
         if (game.gameId in setOf("hideandseek", "chase", "colosseum")) {
-            inventory.setItem(24, menuIcon(player, Material.PLAYER_HEAD, "gui.participants", actions = singleAction(player, "gui.participants_action")))
+            inventory.setItem(24, entryItem(player, Material.PLAYER_HEAD, "gui.participants", actions = singleAction("participants", player, "gui.participants_action")))
         }
         inventory.setItem(
             29,
-            menuIcon(
+            entryItem(
                 player,
                 Material.CLOCK,
                 "gui.time_name",
                 data = listOf(data(player, "gui.current_seconds", runtime.timeLimitSeconds(holder.itemData))),
-                actions = adjustmentActions(player, 30)
+                actions = adjustmentActions(player, "adjust_time", 30)
             )
         )
         if (game.gameId == "hideandseek") {
             inventory.setItem(
                 31,
-                menuIcon(
+                entryItem(
                     player,
                     Material.REPEATER,
                     "gui.preparation_name",
                     data = listOf(data(player, "gui.current_seconds", runtime.preparationSeconds(holder.itemData))),
-                    actions = adjustmentActions(player, 10)
+                    actions = adjustmentActions(player, "adjust_preparation", 10)
                 )
             )
         }
         inventory.setItem(
             33,
-            menuIcon(
+            entryItem(
                 player,
                 Material.BOOK,
                 "gui.history",
                 actions = listOf(
-                    action(player, "lore.click.left", "gui.history_recent"),
-                    action(player, "lore.click.right", "gui.history_top")
+                    action("history_recent", player, MenuAcceptedClicks.LEFT, "gui.history_recent"),
+                    action("history_top", player, MenuAcceptedClicks.RIGHT, "gui.history_top")
                 )
             )
         )
-        inventory.setItem(40, menuIcon(player, Material.BARRIER, "gui.close", actions = singleAction(player, "gui.close_action")))
+        inventory.setItem(40, entryItem(player, Material.BARRIER, "gui.close", actions = singleAction("close", player, "gui.close_action")))
     }
 
     private fun openSelection(player: Player, itemData: MiniGameItemData, requestedPage: Int) {
@@ -770,52 +771,67 @@ class MiniGameAdminMenu(
 
     private fun participantItem(viewer: Player, playerUuid: UUID, selected: Boolean): ItemStack {
         val offline = Bukkit.getOfflinePlayer(playerUuid)
-        val item = menuIcon(
+        val item = entryItem(
             viewer,
             Material.PLAYER_HEAD,
             "gui.participant",
             data = listOf(
-                GuiMenuIconData(MiniGameMessages.text(viewer, "gui.player_label"), offline.name ?: playerUuid.toString(), "§f"),
-                GuiMenuIconData(MiniGameMessages.text(viewer, "gui.selection_label"), MiniGameMessages.text(viewer, if (selected) "gui.selected" else "gui.unselected"), if (selected) "§a" else "§7")
+                GuiMenuEntryData(MiniGameMessages.text(viewer, "gui.player_label"), offline.name ?: playerUuid.toString()),
+                GuiMenuEntryData(
+                    MiniGameMessages.text(viewer, "gui.selection_label"),
+                    MiniGameMessages.text(viewer, if (selected) "gui.selected" else "gui.unselected"),
+                    if (selected) GuiValueTone.SUCCESS else GuiValueTone.MUTED,
+                )
             ),
-            actions = singleAction(viewer, "gui.participant_toggle"),
-            glint = selected
+            actions = singleAction("toggle_participant", viewer, "gui.participant_toggle"),
+            glint = selected,
+            playerHeadOwner = playerUuid,
         )
-        val meta = item.itemMeta as? SkullMeta ?: return item
-        meta.owningPlayer = offline
-        meta.setEnchantmentGlintOverride(selected)
-        item.itemMeta = meta
         return item
     }
 
     private fun data(player: Player, key: String, value: Any?) =
-        GuiMenuIconData(MiniGameMessages.text(player, key), value, "§f")
+        GuiMenuEntryData(MiniGameMessages.text(player, key), value)
 
-    private fun adjustmentActions(player: Player, seconds: Int) = listOf(
-        action(player, "lore.click.left", "gui.increase", "seconds" to seconds),
-        action(player, "lore.click.right", "gui.decrease", "seconds" to seconds)
+    private fun adjustmentActions(player: Player, actionPrefix: String, seconds: Int) = listOf(
+        action("${actionPrefix}_increase", player, MenuAcceptedClicks.LEFT, "gui.increase", "seconds" to seconds),
+        action("${actionPrefix}_decrease", player, MenuAcceptedClicks.RIGHT, "gui.decrease", "seconds" to seconds)
     )
 
-    private fun singleAction(player: Player, actionKey: String): List<GuiMenuIconAction> {
-        val operation = MiniGameMessages.text(player, "lore.click.any")
-        val action = MiniGameMessages.text(player, actionKey)
-        return listOf(GuiMenuIconAction(operation, action, MiniGameMessages.text(player, "lore.action_single_with_operation", "operation" to operation, "action" to action), true))
-    }
+    private fun singleAction(actionId: String, player: Player, actionKey: String): List<GuiMenuEntryAction> =
+        listOf(GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, MiniGameMessages.text(player, actionKey)))
 
-    private fun action(player: Player, operationKey: String, actionKey: String, vararg placeholders: Pair<String, Any?>): GuiMenuIconAction =
-        GuiMenuIconAction(MiniGameMessages.text(player, operationKey), MiniGameMessages.text(player, actionKey, *placeholders), null, true)
+    private fun action(
+        actionId: String,
+        player: Player,
+        acceptedClicks: Set<org.bukkit.event.inventory.ClickType>,
+        actionKey: String,
+        vararg placeholders: Pair<String, Any?>,
+    ): GuiMenuEntryAction =
+        GuiMenuEntryAction(actionId, acceptedClicks, MiniGameMessages.text(player, actionKey, *placeholders))
 
-    private fun menuIcon(
+    private fun entryItem(
         player: Player,
         material: Material,
         nameKey: String,
         role: GuiElementRole = GuiElementRole.ACTION,
-        data: List<GuiMenuIconData> = emptyList(),
-        actions: List<GuiMenuIconAction> = emptyList(),
-        glint: Boolean? = null
-    ): ItemStack = CCSystem.getAPI().getGuiElementService().menuIcon(
-        GuiMenuIconSpec(material, GuiNameSpec.Text(MiniGameMessages.text(player, nameKey), GuiNameStyle.DEFAULT), role, 1, emptyList(), data, emptyList(), emptyList(), emptyList(), actions, glint)
-    )
+        data: List<GuiMenuEntryData> = emptyList(),
+        actions: List<GuiMenuEntryAction> = emptyList(),
+        glint: Boolean? = null,
+        playerHeadOwner: UUID? = null,
+    ): ItemStack = CCSystem.getAPI().getGuiElementService().menuEntry(
+        player,
+        GuiMenuEntrySpec(
+            slot = 0,
+            material = material,
+            name = GuiNameSpec.Text(MiniGameMessages.text(player, nameKey), GuiNameStyle.DEFAULT),
+            role = role,
+            data = data,
+            actions = actions,
+            glint = glint,
+            playerHeadOwner = playerHeadOwner,
+        ),
+    ).item
 
     private fun openHistory(player: Player, itemData: MiniGameItemData, view: HistoryView, requestedPage: Int) {
         val recent = runtime.gameHistory(player, itemData) ?: return
