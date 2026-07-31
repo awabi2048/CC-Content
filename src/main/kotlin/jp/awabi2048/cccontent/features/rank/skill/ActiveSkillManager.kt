@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.rank.skill
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiInputGesture
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.CCContent
@@ -352,8 +353,8 @@ object ActiveSkillManager {
         }
 
         lore.add(GuiLoreLine.Spacer)
-        lore.add(GuiLoreLine.Action(CCContent.languageManager.getMessage("active_skill.selector.left_click"), CCContent.languageManager.getMessage("active_skill.selector.select_action")))
-        lore.add(GuiLoreLine.Action(CCContent.languageManager.getMessage("active_skill.selector.right_click"), CCContent.languageManager.getMessage("active_skill.selector.mode_action")))
+        lore.add(GuiLoreLine.Interaction(player, GuiInputGesture.Described(CCContent.languageManager.getMessage("active_skill.selector.left_click")), CCContent.languageManager.getMessage("active_skill.selector.select_action")))
+        lore.add(GuiLoreLine.Interaction(player, GuiInputGesture.Described(CCContent.languageManager.getMessage("active_skill.selector.right_click")), CCContent.languageManager.getMessage("active_skill.selector.mode_action")))
 
         meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lore, GuiLoreFrame.NONE)))
         button.itemMeta = meta

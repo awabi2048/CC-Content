@@ -1,29 +1,25 @@
-@file:Suppress("DEPRECATION")
-
 package jp.awabi2048.cccontent.features.arena
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
+import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
+import com.awabi2048.ccsystem.api.gui.GuiNameSpec
+import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
-import com.awabi2048.ccsystem.core.gui.GuiItemMarker
-import jp.awabi2048.cccontent.gui.GuiMenuItems
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
-import org.bukkit.inventory.Inventory
-import org.bukkit.inventory.ItemFlag
-import org.bukkit.inventory.ItemStack
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import java.util.UUID
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 
 object ArenaSessionInfoLayout {
     const val MENU_SIZE = 45
@@ -82,46 +78,34 @@ class ArenaSessionInfoMenu(
         activeUpdateTasks.remove(playerId)?.cancel()
     }
 
-    private fun render(inventory: Inventory) {
-        GuiMenuItems.fillFramed(inventory)
+    private fun renderElements(): List<MenuElement> {
         val sessions = arenaManager.getActiveSessions()
-        val maxSlots = ArenaSessionInfoLayout.SESSION_SLOTS.size
-
-        for (i in 0 until maxSlots) {
-            val slot = ArenaSessionInfoLayout.SESSION_SLOTS[i]
-            if (i < sessions.size) {
-                inventory.setItem(slot, buildSessionItem(sessions[i]))
-            } else {
-                inventory.setItem(slot, buildEmptySlotItem())
+        return buildList {
+            ArenaSessionInfoLayout.SESSION_SLOTS.forEachIndexed { index, slot ->
+                if (index < sessions.size) {
+                    add(buildSessionElement(slot, sessions[index]))
+                } else {
+                    add(buildEmptySlotElement(slot))
+                }
             }
+            add(buildLiftElement())
+            add(buildInfoElement())
         }
-
-        inventory.setItem(ArenaSessionInfoLayout.LIFT_SLOT, buildLiftItem())
-        inventory.setItem(ArenaSessionInfoLayout.INFO_SLOT, buildInfoItem())
     }
 
     private fun renderView(): InventoryMenuView {
-        val inventory = Bukkit.createInventory(null, ArenaSessionInfoLayout.MENU_SIZE, ArenaSessionInfoLayout.MENU_TITLE)
-        render(inventory)
         return InventoryMenuView(
             size = ArenaSessionInfoLayout.MENU_SIZE,
-            title = LegacyComponentSerializer.legacySection().deserialize(ArenaSessionInfoLayout.MENU_TITLE),
-            elements = (0 until inventory.size).mapNotNull { slot ->
-                val item = inventory.getItem(slot) ?: return@mapNotNull null
-                MenuElement(slot, item, GuiItemMarker.role(item) ?: GuiElementRole.CONTENT)
-            },
-            standardFrame = false
+            title = elements().title(GuiNameSpec.Text(ArenaSessionInfoLayout.MENU_TITLE, GuiNameStyle.DEFAULT)),
+            elements = renderElements(),
+            standardFrame = true
         )
     }
 
-    private fun buildSessionItem(session: ArenaSession): ItemStack {
+    private fun buildSessionElement(slot: Int, session: ArenaSession): MenuElement {
         val themeIcon = arenaManager.getTheme(session.themeId)?.config(session.promoted)?.iconMaterial ?: Material.ROTTEN_FLESH
-        val item = ItemStack(themeIcon)
-        val meta = item.itemMeta ?: return item
-
         val title = session.inviteMissionTitle
             ?: ArenaI18n.text(null, "arena.ui.broadcast.default_title")
-        meta.setDisplayName(ArenaI18n.text(null, "arena.ui.mission.item_name", "mission" to title))
 
         val hasArrived = session.participants.any { playerId ->
             Bukkit.getPlayer(playerId)?.world?.name == session.worldName
@@ -169,64 +153,71 @@ class ArenaSessionInfoMenu(
             "\u00a77..."
         }
 
-        meta.lore(
-            CCSystem.getAPI().getLoreService().render(
-                GuiLoreSpec.Blocks(buildList {
-                    waveLine?.let { add(GuiLoreBlock(listOf(GuiLoreLine.Text(it)))) }
-                    add(GuiLoreBlock(buildList {
-                        add(GuiLoreLine.Text(ArenaI18n.text(null, "arena.ui.broadcast.players_header")))
-                        participantLines.forEach { add(GuiLoreLine.Text(it)) }
-                        add(GuiLoreLine.Spacer)
-                        add(GuiLoreLine.Text(ArenaI18n.text(null, "arena.ui.broadcast.radio_header")))
-                        add(GuiLoreLine.Text(radioLine))
-                    }))
-                })
-            )
+        return display(
+            slot = slot,
+            material = themeIcon,
+            name = ArenaI18n.text(null, "arena.ui.mission.item_name", "mission" to title),
+            lore = GuiLoreSpec.Blocks(buildList {
+                waveLine?.let { add(GuiLoreBlock(listOf(GuiLoreLine.Text(it)))) }
+                add(GuiLoreBlock(buildList {
+                    add(GuiLoreLine.Text(ArenaI18n.text(null, "arena.ui.broadcast.players_header")))
+                    participantLines.forEach { add(GuiLoreLine.Text(it)) }
+                    add(GuiLoreLine.Spacer)
+                    add(GuiLoreLine.Text(ArenaI18n.text(null, "arena.ui.broadcast.radio_header")))
+                    add(GuiLoreLine.Text(radioLine))
+                }))
+            }),
         )
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        item.itemMeta = meta
-        return item
     }
 
-    private fun buildEmptySlotItem(): ItemStack {
-        val item = ItemStack(Material.GLASS)
-        val meta = item.itemMeta ?: return item
-        meta.setDisplayName(
-            ArenaI18n.text(null, "arena.ui.broadcast.empty_slot")
+    private fun buildEmptySlotElement(slot: Int): MenuElement =
+        display(
+            slot = slot,
+            material = Material.GLASS,
+            name = ArenaI18n.text(null, "arena.ui.broadcast.empty_slot"),
+            lore = GuiLoreSpec.None,
         )
-        meta.lore(emptyList())
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        item.itemMeta = meta
-        return item
-    }
 
-    private fun buildLiftItem(): ItemStack {
+    private fun buildLiftElement(): MenuElement {
         val (material, displayName) = when (arenaManager.getEntranceLiftStatus()) {
             ArenaLiftStatus.OCCUPIED -> Material.CHEST_MINECART to ArenaI18n.text(null, "arena.ui.broadcast.lift.occupied")
             ArenaLiftStatus.READY -> Material.MINECART to ArenaI18n.text(null, "arena.ui.broadcast.lift.ready")
             ArenaLiftStatus.RETURNING -> Material.FURNACE_MINECART to ArenaI18n.text(null, "arena.ui.broadcast.lift.returning")
             ArenaLiftStatus.UNAVAILABLE -> Material.BARRIER to ArenaI18n.text(null, "arena.ui.broadcast.lift.unavailable")
         }
-        val item = ItemStack(material)
-
-        val meta = item.itemMeta ?: return item
-        meta.setDisplayName(displayName)
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        item.itemMeta = meta
-        return item
+        return display(ArenaSessionInfoLayout.LIFT_SLOT, material, displayName, GuiLoreSpec.None)
     }
 
-    private fun buildInfoItem(): ItemStack {
-        val item = ItemStack(Material.BOOK)
-        val meta = item.itemMeta ?: return item
-        meta.setDisplayName(
-            ArenaI18n.text(null, "arena.ui.broadcast.info.name")
+    private fun buildInfoElement(): MenuElement =
+        display(
+            slot = ArenaSessionInfoLayout.INFO_SLOT,
+            material = Material.BOOK,
+            name = ArenaI18n.text(null, "arena.ui.broadcast.info.name"),
+            lore = GuiLoreSpec.Rich(
+                ArenaI18n.stringList(null, "arena.ui.broadcast.info.lore").map(GuiLoreLine::Text),
+                GuiLoreFrame.NONE,
+            ),
         )
-        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(ArenaI18n.stringList(null, "arena.ui.broadcast.info.lore").map { GuiLoreLine.Text(it) }, GuiLoreFrame.NONE)))
-        meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
-        item.itemMeta = meta
-        return item
-    }
+
+    private fun display(
+        slot: Int,
+        material: Material,
+        name: String,
+        lore: GuiLoreSpec,
+    ): MenuElement = elements().menuDisplay(
+        GuiMenuDisplaySpec(
+            slot = slot,
+            item = GuiItemSpec(
+                material = material,
+                name = GuiNameSpec.Text(name, GuiNameStyle.DEFAULT),
+                lore = lore,
+                role = GuiElementRole.CONTENT,
+                amount = 1,
+            ),
+        ),
+    )
+
+    private fun elements() = CCSystem.getAPI().getGuiElementService()
 
     companion object {
         private const val OWNER = "cc-content"

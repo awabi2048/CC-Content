@@ -6,6 +6,7 @@ import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiInputGesture
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -424,13 +425,8 @@ class NpcMenuService(
             loreBlocks.add(GuiLoreBlock(infoLines))
             val operation = CCSystem.getAPI().getI18nString(player, "lore.click.any")
             val action = CCSystem.getAPI().getI18nString(player, "gui.npc.oage_shrine.request.restore.action")
-            val resolvedAction = CCSystem.getAPI().getI18nString(
-                player,
-                "lore.action_single_with_operation",
-                mapOf("operation" to operation, "action" to action)
-            )
             loreBlocks.add(GuiLoreBlock(listOf(
-                GuiLoreLine.SingleAction(operation, action, resolvedAction),
+                GuiLoreLine.Interaction(player, GuiInputGesture.Described(operation), action),
                 GuiLoreLine.Data("初穂料", "🐿 ${ContentEconomyBridge.formatPrice(DEAD_CHEST_RECOVERY_COST)}", "§e")
             )))
             val renderedLore = CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(loreBlocks))
@@ -759,10 +755,10 @@ class NpcMenuService(
                 }))
                 if (canClaim) add(GuiLoreBlock(listOf(
                     GuiLoreLine.Text(text(player, "wording.part_time.completed")),
-                    GuiLoreLine.SingleAction(
-                        text(player, "wording.part_time.operation"),
+                    GuiLoreLine.Interaction(
+                        player,
+                        GuiInputGesture.Described(text(player, "wording.part_time.operation")),
                         text(player, "wording.part_time.action"),
-                        text(player, "wording.part_time.resolved_action")
                     )
                 )))
             })

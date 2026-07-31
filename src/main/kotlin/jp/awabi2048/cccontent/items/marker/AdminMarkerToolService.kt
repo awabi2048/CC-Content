@@ -4,6 +4,7 @@ package jp.awabi2048.cccontent.items.marker
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
+import com.awabi2048.ccsystem.api.gui.GuiInputGesture
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -379,16 +380,19 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                 GuiLoreSpec.Blocks(listOf(GuiLoreBlock(buildList {
                     add(GuiLoreLine.Data(text(definition, player, "current_mode", "現在のモード"), modeName, "§a"))
                     add(GuiLoreLine.Spacer)
-                    add(GuiLoreLine.Action(
-                        text(definition, player, "usage.place.operation", "右クリック（ブロック）"),
+                    add(GuiLoreLine.Interaction(
+                        player,
+                        GuiInputGesture.Described(text(definition, player, "usage.place.operation", "右クリック（ブロック）")),
                         text(definition, player, "usage.place.action", "クリック面の外側にマーカーを設置")
                     ))
-                    add(GuiLoreLine.Action(
-                        text(definition, player, "usage.delete.operation", "Fキー"),
+                    add(GuiLoreLine.Interaction(
+                        player,
+                        GuiInputGesture.Described(text(definition, player, "usage.delete.operation", "Fキー")),
                         text(definition, player, "usage.delete.action", "視線上のマーカーを削除")
                     ))
-                    add(GuiLoreLine.Action(
-                        text(definition, player, "usage.switch.operation", "Shift + ホットバースクロール"),
+                    add(GuiLoreLine.Interaction(
+                        player,
+                        GuiInputGesture.Described(text(definition, player, "usage.switch.operation", "Shift + ホットバースクロール")),
                         text(definition, player, "usage.switch.action", "前後のモードへ変更")
                     ))
                 })))
