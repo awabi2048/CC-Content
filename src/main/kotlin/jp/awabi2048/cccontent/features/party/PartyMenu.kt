@@ -4,7 +4,7 @@ import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
@@ -19,7 +19,7 @@ import com.awabi2048.ccsystem.api.gui.MenuDialogHandler
 import com.awabi2048.ccsystem.api.gui.MenuDialogInput
 import com.awabi2048.ccsystem.api.gui.MenuDialogRequest
 import com.awabi2048.ccsystem.api.gui.MenuElement
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
 import net.kyori.adventure.text.Component
@@ -160,8 +160,8 @@ class PartyMenu(private val controller: PartyController) {
         role = if (full) GuiElementRole.CONTENT else GuiElementRole.ACTION,
         warnings = if (full) listOf(controller.text(player, "party.menu.invite.full")) else emptyList(),
         actions = listOf(
-            action("invite", player, "party.menu.invite.select", MenuAcceptedClicks.LEFT, !full),
-            action("invite", player, "party.menu.invite.input", MenuAcceptedClicks.RIGHT, !full)
+            action("invite", player, "party.menu.invite.select", MenuGesture.LEFT, !full),
+            action("invite", player, "party.menu.invite.input", MenuGesture.RIGHT, !full)
         )
     )
 
@@ -171,16 +171,16 @@ class PartyMenu(private val controller: PartyController) {
     private fun data(player: Player, key: String, value: Any?, color: String = "§f") =
         GuiMenuEntryData(controller.text(player, key), value, tone(color))
 
-    private fun singleAction(actionId: String, player: Player, actionKey: String, enabled: Boolean): List<GuiMenuEntryAction> =
-        listOf(action(actionId, player, actionKey, MenuAcceptedClicks.LEFT_RIGHT, enabled))
+    private fun singleAction(actionId: String, player: Player, actionKey: String, enabled: Boolean): List<GuiMenuActionIntent> =
+        listOf(action(actionId, player, actionKey, MenuGesture.ANY, enabled))
 
     private fun action(
         actionId: String,
         player: Player,
         actionKey: String,
-        acceptedClicks: Set<org.bukkit.event.inventory.ClickType>,
+        gesture: MenuGesture,
         enabled: Boolean,
-    ) = GuiMenuEntryAction(actionId, acceptedClicks, controller.text(player, actionKey), enabled = enabled)
+    ) = GuiMenuActionIntent.GestureAction(actionId, gesture, controller.text(player, actionKey), enabled = enabled)
 
     private fun icon(
         slot: Int,
@@ -193,7 +193,7 @@ class PartyMenu(private val controller: PartyController) {
         data: List<GuiMenuEntryData> = emptyList(),
         warnings: List<String> = emptyList(),
         dangers: List<String> = emptyList(),
-        actions: List<GuiMenuEntryAction> = emptyList(),
+        actions: List<GuiMenuActionIntent> = emptyList(),
         glint: Boolean? = null,
         playerHeadOwner: java.util.UUID? = null,
     ): MenuElement = elements.menuEntry(
