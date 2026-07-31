@@ -7,7 +7,7 @@
 
     <groupId>jp.awabi2048</groupId>
     <artifactId>CC-Content</artifactId>
-    <version>26.731.9</version>
+    <version>26.731.10</version>
     <packaging>jar</packaging>
 
     <name>CC-Content</name>
@@ -54,13 +54,13 @@
         <dependency>
             <groupId>com.awabi2048</groupId>
             <artifactId>CC-System</artifactId>
-            <version>26.731.29</version>
+            <version>26.731.31</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>awabi2048</groupId>
             <artifactId>my-world-manager</artifactId>
-            <version>26.731.46</version>
+            <version>26.731.48</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
