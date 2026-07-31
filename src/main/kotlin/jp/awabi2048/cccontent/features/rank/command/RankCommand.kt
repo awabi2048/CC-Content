@@ -2220,9 +2220,7 @@ class RankCommand(
         val meta = item.itemMeta
         if (meta != null) {
             meta.displayName(withoutItalic(displayName))
-            meta.lore(CCSystem.getAPI().getLoreService().render(
-                GuiLoreSpec.Rich(lore, GuiLoreFrame.NONE)
-            ))
+            meta.lore(CCSystem.getAPI().getLoreService().render(composeLore(lore)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
             item.itemMeta = meta
         }
@@ -2235,15 +2233,31 @@ class RankCommand(
         val meta = item.itemMeta
         if (meta != null) {
             meta.displayName(withoutItalic(displayName))
-            meta.lore(CCSystem.getAPI().getLoreService().render(
-                GuiLoreSpec.Blocks(blocks.map { block ->
-                    GuiLoreBlock(block)
-                })
-            ))
+            meta.lore(CCSystem.getAPI().getLoreService().render(composeBlocks(blocks)))
             meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
             item.itemMeta = meta
         }
         return item
+    }
+
+    private fun composeLore(lines: List<GuiLoreLine>): GuiLoreSpec {
+        val actions = lines.filterIsInstance<GuiLoreLine.Interaction>()
+        val base = lines.filterNot { it is GuiLoreLine.Interaction }
+        return CCSystem.getAPI().getLoreService().compose(
+            if (base.isEmpty()) GuiLoreSpec.None else GuiLoreSpec.Rich(base, GuiLoreFrame.NONE),
+            actions,
+        )
+    }
+
+    private fun composeBlocks(blocks: List<List<GuiLoreLine>>): GuiLoreSpec {
+        val actions = blocks.flatten().filterIsInstance<GuiLoreLine.Interaction>()
+        val baseBlocks = blocks.map { block ->
+            block.filterNot { it is GuiLoreLine.Interaction }
+        }.filter { it.isNotEmpty() }.map(::GuiLoreBlock)
+        return CCSystem.getAPI().getLoreService().compose(
+            if (baseBlocks.isEmpty()) GuiLoreSpec.None else GuiLoreSpec.Blocks(baseBlocks),
+            actions,
+        )
     }
 
     private fun createTaskCategoryItem(

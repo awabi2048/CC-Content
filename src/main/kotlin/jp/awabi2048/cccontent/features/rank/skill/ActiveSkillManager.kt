@@ -352,11 +352,13 @@ object ActiveSkillManager {
             lore.add(GuiLoreLine.Data(CCContent.languageManager.getMessage("active_skill.selector.mode"), currentMode.displayName, "§e"))
         }
 
-        lore.add(GuiLoreLine.Spacer)
-        lore.add(GuiLoreLine.Interaction(player, GuiInputGesture.Described(CCContent.languageManager.getMessage("active_skill.selector.left_click")), CCContent.languageManager.getMessage("active_skill.selector.select_action")))
-        lore.add(GuiLoreLine.Interaction(player, GuiInputGesture.Described(CCContent.languageManager.getMessage("active_skill.selector.right_click")), CCContent.languageManager.getMessage("active_skill.selector.mode_action")))
-
-        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(lore, GuiLoreFrame.NONE)))
+        val actions = listOf(
+            GuiLoreLine.Interaction(player, GuiInputGesture.Described(CCContent.languageManager.getMessage("active_skill.selector.left_click")), CCContent.languageManager.getMessage("active_skill.selector.select_action")),
+            GuiLoreLine.Interaction(player, GuiInputGesture.Described(CCContent.languageManager.getMessage("active_skill.selector.right_click")), CCContent.languageManager.getMessage("active_skill.selector.mode_action"))
+        )
+        meta.lore(CCSystem.getAPI().getLoreService().render(
+            CCSystem.getAPI().getLoreService().compose(GuiLoreSpec.Rich(lore, GuiLoreFrame.NONE), actions)
+        ))
         button.itemMeta = meta
 
         return button

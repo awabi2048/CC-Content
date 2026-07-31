@@ -1128,31 +1128,34 @@ class StorageBoxGuiListener(private val plugin: JavaPlugin) : Listener {
             val icon = entry.prototype.clone().apply {
                 amount = iconAmount
                 val m = itemMeta
-                val appendedLore = CCSystem.getAPI().getLoreService().render(
-                    GuiLoreSpec.Rich(
-                        listOf(
-                            GuiLoreLine.Spacer,
-                            GuiLoreLine.Data(storageText(player, "data.stored_count"), entry.count, "§f"),
-                            if (entry.count > 0L) {
-                                storageAction(player, "shift_left", "action.withdraw_stack")
-                            } else {
-                                GuiLoreLine.Text(storageText(player, "description.registered_empty"))
-                            },
-                            if (entry.count > 0L) {
-                                storageAction(player, "shift_right", "action.withdraw_all")
-                            } else {
-                                storageAction(player, "shift_any", "action.store_type")
-                            },
-                            GuiLoreLine.StyledText(
-                                storageText(player, if (idx == state.selectedIndex) "option.selected" else "option.unselected"),
-                                if (idx == state.selectedIndex) "§a" else "§8",
-                                false
-                            )
-                        ),
-                        GuiLoreFrame.NONE
+                val baseBlocks = buildList {
+                    m?.lore()?.takeIf { it.isNotEmpty() }?.let { existing ->
+                        // 既存Loreは意味解析せず、Opaqueな一つの内容ブロックとして保持する。
+                        add(GuiLoreBlock(existing.map(GuiLoreLine::Opaque)))
+                    }
+                    add(GuiLoreBlock(buildList {
+                        add(GuiLoreLine.Data(storageText(player, "data.stored_count"), entry.count, "§f"))
+                        if (entry.count == 0L) {
+                            add(GuiLoreLine.Text(storageText(player, "description.registered_empty")))
+                        }
+                        add(GuiLoreLine.StyledText(
+                            storageText(player, if (idx == state.selectedIndex) "option.selected" else "option.unselected"),
+                            if (idx == state.selectedIndex) "§a" else "§8",
+                            false,
+                        ))
+                    }))
+                }
+                val actions = if (entry.count > 0L) {
+                    listOf(
+                        storageAction(player, "shift_left", "action.withdraw_stack"),
+                        storageAction(player, "shift_right", "action.withdraw_all"),
                     )
+                } else {
+                    listOf(storageAction(player, "shift_any", "action.store_type"))
+                }
+                val loreLines = CCSystem.getAPI().getLoreService().render(
+                    CCSystem.getAPI().getLoreService().compose(GuiLoreSpec.Blocks(baseBlocks), actions)
                 )
-                val loreLines = (m?.lore() ?: emptyList()) + appendedLore
                 m?.lore(loreLines)
                 itemMeta = m
             }

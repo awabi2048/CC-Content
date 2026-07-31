@@ -38,14 +38,18 @@ object GuiMenuItems {
         lore: List<GuiLoreLine> = emptyList(),
         frame: GuiLoreFrame = GuiLoreFrame.NONE
     ): ItemStack {
+        val actions = lore.filterIsInstance<GuiLoreLine.Interaction>()
+        val baseLines = lore.filterNot { it is GuiLoreLine.Interaction }
+        val base = if (baseLines.isEmpty()) {
+            GuiLoreSpec.None
+        } else {
+            GuiLoreSpec.Rich(baseLines, frame)
+        }
         return CCSystem.getAPI().getGuiElementService().item(
             GuiItemSpec(
                 material = material,
                 name = GuiNameSpec.Text(name, GuiNameStyle.DEFAULT),
-                lore = if (lore.isEmpty()) GuiLoreSpec.None else GuiLoreSpec.Rich(
-                    lore,
-                    frame
-                ),
+                lore = CCSystem.getAPI().getLoreService().compose(base, actions),
                 role = GuiElementRole.CONTENT,
                 amount = 1
             )

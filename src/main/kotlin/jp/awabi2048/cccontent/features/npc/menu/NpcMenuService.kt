@@ -426,10 +426,14 @@ class NpcMenuService(
             val operation = CCSystem.getAPI().getI18nString(player, "lore.click.any")
             val action = CCSystem.getAPI().getI18nString(player, "gui.npc.oage_shrine.request.restore.action")
             loreBlocks.add(GuiLoreBlock(listOf(
-                GuiLoreLine.Interaction(player, GuiInputGesture.Described(operation), action),
                 GuiLoreLine.Data("初穂料", "🐿 ${ContentEconomyBridge.formatPrice(DEAD_CHEST_RECOVERY_COST)}", "§e")
             )))
-            val renderedLore = CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(loreBlocks))
+            val renderedLore = CCSystem.getAPI().getLoreService().render(
+                CCSystem.getAPI().getLoreService().compose(
+                    GuiLoreSpec.Blocks(loreBlocks),
+                    listOf(GuiLoreLine.Interaction(player, GuiInputGesture.Described(operation), action))
+                )
+            )
             val icon = ItemStack(Material.CHEST).apply {
                 itemMeta = itemMeta?.also { meta ->
                     meta.displayName(LegacyComponentSerializer.legacySection().deserialize("§eデスチェスト #${index + 1}"))
@@ -742,8 +746,7 @@ class NpcMenuService(
         val completed = isPartTimeTaskCompleted(player.uniqueId, PART_TIME_TASK_ARENA)
         val opened = isPartTimeOpened(player.uniqueId)
         val canClaim = completed && !opened
-        val renderedLore = CCSystem.getAPI().getLoreService().render(
-            GuiLoreSpec.Blocks(buildList {
+        val blocks = buildList {
                 add(GuiLoreBlock(listOf(
                     GuiLoreLine.Text(text(player, "wording.part_time.heading")),
                     GuiLoreLine.StyledText(text(player, "wording.part_time.task"), if (completed) "§a" else "§f", false)
@@ -754,14 +757,16 @@ class NpcMenuService(
                     if (opened) add(GuiLoreLine.Warning(text(player, "wording.part_time.claimed")))
                 }))
                 if (canClaim) add(GuiLoreBlock(listOf(
-                    GuiLoreLine.Text(text(player, "wording.part_time.completed")),
-                    GuiLoreLine.Interaction(
-                        player,
-                        GuiInputGesture.Described(text(player, "wording.part_time.operation")),
-                        text(player, "wording.part_time.action"),
-                    )
+                    GuiLoreLine.Text(text(player, "wording.part_time.completed"))
                 )))
-            })
+        }
+        val actions = if (canClaim) listOf(GuiLoreLine.Interaction(
+            player,
+            GuiInputGesture.Described(text(player, "wording.part_time.operation")),
+            text(player, "wording.part_time.action"),
+        )) else emptyList()
+        val renderedLore = CCSystem.getAPI().getLoreService().render(
+            CCSystem.getAPI().getLoreService().compose(GuiLoreSpec.Blocks(blocks), actions)
         )
         return GuiMenuItems.icon(Material.BARREL, text(player, "wording.part_time.icon_name")).apply {
             itemMeta = itemMeta?.also { it.lore(renderedLore) }

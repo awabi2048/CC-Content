@@ -377,7 +377,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         val modeName = getModeDisplayName(player, definition, mode)
         meta.lore(
             CCSystem.getAPI().getLoreService().render(
-                GuiLoreSpec.Blocks(listOf(GuiLoreBlock(buildList {
+                composeLore(buildList {
                     add(GuiLoreLine.Data(text(definition, player, "current_mode", "現在のモード"), modeName, "§a"))
                     add(GuiLoreLine.Spacer)
                     add(GuiLoreLine.Interaction(
@@ -395,8 +395,17 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                         GuiInputGesture.Described(text(definition, player, "usage.switch.operation", "Shift + ホットバースクロール")),
                         text(definition, player, "usage.switch.action", "前後のモードへ変更")
                     ))
-                })))
+                })
             )
+        )
+    }
+
+    private fun composeLore(lines: List<GuiLoreLine>): GuiLoreSpec {
+        val actions = lines.filterIsInstance<GuiLoreLine.Interaction>()
+        val base = lines.filterNot { it is GuiLoreLine.Interaction }
+        return CCSystem.getAPI().getLoreService().compose(
+            if (base.isEmpty()) GuiLoreSpec.None else GuiLoreSpec.Rich(base, GuiLoreFrame.NONE),
+            actions,
         )
     }
 

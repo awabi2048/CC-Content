@@ -235,19 +235,23 @@ class FishingItems(
             meta.setItemModel(NamespacedKey.minecraft("book"))
             meta.setMaxStackSize(1)
             meta.lore(CCSystem.getAPI().getLoreService().render(
-                GuiLoreSpec.Blocks(listOf(GuiLoreBlock(listOf(
-                    GuiLoreLine.Text(message(player, "custom_items.fishing.dictionary.description")),
-                    GuiLoreLine.Interaction(
-                        player,
-                        GuiInputGesture.Described(message(player, "custom_items.fishing.dictionary.operation")),
-                        message(player, "custom_items.fishing.dictionary.action")
-                    ),
-                    GuiLoreLine.Interaction(
-                        player,
-                        GuiInputGesture.Described(message(player, "custom_items.fishing.dictionary.hint_operation")),
-                        message(player, "custom_items.fishing.dictionary.hint_action")
+                CCSystem.getAPI().getLoreService().compose(
+                    GuiLoreSpec.Blocks(listOf(GuiLoreBlock(listOf(
+                        GuiLoreLine.Text(message(player, "custom_items.fishing.dictionary.description"))
+                    )))),
+                    listOf(
+                        GuiLoreLine.Interaction(
+                            player,
+                            GuiInputGesture.Described(message(player, "custom_items.fishing.dictionary.operation")),
+                            message(player, "custom_items.fishing.dictionary.action")
+                        ),
+                        GuiLoreLine.Interaction(
+                            player,
+                            GuiInputGesture.Described(message(player, "custom_items.fishing.dictionary.hint_operation")),
+                            message(player, "custom_items.fishing.dictionary.hint_action")
+                        )
                     )
-                ))))
+                )
             ))
             item.itemMeta = meta
             return item
