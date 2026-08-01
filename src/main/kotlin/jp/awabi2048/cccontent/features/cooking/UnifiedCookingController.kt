@@ -13,6 +13,7 @@ import jp.awabi2048.cccontent.features.brewery.item.BreweryItemCodec
 import jp.awabi2048.cccontent.gui.GuiMenuItems
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.persistence.ContentPdcKeys
+import jp.awabi2048.cccontent.util.PotionEffectTypeResolver
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
 import org.bukkit.FluidCollisionMode
@@ -46,7 +47,6 @@ import org.bukkit.inventory.meta.Damageable
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.potion.PotionEffect
-import org.bukkit.potion.PotionEffectType
 import org.bukkit.scheduler.BukkitTask
 import java.io.File
 import java.util.Base64
@@ -161,7 +161,7 @@ internal class UnifiedCookingController(
             ?.get(ContentPdcKeys.cookingRecipeId, PersistentDataType.STRING) ?: return
         val recipe = configuration.recipes[recipeId] ?: return
         recipe.result.effects.forEach { effect ->
-            val type = PotionEffectType.getByName(effect.type)
+            val type = PotionEffectTypeResolver.resolve(effect.type)
                 ?: error("Unknown cooking potion effect: ${effect.type}")
             event.player.addPotionEffect(PotionEffect(type, effect.durationSeconds * 20, effect.amplifier))
         }
