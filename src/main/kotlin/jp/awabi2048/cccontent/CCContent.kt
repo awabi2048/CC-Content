@@ -155,6 +155,8 @@ import java.util.jar.JarFile
 class CCContent : JavaPlugin(), Listener {
     
     companion object {
+        private const val REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = 3
+
         lateinit var instance: CCContent
             private set
         
@@ -1178,7 +1180,12 @@ class CCContent : JavaPlugin(), Listener {
             server.pluginManager.disablePlugin(this)
             return false
         }
-        val expected = CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION
+        val expected = REQUIRED_GUI_RUNTIME_CONTRACT_VERSION
+        if (CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION != expected) {
+            logger.severe("CC-Content のビルド時GUI contractがv3ではないため、CC-Contentを無効化します")
+            server.pluginManager.disablePlugin(this)
+            return false
+        }
         val actual = try {
             CCSystem.getAPI().guiRuntimeContractVersion
         } catch (failure: LinkageError) {
