@@ -29,6 +29,7 @@ import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
 import com.awabi2048.ccsystem.api.gui.MenuGesture
+import jp.awabi2048.cccontent.gui.ContentMenuActionSafety
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -799,7 +800,7 @@ class MiniGameAdminMenu(
     )
 
     private fun singleAction(actionId: String, player: Player, actionKey: String): List<GuiMenuActionIntent> =
-        listOf(GuiMenuActionIntent.GestureAction(actionId, MenuGesture.LEFT_RIGHT, MiniGameMessages.text(player, actionKey)))
+        listOf(ContentMenuActionSafety.gesture(actionId, MenuGesture.LEFT_RIGHT, MiniGameMessages.text(player, actionKey)))
 
     private fun action(
         actionId: String,
@@ -808,7 +809,7 @@ class MiniGameAdminMenu(
         actionKey: String,
         vararg placeholders: Pair<String, Any?>,
     ): GuiMenuActionIntent =
-        GuiMenuActionIntent.GestureAction(actionId, gesture, MiniGameMessages.text(player, actionKey, *placeholders))
+        ContentMenuActionSafety.gesture(actionId, gesture, MiniGameMessages.text(player, actionKey, *placeholders))
 
     private fun entryItem(
         player: Player,

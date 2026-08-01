@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.party
 
 import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
+import jp.awabi2048.cccontent.gui.ContentMenuActionSafety
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
@@ -180,7 +181,7 @@ class PartyMenu(private val controller: PartyController) {
         actionKey: String,
         gesture: MenuGesture,
         enabled: Boolean,
-    ) = GuiMenuActionIntent.GestureAction(actionId, gesture, controller.text(player, actionKey), enabled = enabled)
+    ) = ContentMenuActionSafety.gesture(actionId, gesture, controller.text(player, actionKey), enabled = enabled)
 
     private fun icon(
         slot: Int,

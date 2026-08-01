@@ -8,12 +8,12 @@ import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
 import com.awabi2048.ccsystem.api.gui.MenuGesture
+import jp.awabi2048.cccontent.gui.ContentMenuActionSafety
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.brewery.item.BreweryItemCodec
 import jp.awabi2048.cccontent.features.brewery.barrel.BarrelMatchResult
@@ -1484,7 +1484,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
                 role = GuiElementRole.ACTION,
                 data = data,
                 actions = listOf(
-                    GuiMenuActionIntent.GestureAction(
+                    ContentMenuActionSafety.gesture(
                         actionId = "brewery_action",
                         gesture = MenuGesture.LEFT_RIGHT,
                         label = i18n(player, actionKey),
