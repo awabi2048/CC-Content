@@ -37,7 +37,7 @@ class CCContentInitializationOrderTest {
         String source = Files.readString(PLUGIN_SOURCE, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION"));
-        assertTrue(source.contains("REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = 4"));
+        assertTrue(source.contains("REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = 5"));
         assertTrue(source.contains("CCSystem.getAPI().guiRuntimeContractVersion"));
         assertTrue(source.contains("catch (failure: LinkageError)"));
         assertTrue(source.contains("catch (failure: RuntimeException)"));

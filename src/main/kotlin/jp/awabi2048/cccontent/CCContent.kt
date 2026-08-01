@@ -155,7 +155,7 @@ import java.util.jar.JarFile
 class CCContent : JavaPlugin(), Listener {
     
     companion object {
-        private const val REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = 4
+        private const val REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = 5
 
         lateinit var instance: CCContent
             private set
@@ -1182,7 +1182,7 @@ class CCContent : JavaPlugin(), Listener {
         }
         val expected = REQUIRED_GUI_RUNTIME_CONTRACT_VERSION
         if (CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION != expected) {
-            logger.severe("CC-Content のビルド時GUI contractがv3ではないため、CC-Contentを無効化します")
+            logger.severe("CC-Content のビルド時GUI contractがv5ではないため、CC-Contentを無効化します")
             server.pluginManager.disablePlugin(this)
             return false
         }
