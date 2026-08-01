@@ -155,7 +155,7 @@ import java.util.jar.JarFile
 class CCContent : JavaPlugin(), Listener {
     
     companion object {
-        private const val REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = 3
+        private const val REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = 4
 
         lateinit var instance: CCContent
             private set
