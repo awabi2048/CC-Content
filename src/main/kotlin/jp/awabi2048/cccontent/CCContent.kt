@@ -1179,18 +1179,28 @@ class CCContent : JavaPlugin(), Listener {
             return false
         }
         val expected = CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION
-        val actual = runCatching { CCSystem.getAPI().guiRuntimeContractVersion }
-            .getOrElse { failure ->
-                logger.severe("CC-System GUI runtime contract version の取得に失敗したため、CC-Content を無効化します: ${failure.message}")
-                server.pluginManager.disablePlugin(this)
-                return false
-            }
+        val actual = try {
+            CCSystem.getAPI().guiRuntimeContractVersion
+        } catch (failure: LinkageError) {
+            return disableForGuiRuntimeContractFailure(failure)
+        } catch (failure: RuntimeException) {
+            return disableForGuiRuntimeContractFailure(failure)
+        }
         if (actual != expected) {
             logger.severe("CC-System GUI runtime contract version が一致しないため、CC-Content を無効化します: expected=$expected, actual=$actual")
             server.pluginManager.disablePlugin(this)
             return false
         }
         return true
+    }
+
+    private fun disableForGuiRuntimeContractFailure(failure: Throwable): Boolean {
+        logger.severe(
+            "CC-System GUI runtime contract version の取得に失敗したため、CC-Content を無効化します: " +
+                "${failure.javaClass.name}: ${failure.message}",
+        )
+        server.pluginManager.disablePlugin(this)
+        return false
     }
 
     private fun validateAndRegisterLanguageSources() {

@@ -38,6 +38,9 @@ class CCContentInitializationOrderTest {
 
         assertTrue(source.contains("CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION"));
         assertTrue(source.contains("CCSystem.getAPI().guiRuntimeContractVersion"));
+        assertTrue(source.contains("catch (failure: LinkageError)"));
+        assertTrue(source.contains("catch (failure: RuntimeException)"));
+        assertTrue(source.contains("return disableForGuiRuntimeContractFailure(failure)"));
         assertTrue(source.contains("if (actual != expected)"));
         assertTrue(source.contains("logger.severe"));
         assertTrue(source.contains("server.pluginManager.disablePlugin(this)"));
