@@ -21,14 +21,15 @@ import jp.awabi2048.cccontent.gui.MenuEventGuards
 import jp.awabi2048.cccontent.gui.OwnedMenuHolder
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
+import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
+import jp.awabi2048.cccontent.gui.ContentMenuActionSafety
 import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.entity.Player
@@ -735,8 +736,8 @@ class MiniGameAdminMenu(
                 Material.BOOK,
                 "gui.history",
                 actions = listOf(
-                    action("history_recent", player, MenuAcceptedClicks.LEFT, "gui.history_recent"),
-                    action("history_top", player, MenuAcceptedClicks.RIGHT, "gui.history_top")
+                    action("history_recent", player, MenuGesture.LEFT, "gui.history_recent"),
+                    action("history_top", player, MenuGesture.RIGHT, "gui.history_top")
                 )
             )
         )
@@ -794,21 +795,21 @@ class MiniGameAdminMenu(
         GuiMenuEntryData(MiniGameMessages.text(player, key), value)
 
     private fun adjustmentActions(player: Player, actionPrefix: String, seconds: Int) = listOf(
-        action("${actionPrefix}_increase", player, MenuAcceptedClicks.LEFT, "gui.increase", "seconds" to seconds),
-        action("${actionPrefix}_decrease", player, MenuAcceptedClicks.RIGHT, "gui.decrease", "seconds" to seconds)
+        action("${actionPrefix}_increase", player, MenuGesture.LEFT, "gui.increase", "seconds" to seconds),
+        action("${actionPrefix}_decrease", player, MenuGesture.RIGHT, "gui.decrease", "seconds" to seconds)
     )
 
-    private fun singleAction(actionId: String, player: Player, actionKey: String): List<GuiMenuEntryAction> =
-        listOf(GuiMenuEntryAction(actionId, MenuAcceptedClicks.LEFT_RIGHT, MiniGameMessages.text(player, actionKey)))
+    private fun singleAction(actionId: String, player: Player, actionKey: String): List<GuiMenuActionIntent> =
+        listOf(ContentMenuActionSafety.gesture(actionId, MenuGesture.LEFT_RIGHT, MiniGameMessages.text(player, actionKey)))
 
     private fun action(
         actionId: String,
         player: Player,
-        acceptedClicks: Set<org.bukkit.event.inventory.ClickType>,
+        gesture: MenuGesture,
         actionKey: String,
         vararg placeholders: Pair<String, Any?>,
-    ): GuiMenuEntryAction =
-        GuiMenuEntryAction(actionId, acceptedClicks, MiniGameMessages.text(player, actionKey, *placeholders))
+    ): GuiMenuActionIntent =
+        ContentMenuActionSafety.gesture(actionId, gesture, MiniGameMessages.text(player, actionKey, *placeholders))
 
     private fun entryItem(
         player: Player,
@@ -816,7 +817,7 @@ class MiniGameAdminMenu(
         nameKey: String,
         role: GuiElementRole = GuiElementRole.ACTION,
         data: List<GuiMenuEntryData> = emptyList(),
-        actions: List<GuiMenuEntryAction> = emptyList(),
+        actions: List<GuiMenuActionIntent> = emptyList(),
         glint: Boolean? = null,
         playerHeadOwner: UUID? = null,
     ): ItemStack = CCSystem.getAPI().getGuiElementService().menuEntry(

@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.CCSystemAPI
 import com.awabi2048.ccsystem.api.config.ConfigClassification
 import com.awabi2048.ccsystem.api.config.ConfigMigration
 import com.awabi2048.ccsystem.api.config.ManagedConfigSpec
@@ -154,6 +155,8 @@ import java.util.jar.JarFile
 class CCContent : JavaPlugin(), Listener {
     
     companion object {
+        private const val REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION
+
         lateinit var instance: CCContent
             private set
         
@@ -240,7 +243,6 @@ class CCContent : JavaPlugin(), Listener {
 
     private fun startPlugin() {
         instance = this
-        ensureCCSystemAvailable()
         myWorldBridge = DefaultMyWorldBridge()
         CCSystem.getAPI().getMenuCommandService().unregisterOwner("cc-content")
         saveSplitLanguageResources()
@@ -693,6 +695,7 @@ class CCContent : JavaPlugin(), Listener {
     }
 
     override fun onEnable() {
+        if (!verifyGuiRuntimeContract()) return
         synchronizeConfigurationResources()
         validateConfigurationFiles()
         startPlugin()
@@ -1170,11 +1173,41 @@ class CCContent : JavaPlugin(), Listener {
         restartPluginLifecycle("config reload")
     }
 
-    private fun ensureCCSystemAvailable() {
+    private fun verifyGuiRuntimeContract(): Boolean {
         val ccSystemPlugin = server.pluginManager.getPlugin("CC-System")
         if (ccSystemPlugin == null || !ccSystemPlugin.isEnabled) {
-            throw IllegalStateException("CC-System が有効化されていないため CC-Content を起動できません")
+            logger.severe("CC-System が有効ではないため、CC-Content を無効化します")
+            server.pluginManager.disablePlugin(this)
+            return false
         }
+        val expected = REQUIRED_GUI_RUNTIME_CONTRACT_VERSION
+        if (CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION != expected) {
+            logger.severe("CC-Content のビルド時GUI contractがv6ではないため、CC-Contentを無効化します")
+            server.pluginManager.disablePlugin(this)
+            return false
+        }
+        val actual = try {
+            CCSystem.getAPI().guiRuntimeContractVersion
+        } catch (failure: LinkageError) {
+            return disableForGuiRuntimeContractFailure(failure)
+        } catch (failure: RuntimeException) {
+            return disableForGuiRuntimeContractFailure(failure)
+        }
+        if (actual != expected) {
+            logger.severe("CC-System GUI runtime contract version が一致しないため、CC-Content を無効化します: expected=$expected, actual=$actual")
+            server.pluginManager.disablePlugin(this)
+            return false
+        }
+        return true
+    }
+
+    private fun disableForGuiRuntimeContractFailure(failure: Throwable): Boolean {
+        logger.severe(
+            "CC-System GUI runtime contract version の取得に失敗したため、CC-Content を無効化します: " +
+                "${failure.javaClass.name}: ${failure.message}",
+        )
+        server.pluginManager.disablePlugin(this)
+        return false
     }
 
     private fun validateAndRegisterLanguageSources() {

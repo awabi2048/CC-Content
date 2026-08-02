@@ -6,12 +6,12 @@ import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiNameStyle
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
+import jp.awabi2048.cccontent.gui.ContentMenuActionSafety
 import jp.awabi2048.cccontent.features.fishing.FishQuality
 import net.kyori.adventure.text.Component
 import org.bukkit.Bukkit
@@ -134,9 +134,9 @@ class CatalogCommand(
                 material = Material.WRITABLE_BOOK,
                 name = GuiNameSpec.Text(text(player, "fishing.journal.tab"), GuiNameStyle.DEFAULT),
                 role = GuiElementRole.NAVIGATION,
-                actions = listOf(GuiMenuEntryAction(
+                actions = listOf(ContentMenuActionSafety.gesture(
                     actionId = "open_journal",
-                    acceptedClicks = MenuAcceptedClicks.LEFT,
+                    gesture = MenuGesture.LEFT,
                     label = text(player, "fishing.journal.tab_action"),
                 )),
             )).item)
@@ -215,14 +215,14 @@ class CatalogCommand(
             warnings = if (discovered) emptyList() else listOf(text(player, "fishing.dictionary.details_hidden")),
             dangers = emptyList(),
             actions = if (discovered) buildList {
-                add(GuiMenuEntryAction(
+                add(ContentMenuActionSafety.gesture(
                     actionId = "open_detail",
-                    acceptedClicks = MenuAcceptedClicks.LEFT,
+                    gesture = MenuGesture.LEFT,
                     label = text(player, "fishing.dictionary.detail.action"),
                 ))
-                add(GuiMenuEntryAction(
+                add(ContentMenuActionSafety.gesture(
                     actionId = if (selected) "clear_search" else "set_search",
-                    acceptedClicks = MenuAcceptedClicks.RIGHT,
+                    gesture = MenuGesture.RIGHT,
                     label = text(player, if (selected) {
                         "fishing.dictionary.search.clear_action"
                     } else {

@@ -52,7 +52,6 @@ import com.awabi2048.ccsystem.api.gui.GuiStatusTone
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiMenuDisplaySpec
-import com.awabi2048.ccsystem.api.gui.GuiMenuEntryAction
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
@@ -61,7 +60,8 @@ import com.awabi2048.ccsystem.api.gui.InventoryMenuDefinition
 import com.awabi2048.ccsystem.api.gui.InventoryMenuView
 import com.awabi2048.ccsystem.api.gui.MenuActionHandler
 import com.awabi2048.ccsystem.api.gui.MenuActionResult
-import com.awabi2048.ccsystem.api.gui.MenuAcceptedClicks
+import com.awabi2048.ccsystem.api.gui.MenuGesture
+import jp.awabi2048.cccontent.gui.ContentMenuActionSafety
 import com.awabi2048.ccsystem.api.gui.MenuElement
 import com.awabi2048.ccsystem.api.gui.MenuRoute
 import com.awabi2048.ccsystem.api.gui.MenuUpdate
@@ -598,9 +598,9 @@ class RankCommand(
                         messageProvider.getMessage("gui.profession.selection.profession_item.type_label_name"),
                         typeName,
                     )),
-                    actions = listOf(GuiMenuEntryAction(
+                    actions = listOf(ContentMenuActionSafety.gesture(
                         PROFESSION_SELECT_ACTION,
-                        MenuAcceptedClicks.STANDARD,
+                        MenuGesture.ANY,
                         messageProvider.getMessage("gui.profession.selection.profession_item.select_action"),
                         mapOf("profession" to profession.id),
                     )),
@@ -680,9 +680,9 @@ class RankCommand(
                         material = Material.LIME_CONCRETE,
                         name = GuiNameSpec.Text(confirmLabel, GuiNameStyle.DEFAULT),
                         role = GuiElementRole.CONFIRM,
-                        actions = listOf(GuiMenuEntryAction(
+                        actions = listOf(ContentMenuActionSafety.gesture(
                             PROFESSION_CONFIRM_ACTION,
-                            MenuAcceptedClicks.STANDARD,
+                            MenuGesture.ANY,
                             confirmLabel,
                         )),
                     ),
@@ -694,9 +694,9 @@ class RankCommand(
                         material = Material.RED_CONCRETE,
                         name = GuiNameSpec.Text(cancelLabel, GuiNameStyle.DEFAULT),
                         role = GuiElementRole.CANCEL,
-                        actions = listOf(GuiMenuEntryAction(
+                        actions = listOf(ContentMenuActionSafety.gesture(
                             PROFESSION_CANCEL_ACTION,
-                            MenuAcceptedClicks.STANDARD,
+                            MenuGesture.ANY,
                             cancelLabel,
                         )),
                     ),

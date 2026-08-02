@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.brewery
 
 import jp.awabi2048.cccontent.features.brewery.model.FirePower
+import jp.awabi2048.cccontent.util.PotionEffectTypeResolver
 import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
@@ -240,7 +241,7 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
     private fun parseEffect(outputId: String, raw: String): BreweryEffectDefinition {
         val parts = raw.split('/')
         require(parts.size == 3) { "出力$outputId の効果は TYPE/amplifier/duration_seconds 形式が必要です: $raw" }
-        val type = PotionEffectType.getByName(parts[0].trim().uppercase())
+        val type = PotionEffectTypeResolver.resolve(parts[0])
             ?: error("出力$outputId のPotionEffectTypeが不正です: ${parts[0]}")
         val amplifier = parseRange(parts[1], outputId, raw)
         val duration = parseRange(parts[2], outputId, raw)
