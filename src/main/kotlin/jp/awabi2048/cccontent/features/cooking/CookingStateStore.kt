@@ -17,7 +17,10 @@ internal class CookingStateStore(private val file: File) {
     fun load(): MutableMap<CookingStationKey, PersistedCookingStation> {
         if (!file.exists()) return mutableMapOf()
         val root = YamlConfiguration.loadConfiguration(file)
-        require(integer(root, "schema_version") == 3) { "${file.path}.schema_version must be 3" }
+        if ((root.get("schema_version") as? Number)?.toInt() != CURRENT_SCHEMA_VERSION) {
+            save(emptyMap())
+            return mutableMapOf()
+        }
         val stations = root.getConfigurationSection("stations") ?: return mutableMapOf()
         return stations.getKeys(false).associate { pathKey ->
             val section = section(stations, pathKey)
@@ -29,7 +32,7 @@ internal class CookingStateStore(private val file: File) {
 
     fun save(stations: Map<CookingStationKey, PersistedCookingStation>) {
         val output = YamlConfiguration()
-        output.set("schema_version", 3)
+        output.set("schema_version", CURRENT_SCHEMA_VERSION)
         stations.toSortedMap(compareBy({ it.worldId.toString() }, { it.y }, { it.x }, { it.z }))
             .forEach { (key, station) -> saveStation(output.createSection("stations.${key.pathKey()}"), key, station) }
         file.parentFile.mkdirs()
@@ -171,4 +174,8 @@ internal class CookingStateStore(private val file: File) {
         (map[key] as? Number)?.toInt() ?: error("${file.path} map.$key must be an integer")
     private fun mapBoolean(map: Map<*, *>, key: String): Boolean =
         map[key] as? Boolean ?: error("${file.path} map.$key must be a boolean")
+
+    private companion object {
+        const val CURRENT_SCHEMA_VERSION = 3
+    }
 }

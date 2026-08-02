@@ -12,6 +12,20 @@ class CookingStationStateMachineTest {
         new CookingStoredInput("cut_potato", 2, "serialized", null, 0);
 
     @Test
+    void processingTimeReductionIsFixedAtStart() {
+        CookingRecipeDefinition recipe = recipe(CookingStation.PAN, CookingResultKind.ITEM, 0);
+        CookingStationSession started = CookingStationStateMachine.start(
+            recipe, snapshot(recipe), "player", 1, CookingHeat.HIGH, List.of(INPUT), 0.25
+        );
+
+        assertEquals(60, started.getTotalTicks());
+        CookingStationSession progressed = ((CookingStationStep.Updated)
+            CookingStationStateMachine.tick(started, CookingHeat.HIGH)).getSession();
+        assertEquals(60, progressed.getTotalTicks());
+        assertEquals(59, progressed.getRemainingTicks());
+    }
+
+    @Test
     void wrongHeatCommitsFailureAndNeverRecoversToNormal() {
         CookingRecipeDefinition recipe = recipe(CookingStation.PAN, CookingResultKind.ITEM, 0);
         CookingStationSession started = CookingStationStateMachine.start(
