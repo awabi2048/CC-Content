@@ -55,9 +55,13 @@ class CookingStateStoreTest {
     }
 
     @Test
-    void rejectsUnknownSchema() throws Exception {
+    void replacesUnknownSchemaWithEmptyCurrentState() throws Exception {
         Path file = temp.resolve("state.yml");
-        Files.writeString(file, "schema_version: 2\n");
-        assertThrows(IllegalArgumentException.class, () -> new CookingStateStore(file.toFile()).load());
+        Files.writeString(file, "schema_version: 2\nstations:\n  legacy:\n    status: PROCESSING_NORMAL\n");
+
+        assertTrue(new CookingStateStore(file.toFile()).load().isEmpty());
+        String replaced = Files.readString(file);
+        assertTrue(replaced.contains("schema_version: 3"));
+        assertFalse(replaced.contains("legacy"));
     }
 }

@@ -5,6 +5,8 @@ package jp.awabi2048.cccontent.features.brewery
 import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.action.ContentAction
+import com.awabi2048.ccsystem.api.action.ContentActionType
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
@@ -1274,6 +1276,9 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
                     }
                     state.inventory.setItem(slot, product)
                 }
+                state.ownerUuid?.let { ownerId ->
+                    publishBrewingCompletion(ownerId, recipe.id, "fermentation", recipe.distillationRuns == 0 && recipe.agingVariants.isEmpty())
+                }
                 state.running = false
                 if (!state.fermentationExpAwarded) {
                     state.ownerUuid?.let { awardProcessExp(it, settings.fermentationExp) }
@@ -1704,6 +1709,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         }
         codec.markDistilled(item, parsed, target, 0.0, recipe ?: return, player)
         var afterState = codec.parse(item)
+        val completed = afterState != null && afterState.distillCount == target && recipe.agingTimeDays == 0
         if (afterState != null &&
             afterState.distillCount == target &&
             recipe.agingTimeDays == 0
@@ -1714,6 +1720,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
                 recordCatalog(it.uniqueId, parsed.recipeId, afterState?.quality ?: before, drunk = false, obtained = true)
             }
         }
+        player?.uniqueId?.let { publishBrewingCompletion(it, parsed.recipeId, "distillation", completed) }
     }
 
     private fun applyBlackFrame(inventory: Inventory, protectedSlots: Set<Int>) {
@@ -1757,6 +1764,9 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val finalQuality = (parsed.quality - penalty).coerceIn(0.0, 100.0)
         codec.markAged(item, parsed, finalQuality, recipe, player, selectedOutput.outputId)
         codec.clearAgingStart(item)
+        (player?.uniqueId ?: state.starterUuid)?.let {
+            publishBrewingCompletion(it, parsed.recipeId, "aging", completed = true)
+        }
         if (slot !in state.rewardAwardedSlots) {
             state.starterUuid?.let {
                 awardProcessExp(it, settings.agingExp)
@@ -1771,6 +1781,23 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
     }
 
     private enum class AgingFinalizeResult { BLOCKED, LOST, READY }
+
+    private fun publishBrewingCompletion(playerId: UUID, recipeId: String, stage: String, completed: Boolean) {
+        brewingCompletionActionTypes(completed).forEach { actionType ->
+            CCSystem.getAPI().getContentActionDispatcher().publish(
+                ContentAction(
+                    actionId = UUID.randomUUID(),
+                    schemaVersion = 1,
+                    occurredAt = CCSystem.getAPI().getSharedClockService().now().toInstant(),
+                    playerId = playerId,
+                    actionType = actionType,
+                    amount = 1L,
+                    worldKey = null,
+                    metadata = mapOf("recipeId" to recipeId, "stage" to stage)
+                )
+            )
+        }
+    }
 
     private fun agingInputSlots(holder: AgingHolder): List<Int> {
         val state = agingStates[holder.locationKey] ?: return emptyList()
@@ -2027,8 +2054,9 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         if (!stateFile.exists()) return
         val yml = YamlConfiguration.loadConfiguration(stateFile)
         val schemaVersion = yml.getInt("schema_version", -1)
-        if (schemaVersion != 5) {
+        if (breweryStateRequiresReset(schemaVersion)) {
             plugin.logger.warning("[Brewery] 旧形式の設備状態を破棄しました: schema_version=$schemaVersion")
+            saveStateInternal()
             return
         }
 

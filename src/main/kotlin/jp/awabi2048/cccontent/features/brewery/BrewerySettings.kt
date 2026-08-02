@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.brewery
 
+import com.awabi2048.ccsystem.api.action.ContentActionType
 import jp.awabi2048.cccontent.features.brewery.model.FirePower
 import jp.awabi2048.cccontent.util.PotionEffectTypeResolver
 import org.bukkit.configuration.ConfigurationSection
@@ -8,6 +9,12 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.potion.PotionEffectType
 import java.io.File
 import kotlin.math.roundToInt
+
+internal fun brewingCompletionActionTypes(completed: Boolean): List<ContentActionType> =
+    if (completed) listOf(ContentActionType.BREWING_STAGE_COMPLETED, ContentActionType.BREWING_COMPLETED)
+    else listOf(ContentActionType.BREWING_STAGE_COMPLETED)
+
+internal fun breweryStateRequiresReset(schemaVersion: Int): Boolean = schemaVersion != 5
 
 data class BreweryRecipe(
     val id: String,
