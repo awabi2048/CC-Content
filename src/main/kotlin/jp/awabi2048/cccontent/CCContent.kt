@@ -1182,7 +1182,7 @@ class CCContent : JavaPlugin(), Listener {
         }
         val expected = REQUIRED_GUI_RUNTIME_CONTRACT_VERSION
         if (CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION != expected) {
-            logger.severe("CC-Content のビルド時GUI contractがv6ではないため、CC-Contentを無効化します")
+            logger.severe("CC-Content のビルド時GUI contractが一致しないため、CC-Contentを無効化します: expected=$expected")
             server.pluginManager.disablePlugin(this)
             return false
         }
