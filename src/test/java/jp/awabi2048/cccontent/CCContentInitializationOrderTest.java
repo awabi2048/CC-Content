@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent;
 
+import com.awabi2048.ccsystem.api.CCSystemAPI;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -8,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class CCContentInitializationOrderTest {
     private static final Path PLUGIN_SOURCE = Path.of(
@@ -33,11 +35,16 @@ class CCContentInitializationOrderTest {
     }
 
     @Test
-    void contractFailureDisablesPluginAndReturnsWithoutInitialization() throws IOException {
+    void contractFailureDisablesPluginAndReturnsWithoutInitialization() throws Exception {
         String source = Files.readString(PLUGIN_SOURCE, StandardCharsets.UTF_8);
 
         assertTrue(source.contains("CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION"));
-        assertTrue(source.contains("REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = 6"));
+        assertTrue(source.contains(
+            "REQUIRED_GUI_RUNTIME_CONTRACT_VERSION = CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION"
+        ));
+        var field = CCContent.class.getDeclaredField("REQUIRED_GUI_RUNTIME_CONTRACT_VERSION");
+        field.setAccessible(true);
+        assertEquals(CCSystemAPI.GUI_RUNTIME_CONTRACT_VERSION, field.getInt(null));
         assertTrue(source.contains("CCSystem.getAPI().guiRuntimeContractVersion"));
         assertTrue(source.contains("catch (failure: LinkageError)"));
         assertTrue(source.contains("catch (failure: RuntimeException)"));
