@@ -9,6 +9,8 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -85,5 +87,34 @@ class ArenaDemandModelTest {
         assertFalse(store.tryReserveAll(List.of(first, second), today));
         assertEquals(null, store.lastEntryDate(second));
         assertTrue(store.tryReserveAll(List.of(first, second), today.plusDays(1)));
+    }
+
+    @Test
+    void pendingReservationBlocksDuplicatesUntilCancelled() throws Exception {
+        var file = Files.createTempFile("arena-daily-pending", ".yml").toFile();
+        var player = UUID.randomUUID();
+        var today = LocalDate.of(2026, 8, 10);
+        var store = new ArenaDailyEntryStore(file);
+
+        var reservation = store.beginReservation(List.of(player), today);
+        assertNotNull(reservation);
+        assertNull(store.beginReservation(List.of(player), today));
+        assertNull(store.lastEntryDate(player));
+
+        store.cancel(reservation);
+        assertNotNull(store.beginReservation(List.of(player), today));
+    }
+
+    @Test
+    void failedCommitRollsBackMemoryAndPendingOwnership() throws Exception {
+        var invalidParent = Files.createTempFile("arena-daily-invalid-parent", ".tmp").toFile();
+        var store = new ArenaDailyEntryStore(invalidParent.toPath().resolve("daily.yml").toFile());
+        var player = UUID.randomUUID();
+        var today = LocalDate.of(2026, 8, 10);
+        var reservation = store.beginReservation(List.of(player), today);
+
+        assertThrows(Exception.class, () -> store.commit(reservation));
+        assertNull(store.lastEntryDate(player));
+        assertNotNull(store.beginReservation(List.of(player), today));
     }
 }

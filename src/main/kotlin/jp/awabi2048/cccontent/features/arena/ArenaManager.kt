@@ -441,6 +441,7 @@ class ArenaManager(
         legacyFile = File(plugin.dataFolder, "data/arena/history.yml")
     )
     private val dailyEntryParticipantsByWorld = mutableMapOf<String, MutableSet<UUID>>()
+    private val dailyEntryReservationsByWorld = mutableMapOf<String, ArenaDailyEntryReservation>()
     private var demandConfig = ArenaDemandConfig()
     private var demandModel = ArenaDemandModel(demandConfig)
     private var maintenanceTask: BukkitTask? = null
@@ -1053,21 +1054,24 @@ class ArenaManager(
                 startBarrierAmbientTask(session)
                 session.stageGenerationCompleted = true
 
-                if (!reserveDailyEntry(session.participants)) {
+                if (!beginDailyEntryReservation(session, session.participants)) {
                     terminateSession(session, false)
                     return completed(ArenaStartResult.Error("arena.messages.mission.start_cancelled"))
                 }
-                dailyEntryParticipantsByWorld[session.worldName] = session.participants.toMutableSet()
-
-                session.participants.forEach { participantId ->
-                    val participant = Bukkit.getPlayer(participantId) ?: return@forEach
-                    if (!participant.isOnline) return@forEach
+                val transferred = session.participants.all { participantId ->
+                    val participant = Bukkit.getPlayer(participantId)
+                    if (participant == null || !participant.isOnline) return@all false
                     val spawnLocation = session.entranceLocation.clone()
                     applyStageStartFacingYaw(session, spawnLocation)
-                    participant.teleport(spawnLocation)
+                    if (!participant.teleport(spawnLocation)) return@all false
                     participant.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, STAGE_TRANSFER_BLINDNESS_TICKS, 0, false, false, false))
                     applySessionGameMode(session, participant)
                     playStageEntrySoundsLater(participant)
+                    true
+                }
+                if (!transferred || !commitDailyEntryReservation(session)) {
+                    terminateSession(session, false)
+                    return completed(ArenaStartResult.Error("arena.messages.mission.start_cancelled"))
                 }
                 setDoorActionMarkersReadySilently(session, 1)
                 broadcastStageStartMessage(session)
@@ -1446,18 +1450,35 @@ class ArenaManager(
         return selectedStar == promotedStar
     }
 
-    private fun reserveDailyEntry(playerIds: Collection<UUID>): Boolean {
-        val today = sharedClock().currentDate()
-        return dailyEntryStore.tryReserveAll(playerIds, today)
+    private fun beginDailyEntryReservation(session: ArenaSession, playerIds: Collection<UUID>): Boolean {
+        val reservation = dailyEntryStore.beginReservation(playerIds, sharedClock().currentDate()) ?: return false
+        dailyEntryReservationsByWorld[session.worldName] = reservation
+        return true
     }
 
-    private fun recordSuccessfulHistory(session: ArenaSession) {
+    private fun commitDailyEntryReservation(session: ArenaSession): Boolean {
+        val reservation = dailyEntryReservationsByWorld.remove(session.worldName) ?: return false
+        return try {
+            dailyEntryStore.commit(reservation)
+            dailyEntryParticipantsByWorld[session.worldName] = reservation.playerIds.toMutableSet()
+            true
+        } catch (error: Exception) {
+            plugin.logger.log(Level.SEVERE, "[Arena] 日次参加記録の確定に失敗しました: world=${session.worldName}", error)
+            false
+        }
+    }
+
+    private fun cancelDailyEntryReservation(worldName: String) {
+        dailyEntryReservationsByWorld.remove(worldName)?.let(dailyEntryStore::cancel)
+    }
+
+    private fun createSuccessfulHistoryRecords(session: ArenaSession): List<ArenaHistoryRecord> {
         val date = sharedClock().currentDate()
         val durationSeconds = ((System.currentTimeMillis() - session.startedAtMillis) / 1000L).coerceAtLeast(0L)
         val participantIds = dailyEntryParticipantsByWorld.remove(session.worldName).orEmpty()
-        historyStore.addAll(participantIds.map { playerId ->
+        return participantIds.map { playerId ->
             ArenaHistoryRecord(playerId, date, session.difficultyStar, durationSeconds)
-        })
+        }
     }
 
     fun getActiveSessionPlayerNames(): Set<String> {
@@ -3709,11 +3730,9 @@ class ArenaManager(
         vararg messagePlaceholders: Pair<String, Any?>
     ) {
         transitionSessionPhase(session, ArenaPhase.TERMINATING)
-        if (success) {
-            recordSuccessfulHistory(session)
-        } else {
-            dailyEntryParticipantsByWorld.remove(session.worldName)
-        }
+        cancelDailyEntryReservation(session.worldName)
+        val historyRecords = if (success) createSuccessfulHistoryRecords(session) else emptyList()
+        if (!success) dailyEntryParticipantsByWorld.remove(session.worldName)
         Bukkit.getPluginManager().callEvent(
             ArenaSessionEndedEvent(
                 ownerPlayerId = session.ownerPlayerId,
@@ -3896,6 +3915,12 @@ class ArenaManager(
         session.waveMobIds.clear()
 
         enqueueArenaWorldCleanup(session)
+        if (historyRecords.isNotEmpty()) {
+            runCatching { historyStore.addAll(historyRecords) }
+                .onFailure { error ->
+                    plugin.logger.log(Level.SEVERE, "[Arena] 終了後の履歴保存に失敗しました: world=${session.worldName}", error)
+                }
+        }
     }
 
     private fun enqueueArenaWorldCleanup(session: ArenaSession) {
@@ -7431,7 +7456,7 @@ class ArenaManager(
         val today = sharedClock().currentDate()
         val availableParticipants = participants.filter { dailyEntryStore.lastEntryDate(it.uniqueId) != today }
         if (availableParticipants.none { it.uniqueId == session.ownerPlayerId } ||
-            !reserveDailyEntry(availableParticipants.map { it.uniqueId })) {
+            !beginDailyEntryReservation(session, availableParticipants.map { it.uniqueId })) {
             terminateSession(
                 session,
                 false,
@@ -7439,9 +7464,6 @@ class ArenaManager(
             )
             return
         }
-
-        dailyEntryParticipantsByWorld.getOrPut(session.worldName) { mutableSetOf() }
-            .addAll(availableParticipants.map { it.uniqueId })
 
         availableParticipants.forEach { player ->
             session.participants.add(player.uniqueId)
@@ -7608,7 +7630,14 @@ class ArenaManager(
                 session.liftMarkerLocations.forEach { loc ->
                     liftReturningMarkerKeys.add(liftMarkerKey(loc))
                 }
-                teleportLiftParticipantsToStage(session, participants, stageWorld)
+                val transferSucceeded = teleportLiftParticipantsToStage(session, participants, stageWorld)
+                if (!transferSucceeded || !commitDailyEntryReservation(session)) {
+                    clearLiftFootprint(introWorld, baseLocation.clone().add(0.0, currentRise.toDouble(), 0.0), liftTemplate)
+                    restoreLiftChainsInRange(introWorld, baseLocation, liftTemplate, baseLocation.blockY, baseLocation.blockY + maxRise)
+                    restorePlayerMovement(originalSpeeds)
+                    terminateSession(session, false, messageKey = "arena.messages.mission.start_cancelled")
+                    return@Runnable
+                }
                 participants.forEach { player ->
                     session.arenaPreparingUntilMillisByParticipant.remove(player.uniqueId)
                     session.entranceLiftLockedParticipants.remove(player.uniqueId)
@@ -7910,16 +7939,16 @@ class ArenaManager(
         )
     }
 
-    private fun teleportLiftParticipantsToStage(session: ArenaSession, participants: List<Player>, world: World) {
+    private fun teleportLiftParticipantsToStage(session: ArenaSession, participants: List<Player>, world: World): Boolean {
         val now = System.currentTimeMillis()
-        participants.forEach { player ->
-            if (!player.isOnline) return@forEach
+        if (participants.any { !it.isOnline }) return false
+        for (player in participants) {
             val spawnLocation = session.entranceLocation.clone().apply {
                 this.world = world
             }
             world.getChunkAt(spawnLocation.blockX shr 4, spawnLocation.blockZ shr 4).load(true)
             applyStageStartFacingYaw(session, spawnLocation)
-            player.teleport(spawnLocation)
+            if (!player.teleport(spawnLocation)) return false
             applySessionGameMode(session, player)
             playStageEntrySoundsLater(player)
             session.participantLocationHistory[player.uniqueId] = ArrayDeque<TimedPlayerLocation>().apply {
@@ -7927,6 +7956,7 @@ class ArenaManager(
             }
             session.participantLastSampleMillis[player.uniqueId] = now
         }
+        return true
     }
 
     private fun findLoadedEntranceLiftMarkers(): List<Location> {
