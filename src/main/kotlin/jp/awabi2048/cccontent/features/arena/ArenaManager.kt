@@ -436,7 +436,10 @@ class ArenaManager(
     private val liftReturningMarkerKeys = mutableSetOf<String>()
     private val liftOccupiedWaiters = mutableSetOf<UUID>()
     private val dailyEntryStore = ArenaDailyEntryStore(File(plugin.dataFolder, "data/arena/daily_entries.yml"))
-    private val historyStore = ArenaHistoryStore(File(plugin.dataFolder, "data/arena/history.yml"))
+    private val historyStore = ArenaHistoryStore(
+        directory = File(plugin.dataFolder, "data/arena/history"),
+        legacyFile = File(plugin.dataFolder, "data/arena/history.yml")
+    )
     private val dailyEntryParticipantsByWorld = mutableMapOf<String, MutableSet<UUID>>()
     private var demandConfig = ArenaDemandConfig()
     private var demandModel = ArenaDemandModel(demandConfig)
@@ -503,8 +506,8 @@ class ArenaManager(
 
     fun initialize(featureInitLogger: FeatureInitializationLogger? = null) {
         dailyEntryStore.load()
-        historyStore.load()
         loadBattleConfigs()
+        historyStore.load(sharedClock().currentDate(), demandConfig.maxAgeDays)
         themeLoader.load(featureInitLogger)
         ensureDebugVoidWorldBootstrap()
         prepareArenaWorldPoolAtStartup()
@@ -1413,9 +1416,9 @@ class ArenaManager(
         val date = sharedClock().currentDate()
         val durationSeconds = ((System.currentTimeMillis() - session.startedAtMillis) / 1000L).coerceAtLeast(0L)
         val participantIds = dailyEntryParticipantsByWorld.remove(session.worldName).orEmpty()
-        participantIds.forEach { playerId ->
-            historyStore.add(ArenaHistoryRecord(playerId, date, session.difficultyStar, durationSeconds))
-        }
+        historyStore.addAll(participantIds.map { playerId ->
+            ArenaHistoryRecord(playerId, date, session.difficultyStar, durationSeconds)
+        })
     }
 
     fun getActiveSessionPlayerNames(): Set<String> {
