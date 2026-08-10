@@ -803,9 +803,11 @@ class ArenaEnchantPedestalMenu(
 
             runtime.forgeAnimationTask?.cancel()
             runtime.forgeAnimationTask = null
-            val succeeded = runCatching {
-                executeForge(player, inventory)
-            }.getOrDefault(false)
+            val succeeded = runCatching { executeForge(player, inventory) }
+                .onFailure { error ->
+                    plugin.logger.log(java.util.logging.Level.SEVERE, "[Arena] エンチャント祭壇の確定処理に失敗しました", error)
+                }
+                .getOrDefault(false)
             runtime.isForging = false
             if (!succeeded) {
                 handleForgeFailure(player, inventory)
@@ -832,25 +834,42 @@ class ArenaEnchantPedestalMenu(
         }
 
         val baseItem = toolItem.clone()
-        val consumedCatalysts = prepared.sortedBy { it.slot }.map { it.item.clone() }
+        val sortedCatalysts = prepared.sortedBy { it.slot }
+        val consumedCatalysts = sortedCatalysts.map { it.item.clone() }
         val workingTool = toolItem.clone()
         var state = getOverEnchantState(workingTool)
-        prepared.sortedBy { it.slot }.forEach { preparedCatalyst ->
+        sortedCatalysts.forEach { preparedCatalyst ->
             val catalyst = preparedCatalyst.catalyst
             resolveAppliedEnchantments(catalyst).forEach { (enchantmentId, enchantment, resultingLevel) ->
                 workingTool.addUnsafeEnchantment(enchantment, resultingLevel)
                 val appliedOverLevel = resolveAppliedOverLevel(catalyst, enchantmentId)
                 state = applyOverEnchantEntry(state, enchantmentId, appliedOverLevel)
             }
-            consumeOneCatalyst(inventory, preparedCatalyst.slot)
         }
 
         setOverEnchantState(workingTool, state)
         applyOverEnchantLore(workingTool, state)
 
-        missionServiceProvider()?.recordOverEnchantSuccess(player.uniqueId, prepared.size)
+        // Bukkit Inventory は複数スロットの原子更新を提供しないため、全入力を復元可能な状態にしてから反映します。
+        val originalSlots = (sortedCatalysts.map { it.slot } + ArenaEnchantPedestalLayout.TOOL_SLOT)
+            .distinct()
+            .associateWith { inventory.getItem(it)?.clone() }
+        try {
+            sortedCatalysts.forEach { preparedCatalyst ->
+                consumeOneCatalyst(inventory, preparedCatalyst.slot)
+            }
+            inventory.setItem(ArenaEnchantPedestalLayout.TOOL_SLOT, workingTool)
+        } catch (error: Exception) {
+            originalSlots.forEach { (slot, item) -> inventory.setItem(slot, item) }
+            throw error
+        }
+
+        // 永続進捗と監査ログは取引完了後の副作用であり、失敗しても確定済みアイテムを巻き戻しません。
+        runCatching { missionServiceProvider()?.recordOverEnchantSuccess(player.uniqueId, prepared.size) }
+            .onFailure { error ->
+                plugin.logger.log(java.util.logging.Level.SEVERE, "[Arena] 祭壇成功回数の記録に失敗しました: player=${player.uniqueId}", error)
+            }
         auditLogger.logPedestalTransform(player.uniqueId, player.name, baseItem, workingTool.clone(), consumedCatalysts)
-        inventory.setItem(ArenaEnchantPedestalLayout.TOOL_SLOT, workingTool)
         return true
     }
 

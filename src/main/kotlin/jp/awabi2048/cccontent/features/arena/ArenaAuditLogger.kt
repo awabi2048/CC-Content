@@ -16,7 +16,6 @@ import java.util.Base64
 import java.util.UUID
 
 class ArenaAuditLogger(private val plugin: JavaPlugin) {
-    private val logFile = File(plugin.dataFolder, "data/arena/audit.jsonl")
     private val zoneId get() = CCSystem.getAPI().getSharedClockService().zoneId
 
     fun logMissionUpdate(missions: List<Map<String, Any?>>) {
@@ -182,6 +181,10 @@ class ArenaAuditLogger(private val plugin: JavaPlugin) {
 
     private fun append(payload: Map<String, Any?>) {
         runCatching {
+            val logFile = File(
+                plugin.dataFolder,
+                "data/arena/audit/${CCSystem.getAPI().getSharedClockService().currentDate()}.jsonl"
+            )
             logFile.parentFile.mkdirs()
             logFile.appendText(toJson(payload) + "\n", Charsets.UTF_8)
         }.onFailure { error ->
