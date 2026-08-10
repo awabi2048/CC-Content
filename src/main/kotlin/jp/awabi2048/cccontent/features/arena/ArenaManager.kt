@@ -869,8 +869,28 @@ class ArenaManager(
                 "arena.messages.command.start_error.lobby_marker_not_found"))
         }
 
-        val world = acquireArenaPoolWorld() ?: return completed(ArenaStartResult.Error(
-            "arena.messages.command.start_error.pool_world_unavailable"))
+        val interactionClaims = CCSystem.getAPI().getPlayerInteractionClaimService()
+        val startResources = ArenaStartResourceLease(
+            claimRequired = enableMultiplayerJoin,
+            tryAcquireClaim = {
+                interactionClaims.tryClaim(target.uniqueId, ARENA_INVITE_CLAIM_OWNER)
+            },
+            releaseClaim = {
+                interactionClaims.release(target.uniqueId, ARENA_INVITE_CLAIM_OWNER)
+            },
+            acquireResource = ::acquireArenaPoolWorld,
+            releaseUnusedResource = { unusedWorld -> markArenaWorldReady(unusedWorld.name) }
+        )
+        when (startResources.acquire()) {
+            ArenaStartResourceLease.Failure.CLAIM_BUSY -> {
+                return completed(ArenaStartResult.Error("arena.messages.command.start_error.interaction_busy"))
+            }
+            ArenaStartResourceLease.Failure.RESOURCE_UNAVAILABLE -> {
+                return completed(ArenaStartResult.Error("arena.messages.command.start_error.pool_world_unavailable"))
+            }
+            null -> Unit
+        }
+        val world = startResources.resource()
 
         val returnLocations = participantPlayers.associate { it.uniqueId to it.location.clone() }.toMutableMap()
         val originalGameModes = participantPlayers.associate { it.uniqueId to it.gameMode }.toMutableMap()
@@ -880,69 +900,88 @@ class ArenaManager(
         val placeholderLocation = Location(world, 0.0, 64.0, 0.0)
         val placeholderBounds = ArenaBounds(0, 0, 0, 0, 0, 0)
         val difficultyDisplay = ArenaMenuItems.difficultyStars(variant.difficultyStar)
-        if (enableMultiplayerJoin && !CCSystem.getAPI().getPlayerInteractionClaimService().tryClaim(target.uniqueId, ARENA_INVITE_CLAIM_OWNER)) {
-            return completed(ArenaStartResult.Error("arena.messages.command.start_error.interaction_busy"))
+        val session = try {
+            ArenaSession(
+                ownerPlayerId = target.uniqueId,
+                worldName = world.name,
+                themeId = theme.id,
+                promoted = promoted,
+                difficultyStar = variant.difficultyStar,
+                waves = variant.waves.size,
+                missionModifiers = missionModifiers,
+                missionTypeId = missionTypeId,
+                maxParticipants = sanitizedMaxParticipants,
+                participants = participantPlayers.mapTo(mutableSetOf()) { it.uniqueId },
+                returnLocations = returnLocations,
+                originalGameModes = originalGameModes,
+                playerSpawn = placeholderLocation.clone(),
+                entranceLocation = placeholderLocation.clone(),
+                entranceCheckpoint = placeholderLocation.clone(),
+                goalCheckpoint = placeholderLocation.clone(),
+                stageBounds = placeholderBounds,
+                roomBounds = mutableMapOf(),
+                corridorBounds = mutableMapOf(),
+                transitBounds = mutableMapOf(),
+                pedestalBounds = mutableMapOf(),
+                pedestalMarkerBlocks = mutableSetOf(),
+                roomMobSpawns = mutableMapOf(),
+                roomCheckpoints = mutableMapOf(),
+                activatedRoomCheckpoints = mutableMapOf(),
+                corridorDoorBlocks = mutableMapOf(),
+                doorAnimationPlacements = mutableMapOf(),
+                mechanicMarkersByWave = mutableMapOf(),
+                barrierLocation = placeholderLocation.clone(),
+                barrierPointLocations = mutableListOf(),
+                joinAreaMarkerLocations = mutableListOf(),
+                liftMarkerLocations = liftMarkers.map { it.clone() }.toMutableList(),
+                lobbyMarkerLocations = lobbyMarkers.returnLobby.map { it.clone() }.toMutableList(),
+                lobbyMainMarkerLocations = lobbyMarkers.main.map { it.clone() }.toMutableList(),
+                lobbyTutorialStartMarkerLocations = lobbyMarkers.tutorialStart.map { it.clone() }.toMutableList(),
+                lobbyTutorialStepMarkerLocations = lobbyMarkers.tutorialSteps.map { it.clone() }.toMutableList(),
+                participantSpawnProtectionUntilMillis = if (enableMultiplayerJoin) Long.MAX_VALUE else now + 4000L,
+                multiplayerJoinEnabled = enableMultiplayerJoin,
+                phase = if (enableMultiplayerJoin) ArenaPhase.RECRUITING else ArenaPhase.PREPARING,
+                joinGraceStartMillis = if (enableMultiplayerJoin) now else 0L,
+                joinGraceDurationMillis = if (enableMultiplayerJoin) multiplayerJoinGraceSeconds * 1000L else 0L,
+                joinGraceEndMillis = if (enableMultiplayerJoin) now + (multiplayerJoinGraceSeconds * 1000L) else 0L,
+                inviteMissionTitle = inviteMissionTitle,
+                inviteMissionLore = inviteMissionLore,
+                stageGenerationCompleted = !enableMultiplayerJoin,
+                reviveMaxPerPlayer = variant.reviveMaxPerPlayer,
+                reviveTimeLimitSeconds = variant.reviveTimeLimitSeconds,
+                sidebarParticipantOrder = participantPlayers.map { it.uniqueId }.toMutableList(),
+                sidebarParticipantNames = participantPlayers.associate { it.uniqueId to it.name }.toMutableMap()
+            )
+        } catch (error: Exception) {
+            startResources.close()
+            plugin.logger.log(Level.SEVERE, "[Arena] セッション構築前の初期化に失敗しました: world=${world.name}", error)
+            return completed(ArenaStartResult.Error(
+                "arena.messages.command.start_error.stage_build_failed",
+                arrayOf("message" to (error.message ?: "unknown"))
+            ))
         }
-        val session = ArenaSession(
-            ownerPlayerId = target.uniqueId,
-            worldName = world.name,
-            themeId = theme.id,
-            promoted = promoted,
-            difficultyStar = variant.difficultyStar,
-            waves = variant.waves.size,
-            missionModifiers = missionModifiers,
-            missionTypeId = missionTypeId,
-            maxParticipants = sanitizedMaxParticipants,
-            participants = participantPlayers.mapTo(mutableSetOf()) { it.uniqueId },
-            returnLocations = returnLocations,
-            originalGameModes = originalGameModes,
-            playerSpawn = placeholderLocation.clone(),
-            entranceLocation = placeholderLocation.clone(),
-            entranceCheckpoint = placeholderLocation.clone(),
-            goalCheckpoint = placeholderLocation.clone(),
-            stageBounds = placeholderBounds,
-            roomBounds = mutableMapOf(),
-            corridorBounds = mutableMapOf(),
-            transitBounds = mutableMapOf(),
-            pedestalBounds = mutableMapOf(),
-            pedestalMarkerBlocks = mutableSetOf(),
-            roomMobSpawns = mutableMapOf(),
-            roomCheckpoints = mutableMapOf(),
-            activatedRoomCheckpoints = mutableMapOf(),
-            corridorDoorBlocks = mutableMapOf(),
-            doorAnimationPlacements = mutableMapOf(),
-            mechanicMarkersByWave = mutableMapOf(),
-            barrierLocation = placeholderLocation.clone(),
-            barrierPointLocations = mutableListOf(),
-            joinAreaMarkerLocations = mutableListOf(),
-            liftMarkerLocations = liftMarkers.map { it.clone() }.toMutableList(),
-            lobbyMarkerLocations = lobbyMarkers.returnLobby.map { it.clone() }.toMutableList(),
-            lobbyMainMarkerLocations = lobbyMarkers.main.map { it.clone() }.toMutableList(),
-            lobbyTutorialStartMarkerLocations = lobbyMarkers.tutorialStart.map { it.clone() }.toMutableList(),
-            lobbyTutorialStepMarkerLocations = lobbyMarkers.tutorialSteps.map { it.clone() }.toMutableList(),
-            participantSpawnProtectionUntilMillis = if (enableMultiplayerJoin) Long.MAX_VALUE else now + 4000L,
-            multiplayerJoinEnabled = enableMultiplayerJoin,
-            phase = if (enableMultiplayerJoin) ArenaPhase.RECRUITING else ArenaPhase.PREPARING,
-            joinGraceStartMillis = if (enableMultiplayerJoin) now else 0L,
-            joinGraceDurationMillis = if (enableMultiplayerJoin) multiplayerJoinGraceSeconds * 1000L else 0L,
-            joinGraceEndMillis = if (enableMultiplayerJoin) now + (multiplayerJoinGraceSeconds * 1000L) else 0L,
-            inviteMissionTitle = inviteMissionTitle,
-            inviteMissionLore = inviteMissionLore,
-            stageGenerationCompleted = !enableMultiplayerJoin,
-            reviveMaxPerPlayer = variant.reviveMaxPerPlayer,
-            reviveTimeLimitSeconds = variant.reviveTimeLimitSeconds,
-            sidebarParticipantOrder = participantPlayers.map { it.uniqueId }.toMutableList(),
-            sidebarParticipantNames = participantPlayers.associate { it.uniqueId to it.name }.toMutableMap()
-        )
 
-        sessionsByWorld[world.name] = session
-        participantPlayers.forEach { participant ->
-            playerToSessionWorld[participant.uniqueId] = world.name
+        try {
+            sessionsByWorld[world.name] = session
+            participantPlayers.forEach { participant ->
+                playerToSessionWorld[participant.uniqueId] = world.name
+            }
+            if (enableMultiplayerJoin) {
+                liftMarkers.forEach { liftOccupiedMarkerKeys.add(liftMarkerKey(it)) }
+            }
+            logArenaPoolState("session_start_acquired_pool", world.name)
+        } catch (error: Exception) {
+            sessionsByWorld.remove(world.name)
+            participantPlayers.forEach { participant -> playerToSessionWorld.remove(participant.uniqueId) }
+            releaseOccupiedLiftMarkers(session)
+            startResources.close()
+            plugin.logger.log(Level.SEVERE, "[Arena] セッション登録に失敗しました: world=${world.name}", error)
+            return completed(ArenaStartResult.Error(
+                "arena.messages.command.start_error.stage_build_failed",
+                arrayOf("message" to (error.message ?: "unknown"))
+            ))
         }
-        if (enableMultiplayerJoin) {
-            liftMarkers.forEach { liftOccupiedMarkerKeys.add(liftMarkerKey(it)) }
-        }
-        logArenaPoolState("session_start_acquired_pool", world.name)
+        startResources.transferOwnership()
 
         return try {
             if (enableMultiplayerJoin) {
@@ -8136,7 +8175,7 @@ class ArenaManager(
     }
 
     private fun updateBarrierReturnHoldStates(currentTick: Long) {
-        for (session in sessionsByWorld.values) {
+        for (session in sessionsByWorld.values.toList()) {
             val canReturn = session.barrierRestartCompleted || session.missionCompleted
             if (!canReturn) {
                 if (session.barrierReturnHoldTicksByParticipant.isNotEmpty()) {
