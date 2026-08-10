@@ -40,6 +40,7 @@ import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
 import java.util.Locale
 import java.util.UUID
+import java.util.logging.Level
 import kotlin.random.Random
 
 class ArenaMissionService(
@@ -82,6 +83,12 @@ class ArenaMissionService(
     private val baseDir = File(plugin.dataFolder, "data/arena")
     private val missionDir = File(baseDir, "missions")
     private val playerDir = File(baseDir, "players")
+    private val playerDataWriter = ArenaPlayerDataWriteBehind(
+        playerDirectory = playerDir,
+        failureListener = ArenaPlayerWriteFailureListener { playerId, error ->
+            plugin.logger.log(Level.SEVERE, "[Arena] プレイヤーデータの保存に失敗しました: player=$playerId", error)
+        }
+    )
     private val auditLogger = ArenaAuditLogger(plugin)
     private var currentMissionSet: ArenaMissionSet? = null
     private val playerCache = mutableMapOf<UUID, ArenaPlayerMissionData>()
@@ -95,6 +102,10 @@ class ArenaMissionService(
     }
 
     fun shutdown() {
+        val flushed = playerDataWriter.closeAndFlush(5_000L)
+        if (!flushed) {
+            plugin.logger.severe("[Arena] 停止期限までにプレイヤーデータを保存できませんでした")
+        }
         currentMissionSet = null
         playerCache.clear()
         activeMissions.clear()
@@ -986,25 +997,7 @@ class ArenaMissionService(
 
     private fun savePlayerData(playerId: UUID) {
         val data = playerCache[playerId] ?: return
-        val file = File(playerDir, "$playerId.yml")
-        val config = YamlConfiguration()
-        config.set("arena.total_clear_count", data.totalMissionClearCount)
-        config.set("arena.total_mob_kill_count", data.totalMobKillCount)
-        config.set("arena.total_strong_enemy_kill_count", data.totalStrongEnemyKillCount)
-        config.set("arena.total_over_enchant_success_count", data.totalOverEnchantSuccessCount)
-        config.set("arena.barrier_restart_count", data.barrierRestartCount)
-        config.set("arena.lobby.visited", data.lobbyVisited)
-        config.set("arena.lobby.tutorial_completed", data.lobbyTutorialCompleted)
-        config.set("arena.license_tier", data.licenseTier.id)
-        config.set("arena.completed", data.completedMissionIndices.toList().sorted())
-        val shardCounterSection = linkedMapOf<String, Map<String, Int>>()
-        data.enchantShardKillCounters.toSortedMap().forEach { (shardKey, countsByMob) ->
-            shardCounterSection[shardKey] = countsByMob
-                .filterValues { it > 0 }
-                .toSortedMap()
-        }
-        config.set("arena.enchant_shard_kill_counters", shardCounterSection.filterValues { it.isNotEmpty() })
-        config.save(file)
+        playerDataWriter.submit(playerId, ArenaPlayerMissionSnapshot.from(data))
     }
 
     private fun loadPlayerData(file: File): ArenaPlayerMissionData {
