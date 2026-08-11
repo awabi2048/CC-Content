@@ -67,3 +67,8 @@ plugins/
 # Virtual machine crash logs
 hs_err_pid*
 replay_pid*
+
+# Documentation policy: keep README files, leave other documents untracked.
+*.md
+!README.md
+docs/
