@@ -74,7 +74,7 @@ permissions:
     description: CC-Contentのコンテンツを無効化できる
     default: op
   cc-content.particle:
-    description: BlockDisplayによるボクセル粒子を表示できる
+    description: プロパティ駆動の単一BlockDisplayパーティクルを表示できる
     default: op
   cc-content.rank:
     description: 職業メインメニューを開ける

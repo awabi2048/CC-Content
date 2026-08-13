@@ -4,9 +4,9 @@ import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.displayeffect.DisplayEffectStartRejection
 import com.awabi2048.ccsystem.api.displayeffect.DisplayEffectStartResult
 import com.awabi2048.ccsystem.api.displayeffect.DisplayEffectVector3
-import com.awabi2048.ccsystem.api.displayeffect.VoxelParticleEmissionRequest
-import com.awabi2048.ccsystem.api.displayeffect.VoxelParticlePatternId
-import com.awabi2048.ccsystem.api.displayeffect.VoxelParticleVisibilityMode
+import com.awabi2048.ccsystem.api.displayeffect.DisplayParticleEmissionRequest
+import com.awabi2048.ccsystem.api.displayeffect.DisplayParticlePresetId
+import com.awabi2048.ccsystem.api.displayeffect.DisplayParticleVisibilityMode
 import org.bukkit.command.CommandSender
 import org.bukkit.plugin.Plugin
 
@@ -33,8 +33,8 @@ class VoxelParticleCommand(private val plugin: Plugin) {
         }
 
         val request = runCatching {
-            VoxelParticleEmissionRequest(
-                patternId = VoxelParticlePatternId(parsed.patternId),
+            DisplayParticleEmissionRequest(
+                presetId = DisplayParticlePresetId(parsed.patternId),
                 delta = parsed.delta,
                 speed = parsed.speed,
                 count = parsed.count,
@@ -45,7 +45,7 @@ class VoxelParticleCommand(private val plugin: Plugin) {
             return true
         }
 
-        return when (val result = CCSystem.getAPI().getDisplayEffectService().emitVoxelParticles(plugin, location, request)) {
+        return when (val result = CCSystem.getAPI().getDisplayEffectService().emitDisplayParticles(plugin, location, request)) {
             is DisplayEffectStartResult.Started -> {
                 sender.sendMessage(ContentManagementI18n.text(sender, "particle.started", "pattern" to parsed.patternId, "count" to parsed.count))
                 true
@@ -65,7 +65,7 @@ class VoxelParticleCommand(private val plugin: Plugin) {
     fun complete(sender: CommandSender, args: Array<String>): List<String> {
         if (!sender.hasPermission(PERMISSION)) return emptyList()
         return when (args.size) {
-            1 -> CCSystem.getAPI().getDisplayEffectService().listVoxelParticlePatterns()
+            1 -> CCSystem.getAPI().getDisplayEffectService().listDisplayParticlePresets()
                 .map { it.id.value }
                 .filter { it.startsWith(args[0], ignoreCase = true) }
             2, 3, 4 -> listOf("~", "~1", "~-1", "^").filter { it.startsWith(args.last()) }
@@ -89,7 +89,7 @@ internal data class ParsedVoxelParticleCommand(
     val delta: DisplayEffectVector3,
     val speed: Double,
     val count: Int,
-    val visibilityMode: VoxelParticleVisibilityMode
+    val visibilityMode: DisplayParticleVisibilityMode
 )
 
 /** バニラ `/particle` の省略形と完全形だけを許可し、曖昧な中間形を排除します。 */
@@ -102,13 +102,13 @@ internal object VoxelParticleCommandSyntax {
         val count = if (args.size >= 9) args[8].toIntOrNull() ?: throw IllegalArgumentException("count は整数で指定してください") else 1
         val mode = if (args.size == 10) {
             when (args[9].lowercase()) {
-                "normal" -> VoxelParticleVisibilityMode.NORMAL
-                "force" -> VoxelParticleVisibilityMode.FORCE
+                "normal" -> DisplayParticleVisibilityMode.NORMAL
+                "force" -> DisplayParticleVisibilityMode.FORCE
                 else -> throw IllegalArgumentException("表示モードは normal または force です")
             }
-        } else VoxelParticleVisibilityMode.NORMAL
-        // バニラのResourceLocationと同様に、namespace省略時は minecraft を補います。
-        val patternId = if (':' in args[0]) args[0] else "minecraft:${args[0]}"
+        } else DisplayParticleVisibilityMode.NORMAL
+        // 組み込みプリセットはCC独自表現であり、namespace省略時もその所有元を明示します。
+        val patternId = if (':' in args[0]) args[0] else "cc:${args[0]}"
         return ParsedVoxelParticleCommand(patternId, position, delta, speed, count, mode)
     }
 
