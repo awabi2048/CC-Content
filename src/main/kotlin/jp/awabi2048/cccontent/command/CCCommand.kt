@@ -608,7 +608,7 @@ class CCCommand(
                §7  - 例: /ccc summon zombie_leap_only ~ ~ ~
                §7  - 例: /ccc summon zombie_leap_only
 
-               §f/ccc particle <外観> <動作> <衝突> [<x> <y> <z>] [<dx> <dy> <dz> <speed> <count> [normal|force]] [-- <プロパティ=値>...]
+               §f/ccc particle <pattern> [<x> <y> <z>] [<dx> <dy> <dz> <speed> <count> [normal|force]]
                §7  - 素材・拡縮・回転・運動を組み合わせた単一BlockDisplay粒子を表示します
 
                §f/ccc debug clear_block_placement_data
