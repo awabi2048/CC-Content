@@ -3,13 +3,11 @@ package jp.awabi2048.cccontent.command
 import org.bukkit.Location
 import org.bukkit.Bukkit
 import org.bukkit.command.Command
-import org.bukkit.command.BlockCommandSender
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.entity.Entity
 import org.bukkit.entity.Player
-import org.bukkit.util.Vector
 import jp.awabi2048.cccontent.featurestate.ContentFeatureCatalog
 import jp.awabi2048.cccontent.featurestate.ContentFeatureState
 import jp.awabi2048.cccontent.featurestate.FeatureStateResultType
@@ -32,6 +30,7 @@ data class ContentFeatureStatus(
  * サブコマンド処理の分岐を担当
  */
 class CCCommand(
+    private val voxelParticleCommand: VoxelParticleCommand,
     private val structureCommand: StructureCommand? = null,
     private val onReload: (() -> Unit)? = null,
     private val onRestart: (() -> Unit)? = null,
@@ -77,6 +76,7 @@ class CCCommand(
             "summon" -> {
                 handleSummon(sender, args)
             }
+            "particle" -> voxelParticleCommand.execute(sender, args.drop(1).toTypedArray())
             "structure" -> {
                 if (!hasAdminPermission(sender)) {
                     sender.sendMessage(ContentManagementI18n.text(sender, "no_permission"))
@@ -285,13 +285,13 @@ class CCCommand(
         }
 
         val location = if (args.size == 2) {
-            senderLocation(sender)?.clone() ?: run {
+            CommandLocationResolver.senderLocation(sender)?.clone() ?: run {
                 sender.sendMessage("§c座標省略は位置を持つ実行者のみ使用できます")
                 return false
             }
         } else {
             try {
-                parseLocation(sender, args[2], args[3], args[4])
+                CommandLocationResolver.resolve(sender, args[2], args[3], args[4])
             } catch (e: IllegalArgumentException) {
                 sender.sendMessage("§c${e.message}")
                 return false
@@ -608,6 +608,9 @@ class CCCommand(
                §7  - 例: /ccc summon zombie_leap_only ~ ~ ~
                §7  - 例: /ccc summon zombie_leap_only
 
+               §f/ccc particle <pattern> [<x> <y> <z>] [<dx> <dy> <dz> <speed> <count> [normal|force]]
+               §7  - 微小なBlockDisplayを組み合わせたボクセル粒子を表示します
+
                §f/ccc debug clear_block_placement_data
                §7  - プレイヤー設置ブロック判定データを削除します
 
@@ -640,6 +643,7 @@ class CCCommand(
                  if (hasManagementPermission(sender, "status")) candidates.add("status")
                  if (hasManagementPermission(sender, "enable")) candidates.add("enable")
                  if (hasManagementPermission(sender, "disable")) candidates.add("disable")
+                 if (sender.hasPermission(VoxelParticleCommand.PERMISSION)) candidates.add("particle")
                  if (sender.hasPermission("cc-content.admin")) {
                      candidates.add("rank")
                      candidates.add("reload")
@@ -701,7 +705,7 @@ class CCCommand(
                        else -> emptyList()
                    }
                }
-               "summon" -> {
+              "summon" -> {
                    if (!hasAdminPermission(sender)) return emptyList()
                    when (args.size) {
                       2 -> mobDefinitionIdsProvider?.invoke().orEmpty().sorted().filter { it.startsWith(args[1], ignoreCase = true) }
@@ -709,6 +713,7 @@ class CCCommand(
                       else -> emptyList()
                   }
               }
+              "particle" -> voxelParticleCommand.complete(sender, args.drop(1).toTypedArray())
               "structure" -> {
                   if (!hasAdminPermission(sender)) return emptyList()
                   val subArgs = args.drop(1).toTypedArray()
@@ -731,77 +736,6 @@ class CCCommand(
               else -> emptyList()
           }
       }
-
-    private fun parseLocation(sender: CommandSender, xArg: String, yArg: String, zArg: String): Location {
-        val baseLocation = senderLocation(sender)
-        val args = listOf(xArg, yArg, zArg)
-
-        return if (args.any { it.startsWith("^") }) {
-            if (args.any { !it.startsWith("^") }) {
-                throw IllegalArgumentException("ローカル座標(^)と通常座標は混在できません")
-            }
-            val anchor = baseLocation ?: throw IllegalArgumentException("ローカル座標(^)は位置を持つ実行者のみ使用できます")
-            parseLocalLocation(anchor, xArg, yArg, zArg)
-        } else {
-            val anchor = baseLocation ?: throw IllegalArgumentException("このコマンドは位置を持つ実行者のみ使用できます")
-            Location(
-                anchor.world,
-                parseWorldCoordinate(anchor.x, xArg),
-                parseWorldCoordinate(anchor.y, yArg),
-                parseWorldCoordinate(anchor.z, zArg),
-                anchor.yaw,
-                anchor.pitch
-            )
-        }
-    }
-
-    private fun parseWorldCoordinate(base: Double, raw: String): Double {
-        return if (raw.startsWith("~")) {
-            if (raw == "~") {
-                base
-            } else {
-                base + (raw.substring(1).toDoubleOrNull()
-                    ?: throw IllegalArgumentException("座標の指定が不正です: $raw"))
-            }
-        } else {
-            raw.toDoubleOrNull() ?: throw IllegalArgumentException("座標の指定が不正です: $raw")
-        }
-    }
-
-    private fun parseLocalLocation(anchor: Location, xArg: String, yArg: String, zArg: String): Location {
-        val x = parseLocalComponent(xArg)
-        val y = parseLocalComponent(yArg)
-        val z = parseLocalComponent(zArg)
-
-        val forward = anchor.direction.normalize()
-        var left = Vector(0, 1, 0).crossProduct(forward).normalize()
-        if (left.lengthSquared() == 0.0) {
-            left = Vector(1, 0, 0)
-        }
-        val up = forward.clone().crossProduct(left).normalize()
-        val offset = left.multiply(x).add(up.multiply(y)).add(forward.multiply(z))
-
-        return anchor.clone().add(offset)
-    }
-
-    private fun parseLocalComponent(raw: String): Double {
-        if (!raw.startsWith("^")) {
-            throw IllegalArgumentException("ローカル座標は ^ を使用してください: $raw")
-        }
-        return if (raw == "^") {
-            0.0
-        } else {
-            raw.substring(1).toDoubleOrNull() ?: throw IllegalArgumentException("座標の指定が不正です: $raw")
-        }
-    }
-
-    private fun senderLocation(sender: CommandSender): Location? {
-        return when (sender) {
-            is Entity -> sender.location
-            is BlockCommandSender -> sender.block.location.add(0.5, 0.0, 0.5)
-            else -> null
-        }
-    }
 
     private fun formatCoord(value: Double): String {
         return String.format(java.util.Locale.ROOT, "%.2f", value)
