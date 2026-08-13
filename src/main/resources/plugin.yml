@@ -10,7 +10,7 @@ softdepend: [HeadDatabase, Vault, MyWorldManager, DeadChest, LuckPerms, FastAsyn
 commands:
   cc-content:
     description: CC-Contentメインコマンド
-    usage: /ccc <status|enable|disable|reload|restart|summon|structure|debug|update_day|npc-menu|rank|help>
+    usage: /ccc <status|enable|disable|reload|restart|summon|particle|structure|debug|update_day|npc-menu|rank|help>
     aliases: [ccc]
   sukima_dungeon:
     description: スキマダンジョンコマンド
@@ -63,6 +63,7 @@ permissions:
       cc-content.status: true
       cc-content.enable: true
       cc-content.disable: true
+      cc-content.particle: true
   cc-content.status:
     description: CC-Contentのコンテンツ状態を確認できる
     default: op
@@ -71,6 +72,9 @@ permissions:
     default: op
   cc-content.disable:
     description: CC-Contentのコンテンツを無効化できる
+    default: op
+  cc-content.particle:
+    description: BlockDisplayによるボクセル粒子を表示できる
     default: op
   cc-content.rank:
     description: 職業メインメニューを開ける
