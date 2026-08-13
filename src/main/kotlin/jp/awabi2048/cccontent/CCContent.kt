@@ -173,7 +173,6 @@ class CCContent : JavaPlugin(), Listener {
     private var persistenceFlushTask: BukkitTask? = null
     private lateinit var featureInitLogger: FeatureInitializationLogger
     private lateinit var coreConfig: YamlConfiguration
-    private var languageErrorsByFeature: Map<String, List<String>> = emptyMap()
     
     // SukimaDungeon マネージャー (GitHub版)
     private lateinit var structureLoader: StructureLoader
@@ -202,7 +201,6 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var activeContentEnabledSettings: Map<String, Boolean>
     private var arenaFeatureReady: Boolean = false
     private var arenaFeatureFailureReason: String? = null
-    private var customItemsLanguageAvailable: Boolean = true
     private val configurationFailuresByFeature = linkedMapOf<String, MutableList<String>>()
     private val registeredConfigOwners = linkedSetOf<String>()
     private lateinit var myWorldBridge: MyWorldBridge
@@ -246,10 +244,8 @@ class CCContent : JavaPlugin(), Listener {
         instance = this
         myWorldBridge = DefaultMyWorldBridge()
         CCSystem.getAPI().getMenuCommandService().unregisterOwner("cc-content")
-        saveSplitLanguageResources()
         coreConfig = CoreConfigManager.load(this)
         catalogStore = CatalogStore(File(dataFolder, "data/catalog/state.yml"))
-        validateAndRegisterLanguageSources()
         activeContentEnabledSettings = loadContentEnabledSettings()
 
         languageManager = LanguageLoader(this, "ja_jp")
@@ -324,11 +320,10 @@ class CCContent : JavaPlugin(), Listener {
         server.pluginManager.registerEvents(adminMarkerToolService, this)
         adminMarkerToolService.start()
 
-        if (customItemsLanguageAvailable && isFeatureConfigurationAvailable("custom_items")) {
+        if (isFeatureConfigurationAvailable("custom_items")) {
             registerCustomItems()
         } else {
-            logger.warning("[CustomItems] 言語ファイル検証エラーによりカスタムアイテム登録をスキップします")
-            languageErrorsFor("custom_items").forEach { error -> logger.warning("[CustomItems][Lang] $error") }
+            logger.warning("[CustomItems] 設定検証エラーによりカスタムアイテム登録をスキップします")
         }
         if (minigameRuntime != null) registerMiniGameItems()
 
@@ -355,26 +350,10 @@ class CCContent : JavaPlugin(), Listener {
         }
 
         initializeFeatureIfEnabled("Rank System", "rank") {
-            if (hasLanguageErrorsFor("rank")) {
-                featureInitLogger.setStatus("Rank System", FeatureInitializationLogger.Status.WARNING)
-                featureInitLogger.addSummaryMessage("Rank System", "言語ファイル検証エラーにより無効化")
-                languageErrorsFor("rank").forEach { error -> logger.warning("[Rank][Lang] $error") }
-                return@initializeFeatureIfEnabled
-            }
             initializeRankSystem()
         }
 
         initializeFeatureIfEnabled("Arena", "arena") {
-            if (hasLanguageErrorsFor("arena")) {
-                arenaFeatureReady = false
-                if (arenaFeatureFailureReason.isNullOrBlank()) {
-                    arenaFeatureFailureReason = "Arena言語ファイルの検証エラーにより無効化"
-                }
-                featureInitLogger.setStatus("Arena", FeatureInitializationLogger.Status.WARNING)
-                featureInitLogger.addSummaryMessage("Arena", "言語ファイル検証エラーにより無効化")
-                languageErrorsFor("arena").forEach { error -> logger.warning("[Arena][Lang] $error") }
-                return@initializeFeatureIfEnabled
-            }
             try {
                 arenaFeatureReady = false
                 arenaFeatureFailureReason = null
@@ -565,12 +544,6 @@ class CCContent : JavaPlugin(), Listener {
         }
 
         initializeFeatureIfEnabled("SukimaDungeon", "sukima_dungeon") {
-            if (hasLanguageErrorsFor("sukima_dungeon")) {
-                featureInitLogger.setStatus("SukimaDungeon", FeatureInitializationLogger.Status.WARNING)
-                featureInitLogger.addSummaryMessage("SukimaDungeon", "言語ファイル検証エラーにより無効化")
-                languageErrorsFor("sukima_dungeon").forEach { error -> logger.warning("[SukimaDungeon][Lang] $error") }
-                return@initializeFeatureIfEnabled
-            }
             initializeSukimaDungeon()
         }
 
@@ -814,7 +787,7 @@ class CCContent : JavaPlugin(), Listener {
             val rankManager = RankManagerImpl(storage)
             rankManagerInstance = rankManager
 
-            // 言語ファイルを読み込み
+            // CC-Systemの埋込ローカライズカタログを利用するローダーを初期化
             val messageProvider = MessageProviderImpl(languageManager)
             rankManager.setMessageProvider(messageProvider)
             rankManager.initBossBarManager(this)
@@ -1212,99 +1185,6 @@ class CCContent : JavaPlugin(), Listener {
         return false
     }
 
-    private fun validateAndRegisterLanguageSources() {
-        val api = CCSystem.getAPI()
-        val validationResult = api.validateI18nSource(CCSystem.instance, contentLanguageFeatureByFile())
-        languageErrorsByFeature = validationResult.errorsByFeature
-        customItemsLanguageAvailable = !hasLanguageErrorsFor("custom_items")
-    }
-
-    private fun hasLanguageErrorsFor(feature: String): Boolean {
-        return languageErrorsFor(feature).isNotEmpty()
-    }
-
-    private fun languageErrorsFor(feature: String): List<String> {
-        return languageErrorsByFeature[feature].orEmpty()
-    }
-
-    private fun contentLanguageFeatureByFile(): Map<String, String> {
-        return buildMap {
-            put("content/arena.yml", "arena")
-            put("content/custom_items.yml", "custom_items")
-            put("content/brewery.yml", "brewery")
-            put("content/cooking.yml", "cooking")
-            put("content/fishing.yml", "fishing")
-            put("content/sukima_dungeon.yml", "sukima_dungeon")
-            put("content/rank.yml", "rank")
-            put("content/profession.yml", "rank")
-            put("content/skill.yml", "rank")
-            put("content/tutorial_rank.yml", "rank")
-            put("content/mission.yml", "rank")
-            put("content/gui.yml", "rank")
-            put("content/minigame.yml", "minigame")
-            put("content/resource_collection.yml", "resource_collection")
-            put("content/management.yml", "management")
-        }
-    }
-
-    private fun saveSplitLanguageResources() {
-        val codeSource = runCatching {
-            File(javaClass.protectionDomain.codeSource.location.toURI())
-        }.getOrNull() ?: return
-        if (!codeSource.isFile) {
-            return
-        }
-
-        JarFile(codeSource).use { jar ->
-            jar.entries().asSequence()
-                .filter { !it.isDirectory && it.name.startsWith("lang/") && it.name.endsWith(".yml") }
-                .forEach { entry ->
-                    val target = File(dataFolder, entry.name)
-                    if (!target.exists()) {
-                        target.parentFile?.mkdirs()
-                        saveResource(entry.name, false)
-                    }
-                }
-        }
-    }
-
-    private fun mergeMissingLanguageKeys() {
-        val codeSource = runCatching {
-            File(javaClass.protectionDomain.codeSource.location.toURI())
-        }.getOrNull() ?: return
-        if (!codeSource.isFile) {
-            return
-        }
-
-        JarFile(codeSource).use { jar ->
-            jar.entries().asSequence()
-                .filter { !it.isDirectory && it.name.startsWith("lang/") && it.name.endsWith(".yml") }
-                .forEach { entry ->
-                    val target = File(dataFolder, entry.name)
-                    if (!target.exists()) {
-                        return@forEach
-                    }
-
-                    val defaults = jar.getInputStream(entry).use { input ->
-                        YamlConfiguration.loadConfiguration(InputStreamReader(input, StandardCharsets.UTF_8))
-                    }
-                    val current = YamlConfiguration.loadConfiguration(target)
-                    val missingKeys = defaults.getKeys(true)
-                        .filter { key -> !defaults.isConfigurationSection(key) && !current.contains(key) }
-
-                    if (missingKeys.isEmpty()) {
-                        return@forEach
-                    }
-
-                    missingKeys.forEach { key ->
-                        current.set(key, defaults.get(key))
-                    }
-                    current.save(target)
-                    logger.info("[CCContent][Lang] 欠けている言語キーを補完しました: ${entry.name} (${missingKeys.size} keys)")
-                }
-        }
-    }
-
     /**
      * プラグインを再起動相当に再初期化
      */
@@ -1319,8 +1199,6 @@ class CCContent : JavaPlugin(), Listener {
     private fun restartPluginLifecycle(reason: String) {
         ArenaI18n.clearCache()
         stopPlugin()
-        saveSplitLanguageResources()
-        mergeMissingLanguageKeys()
         synchronizeConfigurationResources()
         validateConfigurationFiles()
         startPlugin()
