@@ -30,7 +30,7 @@ data class ContentFeatureStatus(
  * サブコマンド処理の分岐を担当
  */
 class CCCommand(
-    private val voxelParticleCommand: VoxelParticleCommand,
+    private val displayParticleCommand: DisplayParticleCommand,
     private val structureCommand: StructureCommand? = null,
     private val onReload: (() -> Unit)? = null,
     private val onRestart: (() -> Unit)? = null,
@@ -76,7 +76,7 @@ class CCCommand(
             "summon" -> {
                 handleSummon(sender, args)
             }
-            "particle" -> voxelParticleCommand.execute(sender, args.drop(1).toTypedArray())
+            "particle" -> displayParticleCommand.execute(sender, args.drop(1).toTypedArray())
             "structure" -> {
                 if (!hasAdminPermission(sender)) {
                     sender.sendMessage(ContentManagementI18n.text(sender, "no_permission"))
@@ -643,7 +643,7 @@ class CCCommand(
                  if (hasManagementPermission(sender, "status")) candidates.add("status")
                  if (hasManagementPermission(sender, "enable")) candidates.add("enable")
                  if (hasManagementPermission(sender, "disable")) candidates.add("disable")
-                 if (sender.hasPermission(VoxelParticleCommand.PERMISSION)) candidates.add("particle")
+                 if (sender.hasPermission(DisplayParticleCommand.PERMISSION)) candidates.add("particle")
                  if (sender.hasPermission("cc-content.admin")) {
                      candidates.add("rank")
                      candidates.add("reload")
@@ -713,7 +713,7 @@ class CCCommand(
                       else -> emptyList()
                   }
               }
-              "particle" -> voxelParticleCommand.complete(sender, args.drop(1).toTypedArray())
+              "particle" -> displayParticleCommand.complete(sender, args.drop(1).toTypedArray())
               "structure" -> {
                   if (!hasAdminPermission(sender)) return emptyList()
                   val subArgs = args.drop(1).toTypedArray()

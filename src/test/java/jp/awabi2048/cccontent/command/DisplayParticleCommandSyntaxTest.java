@@ -6,14 +6,14 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class VoxelParticleCommandSyntaxTest {
+class DisplayParticleCommandSyntaxTest {
     @Test
     void acceptsVanillaStyleShortAndFullForms() {
-        var shortForm = VoxelParticleCommandSyntax.INSTANCE.parse(new String[]{"ember"});
+        var shortForm = DisplayParticleCommandSyntax.INSTANCE.parse(new String[]{"ember"});
         assertEquals("cc:ember", shortForm.getPatternId());
         assertEquals(1, shortForm.getCount());
 
-        var fullForm = VoxelParticleCommandSyntax.INSTANCE.parse(new String[]{
+        var fullForm = DisplayParticleCommandSyntax.INSTANCE.parse(new String[]{
             "cc:spark", "~", "~1", "~-2", "0.1", "0.2", "0.3", "0.5", "4", "force"
         });
         assertEquals(4, fullForm.getCount());
@@ -24,10 +24,10 @@ class VoxelParticleCommandSyntaxTest {
     @Test
     void rejectsAmbiguousIntermediateFormsAndViewerSelectors() {
         assertThrows(IllegalArgumentException.class, () ->
-            VoxelParticleCommandSyntax.INSTANCE.parse(new String[]{"ember", "~"})
+            DisplayParticleCommandSyntax.INSTANCE.parse(new String[]{"ember", "~"})
         );
         assertThrows(IllegalArgumentException.class, () ->
-            VoxelParticleCommandSyntax.INSTANCE.parse(new String[]{
+            DisplayParticleCommandSyntax.INSTANCE.parse(new String[]{
                 "ember", "~", "~", "~", "0", "0", "0", "0", "1", "normal", "@a"
             })
         );

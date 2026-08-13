@@ -12,7 +12,7 @@ import jp.awabi2048.cccontent.command.ContentFeatureStatus
 import jp.awabi2048.cccontent.command.ContentOperationalState
 import jp.awabi2048.cccontent.command.ContentItemGrantProvider
 import jp.awabi2048.cccontent.command.StructureCommand
-import jp.awabi2048.cccontent.command.VoxelParticleCommand
+import jp.awabi2048.cccontent.command.DisplayParticleCommand
 import jp.awabi2048.cccontent.config.CoreConfigManager
 import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.config.ResourceConfigurationValidator
@@ -468,7 +468,7 @@ class CCContent : JavaPlugin(), Listener {
             }
         )
         val ccCommand = CCCommand(
-            voxelParticleCommand = VoxelParticleCommand(this),
+            displayParticleCommand = DisplayParticleCommand(this),
             structureCommand = structureCommand,
             onReload = { reloadConfigFiles() },
             onRestart = { restartPlugin() },

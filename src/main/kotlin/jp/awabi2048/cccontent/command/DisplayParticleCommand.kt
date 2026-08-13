@@ -11,14 +11,14 @@ import org.bukkit.command.CommandSender
 import org.bukkit.plugin.Plugin
 
 /** `/ccc particle` を構文解釈し、描画の責務はCC-Systemの公開APIへ委譲します。 */
-class VoxelParticleCommand(private val plugin: Plugin) {
+class DisplayParticleCommand(private val plugin: Plugin) {
     fun execute(sender: CommandSender, args: Array<String>): Boolean {
         if (!sender.hasPermission(PERMISSION)) {
             sender.sendMessage(ContentManagementI18n.text(sender, "particle.no_permission"))
             return true
         }
 
-        val parsed = runCatching { VoxelParticleCommandSyntax.parse(args) }.getOrElse {
+        val parsed = runCatching { DisplayParticleCommandSyntax.parse(args) }.getOrElse {
             sender.sendMessage(ContentManagementI18n.text(sender, "particle.invalid_argument", "detail" to it.message))
             sender.sendMessage(ContentManagementI18n.text(sender, "particle.usage"))
             return true
@@ -83,7 +83,7 @@ class VoxelParticleCommand(private val plugin: Plugin) {
 
 internal data class RawPosition(val x: String, val y: String, val z: String)
 
-internal data class ParsedVoxelParticleCommand(
+internal data class ParsedDisplayParticleCommand(
     val patternId: String,
     val position: RawPosition?,
     val delta: DisplayEffectVector3,
@@ -93,8 +93,8 @@ internal data class ParsedVoxelParticleCommand(
 )
 
 /** バニラ `/particle` の省略形と完全形だけを許可し、曖昧な中間形を排除します。 */
-internal object VoxelParticleCommandSyntax {
-    fun parse(args: Array<String>): ParsedVoxelParticleCommand {
+internal object DisplayParticleCommandSyntax {
+    fun parse(args: Array<String>): ParsedDisplayParticleCommand {
         require(args.size in setOf(1, 4, 9, 10)) { "引数の数が不正です" }
         val position = if (args.size >= 4) RawPosition(args[1], args[2], args[3]) else null
         val delta = if (args.size >= 9) DisplayEffectVector3(number(args[4]), number(args[5]), number(args[6])) else DisplayEffectVector3.ZERO
@@ -109,7 +109,7 @@ internal object VoxelParticleCommandSyntax {
         } else DisplayParticleVisibilityMode.NORMAL
         // 組み込みプリセットはCC独自表現であり、namespace省略時もその所有元を明示します。
         val patternId = if (':' in args[0]) args[0] else "cc:${args[0]}"
-        return ParsedVoxelParticleCommand(patternId, position, delta, speed, count, mode)
+        return ParsedDisplayParticleCommand(patternId, position, delta, speed, count, mode)
     }
 
     private fun number(raw: String): Double = raw.toDoubleOrNull()?.takeIf(Double::isFinite)
