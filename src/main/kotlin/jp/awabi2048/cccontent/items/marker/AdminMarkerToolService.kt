@@ -3,6 +3,8 @@
 package jp.awabi2048.cccontent.items.marker
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+import com.awabi2048.ccsystem.api.localization.generated.ContentCustomItemsKeys
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiInputGesture
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -61,7 +63,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
 
     private data class MarkerToolDefinition(
         val toolId: String,
-        val displayNameKey: String,
+        val displayNameKey: LocalizationKey<String>,
         val itemModel: NamespacedKey,
         val messageKeyPrefix: String,
         val modes: List<MarkerToolMode>,
@@ -96,7 +98,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
     private val definitions = listOf(
         MarkerToolDefinition(
             toolId = "sukima_dungeon.marker_tool",
-            displayNameKey = "custom_items.sukima_dungeon.marker_tool.name",
+            displayNameKey = ContentCustomItemsKeys.CUSTOM_ITEMS_SUKIMA_DUNGEON_MARKER_TOOL_NAME,
             itemModel = NamespacedKey.minecraft("blaze_rod"),
             messageKeyPrefix = "marker",
             modes = listOf(
@@ -116,7 +118,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         ),
         MarkerToolDefinition(
             toolId = "arena.structure_marker_tool",
-            displayNameKey = "custom_items.arena.structure_marker_tool.name",
+            displayNameKey = ContentCustomItemsKeys.CUSTOM_ITEMS_ARENA_STRUCTURE_MARKER_TOOL_NAME,
             itemModel = NamespacedKey.minecraft("blaze_rod"),
             messageKeyPrefix = "marker",
             modes = listOf(
@@ -133,7 +135,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         ),
         MarkerToolDefinition(
             toolId = "arena.other_marker_tool",
-            displayNameKey = "custom_items.arena.other_marker_tool.name",
+            displayNameKey = ContentCustomItemsKeys.CUSTOM_ITEMS_ARENA_OTHER_MARKER_TOOL_NAME,
             itemModel = NamespacedKey.minecraft("blaze_rod"),
             messageKeyPrefix = "marker",
             modes = listOf(
@@ -147,7 +149,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         ),
         MarkerToolDefinition(
             toolId = "arena.lift_tool",
-            displayNameKey = "custom_items.arena.lift_tool.name",
+            displayNameKey = ContentCustomItemsKeys.CUSTOM_ITEMS_ARENA_LIFT_TOOL_NAME,
             itemModel = NamespacedKey.minecraft("blaze_rod"),
             messageKeyPrefix = "marker",
             modes = listOf(
@@ -157,7 +159,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         ),
         MarkerToolDefinition(
             toolId = "arena.mechanic_marker_tool",
-            displayNameKey = "custom_items.arena.mechanic_marker_tool.name",
+            displayNameKey = ContentCustomItemsKeys.CUSTOM_ITEMS_ARENA_MECHANIC_MARKER_TOOL_NAME,
             itemModel = NamespacedKey.minecraft("blaze_rod"),
             messageKeyPrefix = "marker",
             modes = listOf(
@@ -191,7 +193,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         PoisonousPotatoComponentPack.applyNonConsumable(item)
         val meta = item.itemMeta ?: return item
         meta.setItemModel(definition.itemModel)
-        meta.displayName(Component.text(CCSystem.getAPI().getI18nString(player, definition.displayNameKey)))
+        meta.displayName(Component.text(CCSystem.getAPI().getLocalized(player, definition.displayNameKey)))
         meta.persistentDataContainer.set(toolIdKey, PersistentDataType.STRING, definition.toolId)
         meta.persistentDataContainer.set(modeIdKey, PersistentDataType.STRING, definition.modes.first().id)
         updateLore(meta, definition, definition.modes.first(), player)

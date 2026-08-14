@@ -6,6 +6,6 @@ import org.bukkit.entity.Player
 object MiniGameMessages {
     fun text(player: Player?, key: String, vararg values: Pair<String, Any?>): String {
         val placeholders = values.associate { it.first to (it.second ?: "null") }
-        return CCSystem.getAPI().getI18nString(player, "minigame.$key", placeholders).replace('&', '§')
+        return CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text("minigame.$key", "minigame."), placeholders).replace('&', '§')
     }
 }

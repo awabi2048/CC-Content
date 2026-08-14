@@ -252,7 +252,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     fun getHistory(container: PersistentDataContainer): String = container.get(historyKey, PersistentDataType.STRING) ?: ""
 
     private fun text(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): String =
-        CCSystem.getAPI().getI18nString(player, key, placeholders.associate { it.first to (it.second ?: "") }).replace('&', '§')
+        CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "brewery.", "custom_items.brewery."), placeholders.associate { it.first to (it.second ?: "") }).replace('&', '§')
 
     private fun renderLore(player: Player?, description: String, data: List<Pair<String, Any?>>): List<net.kyori.adventure.text.Component> {
         val blocks = mutableListOf<GuiLoreBlock>()

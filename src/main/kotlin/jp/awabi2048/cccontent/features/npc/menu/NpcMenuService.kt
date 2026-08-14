@@ -960,16 +960,16 @@ class NpcMenuService(
 
     private fun text(player: Player, key: String, vararg placeholders: Pair<String, Any?>): String {
         val locale = ContentLocaleResolver.resolve(player)
-        return com.awabi2048.ccsystem.CCSystem.getAPI().getI18nString(
+        return com.awabi2048.ccsystem.CCSystem.getAPI().getLocalized(
             locale,
-            "gui.npc.oage_shrine.$key",
+            jp.awabi2048.cccontent.util.ContentLocalizationKeys.text("gui.npc.oage_shrine.$key", "gui.npc.oage_shrine."),
             placeholders.associate { (name, value) -> name to (value ?: "null") }
         ).replace('&', '§')
     }
 
     private fun list(player: Player, key: String): List<String> {
         val locale = ContentLocaleResolver.resolve(player)
-        return com.awabi2048.ccsystem.CCSystem.getAPI().getI18nStringList(locale, "gui.npc.oage_shrine.$key", emptyMap()).map { it.replace('&', '§') }
+        return com.awabi2048.ccsystem.CCSystem.getAPI().getLocalized(locale, jp.awabi2048.cccontent.util.ContentLocalizationKeys.textList("gui.npc.oage_shrine.$key", "gui.npc.oage_shrine."), emptyMap()).map { it.replace('&', '§') }
     }
 
     private fun playClick(player: Player) {

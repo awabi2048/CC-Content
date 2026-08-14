@@ -2,6 +2,7 @@
 
 package jp.awabi2048.cccontent.features.arena.mission
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import com.awabi2048.ccsystem.api.localization.generated.ContentArenaKeys
 
 import com.awabi2048.ccsystem.CCSystem
@@ -101,27 +102,27 @@ data class ArenaPlayerMissionData(
 enum class ArenaLicenseTier(
     val id: String,
     val maxDifficultyStar: Int,
-    val displayNameKey: String
+    val displayNameKey: LocalizationKey<String>
 ) {
     PAPER(
         id = "paper",
         maxDifficultyStar = 1,
-        displayNameKey = "arena.ui.license.tier.paper"
+        displayNameKey = ContentArenaKeys.ARENA_UI_LICENSE_TIER_PAPER
     ),
     BRONZE(
         id = "bronze",
         maxDifficultyStar = 2,
-        displayNameKey = "arena.ui.license.tier.bronze"
+        displayNameKey = ContentArenaKeys.ARENA_UI_LICENSE_TIER_BRONZE
     ),
     SILVER(
         id = "silver",
         maxDifficultyStar = 3,
-        displayNameKey = "arena.ui.license.tier.silver"
+        displayNameKey = ContentArenaKeys.ARENA_UI_LICENSE_TIER_SILVER
     ),
     GOLD(
         id = "gold",
         maxDifficultyStar = 4,
-        displayNameKey = "arena.ui.license.tier.gold"
+        displayNameKey = ContentArenaKeys.ARENA_UI_LICENSE_TIER_GOLD
     );
 
     fun next(): ArenaLicenseTier? {
@@ -165,33 +166,33 @@ data class ArenaStatusSnapshot(
 
 enum class ArenaMissionType(
     val id: String,
-    val displayNameKey: String,
-    val missionGuideHintsKey: String
+    val displayNameKey: LocalizationKey<String>,
+    val missionGuideHintsKey: LocalizationKey<List<String>>
 ) {
     BARRIER_RESTART(
         id = "barrier_restart",
-        displayNameKey = "arena.mission.type.barrier_restart.name",
-        missionGuideHintsKey = "arena.mission.type.barrier_restart.hints"
+        displayNameKey = ContentArenaKeys.ARENA_MISSION_TYPE_BARRIER_RESTART_NAME,
+        missionGuideHintsKey = ContentArenaKeys.ARENA_MISSION_TYPE_BARRIER_RESTART_HINTS
     ),
     BARRIER_DEPLOY(
         id = "barrier_deploy",
-        displayNameKey = "arena.mission.type.barrier_deploy.name",
-        missionGuideHintsKey = "arena.mission.type.barrier_deploy.hints"
+        displayNameKey = ContentArenaKeys.ARENA_MISSION_TYPE_BARRIER_DEPLOY_NAME,
+        missionGuideHintsKey = ContentArenaKeys.ARENA_MISSION_TYPE_BARRIER_DEPLOY_HINTS
     ),
     SWEEP(
         id = "sweep",
-        displayNameKey = "arena.mission.type.sweep.name",
-        missionGuideHintsKey = "arena.mission.type.sweep.hints"
+        displayNameKey = ContentArenaKeys.ARENA_MISSION_TYPE_SWEEP_NAME,
+        missionGuideHintsKey = ContentArenaKeys.ARENA_MISSION_TYPE_SWEEP_HINTS
     ),
     BOSS(
         id = "boss",
-        displayNameKey = "arena.mission.type.boss.name",
-        missionGuideHintsKey = "arena.mission.type.boss.hints"
+        displayNameKey = ContentArenaKeys.ARENA_MISSION_TYPE_BOSS_NAME,
+        missionGuideHintsKey = ContentArenaKeys.ARENA_MISSION_TYPE_BOSS_HINTS
     ),
     CLEARING(
         id = "clearing",
-        displayNameKey = "arena.mission.type.clearing.name",
-        missionGuideHintsKey = "arena.mission.type.clearing.hints"
+        displayNameKey = ContentArenaKeys.ARENA_MISSION_TYPE_CLEARING_NAME,
+        missionGuideHintsKey = ContentArenaKeys.ARENA_MISSION_TYPE_CLEARING_HINTS
     );
 
     companion object {

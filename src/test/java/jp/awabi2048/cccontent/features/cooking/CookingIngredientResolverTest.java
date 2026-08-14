@@ -36,7 +36,8 @@ class CookingIngredientResolverTest {
         String value
     ) {
         return new UnifiedCookingIngredient(
-            id, new CookingIngredientMatcher(type, value), "key." + id, null
+            id, new CookingIngredientMatcher(type, value),
+            new CookingDisplayName.MinecraftTranslation("item.minecraft.apple"), null
         );
     }
 }

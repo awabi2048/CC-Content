@@ -220,7 +220,7 @@ class NaturalFishingGroundService(
 
     private fun message(player: Player, key: String, vararg placeholders: Pair<String, Any>): Component =
         Component.text(
-            CCSystem.getAPI().getI18nString(player, key, placeholders.toMap()).replace('&', '§')
+            CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "fishing."), placeholders.toMap()).replace('&', '§')
         )
 
     companion object {

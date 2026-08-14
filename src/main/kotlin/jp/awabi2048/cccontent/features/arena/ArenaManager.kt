@@ -3544,13 +3544,13 @@ class ArenaManager(
 
     private fun hasI18nString(locale: String, key: String): Boolean {
         return runCatching {
-            CCSystem.getAPI().getI18nString(locale, key)
+            CCSystem.getAPI().getLocalized(locale, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "arena."))
         }.isSuccess
     }
 
     private fun hasI18nStringList(locale: String, key: String): Boolean {
         return runCatching {
-            CCSystem.getAPI().getI18nStringList(locale, key)
+            CCSystem.getAPI().getLocalized(locale, jp.awabi2048.cccontent.util.ContentLocalizationKeys.textList(key, "arena."))
         }.isSuccess
     }
 

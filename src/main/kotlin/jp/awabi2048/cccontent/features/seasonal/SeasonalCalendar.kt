@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.seasonal
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+
 import java.time.DayOfWeek
 import java.time.Duration
 import java.time.LocalDate
@@ -99,7 +101,7 @@ data class NthWeekdaySchedule(
 data class SeasonalEventDefinition(
     val id: String,
     val enabled: Boolean,
-    val displayNameKey: String,
+    val displayNameKey: LocalizationKey<String>,
     val schedule: SeasonalSchedule,
     val gracePeriod: Duration,
     val cycle: SeasonalCycle?,
@@ -108,7 +110,6 @@ data class SeasonalEventDefinition(
 ) {
     init {
         require(id.matches(Regex("[a-z0-9_]+")))
-        require(displayNameKey.matches(Regex("[a-z0-9_.-]+")))
         require(!gracePeriod.isNegative)
     }
 }

@@ -363,7 +363,7 @@ class CatalogCommand(
     }
 
     private fun text(player: Player, key: String, vararg placeholders: Pair<String, Any?>): String =
-        CCSystem.getAPI().getI18nString(player, key, placeholders.associate { it.first to (it.second ?: "") }).replace('&', '§')
+        CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "catalog."), placeholders.associate { it.first to (it.second ?: "") }).replace('&', '§')
 }
 
 private class FishingDetailHolder(val owner: UUID, val returnPage: Int) : InventoryHolder {

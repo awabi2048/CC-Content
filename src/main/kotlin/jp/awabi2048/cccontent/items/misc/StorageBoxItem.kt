@@ -50,16 +50,16 @@ import java.util.UUID
 private val storageLoreLegacy = LegacyComponentSerializer.legacySection()
 
 private fun storageText(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): String =
-    CCSystem.getAPI().getI18nString(
+    CCSystem.getAPI().getLocalized(
         ContentLocaleResolver.resolve(player),
-        "custom_items.misc.storage_box_ui.$key",
+        jp.awabi2048.cccontent.util.ContentLocalizationKeys.text("custom_items.misc.storage_box_ui.$key", "custom_items.misc.storage_box_ui."),
         placeholders.associate { (name, value) -> name to (value ?: "null") }
     ).replace('&', '§')
 
 private fun commonText(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): String =
-    CCSystem.getAPI().getI18nString(
+    CCSystem.getAPI().getLocalized(
         ContentLocaleResolver.resolve(player),
-        key,
+        jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "lore.click."),
         placeholders.associate { (name, value) -> name to (value ?: "null") }
     ).replace('&', '§')
 

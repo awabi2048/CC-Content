@@ -11,15 +11,15 @@ class LanguageLoader(
     private val normalizedLanguage = language.lowercase()
 
     fun getMessage(key: String, vararg placeholders: Pair<String, Any?>): String {
-        return CCSystem.getAPI().getI18nString(normalizedLanguage, key, placeholdersMap(*placeholders)).replace('&', '§')
+        return CCSystem.getAPI().getLocalized(normalizedLanguage, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "rank."), placeholdersMap(*placeholders)).replace('&', '§')
     }
 
     fun getRawMessage(key: String): String {
-        return CCSystem.getAPI().getI18nString(normalizedLanguage, key).replace('&', '§')
+        return CCSystem.getAPI().getLocalized(normalizedLanguage, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "rank.")).replace('&', '§')
     }
 
     fun getStringList(key: String): List<String> {
-        return CCSystem.getAPI().getI18nStringList(normalizedLanguage, key).map { it.replace('&', '§') }
+        return CCSystem.getAPI().getLocalized(normalizedLanguage, jp.awabi2048.cccontent.util.ContentLocalizationKeys.textList(key, "rank.")).map { it.replace('&', '§') }
     }
 
     private fun placeholdersMap(vararg placeholders: Pair<String, Any?>): Map<String, Any> {

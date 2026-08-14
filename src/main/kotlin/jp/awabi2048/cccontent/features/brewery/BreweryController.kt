@@ -241,9 +241,8 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             )
         )
         val drinkMessageKey = "brewery.recipe.$outputId.drink_message"
-        if (CCSystem.getAPI().hasI18nKey(drinkMessageKey)) {
-            event.player.sendMessage(i18n(event.player, drinkMessageKey))
-        }
+        jp.awabi2048.cccontent.util.ContentLocalizationKeys.optionalText(drinkMessageKey, "brewery.")
+            ?.let { event.player.sendMessage(CCSystem.getAPI().getLocalized(event.player, it)) }
         markDirty()
         saveIntoxication(event.player, state)
     }
@@ -1905,7 +1904,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
 
     private fun i18n(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): String {
         return com.awabi2048.ccsystem.CCSystem.getAPI()
-            .getI18nString(player, key, placeholders.associate { it.first to (it.second ?: "") })
+            .getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "brewery."), placeholders.associate { it.first to (it.second ?: "") })
             .replace('&', '§')
     }
 

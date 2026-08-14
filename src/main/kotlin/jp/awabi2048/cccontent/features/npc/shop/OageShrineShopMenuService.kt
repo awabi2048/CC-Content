@@ -243,12 +243,12 @@ class OageShrineShopMenuService(
 
     private fun text(player: Player, key: String, vararg placeholders: Pair<String, Any?>): String {
         val locale = ContentLocaleResolver.resolve(player)
-        return CCSystem.getAPI().getI18nString(locale, "gui.npc.oage_shrine.$key", placeholdersMap(*placeholders)).replace('&', '§')
+        return CCSystem.getAPI().getLocalized(locale, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text("gui.npc.oage_shrine.$key", "gui.npc.oage_shrine."), placeholdersMap(*placeholders)).replace('&', '§')
     }
 
     private fun list(player: Player, key: String, vararg placeholders: Pair<String, Any?>): List<String> {
         val locale = ContentLocaleResolver.resolve(player)
-        return CCSystem.getAPI().getI18nStringList(locale, "gui.npc.oage_shrine.$key", placeholdersMap(*placeholders)).map { it.replace('&', '§') }
+        return CCSystem.getAPI().getLocalized(locale, jp.awabi2048.cccontent.util.ContentLocalizationKeys.textList("gui.npc.oage_shrine.$key", "gui.npc.oage_shrine."), placeholdersMap(*placeholders)).map { it.replace('&', '§') }
     }
 
     private fun placeholdersMap(vararg placeholders: Pair<String, Any?>): Map<String, Any> {
