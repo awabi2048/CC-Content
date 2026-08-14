@@ -34,11 +34,7 @@ class LanguageResourceValidationTest {
                 while (matcher.find()) {
                     String key = matcher.group(7);
                     if (key.startsWith("block.minecraft.") || key.startsWith("item.minecraft.")) continue;
-                    String call = matcher.group(1);
-                    LocalizationKey.ValueType expected = call.contains("List") || call.endsWith(".list") || call.endsWith(".stringList")
-                        ? LocalizationKey.ValueType.TEXT_LIST
-                        : LocalizationKey.ValueType.TEXT;
-                    requireKey(errors, file, key, expected);
+                    errors.add("fixed key must use generated LocalizationKey\n  file: " + file + "\n  key: " + key);
                 }
             }
         }

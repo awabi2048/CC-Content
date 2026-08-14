@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.brewery.item
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentBreweryKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -221,7 +223,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         val meta = item.itemMeta ?: return item
         meta.setItemModel(NamespacedKey.minecraft("shears"))
         meta.displayName(Component.text(text(player, "brewery.item.filter.name")))
-        val lines = CCSystem.getAPI().getI18nStringList(player, "brewery.item.filter.description")
+        val lines = CCSystem.getAPI().getLocalized(player, ContentBreweryKeys.BREWERY_ITEM_FILTER_DESCRIPTION)
         meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(GuiLoreBlock(lines.map(GuiLoreLine::Text))))) )
         meta.persistentDataContainer.set(filterKey, PersistentDataType.BYTE, 1)
         meta.persistentDataContainer.set(filterRemainingUsesKey, PersistentDataType.INTEGER, FILTER_MAX_USES)

@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.rank.impl
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentProfessionKeys
+
 import jp.awabi2048.cccontent.features.rank.RankStorage
 import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.event.PlayerExperienceGainEvent
@@ -135,7 +137,7 @@ class ProfessionManagerImpl(
                 if (prof.levelUpNotificationEnabled) {
                     player.sendMessage(
                         messageProvider.getMessage(
-                            "profession.level_up",
+                            ContentProfessionKeys.PROFESSION_LEVEL_UP,
                             "profession" to messageProvider.getProfessionName(prof.profession),
                             "old" to oldLevel,
                             "new" to newLevel,
@@ -150,7 +152,7 @@ class ProfessionManagerImpl(
                         }
                         val message = Component.text(
                             messageProvider.getMessage(
-                                "profession.new_unlock",
+                                ContentProfessionKeys.PROFESSION_NEW_UNLOCK,
                                 "count" to newlyUnlockedSkills.size,
                                 "skills" to unlockedNames
                             )
@@ -427,7 +429,7 @@ class ProfessionManagerImpl(
 
             player.sendMessage(
                 messageProvider.getMessage(
-                    "profession.prestige.executed",
+                    ContentProfessionKeys.PROFESSION_PRESTIGE_EXECUTED,
                     "profession" to messageProvider.getProfessionName(prof.profession),
                     "level" to prestigeLevel
                 )
@@ -520,7 +522,7 @@ class ProfessionManagerImpl(
             )
             player.sendMessage(
                 messageProvider.getMessage(
-                    "profession.prestige.executed",
+                    ContentProfessionKeys.PROFESSION_PRESTIGE_EXECUTED,
                     "profession" to messageProvider.getProfessionName(profession.profession),
                     "level" to cycleNumber
                 )

@@ -9,6 +9,8 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentArenaKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.input.PlayerInteractionChannel
 import jp.awabi2048.cccontent.config.FeatureConfigManager
@@ -947,10 +949,10 @@ class ArenaManager(
             if (enableMultiplayerJoin) {
                 target.showBossBar(getOrCreateJoinCountdownBossBar(session, target.uniqueId))
                 target.sendMessage(
-                    ArenaI18n.text(target, "arena.messages.multiplayer.invite_window_started")
+                    ArenaI18n.text(target, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_WINDOW_STARTED)
                 )
                 target.sendMessage(
-                    ArenaI18n.text(target, "arena.messages.multiplayer.invite_window_hint")
+                    ArenaI18n.text(target, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_WINDOW_HINT)
                 )
 
                 session.stageBuildTask = stageGenerator.buildIncrementally(
@@ -1038,7 +1040,7 @@ class ArenaManager(
             }
             if (showSessionStartedMessage) {
                 target.sendMessage(
-                    ArenaI18n.text(target, "arena.messages.session.started", "theme" to theme.id, "mob_type" to theme.id, "difficulty" to difficultyDisplay, "waves" to variant.waves.size)
+                    ArenaI18n.text(target, ContentArenaKeys.ARENA_MESSAGES_SESSION_STARTED, "theme" to theme.id, "mob_type" to theme.id, "difficulty" to difficultyDisplay, "waves" to variant.waves.size)
                 )
             }
             ArenaStartResult.Success(theme.id, variant.waves.size, promoted, difficultyDisplay)
@@ -1061,11 +1063,11 @@ class ArenaManager(
         }
     }
 
-    fun stopSession(player: Player, reason: String = ArenaI18n.text(player, "arena.messages.session.ended")): Boolean {
+    fun stopSession(player: Player, reason: String = ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_SESSION_ENDED)): Boolean {
         return leavePlayerFromSession(player.uniqueId, reason)
     }
 
-    fun stopSessionToLobby(player: Player, reason: String = ArenaI18n.text(player, "arena.messages.session.ended")): Boolean {
+    fun stopSessionToLobby(player: Player, reason: String = ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_SESSION_ENDED)): Boolean {
         val session = getSession(player)
         val destination = if (session != null) resolveSessionLobbyLocation(session) else null
         val stopped = leavePlayerFromSession(player.uniqueId, reason, destination)
@@ -1078,13 +1080,13 @@ class ArenaManager(
 
     fun stopSessionById(playerId: UUID, reason: String? = null): Boolean {
         val player = Bukkit.getPlayer(playerId)
-        val localizedReason = reason ?: ArenaI18n.text(player, "arena.messages.session.ended")
+        val localizedReason = reason ?: ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_SESSION_ENDED)
         return leavePlayerFromSession(playerId, localizedReason)
     }
 
     fun stopSessionToLobbyById(playerId: UUID, reason: String? = null): Boolean {
         val player = Bukkit.getPlayer(playerId)
-        val localizedReason = reason ?: ArenaI18n.text(player, "arena.messages.session.ended")
+        val localizedReason = reason ?: ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_SESSION_ENDED)
         val worldName = playerToSessionWorld[playerId]
         val session = worldName?.let { sessionsByWorld[it] }
         val destination = if (session != null) resolveSessionLobbyLocation(session) else null
@@ -1297,7 +1299,7 @@ class ArenaManager(
     }
 
     private fun showLobbyTutorialCompletedEffect(player: Player) {
-        player.sendTitle("", ArenaI18n.text(player, "arena.messages.lobby.tutorial.completed_title"), 10, 100, 10)
+        player.sendTitle("", ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_LOBBY_TUTORIAL_COMPLETED_TITLE), 10, 100, 10)
         playLobbyBgm(player)
     }
 
@@ -1315,7 +1317,7 @@ class ArenaManager(
             .mapNotNull { Bukkit.getPlayer(it) }
             .filter { it.isOnline && it.world.name == session.worldName }
             .forEach { participant ->
-                participant.sendMessage(ArenaI18n.text(participant, "arena.messages.down.participant_died", "player" to player.name))
+                participant.sendMessage(ArenaI18n.text(participant, ContentArenaKeys.ARENA_MESSAGES_DOWN_PARTICIPANT_DIED, "player" to player.name))
                 if (!hasOtherAliveNonDownParticipant(session, participant.uniqueId)) {
                     return@forEach
                 }
@@ -1726,12 +1728,12 @@ class ArenaManager(
     private fun declineInvitedParticipant(session: ArenaSession, invited: Player) {
         removeInvitedParticipant(session, invited.uniqueId)
         invited.sendMessage(
-            ArenaI18n.text(invited, "arena.messages.multiplayer.declined_self")
+            ArenaI18n.text(invited, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_DECLINED_SELF)
         )
         val owner = Bukkit.getPlayer(session.ownerPlayerId)
         if (owner != null && owner.isOnline) {
             owner.sendMessage(
-                ArenaI18n.text(owner, "arena.messages.multiplayer.declined_notify_owner", "player" to invited.name)
+                ArenaI18n.text(owner, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_DECLINED_NOTIFY_OWNER, "player" to invited.name)
             )
         }
     }
@@ -2239,14 +2241,14 @@ class ArenaManager(
             event.isCancelled = true
             if (!ArenaPermissions.hasPedestalMenuPermission(player)) {
                 player.sendMessage(
-                    ArenaI18n.text(player, "arena.messages.command.menu_permission_denied")
+                    ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_COMMAND_MENU_PERMISSION_DENIED)
                 )
                 return
             }
             val menu = pedestalMenuProvider?.invoke()
             if (menu == null) {
                 player.sendMessage(
-                    ArenaI18n.text(player, "arena.messages.command.feature_unavailable")
+                    ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE)
                 )
                 return
             }
@@ -2274,14 +2276,14 @@ class ArenaManager(
     private fun openPedestalMenu(player: Player) {
         if (!ArenaPermissions.hasPedestalMenuPermission(player)) {
             player.sendMessage(
-                ArenaI18n.text(player, "arena.messages.command.menu_permission_denied")
+                ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_COMMAND_MENU_PERMISSION_DENIED)
             )
             return
         }
         val menu = pedestalMenuProvider?.invoke()
         if (menu == null) {
             player.sendMessage(
-                ArenaI18n.text(player, "arena.messages.command.feature_unavailable")
+                ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE)
             )
             return
         }
@@ -2381,7 +2383,7 @@ class ArenaManager(
         if (ownerSession != null && ownerSession.multiplayerJoinEnabled && ownerSession.ownerPlayerId == player.uniqueId) {
             if (System.currentTimeMillis() >= ownerSession.joinGraceEndMillis) {
                 player.sendMessage(
-                    ArenaI18n.text(player, "arena.messages.multiplayer.invite_window_closed")
+                    ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_WINDOW_CLOSED)
                 )
                 return true
             }
@@ -2440,21 +2442,21 @@ class ArenaManager(
         val reservedSeats = session.participants.size + session.invitedParticipants.size
         if (reservedSeats >= session.maxParticipants) {
             owner.sendMessage(
-                ArenaI18n.text(owner, "arena.messages.multiplayer.invite_failed_full")
+                ArenaI18n.text(owner, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_FAILED_FULL)
             )
             return
         }
 
         if (playerToSessionWorld.containsKey(invited.uniqueId)) {
             owner.sendMessage(
-                ArenaI18n.text(owner, "arena.messages.multiplayer.invite_failed_in_session", "player" to invited.name)
+                ArenaI18n.text(owner, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_FAILED_IN_SESSION, "player" to invited.name)
             )
             return
         }
 
         if (invited.world.uid != owner.world.uid) {
             owner.sendMessage(
-                ArenaI18n.text(owner, "arena.messages.multiplayer.invite_failed_world")
+                ArenaI18n.text(owner, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_FAILED_WORLD)
             )
             return
         }
@@ -2462,7 +2464,7 @@ class ArenaManager(
         val lockedWorld = invitedPlayerLocks[invited.uniqueId]
         if (lockedWorld != null && lockedWorld != session.worldName) {
             owner.sendMessage(
-                ArenaI18n.text(owner, "arena.messages.multiplayer.invite_failed_already_locked", "player" to invited.name)
+                ArenaI18n.text(owner, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_FAILED_ALREADY_LOCKED, "player" to invited.name)
             )
             return
         }
@@ -2470,7 +2472,7 @@ class ArenaManager(
         if (CCSystem.getAPI().getPlayerInteractionClaimService()
                 .claim(invited.uniqueId, PlayerInteractionChannel.SECONDARY, ARENA_INVITED_CLAIM_OWNER) == null) {
             owner.sendMessage(
-                ArenaI18n.text(owner, "arena.messages.multiplayer.invite_failed_already_locked", "player" to invited.name)
+                ArenaI18n.text(owner, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_FAILED_ALREADY_LOCKED, "player" to invited.name)
             )
             return
         }
@@ -2479,7 +2481,7 @@ class ArenaManager(
             CCSystem.getAPI().getPlayerInteractionClaimService()
                 .release(invited.uniqueId, PlayerInteractionChannel.SECONDARY, ARENA_INVITED_CLAIM_OWNER)
             owner.sendMessage(
-                ArenaI18n.text(owner, "arena.messages.multiplayer.already_invited", "player" to invited.name)
+                ArenaI18n.text(owner, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_ALREADY_INVITED, "player" to invited.name)
             )
             return
         }
@@ -2490,11 +2492,11 @@ class ArenaManager(
         invited.isGlowing = true
         invited.showBossBar(getOrCreateJoinCountdownBossBar(session, invited.uniqueId))
         owner.sendMessage(
-            ArenaI18n.text(owner, "arena.messages.multiplayer.invite_sent", "player" to invited.name)
+            ArenaI18n.text(owner, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_SENT, "player" to invited.name)
         )
         invited.sendMessage(buildInviteMessageComponent(owner.name, session))
         invited.sendMessage(
-            ArenaI18n.text(invited, "arena.messages.multiplayer.invited_decline_hint")
+            ArenaI18n.text(invited, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITED_DECLINE_HINT)
         )
     }
 
@@ -2502,20 +2504,20 @@ class ArenaManager(
         val missionTitle = session.inviteMissionTitle
         if (missionTitle.isNullOrBlank()) {
             return legacySerializer.deserialize(
-                ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_simple", "owner" to ownerName)
+                ArenaI18n.text(null, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_MESSAGE_SIMPLE, "owner" to ownerName)
             )
         }
 
         val hoverText = if (session.inviteMissionLore.isEmpty()) {
-            ArenaI18n.text(null, "arena.messages.multiplayer.no_description")
+            ArenaI18n.text(null, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_NO_DESCRIPTION)
         } else {
             session.inviteMissionLore.joinToString("\n")
         }
 
-        val prefix = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_prefix", "owner" to ownerName))
-        val missionPart = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_mission", "mission" to missionTitle))
+        val prefix = legacySerializer.deserialize(ArenaI18n.text(null, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_MESSAGE_PREFIX, "owner" to ownerName))
+        val missionPart = legacySerializer.deserialize(ArenaI18n.text(null, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_MESSAGE_MISSION, "mission" to missionTitle))
             .hoverEvent(HoverEvent.showText(legacySerializer.deserialize(hoverText)))
-        val suffix = legacySerializer.deserialize(ArenaI18n.text(null, "arena.messages.multiplayer.invite_message_suffix"))
+        val suffix = legacySerializer.deserialize(ArenaI18n.text(null, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_MESSAGE_SUFFIX))
 
         return Component.empty()
             .append(prefix)
@@ -2730,7 +2732,7 @@ class ArenaManager(
 
         if (!reviveDisabled) {
             player.sendMessage(
-                ArenaI18n.text(player, "arena.messages.down.entered")
+                ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_DOWN_ENTERED)
             )
 
             session.participants
@@ -2739,13 +2741,13 @@ class ArenaManager(
                 .mapNotNull { Bukkit.getPlayer(it) }
                 .filter { it.isOnline && it.world.name == session.worldName }
                 .forEach { participant ->
-                    participant.sendMessage(ArenaI18n.text(participant, "arena.messages.down.needs_revive", "player" to player.name))
-                    participant.sendMessage(ArenaI18n.text(participant, "arena.messages.down.revive_hint"))
+                    participant.sendMessage(ArenaI18n.text(participant, ContentArenaKeys.ARENA_MESSAGES_DOWN_NEEDS_REVIVE, "player" to player.name))
+                    participant.sendMessage(ArenaI18n.text(participant, ContentArenaKeys.ARENA_MESSAGES_DOWN_REVIVE_HINT))
                 }
         }
 
         if (reviveDisabled && hasOtherAliveNonDownParticipant(session, player.uniqueId)) {
-            val oageMessage = ArenaI18n.stringList(player, "arena.messages.oage.down_with_survivors").randomOrNull() ?: return
+            val oageMessage = ArenaI18n.stringList(player, ContentArenaKeys.ARENA_MESSAGES_OAGE_DOWN_WITH_SURVIVORS).randomOrNull() ?: return
             sendOageMessage(
                 player,
                 "arena.messages.oage.down_with_survivors",
@@ -2779,7 +2781,7 @@ class ArenaManager(
             downed.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, Int.MAX_VALUE, 0, false, false, false))
             downed.playSound(downed.location, Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0f, 0.75f)
             downed.sendMessage(
-                ArenaI18n.text(downed, "arena.messages.down.game_over")
+                ArenaI18n.text(downed, ContentArenaKeys.ARENA_MESSAGES_DOWN_GAME_OVER)
             )
             scheduleOageMessage(
                 downed,
@@ -2803,14 +2805,14 @@ class ArenaManager(
         downed.noDamageTicks = 20
 
         downed.sendMessage(
-            ArenaI18n.text(downed, "arena.messages.down.recovered")
+            ArenaI18n.text(downed, ContentArenaKeys.ARENA_MESSAGES_DOWN_RECOVERED)
         )
 
         if (revivedBy != null && revivedBy.uniqueId != downed.uniqueId) {
             downed.playSound(downed.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f)
             revivedBy.playSound(revivedBy.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.5f)
             revivedBy.sendMessage(
-                ArenaI18n.text(revivedBy, "arena.messages.down.revive_success", "player" to downed.name)
+                ArenaI18n.text(revivedBy, ContentArenaKeys.ARENA_MESSAGES_DOWN_REVIVE_SUCCESS, "player" to downed.name)
             )
         }
     }
@@ -2859,7 +2861,7 @@ class ArenaManager(
                         downed.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, blindnessTicks, 0, false, false, false))
                         if (downState.reviveDisabled) {
                             downed.sendMessage(
-                                ArenaI18n.text(downed, "arena.messages.down.game_over")
+                                ArenaI18n.text(downed, ContentArenaKeys.ARENA_MESSAGES_DOWN_GAME_OVER)
                             )
                             scheduleOageMessage(
                                 downed,
@@ -2888,7 +2890,7 @@ class ArenaManager(
                         } else {
                             stopSessionById(
                                 downedId,
-                                ArenaI18n.text(downed, "arena.messages.down.timeout")
+                                ArenaI18n.text(downed, ContentArenaKeys.ARENA_MESSAGES_DOWN_TIMEOUT)
                             )
                         }
                     }
@@ -3054,8 +3056,8 @@ class ArenaManager(
                 reviverPlayerBar = BossBar.bossBar(Component.empty(), 0.0f, BossBar.Color.BLUE, BossBar.Overlay.PROGRESS)
             )
         }
-        bossBars.downedPlayerBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.revive.downed", "reviver" to reviver.name)))
-        bossBars.reviverPlayerBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.revive.reviver", "downed" to downed.name)))
+        bossBars.downedPlayerBar.name(legacySerializer.deserialize(ArenaI18n.text(null, ContentArenaKeys.ARENA_BOSSBAR_REVIVE_DOWNED, "reviver" to reviver.name)))
+        bossBars.reviverPlayerBar.name(legacySerializer.deserialize(ArenaI18n.text(null, ContentArenaKeys.ARENA_BOSSBAR_REVIVE_REVIVER, "downed" to downed.name)))
         bossBars.downedPlayerBar.progress(progress.coerceIn(0.0f, 1.0f))
         bossBars.reviverPlayerBar.progress(progress.coerceIn(0.0f, 1.0f))
 
@@ -3748,7 +3750,7 @@ class ArenaManager(
                 player.sendMessage(ArenaI18n.text(player, messageKey, *messagePlaceholders))
                 if (success) {
                     player.sendMessage(
-                        ArenaI18n.text(player, "arena.messages.session.retry_hint")
+                        ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_SESSION_RETRY_HINT)
                     )
                 }
             }
@@ -4432,9 +4434,9 @@ class ArenaManager(
         if (!notified.add(wave)) return
 
         val title = if (wave >= session.waves) {
-            ArenaI18n.text(player, "arena.messages.wave.last_title")
+            ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_WAVE_LAST_TITLE)
         } else {
-            ArenaI18n.text(player, "arena.messages.wave.title", "wave" to wave)
+            ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_WAVE_TITLE, "wave" to wave)
         }
         player.sendTitle("", title, 10, 50, 10)
         if (playWitherSpawn) {
@@ -5032,7 +5034,7 @@ class ArenaManager(
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline && player.world.name == session.worldName) {
                 player.sendMessage(
-                    ArenaI18n.text(player, "arena.messages.clearing.boss_spawned")
+                    ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_CLEARING_BOSS_SPAWNED)
                 )
                 player.playSound(player.location, Sound.ENTITY_WITHER_SPAWN, 0.7f, 1.2f)
             }
@@ -5083,7 +5085,7 @@ class ArenaManager(
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline && player.world.name == session.worldName) {
                 player.sendMessage(
-                    ArenaI18n.text(player, "arena.messages.clearing.success")
+                    ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_CLEARING_SUCCESS)
                 )
                 player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 2.0f)
                 player.playSound(player.location, Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.0f)
@@ -5101,7 +5103,7 @@ class ArenaManager(
                 if (player != null && player.isOnline && player.world.name == activeSession.worldName) {
                     player.sendTitle(
                         "",
-                        ArenaI18n.text(player, "arena.messages.mission.return_hint"),
+                        ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MISSION_RETURN_HINT),
                         0,
                         50,
                         10
@@ -5157,7 +5159,7 @@ class ArenaManager(
             val player = Bukkit.getPlayer(participantId)
             if (player != null && player.isOnline && player.world.name == session.worldName) {
                 player.sendMessage(
-                    ArenaI18n.text(player, "arena.messages.clearing.time_expired")
+                    ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_CLEARING_TIME_EXPIRED)
                 )
                 player.playSound(player.location, Sound.ENTITY_WITHER_DEATH, 0.7f, 0.5f)
             }
@@ -5852,11 +5854,11 @@ class ArenaManager(
                 sendOageMessage(
                     player,
                     "arena.messages.barrier.restart_confirmed",
-                    ArenaI18n.text(player, "arena.messages.barrier.restart_confirmed")
+                    ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_BARRIER_RESTART_CONFIRMED)
                 )
                 player.sendTitle(
                     "",
-                    ArenaI18n.text(player, "arena.messages.barrier.return_hint"),
+                    ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_BARRIER_RETURN_HINT),
                     0,
                     50,
                     10
@@ -5948,7 +5950,7 @@ class ArenaManager(
         }
 
         if (session.barrierRestarting) {
-            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.barrier_restart")))
+            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, ContentArenaKeys.ARENA_BOSSBAR_BARRIER_RESTART)))
             bossBar.color(BossBar.Color.PINK)
             bossBar.progress(barrierRestartProgress(session).toFloat().coerceIn(0.0f, 1.0f))
             return
@@ -5968,18 +5970,18 @@ class ArenaManager(
         if (clearedWave != null) {
             val nextWave = clearedWave + 1
             if (nextWave <= session.waves && !session.startedWaves.contains(nextWave)) {
-                bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.wave_clear", "wave" to clearedWave)))
+                bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, ContentArenaKeys.ARENA_BOSSBAR_WAVE_CLEAR, "wave" to clearedWave)))
                 bossBar.color(BossBar.Color.BLUE)
                 bossBar.progress(1.0f)
                 return
             }
 
             val waveLabel = if (clearedWave >= session.waves) {
-                ArenaI18n.text(null, "arena.bossbar.last_wave_label")
+                ArenaI18n.text(null, ContentArenaKeys.ARENA_BOSSBAR_LAST_WAVE_LABEL)
             } else {
-                ArenaI18n.text(null, "arena.bossbar.wave_label", "wave" to clearedWave)
+                ArenaI18n.text(null, ContentArenaKeys.ARENA_BOSSBAR_WAVE_LABEL, "wave" to clearedWave)
             }
-            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.wave_clear_dynamic", "waveLabel" to waveLabel)))
+            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, ContentArenaKeys.ARENA_BOSSBAR_WAVE_CLEAR_DYNAMIC, "waveLabel" to waveLabel)))
             bossBar.color(BossBar.Color.BLUE)
             bossBar.progress(1.0f)
             return
@@ -5999,7 +6001,7 @@ class ArenaManager(
             val defeatedCount = bossCount - aliveBossCount
             val progress = (defeatedCount.toDouble() / bossCount.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
             val barColor = if (remainingSeconds <= 60) BossBar.Color.RED else BossBar.Color.PURPLE
-            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.clearing_boss", "time" to timeText, "alive" to aliveBossCount)))
+            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, ContentArenaKeys.ARENA_BOSSBAR_CLEARING_BOSS, "time" to timeText, "alive" to aliveBossCount)))
             bossBar.color(barColor)
             bossBar.progress(progress)
             return
@@ -6019,7 +6021,7 @@ class ArenaManager(
                 it.type == ArenaActionMarkerType.BARRIER_ACTIVATE && it.state == ArenaActionMarkerState.RUNNING
             }
             val progress = (activated.toDouble() / total.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
-            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.last_wave_progress", "activated" to activated, "total" to total)))
+            bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, ContentArenaKeys.ARENA_BOSSBAR_LAST_WAVE_PROGRESS, "activated" to activated, "total" to total)))
             bossBar.color(BossBar.Color.BLUE)
             bossBar.progress(progress)
             return
@@ -6029,11 +6031,11 @@ class ArenaManager(
         val target = (session.waveClearTargets[wave] ?: 1).coerceAtLeast(1)
         val progress = (kills.toDouble() / target.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
         val waveLabel = if (wave >= session.waves) {
-            ArenaI18n.text(null, "arena.bossbar.last_wave_label")
+            ArenaI18n.text(null, ContentArenaKeys.ARENA_BOSSBAR_LAST_WAVE_LABEL)
         } else {
-            ArenaI18n.text(null, "arena.bossbar.wave_label", "wave" to wave)
+            ArenaI18n.text(null, ContentArenaKeys.ARENA_BOSSBAR_WAVE_LABEL, "wave" to wave)
         }
-        bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.wave_progress", "waveLabel" to waveLabel, "kills" to kills, "target" to target)))
+        bossBar.name(legacySerializer.deserialize(ArenaI18n.text(null, ContentArenaKeys.ARENA_BOSSBAR_WAVE_PROGRESS, "waveLabel" to waveLabel, "kills" to kills, "target" to target)))
         bossBar.color(BossBar.Color.RED)
         bossBar.progress(progress)
     }
@@ -6341,7 +6343,7 @@ class ArenaManager(
                 val player = Bukkit.getPlayer(participantId) ?: return@forEach
                 if (!player.isOnline || player.world.name != activeSession.worldName) return@forEach
                 val themeName = ArenaI18n.text(player, "arena.theme.${activeSession.themeId}.name")
-                player.sendTitle("", ArenaI18n.text(player, "arena.messages.session.stage_title", "theme" to themeName), 10, 60, 10)
+                player.sendTitle("", ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_SESSION_STAGE_TITLE, "theme" to themeName), 10, 60, 10)
             }
             startArenaBgmMode(activeSession, ArenaBgmMode.NORMAL, currentTick)
         }, delayTicks.coerceAtLeast(0L))
@@ -7093,7 +7095,7 @@ class ArenaManager(
                         .mapNotNull { Bukkit.getPlayer(it) }
                         .filter { it.isOnline }
                     waiters.forEach { waitingPlayer ->
-                    waitingPlayer.sendTitle(ArenaI18n.text(waitingPlayer, "arena.messages.multiplayer.stage_wait_title"), "", 0, 60, 0)
+                    waitingPlayer.sendTitle(ArenaI18n.text(waitingPlayer, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_STAGE_WAIT_TITLE), "", 0, 60, 0)
                     }
                     session.stageGenerationWaitTitleShown = true
                 }
@@ -7113,17 +7115,17 @@ class ArenaManager(
             if (invited == null || !invited.isOnline) {
                 removeInvitedParticipant(session, invitedId)
                 owner.sendMessage(
-                    ArenaI18n.text(owner, "arena.messages.multiplayer.invite_cancelled_offline")
+                    ArenaI18n.text(owner, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_CANCELLED_OFFLINE)
                 )
                 return@forEach
             }
             if (invited.world.uid != owner.world.uid) {
                 removeInvitedParticipant(session, invitedId)
                 invited.sendMessage(
-                    ArenaI18n.text(invited, "arena.messages.multiplayer.invite_auto_declined_far")
+                    ArenaI18n.text(invited, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_AUTO_DECLINED_FAR)
                 )
                 owner.sendMessage(
-                    ArenaI18n.text(owner, "arena.messages.multiplayer.invite_auto_declined_far_owner", "player" to invited.name)
+                    ArenaI18n.text(owner, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_AUTO_DECLINED_FAR_OWNER, "player" to invited.name)
                 )
                 return@forEach
             }
@@ -7131,10 +7133,10 @@ class ArenaManager(
             if (invited.location.distanceSquared(owner.location) > maxDistanceSquared) {
                 removeInvitedParticipant(session, invitedId)
                 invited.sendMessage(
-                    ArenaI18n.text(invited, "arena.messages.multiplayer.invite_auto_declined_far")
+                    ArenaI18n.text(invited, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_AUTO_DECLINED_FAR)
                 )
                 owner.sendMessage(
-                    ArenaI18n.text(owner, "arena.messages.multiplayer.invite_auto_declined_far_owner", "player" to invited.name)
+                    ArenaI18n.text(owner, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_INVITE_AUTO_DECLINED_FAR_OWNER, "player" to invited.name)
                 )
             }
         }
@@ -7150,7 +7152,7 @@ class ArenaManager(
                 (ownerRemaining.toDouble() / session.joinGraceDurationMillis.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
             }
             val ownerBar = getOrCreateJoinCountdownBossBar(session, owner.uniqueId)
-            ownerBar.name(legacySerializer.deserialize(ArenaI18n.text(owner, "arena.bossbar.join_countdown", "seconds" to formatRemainingSeconds(ownerRemaining))))
+            ownerBar.name(legacySerializer.deserialize(ArenaI18n.text(owner, ContentArenaKeys.ARENA_BOSSBAR_JOIN_COUNTDOWN, "seconds" to formatRemainingSeconds(ownerRemaining))))
             ownerBar.progress(ownerProgress)
             owner.showBossBar(ownerBar)
         }
@@ -7166,7 +7168,7 @@ class ArenaManager(
                 (remaining.toDouble() / session.joinGraceDurationMillis.toDouble()).toFloat().coerceIn(0.0f, 1.0f)
             }
             val bar = getOrCreateJoinCountdownBossBar(session, invitedId)
-            bar.name(legacySerializer.deserialize(ArenaI18n.text(invited, "arena.bossbar.join_countdown", "seconds" to formatRemainingSeconds(remaining))))
+            bar.name(legacySerializer.deserialize(ArenaI18n.text(invited, ContentArenaKeys.ARENA_BOSSBAR_JOIN_COUNTDOWN, "seconds" to formatRemainingSeconds(remaining))))
             bar.progress(progress)
             invited.showBossBar(bar)
         }
@@ -7174,7 +7176,7 @@ class ArenaManager(
 
     private fun getOrCreateJoinCountdownBossBar(session: ArenaSession, playerId: UUID): BossBar {
         return session.joinCountdownBossBars.getOrPut(playerId) {
-            BossBar.bossBar(legacySerializer.deserialize(ArenaI18n.text(null, "arena.bossbar.join_countdown", "seconds" to "0")), 1.0f, BossBar.Color.WHITE, BossBar.Overlay.NOTCHED_12)
+            BossBar.bossBar(legacySerializer.deserialize(ArenaI18n.text(null, ContentArenaKeys.ARENA_BOSSBAR_JOIN_COUNTDOWN, "seconds" to "0")), 1.0f, BossBar.Color.WHITE, BossBar.Overlay.NOTCHED_12)
         }
     }
 
@@ -7241,7 +7243,7 @@ class ArenaManager(
                 if (currentTick < nextTick) return@forEach
                 val player = Bukkit.getPlayer(playerId) ?: return@forEach
                 if (!player.isOnline) return@forEach
-                player.sendTitle("", ArenaI18n.text(player, "arena.messages.multiplayer.waiting_title"), 0, 25, 5)
+                player.sendTitle("", ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_WAITING_TITLE), 0, 25, 5)
                 session.waitingSubtitleNextTickByPlayer[playerId] = currentTick + 20L
             }
         }
@@ -7252,7 +7254,7 @@ class ArenaManager(
             session.waitingOutsideTicksByPlayer.remove(playerId)
             val player = Bukkit.getPlayer(playerId) ?: return@forEach
             player.sendMessage(
-                ArenaI18n.text(player, "arena.messages.multiplayer.waiting_exited")
+                ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_WAITING_EXITED)
             )
         }
     }
@@ -7343,7 +7345,7 @@ class ArenaManager(
             candidates
                 .filter { it.isOnline }
                 .forEach { player ->
-                    player.sendMessage(ArenaI18n.text(player, "arena.messages.multiplayer.fast_start_hint"))
+                    player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_FAST_START_HINT))
                 }
             session.waitingFastStartHintCooldownUntilMillis = nowMillis + MULTIPLAYER_FAST_START_HINT_COOLDOWN_MILLIS
         }
@@ -7929,7 +7931,7 @@ class ArenaManager(
             if (player != null && player.isOnline) {
                 OageMessageSender.send(
                     player,
-                    ArenaI18n.text(player, "arena.messages.oage.lift_occupied_done"),
+                    ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_OAGE_LIFT_OCCUPIED_DONE),
                     plugin,
                     sound = Sound.ENTITY_ALLAY_AMBIENT_WITHOUT_ITEM,
                     volume = 1.0f,
@@ -8057,7 +8059,7 @@ class ArenaManager(
             renderActionMarkerParticles(player, marker, color)
             if (isInsideActionMarkerRange(player.location, marker.center)) {
                 player.sendActionBar(
-                    Component.text(ArenaI18n.text(player, "arena.messages.lobby.tutorial.hold_hint"))
+                    Component.text(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_LOBBY_TUTORIAL_HOLD_HINT))
                 )
             }
             updateLobbyTutorialHoldState(player, marker, currentTick)
@@ -8102,7 +8104,7 @@ class ArenaManager(
 
         val tutorialState = lobbyTutorialStates[playerId]
         val stepIndex = tutorialState?.stepIndex ?: 0
-        val stepMessages = ArenaI18n.stringList(player, "arena.messages.lobby.tutorial.steps")
+        val stepMessages = ArenaI18n.stringList(player, ContentArenaKeys.ARENA_MESSAGES_LOBBY_TUTORIAL_STEPS)
         stepMessages.getOrNull(stepIndex)
             ?.takeIf { it.isNotBlank() }
             ?.let { sendLobbyGuideMessage(player, listOf(it)) }
@@ -8193,7 +8195,7 @@ class ArenaManager(
                 if (returnedToLobby && session.missionCompleted) {
                     val lobbyPlayer = Bukkit.getPlayer(participantId)
                     if (lobbyPlayer != null && lobbyPlayer.isOnline) {
-                        val followupMessage = ArenaI18n.stringList(lobbyPlayer, "arena.messages.oage.mission_returned_followup").randomOrNull()
+                        val followupMessage = ArenaI18n.stringList(lobbyPlayer, ContentArenaKeys.ARENA_MESSAGES_OAGE_MISSION_RETURNED_FOLLOWUP).randomOrNull()
                         if (!followupMessage.isNullOrBlank()) {
                             sendOageMessage(
                                 lobbyPlayer,
@@ -8211,7 +8213,7 @@ class ArenaManager(
         val marker = findHoldableActionMarker(session, player.location)
         if (marker?.type == ArenaActionMarkerType.DOOR_TOGGLE) {
             player.sendActionBar(
-                Component.text(ArenaI18n.text(player, "arena.messages.door.open_hint"))
+                Component.text(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_DOOR_OPEN_HINT))
             )
         }
         if (!player.isSneaking || marker == null) {
@@ -8603,13 +8605,13 @@ class ArenaManager(
     private fun buildRecruitmentSidebarLines(session: ArenaSession): List<String> {
         val now = System.currentTimeMillis()
         val remainingSeconds = (session.joinGraceEndMillis - now).coerceAtLeast(0L) / 1000L
-        val missionTitle = session.inviteMissionTitle?.takeIf { it.isNotBlank() } ?: ArenaI18n.text(null, "arena.ui.recruitment.default_mission_title")
+        val missionTitle = session.inviteMissionTitle?.takeIf { it.isNotBlank() } ?: ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_RECRUITMENT_DEFAULT_MISSION_TITLE)
 
         val lines = mutableListOf<String>()
         lines += ""
-        lines += ArenaI18n.text(null, "arena.ui.recruitment.title", "missionTitle" to missionTitle)
+        lines += ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_RECRUITMENT_TITLE, "missionTitle" to missionTitle)
         lines += ""
-        lines += ArenaI18n.text(null, "arena.ui.recruitment.remaining", "seconds" to remainingSeconds)
+        lines += ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_RECRUITMENT_REMAINING, "seconds" to remainingSeconds)
         lines += ""
 
         val playerIds = linkedSetOf<UUID>()
@@ -8621,9 +8623,9 @@ class ArenaManager(
                 ?: "Unknown"
             val inWaitingArea = session.waitingParticipants.contains(playerId)
             lines += if (inWaitingArea) {
-                ArenaI18n.text(null, "arena.ui.recruitment.waiting_participant", "name" to name)
+                ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_RECRUITMENT_WAITING_PARTICIPANT, "name" to name)
             } else {
-                ArenaI18n.text(null, "arena.ui.recruitment.normal_participant", "name" to name)
+                ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_RECRUITMENT_NORMAL_PARTICIPANT, "name" to name)
             }
         }
         lines += ""
@@ -8636,8 +8638,8 @@ class ArenaManager(
         val lines = mutableListOf<String>()
         lines += ""
         lines += when {
-            session.phase == ArenaPhase.GAME_OVER -> ArenaI18n.text(null, "arena.ui.sidebar.defeat")
-            inGetReady -> ArenaI18n.text(null, "arena.ui.sidebar.get_ready")
+            session.phase == ArenaPhase.GAME_OVER -> ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_SIDEBAR_DEFEAT)
+            inGetReady -> ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_SIDEBAR_GET_READY)
             else -> buildWaveSidebarHeader(session, sidebarWave ?: session.currentWave.coerceAtLeast(1))
         }
 
@@ -8646,7 +8648,7 @@ class ArenaManager(
             val elapsedMillis = System.currentTimeMillis() - session.firstDoorOpenedAtMillis!!
             val elapsedSeconds = (elapsedMillis / 1000).toInt().coerceAtLeast(0)
             val elapsedTimeText = formatTimeRemaining(elapsedSeconds)
-            lines += ArenaI18n.text(null, "arena.ui.sidebar.elapsed_time", "time" to elapsedTimeText)
+            lines += ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_SIDEBAR_ELAPSED_TIME, "time" to elapsedTimeText)
         }
 
         lines += ""
@@ -8662,7 +8664,7 @@ class ArenaManager(
                 ?: session.sidebarParticipantNames[playerId]
                 ?: "Unknown"
             val status = resolveSidebarParticipantStatus(session, playerId)
-            lines += ArenaI18n.text(null, "arena.ui.sidebar.participant_line", "name" to name, "status" to status)
+            lines += ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_SIDEBAR_PARTICIPANT_LINE, "name" to name, "status" to status)
         }
         lines += ""
         return lines
@@ -8676,7 +8678,7 @@ class ArenaManager(
     private fun buildWaveSidebarHeader(session: ArenaSession, wave: Int): String {
         return ArenaI18n.text(
             null,
-            "arena.ui.sidebar.wave_progress",
+            ContentArenaKeys.ARENA_UI_SIDEBAR_WAVE_PROGRESS,
             "wave" to wave,
             "current" to wave,
             "total" to session.waves
@@ -8685,15 +8687,15 @@ class ArenaManager(
 
     private fun resolveSidebarParticipantStatus(session: ArenaSession, playerId: UUID): String {
         if (isSidebarPreparing(session, playerId)) {
-            return ArenaI18n.text(null, "arena.ui.sidebar.status_preparing")
+            return ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_SIDEBAR_STATUS_PREPARING)
         }
 
         val downState = session.downedPlayers[playerId]
         if (downState != null) {
             if (downState.reviveDisabled) {
-                return ArenaI18n.text(null, "arena.ui.sidebar.status_dead")
+                return ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_SIDEBAR_STATUS_DEAD)
             }
-            return ArenaI18n.text(null, "arena.ui.sidebar.status_down")
+            return ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_SIDEBAR_STATUS_DOWN)
         }
 
         val online = Bukkit.getPlayer(playerId)
@@ -8704,7 +8706,7 @@ class ArenaManager(
             !online.isDead &&
             online.world.name != session.worldName
         ) {
-            return ArenaI18n.text(null, "arena.ui.sidebar.status_returned")
+            return ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_SIDEBAR_STATUS_RETURNED)
         }
 
         if (
@@ -8722,7 +8724,7 @@ class ArenaManager(
                 "§c❤ $health"
             }
         }
-        return ArenaI18n.text(null, "arena.ui.sidebar.status_dead")
+        return ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_SIDEBAR_STATUS_DEAD)
     }
 
     private fun isSidebarPreparing(session: ArenaSession, playerId: UUID): Boolean {
@@ -8769,7 +8771,7 @@ class ArenaManager(
         val objective = scoreboard.registerNewObjective(
             ARENA_SIDEBAR_OBJECTIVE_NAME,
             "dummy",
-            legacySerializer.deserialize(ArenaI18n.text(null, "arena.ui.sidebar.title"))
+            legacySerializer.deserialize(ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_SIDEBAR_TITLE))
         )
         objective.displaySlot = DisplaySlot.SIDEBAR
         objective.numberFormat(NumberFormat.blank())

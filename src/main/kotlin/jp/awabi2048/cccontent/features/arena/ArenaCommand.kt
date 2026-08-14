@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentArenaKeys
+
 import com.awabi2048.ccsystem.CCSystem
 
 import org.bukkit.Bukkit
@@ -53,13 +55,13 @@ class ArenaCommand(
 
     override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
         if (!ArenaPermissions.hasAdminAccess(sender)) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.no_permission"))
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_NO_PERMISSION))
             return true
         }
 
         if (!featureEnabledProvider()) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable"))
-            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "reason" to it)) }
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE))
+            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE_REASON, "reason" to it)) }
             return true
         }
 
@@ -86,7 +88,7 @@ class ArenaCommand(
     private fun handleMenu(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 2) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.usage.menu")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_USAGE_MENU)
             )
             return true
         }
@@ -94,7 +96,7 @@ class ArenaCommand(
         val menuType = ArenaMenuType.fromId(args[1])
         if (menuType == null) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.usage.menu")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_USAGE_MENU)
             )
             return true
         }
@@ -104,7 +106,7 @@ class ArenaCommand(
 
         if (!forcedByOther && !menuType.permissionCheck(target)) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.menu_permission_denied")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_MENU_PERMISSION_DENIED)
             )
             return true
         }
@@ -115,32 +117,32 @@ class ArenaCommand(
     private fun handleLobby(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 2) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.usage.lobby")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_USAGE_LOBBY)
             )
             return true
         }
 
         val manager = arenaManagerProvider()
         if (manager == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable"))
-            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "reason" to it)) }
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE))
+            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE_REASON, "reason" to it)) }
             return true
         }
 
         val target = Bukkit.getPlayer(args[1])
         if (target == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found"))
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_TARGET_NOT_FOUND))
             return true
         }
         if (!target.isOnline) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found"))
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_TARGET_NOT_FOUND))
             return true
         }
 
         val lobbyTypeRaw = args.getOrNull(2)?.lowercase()
         if (lobbyTypeRaw != null && lobbyTypeRaw != "tutorial" && lobbyTypeRaw != "main") {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.usage.lobby")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_USAGE_LOBBY)
             )
             return true
         }
@@ -148,14 +150,14 @@ class ArenaCommand(
         val moved = manager.sendPlayerToLobby(target, lobbyTypeRaw)
         if (!moved) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.lobby_failed")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_LOBBY_FAILED)
             )
             return true
         }
 
         val resolvedType = if (lobbyTypeRaw == "tutorial") "tutorial" else if (lobbyTypeRaw == "main") "main" else "auto"
         sender.sendMessage(
-            ArenaI18n.text(sender, "arena.messages.command.lobby_success", "player" to target.name, "type" to resolvedType)
+            ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_LOBBY_SUCCESS, "player" to target.name, "type" to resolvedType)
         )
         return true
     }
@@ -163,8 +165,8 @@ class ArenaCommand(
     private fun handleStatus(sender: CommandSender): Boolean {
         val manager = arenaManagerProvider()
         if (manager == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable"))
-            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "reason" to it)) }
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE))
+            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE_REASON, "reason" to it)) }
             return true
         }
 
@@ -189,8 +191,8 @@ class ArenaCommand(
         }
         val manager = arenaManagerProvider()
         if (manager == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable"))
-            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "reason" to it)) }
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE))
+            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE_REASON, "reason" to it)) }
             return true
         }
         if (!manager.debugSkipCurrentWave(player)) {
@@ -317,15 +319,15 @@ class ArenaCommand(
     private fun handleStart(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size !in 4..5) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.usage.start")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_USAGE_START)
             )
             return true
         }
 
         val manager = arenaManagerProvider()
         if (manager == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable"))
-            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "reason" to it)) }
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE))
+            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE_REASON, "reason" to it)) }
             return true
         }
 
@@ -352,7 +354,7 @@ class ArenaCommand(
             else -> {
                 val player = Bukkit.getPlayer(args[1])
                 if (player == null) {
-                    sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found"))
+                    sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_TARGET_NOT_FOUND))
                     return true
                 }
                 player to emptyList()
@@ -362,13 +364,13 @@ class ArenaCommand(
         val theme = args[2]
         val missionType = ArenaMissionType.fromId(args[3].lowercase())
         if (missionType == null || missionType !in startCommandMissionTypes) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.start_error.invalid_mission_type", "type" to args[3]))
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_START_ERROR_INVALID_MISSION_TYPE, "type" to args[3]))
             return true
         }
         val variantArg = args.getOrNull(4)
         if (variantArg != null && !variantArg.equals("promoted", ignoreCase = true)) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.usage.start")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_USAGE_START)
             )
             return true
         }
@@ -389,7 +391,7 @@ class ArenaCommand(
         )) {
             is ArenaStartResult.Success -> {
                 sender.sendMessage(
-                    ArenaI18n.text(sender, "arena.messages.command.start_success", "player" to target.name, "mob_type" to result.themeId, "difficulty" to result.difficultyDisplay, "theme" to result.themeId, "waves" to result.waves)
+                    ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_START_SUCCESS, "player" to target.name, "mob_type" to result.themeId, "difficulty" to result.difficultyDisplay, "theme" to result.themeId, "waves" to result.waves)
                 )
             }
             is ArenaStartResult.Error -> {
@@ -404,12 +406,12 @@ class ArenaCommand(
 
     private fun handleStop(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 2) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.usage.stop"))
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_USAGE_STOP))
             return true
         }
         val target = Bukkit.getPlayer(args[1])
         if (target == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found"))
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_TARGET_NOT_FOUND))
             return true
         }
         val manager = arenaManagerProvider()
@@ -421,15 +423,15 @@ class ArenaCommand(
 
         val stopped = manager.stopSession(
             target,
-            ArenaI18n.text(target, "arena.messages.session.stopped_by_admin")
+            ArenaI18n.text(target, ContentArenaKeys.ARENA_MESSAGES_SESSION_STOPPED_BY_ADMIN)
         )
         if (stopped) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.stop_success", "player" to target.name)
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_STOP_SUCCESS, "player" to target.name)
             )
         } else {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.stop_not_in_session", "player" to target.name)
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_STOP_NOT_IN_SESSION, "player" to target.name)
             )
         }
         return true
@@ -437,7 +439,7 @@ class ArenaCommand(
 
     private fun handleTheme(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size < 2 || !args[1].equals("list", ignoreCase = true)) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.usage.theme"))
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_USAGE_THEME))
             return true
         }
 
@@ -450,12 +452,12 @@ class ArenaCommand(
 
         val ids = manager.getThemeIds().sorted()
         if (ids.isEmpty()) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.theme_none"))
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_THEME_NONE))
             return true
         }
 
         sender.sendMessage(
-            ArenaI18n.text(sender, "arena.messages.command.theme_list", "themes" to ids.joinToString(", "))
+            ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_THEME_LIST, "themes" to ids.joinToString(", "))
         )
         return true
     }
@@ -463,35 +465,35 @@ class ArenaCommand(
     private fun handleLicense(sender: CommandSender, args: Array<out String>): Boolean {
         if (args.size != 4 || !args[1].equals("set", ignoreCase = true)) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.usage.license")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_USAGE_LICENSE)
             )
             return true
         }
 
         val target = Bukkit.getPlayer(args[2])
         if (target == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found"))
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_TARGET_NOT_FOUND))
             return true
         }
 
         val service = missionService
         if (service == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable"))
-            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable_reason", "reason" to it)) }
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE))
+            featureFailureReasonProvider()?.let { sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE_REASON, "reason" to it)) }
             return true
         }
 
         val licenseTier = ArenaLicenseTier.fromId(args[3])
         if (licenseTier == null) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.usage.license")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_USAGE_LICENSE)
             )
             return true
         }
 
         val updatedTier = service.setLicenseTier(target.uniqueId, licenseTier)
         sender.sendMessage(
-            ArenaI18n.text(sender, "arena.messages.command.license_set_success", "player" to target.name, "tier" to ArenaI18n.text(sender, updatedTier.displayNameKey))
+            ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_LICENSE_SET_SUCCESS, "player" to target.name, "tier" to ArenaI18n.text(sender, updatedTier.displayNameKey))
         )
         return true
     }
@@ -500,13 +502,13 @@ class ArenaCommand(
         val target = sender as? Player
         if (target == null) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.usage.menu")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_USAGE_MENU)
             )
             return true
         }
         if (!ArenaPermissions.hasBroadcastMenuPermission(target)) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.menu_permission_denied")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_MENU_PERMISSION_DENIED)
             )
             return true
         }
@@ -517,13 +519,13 @@ class ArenaCommand(
         val target = sender as? Player
         if (target == null) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.usage.menu")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_USAGE_MENU)
             )
             return true
         }
         if (!ArenaPermissions.hasPedestalMenuPermission(target)) {
             sender.sendMessage(
-                ArenaI18n.text(sender, "arena.messages.command.menu_permission_denied")
+                ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_MENU_PERMISSION_DENIED)
             )
             return true
         }
@@ -535,7 +537,7 @@ class ArenaCommand(
             val self = sender as? Player
             if (self == null) {
                 sender.sendMessage(
-                    ArenaI18n.text(sender, "arena.messages.command.target_required_from_console")
+                    ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_TARGET_REQUIRED_FROM_CONSOLE)
                 )
                 return null
             }
@@ -544,7 +546,7 @@ class ArenaCommand(
 
         val target = Bukkit.getPlayer(targetArg)
         if (target == null) {
-            sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.target_not_found"))
+            sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_TARGET_NOT_FOUND))
             return null
         }
         return target
@@ -555,7 +557,7 @@ class ArenaCommand(
             ArenaMenuType.MISSION -> {
                 val service = missionService
                 if (service == null) {
-                    sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.menu_open_failed"))
+                    sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_MENU_OPEN_FAILED))
                     return true
                 }
                 service.openMenu(target)
@@ -565,7 +567,7 @@ class ArenaCommand(
             ArenaMenuType.BROADCAST -> {
                 val menu = sessionInfoMenu
                 if (menu == null) {
-                    sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable"))
+                    sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE))
                     return true
                 }
                 menu.openMenu(target)
@@ -575,7 +577,7 @@ class ArenaCommand(
             ArenaMenuType.PEDESTAL -> {
                 val menu = pedestalMenu
                 if (menu == null) {
-                    sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable"))
+                    sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE))
                     return true
                 }
                 menu.openMenu(target)
@@ -585,7 +587,7 @@ class ArenaCommand(
             ArenaMenuType.TOKEN_EXCHANGE -> {
                 val menu = tokenExchangeMenu
                 if (menu == null) {
-                    sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.feature_unavailable"))
+                    sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_FEATURE_UNAVAILABLE))
                     return true
                 }
                 menu.openMenu(target)
@@ -595,13 +597,13 @@ class ArenaCommand(
     }
 
     private fun showUsage(sender: CommandSender) {
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.header"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.menu"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.lobby"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.start"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.stop"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.license"))
-        sender.sendMessage(ArenaI18n.text(sender, "arena.messages.command.help.status"))
+        sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_HELP_HEADER))
+        sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_HELP_MENU))
+        sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_HELP_LOBBY))
+        sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_HELP_START))
+        sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_HELP_STOP))
+        sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_HELP_LICENSE))
+        sender.sendMessage(ArenaI18n.text(sender, ContentArenaKeys.ARENA_MESSAGES_COMMAND_HELP_STATUS))
     }
 
     override fun onTabComplete(

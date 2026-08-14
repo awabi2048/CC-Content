@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.rank.prestige
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentProfessionKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -75,7 +77,7 @@ class PrestigeToken {
             // 表示名設定
             meta.setDisplayName(
                 messageProvider.getMessage(
-                    "profession.prestige.token.name",
+                    ContentProfessionKeys.PROFESSION_PRESTIGE_TOKEN_NAME,
                     "profession" to professionName
                 )
             )
@@ -87,25 +89,25 @@ class PrestigeToken {
             }
             val dataLines = mutableListOf<GuiLoreLine>(
                 GuiLoreLine.Data(
-                    messageProvider.getMessage("profession.prestige.token.cycle"),
+                    messageProvider.getMessage(ContentProfessionKeys.PROFESSION_PRESTIGE_TOKEN_CYCLE),
                     cycleNumber,
                     "§b"
                 ),
                 GuiLoreLine.Data(
-                    messageProvider.getMessage("profession.prestige.token.owner"),
+                    messageProvider.getMessage(ContentProfessionKeys.PROFESSION_PRESTIGE_TOKEN_OWNER),
                     owner.name,
                     "§6"
                 )
             )
             if (specializationName != null) {
                 dataLines += GuiLoreLine.Data(
-                    messageProvider.getMessage("profession.prestige.token.specialization"),
+                    messageProvider.getMessage(ContentProfessionKeys.PROFESSION_PRESTIGE_TOKEN_SPECIALIZATION),
                     specializationName,
                     "§d"
                 )
             }
             dataLines += GuiLoreLine.Data(
-                messageProvider.getMessage("profession.prestige.token.representative_statistic"),
+                messageProvider.getMessage(ContentProfessionKeys.PROFESSION_PRESTIGE_TOKEN_REPRESENTATIVE_STATISTIC),
                 representativeStatistic,
                 "§a"
             )
@@ -114,7 +116,7 @@ class PrestigeToken {
                 GuiLoreSpec.Blocks(listOf(
                     GuiLoreBlock(listOf(GuiLoreLine.Text(
                         messageProvider.getMessage(
-                            "profession.prestige.token.description",
+                            ContentProfessionKeys.PROFESSION_PRESTIGE_TOKEN_DESCRIPTION,
                             "profession" to professionName
                         )
                     ))),

@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.rank.localization
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 
 /**
@@ -36,4 +37,14 @@ class MessageProviderImpl(
     override fun getMessageList(key: String): List<String> {
         return languageLoader.getStringList(key)
     }
+    override fun getMessage(key: LocalizationKey<String>, vararg args: Any?): String {
+        val placeholders = args.mapNotNull { arg ->
+            @Suppress("UNCHECKED_CAST")
+            arg as? Pair<String, Any?>
+        }.toTypedArray()
+        return languageLoader.getMessage(key, *placeholders)
+    }
+
+    override fun getMessageList(key: LocalizationKey<List<String>>): List<String> =
+        languageLoader.getStringList(key)
 }

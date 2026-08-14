@@ -2,6 +2,12 @@
 
 package jp.awabi2048.cccontent.features.rank.command
 
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
+import com.awabi2048.ccsystem.api.localization.generated.ContentGuiKeys
+import com.awabi2048.ccsystem.api.localization.generated.ContentProfessionKeys
+import com.awabi2048.ccsystem.api.localization.generated.ContentRankKeys
+import com.awabi2048.ccsystem.api.localization.generated.ContentTutorialRankKeys
+
 import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
 
 import jp.awabi2048.cccontent.features.rank.RankManager
@@ -388,7 +394,7 @@ class RankCommand(
             return openProfessionSelectionGui(viewer)
         }
         if (!RankReleasePolicy.canAccessProfession(viewer, playerProfession.profession)) {
-            viewer.sendMessage(messageProvider.getMessage("release.profession_unavailable"))
+            viewer.sendMessage(messageProvider.getMessage(ContentProfessionKeys.RELEASE_PROFESSION_UNAVAILABLE))
             return false
         }
 
@@ -396,7 +402,7 @@ class RankCommand(
         val inventory = Bukkit.createInventory(
             holder,
             45,
-            messageProvider.getMessage("gui.profession.selection.main_menu_title")
+            messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_SELECTION_MAIN_MENU_TITLE)
         )
         holder.backingInventory = inventory
 
@@ -436,13 +442,13 @@ class RankCommand(
     private fun createAttainerGuildGuideItem(): DisplayItemSpec =
         DisplayItemSpec(
             material = Material.WRITABLE_BOOK,
-            name = toComponent(messageProvider.getMessage("tutorial_rank.attainer.guild_guide.name")),
+            name = toComponent(messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_ATTAINER_GUILD_GUIDE_NAME)),
             lore = blockLore(
                 listOf(
-                listOf(GuiLoreLine.Text(messageProvider.getMessage("tutorial_rank.attainer.guild_guide.completed"))),
+                listOf(GuiLoreLine.Text(messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_ATTAINER_GUILD_GUIDE_COMPLETED))),
                 listOf(
-                    GuiLoreLine.Text(messageProvider.getMessage("tutorial_rank.attainer.guild_guide.description")),
-                    GuiLoreLine.Text(messageProvider.getMessage("tutorial_rank.attainer.guild_guide.location"))
+                    GuiLoreLine.Text(messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_ATTAINER_GUILD_GUIDE_DESCRIPTION)),
+                    GuiLoreLine.Text(messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_ATTAINER_GUILD_GUIDE_LOCATION))
                 )
                 )
             ),
@@ -466,10 +472,10 @@ class RankCommand(
         }
         return DisplayItemSpec(
             material = Material.WRITABLE_BOOK,
-            name = toComponent("§e${messageProvider.getMessage("tutorial_rank.progress.name")}"),
+            name = toComponent("§e${messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_PROGRESS_NAME)}"),
             lore = GuiLoreSpec.Blocks(listOf(
                     GuiLoreBlock(listOf(
-                        GuiLoreLine.Text(messageProvider.getMessage("tutorial_rank.progress.description"))
+                        GuiLoreLine.Text(messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_PROGRESS_DESCRIPTION))
                     )),
                     GuiLoreBlock(listOf(
                         GuiLoreLine.ProgressPath(rankLabels, currentRank.ordinal)
@@ -496,9 +502,9 @@ class RankCommand(
                 49,
                 DisplayItemSpec(
                     Material.BOOK,
-                    toComponent(messageProvider.getMessage("gui.profession.guild.info.name")),
+                    toComponent(messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_GUILD_INFO_NAME)),
                     GuiLoreSpec.Rich(
-                        messageProvider.getMessageList("gui.profession.guild.info.lore").map(GuiLoreLine::Text),
+                        messageProvider.getMessageList(ContentGuiKeys.GUI_PROFESSION_GUILD_INFO_LORE).map(GuiLoreLine::Text),
                         GuiLoreFrame.NONE,
                     ),
                 ),
@@ -515,7 +521,7 @@ class RankCommand(
         }
         return InventoryMenuView(
             size = 54,
-            title = LEGACY_SERIALIZER.deserialize(messageProvider.getMessage("gui.profession.guild.title")),
+            title = LEGACY_SERIALIZER.deserialize(messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_GUILD_TITLE)),
             elements = entries,
             standardFrame = true,
         )
@@ -526,7 +532,7 @@ class RankCommand(
             Material.PLAYER_HEAD,
             toComponent("§a§l${player.name}"),
             GuiLoreSpec.Rich(
-                messageProvider.getMessageList("gui.profession.selection.player_head.lore").map(GuiLoreLine::Text),
+                messageProvider.getMessageList(ContentGuiKeys.GUI_PROFESSION_SELECTION_PLAYER_HEAD_LORE).map(GuiLoreLine::Text),
                 GuiLoreFrame.NONE,
             ),
             player.uniqueId,
@@ -546,11 +552,11 @@ class RankCommand(
         val professionName = messageProvider.getProfessionName(profession)
         val professionDesc = messageProvider.getProfessionDescription(profession)
         val typeName = when (profession.type) {
-            ProfessionType.GATHERING -> messageProvider.getMessage("gui.profession.type.gathering")
-            ProfessionType.CRAFTING -> messageProvider.getMessage("gui.profession.type.crafting")
-            ProfessionType.COMBAT -> messageProvider.getMessage("gui.profession.type.combat")
-            ProfessionType.CREATIVE -> messageProvider.getMessage("gui.profession.type.creative")
-            ProfessionType.GENERAL -> messageProvider.getMessage("gui.profession.type.general")
+            ProfessionType.GATHERING -> messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_TYPE_GATHERING)
+            ProfessionType.CRAFTING -> messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_TYPE_CRAFTING)
+            ProfessionType.COMBAT -> messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_TYPE_COMBAT)
+            ProfessionType.CREATIVE -> messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_TYPE_CREATIVE)
+            ProfessionType.GENERAL -> messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_TYPE_GENERAL)
         }
         
         val name = toComponent("${profession.displayColorCode}§l$professionName")
@@ -561,26 +567,26 @@ class RankCommand(
                 blockLore(listOf(listOf(
                     GuiLoreLine.Text(professionDesc),
                     GuiLoreLine.Spacer,
-                    GuiLoreLine.Data(messageProvider.getMessage("gui.profession.selection.profession_item.type_label_name"), typeName, "§f"),
+                    GuiLoreLine.Data(messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_SELECTION_PROFESSION_ITEM_TYPE_LABEL_NAME), typeName, "§f"),
                     GuiLoreLine.Spacer,
-                    GuiLoreLine.Text(messageProvider.getMessage("gui.profession.selection.profession_item.current_profession"))
+                    GuiLoreLine.Text(messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_SELECTION_PROFESSION_ITEM_CURRENT_PROFESSION))
                 ))),
             ))
         } else if (!RankReleasePolicy.canAccessProfession(viewer, profession)) {
             displayElement(slot, DisplayItemSpec(
                 Material.BARRIER,
-                toComponent(messageProvider.getMessage("release.profession_unavailable")),
-                blockLore(listOf(listOf(GuiLoreLine.Warning(messageProvider.getMessage("release.profession_unavailable_lore"))))),
+                toComponent(messageProvider.getMessage(ContentProfessionKeys.RELEASE_PROFESSION_UNAVAILABLE)),
+                blockLore(listOf(listOf(GuiLoreLine.Warning(messageProvider.getMessage(ContentProfessionKeys.RELEASE_PROFESSION_UNAVAILABLE_LORE))))),
             ))
         } else if (hasProfession) {
-            val alreadySelectedLore = messageProvider.getMessageList("gui.profession.selection.profession_item.already_selected_lore")
+            val alreadySelectedLore = messageProvider.getMessageList(ContentGuiKeys.GUI_PROFESSION_SELECTION_PROFESSION_ITEM_ALREADY_SELECTED_LORE)
             displayElement(slot, DisplayItemSpec(
                 icon,
                 name,
                 blockLore(listOf(buildList {
                     add(GuiLoreLine.Text(professionDesc))
                     add(GuiLoreLine.Spacer)
-                    add(GuiLoreLine.Data(messageProvider.getMessage("gui.profession.selection.profession_item.type_label_name"), typeName, "§f"))
+                    add(GuiLoreLine.Data(messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_SELECTION_PROFESSION_ITEM_TYPE_LABEL_NAME), typeName, "§f"))
                     add(GuiLoreLine.Spacer)
                     alreadySelectedLore.forEach { add(GuiLoreLine.Warning(it)) }
                 })),
@@ -595,13 +601,13 @@ class RankCommand(
                     role = GuiElementRole.ACTION,
                     description = listOf(professionDesc),
                     data = listOf(GuiMenuEntryData(
-                        messageProvider.getMessage("gui.profession.selection.profession_item.type_label_name"),
+                        messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_SELECTION_PROFESSION_ITEM_TYPE_LABEL_NAME),
                         typeName,
                     )),
                     actions = listOf(ContentMenuActionSafety.gesture(
                         PROFESSION_SELECT_ACTION,
                         MenuGesture.ANY,
-                        messageProvider.getMessage("gui.profession.selection.profession_item.select_action"),
+                        messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_SELECTION_PROFESSION_ITEM_SELECT_ACTION),
                         mapOf("profession" to profession.id),
                     )),
                 ),
@@ -614,12 +620,12 @@ class RankCommand(
             ?: return MenuActionResult.Rejected()
         if (rankManager.hasProfession(player.uniqueId)) {
             return MenuActionResult.Rejected(
-                toComponent(messageProvider.getMessage("gui.profession.error.already_has_profession"))
+                toComponent(messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_ERROR_ALREADY_HAS_PROFESSION))
             )
         }
         if (!RankReleasePolicy.canAccessProfession(player, profession)) {
             return MenuActionResult.Rejected(
-                toComponent(messageProvider.getMessage("release.profession_unavailable"))
+                toComponent(messageProvider.getMessage(ContentProfessionKeys.RELEASE_PROFESSION_UNAVAILABLE))
             )
         }
         return MenuActionResult.Success(
@@ -639,7 +645,7 @@ class RankCommand(
         val gui = CCSystem.getAPI().getGuiElementService()
         val title = gui.title(
                 com.awabi2048.ccsystem.api.gui.GuiNameSpec.Text(
-                    messageProvider.getMessage("gui.profession.confirm_dialog.title"),
+                    messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_CONFIRM_DIALOG_TITLE),
                     com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT,
                 )
         )
@@ -652,7 +658,7 @@ class RankCommand(
         val startSkill = skillTree?.getStartSkillId()?.let(skillTree::getSkill)
         val icon = startSkill?.icon?.let { Material.matchMaterial(it.uppercase()) } ?: Material.BOOK
         val bodyLines = messageProvider.getMessage(
-            "gui.profession.confirm_dialog.body",
+            ContentGuiKeys.GUI_PROFESSION_CONFIRM_DIALOG_BODY,
             "profession" to professionName,
             "description" to professionDesc,
         ).lines().map { line ->
@@ -666,8 +672,8 @@ class RankCommand(
                 blockLore(listOf(bodyLines)),
             ),
         )
-        val confirmLabel = messageProvider.getMessage("gui.profession.confirm_dialog.confirm_button")
-        val cancelLabel = messageProvider.getMessage("gui.profession.confirm_dialog.cancel_button")
+        val confirmLabel = messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_CONFIRM_DIALOG_CONFIRM_BUTTON)
+        val cancelLabel = messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_CONFIRM_DIALOG_CANCEL_BUTTON)
         return InventoryMenuView(
             size = layout.size,
             title = title,
@@ -710,20 +716,20 @@ class RankCommand(
             ?: return MenuActionResult.Rejected()
         if (!RankReleasePolicy.canAccessProfession(player, profession)) {
             return MenuActionResult.Rejected(
-                toComponent(messageProvider.getMessage("release.profession_unavailable"))
+                toComponent(messageProvider.getMessage(ContentProfessionKeys.RELEASE_PROFESSION_UNAVAILABLE))
             )
         }
         if (rankManager.hasProfession(player.uniqueId)) {
             return MenuActionResult.Rejected(
-                toComponent(messageProvider.getMessage("gui.profession.error.already_has_profession"))
+                toComponent(messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_ERROR_ALREADY_HAS_PROFESSION))
             )
         }
         if (!rankManager.selectProfession(player.uniqueId, profession)) {
             return MenuActionResult.Rejected(
-                toComponent(messageProvider.getMessage("gui.profession.error.selection_failed"))
+                toComponent(messageProvider.getMessage(ContentGuiKeys.GUI_PROFESSION_ERROR_SELECTION_FAILED))
             )
         }
-        player.sendMessage(messageProvider.getMessage("message.profession_selected", "profession" to messageProvider.getProfessionName(profession)))
+        player.sendMessage(messageProvider.getMessage(ContentRankKeys.MESSAGE_PROFESSION_SELECTED, "profession" to messageProvider.getProfessionName(profession)))
         return MenuActionResult.Success(MenuUpdate.Close)
     }
 
@@ -745,10 +751,10 @@ class RankCommand(
             inventory.setItem(slot, headerFooterPane)
         }
 
-        val skillTreeLore = messageProvider.getMessageList("rank.gui.tree_button_lore")
+        val skillTreeLore = messageProvider.getMessageList(ContentRankKeys.RANK_GUI_TREE_BUTTON_LORE)
         val skillTreeItem = createGuiBlockItem(
             Material.OAK_SAPLING,
-            toComponent(messageProvider.getMessage("rank.gui.tree_button")),
+            toComponent(messageProvider.getMessage(ContentRankKeys.RANK_GUI_TREE_BUTTON)),
             listOf(skillTreeLore.map(GuiLoreLine::Text))
         )
         inventory.setItem(MAIN_MENU_SKILL_TREE_SLOT, skillTreeItem)
@@ -770,7 +776,7 @@ class RankCommand(
             requiredTotalExp - previousLevelExp
         }
         val experienceDisplay = if (isMaxLevel) {
-            messageProvider.getMessage("rank.gui.max_level")
+            messageProvider.getMessage(ContentRankKeys.RANK_GUI_MAX_LEVEL)
         } else {
             "${String.format("%,d", currentLevelExp)}/${String.format("%,d", levelExp)}"
         }
@@ -790,10 +796,10 @@ class RankCommand(
         )
         inventory.setItem(MAIN_MENU_PROFESSION_OVERVIEW_SLOT, professionOverviewItem)
 
-        val settingsLore = messageProvider.getMessageList("rank.gui.settings_button_lore")
+        val settingsLore = messageProvider.getMessageList(ContentRankKeys.RANK_GUI_SETTINGS_BUTTON_LORE)
         val settingsItem = createGuiBlockItem(
             Material.COMPARATOR,
-            toComponent(messageProvider.getMessage("rank.gui.settings_button")),
+            toComponent(messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_BUTTON)),
             listOf(settingsLore.map(GuiLoreLine::Text))
         )
         inventory.setItem(MAIN_MENU_SETTINGS_SLOT, settingsItem)
@@ -807,12 +813,12 @@ class RankCommand(
             skullMeta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(
                 GuiLoreBlock(listOf(
                     GuiLoreLine.Data(
-                        messageProvider.getMessage("rank.gui.player_info.profession"),
+                        messageProvider.getMessage(ContentRankKeys.RANK_GUI_PLAYER_INFO_PROFESSION),
                         professionName,
                         playerProfession.profession.displayColorCode
                     ),
                     GuiLoreLine.Data(
-                        messageProvider.getMessage("rank.gui.player_info.level"),
+                        messageProvider.getMessage(ContentRankKeys.RANK_GUI_PLAYER_INFO_LEVEL),
                         currentLevel,
                         "§e"
                     )
@@ -874,13 +880,13 @@ class RankCommand(
     private fun openSkillTreeGui(viewer: Player): Boolean {
         val playerProfession = rankManager.getPlayerProfession(viewer.uniqueId)
         if (playerProfession == null) {
-            viewer.sendMessage(messageProvider.getMessage("rank.skill.gui.no_profession"))
+            viewer.sendMessage(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_NO_PROFESSION))
             return false
         }
         if (!RankReleasePolicy.canAccessProfession(viewer, playerProfession.profession) ||
             !RankReleasePolicy.canUseSkills(viewer)
         ) {
-            viewer.sendMessage(messageProvider.getMessage("release.skill_unavailable"))
+            viewer.sendMessage(messageProvider.getMessage(ContentProfessionKeys.RELEASE_SKILL_UNAVAILABLE))
             return false
         }
 
@@ -888,7 +894,7 @@ class RankCommand(
         if (skillTree == null) {
             viewer.sendMessage(
                 messageProvider.getMessage(
-                    "rank.skill.gui.tree_not_found",
+                    ContentRankKeys.RANK_SKILL_GUI_TREE_NOT_FOUND,
                     "profession" to messageProvider.getProfessionName(playerProfession.profession)
                 )
             )
@@ -898,7 +904,7 @@ class RankCommand(
         val selectedSkillId = skillTree.getStartSkillId()
         val selectedSkill = skillTree.getSkill(selectedSkillId)
         if (selectedSkill == null) {
-            viewer.sendMessage(messageProvider.getMessage("rank.skill.gui.start_not_found"))
+            viewer.sendMessage(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_START_NOT_FOUND))
             return false
         }
 
@@ -921,7 +927,7 @@ class RankCommand(
             holder,
             45,
             messageProvider.getMessage(
-                "rank.skill.gui.title",
+                ContentRankKeys.RANK_SKILL_GUI_TITLE,
                 "profession" to messageProvider.getProfessionName(playerProfession.profession)
             )
         )
@@ -938,7 +944,7 @@ class RankCommand(
         val inventory = Bukkit.createInventory(
             holder,
             27,
-            messageProvider.getMessage("rank.gui.settings_title")
+            messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_TITLE)
         )
         holder.backingInventory = inventory
         renderProfessionSettingsMenu(inventory, playerProfession, viewer)
@@ -974,24 +980,24 @@ class RankCommand(
         }
         val bossBarItem = createGuiBlockItem(
             Material.CLOCK,
-            toComponent(messageProvider.getMessage("rank.gui.settings.bossbar.title")),
+            toComponent(messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_BOSSBAR_TITLE)),
             listOf(listOf(
-                GuiLoreLine.Data(messageProvider.getMessage("rank.gui.settings.current_label"), bossBarMode.displayName, bossBarValueColor),
-                settingsSingleAction(player, messageProvider.getMessage("rank.gui.settings.bossbar.action"))
+                GuiLoreLine.Data(messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_CURRENT_LABEL), bossBarMode.displayName, bossBarValueColor),
+                settingsSingleAction(player, messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_BOSSBAR_ACTION))
             ))
         )
         val levelUpEnabled = rankManager.isLevelUpNotificationEnabled(playerProfession.playerUuid)
         val levelUpValue = if (levelUpEnabled) {
-            "§a${messageProvider.getMessage("rank.gui.settings.level_up.enabled")}"
+            "§a${messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_LEVEL_UP_ENABLED)}"
         } else {
-            "§c${messageProvider.getMessage("rank.gui.settings.level_up.disabled")}"
+            "§c${messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_LEVEL_UP_DISABLED)}"
         }
         val levelUpItem = createGuiBlockItem(
             Material.BELL,
-            toComponent(messageProvider.getMessage("rank.gui.settings.level_up.title")),
+            toComponent(messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_LEVEL_UP_TITLE)),
             listOf(listOf(
-                GuiLoreLine.Data(messageProvider.getMessage("rank.gui.settings.current_label"), levelUpValue, "§f"),
-                settingsSingleAction(player, messageProvider.getMessage("rank.gui.settings.level_up.action"))
+                GuiLoreLine.Data(messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_CURRENT_LABEL), levelUpValue, "§f"),
+                settingsSingleAction(player, messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_LEVEL_UP_ACTION))
             ))
         )
         val settingItems = mutableListOf(
@@ -1023,16 +1029,16 @@ class RankCommand(
                 settingItems += ProfessionSettingAction.FISHING_INFORMATION to
                     createGuiBlockItem(
                         Material.COMPASS,
-                        toComponent(messageProvider.getMessage("rank.gui.settings.feature.fishing_information.title")),
+                        toComponent(messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_FEATURE_FISHING_INFORMATION_TITLE)),
                         listOf(listOf(
                             GuiLoreLine.Data(
-                                messageProvider.getMessage("rank.gui.settings.current_label"),
+                                messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_CURRENT_LABEL),
                                 messageProvider.getMessage("rank.gui.settings.feature.fishing_information.mode.$mode"),
                                 "§e"
                             ),
                             settingsSingleAction(
                                 player,
-                                messageProvider.getMessage("rank.gui.settings.feature.fishing_information.action")
+                                messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_FEATURE_FISHING_INFORMATION_ACTION)
                             )
                         ))
                     )
@@ -1049,7 +1055,7 @@ class RankCommand(
 
         val backItem = createGuiItem(
             Material.REDSTONE,
-            toComponent(messageProvider.getMessage("rank.gui.settings.back")),
+            toComponent(messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_BACK)),
             emptyList()
         )
         inventory.setItem(SETTINGS_MENU_BACK_SLOT, backItem)
@@ -1068,7 +1074,7 @@ class RankCommand(
             toComponent(messageProvider.getMessage("rank.gui.settings.feature.$key.title")),
             listOf(listOf(
                 GuiLoreLine.Data(
-                    messageProvider.getMessage("rank.gui.settings.current_label"),
+                    messageProvider.getMessage(ContentRankKeys.RANK_GUI_SETTINGS_CURRENT_LABEL),
                     messageProvider.getMessage("rank.gui.settings.feature.state.$stateKey"),
                     stateColor
                 ),
@@ -1078,7 +1084,7 @@ class RankCommand(
     }
 
     private fun settingsSingleAction(player: Player, action: String): GuiLoreLine.Interaction {
-        val operation = CCSystem.getAPI().getI18nString(player, "lore.click.any")
+        val operation = CCSystem.getAPI().getLocalized(player, CommonKeys.LORE_CLICK_ANY)
         return GuiLoreLine.Interaction(player, GuiInputGesture.Described(operation), action)
     }
 
@@ -1883,34 +1889,34 @@ class RankCommand(
         )
         blocks += listOf(
             GuiLoreLine.Data(
-                messageProvider.getMessage("rank.skill.gui.lore.required_level_label"),
-                messageProvider.getMessage("rank.skill.gui.lore.level_value", "level" to skill.requiredLevel),
+                messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_LORE_REQUIRED_LEVEL_LABEL),
+                messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_LORE_LEVEL_VALUE, "level" to skill.requiredLevel),
                 if (state.currentLevel >= skill.requiredLevel) "§f" else "§c"
             )
         )
 
         val stateLine = when {
             prestigeUnlocked ->
-                GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.status.prestige_unlocked"))
+                GuiLoreLine.Text(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_STATUS_PRESTIGE_UNLOCKED))
             prestigeAvailable ->
-                GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.status.prestige_available"))
+                GuiLoreLine.Text(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_STATUS_PRESTIGE_AVAILABLE))
             acquired ->
-                GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.status.acquired"))
+                GuiLoreLine.Text(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_STATUS_ACQUIRED))
             available ->
-                GuiLoreLine.Text(messageProvider.getMessage("rank.skill.gui.status.available"))
+                GuiLoreLine.Text(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_STATUS_AVAILABLE))
             blockedByBranch ->
-                GuiLoreLine.Warning(messageProvider.getMessage("rank.skill.gui.lore.branch_locked"))
+                GuiLoreLine.Warning(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_LORE_BRANCH_LOCKED))
             missingPrerequisite ->
-                GuiLoreLine.Warning(messageProvider.getMessage("rank.skill.gui.lore.prerequisite_locked"))
+                GuiLoreLine.Warning(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_LORE_PREREQUISITE_LOCKED))
             state.currentLevel < skill.requiredLevel ->
                 GuiLoreLine.Warning(
                     messageProvider.getMessage(
-                        "rank.skill.gui.lore.level_locked",
+                        ContentRankKeys.RANK_SKILL_GUI_LORE_LEVEL_LOCKED,
                         "level" to skill.requiredLevel
                     )
                 )
             else ->
-                GuiLoreLine.Warning(messageProvider.getMessage("rank.skill.gui.status.locked"))
+                GuiLoreLine.Warning(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_STATUS_LOCKED))
         }
         blocks += listOf(stateLine)
 
@@ -1918,15 +1924,15 @@ class RankCommand(
             prestigeAvailable -> blocks += listOf(
                 GuiLoreLine.Interaction(
                     null,
-                    GuiInputGesture.Described(messageProvider.getMessage("rank.skill.gui.lore.click_operation")),
-                    messageProvider.getMessage("rank.skill.gui.lore.acquire_prestige_action")
+                    GuiInputGesture.Described(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_LORE_CLICK_OPERATION)),
+                    messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_LORE_ACQUIRE_PRESTIGE_ACTION)
                 )
             )
             available -> blocks += listOf(
                 GuiLoreLine.Interaction(
                     null,
-                    GuiInputGesture.Described(messageProvider.getMessage("rank.skill.gui.lore.click_operation")),
-                    messageProvider.getMessage("rank.skill.gui.lore.acquire_action")
+                    GuiInputGesture.Described(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_LORE_CLICK_OPERATION)),
+                    messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_LORE_ACQUIRE_ACTION)
                 )
             )
         }
@@ -1978,10 +1984,10 @@ class RankCommand(
                 "rank.tutorial_task_info.category.play_time",
                 "rank.tutorial_task_info.comment.play_time",
                 listOf(taskProgressLine(
-                    messageProvider.getMessage("tutorial_rank.task.label.play_time"),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_LABEL_PLAY_TIME),
                     current,
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.unit.minute"),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_UNIT_MINUTE),
                     done
                 ))
             )
@@ -1994,10 +2000,10 @@ class RankCommand(
                 val current = minOf(progress.activeOverworldTime, required)
                 val done = progress.activeOverworldTime >= required
                 details += taskProgressLine(
-                    messageProvider.getMessage("tutorial_rank.task.label.active_overworld"),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_LABEL_ACTIVE_OVERWORLD),
                     current,
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.unit.minute"),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_UNIT_MINUTE),
                     done
                 )
             }
@@ -2006,10 +2012,10 @@ class RankCommand(
                 val current = minOf(progress.activeNetherResourceTime, required)
                 val done = progress.activeNetherResourceTime >= required
                 details += taskProgressLine(
-                    messageProvider.getMessage("tutorial_rank.task.label.active_nether_resource"),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_LABEL_ACTIVE_NETHER_RESOURCE),
                     current,
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.unit.minute"),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_UNIT_MINUTE),
                     done
                 )
             }
@@ -2037,8 +2043,8 @@ class RankCommand(
                     done,
                     minOf(current, required),
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.suffix.defeat"),
-                    messageProvider.getMessage("tutorial_rank.task.unit.entity")
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_SUFFIX_DEFEAT),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_UNIT_ENTITY)
                 )
             }
             requirement.bossKills.forEach { (bossType, required) ->
@@ -2054,8 +2060,8 @@ class RankCommand(
                     done,
                     minOf(current, required),
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.suffix.defeat"),
-                    messageProvider.getMessage("tutorial_rank.task.unit.entity")
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_SUFFIX_DEFEAT),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_UNIT_ENTITY)
                 )
             }
 
@@ -2074,11 +2080,11 @@ class RankCommand(
                 val current = minOf(progress.diamondOresMined, required)
                 val done = progress.diamondOresMined >= required
                 details += taskProgressLine(
-                    messageProvider.getMessage("tutorial_rank.task.label.diamond_ore") +
-                        messageProvider.getMessage("tutorial_rank.task.suffix.collect"),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_LABEL_DIAMOND_ORE) +
+                        messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_SUFFIX_COLLECT),
                     current,
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.unit.item"),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_UNIT_ITEM),
                     done
                 )
             }
@@ -2095,8 +2101,8 @@ class RankCommand(
                     done,
                     minOf(current, required),
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.suffix.collect"),
-                    messageProvider.getMessage("tutorial_rank.task.unit.item")
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_SUFFIX_COLLECT),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_UNIT_ITEM)
                 )
             }
 
@@ -2117,10 +2123,10 @@ class RankCommand(
                 "rank.tutorial_task_info.category.vanilla_exp",
                 "rank.tutorial_task_info.comment.vanilla_exp",
                 listOf(taskProgressLine(
-                    messageProvider.getMessage("tutorial_rank.task.label.exp"),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_LABEL_EXP),
                     current,
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.unit.experience"),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_UNIT_EXPERIENCE),
                     done
                 ))
             )
@@ -2133,10 +2139,10 @@ class RankCommand(
                 val current = minOf(progress.enderEyesCrafted, required)
                 val done = progress.enderEyesCrafted >= required
                 details += taskProgressLine(
-                    messageProvider.getMessage("tutorial_rank.task.label.ender_eye"),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_LABEL_ENDER_EYE),
                     current,
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.unit.item"),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_UNIT_ITEM),
                     done
                 )
             }
@@ -2153,8 +2159,8 @@ class RankCommand(
                     done,
                     minOf(current, required),
                     required,
-                    messageProvider.getMessage("tutorial_rank.task.suffix.collect"),
-                    messageProvider.getMessage("tutorial_rank.task.unit.item")
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_SUFFIX_COLLECT),
+                    messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_UNIT_ITEM)
                 )
             }
 
@@ -2387,13 +2393,13 @@ class RankCommand(
         viewer.playSound(viewer.location, "minecraft:ui.button.click", 0.8f, 1.0f)
 
         if (!RankReleasePolicy.canUseSkills(viewer)) {
-            viewer.sendMessage(messageProvider.getMessage("release.skill_unavailable"))
+            viewer.sendMessage(messageProvider.getMessage(ContentProfessionKeys.RELEASE_SKILL_UNAVAILABLE))
             return
         }
 
         val latestProfession = rankManager.getPlayerProfession(viewer.uniqueId)
         if (latestProfession == null || latestProfession.profession != holder.state.profession) {
-            viewer.sendMessage(messageProvider.getMessage("rank.skill.gui.no_profession"))
+            viewer.sendMessage(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_NO_PROFESSION))
             viewer.playSound(viewer.location, "minecraft:entity.villager.no", 1.0f, 1.0f)
             return
         }
@@ -2419,7 +2425,7 @@ class RankCommand(
 
             viewer.sendMessage(
                 messageProvider.getMessage(
-                    "rank.skill.gui.unlock.already",
+                    ContentRankKeys.RANK_SKILL_GUI_UNLOCK_ALREADY,
                     "skill" to messageProvider.getSkillName(holder.state.profession, skill.skillId)
                 )
             )
@@ -2436,7 +2442,7 @@ class RankCommand(
             }
             viewer.sendMessage(
                 messageProvider.getMessage(
-                    "rank.skill.gui.unlock.missing_prerequisite",
+                    ContentRankKeys.RANK_SKILL_GUI_UNLOCK_MISSING_PREREQUISITE,
                     "skills" to prerequisiteNames
                 )
             )
@@ -2447,7 +2453,7 @@ class RankCommand(
         if (holder.state.currentLevel < skill.requiredLevel) {
             viewer.sendMessage(
                 messageProvider.getMessage(
-                    "rank.skill.gui.unlock.level_shortage",
+                    ContentRankKeys.RANK_SKILL_GUI_UNLOCK_LEVEL_SHORTAGE,
                     "required" to skill.requiredLevel,
                     "current" to holder.state.currentLevel
                 )
@@ -2466,7 +2472,7 @@ class RankCommand(
             siblings.any { it in holder.state.acquiredSkills && it != skill.skillId }
         }
         if (blockedByBranch) {
-            viewer.sendMessage(messageProvider.getMessage("rank.skill.gui.unlock.branch_locked"))
+            viewer.sendMessage(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_UNLOCK_BRANCH_LOCKED))
             viewer.playSound(viewer.location, "minecraft:entity.villager.no", 1.0f, 1.0f)
             return
         }
@@ -2493,7 +2499,7 @@ class RankCommand(
     ) {
         val success = rankManager.acquireSkill(viewer.uniqueId, skill.skillId)
         if (!success) {
-            viewer.sendMessage(messageProvider.getMessage("rank.skill.gui.unlock.failed"))
+            viewer.sendMessage(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_UNLOCK_FAILED))
             viewer.playSound(viewer.location, "minecraft:entity.villager.no", 1.0f, 1.0f)
             return
         }
@@ -2507,7 +2513,7 @@ class RankCommand(
 
         viewer.sendMessage(
             messageProvider.getMessage(
-                "rank.skill.gui.unlock.success",
+                ContentRankKeys.RANK_SKILL_GUI_UNLOCK_SUCCESS,
                 "skill" to messageProvider.getSkillName(holder.state.profession, skill.skillId)
             )
         )
@@ -2523,10 +2529,10 @@ class RankCommand(
         val skillName = messageProvider.getSkillName(holder.state.profession, skill.skillId)
         ConfirmationDialog.show(
             viewer,
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.title"))),
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.body", "skill" to skillName))),
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm"))),
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel"))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_DIALOG_TITLE))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_DIALOG_BODY, "skill" to skillName))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_DIALOG_CONFIRM))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_DIALOG_CANCEL))),
             { target -> executeSkillUnlock(target, holder, skillTree, skill) },
         )
     }
@@ -2540,10 +2546,10 @@ class RankCommand(
         val skillName = messageProvider.getSkillName(holder.state.profession, skill.skillId)
         ConfirmationDialog.show(
             viewer,
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.prestige.dialog.title"))),
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.prestige.dialog.body", "skill" to skillName))),
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm"))),
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel"))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_PRESTIGE_DIALOG_TITLE))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_PRESTIGE_DIALOG_BODY, "skill" to skillName))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_DIALOG_CONFIRM))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_DIALOG_CANCEL))),
             { target -> executePrestigeSkillUnlock(target, holder, skillTree, skill) },
         )
     }
@@ -2556,7 +2562,7 @@ class RankCommand(
     ) {
         val success = rankManager.acquirePrestigeSkill(viewer.uniqueId, skill.skillId)
         if (!success) {
-            viewer.sendMessage(messageProvider.getMessage("rank.skill.gui.prestige.unlock.failed"))
+            viewer.sendMessage(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_PRESTIGE_UNLOCK_FAILED))
             viewer.playSound(viewer.location, "minecraft:entity.villager.no", 1.0f, 1.0f)
             return
         }
@@ -2568,7 +2574,7 @@ class RankCommand(
 
         viewer.sendMessage(
             messageProvider.getMessage(
-                "rank.skill.gui.prestige.unlock.success",
+                ContentRankKeys.RANK_SKILL_GUI_PRESTIGE_UNLOCK_SUCCESS,
                 "skill" to messageProvider.getSkillName(holder.state.profession, skill.skillId)
             )
         )
@@ -2630,7 +2636,7 @@ class RankCommand(
             MAIN_MENU_SKILL_TREE_SLOT -> {
                 // スキルツリーを開く
                 if (!RankReleasePolicy.canUseSkills(player)) {
-                    player.sendMessage(messageProvider.getMessage("release.skill_unavailable"))
+                    player.sendMessage(messageProvider.getMessage(ContentProfessionKeys.RELEASE_SKILL_UNAVAILABLE))
                     return
                 }
                 ManagedMenuPresenter.success(player)
@@ -2644,7 +2650,7 @@ class RankCommand(
             }
             MAIN_MENU_MODE_SWITCH_SLOT -> {
                 if (!RankReleasePolicy.canUseSkills(player)) {
-                    player.sendMessage(messageProvider.getMessage("release.skill_unavailable"))
+                    player.sendMessage(messageProvider.getMessage(ContentProfessionKeys.RELEASE_SKILL_UNAVAILABLE))
                     return
                 }
                 // 能動スキルがない場合は処理しない
@@ -2765,7 +2771,7 @@ class RankCommand(
 
     private fun openPrestigeConfirmDialogFirst(player: Player) {
         if (!rankManager.canPrestige(player.uniqueId)) {
-            player.sendMessage(messageProvider.getMessage("rank.prestige.cannot"))
+            player.sendMessage(messageProvider.getMessage(ContentRankKeys.RANK_PRESTIGE_CANNOT))
             ManagedMenuPresenter.rejected(player)
             return
         }
@@ -2775,10 +2781,10 @@ class RankCommand(
         val prestigeLevel = rankManager.getPrestigeLevel(player.uniqueId)
         ConfirmationDialog.show(
             player,
-            withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.first.title"))),
-            withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.first.body", "profession" to professionName, "level" to prestigeLevel))),
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm"))),
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel"))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_PRESTIGE_DIALOG_FIRST_TITLE))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_PRESTIGE_DIALOG_FIRST_BODY, "profession" to professionName, "level" to prestigeLevel))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_DIALOG_CONFIRM))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_DIALOG_CANCEL))),
             { target -> openPrestigeConfirmDialogSecond(target) },
         )
     }
@@ -2789,10 +2795,10 @@ class RankCommand(
         val prestigeLevel = rankManager.getPrestigeLevel(player.uniqueId)
         ConfirmationDialog.show(
             player,
-            withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.second.title"))),
-            withoutItalic(toComponent(messageProvider.getMessage("rank.prestige.dialog.second.body", "profession" to professionName, "level" to prestigeLevel))),
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.confirm"))),
-            withoutItalic(toComponent(messageProvider.getMessage("rank.skill.gui.dialog.cancel"))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_PRESTIGE_DIALOG_SECOND_TITLE))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_PRESTIGE_DIALOG_SECOND_BODY, "profession" to professionName, "level" to prestigeLevel))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_DIALOG_CONFIRM))),
+            withoutItalic(toComponent(messageProvider.getMessage(ContentRankKeys.RANK_SKILL_GUI_DIALOG_CANCEL))),
             { target -> executePrestige(target) },
         )
     }
@@ -2800,7 +2806,7 @@ class RankCommand(
     private fun executePrestige(player: Player) {
         val success = rankManager.executePrestige(player.uniqueId)
         if (!success) {
-            player.sendMessage(messageProvider.getMessage("rank.prestige.failed"))
+            player.sendMessage(messageProvider.getMessage(ContentRankKeys.RANK_PRESTIGE_FAILED))
             ManagedMenuPresenter.rejected(player)
             return
         }

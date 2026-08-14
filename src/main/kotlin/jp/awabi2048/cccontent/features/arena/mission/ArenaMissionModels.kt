@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.arena.mission
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentArenaKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import jp.awabi2048.cccontent.gui.OwnedMenuHolder
 import java.util.UUID
@@ -241,10 +243,10 @@ object ArenaMissionLayout {
     val CONFIRM_SIZE: Int get() = CCSystem.getAPI().getGuiLayoutService().confirmation45().size
 
     val MENU_TITLE: String
-        get() = ArenaI18n.text(null, "arena.ui.menu_title")
+        get() = ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_MENU_TITLE)
 
     val CONFIRM_TITLE: String
-        get() = ArenaI18n.text(null, "arena.ui.confirm_title")
+        get() = ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_CONFIRM_TITLE)
 
     val MENU_MISSION_SLOTS = listOf(19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34)
     const val MENU_PLAYER_SLOT = 47

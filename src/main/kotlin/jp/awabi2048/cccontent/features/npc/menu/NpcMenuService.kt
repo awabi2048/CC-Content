@@ -2,6 +2,9 @@
 
 package jp.awabi2048.cccontent.features.npc.menu
 
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
+import com.awabi2048.ccsystem.api.localization.generated.ContentGuiKeys
+
 import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
@@ -423,8 +426,8 @@ class NpcMenuService(
                 add(GuiLoreLine.Data("死亡時刻", desc.createdAt, "§e"))
             }
             loreBlocks.add(GuiLoreBlock(infoLines))
-            val operation = CCSystem.getAPI().getI18nString(player, "lore.click.any")
-            val action = CCSystem.getAPI().getI18nString(player, "gui.npc.oage_shrine.request.restore.action")
+            val operation = CCSystem.getAPI().getLocalized(player, CommonKeys.LORE_CLICK_ANY)
+            val action = CCSystem.getAPI().getLocalized(player, ContentGuiKeys.GUI_NPC_OAGE_SHRINE_REQUEST_RESTORE_ACTION)
             loreBlocks.add(GuiLoreBlock(listOf(
                 GuiLoreLine.Interaction(player, GuiInputGesture.Described(operation), action),
                 GuiLoreLine.Data("初穂料", "🐿 ${ContentEconomyBridge.formatPrice(DEAD_CHEST_RECOVERY_COST)}", "§e")

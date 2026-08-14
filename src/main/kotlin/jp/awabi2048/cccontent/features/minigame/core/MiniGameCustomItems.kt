@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.minigame.core
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentCustomItemsKeys
+
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
@@ -44,8 +46,8 @@ class MiniGameManagerItem(
     private fun base(amount: Int, player: Player?): ItemStack = ItemStack(Material.POISONOUS_POTATO, amount).apply {
         PoisonousPotatoComponentPack.applyNonConsumable(this)
         itemMeta = itemMeta?.also { meta: ItemMeta ->
-            meta.setDisplayName(CustomItemI18n.text(player, "custom_items.minigame.manager.name", displayName))
-            meta.lore = CustomItemI18n.list(player, "custom_items.minigame.manager.lore", emptyList())
+            meta.setDisplayName(CustomItemI18n.text(player, ContentCustomItemsKeys.CUSTOM_ITEMS_MINIGAME_MANAGER_NAME, displayName))
+            meta.lore = CustomItemI18n.list(player, ContentCustomItemsKeys.CUSTOM_ITEMS_MINIGAME_MANAGER_LORE, emptyList())
             meta.setItemModel(itemModel)
             meta.setMaxStackSize(1)
         }

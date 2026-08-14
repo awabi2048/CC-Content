@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentArenaKeys
+
 import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
@@ -51,7 +53,7 @@ private object ArenaEnchantPedestalLayout {
     val CENTER_WHITE_SLOTS: Set<Int> = setOf(12, 13, 14, 18, 20, 21, 23, 24, 26, 30, 31, 32)
     val ACTIVE_BACKGROUND_SLOTS: Set<Int> = (9..35).toSet() - setOf(TOOL_SLOT)
     val TITLE: String
-        get() = ArenaI18n.text(null, "arena.ui.pedestal.title")
+        get() = ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_PEDESTAL_TITLE)
 
     val REVEAL_STEPS: List<List<Int>> = listOf(
         listOf(13, 31),
@@ -1313,7 +1315,7 @@ class ArenaEnchantPedestalMenu(
         val item = ItemStack(Material.BOOKSHELF)
         val meta = item.itemMeta ?: return item
         if (evaluation.powerInsufficient) {
-            meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.execute.insufficient_power"))
+            meta.setDisplayName(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PEDESTAL_EXECUTE_INSUFFICIENT_POWER))
             meta.lore = null
         } else if (!evaluation.processable) {
             meta.setDisplayName("§c力を感じられません")
@@ -1323,7 +1325,7 @@ class ArenaEnchantPedestalMenu(
             meta.lore(
                 CCSystem.getAPI().getLoreService().render(
                     GuiLoreSpec.Rich(
-                        listOf(GuiLoreLine.Warning(ArenaI18n.text(player, "arena.ui.pedestal.execute.missing_level", "value" to evaluation.missingLevel))),
+                        listOf(GuiLoreLine.Warning(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PEDESTAL_EXECUTE_MISSING_LEVEL, "value" to evaluation.missingLevel))),
                         GuiLoreFrame.NONE
                     )
                 )
@@ -1334,7 +1336,7 @@ class ArenaEnchantPedestalMenu(
             meta.lore(
                 CCSystem.getAPI().getLoreService().render(
                     GuiLoreSpec.Rich(
-                        listOf(GuiLoreLine.Text(ArenaI18n.text(player, "arena.ui.pedestal.execute.consume_level", "value" to consume))),
+                        listOf(GuiLoreLine.Text(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PEDESTAL_EXECUTE_CONSUME_LEVEL, "value" to consume))),
                         GuiLoreFrame.NONE
                     )
                 )
@@ -1349,7 +1351,7 @@ class ArenaEnchantPedestalMenu(
         val item = ItemStack(Material.END_CRYSTAL, progress.remainingUntilNextUnlockDisplayAmount())
         item.setData(DataComponentTypes.MAX_STACK_SIZE, 99)
         val meta = item.itemMeta ?: return item
-        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
+        meta.setDisplayName(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PEDESTAL_BLANK))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return ArenaMenuItems.hideTooltip(item)
@@ -1365,8 +1367,8 @@ class ArenaEnchantPedestalMenu(
     private fun buildInfoItem(player: Player): ItemStack {
         val item = ItemStack(Material.MAP)
         val meta = item.itemMeta ?: return item
-        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
-        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(ArenaI18n.stringList(player, "arena.ui.pedestal.info.dummy").map { GuiLoreLine.Text(it) }, GuiLoreFrame.NONE)))
+        meta.setDisplayName(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PEDESTAL_BLANK))
+        meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(ArenaI18n.stringList(player, ContentArenaKeys.ARENA_UI_PEDESTAL_INFO_DUMMY).map { GuiLoreLine.Text(it) }, GuiLoreFrame.NONE)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return ArenaMenuItems.hideTooltip(item)
@@ -1414,7 +1416,7 @@ class ArenaEnchantPedestalMenu(
         }
         val item = ItemStack(material)
         val meta = item.itemMeta ?: return item
-        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
+        meta.setDisplayName(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PEDESTAL_BLANK))
         meta.lore = null
         meta.persistentDataContainer.set(inputPlaceholderKey, PersistentDataType.BYTE, 1)
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
@@ -1423,7 +1425,7 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun buildInputSlotPlaceholder(player: Player): ItemStack {
-        val item = GuiMenuItems.backgroundPane(Material.LIGHT_GRAY_STAINED_GLASS_PANE, ArenaI18n.text(player, "arena.ui.pedestal.blank"))
+        val item = GuiMenuItems.backgroundPane(Material.LIGHT_GRAY_STAINED_GLASS_PANE, ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PEDESTAL_BLANK))
         val meta = item.itemMeta ?: return item
         meta.persistentDataContainer.set(inputPlaceholderKey, PersistentDataType.BYTE, 1)
         item.itemMeta = meta
@@ -1431,7 +1433,7 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun buildHiddenAnimationPane(player: Player): ItemStack {
-        val item = GuiMenuItems.backgroundPane(Material.GRAY_STAINED_GLASS_PANE, ArenaI18n.text(player, "arena.ui.pedestal.blank"))
+        val item = GuiMenuItems.backgroundPane(Material.GRAY_STAINED_GLASS_PANE, ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PEDESTAL_BLANK))
         val meta = item.itemMeta ?: return item
         meta.persistentDataContainer.set(inputPlaceholderKey, PersistentDataType.BYTE, 1)
         item.itemMeta = meta
@@ -1439,13 +1441,13 @@ class ArenaEnchantPedestalMenu(
     }
 
     private fun buildSimplePane(player: Player, material: Material): ItemStack {
-        return GuiMenuItems.backgroundPane(material, ArenaI18n.text(player, "arena.ui.pedestal.blank"))
+        return GuiMenuItems.backgroundPane(material, ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PEDESTAL_BLANK))
     }
 
     private fun buildPathPane(player: Player, material: Material, glint: Boolean): ItemStack {
         val item = ItemStack(material)
         val meta = item.itemMeta ?: return item
-        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
+        meta.setDisplayName(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PEDESTAL_BLANK))
         meta.persistentDataContainer.set(inputPlaceholderKey, PersistentDataType.BYTE, 1)
         meta.setEnchantmentGlintOverride(glint)
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES, ItemFlag.HIDE_ENCHANTS)
@@ -1456,7 +1458,7 @@ class ArenaEnchantPedestalMenu(
     private fun buildForgeProgressItem(player: Player): ItemStack {
         val item = ItemStack(Material.YELLOW_STAINED_GLASS_PANE)
         val meta = item.itemMeta ?: return item
-        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.pedestal.blank"))
+        meta.setDisplayName(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PEDESTAL_BLANK))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
         return ArenaMenuItems.hideTooltip(item)

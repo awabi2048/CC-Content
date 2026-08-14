@@ -1,11 +1,16 @@
 package jp.awabi2048.cccontent.features.rank.localization
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 
 /**
  * 翻訳メッセージを提供するインターフェース
  */
 interface MessageProvider {
+    fun getMessage(key: LocalizationKey<String>, vararg args: Any?): String
+
+    fun getMessageList(key: LocalizationKey<List<String>>): List<String>
+
     /**
      * 翻訳キーに基づいてメッセージを取得
      * @param key 翻訳キー

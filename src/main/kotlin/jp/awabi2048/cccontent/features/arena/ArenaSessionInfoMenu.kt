@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentArenaKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiItemSpec
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
@@ -28,7 +30,7 @@ object ArenaSessionInfoLayout {
     const val INFO_SLOT = 40
 
     val MENU_TITLE: String
-        get() = ArenaI18n.text(null, "arena.ui.broadcast.title")
+        get() = ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_TITLE)
 }
 
 class ArenaSessionInfoMenu(
@@ -105,14 +107,14 @@ class ArenaSessionInfoMenu(
     private fun buildSessionElement(slot: Int, session: ArenaSession): MenuElement {
         val themeIcon = arenaManager.getTheme(session.themeId)?.config(session.promoted)?.iconMaterial ?: Material.ROTTEN_FLESH
         val title = session.inviteMissionTitle
-            ?: ArenaI18n.text(null, "arena.ui.broadcast.default_title")
+            ?: ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_DEFAULT_TITLE)
 
         val hasArrived = session.participants.any { playerId ->
             Bukkit.getPlayer(playerId)?.world?.name == session.worldName
         }
         val waveLine = if (session.startedWaves.isEmpty()) {
             if (hasArrived) {
-                ArenaI18n.text(null, "arena.ui.broadcast.wave.get_ready")
+                ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_WAVE_GET_READY)
             } else {
                 null
             }
@@ -120,13 +122,13 @@ class ArenaSessionInfoMenu(
             val displayWave = session.startedWaves.maxOrNull() ?: session.currentWave.coerceAtLeast(1)
             val isLastWave = displayWave >= session.waves
             val waveBase = if (isLastWave) {
-                ArenaI18n.text(null, "arena.ui.broadcast.wave.last")
+                ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_WAVE_LAST)
             } else {
-                ArenaI18n.text(null, "arena.ui.broadcast.wave.normal", "wave" to displayWave)
+                ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_WAVE_NORMAL, "wave" to displayWave)
             }
             val cleared = session.clearedWaves.contains(displayWave)
             if (cleared) {
-                "$waveBase ${ArenaI18n.text(null, "arena.ui.broadcast.wave.clear")}"
+                "$waveBase ${ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_WAVE_CLEAR)}"
             } else {
                 waveBase
             }
@@ -143,7 +145,7 @@ class ArenaSessionInfoMenu(
                 ?: session.sidebarParticipantNames[playerId]
                 ?: "Unknown"
             val status = arenaManager.resolveParticipantStatus(session, playerId)
-            ArenaI18n.text(null, "arena.ui.broadcast.player_line", "name" to name, "status" to status)
+            ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_PLAYER_LINE, "name" to name, "status" to status)
         }
 
         val lastMsg = session.lastOageMessage
@@ -156,14 +158,14 @@ class ArenaSessionInfoMenu(
         return display(
             slot = slot,
             material = themeIcon,
-            name = ArenaI18n.text(null, "arena.ui.mission.item_name", "mission" to title),
+            name = ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_MISSION_ITEM_NAME, "mission" to title),
             lore = GuiLoreSpec.Blocks(buildList {
                 waveLine?.let { add(GuiLoreBlock(listOf(GuiLoreLine.Text(it)))) }
                 add(GuiLoreBlock(buildList {
-                    add(GuiLoreLine.Text(ArenaI18n.text(null, "arena.ui.broadcast.players_header")))
+                    add(GuiLoreLine.Text(ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_PLAYERS_HEADER)))
                     participantLines.forEach { add(GuiLoreLine.Text(it)) }
                     add(GuiLoreLine.Spacer)
-                    add(GuiLoreLine.Text(ArenaI18n.text(null, "arena.ui.broadcast.radio_header")))
+                    add(GuiLoreLine.Text(ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_RADIO_HEADER)))
                     add(GuiLoreLine.Text(radioLine))
                 }))
             }),
@@ -174,16 +176,16 @@ class ArenaSessionInfoMenu(
         display(
             slot = slot,
             material = Material.GLASS,
-            name = ArenaI18n.text(null, "arena.ui.broadcast.empty_slot"),
+            name = ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_EMPTY_SLOT),
             lore = GuiLoreSpec.None,
         )
 
     private fun buildLiftElement(): MenuElement {
         val (material, displayName) = when (arenaManager.getEntranceLiftStatus()) {
-            ArenaLiftStatus.OCCUPIED -> Material.CHEST_MINECART to ArenaI18n.text(null, "arena.ui.broadcast.lift.occupied")
-            ArenaLiftStatus.READY -> Material.MINECART to ArenaI18n.text(null, "arena.ui.broadcast.lift.ready")
-            ArenaLiftStatus.RETURNING -> Material.FURNACE_MINECART to ArenaI18n.text(null, "arena.ui.broadcast.lift.returning")
-            ArenaLiftStatus.UNAVAILABLE -> Material.BARRIER to ArenaI18n.text(null, "arena.ui.broadcast.lift.unavailable")
+            ArenaLiftStatus.OCCUPIED -> Material.CHEST_MINECART to ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_LIFT_OCCUPIED)
+            ArenaLiftStatus.READY -> Material.MINECART to ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_LIFT_READY)
+            ArenaLiftStatus.RETURNING -> Material.FURNACE_MINECART to ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_LIFT_RETURNING)
+            ArenaLiftStatus.UNAVAILABLE -> Material.BARRIER to ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_LIFT_UNAVAILABLE)
         }
         return display(ArenaSessionInfoLayout.LIFT_SLOT, material, displayName, GuiLoreSpec.None)
     }
@@ -192,9 +194,9 @@ class ArenaSessionInfoMenu(
         display(
             slot = ArenaSessionInfoLayout.INFO_SLOT,
             material = Material.BOOK,
-            name = ArenaI18n.text(null, "arena.ui.broadcast.info.name"),
+            name = ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_BROADCAST_INFO_NAME),
             lore = GuiLoreSpec.Rich(
-                ArenaI18n.stringList(null, "arena.ui.broadcast.info.lore").map(GuiLoreLine::Text),
+                ArenaI18n.stringList(null, ContentArenaKeys.ARENA_UI_BROADCAST_INFO_LORE).map(GuiLoreLine::Text),
                 GuiLoreFrame.NONE,
             ),
         )
