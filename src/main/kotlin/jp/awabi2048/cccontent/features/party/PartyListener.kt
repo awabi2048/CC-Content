@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.party
 
+import com.awabi2048.ccsystem.api.input.PlayerInteractionChannel
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerQuitEvent
@@ -16,7 +17,11 @@ class PartyListener(private val controller: PartyController) : Listener {
 
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
-        controller.interactionClaims.release(event.player.uniqueId, PartyMenuListener.CLAIM_OWNER)
+        controller.interactionClaims.release(
+            event.player.uniqueId,
+            PlayerInteractionChannel.SECONDARY,
+            PartyMenuListener.CLAIM_OWNER,
+        )
         controller.resetChat(event.player)
         runCatching { controller.service.scheduleDeparture(event.player.uniqueId) }
     }

@@ -10,6 +10,7 @@
 package jp.awabi2048.cccontent.features.arena
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.input.PlayerInteractionChannel
 import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageGenerator
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageBuildException
@@ -877,7 +878,8 @@ class ArenaManager(
         val placeholderLocation = Location(world, 0.0, 64.0, 0.0)
         val placeholderBounds = ArenaBounds(0, 0, 0, 0, 0, 0)
         val difficultyDisplay = ArenaMenuItems.difficultyStars(variant.difficultyStar)
-        if (enableMultiplayerJoin && !CCSystem.getAPI().getPlayerInteractionClaimService().tryClaim(target.uniqueId, ARENA_INVITE_CLAIM_OWNER)) {
+        if (enableMultiplayerJoin && CCSystem.getAPI().getPlayerInteractionClaimService()
+                .claim(target.uniqueId, PlayerInteractionChannel.SECONDARY, ARENA_INVITE_CLAIM_OWNER) == null) {
             return completed(ArenaStartResult.Error("arena.messages.command.start_error.interaction_busy"))
         }
         val session = ArenaSession(
@@ -1671,7 +1673,8 @@ class ArenaManager(
 
     private fun releaseInvitedPlayerLock(playerId: UUID) {
         invitedPlayerLocks.remove(playerId)
-        CCSystem.getAPI().getPlayerInteractionClaimService().release(playerId, ARENA_INVITED_CLAIM_OWNER)
+        CCSystem.getAPI().getPlayerInteractionClaimService()
+            .release(playerId, PlayerInteractionChannel.SECONDARY, ARENA_INVITED_CLAIM_OWNER)
         val player = Bukkit.getPlayer(playerId)
         if (player != null && player.isOnline) {
             player.isGlowing = false
@@ -1688,7 +1691,8 @@ class ArenaManager(
 
     private fun clearMultiplayerRecruitmentState(session: ArenaSession) {
         val ownerId = session.ownerPlayerId
-        CCSystem.getAPI().getPlayerInteractionClaimService().release(ownerId, ARENA_INVITE_CLAIM_OWNER)
+        CCSystem.getAPI().getPlayerInteractionClaimService()
+            .release(ownerId, PlayerInteractionChannel.SECONDARY, ARENA_INVITE_CLAIM_OWNER)
         hideJoinCountdownBossBar(session, ownerId)
         removeArenaSidebar(ownerId)
 
@@ -2463,7 +2467,8 @@ class ArenaManager(
             return
         }
 
-        if (!CCSystem.getAPI().getPlayerInteractionClaimService().tryClaim(invited.uniqueId, ARENA_INVITED_CLAIM_OWNER)) {
+        if (CCSystem.getAPI().getPlayerInteractionClaimService()
+                .claim(invited.uniqueId, PlayerInteractionChannel.SECONDARY, ARENA_INVITED_CLAIM_OWNER) == null) {
             owner.sendMessage(
                 ArenaI18n.text(owner, "arena.messages.multiplayer.invite_failed_already_locked", "player" to invited.name)
             )
@@ -2471,7 +2476,8 @@ class ArenaManager(
         }
 
         if (!session.invitedParticipants.add(invited.uniqueId)) {
-            CCSystem.getAPI().getPlayerInteractionClaimService().release(invited.uniqueId, ARENA_INVITED_CLAIM_OWNER)
+            CCSystem.getAPI().getPlayerInteractionClaimService()
+                .release(invited.uniqueId, PlayerInteractionChannel.SECONDARY, ARENA_INVITED_CLAIM_OWNER)
             owner.sendMessage(
                 ArenaI18n.text(owner, "arena.messages.multiplayer.already_invited", "player" to invited.name)
             )

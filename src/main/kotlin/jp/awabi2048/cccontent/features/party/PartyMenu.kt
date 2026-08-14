@@ -4,6 +4,7 @@ import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
 import jp.awabi2048.cccontent.gui.ContentMenuActionSafety
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.input.PlayerInteractionChannel
 import com.awabi2048.ccsystem.api.gui.GuiElementRole
 import com.awabi2048.ccsystem.api.gui.GuiMenuActionIntent
 import com.awabi2048.ccsystem.api.gui.GuiMenuEntryData
@@ -273,7 +274,11 @@ class PartyMenu(private val controller: PartyController) {
             showInviteDialog(player)
             return MenuActionResult.Success(MenuUpdate.None)
         }
-        if (!controller.interactionClaims.tryClaim(player.uniqueId, PartyMenuListener.CLAIM_OWNER)) {
+        if (controller.interactionClaims.claim(
+                player.uniqueId,
+                PlayerInteractionChannel.SECONDARY,
+                PartyMenuListener.CLAIM_OWNER,
+            ) == null) {
             controller.message(player, "party.interaction.busy")
             return MenuActionResult.Rejected()
         }
