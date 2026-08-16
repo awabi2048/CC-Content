@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.cooking
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.configuration.ConfigurationSection
@@ -26,9 +27,15 @@ data class CookingContainerRemainder(val material: Material, val amount: Int)
 data class UnifiedCookingIngredient(
     val id: String,
     val matcher: CookingIngredientMatcher,
-    val displayNameKey: String,
+    val displayName: CookingDisplayName,
     val containerRemainder: CookingContainerRemainder?
 )
+
+/** CC catalog と Minecraft クライアント翻訳を混同しない表示名契約です。 */
+sealed interface CookingDisplayName {
+    data class Localized(val key: LocalizationKey<String>) : CookingDisplayName
+    data class MinecraftTranslation(val key: String) : CookingDisplayName
+}
 
 enum class CuttingFoodClass { DELICATE, FIRM, TOUGH }
 enum class CookingIntermediateStage { PRIMARY, SECONDARY }
@@ -140,10 +147,26 @@ object UnifiedCookingConfigurationLoader {
             UnifiedCookingIngredient(
                 id,
                 CookingIngredientMatcher(type, value),
-                requireString(ingredient, "display_name_key", file),
+                parseDisplayName(requireString(ingredient, "display_name_key", file), file, path),
                 remainder
             )
         }.also { require(it.isNotEmpty()) { "${file.path}.ingredients must not be empty" } }
+    }
+
+    private fun parseDisplayName(raw: String, file: File, path: String): CookingDisplayName = when {
+        raw.startsWith("item.minecraft.") -> CookingDisplayName.MinecraftTranslation(raw)
+        else -> runCatching {
+            CookingDisplayName.Localized(
+                jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(
+                    raw,
+                    "custom_items.cooking.",
+                    "custom_items.resource.",
+                    "fishing.catalog.item.",
+                ),
+            )
+        }.getOrElse { error ->
+            throw IllegalArgumentException("${file.path}.$path.display_name_key is invalid: $raw", error)
+        }
     }
 
     @JvmStatic

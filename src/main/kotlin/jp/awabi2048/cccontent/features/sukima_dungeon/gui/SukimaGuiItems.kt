@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon.gui
 
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreFrame
 import com.awabi2048.ccsystem.api.gui.GuiInputGesture
@@ -15,7 +17,7 @@ internal object SukimaGuiItems {
     }
 
     fun singleAction(player: Player, action: String): GuiLoreLine.Interaction {
-        val operation = CCSystem.getAPI().getI18nString(player, "lore.click.any")
+        val operation = CCSystem.getAPI().getLocalized(player, CommonKeys.LORE_CLICK_ANY)
         return GuiLoreLine.Interaction(player, GuiInputGesture.Described(operation), action)
     }
 }

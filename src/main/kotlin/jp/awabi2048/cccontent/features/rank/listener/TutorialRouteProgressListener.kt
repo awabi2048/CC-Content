@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.rank.listener
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentTutorialRankKeys
+
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.RankStorage
 import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
@@ -145,7 +147,7 @@ class TutorialRouteProgressListener(
         if (cause == PlayerTeleportEvent.TeleportCause.NETHER_PORTAL || fromType == Material.NETHER_PORTAL) {
             evaluateAndSave(player)
             if (rankManager.getTutorialRank(player.uniqueId).level < TutorialRank.PIONEER.level) {
-                cancelPortal(event, player, messageProvider.getMessage("tutorial_rank.task.nether_locked"))
+                cancelPortal(event, player, messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_NETHER_LOCKED))
                 return
             }
             event.isCancelled = true
@@ -158,7 +160,7 @@ class TutorialRouteProgressListener(
         if (cause == PlayerTeleportEvent.TeleportCause.END_PORTAL || fromType == Material.END_PORTAL) {
             evaluateAndSave(player)
             if (rankManager.getTutorialRank(player.uniqueId).level < TutorialRank.ADVENTURER.level) {
-                cancelPortal(event, player, messageProvider.getMessage("tutorial_rank.task.end_locked"))
+                cancelPortal(event, player, messageProvider.getMessage(ContentTutorialRankKeys.TUTORIAL_RANK_TASK_END_LOCKED))
                 return
             }
             event.isCancelled = true

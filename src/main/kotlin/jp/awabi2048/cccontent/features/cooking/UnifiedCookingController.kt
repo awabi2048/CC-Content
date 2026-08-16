@@ -719,7 +719,10 @@ internal class UnifiedCookingController(
     private fun realItem(item: ItemStack): Boolean = !item.type.isAir && item.type !in UI_MATERIALS
     private fun encode(item: ItemStack): String = Base64.getEncoder().encodeToString(item.serializeAsBytes())
     private fun decode(encoded: String): ItemStack = ItemStack.deserializeBytes(Base64.getDecoder().decode(encoded))
-    private fun message(player: Player, key: String): String = CCSystem.getAPI().getI18nString(player, key)
+    private fun message(player: Player, key: String): String = CCSystem.getAPI().getLocalized(
+        player,
+        jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "cooking."),
+    )
 
 
     companion object {

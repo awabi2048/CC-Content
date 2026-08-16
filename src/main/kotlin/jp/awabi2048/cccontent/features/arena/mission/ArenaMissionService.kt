@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.arena.mission
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentArenaKeys
+
 import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
 
 import jp.awabi2048.cccontent.config.FeatureConfigManager
@@ -167,7 +169,7 @@ class ArenaMissionService(
         } catch (e: Exception) {
             plugin.logger.warning("[Arena] アリーナメニューの表示に失敗しました: message=${e.message}")
             e.printStackTrace()
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed_detail", "message" to (e.message ?: "unknown")))
+            player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MENU_OPEN_FAILED_DETAIL, "message" to (e.message ?: "unknown")))
             false
         }
     }
@@ -244,7 +246,7 @@ class ArenaMissionService(
 
         val missionIndex = ArenaMissionLayout.missionIndexForSlot(rawSlot) ?: return true
         val missionSet = getCurrentMissionSetOrNull() ?: run {
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed"))
+            player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MENU_OPEN_FAILED))
             return true
         }
         val mission = missionSet.missions.getOrNull(missionIndex) ?: return true
@@ -252,12 +254,12 @@ class ArenaMissionService(
         playUiClick(player)
 
         if (isMissionCompleted(player.uniqueId, mission.index)) {
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.already_completed"))
+            player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MISSION_ALREADY_COMPLETED))
             return true
         }
 
         if (arenaManager.isPlayerInvitedToSession(player.uniqueId)) {
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.already_in_mission"))
+            player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MISSION_ALREADY_IN_MISSION))
             return true
         }
 
@@ -266,7 +268,7 @@ class ArenaMissionService(
         }
 
         if (!openMissionConfirmMenu(player, mission.index)) {
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed"))
+            player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MENU_OPEN_FAILED))
         }
         return true
     }
@@ -285,7 +287,7 @@ class ArenaMissionService(
             ArenaMissionLayout.CONFIRM_CANCEL_SLOT -> {
                 playUiClick(player)
                 if (!openMenu(player)) {
-                    player.sendMessage(ArenaI18n.text(player, "arena.messages.menu.open_failed"))
+                    player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MENU_OPEN_FAILED))
                 }
                 true
             }
@@ -310,7 +312,7 @@ class ArenaMissionService(
                 evaluateLicensePromotion(participantId, playerData)
                 savePlayerData(participantId)
                 Bukkit.getPlayer(participantId)?.let { player ->
-                    player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.completed"))
+                    player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MISSION_COMPLETED))
                 }
                 plugin.logger.info("[Arena] mission completion recorded: player=$participantId, mission=${activeRecord.missionIndex}")
             }
@@ -341,16 +343,16 @@ class ArenaMissionService(
 
     private fun startMission(player: Player, missionIndex: Int) {
         val missionSet = getCurrentMissionSetOrNull() ?: run {
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.not_found"))
+            player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MISSION_NOT_FOUND))
             return
         }
         val mission = missionSet.missions.getOrNull(missionIndex) ?: run {
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.not_found"))
+            player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MISSION_NOT_FOUND))
             return
         }
 
         if (isMissionCompleted(player.uniqueId, mission.index)) {
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.already_completed"))
+            player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MISSION_ALREADY_COMPLETED))
             return
         }
 
@@ -361,7 +363,7 @@ class ArenaMissionService(
         val requestEvent = ArenaMissionStartRequestEvent(player, mission)
         Bukkit.getPluginManager().callEvent(requestEvent)
         if (requestEvent.isCancelled) {
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.start_cancelled"))
+            player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MISSION_START_CANCELLED))
             return
         }
 
@@ -402,7 +404,7 @@ class ArenaMissionService(
                         if (player.isOnline) {
                             OageMessageSender.send(
                                 player,
-                                ArenaI18n.text(player, "arena.messages.oage.lift_ready"),
+                                ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_OAGE_LIFT_READY),
                                 plugin,
                                 sound = Sound.ENTITY_ALLAY_AMBIENT_WITHOUT_ITEM,
                                 volume = 1.0f,
@@ -413,11 +415,11 @@ class ArenaMissionService(
                 }
                 is ArenaStartResult.Error -> {
                     if (result.messageKey == "arena.messages.command.start_error.stage_build_failed") {
-                        player.sendMessage(ArenaI18n.text(player, "arena.messages.mission.stage_build_failed_internal"))
+                        player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MISSION_STAGE_BUILD_FAILED_INTERNAL))
                     } else if (result.messageKey == "arena.messages.command.start_error.lift_occupied") {
                         OageMessageSender.send(
                             player,
-                            ArenaI18n.text(player, "arena.messages.multiplayer.lift_occupied_oage"),
+                            ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_LIFT_OCCUPIED_OAGE),
                             plugin,
                             sound = Sound.ENTITY_ALLAY_AMBIENT_WITHOUT_ITEM,
                             volume = 1.0f,
@@ -426,7 +428,7 @@ class ArenaMissionService(
                     } else if (result.messageKey == "arena.messages.command.start_error.lift_not_ready") {
                         OageMessageSender.send(
                             player,
-                            ArenaI18n.text(player, "arena.messages.multiplayer.lift_not_ready_oage"),
+                            ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MULTIPLAYER_LIFT_NOT_READY_OAGE),
                             plugin,
                             sound = Sound.ENTITY_ALLAY_AMBIENT_WITHOUT_ITEM,
                             volume = 1.0f,
@@ -746,9 +748,9 @@ class ArenaMissionService(
 
     private fun renderConfirmMenu(player: Player, inventory: Inventory, mission: ArenaMissionEntry) {
         fillConfirmBackground(inventory)
-        inventory.setItem(ArenaMissionLayout.CONFIRM_OK_SLOT, createActionItem(Material.LIME_WOOL, ArenaI18n.text(player, "arena.ui.confirm.ok_name"), ArenaI18n.stringList(player, "arena.ui.confirm.ok_lore").map(GuiLoreLine::Text)))
+        inventory.setItem(ArenaMissionLayout.CONFIRM_OK_SLOT, createActionItem(Material.LIME_WOOL, ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_CONFIRM_OK_NAME), ArenaI18n.stringList(player, ContentArenaKeys.ARENA_UI_CONFIRM_OK_LORE).map(GuiLoreLine::Text)))
         inventory.setItem(ArenaMissionLayout.CONFIRM_MISSION_SLOT, createMissionSummaryItem(player, mission))
-        inventory.setItem(ArenaMissionLayout.CONFIRM_CANCEL_SLOT, createActionItem(Material.RED_WOOL, ArenaI18n.text(player, "arena.ui.confirm.cancel_name"), ArenaI18n.stringList(player, "arena.ui.confirm.cancel_lore").map(GuiLoreLine::Text)))
+        inventory.setItem(ArenaMissionLayout.CONFIRM_CANCEL_SLOT, createActionItem(Material.RED_WOOL, ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_CONFIRM_CANCEL_NAME), ArenaI18n.stringList(player, ContentArenaKeys.ARENA_UI_CONFIRM_CANCEL_LORE).map(GuiLoreLine::Text)))
     }
 
     private fun openMissionConfirmMenu(player: Player, missionIndex: Int): Boolean {
@@ -800,9 +802,9 @@ class ArenaMissionService(
         val title = "${missionDisplayName(mission.missionTypeId)}＠${themeDisplayName(player, mission.themeId)}"
         meta.setDisplayName(
             if (isCompleted) {
-                ArenaI18n.text(player, "arena.ui.mission.completed_item_name", "mission" to title)
+                ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_MISSION_COMPLETED_ITEM_NAME, "mission" to title)
             } else {
-                ArenaI18n.text(player, "arena.ui.mission.item_name", "mission" to title)
+                ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_MISSION_ITEM_NAME, "mission" to title)
             }
         )
         meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(buildMissionLore(player, mission), GuiLoreFrame.BOTH)))
@@ -813,7 +815,7 @@ class ArenaMissionService(
     private fun createMissionSummaryItem(player: Player, mission: ArenaMissionEntry): ItemStack {
         return createActionItem(
             themeIconMaterial(mission.themeId, mission.promoted),
-            ArenaI18n.text(player, "arena.ui.mission.item_name", "mission" to "${missionDisplayName(mission.missionTypeId)}＠${themeDisplayName(player, mission.themeId)}"),
+            ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_MISSION_ITEM_NAME, "mission" to "${missionDisplayName(mission.missionTypeId)}＠${themeDisplayName(player, mission.themeId)}"),
             buildMissionConfirmLore(player, mission)
         )
     }
@@ -826,10 +828,10 @@ class ArenaMissionService(
         val item = ItemStack(Material.PLAYER_HEAD)
         val meta = item.itemMeta as? SkullMeta ?: return item
         meta.owningPlayer = player
-        meta.setDisplayName(ArenaI18n.text(player, "arena.ui.player.name_format", "player" to player.name))
+        meta.setDisplayName(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PLAYER_NAME_FORMAT, "player" to player.name))
         meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Rich(listOf(
-            GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.player.mob_kills"), "${playerData.totalMobKillCount} ${ArenaI18n.text(player, "arena.ui.player.mob_kills_unit")}", "§e"),
-            GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.player.barrier_restarts"), "${playerData.barrierRestartCount} ${ArenaI18n.text(player, "arena.ui.player.barrier_restarts_unit")}", "§e"),
+            GuiLoreLine.Data(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PLAYER_MOB_KILLS), "${playerData.totalMobKillCount} ${ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PLAYER_MOB_KILLS_UNIT)}", "§e"),
+            GuiLoreLine.Data(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PLAYER_BARRIER_RESTARTS), "${playerData.barrierRestartCount} ${ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_PLAYER_BARRIER_RESTARTS_UNIT)}", "§e"),
         ), GuiLoreFrame.BOTH)))
         meta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES)
         item.itemMeta = meta
@@ -839,7 +841,7 @@ class ArenaMissionService(
     private fun createInfoItem(): ItemStack {
         return createActionItem(
             Material.BOOK,
-            ArenaI18n.text(null, "arena.ui.info_title"),
+            ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_INFO_TITLE),
             buildInfoLore()
         )
     }
@@ -848,13 +850,13 @@ class ArenaMissionService(
         val currentTier = playerData.licenseTier
         val nextTier = currentTier.next()
         val lore = mutableListOf<GuiLoreLine>()
-        lore += GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.license_card.current_license"), licenseTierDisplayName(player, currentTier), "§e")
-        lore += GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.license_card.allowed_difficulty"), "${difficultyDisplay(currentTier.maxDifficultyStar)} ${ArenaI18n.text(player, "arena.ui.license_card.allowed_difficulty_suffix")}", "§c")
+        lore += GuiLoreLine.Data(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_LICENSE_CARD_CURRENT_LICENSE), licenseTierDisplayName(player, currentTier), "§e")
+        lore += GuiLoreLine.Data(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_LICENSE_CARD_ALLOWED_DIFFICULTY), "${difficultyDisplay(currentTier.maxDifficultyStar)} ${ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_LICENSE_CARD_ALLOWED_DIFFICULTY_SUFFIX)}", "§c")
         lore += GuiLoreLine.Spacer
-        lore += GuiLoreLine.Text(ArenaI18n.text(player, "arena.ui.license_card.next_header"))
+        lore += GuiLoreLine.Text(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_LICENSE_CARD_NEXT_HEADER))
 
         if (nextTier == null) {
-            lore += GuiLoreLine.StyledText(ArenaI18n.text(player, "arena.ui.license_card.max_reached"), "§a", false)
+            lore += GuiLoreLine.StyledText(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_LICENSE_CARD_MAX_REACHED), "§a", false)
         } else {
             val requirement = LICENSE_REQUIREMENTS[nextTier]
                 ?: throw IllegalStateException("ライセンス要件が未定義です: tier=${nextTier.id}")
@@ -863,7 +865,7 @@ class ArenaMissionService(
 
         return createActionItem(
             Material.NAME_TAG,
-            ArenaI18n.text(player, "arena.ui.license_card.title"),
+            ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_LICENSE_CARD_TITLE),
             lore
         )
     }
@@ -871,10 +873,10 @@ class ArenaMissionService(
     private fun buildMissionLore(player: Player, mission: ArenaMissionEntry): List<GuiLoreLine> {
         val missionType = ArenaMissionType.fromId(mission.missionTypeId) ?: ArenaMissionType.BARRIER_RESTART
         val lore = mutableListOf<GuiLoreLine>()
-        lore += GuiLoreLine.Text(ArenaI18n.text(player, "arena.ui.mission.mission_title"))
+        lore += GuiLoreLine.Text(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_MISSION_MISSION_TITLE))
         lore += missionGuideHints(missionType, player).map(GuiLoreLine::Text)
         lore += GuiLoreLine.Spacer
-        lore += GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.mission.difficulty_inline"), difficultyDisplay(mission.difficultyStar), "§f")
+        lore += GuiLoreLine.Data(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_MISSION_DIFFICULTY_INLINE), difficultyDisplay(mission.difficultyStar), "§f")
         return lore
     }
 
@@ -882,16 +884,16 @@ class ArenaMissionService(
         val missionType = ArenaMissionType.fromId(mission.missionTypeId) ?: ArenaMissionType.BARRIER_RESTART
         val memo = randomMissionMemo(player)
         val lore = mutableListOf<GuiLoreLine>()
-        lore += GuiLoreLine.Text(ArenaI18n.text(player, "arena.ui.mission.mission_title"))
+        lore += GuiLoreLine.Text(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_MISSION_MISSION_TITLE))
         lore += missionGuideHints(missionType, player).map(GuiLoreLine::Text)
         lore += GuiLoreLine.Spacer
-        lore += GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.mission.difficulty_inline"), difficultyDisplay(mission.difficultyStar), "§f")
-        lore += GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.mission.memo_inline"), memo, "§f")
+        lore += GuiLoreLine.Data(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_MISSION_DIFFICULTY_INLINE), difficultyDisplay(mission.difficultyStar), "§f")
+        lore += GuiLoreLine.Data(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_MISSION_MEMO_INLINE), memo, "§f")
         return lore
     }
 
     private fun buildInfoLore(): List<GuiLoreLine> {
-        val lines = ArenaI18n.stringList(null, "arena.ui.info.lines")
+        val lines = ArenaI18n.stringList(null, ContentArenaKeys.ARENA_UI_INFO_LINES)
         return lines.map(GuiLoreLine::Text)
     }
 
@@ -900,7 +902,7 @@ class ArenaMissionService(
     }
 
     private fun randomMissionMemo(player: Player): String {
-        val memos = ArenaI18n.stringList(player, "arena.mission.memo_choices")
+        val memos = ArenaI18n.stringList(player, ContentArenaKeys.ARENA_MISSION_MEMO_CHOICES)
         return memos.randomOrNull() ?: "§eがんばってください！"
     }
 
@@ -957,7 +959,7 @@ class ArenaMissionService(
             return true
         }
         player.sendMessage(
-            ArenaI18n.text(player, "arena.messages.mission.license_insufficient")
+            ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MISSION_LICENSE_INSUFFICIENT)
         )
         return false
     }
@@ -1078,7 +1080,7 @@ class ArenaMissionService(
             val onlinePlayer = Bukkit.getPlayer(playerId)
             if (onlinePlayer != null && onlinePlayer.isOnline) {
                 onlinePlayer.sendMessage(
-                    ArenaI18n.text(onlinePlayer, "arena.messages.license.promoted", "tier" to licenseTierDisplayName(onlinePlayer, nextTier))
+                    ArenaI18n.text(onlinePlayer, ContentArenaKeys.ARENA_MESSAGES_LICENSE_PROMOTED, "tier" to licenseTierDisplayName(onlinePlayer, nextTier))
                 )
             }
         }

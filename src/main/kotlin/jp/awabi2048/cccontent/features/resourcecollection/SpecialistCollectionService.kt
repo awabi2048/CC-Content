@@ -244,7 +244,7 @@ class SpecialistCollectionService(
         )
         player.swingMainHand()
         val materialHint = if (profile.detailedInspectionEnabled) {
-            CCSystem.getAPI().getI18nString(player, "custom_items.resource.${result.resourceId}.name")
+            CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text("custom_items.resource.${result.resourceId}.name", "custom_items.resource."))
         } else {
             text(player, "resource_collection.display.hint.companion_minerals")
         }
@@ -273,7 +273,7 @@ class SpecialistCollectionService(
     }
 
     private fun localizedEnum(player: Player, prefix: String, value: String): String =
-        CCSystem.getAPI().getI18nString(player, "$prefix.${value.lowercase()}")
+        CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text("$prefix.${value.lowercase()}", "resource_collection."))
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     fun onAreaHarvest(event: BlockBreakEvent) {
@@ -508,9 +508,9 @@ class SpecialistCollectionService(
         val collectibleHint = if (profile.detailedInspectionEnabled) {
             discoveredDefinitions
                 .map { definition ->
-                    CCSystem.getAPI().getI18nString(
+                    CCSystem.getAPI().getLocalized(
                         player,
-                        "custom_items.${definition.customItemId}.name"
+                        jp.awabi2048.cccontent.util.ContentLocalizationKeys.text("custom_items.${definition.customItemId}.name", "custom_items.")
                     )
                 }
                 .distinct()
@@ -538,7 +538,7 @@ class SpecialistCollectionService(
                 add(GuiLoreLine.Data(
                     text(player, "resource_collection.display.data.uses"),
                     discoveredDefinitions
-                        .map { definition -> CCSystem.getAPI().getI18nString(player, definition.useNameKey) }
+                        .map { definition -> CCSystem.getAPI().getLocalized(player, definition.useNameKey) }
                         .distinct()
                         .joinToString(text(player, "resource_collection.display.list_separator")),
                     "§f"
@@ -547,7 +547,7 @@ class SpecialistCollectionService(
                     text(player, "resource_collection.display.data.vegetation_group"),
                     discoveredDefinitions
                         .map { definition ->
-                            CCSystem.getAPI().getI18nString(player, definition.vegetationGroupNameKey)
+                            CCSystem.getAPI().getLocalized(player, definition.vegetationGroupNameKey)
                         }
                         .distinct()
                         .joinToString(text(player, "resource_collection.display.list_separator")),
@@ -720,14 +720,14 @@ class SpecialistCollectionService(
                     "[Resource Collection] 存在しない林産物アイテムを無視しました: ${resolution.type.itemId}"
                 )
             }
-            if (targetBlock != null && !CCSystem.getAPI().hasI18nKey(resolution.type.displayNameKey)) {
+            if (targetBlock != null && !jp.awabi2048.cccontent.util.ContentLocalizationKeys.hasText(resolution.type.displayNameKey, "custom_items.resource.")) {
                 plugin.logger.warning(
                     "[Resource Collection] 存在しない林産物言語キーを無視しました: ${resolution.type.displayNameKey}"
                 )
             }
             if (targetBlock != null &&
                 CustomItemManager.getItem(resolution.type.itemId) != null &&
-                CCSystem.getAPI().hasI18nKey(resolution.type.displayNameKey)) {
+                jp.awabi2048.cccontent.util.ContentLocalizationKeys.hasText(resolution.type.displayNameKey, "custom_items.resource.")) {
                 targets[targetBlock.key()] = ForestProductTarget(
                     resolution.type.itemId,
                     resolution.type.name.lowercase(),
@@ -738,7 +738,7 @@ class SpecialistCollectionService(
                 )
                 if (profile.exactMaterialInspectionEnabled) {
                     discoveredNames.add(
-                        CCSystem.getAPI().getI18nString(player, resolution.type.displayNameKey)
+                        CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(resolution.type.displayNameKey, "custom_items.resource."))
                     )
                 }
                 player.spawnParticle(
@@ -1332,7 +1332,7 @@ class SpecialistCollectionService(
                 "§a",
                 false
             ))
-            if (CCSystem.getAPI().hasI18nKey(descriptionKey)) {
+            if (jp.awabi2048.cccontent.util.ContentLocalizationKeys.hasText(descriptionKey, "custom_items.")) {
                 add(GuiLoreLine.Text(text(player, descriptionKey)))
             }
         }
@@ -1501,7 +1501,7 @@ class SpecialistCollectionService(
     }
 
     private fun text(player: Player?, key: String, vararg values: Pair<String, Any>): String =
-        CCSystem.getAPI().getI18nString(player, key, values.toMap()).replace('&', '§')
+        CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "resource_collection.", "custom_items.resource."), values.toMap()).replace('&', '§')
 
     private fun message(player: Player?, key: String, vararg values: Pair<String, Any>): Component =
         Component.text(text(player, key, *values))

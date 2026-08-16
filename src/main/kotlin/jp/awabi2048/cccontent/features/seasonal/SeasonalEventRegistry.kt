@@ -35,19 +35,14 @@ object SeasonalEventRegistry {
             zoneId = ZoneId.of(requiredString(config, "timezone")),
             upcomingWindow = Duration.ofSeconds(config.getLong("upcoming_window_seconds").also { require(it >= 0) })
         )
-        var rejected = 0
-        val definitions = config.getMapList("definitions").mapIndexedNotNull { index, raw ->
-            runCatching { parseDefinition(raw, index) }
-                .onFailure { error ->
-                    rejected++
-                    plugin.logger.warning("[Seasonal] definitions[$index]を無効化しました: ${error.message}")
-                }
-                .getOrNull()
+        // 言語キー不正を含む設定不整合は項目単位で隠さず、ロード全体を失敗させます。
+        val definitions = config.getMapList("definitions").mapIndexed { index, raw ->
+            parseDefinition(raw, index)
         }
         val duplicateIds = definitions.groupingBy(SeasonalEventDefinition::id).eachCount()
             .filterValues { it > 1 }.keys
         require(duplicateIds.isEmpty()) { "$CONFIG_PATH contains duplicate ids: ${duplicateIds.sorted()}" }
-        return SeasonalRegistryLoadResult(settings, definitions, rejected)
+        return SeasonalRegistryLoadResult(settings, definitions, 0)
     }
 
     private fun parseDefinition(raw: Map<*, *>, index: Int): SeasonalEventDefinition {
@@ -58,7 +53,10 @@ object SeasonalEventRegistry {
         return SeasonalEventDefinition(
             id = id,
             enabled = requiredBoolean(raw, "enabled", path),
-            displayNameKey = requiredString(raw, "display_name_key", path),
+            displayNameKey = jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(
+                requiredString(raw, "display_name_key", path),
+                "seasonal.",
+            ),
             schedule = parseSchedule(schedule, "$path.schedule"),
             gracePeriod = Duration.ofSeconds(optionalLong(raw, "grace_seconds", 0L, path)),
             cycle = cycleMap?.let { parseCycle(it, "$path.cycle") },

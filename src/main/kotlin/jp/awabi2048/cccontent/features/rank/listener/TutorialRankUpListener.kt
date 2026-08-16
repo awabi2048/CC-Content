@@ -1,5 +1,8 @@
 package jp.awabi2048.cccontent.features.rank.listener
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentRankKeys
+import com.awabi2048.ccsystem.api.localization.generated.ContentTutorialRankKeys
+
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.event.TutorialRankUpEvent
 import jp.awabi2048.cccontent.features.rank.localization.MessageProvider
@@ -25,13 +28,13 @@ class TutorialRankUpListener(
         val newRank = event.newRank
 
         player.sendMessage("§6§l==========================================")
-        player.sendMessage(messageProvider.getMessage("message.rank_up", "rank" to newRank.name))
+        player.sendMessage(messageProvider.getMessage(ContentRankKeys.MESSAGE_RANK_UP, "rank" to newRank.name))
         player.sendMessage("§f${oldRank.name} → ${newRank.name}")
         player.sendMessage("§6§l==========================================")
         player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f)
 
         if (newRank == TutorialRank.ATTAINER && !rankManager.hasProfession(player.uniqueId)) {
-            messageProvider.getMessageList("tutorial_rank.attainer.reached_messages").forEach(player::sendMessage)
+            messageProvider.getMessageList(ContentTutorialRankKeys.TUTORIAL_RANK_ATTAINER_REACHED_MESSAGES).forEach(player::sendMessage)
         }
     }
 }

@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentArenaKeys
+
 import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
@@ -49,8 +51,8 @@ private object ArenaTokenExchangeLayout {
     const val CONFIRM_OK_SLOT = 20
     const val CONFIRM_CANCEL_SLOT = 24
     val INPUT_SLOTS: Set<Int> = (10..16).toSet() + (19..25).toSet() + (28..34).toSet()
-    val TITLE: String get() = ArenaI18n.text(null, "arena.ui.token_exchange.title")
-    val CONFIRM_TITLE: String get() = ArenaI18n.text(null, "arena.ui.token_exchange.confirm_title")
+    val TITLE: String get() = ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_TOKEN_EXCHANGE_TITLE)
+    val CONFIRM_TITLE: String get() = ArenaI18n.text(null, ContentArenaKeys.ARENA_UI_TOKEN_EXCHANGE_CONFIRM_TITLE)
 }
 
 private enum class TokenExchangeMode(val id: String, val material: Material) {
@@ -452,7 +454,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
                 player.uniqueId, player.name, "token_exchange_failed",
                 holder.mode.id, current.total.toDouble(), current.stacks, "economy_deposit_failed"
             )
-            player.sendMessage(ArenaI18n.text(player, "arena.messages.token_exchange.failed"))
+            player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_TOKEN_EXCHANGE_FAILED))
             sourceHolder.transitionToConfirm = false
             activeMenuPlayers += player.uniqueId
             syncTemporaryHints(player)
@@ -476,7 +478,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
         removeTemporaryHints(player, "exchange_completed", false)
         player.playSound(player.location, Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 2.0f)
         ManagedMenuPresenter.close(player)
-        player.sendMessage(ArenaI18n.text(player, "arena.messages.token_exchange.completed", "amount" to formatAcorn(current.total)))
+        player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_TOKEN_EXCHANGE_COMPLETED, "amount" to formatAcorn(current.total)))
     }
 
     private fun removeInputItemsForExchange(holder: ArenaTokenExchangeHolder): List<RemovedInputItem> {
@@ -590,8 +592,8 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
         )
         inventory.setItem(
             ArenaTokenExchangeLayout.INFO_SLOT,
-            GuiMenuItems.icon(Material.BOOK, ArenaI18n.text(player, "arena.ui.token_exchange.info_name"), listOf(
-                GuiLoreLine.Text(ArenaI18n.text(player, "arena.ui.token_exchange.info_lore"))
+            GuiMenuItems.icon(Material.BOOK, ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_TOKEN_EXCHANGE_INFO_NAME), listOf(
+                GuiLoreLine.Text(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_TOKEN_EXCHANGE_INFO_LORE))
             ))
         )
     }
@@ -604,11 +606,11 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
         )
         holder.backingInventory.setItem(
             ArenaTokenExchangeLayout.CONFIRM_OK_SLOT,
-            GuiMenuItems.icon(Material.LIME_CONCRETE, ArenaI18n.text(player, "arena.ui.token_exchange.confirm_ok"))
+            GuiMenuItems.icon(Material.LIME_CONCRETE, ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_TOKEN_EXCHANGE_CONFIRM_OK))
         )
         holder.backingInventory.setItem(
             ArenaTokenExchangeLayout.CONFIRM_CANCEL_SLOT,
-            GuiMenuItems.icon(Material.RED_CONCRETE, ArenaI18n.text(player, "arena.ui.token_exchange.confirm_cancel"))
+            GuiMenuItems.icon(Material.RED_CONCRETE, ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_TOKEN_EXCHANGE_CONFIRM_CANCEL))
         )
     }
 
@@ -636,13 +638,13 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
 
     private fun buildExchangeLore(player: Player, lines: List<TokenExchangeLine>): List<GuiLoreLine> {
         return buildList {
-            add(GuiLoreLine.Text(ArenaI18n.text(player, "arena.ui.token_exchange.details_heading")))
+            add(GuiLoreLine.Text(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_TOKEN_EXCHANGE_DETAILS_HEADING)))
             lines.take(4).forEach { line ->
                 val name = CustomItemI18n.text(player, "custom_items.arena.mob_token.token_names.${line.categoryId}", line.categoryId)
                     .replace(Regex("§[0-9a-fk-or]", RegexOption.IGNORE_CASE), "")
                 add(GuiLoreLine.SubData(name, ArenaI18n.text(
                     player,
-                    "arena.ui.token_exchange.details_line",
+                    ContentArenaKeys.ARENA_UI_TOKEN_EXCHANGE_DETAILS_LINE,
                     "unit_price" to formatAcorn(line.unitPrice),
                     "amount" to line.amount,
                     "subtotal" to formatAcorn(line.subtotal)
@@ -650,7 +652,7 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
             }
             if (lines.size > 4) {
                 val remaining = lines.drop(4).fold(ZERO) { sum, line -> truncate(sum + line.subtotal) }
-                add(GuiLoreLine.Data(ArenaI18n.text(player, "arena.ui.token_exchange.details_other"), formatAcorn(remaining), "§f"))
+                add(GuiLoreLine.Data(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_TOKEN_EXCHANGE_DETAILS_OTHER), formatAcorn(remaining), "§f"))
             }
         }
     }

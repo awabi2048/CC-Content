@@ -76,8 +76,8 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
                 meta.displayName(Component.text(text(player, "custom_items.cooking.$id.name"))
                     .decoration(TextDecoration.ITALIC, false))
                 val descriptionKey = "custom_items.cooking.$id.description"
-                if (CCSystem.getAPI().hasI18nKey(descriptionKey)) {
-                    meta.lore(listOf(Component.text(text(player, descriptionKey), NamedTextColor.GRAY)
+                jp.awabi2048.cccontent.util.ContentLocalizationKeys.optionalText(descriptionKey, "custom_items.cooking.")?.let { description ->
+                    meta.lore(listOf(Component.text(CCSystem.getAPI().getLocalized(player, description).replace('&', '§'), NamedTextColor.GRAY)
                         .decoration(TextDecoration.ITALIC, false)))
                 }
                 meta.setItemModel(model)
@@ -91,7 +91,7 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
             item.itemMeta?.persistentDataContainer?.get(ContentPdcKeys.customItemId, PersistentDataType.STRING) == fullId
 
         protected fun text(player: Player?, key: String): String =
-            CCSystem.getAPI().getI18nString(player, key).replace('&', '§')
+            CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "custom_items.cooking.")).replace('&', '§')
     }
 
     private class ToolItem(id: String, private val durability: Int) : BaseCookingItem(id) {

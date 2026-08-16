@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.seasonal;
 
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys;
+
 import org.junit.jupiter.api.Test;
 
 import java.time.DayOfWeek;
@@ -57,7 +59,7 @@ class SeasonalCalendarServiceTest {
         var event = new SeasonalEventDefinition(
             "disabled_event",
             false,
-            "seasonal.disabled.name",
+            CommonKeys.GENERAL_UNKNOWN,
             new AnnualRangeSchedule(
                 MonthDay.of(1, 1), LocalTime.MIDNIGHT,
                 MonthDay.of(1, 2), LocalTime.MIDNIGHT
@@ -79,7 +81,7 @@ class SeasonalCalendarServiceTest {
         return new SeasonalEventDefinition(
             "test_event",
             true,
-            "seasonal.test.name",
+            CommonKeys.GENERAL_UNKNOWN,
             schedule,
             grace,
             cycle,

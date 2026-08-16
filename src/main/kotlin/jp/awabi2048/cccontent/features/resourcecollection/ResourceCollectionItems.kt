@@ -126,7 +126,7 @@ class ResourceCollectionItems(plugin: JavaPlugin) {
                 item.itemMeta?.persistentDataContainer?.get(resourceIdKey, PersistentDataType.STRING) == definition.id
 
         private fun message(player: Player?, key: String): String =
-            CCSystem.getAPI().getI18nString(player, key).replace('&', '§')
+            CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "custom_items.resource.")).replace('&', '§')
     }
 
     companion object {

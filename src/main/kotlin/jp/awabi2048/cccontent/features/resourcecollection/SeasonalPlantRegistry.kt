@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.resourcecollection
 
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import com.awabi2048.ccsystem.api.time.Season
 import org.bukkit.Material
 import org.bukkit.configuration.file.YamlConfiguration
@@ -11,8 +12,8 @@ import java.util.Random
 data class SeasonalPlantDefinition(
     val id: String,
     val customItemId: String,
-    val useNameKey: String,
-    val vegetationGroupNameKey: String,
+    val useNameKey: LocalizationKey<String>,
+    val vegetationGroupNameKey: LocalizationKey<String>,
     val weightsBySeason: Map<Season, Int>,
     val sourceMaterials: Set<Material>,
     val biomeKeys: Set<String>,
@@ -136,10 +137,10 @@ class SeasonalPlantRegistry private constructor(
             )
         }
 
-        private fun requireLanguageKey(raw: Map<*, *>, key: String, path: String): String {
+        private fun requireLanguageKey(raw: Map<*, *>, key: String, path: String): LocalizationKey<String> {
             val value = requireString(raw, key, path)
             require(value.matches(Regex("[a-z0-9_.-]+"))) { "$path.$key is invalid" }
-            return value
+            return jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(value, "resource_collection.")
         }
 
         private fun requireString(raw: Map<*, *>, key: String, path: String): String =

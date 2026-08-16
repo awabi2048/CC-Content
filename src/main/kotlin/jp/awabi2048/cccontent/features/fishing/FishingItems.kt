@@ -152,7 +152,7 @@ class FishingItems(
     private fun formatPercent(multiplier: Double): String = "${(multiplier * 100.0).toInt()}%"
 
     private fun message(player: Player?, key: String): String =
-        CCSystem.getAPI().getI18nString(player, key).replace('&', '§')
+        CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "fishing.", "custom_items.fishing.")).replace('&', '§')
 
     private inner class FishingRodCustomItem(private val definition: RodDefinition) : CustomItem {
         override val feature = "fishing"

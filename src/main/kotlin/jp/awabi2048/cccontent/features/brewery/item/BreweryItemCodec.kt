@@ -2,6 +2,8 @@
 
 package jp.awabi2048.cccontent.features.brewery.item
 
+import com.awabi2048.ccsystem.api.localization.generated.ContentBreweryKeys
+
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
@@ -221,7 +223,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         val meta = item.itemMeta ?: return item
         meta.setItemModel(NamespacedKey.minecraft("shears"))
         meta.displayName(Component.text(text(player, "brewery.item.filter.name")))
-        val lines = CCSystem.getAPI().getI18nStringList(player, "brewery.item.filter.description")
+        val lines = CCSystem.getAPI().getLocalized(player, ContentBreweryKeys.BREWERY_ITEM_FILTER_DESCRIPTION)
         meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(GuiLoreBlock(lines.map(GuiLoreLine::Text))))) )
         meta.persistentDataContainer.set(filterKey, PersistentDataType.BYTE, 1)
         meta.persistentDataContainer.set(filterRemainingUsesKey, PersistentDataType.INTEGER, FILTER_MAX_USES)
@@ -250,7 +252,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     fun getHistory(container: PersistentDataContainer): String = container.get(historyKey, PersistentDataType.STRING) ?: ""
 
     private fun text(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): String =
-        CCSystem.getAPI().getI18nString(player, key, placeholders.associate { it.first to (it.second ?: "") }).replace('&', '§')
+        CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "brewery.", "custom_items.brewery."), placeholders.associate { it.first to (it.second ?: "") }).replace('&', '§')
 
     private fun renderLore(player: Player?, description: String, data: List<Pair<String, Any?>>): List<net.kyori.adventure.text.Component> {
         val blocks = mutableListOf<GuiLoreBlock>()

@@ -42,11 +42,11 @@ class PartyController(
     }
 
     fun message(player: Player, key: String, placeholders: Map<String, Any> = emptyMap()) {
-        player.sendMessage(CCSystem.getAPI().getI18nString(player, key, placeholders))
+        player.sendMessage(CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "party."), placeholders))
     }
 
     fun text(player: Player, key: String, placeholders: Map<String, Any> = emptyMap()): String =
-        CCSystem.getAPI().getI18nString(player, key, placeholders)
+        CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "party."), placeholders)
 
     fun openMenu(player: Player) = menu.open(player)
 

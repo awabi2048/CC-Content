@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.resourcecollection;
 
 import com.awabi2048.ccsystem.api.time.Season;
+import com.awabi2048.ccsystem.api.localization.generated.ContentResourceCollectionKeys;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -15,8 +16,8 @@ class SeasonalPlantRegistryTest {
     private final SeasonalPlantDefinition springFern = new SeasonalPlantDefinition(
         "approved_spring_fern",
         "resource.approved_spring_fern",
-        "resource_collection.test.use",
-        "resource_collection.test.group",
+        ContentResourceCollectionKeys.RESOURCE_COLLECTION_USE_COOKING,
+        ContentResourceCollectionKeys.RESOURCE_COLLECTION_GROUP_FOREST,
         Map.of(Season.SPRING, 1, Season.SUMMER, 0, Season.AUTUMN, 0, Season.WINTER, 0),
         Set.of(Material.FERN),
         Set.of("minecraft:plains"),

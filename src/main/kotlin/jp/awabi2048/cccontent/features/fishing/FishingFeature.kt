@@ -1048,9 +1048,9 @@ class FishingFeature(
         CCSystem.getAPI().getResourceWorldLifecycleService().isReady(player.world.key)
 
     private fun message(player: Player?, key: String, vararg placeholders: Pair<String, Any?>): String =
-        CCSystem.getAPI().getI18nString(
+        CCSystem.getAPI().getLocalized(
             player,
-            key,
+            jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "fishing."),
             placeholders.associate { (name, value) -> name to (value ?: "null") }
         ).replace('&', '§')
 
