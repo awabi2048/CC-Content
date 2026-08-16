@@ -33,6 +33,7 @@ import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardData
+import jp.awabi2048.cccontent.items.arena.ArenaMobTokenLocalization
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardDefinition
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardItem
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardRegistry
@@ -340,8 +341,6 @@ class ArenaManager(
         const val MIDDLE_RING_MAX_ANGULAR_VELOCITY = 0.14
         const val MOB_TOKEN_DROP_CHANCE_DEFAULT = 0.30
         const val MOB_TOKEN_LOOTING_BONUS_PER_LEVEL_DEFAULT = 0.033
-        const val MOB_TOKEN_LORE_LANGUAGE_KEY = "custom_items.arena.mob_token.lore"
-        const val MOB_TOKEN_NAME_LANGUAGE_KEY_PREFIX = "custom_items.arena.mob_token.token_names"
         const val ENCHANT_SHARD_DROP_RATE_MULTIPLIER_DEFAULT = 1.0
         const val ENCHANT_SHARD_LOOTING_MULTIPLIER_PER_LEVEL_DEFAULT = 0.10
         const val STAGE_TRANSFER_BLINDNESS_TICKS = 60
@@ -712,8 +711,7 @@ class ArenaManager(
         mobDefinitions.putAll(loaded)
         knownMobTypeIds.clear()
         knownMobTypeIds.addAll(loaded.values.map { it.typeId.trim().lowercase(Locale.ROOT) })
-        val tokenTypeIds = registerMobTypeTokenItems()
-        validateMobTokenLanguageKeys(tokenTypeIds)
+        registerMobTypeTokenItems()
 
         if (mobDefinitions.isEmpty()) {
             plugin.logger.severe("[Arena] config/mob_definition.yml did not load any mob definitions.")
@@ -3504,60 +3502,21 @@ class ArenaManager(
         return normalized.replace(Regex("[^a-z0-9_]+"), "_")
     }
 
-    private fun registerMobTypeTokenItems(): Set<String> {
+    private fun registerMobTypeTokenItems() {
         val tokenTypeIds = buildSet {
             knownMobTypeIds.forEach { add(resolveMobTokenCategoryTypeId(it)) }
             add("boomerang")
         }
+        validateMobTokenLocalizationContract(tokenTypeIds)
         CustomItemManager.register(ArenaMobTokenItem())
-        return tokenTypeIds
     }
 
-    private fun validateMobTokenLanguageKeys(requiredTypeIds: Set<String>) {
-        if (requiredTypeIds.isEmpty()) return
-
-        val api = CCSystem.getAPI()
-        val locales = api.getSupportedLanguages().ifEmpty { setOf("ja_jp", "en_us") }
-        locales.forEach { locale ->
-            val missingKeys = mutableListOf<String>()
-            // 表示時と同じCC-System言語ソースを検証し、CC-Content側の旧ファイル配置に依存しない。
-            if (!hasI18nStringList(locale, MOB_TOKEN_LORE_LANGUAGE_KEY)) {
-                missingKeys += MOB_TOKEN_LORE_LANGUAGE_KEY
-            }
-
-            requiredTypeIds.forEach { typeId ->
-                val normalizedTypeId = normalizeMobTokenLanguageTypeId(typeId)
-                val key = "$MOB_TOKEN_NAME_LANGUAGE_KEY_PREFIX.$normalizedTypeId"
-                if (!hasI18nString(locale, key)) {
-                    missingKeys += key
-                }
-            }
-
-            if (missingKeys.isNotEmpty()) {
-                plugin.logger.warning("[Arena] mob token language keys are missing or invalid: locale=$locale")
-                missingKeys.forEach { key ->
-                    plugin.logger.warning("[Arena]   - $key")
-                }
-            }
-        }
-    }
-
-    private fun hasI18nString(locale: String, key: String): Boolean {
-        return runCatching {
-            CCSystem.getAPI().getLocalized(locale, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "arena."))
-        }.isSuccess
-    }
-
-    private fun hasI18nStringList(locale: String, key: String): Boolean {
-        return runCatching {
-            CCSystem.getAPI().getLocalized(locale, jp.awabi2048.cccontent.util.ContentLocalizationKeys.textList(key, "arena."))
-        }.isSuccess
-    }
-
-    private fun normalizeMobTokenLanguageTypeId(typeId: String): String {
-        return when (sanitizeMobTypeId(typeId)) {
-            "cave_spider" -> "spider"
-            else -> sanitizeMobTypeId(typeId)
+    private fun validateMobTokenLocalizationContract(requiredTypeIds: Set<String>) {
+        val unsupported = requiredTypeIds
+            .filterNot(ArenaMobTokenLocalization::supports)
+            .sorted()
+        require(unsupported.isEmpty()) {
+            "Arena mob tokenの生成済み言語キーが不足しています: categories=${unsupported.joinToString()}"
         }
     }
 

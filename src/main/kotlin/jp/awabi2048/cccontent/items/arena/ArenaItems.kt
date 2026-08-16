@@ -92,12 +92,12 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
         val normalizedTypeId = resolveTokenCategoryTypeId(mobTypeId)
         val tokenName = CustomItemI18n.text(
             player,
-            "custom_items.arena.mob_token.token_names.$normalizedTypeId",
+            ArenaMobTokenLocalization.nameKey(normalizedTypeId),
             normalizedTypeId
         )
         val localizedLore = CustomItemI18n.lore(
             player,
-            "custom_items.arena.mob_token.lore",
+            ArenaMobTokenLocalization.loreKey,
             listOf("§7アリーナに出現するモンスターが落としたアイテム", "§7アリーナロビーで報酬と交換しよう！")
         )
 
@@ -133,10 +133,10 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
         }
 
         fun supportsTokenCategoryTypeId(typeId: String): Boolean {
-            return SUPPORTED_TOKEN_CATEGORY_TYPE_IDS.contains(resolveTokenCategoryTypeId(typeId))
+            return ArenaMobTokenLocalization.supports(resolveTokenCategoryTypeId(typeId))
         }
 
-        fun supportedTokenCategoryTypeIds(): Set<String> = SUPPORTED_TOKEN_CATEGORY_TYPE_IDS
+        fun supportedTokenCategoryTypeIds(): Set<String> = ArenaMobTokenLocalization.supportedCategoryIds()
 
         fun readCategoryId(item: ItemStack): String? {
             val meta = item.itemMeta ?: return null
@@ -178,34 +178,6 @@ class ArenaMobTokenItem(private val mobTypeId: String = "zombie") : ArenaSimpleI
             }
         }
 
-        private val SUPPORTED_TOKEN_CATEGORY_TYPE_IDS = setOf(
-            "skeleton",
-            "zombie",
-            "creeper",
-            "piglin",
-            "wither_skeleton",
-            "ender_dragon",
-            "husk",
-            "iron_golem",
-            "guardian",
-            "elder_guardian",
-            "drowned",
-            "silverfish",
-            "spider",
-            "witch",
-            "blaze",
-            "magma_cube",
-            "slime",
-            "bogged",
-            "stray",
-            "bat",
-            "enderman",
-            "endermite",
-            "shulker",
-            "spirit",
-            "frog",
-            "boomerang"
-        )
     }
 }
 

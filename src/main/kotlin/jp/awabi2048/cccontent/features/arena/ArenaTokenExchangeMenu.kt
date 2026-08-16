@@ -15,6 +15,7 @@ import jp.awabi2048.cccontent.gui.GuiMenuItems
 import jp.awabi2048.cccontent.gui.VirtualInventoryEscrowService
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.arena.ArenaMobTokenItem
+import jp.awabi2048.cccontent.items.arena.ArenaMobTokenLocalization
 import jp.awabi2048.cccontent.util.ItemMetaCompat
 import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.Bukkit
@@ -640,7 +641,11 @@ class ArenaTokenExchangeMenu(private val plugin: JavaPlugin) : Listener {
         return buildList {
             add(GuiLoreLine.Text(ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_TOKEN_EXCHANGE_DETAILS_HEADING)))
             lines.take(4).forEach { line ->
-                val name = CustomItemI18n.text(player, "custom_items.arena.mob_token.token_names.${line.categoryId}", line.categoryId)
+                val name = CustomItemI18n.text(
+                    player,
+                    ArenaMobTokenLocalization.nameKey(line.categoryId),
+                    line.categoryId,
+                )
                     .replace(Regex("§[0-9a-fk-or]", RegexOption.IGNORE_CASE), "")
                 add(GuiLoreLine.SubData(name, ArenaI18n.text(
                     player,

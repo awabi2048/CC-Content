@@ -3,6 +3,7 @@
 package jp.awabi2048.cccontent.mob
 
 import jp.awabi2048.cccontent.features.arena.ArenaI18n
+import jp.awabi2048.cccontent.items.arena.ArenaMobTokenLocalization
 import jp.awabi2048.cccontent.mob.type.HuskBowOnlyMobType
 import jp.awabi2048.cccontent.mob.type.HuskBowSwapMobType
 import jp.awabi2048.cccontent.mob.type.HuskLeapOnlyMobType
@@ -679,8 +680,7 @@ class MobService(private val plugin: JavaPlugin) {
     fun resolveCustomMobDisplayNameByDamager(damager: Entity, viewer: Player?): String? {
         val activeMob = resolveActiveMobByDamager(damager) ?: return null
         val categoryId = activeMob.mobType.rewardCategoryId
-        val key = "custom_items.arena.mob_token.token_names.$categoryId"
-        return ArenaI18n.text(viewer, key)
+        return ArenaI18n.text(viewer, ArenaMobTokenLocalization.nameKey(categoryId))
     }
 
     private fun resolveActiveMobByDamager(damager: Entity): ActiveMob? {
