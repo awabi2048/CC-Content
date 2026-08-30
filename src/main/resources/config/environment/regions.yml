@@ -1,0 +1,76 @@
+config_version: 1
+
+# 採取判定が参照する位置条件を一元化する設定です。
+biome_groups:
+  temperate: [minecraft:plains, minecraft:sunflower_plains, minecraft:forest, minecraft:flower_forest, minecraft:birch_forest, minecraft:old_growth_birch_forest, minecraft:dark_forest, minecraft:meadow, minecraft:cherry_grove, minecraft:pale_garden, minecraft:windswept_forest, minecraft:windswept_hills, minecraft:windswept_gravelly_hills]
+  temperate_field: [minecraft:plains, minecraft:sunflower_plains, minecraft:meadow, minecraft:forest, minecraft:birch_forest, minecraft:old_growth_birch_forest]
+  wetland: [minecraft:river, minecraft:swamp, minecraft:mangrove_swamp]
+  warm_field: [minecraft:plains, minecraft:sunflower_plains, minecraft:savanna, minecraft:savanna_plateau, minecraft:windswept_savanna]
+  jungle: [minecraft:jungle, minecraft:sparse_jungle, minecraft:bamboo_jungle]
+  dry_field: [minecraft:savanna, minecraft:savanna_plateau, minecraft:windswept_savanna, minecraft:wooded_badlands]
+  forest: [minecraft:forest, minecraft:flower_forest, minecraft:birch_forest, minecraft:old_growth_birch_forest, minecraft:bamboo_jungle]
+  tea_source: [minecraft:forest, minecraft:birch_forest, minecraft:old_growth_birch_forest, minecraft:taiga, minecraft:old_growth_pine_taiga, minecraft:old_growth_spruce_taiga, minecraft:bamboo_jungle]
+  taiga: [minecraft:taiga, minecraft:old_growth_pine_taiga, minecraft:old_growth_spruce_taiga]
+  cold_field: [minecraft:plains, minecraft:meadow, minecraft:snowy_plains, minecraft:grove]
+  flower_field: [minecraft:plains, minecraft:sunflower_plains, minecraft:meadow, minecraft:flower_forest]
+  green_onion_field: [minecraft:plains, minecraft:meadow, minecraft:river, minecraft:forest]
+  grape_forest: [minecraft:forest, minecraft:flower_forest, minecraft:birch_forest, minecraft:jungle, minecraft:sparse_jungle]
+  blueberry_taiga: [minecraft:taiga, minecraft:snowy_taiga, minecraft:grove, minecraft:old_growth_pine_taiga, minecraft:old_growth_spruce_taiga]
+  ocean_family: [minecraft:ocean, minecraft:deep_ocean, minecraft:cold_ocean, minecraft:deep_cold_ocean, minecraft:frozen_ocean, minecraft:lukewarm_ocean, minecraft:deep_lukewarm_ocean, minecraft:warm_ocean, minecraft:deep_warm_ocean]
+  forest_product_old_growth_pine_taiga: [minecraft:old_growth_pine_taiga, minecraft:old_growth_spruce_taiga]
+  forest_product_old_growth_birch_forest: [minecraft:old_growth_birch_forest]
+  forest_product_oak_swamp: [minecraft:swamp]
+  forest_product_pale_garden: [minecraft:pale_garden]
+  forest_product_dark_forest: [minecraft:dark_forest]
+  forest_product_jungle: [minecraft:jungle, minecraft:sparse_jungle, minecraft:bamboo_jungle]
+  forest_product_eroded_savanna: [minecraft:eroded_savanna]
+  forest_product_cherry_grove: [minecraft:cherry_grove]
+  forest_product_mangrove_swamp: [minecraft:mangrove_swamp]
+
+biome_profiles:
+  minecraft:plains: { climate: TEMPERATE, terrain: FIELD, water: LAND }
+  minecraft:sunflower_plains: { climate: TEMPERATE, terrain: FIELD, water: LAND }
+  minecraft:forest: { climate: TEMPERATE, terrain: FOREST, water: LAND }
+  minecraft:flower_forest: { climate: TEMPERATE, terrain: FOREST, water: LAND }
+  minecraft:birch_forest: { climate: TEMPERATE, terrain: FOREST, water: LAND }
+  minecraft:old_growth_birch_forest: { climate: TEMPERATE, terrain: FOREST, water: LAND }
+  minecraft:dark_forest: { climate: TEMPERATE, terrain: FOREST, water: LAND }
+  minecraft:meadow: { climate: TEMPERATE, terrain: FIELD, water: LAND }
+  minecraft:cherry_grove: { climate: TEMPERATE, terrain: MOUNTAIN, water: LAND }
+  minecraft:pale_garden: { climate: TEMPERATE, terrain: FOREST, water: LAND }
+  minecraft:windswept_forest: { climate: TEMPERATE, terrain: MOUNTAIN, water: LAND }
+  minecraft:windswept_hills: { climate: TEMPERATE, terrain: MOUNTAIN, water: LAND }
+  minecraft:windswept_gravelly_hills: { climate: TEMPERATE, terrain: MOUNTAIN, water: LAND }
+  minecraft:river: { climate: WET, terrain: WETLAND, water: RIVER }
+  minecraft:frozen_river: { climate: COLD, terrain: WETLAND, water: RIVER }
+  minecraft:swamp: { climate: WET, terrain: WETLAND, water: LAND }
+  minecraft:mangrove_swamp: { climate: WET, terrain: WETLAND, water: LAND }
+  minecraft:savanna: { climate: WARM, terrain: FIELD, water: LAND }
+  minecraft:savanna_plateau: { climate: WARM, terrain: FIELD, water: LAND }
+  minecraft:windswept_savanna: { climate: DRY, terrain: BADLANDS, water: LAND }
+  minecraft:wooded_badlands: { climate: DRY, terrain: BADLANDS, water: LAND }
+  minecraft:eroded_savanna: { climate: DRY, terrain: BADLANDS, water: LAND }
+  minecraft:jungle: { climate: TROPICAL, terrain: JUNGLE, water: LAND }
+  minecraft:sparse_jungle: { climate: TROPICAL, terrain: JUNGLE, water: LAND }
+  minecraft:bamboo_jungle: { climate: TROPICAL, terrain: JUNGLE, water: LAND }
+  minecraft:taiga: { climate: COLD, terrain: TAIGA, water: LAND }
+  minecraft:old_growth_pine_taiga: { climate: COLD, terrain: TAIGA, water: LAND }
+  minecraft:old_growth_spruce_taiga: { climate: COLD, terrain: TAIGA, water: LAND }
+  minecraft:snowy_plains: { climate: COLD, terrain: FIELD, water: LAND }
+  minecraft:grove: { climate: COLD, terrain: FIELD, water: LAND }
+  minecraft:ocean: { climate: WET, terrain: OCEAN, water: OCEAN }
+  minecraft:deep_ocean: { climate: WET, terrain: OCEAN, water: OCEAN }
+  minecraft:cold_ocean: { climate: COLD, terrain: OCEAN, water: OCEAN }
+  minecraft:deep_cold_ocean: { climate: COLD, terrain: OCEAN, water: OCEAN }
+  minecraft:frozen_ocean: { climate: COLD, terrain: OCEAN, water: OCEAN }
+  minecraft:lukewarm_ocean: { climate: WARM, terrain: OCEAN, water: OCEAN }
+  minecraft:deep_lukewarm_ocean: { climate: WARM, terrain: OCEAN, water: OCEAN }
+  minecraft:warm_ocean: { climate: TROPICAL, terrain: OCEAN, water: OCEAN }
+  minecraft:deep_warm_ocean: { climate: TROPICAL, terrain: OCEAN, water: OCEAN }
+
+vertical_regions:
+  wild_gathering: { minimum_y: 35, maximum_y: 200 }
+  mineral_high: { minimum_y: 96, maximum_y: 320 }
+  mineral_shallow: { minimum_y: 32, maximum_y: 95 }
+  mineral_middle: { minimum_y: 0, maximum_y: 31 }
+  mineral_deep: { minimum_y: -2147483648, maximum_y: -1 }

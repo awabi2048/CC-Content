@@ -50,6 +50,7 @@ import java.util.ArrayDeque
 import java.util.UUID
 import java.time.Instant
 import org.bukkit.block.data.Bisected
+import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver
 
 class SpecialistCollectionService(
     private val plugin: JavaPlugin,
@@ -57,7 +58,8 @@ class SpecialistCollectionService(
     private val settings: ResourceCollectionSettings,
     private val seasonalPlants: SeasonalPlantRegistry,
     private val forestProducts: ForestProductRegistry,
-    private val random: Random = Random()
+    private val random: Random = Random(),
+    private val environmentResolver: CollectionEnvironmentResolver = CollectionEnvironmentResolver.defaults()
 ) : Listener {
     companion object {
         private val internalBreaks = mutableSetOf<String>()
@@ -240,7 +242,8 @@ class SpecialistCollectionService(
         val result = MineralCompanionPolicy.inspect(
             block.world.environment,
             block.biome.key.toString(),
-            block.y
+            block.y,
+            environmentResolver
         )
         player.swingMainHand()
         val materialHint = if (profile.detailedInspectionEnabled) {
@@ -1018,7 +1021,8 @@ class SpecialistCollectionService(
             val result = MineralCompanionPolicy.inspect(
                 block.world.environment,
                 block.biome.key.toString(),
-                block.y
+                block.y,
+                environmentResolver
             )
             dropResourceNaturally(player, result.resourceId, specialAmount, block.location)
             sendCustomCollectionResult(

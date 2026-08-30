@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.resourcecollection
 
 import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import com.awabi2048.ccsystem.api.time.Season
+import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver
 import org.bukkit.Material
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
@@ -71,7 +72,13 @@ class SeasonalPlantRegistry private constructor(
     companion object {
         private const val CONFIG_PATH = "config/resource_collection/seasonal_plants.yml"
 
-        fun load(plugin: JavaPlugin): SeasonalPlantRegistry {
+        fun load(plugin: JavaPlugin): SeasonalPlantRegistry =
+            load(plugin, CollectionEnvironmentResolver.load(plugin))
+
+        fun load(
+            plugin: JavaPlugin,
+            environmentResolver: CollectionEnvironmentResolver
+        ): SeasonalPlantRegistry {
             val file = ensureFile(plugin)
             val config = YamlConfiguration.loadConfiguration(file)
             require(config.get("schema_version") is Number && config.getInt("schema_version") == 2) {
@@ -80,7 +87,9 @@ class SeasonalPlantRegistry private constructor(
             val enabled = requireBoolean(config, "enabled")
             require(!config.contains("surface_recovery_seconds")) { "$CONFIG_PATH.surface_recovery_seconds is forbidden" }
             val rawDefinitions = config.getMapList("definitions")
-            val definitions = rawDefinitions.mapIndexed { index, raw -> parseDefinition(raw, index) }
+            val definitions = rawDefinitions.mapIndexed { index, raw ->
+                parseDefinition(raw, index, environmentResolver)
+            }
             val duplicateIds = definitions.groupingBy(SeasonalPlantDefinition::id).eachCount()
                 .filterValues { it > 1 }.keys
             require(duplicateIds.isEmpty()) { "$CONFIG_PATH contains duplicate ids: ${duplicateIds.sorted()}" }
@@ -93,7 +102,11 @@ class SeasonalPlantRegistry private constructor(
         fun of(enabled: Boolean, definitions: List<SeasonalPlantDefinition>): SeasonalPlantRegistry =
             SeasonalPlantRegistry(enabled, definitions)
 
-        private fun parseDefinition(raw: Map<*, *>, index: Int): SeasonalPlantDefinition {
+        private fun parseDefinition(
+            raw: Map<*, *>,
+            index: Int,
+            environmentResolver: CollectionEnvironmentResolver
+        ): SeasonalPlantDefinition {
             val path = "$CONFIG_PATH.definitions[$index]"
             val id = requireString(raw, "id", path)
             require(id.matches(Regex("[a-z0-9_]+"))) { "$path.id must use lowercase snake_case" }
@@ -114,12 +127,28 @@ class SeasonalPlantRegistry private constructor(
                     .getOrElse { throw IllegalArgumentException("$path.source_materials contains invalid material: $rawMaterial") }
             }.toSet()
             require(sourceMaterials.isNotEmpty()) { "$path.source_materials must not be empty" }
-            val biomeKeys = optionalStringList(raw, "biome_keys", path).map { it.lowercase(Locale.ROOT) }.toSet()
+            val biomeKeys = if ("environment_groups" in raw) {
+                val groups = requireStringList(raw, "environment_groups", path)
+                environmentResolver.biomesInGroups(groups).also {
+                    require(it.isNotEmpty()) {
+                        "$path.environment_groups must resolve to at least one biome"
+                    }
+                }
+            } else {
+                optionalStringList(raw, "biome_keys", path).map { it.lowercase(Locale.ROOT) }.toSet()
+            }
             biomeKeys.forEach { key ->
                 require(key.matches(Regex("[a-z0-9_.-]+:[a-z0-9_./-]+"))) { "$path.biome_keys contains invalid key: $key" }
             }
-            val minimumY = requireInt(raw, "minimum_y", path)
-            val maximumY = requireInt(raw, "maximum_y", path)
+            val vertical: Pair<Int, Int> = if ("vertical_region" in raw) {
+                val regionId = requireString(raw, "vertical_region", path)
+                environmentResolver.verticalRegion(regionId)?.let { it.minimumY to it.maximumY }
+                    ?: error("$path.vertical_region is not defined in ${CollectionEnvironmentResolver.CONFIG_PATH}")
+            } else {
+                requireInt(raw, "minimum_y", path) to requireInt(raw, "maximum_y", path)
+            }
+            val minimumY = vertical.first
+            val maximumY = vertical.second
             require(minimumY <= maximumY) { "$path.minimum_y must not exceed maximum_y" }
             val itemModel = requireString(raw, "item_model", path)
             require(itemModel.matches(Regex("[a-z0-9_.-]+:[a-z0-9_./-]+"))) { "$path.item_model is invalid" }
@@ -161,6 +190,7 @@ class SeasonalPlantRegistry private constructor(
         private fun requireInt(raw: Map<*, *>, key: String, path: String): Int =
             (raw[key] as? Number)?.toInt()
                 ?: throw IllegalArgumentException("$path.$key must be an integer")
+
 
         private fun requireBoolean(config: YamlConfiguration, key: String): Boolean {
             val value = config.get(key)
