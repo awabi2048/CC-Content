@@ -45,6 +45,8 @@ function Parse-Ingredients([string]$cell) {
 }
 
 function Append-Result($builder, [string]$id, [string]$kind, [string]$container, [string]$pane, [string]$tier, [string]$heat, [int]$amount, [int]$stack, $effects) {
+    # 見た目の解決は生成済みItemStackのitem_modelとリソースパックへ集約する。
+    # 設定生成物には論理IDだけを残し、モデル指定が再生成時に復活しないようにする。
     $base = if ($kind -eq 'BOWL') { 'RABBIT_STEW' } elseif ($kind -eq 'BOTTLE') { 'POTION' } else { 'POISONOUS_POTATO' }
     $nutrition = if ($kind -eq 'BOTTLE') { 0 } elseif ($tier -eq 'TOP') { 12 } elseif ($tier -eq 'ADVANCED') { 9 } elseif ($tier -eq 'INTERMEDIATE') { 7 } elseif ($tier -eq 'BASIC') { 5 } else { 0 }
     $saturation = if ($kind -eq 'BOTTLE') { '0.0' } elseif ($tier -eq 'TOP') { '1.2' } elseif ($tier -eq 'ADVANCED') { '1.0' } elseif ($tier -eq 'INTERMEDIATE') { '0.8' } elseif ($tier -eq 'BASIC') { '0.6' } else { '0.0' }
@@ -52,7 +54,6 @@ function Append-Result($builder, [string]$id, [string]$kind, [string]$container,
     [void]$builder.AppendLine("      kind: $kind")
     [void]$builder.AppendLine("      custom_item_id: cooking.$id")
     [void]$builder.AppendLine("      base_material: $base")
-    [void]$builder.AppendLine("      item_model: kota_server:custom_item/cooking/$id")
     if ($container -and $container -ne '-') { [void]$builder.AppendLine("      container: $container") }
     if ($pane -and $pane -ne '-') { [void]$builder.AppendLine("      liquid_pane: $pane") }
     [void]$builder.AppendLine("      nutrition: $nutrition")
@@ -72,7 +73,6 @@ function Append-Result($builder, [string]$id, [string]$kind, [string]$container,
     [void]$builder.AppendLine('    failure_result:')
     [void]$builder.AppendLine("      custom_item_id: cooking.$failureId")
     [void]$builder.AppendLine('      base_material: POISONOUS_POTATO')
-    [void]$builder.AppendLine("      item_model: kota_server:custom_item/cooking/$failureId")
     if ($pane -and $pane -ne '-') { [void]$builder.AppendLine('      liquid_pane: GRAY_STAINED_GLASS_PANE') }
     [void]$builder.AppendLine('      max_stack_size: 1')
     [void]$builder.AppendLine('      amount_per_scale: 1')

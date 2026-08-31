@@ -35,6 +35,8 @@ foreach ($row in Rows (Section '## 37.2 完成酒27件' '## 37.3 Cooking非酒�
 
 $families = Rows (Section '# 33. 醸造family完全定義' '# 34. 完成酒名・モデル') 10
 $builder = [Text.StringBuilder]::new()
+# 醸造アイテムの見た目はBreweryItemCodecが論理IDからitem_modelを生成し、
+# リソースパックの中継定義で解決する。設定生成物へモデルIDを埋め込まない。
 [void]$builder.AppendLine('config_version: 3')
 [void]$builder.AppendLine('')
 [void]$builder.AppendLine('preparations:')
@@ -107,7 +109,6 @@ foreach ($row in $families) {
             [void]$builder.AppendLine('        effects:')
             foreach ($effect in $effects[$outputId]) { [void]$builder.AppendLine("          - $effect") }
         }
-        [void]$builder.AppendLine("        item_model: kota_server:custom_item/brewery/$outputId")
         [void]$builder.AppendLine('        consumption:')
         [void]$builder.AppendLine("          alcohol_percent: $($values[0].ToString('0.0',[Globalization.CultureInfo]::InvariantCulture))")
         [void]$builder.AppendLine("          intoxication_points: $($values[1].ToString('0.0',[Globalization.CultureInfo]::InvariantCulture))")
