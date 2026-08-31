@@ -120,7 +120,7 @@ internal class CookingStateStore(private val file: File) {
         target.set("starter_uuid", session.starterId)
         target.set("recipe_or_preparation_id", session.recipeId)
         target.set("scale", session.scale)
-        target.set("start_heat", session.startHeat.name)
+        target.set("start_heat", session.startHeat?.name)
         target.set("outcome", if (session.failureCommitted) "FAILURE" else "NORMAL")
         target.set("remaining_ticks", session.remainingTicks)
         target.set("total_ticks", session.totalTicks)
@@ -159,7 +159,7 @@ internal class CookingStateStore(private val file: File) {
         target.set("result_amount", snapshot.resultAmountPerScale)
         target.set("failure_result", snapshot.failureResultId)
         target.set("duration_seconds", snapshot.durationSeconds)
-        target.set("heat", snapshot.expectedHeat.name)
+        target.set("heat", snapshot.expectedHeat?.name)
         target.set("water_units", snapshot.waterUnits)
         target.set("result_kind", snapshot.resultKind.name)
         target.set("container", snapshot.containerMaterial)
@@ -231,7 +231,7 @@ internal class CookingStateStore(private val file: File) {
         }
         val session = CookingStationSession(
             string(section, "recipe_or_preparation_id"), snapshot, string(section, "starter_uuid"),
-            integer(section, "scale"), enum(section, "start_heat"), string(section, "outcome") == "FAILURE",
+            integer(section, "scale"), optionalEnum<CookingHeat>(section, "start_heat"), string(section, "outcome") == "FAILURE",
             inputs, integer(section, "reserved_water_units"), long(section, "total_ticks"),
             long(section, "remaining_ticks"), status, outputs, reservoir,
             integer(section, "water_consumed")
@@ -247,7 +247,7 @@ internal class CookingStateStore(private val file: File) {
 
     private fun loadSnapshot(section: ConfigurationSection): CookingRecipeSnapshot = CookingRecipeSnapshot(
         string(section, "result_id"), integer(section, "result_amount"), string(section, "failure_result"),
-        integer(section, "duration_seconds"), enum(section, "heat"), integer(section, "water_units"),
+        integer(section, "duration_seconds"), optionalEnum<CookingHeat>(section, "heat"), integer(section, "water_units"),
         enum(section, "result_kind"), section.getString("container"), section.getString("pane"),
         long(section, "exp"), section.getString("brew_family"), section.get("prepared_quality")?.let { integer(section, "prepared_quality") }
     )
@@ -264,6 +264,11 @@ internal class CookingStateStore(private val file: File) {
         parent.get(path) as? Boolean ?: error("${file.path}.$path must be a boolean")
     private inline fun <reified T : Enum<T>> enum(parent: ConfigurationSection, path: String): T =
         runCatching { enumValueOf<T>(string(parent, path)) }.getOrElse { error("${file.path}.$path is invalid") }
+    private inline fun <reified T : Enum<T>> optionalEnum(parent: ConfigurationSection, path: String): T? {
+        val raw = parent.get(path) ?: return null
+        require(raw is String && raw.isNotBlank()) { "${file.path}.$path must be a non-empty string when present" }
+        return runCatching { enumValueOf<T>(raw) }.getOrElse { error("${file.path}.$path is invalid") }
+    }
     private fun mapString(map: Map<*, *>, key: String): String =
         map[key] as? String ?: error("${file.path} map.$key must be a string")
     private fun mapInt(map: Map<*, *>, key: String): Int =

@@ -59,6 +59,48 @@ class CookingStationStateMachineTest {
     }
 
     @Test
+    void equipmentWithoutHeatProcessesWithoutAHeatPauseOrFailure() {
+        CookingRecipeDefinition recipe = new CookingRecipeDefinition(
+            "soy_sauce",
+            CookingStation.FERMENTATION,
+            "INTERMEDIATE_MATERIAL",
+            CookingTier.BASIC,
+            null,
+            Map.of("soy_sauce_moromi", 1),
+            0,
+            1,
+            20,
+            CookingResultKind.ITEM
+        );
+        CookingStationSession started = CookingStationStateMachine.start(
+            recipe,
+            new CookingRecipeSnapshot(
+                "cooking.soy_sauce", 1, "cooking.burnt_solid_food", recipe.getDurationSeconds(),
+                null, 0, CookingResultKind.ITEM, null, null, recipe.getExperience(), null, null
+            ),
+            "player",
+            1,
+            null,
+            List.of(INPUT),
+            0.0
+        );
+
+        CookingStationSession progressing = started;
+        CookingStationStep step;
+        do {
+            step = CookingStationStateMachine.tick(progressing, null);
+            progressing = step instanceof CookingStationStep.Updated updated
+                ? updated.getSession()
+                : ((CookingStationStep.Completed) step).getSession();
+        } while (step instanceof CookingStationStep.Updated);
+        CookingStationSession finished = CookingStationStateMachine.finish(progressing, recipe);
+
+        assertFalse(started.getFailureCommitted());
+        assertEquals(CookingProcessState.READY_ITEM, finished.getState());
+        assertEquals("cooking.soy_sauce", finished.getOutputStacks().getFirst().getCustomItemId());
+    }
+
+    @Test
     void failureAndNormalOutputsAreSeparated() {
         CookingRecipeDefinition recipe = recipe(CookingStation.CAULDRON, CookingResultKind.BOWL, 1);
         CookingStationSession normal = CookingStationStateMachine.start(

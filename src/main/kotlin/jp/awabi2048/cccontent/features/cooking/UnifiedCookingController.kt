@@ -14,6 +14,10 @@ import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.profession.profile.CookSkillProfile
 import jp.awabi2048.cccontent.features.rank.profession.profile.BrewerSkillProfile
 import jp.awabi2048.cccontent.features.brewery.item.BreweryItemCodec
+import jp.awabi2048.cccontent.features.processing.ProcessingClient
+import jp.awabi2048.cccontent.features.processing.ProcessingEquipmentCapability
+import jp.awabi2048.cccontent.features.processing.ProcessingEquipmentService
+import jp.awabi2048.cccontent.features.processing.ProcessingLocationKey
 import jp.awabi2048.cccontent.gui.GuiMenuItems
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.ContentItemModels
@@ -36,7 +40,9 @@ import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
 import org.bukkit.event.block.BlockBreakEvent
+import org.bukkit.event.block.BlockExplodeEvent
 import org.bukkit.event.block.CauldronLevelChangeEvent
+import org.bukkit.event.entity.EntityExplodeEvent
 import org.bukkit.event.inventory.ClickType
 import org.bukkit.event.inventory.InventoryAction
 import org.bukkit.event.inventory.InventoryClickEvent
@@ -68,6 +74,7 @@ internal class UnifiedCookingController(
     private val catalogStore: CatalogStore,
     private val configuration: UnifiedCookingConfiguration,
     private val breweryPreparations: Map<String, BreweryPreparationDefinition>,
+    private val processingEquipmentService: ProcessingEquipmentService,
     private val environmentResolver: CollectionEnvironmentResolver = CollectionEnvironmentResolver.defaults()
 ) : Listener {
     private val resolver = CookingIngredientResolver(configuration.ingredients.values)
@@ -82,6 +89,7 @@ internal class UnifiedCookingController(
 
     fun initialize() {
         Bukkit.getPluginManager().registerEvents(this, plugin)
+        restoreProcessingEquipmentLeases()
         task = Bukkit.getScheduler().runTaskTimer(plugin, Runnable(::tick), 1L, 1L)
     }
 
@@ -90,18 +98,19 @@ internal class UnifiedCookingController(
         task?.cancel()
         task = null
         flush()
+        processingEquipmentService.releaseAll(ProcessingClient.COOKING)
         locks.clear()
     }
 
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     fun onInteract(event: PlayerInteractEvent) {
         if (event.hand != EquipmentSlot.HAND || event.action != Action.RIGHT_CLICK_BLOCK) return
         val block = event.clickedBlock ?: return
         if (handleLiquidContainer(event, block)) return
-        val station = detectStation(event.player, block) ?: return
+        val detected = detectStation(event.player, block) ?: return
         if (event.useInteractedBlock() == Event.Result.DENY || event.useItemInHand() == Event.Result.DENY) return
         event.isCancelled = true
-        open(event.player, CookingStationKey.from(block), station)
+        open(event.player, detected.key, detected.station)
     }
 
     /** 海水バケツは通常の水入りバケツとして使えるため、採取結果だけを差し替えます。 */
@@ -302,21 +311,79 @@ internal class UnifiedCookingController(
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     fun onBreak(event: BlockBreakEvent) {
-        val key = CookingStationKey.from(event.block)
-        val data = stations[key] ?: return
+        val key = processingEquipmentService.findAt(
+            ProcessingLocationKey.from(event.block),
+            ProcessingEquipmentCapability.FERMENTATION,
+        )?.let { CookingStationKey.from(it.canonicalLocation) }
+            ?: CookingStationKey.from(event.block)
+        val data = stations[key] ?: run {
+            releaseProcessingLease(key)
+            return
+        }
         stations.remove(key)
         locks.remove(key)?.let { Bukkit.getPlayer(it)?.let(ManagedMenuPresenter::close) }
+        releaseProcessingLease(key)
         dropContents(event.block, data)
         dirty = true
         flush()
     }
 
-    private fun detectStation(player: Player, block: Block): CookingStation? {
+    /**
+     * Breweryが管理する物理設備の爆破時にも、Cookingが借用していた保存状態を破棄します。
+     * 通常の破壊はBlockBreakEventで処理できますが、爆発はBrewery側の設備破棄だけでは
+     * Cookingの待機材料・処理成果物まで回収できないため、借用側にも同じ破棄境界を置きます。
+     */
+    @EventHandler(ignoreCancelled = true)
+    fun onBlockExplode(event: BlockExplodeEvent) {
+        if (event.blockList().any(::invalidateBorrowedEquipmentAt)) flush()
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityExplode(event: EntityExplodeEvent) {
+        if (event.blockList().any(::invalidateBorrowedEquipmentAt)) flush()
+    }
+
+    private data class DetectedStation(
+        val key: CookingStationKey,
+        val station: CookingStation,
+    )
+
+    /**
+     * Cookingが扱う物理入口を、物理ブロックではなく能力から解決します。
+     * Breweryの空の発酵樽を空手で開く操作はBreweryへ残し、Cookingの材料か保存状態が
+     * ある場合だけ同じ樽をCookingの発酵設備として借用します。
+     */
+    private fun detectBorrowedStation(player: Player, block: Block): DetectedStation? {
+        val equipment = processingEquipmentService.findAt(
+            ProcessingLocationKey.from(block),
+            ProcessingEquipmentCapability.FERMENTATION,
+        ) ?: return null
+        val key = CookingStationKey.from(equipment.canonicalLocation)
+        val stored = stations[key]
+        val hasStoredCookingState = stored?.equipment == CookingStation.FERMENTATION && (
+            stored.session != null ||
+                stored.workspaceItems.isNotEmpty()
+        )
+        val heldIngredient = resolver.resolve(player.inventory.itemInMainHand)?.id
+        val hasMatchingIngredient = heldIngredient != null && configuration.recipes.values.any { recipe ->
+            recipe.definition.station == CookingStation.FERMENTATION &&
+                heldIngredient in recipe.definition.ingredients
+        }
+        if (hasStoredCookingState || hasMatchingIngredient) {
+            return DetectedStation(key, CookingStation.FERMENTATION)
+        }
+        return null
+    }
+
+    private fun detectStation(player: Player, block: Block): DetectedStation? {
+        detectBorrowedStation(player, block)?.let { return it }
         val mainHand = player.inventory.itemInMainHand
         val emptyHand = mainHand.type.isAir
-        if (player.isSneaking && emptyHand && CuttingPolicy.boardClass(block.type) != null) return CookingStation.CUTTING
+        if (player.isSneaking && emptyHand && CuttingPolicy.boardClass(block.type) != null) {
+            return DetectedStation(CookingStationKey.from(block), CookingStation.CUTTING)
+        }
         if (CustomItemManager.identify(mainHand)?.fullId == "cooking.frying_pan" && heat(block) != null) {
-            return CookingStation.PAN
+            return DetectedStation(CookingStationKey.from(block), CookingStation.PAN)
         }
         val cauldronData = stations[CookingStationKey.from(block)]
             ?.takeIf { it.equipment == CookingStation.CAULDRON }
@@ -329,7 +396,7 @@ internal class UnifiedCookingController(
             (block.type == Material.CAULDRON || block.type == Material.WATER_CAULDRON) &&
             (heat(block.getRelative(BlockFace.DOWN)) != null || hasStoredCauldronState)
         ) {
-            return CookingStation.CAULDRON
+            return DetectedStation(CookingStationKey.from(block), CookingStation.CAULDRON)
         }
         return null
     }
@@ -485,6 +552,21 @@ internal class UnifiedCookingController(
             player.sendMessage(message(player, "cooking.error.in_use"))
             return
         }
+        val processingCapability = processingCapability(equipment)
+        if (processingCapability != null && processingEquipmentService.tryAcquire(
+                ProcessingLocationKey.from(key.blockIfLoaded() ?: run {
+                    locks.remove(key, player.uniqueId)
+                    return
+                }),
+                processingCapability,
+                ProcessingClient.COOKING,
+                COOKING_BORROWED_PROCESS_ID,
+            ) == null
+        ) {
+            locks.remove(key, player.uniqueId)
+            player.sendMessage(message(player, "cooking.error.in_use"))
+            return
+        }
         // 物理ブロックの水を、メニューが参照する論理液体状態へ初回表示時に同期します。
         // これにより保存状態をまだ持たない水入り釜も、液体領域へ「水」として表示できます。
         val current = if (equipment == CookingStation.CAULDRON) {
@@ -494,6 +576,7 @@ internal class UnifiedCookingController(
         }
         if (current != null && current.equipment != equipment) {
             locks.remove(key, player.uniqueId)
+            releaseProcessingLease(key)
             return
         }
         val pan = if (equipment == CookingStation.PAN) player.inventory.itemInMainHand.serializeAsBytes() else null
@@ -502,6 +585,7 @@ internal class UnifiedCookingController(
             CookingStation.CUTTING -> message(player, "cooking.ui.title.cutting")
             CookingStation.PAN -> message(player, "cooking.ui.title.pan")
             CookingStation.CAULDRON -> message(player, "cooking.ui.title.cauldron")
+            CookingStation.FERMENTATION -> message(player, "cooking.ui.title.fermentation")
             else -> error("Unsupported interactive cooking station")
         }
         val inventory = Bukkit.createInventory(holder, 45, Component.text(title))
@@ -543,7 +627,14 @@ internal class UnifiedCookingController(
         inventory.setItem(UnifiedCookingLayout.STATE, stateIcon(player, data?.session))
         if (holder.equipment != CookingStation.CUTTING) {
             inventory.setItem(UnifiedCookingLayout.CANCEL, icon(Material.RED_CONCRETE, message(player, "cooking.ui.cancel")))
-            inventory.setItem(UnifiedCookingLayout.HEAT, heatIcon(player, holder))
+            inventory.setItem(
+                UnifiedCookingLayout.HEAT,
+                if (holder.equipment == CookingStation.FERMENTATION) {
+                    icon(Material.BARREL, message(player, ContentCookingGeneratedKeys.COOKING_UI_EQUIPMENT))
+                } else {
+                    heatIcon(player, holder)
+                }
+            )
         }
     }
 
@@ -551,7 +642,8 @@ internal class UnifiedCookingController(
         if (stations[holder.stationKey]?.session != null) return
         when (holder.equipment) {
             CookingStation.CUTTING -> startCutting(player, inventory, holder)
-            CookingStation.PAN, CookingStation.CAULDRON -> startTimed(player, inventory, holder)
+            CookingStation.PAN, CookingStation.CAULDRON, CookingStation.FERMENTATION ->
+                startTimed(player, inventory, holder)
             else -> Unit
         }
     }
@@ -1179,6 +1271,7 @@ internal class UnifiedCookingController(
             updated.liquidAreaItems.isEmpty()
         ) {
             stations.remove(holder.stationKey)
+            releaseProcessingLease(holder.stationKey)
         } else {
             stations[holder.stationKey] = updated
         }
@@ -1360,7 +1453,8 @@ internal class UnifiedCookingController(
                 return
             }
         }
-        val currentHeat = stationHeat(block, holder.equipment) ?: run {
+        val currentHeat = stationHeat(block, holder.equipment)
+        if (currentHeat == null && holder.equipment != CookingStation.FERMENTATION) {
             player.sendMessage(message(player, "cooking.error.no_heat")); return
         }
         if (items.isEmpty()) return
@@ -1428,10 +1522,21 @@ internal class UnifiedCookingController(
             val configured = configuration.recipes.getValue(selected.recipe.id)
             CookingRecipeSnapshot(
                 configured.result.customItemId, configured.result.amountPerScale, configured.failureResult.customItemId,
-                selected.recipe.durationSeconds, requireNotNull(selected.recipe.heat), selected.recipe.waterUnits,
+                selected.recipe.durationSeconds, selected.recipe.heat, selected.recipe.waterUnits,
                 selected.recipe.resultKind, configured.result.container?.name, configured.result.liquidPane?.name,
                 selected.recipe.experience
             )
+        }
+        val processingCapability = processingCapability(holder.equipment)
+        if (processingCapability != null && processingEquipmentService.tryAcquire(
+                ProcessingLocationKey.from(block),
+                processingCapability,
+                ProcessingClient.COOKING,
+                COOKING_BORROWED_PROCESS_ID,
+            ) == null
+        ) {
+            player.sendMessage(message(player, "cooking.error.in_use"))
+            return
         }
         val session = CookingStationStateMachine.start(
             selected.recipe, snapshot, player.uniqueId.toString(), selected.scale, currentHeat, stored,
@@ -1608,8 +1713,18 @@ internal class UnifiedCookingController(
                 stations[holder.stationKey] = current.copy(workspaceItems = emptyMap())
             } else {
                 stations.remove(holder.stationKey)
+                releaseProcessingLease(holder.stationKey)
             }
         } else {
+            processingCapability(holder.equipment)?.let { capability ->
+                if (processingEquipmentService.tryAcquire(
+                        ProcessingLocationKey.from(holder.stationKey.blockIfLoaded() ?: return),
+                        capability,
+                        ProcessingClient.COOKING,
+                        COOKING_BORROWED_PROCESS_ID,
+                    ) == null
+                ) return
+            }
             stations[holder.stationKey] = (current ?: PersistedCookingStation(holder.equipment)).copy(
                 equipment = holder.equipment,
                 workspaceItems = items
@@ -1655,6 +1770,56 @@ internal class UnifiedCookingController(
         CookingStation.PAN -> heat(block)
         CookingStation.CAULDRON -> heat(block.getRelative(BlockFace.DOWN))
         else -> null
+    }
+
+    private fun processingCapability(equipment: CookingStation): ProcessingEquipmentCapability? = when (equipment) {
+        // レシピは物理的な「樽」ではなく、発酵能力だけを要求します。どの設備がその能力を
+        // 提供するかはProcessingEquipmentProvider側で解決します。
+        CookingStation.FERMENTATION -> ProcessingEquipmentCapability.FERMENTATION
+        else -> null
+    }
+
+    private fun invalidateBorrowedEquipmentAt(block: Block): Boolean {
+        val equipment = processingEquipmentService.findAt(
+            ProcessingLocationKey.from(block),
+            ProcessingEquipmentCapability.FERMENTATION,
+        ) ?: return false
+        val key = CookingStationKey.from(equipment.canonicalLocation)
+        val data = stations[key] ?: return false
+        if (data.equipment != CookingStation.FERMENTATION) return false
+
+        stations.remove(key)
+        locks.remove(key)?.let { Bukkit.getPlayer(it)?.let(ManagedMenuPresenter::close) }
+        releaseProcessingLease(key)
+        dropContents(block, data)
+        dirty = true
+        return true
+    }
+
+    private fun releaseProcessingLease(key: CookingStationKey) {
+        val lease = processingEquipmentService.leaseAt(
+            ProcessingLocationKey(key.worldId, key.x, key.y, key.z)
+        ) ?: return
+        if (lease.client == ProcessingClient.COOKING) {
+            processingEquipmentService.release(lease)
+        }
+    }
+
+    /** 保存済みの借用工程を復元し、Breweryとの設備競合を再起動後も維持します。 */
+    private fun restoreProcessingEquipmentLeases() {
+        stations.forEach { (key, data) ->
+            if (data.equipment != CookingStation.FERMENTATION) return@forEach
+            if (data.session == null && data.workspaceItems.isEmpty()) return@forEach
+            if (processingEquipmentService.tryAcquire(
+                    ProcessingLocationKey(key.worldId, key.x, key.y, key.z),
+                    ProcessingEquipmentCapability.FERMENTATION,
+                    ProcessingClient.COOKING,
+                    COOKING_BORROWED_PROCESS_ID,
+                ) == null
+            ) {
+                plugin.logger.warning("[Cooking] 借用設備の占有を復元できませんでした: ${key.serialize()}")
+            }
+        }
     }
 
     private fun heat(block: Block): CookingHeat? {
@@ -1748,6 +1913,7 @@ internal class UnifiedCookingController(
 
 
     companion object {
+        private const val COOKING_BORROWED_PROCESS_ID = "cooking:borrowed_equipment"
         private val UI_MATERIALS = setOf(
             Material.BLACK_STAINED_GLASS_PANE, Material.GRAY_STAINED_GLASS_PANE,
             Material.BARRIER, Material.LIME_CONCRETE, Material.RED_CONCRETE,

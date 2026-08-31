@@ -3,19 +3,28 @@ package jp.awabi2048.cccontent.features.brewery
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
+import jp.awabi2048.cccontent.features.processing.ProcessingEquipmentService
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-class BreweryFeature(private val plugin: JavaPlugin, private val catalogStore: CatalogStore) {
+class BreweryFeature(
+    private val plugin: JavaPlugin,
+    private val catalogStore: CatalogStore,
+    private val processingEquipmentService: ProcessingEquipmentService,
+) {
     private var controller: BreweryController? = null
 
     fun initialize(featureInitLogger: FeatureInitializationLogger? = null) {
         try {
             ensureResources()
             retireGardenLedger()
-            controller = BreweryController(plugin, catalogStore).also { it.initialize() }
+            // 先に参照を公開してから初期化します。初期化途中で失敗しても catch 節が
+            // 共有設備プロバイダーを登録済みコントローラー経由で確実に解除できます。
+            val createdController = BreweryController(plugin, catalogStore, processingEquipmentService)
+            controller = createdController
+            createdController.initialize()
             featureInitLogger?.apply {
                 setStatus("Brewery", FeatureInitializationLogger.Status.SUCCESS)
             }
@@ -34,8 +43,13 @@ class BreweryFeature(private val plugin: JavaPlugin, private val catalogStore: C
 
     fun reload() {
         ensureResources()
-        if (controller == null) controller = BreweryController(plugin, catalogStore).also { it.initialize() }
-        else controller?.reload()
+        if (controller == null) {
+            val createdController = BreweryController(plugin, catalogStore, processingEquipmentService)
+            controller = createdController
+            createdController.initialize()
+        } else {
+            controller?.reload()
+        }
     }
 
     fun shutdown() {

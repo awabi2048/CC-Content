@@ -2,7 +2,7 @@ package jp.awabi2048.cccontent.features.cooking
 
 import kotlin.math.ceil
 
-enum class CookingStation { CUTTING, PAN, CAULDRON, FURNACE, SMOKER, CRAFTING }
+enum class CookingStation { CUTTING, PAN, CAULDRON, FURNACE, SMOKER, CRAFTING, FERMENTATION }
 enum class CookingHeat { NORMAL, HIGH }
 enum class CookingTier(val minimumCookLevel: Int) {
     BASIC(0), INTERMEDIATE(15), ADVANCED(35), TOP(50)

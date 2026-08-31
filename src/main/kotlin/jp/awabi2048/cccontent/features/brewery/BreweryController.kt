@@ -23,9 +23,14 @@ import jp.awabi2048.cccontent.features.brewery.barrel.BreweryBarrel
 import jp.awabi2048.cccontent.features.brewery.barrel.BreweryBarrelMatcher
 import jp.awabi2048.cccontent.features.brewery.barrel.BreweryBarrelRegistry
 import jp.awabi2048.cccontent.features.brewery.barrel.BreweryBarrelStore
+import jp.awabi2048.cccontent.features.brewery.barrel.BreweryEquipmentProvider
 import jp.awabi2048.cccontent.features.brewery.model.BarrelSize
 import jp.awabi2048.cccontent.features.brewery.model.BreweryLocationKey
 import jp.awabi2048.cccontent.features.brewery.model.BrewStage
+import jp.awabi2048.cccontent.features.processing.ProcessingClient
+import jp.awabi2048.cccontent.features.processing.ProcessingEquipmentCapability
+import jp.awabi2048.cccontent.features.processing.ProcessingEquipmentService
+import jp.awabi2048.cccontent.features.processing.ProcessingLocationKey
 import jp.awabi2048.cccontent.features.brewery.BreweryIntoxicationMath
 import jp.awabi2048.cccontent.features.brewery.BreweryIntoxicationState
 import jp.awabi2048.cccontent.features.rank.profession.profile.BrewerSkillProfile
@@ -81,7 +86,11 @@ import kotlin.random.Random
 import kotlin.math.ceil
 import kotlin.math.floor
 
-class BreweryController(private val plugin: JavaPlugin, private val catalogStore: CatalogStore) : Listener {
+class BreweryController(
+    private val plugin: JavaPlugin,
+    private val catalogStore: CatalogStore,
+    private val processingEquipmentService: ProcessingEquipmentService,
+) : Listener {
     private val settingsLoader = BrewerySettingsLoader(plugin)
     private val codec = BreweryItemCodec(plugin)
     private val stateFile = File(plugin.dataFolder, "data/brewery/state.yml")
@@ -92,6 +101,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         barrelMatcher,
         plugin.logger
     )
+    private val equipmentProvider = BreweryEquipmentProvider({ settings }, barrelRegistry)
     private val filterRecipeKey = NamespacedKey(plugin, "brewery_sample_filter")
     private val yeastRecipeKey = NamespacedKey(plugin, "brewery_cultured_yeast_recipe")
     private val yeastKey = NamespacedKey(plugin, "brewery_cultured_yeast")
@@ -107,6 +117,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
     private var tickerTask: BukkitTask? = null
     private var autosaveTask: BukkitTask? = null
     private var dirty: Boolean = false
+    private var equipmentProviderRegistered = false
 
     private val fermentationStates = mutableMapOf<BreweryLocationKey, FermentationState>()
     private val distillationStates = mutableMapOf<BreweryLocationKey, DistillationState>()
@@ -143,6 +154,11 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         private const val SMALL_AGING_BARREL_SLOT = 20
         private const val SMALL_AGING_CORE_SLOT = 22
         private const val SMALL_AGING_CLOCK_SLOT = 24
+
+        private const val PROCESSING_PROVIDER_ID = "brewery"
+        private const val BREWERY_FERMENTATION_PROCESS_ID = "brewery:fermentation"
+        private const val BREWERY_DISTILLATION_PROCESS_ID = "brewery:distillation"
+        private const val BREWERY_AGING_PROCESS_ID = "brewery:aging"
     }
 
     fun initialize() {
@@ -151,6 +167,10 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         recipes = settingsLoader.loadRecipes()
         barrelRegistry.replaceAll(barrelStore.load())
         barrelStore.save(barrelRegistry.all())
+        if (!equipmentProviderRegistered) {
+            processingEquipmentService.registerProvider(PROCESSING_PROVIDER_ID, equipmentProvider)
+            equipmentProviderRegistered = true
+        }
         loadState()
         registerSampleFilterRecipe()
         registerCulturedYeastRecipe()
@@ -184,6 +204,11 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         barrelStore.save(barrelRegistry.all())
         tickerTask?.cancel()
         autosaveTask?.cancel()
+        processingEquipmentService.releaseAll(ProcessingClient.BREWERY)
+        if (equipmentProviderRegistered) {
+            processingEquipmentService.unregisterProvider(PROCESSING_PROVIDER_ID)
+            equipmentProviderRegistered = false
+        }
     }
 
     fun flushIfDirty() {
@@ -277,7 +302,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         }
     }
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     fun onInteract(event: PlayerInteractEvent) {
         val block = event.clickedBlock ?: return
         if (event.action != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK) return
@@ -328,7 +353,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             .serialize(event.line(0) ?: net.kyori.adventure.text.Component.empty())
             .trim()
         if (keyword.equals(settings.fermentationSignKeyword, ignoreCase = true)) {
-            val barrel = attachedVanillaBarrel(event.block)
+            val barrel = equipmentProvider.vanillaBarrelForSign(event.block)
             if (barrel == null) {
                 event.isCancelled = true
                 event.player.sendMessage(i18n(event.player, "brewery.error.fermentation_barrel_required"))
@@ -593,6 +618,16 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         if (state.running) return 0
         val before = item.amount
 
+        val requiresLease = isYeastItem(item) || codec.parse(item)?.stage == BrewStage.PREPARED
+        if (requiresLease && !acquireBreweryEquipment(
+                state.locationKey,
+                ProcessingEquipmentCapability.FERMENTATION,
+                BREWERY_FERMENTATION_PROCESS_ID,
+            )
+        ) {
+            return 0
+        }
+
         if (isYeastItem(item)) {
             moveToSingleSlot(item, state.inventory, FERMENT_YEAST_SLOT, ::isYeastItem)
         }
@@ -603,7 +638,11 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             }
         }
 
-        return (before - item.amount).coerceAtLeast(0)
+        val moved = (before - item.amount).coerceAtLeast(0)
+        if (moved == 0 && requiresLease && !hasFermentationContents(state)) {
+            releaseBreweryFermentationLeaseIfIdle(state)
+        }
+        return moved
     }
 
     private fun quickMoveToDistillation(state: DistillationState, item: ItemStack): Int {
@@ -840,6 +879,17 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
 
         if (slot == FERMENT_YEAST_SLOT) {
             if (state.running) return
+            val cursor = event.cursor
+            if (cursor != null && !cursor.type.isAir && isYeastItem(cursor) &&
+                !acquireBreweryEquipment(
+                    state.locationKey,
+                    ProcessingEquipmentCapability.FERMENTATION,
+                    BREWERY_FERMENTATION_PROCESS_ID,
+                )
+            ) {
+                player.sendMessage(i18n(player, "brewery.error.machine_locked"))
+                return
+            }
             val moved = handleSingleSlotMove(
                 event,
                 setOf(FERMENT_YEAST_SLOT),
@@ -866,6 +916,15 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         }
 
         if (codec.parse(cursor)?.stage != BrewStage.PREPARED) return
+        if (!acquireBreweryEquipment(
+                state.locationKey,
+                ProcessingEquipmentCapability.FERMENTATION,
+                BREWERY_FERMENTATION_PROCESS_ID,
+            )
+        ) {
+            (event.whoClicked as? Player)?.sendMessage(i18n(event.whoClicked as? Player, "brewery.error.machine_locked"))
+            return
+        }
 
         if (current == null || current.type.isAir || isPlaceholder) {
             inv.setItem(slot, cursor.clone())
@@ -926,6 +985,18 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             if (!validBatch || !codec.isSampleFilter(state.inventory.getItem(DISTILL_FILTER_SLOT))) {
                 player.sendMessage(i18n(player, "brewery.error.no_material"))
                 refreshDistillationDecor(state)
+                return
+            }
+
+            val equipmentKey = ProcessingLocationKey(key.worldUid, key.x, key.y, key.z)
+            if (processingEquipmentService.tryAcquire(
+                    equipmentKey,
+                    ProcessingEquipmentCapability.DISTILLATION,
+                    ProcessingClient.BREWERY,
+                    BREWERY_DISTILLATION_PROCESS_ID,
+                ) == null
+            ) {
+                player.sendMessage(i18n(player, "brewery.error.machine_locked"))
                 return
             }
 
@@ -1017,6 +1088,23 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             return
         }
         if (!passesSkillRequirement(player, recipe)) {
+            return
+        }
+
+        val equipmentKey = ProcessingLocationKey(
+            state.locationKey.worldUid,
+            state.locationKey.x,
+            state.locationKey.y,
+            state.locationKey.z,
+        )
+        if (processingEquipmentService.tryAcquire(
+                equipmentKey,
+                ProcessingEquipmentCapability.FERMENTATION,
+                ProcessingClient.BREWERY,
+                BREWERY_FERMENTATION_PROCESS_ID,
+            ) == null
+        ) {
+            player.sendMessage(i18n(player, "brewery.error.machine_locked"))
             return
         }
 
@@ -1168,6 +1256,23 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
 
         if (recipe != null && !isBarrelTypeAllowed(state.barrelWoodType, recipe.agingBarrelTypes)) {
             (event.whoClicked as? Player)?.sendMessage(i18n(event.whoClicked as? Player, "brewery.error.barrel_type", "types" to recipe.agingBarrelTypes.joinToString(", ")))
+            return
+        }
+
+        val equipmentKey = ProcessingLocationKey(
+            state.locationKey.worldUid,
+            state.locationKey.x,
+            state.locationKey.y,
+            state.locationKey.z,
+        )
+        if (processingEquipmentService.tryAcquire(
+                equipmentKey,
+                ProcessingEquipmentCapability.AGING,
+                ProcessingClient.BREWERY,
+                BREWERY_AGING_PROCESS_ID,
+            ) == null
+        ) {
+            (event.whoClicked as? Player)?.sendMessage(i18n(event.whoClicked as? Player, "brewery.error.machine_locked"))
             return
         }
 
@@ -1407,6 +1512,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         state.inventory.setItem(4, uiItem(localePlayer, Material.BARREL, "brewery.ui.title.fermentation", "header"))
         state.inventory.setItem(FERMENT_CLOSE_SLOT, uiItem(localePlayer, Material.BARRIER, "catalog.close", "close"))
         state.inventory.setItem(FERMENT_INFO_SLOT, uiItem(localePlayer, Material.PAPER, "brewery.ui.title.fermentation", "info"))
+        releaseBreweryFermentationLeaseIfIdle(state)
     }
 
     private fun applyFermentationBackground(state: FermentationState) {
@@ -1510,6 +1616,42 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         return uiKind(item)?.startsWith("fermentation_") == true || uiKind(item) == "generic"
     }
 
+    private fun hasFermentationContents(state: FermentationState): Boolean {
+        return FERMENT_INPUT_SLOTS.any { slot ->
+            state.inventory.getItem(slot)?.let { item ->
+                !item.type.isAir && !isFermentationPlaceholderItem(item)
+            } == true
+        } || state.inventory.getItem(FERMENT_YEAST_SLOT)?.let { item ->
+            !item.type.isAir && !isFermentationPlaceholderItem(item)
+        } == true
+    }
+
+    /** 出力回収後の空設備はCookingへ返し、Breweryの処理占有を残さないようにします。 */
+    private fun releaseBreweryFermentationLeaseIfIdle(state: FermentationState) {
+        if (state.running || hasFermentationContents(state)) return
+        processingEquipmentService.releaseAt(
+            ProcessingLocationKey(
+                state.locationKey.worldUid,
+                state.locationKey.x,
+                state.locationKey.y,
+                state.locationKey.z,
+            ),
+            ProcessingClient.BREWERY,
+            BREWERY_FERMENTATION_PROCESS_ID,
+        )
+    }
+
+    private fun acquireBreweryEquipment(
+        key: BreweryLocationKey,
+        capability: ProcessingEquipmentCapability,
+        processId: String,
+    ): Boolean = processingEquipmentService.tryAcquire(
+        ProcessingLocationKey(key.worldUid, key.x, key.y, key.z),
+        capability,
+        ProcessingClient.BREWERY,
+        processId,
+    ) != null
+
     private fun refreshDistillationDecor(state: DistillationState, player: Player? = null) {
         val localePlayer = player ?: machinePlayer(state.locationKey)
         applyDistillationBackground(state)
@@ -1529,6 +1671,7 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         state.inventory.setItem(4, uiItem(localePlayer, Material.BREWING_STAND, "brewery.ui.title.distillation", "header"))
         state.inventory.setItem(DISTILL_CLOSE_SLOT, uiItem(localePlayer, Material.BARRIER, "catalog.close", "close"))
         state.inventory.setItem(DISTILL_INFO_SLOT, uiItem(localePlayer, Material.PAPER, "brewery.ui.title.distillation", "info"))
+        releaseBreweryDistillationLeaseIfIdle(state)
     }
 
     private fun estimateDistillationSeconds(state: DistillationState): Int {
@@ -1602,6 +1745,45 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             isControlDisplayItem(item)
     }
 
+    private fun hasDistillationContents(state: DistillationState): Boolean {
+        return DISTILL_INPUT_SLOTS.any { slot ->
+            state.inventory.getItem(slot)?.let { item ->
+                !item.type.isAir && !isDistillationPlaceholderItem(item)
+            } == true
+        } || state.inventory.getItem(DISTILL_FILTER_SLOT)?.let { item ->
+            !item.type.isAir && !isDistillationPlaceholderItem(item)
+        } == true
+    }
+
+    private fun hasAgingContents(state: AgingState): Boolean = agingInputSlots(state).any { slot ->
+        state.inventory.getItem(slot)?.let { item ->
+            !item.type.isAir && !isAgingPlaceholderItem(item)
+        } == true
+    }
+
+    private fun releaseBreweryLeaseIfIdle(
+        key: BreweryLocationKey,
+        capability: ProcessingEquipmentCapability,
+        processId: String,
+        busy: Boolean,
+    ) {
+        if (busy) return
+        processingEquipmentService.releaseAt(
+            ProcessingLocationKey(key.worldUid, key.x, key.y, key.z),
+            ProcessingClient.BREWERY,
+            processId,
+        )
+    }
+
+    private fun releaseBreweryDistillationLeaseIfIdle(state: DistillationState) {
+        releaseBreweryLeaseIfIdle(
+            state.locationKey,
+            ProcessingEquipmentCapability.DISTILLATION,
+            BREWERY_DISTILLATION_PROCESS_ID,
+            state.running || hasDistillationContents(state),
+        )
+    }
+
     private fun refreshAgingDecor(state: AgingState, player: Player? = null) {
         val localePlayer = player ?: machinePlayer(state.locationKey)
         applyAgingBackground(state)
@@ -1633,6 +1815,16 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         val infoSlot = if (state.size == BarrelSize.BIG) 53 else 44
         state.inventory.setItem(closeSlot, uiItem(localePlayer, Material.BARRIER, "catalog.close", "close"))
         state.inventory.setItem(infoSlot, uiItem(localePlayer, Material.PAPER, "brewery.ui.aging_core", "info"))
+        releaseBreweryAgingLeaseIfIdle(state)
+    }
+
+    private fun releaseBreweryAgingLeaseIfIdle(state: AgingState) {
+        releaseBreweryLeaseIfIdle(
+            state.locationKey,
+            ProcessingEquipmentCapability.AGING,
+            BREWERY_AGING_PROCESS_ID,
+            hasAgingContents(state),
+        )
     }
 
     private fun applyAgingBackground(state: AgingState) {
@@ -1674,7 +1866,10 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         key in fermentationStates ||
             key in distillationStates ||
             key in agingStates ||
-            barrelRegistry.findByBlock(key) != null
+            barrelRegistry.findByBlock(key) != null ||
+            processingEquipmentService.findAt(
+                ProcessingLocationKey(key.worldUid, key.x, key.y, key.z)
+            ) != null
 
     private fun invalidateAt(key: BreweryLocationKey) {
         val registered = barrelRegistry.findByBlock(key)
@@ -1688,6 +1883,11 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
             barrelRegistry.unregister(registered.id)
             barrelStore.save(barrelRegistry.all())
         }
+        // 保存状態を消した設備の占有も同じイベントで解放します。解放しないと、同じ座標に
+        // 新しい設備を置いた際に、破壊前のBrewery/Cooking占有が残って再利用できなくなります。
+        processingEquipmentService.leaseAt(
+            ProcessingLocationKey(canonicalKey.worldUid, canonicalKey.x, canonicalKey.y, canonicalKey.z)
+        )?.let { processingEquipmentService.release(it) }
         machineLocks.remove(canonicalKey)
         inventories.forEach { inventory ->
             inventory.viewers.filterIsInstance<Player>().forEach(ManagedMenuPresenter::close)
@@ -1938,36 +2138,8 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         }
     }
 
-    private fun fermentationBarrelFor(block: org.bukkit.block.Block): org.bukkit.block.Block? {
-        if (block.state is Barrel) {
-            return listOf(
-                org.bukkit.block.BlockFace.NORTH,
-                org.bukkit.block.BlockFace.EAST,
-                org.bukkit.block.BlockFace.SOUTH,
-                org.bukkit.block.BlockFace.WEST
-            ).asSequence()
-                .map(block::getRelative)
-                .firstOrNull { sign ->
-                    attachedVanillaBarrel(sign) == block && isFermentationSign(sign)
-                }
-                ?.let { block }
-        }
-        return attachedVanillaBarrel(block)?.takeIf { isFermentationSign(block) }
-    }
-
-    private fun attachedVanillaBarrel(signBlock: org.bukkit.block.Block): org.bukkit.block.Block? {
-        val wallSign = signBlock.blockData as? WallSign ?: return null
-        return signBlock.getRelative(wallSign.facing.oppositeFace)
-            .takeIf { it.state is Barrel }
-    }
-
-    private fun isFermentationSign(block: org.bukkit.block.Block): Boolean {
-        val sign = block.state as? Sign ?: return false
-        val line = PlainTextComponentSerializer.plainText()
-            .serialize(sign.getSide(Side.FRONT).line(0))
-            .trim()
-        return line.equals(settings.fermentationSignKeyword, ignoreCase = true)
-    }
+    private fun fermentationBarrelFor(block: org.bukkit.block.Block): org.bukkit.block.Block? =
+        equipmentProvider.fermentationBarrelFor(block)
 
     private fun registerSampleFilterRecipe() {
         Bukkit.removeRecipe(filterRecipeKey)
@@ -2162,6 +2334,37 @@ class BreweryController(private val plugin: JavaPlugin, private val catalogStore
         }
 
         dirty = false
+        restoreProcessingEquipmentLeases()
+    }
+
+    /** 再起動後も、既存状態を持つ設備を他機能へ誤って貸し出さないよう占有を復元します。 */
+    private fun restoreProcessingEquipmentLeases() {
+        fermentationStates.forEach { (key, state) ->
+            if (state.running || hasFermentationContents(state)) {
+                acquireRestoredLease(key, ProcessingEquipmentCapability.FERMENTATION, BREWERY_FERMENTATION_PROCESS_ID)
+            }
+        }
+        distillationStates.forEach { (key, state) ->
+            if (state.running || hasDistillationContents(state)) {
+                acquireRestoredLease(key, ProcessingEquipmentCapability.DISTILLATION, BREWERY_DISTILLATION_PROCESS_ID)
+            }
+        }
+        agingStates.forEach { (key, state) ->
+            if (hasAgingContents(state)) {
+                acquireRestoredLease(key, ProcessingEquipmentCapability.AGING, BREWERY_AGING_PROCESS_ID)
+            }
+        }
+    }
+
+    private fun acquireRestoredLease(
+        key: BreweryLocationKey,
+        capability: ProcessingEquipmentCapability,
+        processId: String,
+    ) {
+        val location = ProcessingLocationKey(key.worldUid, key.x, key.y, key.z)
+        if (processingEquipmentService.tryAcquire(location, capability, ProcessingClient.BREWERY, processId) == null) {
+            plugin.logger.warning("[Brewery] 設備占有の復元に失敗しました: ${key.toSerialized()} capability=$capability")
+        }
     }
 
     fun catalogItems(): List<CatalogItem> = recipes.values

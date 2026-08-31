@@ -53,7 +53,7 @@ internal object BreweryPreparationConfigurationLoader {
                 Material.valueOf(requireNotNull(raw.getString("liquid_pane"))),
                 requireNotNull(raw.getString("failure_result"))
             )
-        }.also { require(it.size == 26) }
+        }.also { require(it.isNotEmpty()) { "Brewery preparations must not be empty" } }
     }
 
     private fun tier(group: String): CookingTier = when (group) {

@@ -88,6 +88,7 @@ import jp.awabi2048.cccontent.features.fishing.FishingFeature
 import jp.awabi2048.cccontent.features.catalog.CatalogCommand
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import jp.awabi2048.cccontent.features.catalog.CatalogType
+import jp.awabi2048.cccontent.features.processing.ProcessingEquipmentService
 import jp.awabi2048.cccontent.features.resourcecollection.ResourceCollectionFeature
 import jp.awabi2048.cccontent.features.seasonal.SeasonalFeature
 import jp.awabi2048.cccontent.features.party.PartyCommand
@@ -188,6 +189,8 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var sharedMobService: MobService
     private var breweryFeature: BreweryFeature? = null
     private var cookingFeature: CookingFeature? = null
+    /** Cooking/Breweryが物理設備を能力単位で共有するための、Content内共通サービスです。 */
+    private var processingEquipmentService: ProcessingEquipmentService? = null
     private var fishingFeature: FishingFeature? = null
     private lateinit var catalogStore: CatalogStore
     private var resourceCollectionFeature: ResourceCollectionFeature? = null
@@ -246,6 +249,7 @@ class CCContent : JavaPlugin(), Listener {
         CCSystem.getAPI().getMenuCommandService().unregisterOwner("cc-content")
         coreConfig = CoreConfigManager.load(this)
         catalogStore = CatalogStore(File(dataFolder, "data/catalog/state.yml"))
+        processingEquipmentService = ProcessingEquipmentService()
         activeContentEnabledSettings = loadContentEnabledSettings()
 
         languageManager = LanguageLoader(this, "ja_jp")
@@ -618,6 +622,8 @@ class CCContent : JavaPlugin(), Listener {
         breweryFeature = null
         cleanup("cooking") { cookingFeature?.shutdown() }
         cookingFeature = null
+        cleanup("processing equipment") { processingEquipmentService?.clear() }
+        processingEquipmentService = null
         cleanup("fishing") { fishingFeature?.shutdown() }
         fishingFeature = null
         cleanup("resource collection") { resourceCollectionFeature?.shutdown() }
@@ -1372,13 +1378,18 @@ class CCContent : JavaPlugin(), Listener {
     }
 
     private fun initializeBrewery() {
-        val feature = BreweryFeature(this, catalogStore)
+        val feature = BreweryFeature(this, catalogStore, requireNotNull(processingEquipmentService))
         breweryFeature = feature
         feature.initialize(featureInitLogger)
     }
 
     private fun initializeCooking() {
-        val feature = CookingFeature(this, { rankManagerInstance }, catalogStore)
+        val feature = CookingFeature(
+            this,
+            { rankManagerInstance },
+            catalogStore,
+            requireNotNull(processingEquipmentService),
+        )
         cookingFeature = feature
         feature.initialize(featureInitLogger)
     }

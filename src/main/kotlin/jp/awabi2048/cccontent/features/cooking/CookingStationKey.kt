@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.cooking
 
 import org.bukkit.Bukkit
 import org.bukkit.block.Block
+import jp.awabi2048.cccontent.features.processing.ProcessingLocationKey
 import java.util.Base64
 import java.util.UUID
 
@@ -25,6 +26,9 @@ internal data class CookingStationKey(
     companion object {
         fun from(block: Block): CookingStationKey =
             CookingStationKey(block.world.uid, block.x, block.y, block.z)
+
+        fun from(location: ProcessingLocationKey): CookingStationKey =
+            CookingStationKey(location.worldId, location.x, location.y, location.z)
 
         fun deserialize(value: String): CookingStationKey? {
             val parts = value.split(';')

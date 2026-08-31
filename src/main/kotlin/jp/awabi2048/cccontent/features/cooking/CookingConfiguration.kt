@@ -266,17 +266,31 @@ object UnifiedCookingConfigurationLoader {
                 require(!raw.contains(field)) { "${file.path}.recipes.$id.$field is forbidden" }
             }
             val station = enumValue<CookingStation>(raw, "equipment", file)
-            require(station == CookingStation.PAN || station == CookingStation.CAULDRON) {
-                "${file.path}.recipes.$id equipment must be PAN or CAULDRON"
+            require(station == CookingStation.PAN || station == CookingStation.CAULDRON ||
+                station == CookingStation.FERMENTATION) {
+                "${file.path}.recipes.$id equipment must be PAN, CAULDRON, or FERMENTATION"
             }
-            val heat = enumValue<CookingHeat>(raw, "heat", file)
+            val heat = optionalEnumValue<CookingHeat>(raw, "heat", file)
+            require(
+                when (station) {
+                    CookingStation.PAN, CookingStation.CAULDRON -> heat != null
+                    CookingStation.FERMENTATION -> heat == null
+                }
+            ) {
+                "${file.path}.recipes.$id heat must be specified only for heated stations"
+            }
             val ingredientAmounts = requireSection(raw, "ingredients", file).getKeys(false).associateWith { ingredientId ->
                 require(ingredientId in ingredients) { "${file.path}.recipes.$id uses unknown ingredient $ingredientId" }
                 requireInt(raw, "ingredients.$ingredientId", file).also { require(it > 0) }
             }
             require(ingredientAmounts.isNotEmpty() && ingredientAmounts.size <= 5)
             val water = requireInt(raw, "water_units", file)
-            require(if (station == CookingStation.CAULDRON) water in 1..3 else water == 0)
+            require(
+                when (station) {
+                    CookingStation.CAULDRON -> water in 1..3
+                    CookingStation.PAN, CookingStation.FERMENTATION -> water == 0
+                }
+            )
             val result = loadResult(requireSection(raw, "result", file), file, false)
             val failure = loadResult(requireSection(raw, "failure_result", file), file, true)
             val kind = enumValue<CookingResultKind>(requireSection(raw, "result", file), "kind", file)
@@ -503,4 +517,15 @@ object UnifiedCookingConfigurationLoader {
     private inline fun <reified T : Enum<T>> enumValue(parent: ConfigurationSection, path: String, file: File): T =
         runCatching { enumValueOf<T>(requireString(parent, path, file).uppercase()) }
             .getOrElse { error("${file.path}.$path is invalid") }
+
+    private inline fun <reified T : Enum<T>> optionalEnumValue(
+        parent: ConfigurationSection,
+        path: String,
+        file: File,
+    ): T? {
+        val value = parent.get(path) ?: return null
+        require(value is String && value.isNotBlank()) { "${file.path}.$path must be a non-empty string when present" }
+        return runCatching { enumValueOf<T>(value.uppercase()) }
+            .getOrElse { error("${file.path}.$path is invalid") }
+    }
 }

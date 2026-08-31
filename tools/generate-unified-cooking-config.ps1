@@ -134,11 +134,10 @@ $recipeBuilder = [System.Text.StringBuilder]::new()
 $intermediateRows = Table-Rows (Section-Lines '# 21. 中間材料完全定義' '# 22. 完成料理完全定義') 11
 foreach ($row in $intermediateRows) {
     $id = @(Ticks $row[0])[0].Replace('cooking.', '')
-    $stage = @(Ticks $row[2])[0].Split('/')[0].Trim()
     $equipmentHeat = @(Ticks $row[3])
     $equipment = $equipmentHeat[0]
-    if ($equipment -notin @('PAN', 'CAULDRON')) { continue }
-    $heat = $equipmentHeat[1]
+    if ($equipment -notin @('PAN', 'CAULDRON', 'FERMENTATION')) { continue }
+    $heat = if ($equipmentHeat.Count -ge 2) { $equipmentHeat[1] } else { '-' }
     $ingredients = Parse-Ingredients $row[4]
     $water = [int]$row[5]
     $resultTokens = @(Ticks $row[6])
@@ -152,12 +151,13 @@ foreach ($row in $intermediateRows) {
     [void]$recipeBuilder.AppendLine("    equipment: $equipment")
     [void]$recipeBuilder.AppendLine("    group: INTERMEDIATE_MATERIAL")
     [void]$recipeBuilder.AppendLine("    tier: BASIC")
-    [void]$recipeBuilder.AppendLine("    heat: $heat")
+    if ($heat -ne '-') { [void]$recipeBuilder.AppendLine("    heat: $heat") }
     [void]$recipeBuilder.AppendLine('    ingredients:')
     foreach ($pair in $ingredients.GetEnumerator()) { [void]$recipeBuilder.AppendLine("      $($pair.Key): $($pair.Value)") }
     [void]$recipeBuilder.AppendLine("    water_units: $water")
     [void]$recipeBuilder.AppendLine("    duration_seconds: $seconds")
-    [void]$recipeBuilder.AppendLine('    exp: 0')
+    $experience = if ($row.Count -ge 12 -and $row[11] -ne '-') { [int]$row[11] } else { 0 }
+    [void]$recipeBuilder.AppendLine("    exp: $experience")
     Append-Result $recipeBuilder $id $kind $container $pane 'NONE' $heat $amount $stack @()
 }
 
