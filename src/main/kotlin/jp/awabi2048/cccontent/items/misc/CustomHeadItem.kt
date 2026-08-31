@@ -44,7 +44,6 @@ class CustomHeadItem(
         })
         meta.setItemModel(NamespacedKey.minecraft(modelMaterial.key.key))
         meta.setMaxStackSize(1)
-        variant.itemCustomModelData?.let { ItemMetaCompat.setLegacyCustomModelData(meta, it) }
         meta.persistentDataContainer.set(variantKey, PersistentDataType.STRING, variant.variantId)
         item.itemMeta = meta
         return item

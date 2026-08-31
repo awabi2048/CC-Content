@@ -18,8 +18,7 @@ data class SeasonalPlantDefinition(
     val sourceMaterials: Set<Material>,
     val biomeKeys: Set<String>,
     val minimumY: Int,
-    val maximumY: Int,
-    val itemModel: String
+    val maximumY: Int
 ) {
     fun matches(season: Season, material: Material, biomeKey: String, y: Int): Boolean =
         weight(season) > 0 &&
@@ -121,8 +120,6 @@ class SeasonalPlantRegistry private constructor(
             val minimumY = requireInt(raw, "minimum_y", path)
             val maximumY = requireInt(raw, "maximum_y", path)
             require(minimumY <= maximumY) { "$path.minimum_y must not exceed maximum_y" }
-            val itemModel = requireString(raw, "item_model", path)
-            require(itemModel.matches(Regex("[a-z0-9_.-]+:[a-z0-9_./-]+"))) { "$path.item_model is invalid" }
             return SeasonalPlantDefinition(
                 id,
                 customItemId,
@@ -132,8 +129,7 @@ class SeasonalPlantRegistry private constructor(
                 sourceMaterials,
                 biomeKeys,
                 minimumY,
-                maximumY,
-                itemModel
+                maximumY
             )
         }
 

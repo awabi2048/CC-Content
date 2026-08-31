@@ -13,6 +13,7 @@ import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.catalog.CatalogCondition
 import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
+import jp.awabi2048.cccontent.items.ContentItemModels
 import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.profile.FisherSkillProfile
@@ -152,6 +153,8 @@ class FishingFeature(
         val item = ItemStack(settings.fishes.firstOrNull { it.id == record.fishId }?.material ?: Material.COD)
         item.editMeta { meta ->
             meta.displayName(Component.text(message(player, "fishing.catalog.item.${record.fishId}")))
+            // ジャーナル内の魚アイコンも実アイテムと同じ表示経路を使います。
+            meta.setItemModel(ContentItemModels.fishingFish(record.fishId))
             meta.lore(listOf(
                 Component.empty(),
                 Component.text(message(player, "fishing.dictionary.description.${record.fishId}")),
@@ -253,6 +256,7 @@ class FishingFeature(
             pdc.set(NamespacedKey("cccontent", "fish_weight_grams"), PersistentDataType.INTEGER, record.weightGrams)
             pdc.set(NamespacedKey("cccontent", "fish_size_cm"), PersistentDataType.INTEGER, record.sizeCm)
             pdc.set(NamespacedKey("cccontent", "fish_quality"), PersistentDataType.STRING, record.quality.id)
+            meta.setItemModel(ContentItemModels.fishingGyotaku(record.fishId))
             pdc.set(NamespacedKey("cccontent", "caught_at_epoch_millis"), PersistentDataType.LONG, record.caughtAtEpochMillis)
             pdc.set(NamespacedKey("cccontent", "angler_uuid"), PersistentDataType.STRING, record.anglerUuid.toString())
             pdc.set(NamespacedKey("cccontent", "angler_name"), PersistentDataType.STRING, record.anglerName)

@@ -15,7 +15,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.cooked_rice
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/cooked_rice
       nutrition: 0
       saturation_modifier: 0.0
       max_stack_size: 64
@@ -23,7 +22,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   tomato_sauce:
@@ -41,7 +39,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.tomato_sauce
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/tomato_sauce
       container: GLASS_BOTTLE
       liquid_pane: RED_STAINED_GLASS_PANE
       nutrition: 0
@@ -52,7 +49,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.underprepared_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/underprepared_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -71,7 +67,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.dashi
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/dashi
       container: GLASS_BOTTLE
       liquid_pane: YELLOW_STAINED_GLASS_PANE
       nutrition: 0
@@ -82,7 +77,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -101,7 +95,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.rice_vinegar
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/rice_vinegar
       container: GLASS_BOTTLE
       liquid_pane: WHITE_STAINED_GLASS_PANE
       nutrition: 0
@@ -112,7 +105,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -131,7 +123,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.cocoa_syrup
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/cocoa_syrup
       container: GLASS_BOTTLE
       liquid_pane: BROWN_STAINED_GLASS_PANE
       nutrition: 0
@@ -142,7 +133,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.underprepared_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/underprepared_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -161,7 +151,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.pan_fried_potato
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/pan_fried_potato
       nutrition: 5
       saturation_modifier: 0.6
       max_stack_size: 16
@@ -171,7 +160,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   honey_carrot:
@@ -189,7 +177,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.honey_carrot
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/honey_carrot
       nutrition: 5
       saturation_modifier: 0.6
       max_stack_size: 16
@@ -199,7 +186,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   grilled_cod:
@@ -217,7 +203,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.grilled_cod
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/grilled_cod
       nutrition: 5
       saturation_modifier: 0.6
       max_stack_size: 16
@@ -227,7 +212,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   grilled_mackerel:
@@ -245,7 +229,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.grilled_mackerel
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/grilled_mackerel
       nutrition: 5
       saturation_modifier: 0.6
       max_stack_size: 16
@@ -255,7 +238,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   grilled_horse_mackerel:
@@ -273,7 +255,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.grilled_horse_mackerel
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/grilled_horse_mackerel
       nutrition: 5
       saturation_modifier: 0.6
       max_stack_size: 16
@@ -283,7 +264,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   potato_soup:
@@ -301,7 +281,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.potato_soup
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/potato_soup
       container: BOWL
       liquid_pane: YELLOW_STAINED_GLASS_PANE
       nutrition: 5
@@ -313,7 +292,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -332,7 +310,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.mushroom_soup
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/mushroom_soup
       container: BOWL
       liquid_pane: BROWN_STAINED_GLASS_PANE
       nutrition: 5
@@ -344,7 +321,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -364,7 +340,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.miso_soup
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/miso_soup
       container: BOWL
       liquid_pane: BROWN_STAINED_GLASS_PANE
       nutrition: 5
@@ -376,7 +351,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -394,7 +368,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.green_tea
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/green_tea
       container: GLASS_BOTTLE
       liquid_pane: LIME_STAINED_GLASS_PANE
       nutrition: 0
@@ -407,7 +380,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -426,7 +398,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.hot_cocoa
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/hot_cocoa
       container: GLASS_BOTTLE
       liquid_pane: BROWN_STAINED_GLASS_PANE
       nutrition: 0
@@ -439,7 +410,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -461,7 +431,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.meat_vegetable_stir_fry
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/meat_vegetable_stir_fry
       container: BOWL
       liquid_pane: ORANGE_STAINED_GLASS_PANE
       nutrition: 7
@@ -473,7 +442,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -494,7 +462,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.hamburg_steak
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/hamburg_steak
       nutrition: 7
       saturation_modifier: 0.8
       max_stack_size: 16
@@ -504,7 +471,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   teriyaki_chicken:
@@ -524,7 +490,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.teriyaki_chicken
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/teriyaki_chicken
       nutrition: 7
       saturation_modifier: 0.8
       max_stack_size: 16
@@ -534,7 +499,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   vegetable_curry_rice:
@@ -555,7 +519,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.vegetable_curry_rice
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/vegetable_curry_rice
       container: BOWL
       liquid_pane: ORANGE_STAINED_GLASS_PANE
       nutrition: 7
@@ -567,7 +530,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -588,7 +550,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.cod_simmered
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/cod_simmered
       container: BOWL
       liquid_pane: BROWN_STAINED_GLASS_PANE
       nutrition: 7
@@ -600,7 +561,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -620,7 +580,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.mackerel_miso_simmer
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/mackerel_miso_simmer
       container: BOWL
       liquid_pane: BROWN_STAINED_GLASS_PANE
       nutrition: 7
@@ -632,7 +591,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -652,7 +610,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.cod_meuniere
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/cod_meuniere
       nutrition: 7
       saturation_modifier: 0.8
       max_stack_size: 16
@@ -662,7 +619,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   flounder_meuniere:
@@ -681,7 +637,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.flounder_meuniere
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/flounder_meuniere
       nutrition: 7
       saturation_modifier: 0.8
       max_stack_size: 16
@@ -691,7 +646,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   ayu_shioyaki:
@@ -709,7 +663,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.ayu_shioyaki
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/ayu_shioyaki
       nutrition: 7
       saturation_modifier: 0.8
       max_stack_size: 16
@@ -719,7 +672,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   sea_bream_shioyaki:
@@ -737,7 +689,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.sea_bream_shioyaki
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/sea_bream_shioyaki
       nutrition: 7
       saturation_modifier: 0.8
       max_stack_size: 16
@@ -747,7 +698,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   smelt_soup:
@@ -766,7 +716,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.smelt_soup
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/smelt_soup
       container: BOWL
       liquid_pane: LIGHT_GRAY_STAINED_GLASS_PANE
       nutrition: 7
@@ -778,7 +727,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -798,7 +746,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.potato_potage
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/potato_potage
       container: BOWL
       liquid_pane: WHITE_STAINED_GLASS_PANE
       nutrition: 7
@@ -810,7 +757,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -830,7 +776,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.mushroom_butter_saute
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/mushroom_butter_saute
       nutrition: 7
       saturation_modifier: 0.8
       max_stack_size: 16
@@ -840,7 +785,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   ginger_drink:
@@ -858,7 +802,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.ginger_drink
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/ginger_drink
       container: GLASS_BOTTLE
       liquid_pane: ORANGE_STAINED_GLASS_PANE
       nutrition: 0
@@ -871,7 +814,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -890,7 +832,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.coffee
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/coffee
       container: GLASS_BOTTLE
       liquid_pane: BLACK_STAINED_GLASS_PANE
       nutrition: 0
@@ -904,7 +845,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -923,7 +863,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.rd_smoothie
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/rd_smoothie
       container: GLASS_BOTTLE
       liquid_pane: RED_STAINED_GLASS_PANE
       nutrition: 0
@@ -936,7 +875,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -955,7 +893,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.yl_smoothie
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/yl_smoothie
       container: GLASS_BOTTLE
       liquid_pane: YELLOW_STAINED_GLASS_PANE
       nutrition: 0
@@ -968,7 +905,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -987,7 +923,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.pl_smoothie
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/pl_smoothie
       container: GLASS_BOTTLE
       liquid_pane: PURPLE_STAINED_GLASS_PANE
       nutrition: 0
@@ -1000,7 +935,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1020,7 +954,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.mix_smoothie
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/mix_smoothie
       container: GLASS_BOTTLE
       liquid_pane: PINK_STAINED_GLASS_PANE
       nutrition: 0
@@ -1035,7 +968,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1054,7 +986,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.or_smoothie
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/or_smoothie
       container: GLASS_BOTTLE
       liquid_pane: ORANGE_STAINED_GLASS_PANE
       nutrition: 0
@@ -1068,7 +999,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1087,7 +1017,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.bl_smoothie
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/bl_smoothie
       container: GLASS_BOTTLE
       liquid_pane: RED_STAINED_GLASS_PANE
       nutrition: 0
@@ -1101,7 +1030,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1120,7 +1048,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.vt_smoothie
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/vt_smoothie
       container: GLASS_BOTTLE
       liquid_pane: MAGENTA_STAINED_GLASS_PANE
       nutrition: 0
@@ -1134,7 +1061,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1153,7 +1079,6 @@ recipes:
       kind: BOTTLE
       custom_item_id: cooking.gr_smoothie
       base_material: POTION
-      item_model: kota_server:custom_item/cooking/gr_smoothie
       container: GLASS_BOTTLE
       liquid_pane: GREEN_STAINED_GLASS_PANE
       nutrition: 0
@@ -1166,7 +1091,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bottle_liquid
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1188,7 +1112,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.pork_soup
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/pork_soup
       container: BOWL
       liquid_pane: BROWN_STAINED_GLASS_PANE
       nutrition: 9
@@ -1201,7 +1124,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1223,7 +1145,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.cream_stew
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/cream_stew
       container: BOWL
       liquid_pane: WHITE_STAINED_GLASS_PANE
       nutrition: 9
@@ -1235,7 +1156,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1257,7 +1177,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.beef_stew
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/beef_stew
       container: BOWL
       liquid_pane: RED_STAINED_GLASS_PANE
       nutrition: 9
@@ -1269,7 +1188,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1291,7 +1209,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.fried_rice
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/fried_rice
       container: BOWL
       liquid_pane: YELLOW_STAINED_GLASS_PANE
       nutrition: 9
@@ -1303,7 +1220,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1325,7 +1241,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.omurice
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/omurice
       container: BOWL
       liquid_pane: ORANGE_STAINED_GLASS_PANE
       nutrition: 9
@@ -1337,7 +1252,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1357,7 +1271,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.tuna_steak
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/tuna_steak
       nutrition: 9
       saturation_modifier: 1.0
       max_stack_size: 16
@@ -1367,7 +1280,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   salmon_mushroom_grill:
@@ -1387,7 +1299,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.salmon_mushroom_grill
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/salmon_mushroom_grill
       nutrition: 9
       saturation_modifier: 1.0
       max_stack_size: 16
@@ -1397,7 +1308,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   eel_kabayaki:
@@ -1416,7 +1326,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.eel_kabayaki
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/eel_kabayaki
       nutrition: 9
       saturation_modifier: 1.0
       max_stack_size: 16
@@ -1426,7 +1335,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   nether_fungus_stir_fry:
@@ -1446,7 +1354,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.nether_fungus_stir_fry
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/nether_fungus_stir_fry
       nutrition: 9
       saturation_modifier: 1.0
       max_stack_size: 16
@@ -1456,7 +1363,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   chorus_compote:
@@ -1474,7 +1380,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.chorus_compote
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/chorus_compote
       container: BOWL
       liquid_pane: PURPLE_STAINED_GLASS_PANE
       nutrition: 9
@@ -1486,7 +1391,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1508,7 +1412,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.autumn_salmon_hotpot
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/autumn_salmon_hotpot
       container: BOWL
       liquid_pane: ORANGE_STAINED_GLASS_PANE
       nutrition: 12
@@ -1520,7 +1423,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1542,7 +1444,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.anglerfish_hotpot
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/anglerfish_hotpot
       container: BOWL
       liquid_pane: BROWN_STAINED_GLASS_PANE
       nutrition: 12
@@ -1554,7 +1455,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1576,7 +1476,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.fugu_hotpot
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/fugu_hotpot
       container: BOWL
       liquid_pane: WHITE_STAINED_GLASS_PANE
       nutrition: 12
@@ -1588,7 +1487,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.burnt_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/burnt_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1
@@ -1608,7 +1506,6 @@ recipes:
       kind: ITEM
       custom_item_id: cooking.soul_fire_tuna_steak
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/soul_fire_tuna_steak
       nutrition: 12
       saturation_modifier: 1.2
       max_stack_size: 16
@@ -1618,7 +1515,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_solid_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_solid_food
       max_stack_size: 1
       amount_per_scale: 1
   adventurers_hotpot:
@@ -1639,7 +1535,6 @@ recipes:
       kind: BOWL
       custom_item_id: cooking.adventurers_hotpot
       base_material: RABBIT_STEW
-      item_model: kota_server:custom_item/cooking/adventurers_hotpot
       container: BOWL
       liquid_pane: RED_STAINED_GLASS_PANE
       nutrition: 12
@@ -1651,7 +1546,6 @@ recipes:
     failure_result:
       custom_item_id: cooking.undercooked_bowl_food
       base_material: POISONOUS_POTATO
-      item_model: kota_server:custom_item/cooking/undercooked_bowl_food
       liquid_pane: GRAY_STAINED_GLASS_PANE
       max_stack_size: 1
       amount_per_scale: 1

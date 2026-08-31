@@ -9,9 +9,9 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreBlock
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.features.brewery.BreweryRecipe
-import jp.awabi2048.cccontent.features.brewery.breweryQualityIndex
 import jp.awabi2048.cccontent.features.brewery.breweryQualityTier
 import jp.awabi2048.cccontent.features.brewery.model.BrewStage
+import jp.awabi2048.cccontent.items.ContentItemModels
 import jp.awabi2048.cccontent.persistence.ContentPdcKeys
 import net.kyori.adventure.text.Component
 import org.bukkit.Color
@@ -22,8 +22,6 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.persistence.PersistentDataContainer
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.java.JavaPlugin
-import io.papermc.paper.datacomponent.DataComponentTypes
-import io.papermc.paper.datacomponent.item.CustomModelData
 import kotlin.math.roundToInt
 
 class BreweryItemCodec(private val plugin: JavaPlugin) {
@@ -59,7 +57,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         val item = ItemStack(Material.POTION)
         item.editMeta { meta ->
             meta.displayName(Component.text(text(player, "brewery.preparation.$preparationId.name")))
-            meta.setItemModel(NamespacedKey("kota_server", "custom_item/brewery/$preparationId"))
+            meta.setItemModel(ContentItemModels.breweryPrepared(preparationId))
             val pdc = meta.persistentDataContainer
             pdc.set(schemaVersionKey, PersistentDataType.INTEGER, 3)
             pdc.set(recipeIdKey, PersistentDataType.STRING, familyId)
@@ -82,6 +80,8 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
             "brewery.item.data.stage" to text(player, if (muddy) "brewery.item.stage.failed" else "brewery.item.stage.fermented"),
             "brewery.item.data.quality" to "%.1f".format(quality)
         )))
+        // 発酵段階も表示経路を固定し、将来はレシピ別モデルへ差し替えられるようにします。
+        meta.setItemModel(if (muddy) ContentItemModels.breweryFailed(recipeId) else ContentItemModels.breweryFermented(recipeId))
         val pdc = meta.persistentDataContainer
         pdc.set(schemaVersionKey, PersistentDataType.INTEGER, 3)
         pdc.set(stageKey, PersistentDataType.STRING, if (muddy) BrewStage.FAILED.name else BrewStage.FERMENTED.name)
@@ -185,7 +185,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         val product = text(player, "brewery.recipe.$outputId.final.$tier.name")
         meta.displayName(Component.text(text(player, "brewery.item.name.aged", "recipe" to text(player, "brewery.recipe.$outputId.name"), "product" to product, "stars" to "★".repeat(stars))))
         meta.setEnchantmentGlintOverride(output?.glint ?: recipe.finalOutputGlint)
-        meta.setItemModel(NamespacedKey.fromString(output?.itemModel ?: "kota_server:custom_item/brewery/$outputId"))
+        meta.setItemModel(ContentItemModels.brewery("final/$outputId"))
         meta.lore(renderLore(player, text(player, "brewery.recipe.$outputId.final.$tier.description"), listOf(
             "brewery.item.data.recipe" to text(player, "brewery.recipe.$outputId.name"),
             "brewery.item.data.stage" to text(player, "brewery.item.stage.aged"),
@@ -196,12 +196,6 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
         pdc.set(customItemIdKey, PersistentDataType.STRING, "brewery.$outputId")
         applyPotionColor(meta, recipe.finalOutputColor)
         item.itemMeta = meta
-        recipe.finalOutputCustomModelData.getOrNull(breweryQualityIndex(finalQuality))?.let { model ->
-            item.setData(
-                DataComponentTypes.CUSTOM_MODEL_DATA,
-                CustomModelData.customModelData().addFloat(model.toFloat()).build()
-            )
-        }
     }
 
     fun outputId(item: ItemStack): String? = item.itemMeta?.persistentDataContainer
@@ -221,7 +215,7 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     fun buildSampleFilterItem(player: Player?): ItemStack {
         val item = ItemStack(Material.POISONOUS_POTATO)
         val meta = item.itemMeta ?: return item
-        meta.setItemModel(NamespacedKey.minecraft("shears"))
+        meta.setItemModel(ContentItemModels.brewery("sample_filter"))
         meta.displayName(Component.text(text(player, "brewery.item.filter.name")))
         val lines = CCSystem.getAPI().getLocalized(player, ContentBreweryKeys.BREWERY_ITEM_FILTER_DESCRIPTION)
         meta.lore(CCSystem.getAPI().getLoreService().render(GuiLoreSpec.Blocks(listOf(GuiLoreBlock(lines.map(GuiLoreLine::Text))))) )

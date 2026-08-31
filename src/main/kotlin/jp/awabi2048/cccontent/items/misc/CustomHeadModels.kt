@@ -13,7 +13,6 @@ data class CustomHeadVariant(
     val itemMaterial: Material,
     val itemDisplayName: String,
     val itemLore: List<String>,
-    val itemCustomModelData: Int?,
     val guiTitle: String,
     val themeIconMaterial: Material,
     val themeIconName: String,

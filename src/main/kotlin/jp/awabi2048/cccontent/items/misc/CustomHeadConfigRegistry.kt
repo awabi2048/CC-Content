@@ -85,12 +85,6 @@ object CustomHeadConfigRegistry {
                 "&7選択後に確認ダイアログで交換"
             )
         }.map(::colorize)
-        val itemCustomModelData = if (section.contains("item.custom_model_data")) {
-            section.getInt("item.custom_model_data")
-        } else {
-            null
-        }
-
         val guiTitle = colorize(section.getString("gui.title") ?: "&0&lカスタムヘッド選択")
         val themeIconMaterial = parseMaterial(section.getString("gui.theme_icon_material"), Material.PAPER)
         val themeIconName = colorize(section.getString("gui.theme_icon_name") ?: "&eテーマ")
@@ -118,7 +112,6 @@ object CustomHeadConfigRegistry {
             itemMaterial = itemMaterial,
             itemDisplayName = itemDisplayName,
             itemLore = itemLore,
-            itemCustomModelData = itemCustomModelData,
             guiTitle = guiTitle,
             themeIconMaterial = themeIconMaterial,
             themeIconName = themeIconName,
