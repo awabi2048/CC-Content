@@ -22,4 +22,11 @@ class UnifiedCookingLayoutTest {
         assertEquals(44, UnifiedCookingLayout.HEAT);
         assertEquals(10, Set.copyOf(UnifiedCookingLayout.INSTANCE.getCUTTING_WORK()).size());
     }
+
+    @Test
+    void liquidDisplayKeepsOnePanelPerCanonicalUnit() {
+        assertEquals(List.of(22), UnifiedCookingLayout.INSTANCE.liquidDisplayOrder(1));
+        assertEquals(List.of(21, 23), UnifiedCookingLayout.INSTANCE.liquidDisplayOrder(2));
+        assertEquals(List.of(20, 21, 22, 23, 24), UnifiedCookingLayout.INSTANCE.liquidDisplayOrder(5));
+    }
 }

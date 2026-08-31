@@ -21,7 +21,6 @@ recipes:
       bittern:
         custom_item_id: cooking.nigari_bottle
         container: GLASS_BOTTLE
-        liquid_pane: GRAY_STAINED_GLASS_PANE
 
   tofu:
     equipment: CAULDRON

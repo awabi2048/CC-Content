@@ -74,8 +74,7 @@ data class UnifiedCookingRecipe(
 data class UnifiedLiquidOutput(
     val liquidId: String,
     val customItemId: String,
-    val container: Material,
-    val liquidPane: Material
+    val container: Material
 )
 
 data class UnifiedLiquidCookingRecipe(
@@ -115,7 +114,9 @@ data class UnifiedLiquidCookingRecipe(
             0,
             CookingResultKind.ITEM,
             null,
-            residualLiquids.keys.singleOrNull()?.let { liquidOutputs[it]?.liquidPane?.name },
+            residualLiquids.keys.singleOrNull()?.let { liquidId ->
+                CookingLiquidPresentation.paneFor(CookingLiquidContents.of(mapOf(liquidId to 1))).name
+            },
             experience
         )
 }
@@ -311,6 +312,9 @@ object UnifiedCookingConfigurationLoader {
             val inputSection = requireSection(raw, "liquid_inputs", file)
             val inputs = inputSection.getKeys(false).associateWith { liquidId ->
                 requireStringId(liquidId, "${file.path}.recipes.$rawId.liquid_inputs")
+                require(liquidId in CookingLiquidPresentation.knownLiquidIds) {
+                    "${file.path}.recipes.$rawId.liquid_inputs contains an unknown liquid: $liquidId"
+                }
                 requireInt(inputSection, liquidId, file).also { require(it > 0) }
             }
             require(inputs.isNotEmpty()) { "${file.path}.recipes.$rawId.liquid_inputs must not be empty" }
@@ -320,6 +324,11 @@ object UnifiedCookingConfigurationLoader {
             val result = loadResult(requireSection(raw, "result", file), file, false)
             require(result.container == null) { "${file.path}.recipes.$rawId.result must be a solid item" }
             val residual = optionalAmountMap(raw.getConfigurationSection("residual_liquids"), file, rawId)
+            residual.keys.forEach { liquidId ->
+                require(liquidId in CookingLiquidPresentation.knownLiquidIds) {
+                    "${file.path}.recipes.$rawId.residual_liquids contains an unknown liquid: $liquidId"
+                }
+            }
             require(residual.size <= 1) {
                 "${file.path}.recipes.$rawId supports at most one collectible residual liquid"
             }
@@ -339,8 +348,7 @@ object UnifiedCookingConfigurationLoader {
                 UnifiedLiquidOutput(
                     liquidId,
                     requireString(output, "custom_item_id", file),
-                    requireMaterial(output, "container", file),
-                    requireMaterial(output, "liquid_pane", file)
+                    requireMaterial(output, "container", file)
                 )
             }.orEmpty()
             residual.keys.forEach { liquidId ->

@@ -4,6 +4,8 @@ import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+import com.awabi2048.ccsystem.api.localization.generated.ContentCookingGeneratedKeys
 import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver
 import jp.awabi2048.cccontent.features.environment.SurfaceWaterRegionAnalyzer
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
@@ -18,6 +20,7 @@ import jp.awabi2048.cccontent.items.ContentItemModels
 import jp.awabi2048.cccontent.persistence.ContentPdcKeys
 import jp.awabi2048.cccontent.util.PotionEffectTypeResolver
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.FluidCollisionMode
 import org.bukkit.GameMode
@@ -153,6 +156,11 @@ internal class UnifiedCookingController(
             if (event.click == ClickType.LEFT) collectLiquid(player, event, holder, session)
             return
         }
+        // 液体パネルの空き枠は装飾であり、論理状態へ直接紐付くため投入欄として扱いません。
+        if (raw in holder.liquidDisplaySlots) {
+            event.isCancelled = true
+            return
+        }
         if (raw == UnifiedCookingLayout.CLOSE) {
             event.isCancelled = true
             if (event.click == ClickType.LEFT) ManagedMenuPresenter.close(player)
@@ -176,6 +184,9 @@ internal class UnifiedCookingController(
     @EventHandler(ignoreCancelled = true)
     fun onDrag(event: InventoryDragEvent) {
         val holder = event.view.topInventory.holder as? UnifiedCookingHolder ?: return
+        if (event.rawSlots.any { it in holder.liquidDisplaySlots }) {
+            event.isCancelled = true
+        }
         if (event.rawSlots.any { it < event.view.topInventory.size && it !in holder.inputSlots }) {
             event.isCancelled = true
         }
@@ -428,8 +439,10 @@ internal class UnifiedCookingController(
             if (slot in holder.inputSlots) inventory.setItem(slot, decode(encoded))
         }
         holder.outputIndices.clear()
+        holder.liquidDisplaySlots.clear()
         holder.liquidSlots.clear()
         data?.session?.let { session -> renderSessionOutputs(player, inventory, holder, session) }
+        renderLiquidDisplay(player, inventory, holder, data)
         inventory.setItem(UnifiedCookingLayout.CLOSE, icon(Material.BARRIER, message(player, "cooking.ui.close")))
         inventory.setItem(UnifiedCookingLayout.INFO, icon(Material.BOOK, message(player, "cooking.ui.info")))
         inventory.setItem(UnifiedCookingLayout.START, icon(
@@ -470,30 +483,120 @@ internal class UnifiedCookingController(
                 holder.outputIndices[slot] = index
             }
         }
-        if (session.state == CookingProcessState.READY_LIQUID) {
+        if (session.state == CookingProcessState.READY_LIQUID &&
+            configuration.liquidRecipes[session.recipeId]?.collectSolidResultWithLiquid != true
+        ) {
             session.outputStacks.take(UnifiedCookingLayout.TIMED_OUTPUT_ORDER.size).forEachIndexed { index, output ->
                 val slot = UnifiedCookingLayout.TIMED_OUTPUT_ORDER[index]
                 inventory.setItem(slot, outputItem(output, player))
                 holder.outputIndices[slot] = index
             }
-            val reservoir = session.reservoir ?: return
-            val pane = session.recipeSnapshot.liquidPaneMaterial?.let(Material::matchMaterial)
-                ?: Material.GRAY_STAINED_GLASS_PANE
-            val visibleSlotCount = when {
-                reservoir.remaining * 3 > reservoir.maximum * 2 -> 5
-                reservoir.remaining * 3 > reservoir.maximum -> 3
-                else -> 1
-            }
-            // 固形成果物と液体成果物を同時に表示できるよう、固形物で使用中の
-            // スロットを除外してから液体領域を描画します。
-            UnifiedCookingLayout.LIQUID_OUTPUT_ORDER
-                .filterNot(holder.outputIndices::containsKey)
-                .take(visibleSlotCount)
-                .forEach { slot ->
-                    inventory.setItem(slot, icon(pane, message(player, "cooking.ui.liquid_result")))
-                    holder.liquidSlots += slot
-                }
         }
+    }
+
+    private data class LiquidDisplayState(
+        val name: String,
+        val pane: Material,
+        val remainingUnits: Int,
+        val maximumUnits: Int,
+        val collectable: Boolean
+    )
+
+    /** 液体の論理単位を、5枠のパネルとName/Loreへ同じ状態から描画します。 */
+    private fun renderLiquidDisplay(
+        player: Player,
+        inventory: Inventory,
+        holder: UnifiedCookingHolder,
+        data: PersistedCookingStation?
+    ) {
+        if (holder.equipment != CookingStation.CAULDRON) return
+        val state = liquidDisplayState(player, data) ?: return
+        val availableSlots = UnifiedCookingLayout.LIQUID_OUTPUT_ORDER.filterNot(holder.outputIndices::containsKey)
+        // 残量の単位数を保ちつつ、少量時も視線の中心から広がる配置にします。
+        val activeSlots = UnifiedCookingLayout.liquidDisplayOrder(state.remainingUnits)
+            .filter(availableSlots::contains)
+            .take(state.remainingUnits)
+            .toSet()
+        val amount = message(
+            player,
+            ContentCookingGeneratedKeys.COOKING_LIQUID_AMOUNT,
+            mapOf(
+                "amount" to CookingLiquidVolume.toMillibuckets(state.remainingUnits),
+                "remaining" to state.remainingUnits,
+                "maximum" to state.maximumUnits
+            )
+        )
+        val lore = buildList {
+            add(GuiLoreLine.Text(amount))
+            if (state.collectable) {
+                add(GuiLoreLine.Text(message(player, ContentCookingGeneratedKeys.COOKING_LIQUID_COLLECT)))
+            }
+        }
+        availableSlots.forEach { slot ->
+            holder.liquidDisplaySlots += slot
+            if (slot in activeSlots) {
+                inventory.setItem(slot, GuiMenuItems.icon(state.pane, state.name, lore))
+                holder.liquidSlots += slot
+            } else {
+                inventory.setItem(slot, GuiMenuItems.backgroundPane(Material.WHITE_STAINED_GLASS_PANE, ""))
+            }
+        }
+    }
+
+    private fun liquidDisplayState(player: Player, data: PersistedCookingStation?): LiquidDisplayState? {
+        val session = data?.session
+        if (session?.state == CookingProcessState.READY_LIQUID) {
+            val reservoir = session.reservoir ?: return null
+            val recipe = configuration.liquidRecipes[session.recipeId]
+            val residualId = recipe?.residualLiquids?.keys?.singleOrNull()
+            if (residualId != null) {
+                val contents = CookingLiquidContents.of(mapOf(residualId to reservoir.remaining))
+                return LiquidDisplayState(
+                    liquidDisplayName(player, contents),
+                    CookingLiquidPresentation.paneFor(contents),
+                    reservoir.remaining,
+                    reservoir.maximum,
+                    true
+                )
+            }
+            // 既存の通常料理の液体成果物も同じパネル枠へ表示し、旧「液体成果物」ラベルは使いません。
+            return LiquidDisplayState(
+                liquidResultName(player, reservoir.customItemId),
+                session.recipeSnapshot.liquidPaneMaterial?.let(Material::matchMaterial)
+                    ?: Material.GRAY_STAINED_GLASS_PANE,
+                reservoir.remaining,
+                reservoir.maximum,
+                true
+            )
+        }
+
+        val contents = CookingLiquidContents.of(data?.liquidContents.orEmpty())
+        if (contents.isEmpty() || !contents.containsNonWater()) return null
+        return LiquidDisplayState(
+            liquidDisplayName(player, contents),
+            CookingLiquidPresentation.paneFor(contents),
+            contents.total,
+            CookingLiquidContents.MAX_CAPACITY,
+            false
+        )
+    }
+
+    private fun liquidDisplayName(player: Player, contents: CookingLiquidContents): String {
+        val ids = CookingLiquidPresentation.orderedLiquidIds(contents)
+        require(ids.isNotEmpty())
+        val separator = if (CCSystem.getAPI().getPlayerLanguage(player) == "en_us") " and " else "と"
+        val names = ids.joinToString(separator) { liquidId ->
+            message(player, CookingLiquidPresentation.definition(liquidId).nameKey)
+        }
+        return if (ids.size == 1) names else
+            message(player, ContentCookingGeneratedKeys.COOKING_LIQUID_MIXED, mapOf("components" to names))
+    }
+
+    private fun liquidResultName(player: Player, customItemId: String): String {
+        val item = CustomItemManager.createItemForPlayer(customItemId, player, 1) ?: return customItemId
+        return item.itemMeta?.displayName()?.let(PlainTextComponentSerializer.plainText()::serialize)
+            ?.takeIf(String::isNotBlank)
+            ?: customItemId
     }
 
     private fun collectSolid(
@@ -586,8 +689,9 @@ internal class UnifiedCookingController(
 
     private fun updateAfterCollection(holder: UnifiedCookingHolder, next: CookingStationSession, player: Player) {
         val current = stations[holder.stationKey] ?: return
-        val successful = configuration.recipes[next.recipeId]?.definition?.experience?.let { it > 0 } == true &&
-            !next.failureCommitted
+        val experience = configuration.recipes[next.recipeId]?.definition?.experience
+            ?: configuration.liquidRecipes[next.recipeId]?.experience
+        val successful = experience?.let { it > 0 } == true && !next.failureCommitted
         val collectorId = player.uniqueId.toString()
         val firstCollection = collectorId !in current.collectorIds
         if (successful && firstCollection) {
@@ -1067,13 +1171,21 @@ internal class UnifiedCookingController(
     private fun icon(material: Material, name: String): ItemStack =
         GuiMenuItems.icon(material, name, emptyList<GuiLoreLine>())
 
-    private fun realItem(item: ItemStack): Boolean = !item.type.isAir && item.type !in UI_MATERIALS
+    private fun realItem(item: ItemStack): Boolean =
+        !item.type.isAir && item.type !in UI_MATERIALS &&
+            !item.type.name.endsWith("_STAINED_GLASS_PANE")
     private fun encode(item: ItemStack): String = Base64.getEncoder().encodeToString(item.serializeAsBytes())
     private fun decode(encoded: String): ItemStack = ItemStack.deserializeBytes(Base64.getDecoder().decode(encoded))
     private fun message(player: Player, key: String): String = CCSystem.getAPI().getLocalized(
         player,
         jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "cooking."),
     )
+
+    private fun message(
+        player: Player?,
+        key: LocalizationKey<String>,
+        placeholders: Map<String, Any> = emptyMap()
+    ): String = CCSystem.getAPI().getLocalized(player, key, placeholders).replace('&', '§')
 
 
     companion object {
@@ -1106,6 +1218,16 @@ internal object UnifiedCookingLayout {
     val TIMED_WORK = listOf(20, 21, 22, 23, 24)
     val TIMED_OUTPUT_ORDER = listOf(22, 21, 23, 20, 24)
     val LIQUID_OUTPUT_ORDER = listOf(21, 23, 20, 24, 22)
+
+    fun liquidDisplayOrder(units: Int): List<Int> = when (units) {
+        0 -> emptyList()
+        1 -> listOf(22)
+        2 -> listOf(21, 23)
+        3 -> listOf(21, 22, 23)
+        4 -> listOf(20, 21, 23, 24)
+        5 -> listOf(20, 21, 22, 23, 24)
+        else -> error("Liquid display units must be between 0 and 5: $units")
+    }
 }
 
 internal class UnifiedCookingHolder(
@@ -1117,6 +1239,8 @@ internal class UnifiedCookingHolder(
 ) : InventoryHolder {
     lateinit var backingInventory: Inventory
     val outputIndices = mutableMapOf<Int, Int>()
+    /** 液体表示として占有している全枠。空き枠も投入欄から除外します。 */
+    val liquidDisplaySlots = mutableSetOf<Int>()
     val liquidSlots = mutableSetOf<Int>()
     val inputSlots: List<Int> = if (equipment == CookingStation.CUTTING) {
         UnifiedCookingLayout.CUTTING_WORK + UnifiedCookingLayout.TOOL
