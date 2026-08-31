@@ -20,6 +20,7 @@ import jp.awabi2048.cccontent.items.ContentItemModels
 import jp.awabi2048.cccontent.persistence.ContentPdcKeys
 import jp.awabi2048.cccontent.util.PotionEffectTypeResolver
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.FluidCollisionMode
@@ -126,13 +127,14 @@ internal class UnifiedCookingController(
             event.isCancelled = true
             return
         }
-        if (contents.isEmpty()) return
         // 最後の水を汲み切った場合、newState は通常の CAULDRON になり
         // Levelled ではありません。その場合も保存済みの通常水を消します。
         val physicalLevel = (event.newState.blockData as? Levelled)?.level ?: 0
         val logicalUnits = CookingLiquidVolume.fromVanillaLevel(physicalLevel)
-        stations[key] = if (logicalUnits <= 0) data.copy(liquidContents = emptyMap()) else
+        val updated = if (logicalUnits <= 0) data.copy(liquidContents = emptyMap()) else
             data.copy(liquidContents = mapOf(CookingLiquidIds.WATER to logicalUnits))
+        if (updated.liquidContents == data.liquidContents) return
+        stations[key] = updated
         dirty = true
     }
 
@@ -176,17 +178,11 @@ internal class UnifiedCookingController(
             collectSolid(player, event, holder, raw, session)
             return
         }
-        if (raw in holder.liquidSlots) {
-            event.isCancelled = true
-            if (event.click == ClickType.LEFT) {
-                if (session == null) collectInputLiquid(player, event, holder)
-                else collectLiquid(player, event, holder, session)
-            }
-            return
-        }
-        // 液体パネルの空き枠は装飾であり、論理状態へ直接紐付くため投入欄として扱いません。
         if (raw in holder.liquidDisplaySlots) {
             event.isCancelled = true
+            if (event.click == ClickType.LEFT || event.click == ClickType.RIGHT) {
+                handleLiquidAreaClick(player, event, holder, session)
+            }
             return
         }
         if (raw == UnifiedCookingLayout.CLOSE) {
@@ -240,6 +236,22 @@ internal class UnifiedCookingController(
         }
         val session = stations[holder.stationKey]?.session
         val inputWorkspaceAllowed = CookingInventoryInteractionPolicy.allowsInputWorkspace(session?.state)
+        if (holder.equipment == CookingStation.CAULDRON) {
+            val top = event.view.topInventory
+            val topSlots = event.rawSlots.filter { it < top.size }
+            if (topSlots.isEmpty()) return
+            if (topSlots.any { it !in holder.liquidDisplaySlots }) {
+                event.isCancelled = true
+                return
+            }
+            event.isCancelled = true
+            if (inputWorkspaceAllowed) {
+                // ドラッグ操作もクリック操作と同じ論理スタックへ登録し、表示枠数と保存順を
+                // バニラの一時的なスロット配置へ依存させません。
+                insertLiquidAreaItem(player, holder, event.oldCursor)
+            }
+            return
+        }
         if (event.rawSlots.any { it in holder.liquidDisplaySlots }) {
             event.isCancelled = true
         }
@@ -306,17 +318,17 @@ internal class UnifiedCookingController(
         if (CustomItemManager.identify(mainHand)?.fullId == "cooking.frying_pan" && heat(block) != null) {
             return CookingStation.PAN
         }
-        val customLiquidInCauldron = stations[CookingStationKey.from(block)]
-            ?.liquidContents
-            ?.keys
-            ?.any { it != CookingLiquidIds.WATER } == true
-        val pendingCauldronSession = stations[CookingStationKey.from(block)]
-            ?.let { it.equipment == CookingStation.CAULDRON && it.session != null } == true
-        if (player.isSneaking && emptyHand && block.type == Material.WATER_CAULDRON &&
-            (heat(block.getRelative(BlockFace.DOWN)) != null || customLiquidInCauldron || pendingCauldronSession)) {
-            return CookingStation.CAULDRON
-        }
-        if (player.isSneaking && emptyHand && pendingCauldronSession && block.type == Material.CAULDRON) {
+        val cauldronData = stations[CookingStationKey.from(block)]
+            ?.takeIf { it.equipment == CookingStation.CAULDRON }
+        val hasStoredCauldronState = cauldronData != null && (
+            cauldronData.liquidContents.isNotEmpty() ||
+                cauldronData.liquidAreaItems.isNotEmpty() ||
+                cauldronData.session != null
+            )
+        if (player.isSneaking && emptyHand &&
+            (block.type == Material.CAULDRON || block.type == Material.WATER_CAULDRON) &&
+            (heat(block.getRelative(BlockFace.DOWN)) != null || hasStoredCauldronState)
+        ) {
             return CookingStation.CAULDRON
         }
         return null
@@ -395,6 +407,27 @@ internal class UnifiedCookingController(
         }
     }
 
+    /**
+     * 保存状態がまだない、または物理水位だけが先に変化した釜を論理状態へ同期します。
+     * 物理ブロックは水以外の液体を表現できないため、既に論理液体を持つ釜は保存値を優先します。
+     */
+    private fun synchronizeCauldronState(key: CookingStationKey): PersistedCookingStation? {
+        val existing = stations[key]
+        if (existing != null && existing.equipment != CookingStation.CAULDRON) return existing
+        val block = key.blockIfLoaded() ?: return existing
+        val contents = currentLiquidContents(block, existing)
+        if (contents.isEmpty() || existing?.liquidContents == contents.amounts) return existing
+
+        val updated = (existing ?: PersistedCookingStation(CookingStation.CAULDRON)).copy(
+            equipment = CookingStation.CAULDRON,
+            liquidContents = contents.amounts,
+        )
+        stations[key] = updated
+        dirty = true
+        flush()
+        return updated
+    }
+
     private fun setCauldronContents(block: Block, contents: CookingLiquidContents) {
         if (contents.isEmpty()) {
             block.type = Material.CAULDRON
@@ -469,7 +502,13 @@ internal class UnifiedCookingController(
             player.sendMessage(message(player, "cooking.error.in_use"))
             return
         }
-        val current = stations[key]
+        // 物理ブロックの水を、メニューが参照する論理液体状態へ初回表示時に同期します。
+        // これにより保存状態をまだ持たない水入り釜も、液体領域へ「水」として表示できます。
+        val current = if (equipment == CookingStation.CAULDRON) {
+            synchronizeCauldronState(key)
+        } else {
+            stations[key]
+        }
         if (current != null && current.equipment != equipment) {
             locks.remove(key, player.uniqueId)
             return
@@ -496,13 +535,20 @@ internal class UnifiedCookingController(
     private fun render(player: Player, inventory: Inventory, holder: UnifiedCookingHolder) {
         CCSystem.getAPI().getGuiLayoutService().applyStandardFrame(inventory)
         holder.inputSlots.forEach { inventory.setItem(it, null) }
-        val data = stations[holder.stationKey]
-        data?.workspaceItems?.forEach { (slot, encoded) ->
-            if (slot in holder.inputSlots) inventory.setItem(slot, decode(encoded))
+        val data = if (holder.equipment == CookingStation.CAULDRON) {
+            synchronizeCauldronState(holder.stationKey)
+        } else {
+            stations[holder.stationKey]
+        }
+        if (holder.equipment != CookingStation.CAULDRON) {
+            data?.workspaceItems?.forEach { (slot, encoded) ->
+                if (slot in holder.inputSlots) inventory.setItem(slot, decode(encoded))
+            }
         }
         holder.outputIndices.clear()
         holder.liquidDisplaySlots.clear()
         holder.liquidSlots.clear()
+        holder.liquidItemSlots.clear()
         data?.session?.let { session -> renderSessionOutputs(player, inventory, holder, session) }
         renderLiquidDisplay(player, inventory, holder, data)
         inventory.setItem(UnifiedCookingLayout.CLOSE, icon(Material.BARRIER, message(player, "cooking.ui.close")))
@@ -557,7 +603,8 @@ internal class UnifiedCookingController(
     }
 
     private data class LiquidDisplayState(
-        val name: String,
+        val contents: CookingLiquidContents,
+        val name: String?,
         val remainingUnits: Int,
         val maximumUnits: Int,
         val collectable: Boolean
@@ -571,25 +618,35 @@ internal class UnifiedCookingController(
         data: PersistedCookingStation?
     ) {
         if (holder.equipment != CookingStation.CAULDRON) return
-        val state = liquidDisplayState(player, data) ?: return
+        val state = liquidDisplayState(player, data)
         val availableSlots = UnifiedCookingLayout.LIQUID_OUTPUT_ORDER.filterNot(holder.outputIndices::containsKey)
         // 液体は意味上の単位順をそのまま左から詰め、論理量と表示枠の対応を保ちます。
         // 他の成果物が同じ列を一時的に占有しても、残った液体枠の左端から詰めます。
-        val activeSlots = UnifiedCookingLayout.liquidDisplayOrder(state.remainingUnits, availableSlots)
-            .toSet()
+        val activeSlots = if (state.remainingUnits > 0) {
+            UnifiedCookingLayout.liquidDisplayOrder(state.remainingUnits, availableSlots).toSet()
+        } else {
+            emptySet()
+        }
         val canCollect = state.collectable &&
             CookingStationStateMachine.canCollectLiquid(data?.session, true)
-        val amount = message(
-            player,
-            ContentCookingGeneratedKeys.COOKING_LIQUID_AMOUNT,
-            mapOf(
-                "amount" to CookingLiquidVolume.toMillibuckets(state.remainingUnits),
-                "remaining" to state.remainingUnits,
-                "maximum" to state.maximumUnits
-            )
-        )
+        val itemLore = liquidAreaItemLore(data?.liquidAreaItems.orEmpty())
         val lore = buildList {
-            add(GuiLoreLine.Text(amount))
+            if (state.remainingUnits > 0) {
+                add(
+                    GuiLoreLine.Text(
+                        message(
+                            player,
+                            ContentCookingGeneratedKeys.COOKING_LIQUID_AMOUNT,
+                            mapOf(
+                                "amount" to CookingLiquidVolume.toMillibuckets(state.remainingUnits),
+                                "remaining" to state.remainingUnits,
+                                "maximum" to state.maximumUnits
+                            )
+                        )
+                    )
+                )
+            }
+            addAll(itemLore)
             if (canCollect) {
                 add(GuiLoreLine.Text(message(player, ContentCookingGeneratedKeys.COOKING_LIQUID_COLLECT)))
             }
@@ -601,27 +658,34 @@ internal class UnifiedCookingController(
                     slot,
                     GuiMenuItems.icon(
                         Material.POISONOUS_POTATO,
-                        state.name,
+                        state.name ?: " ",
                         lore,
                         itemModel = ContentItemModels.cookingLiquidDisplay()
                     )
                 )
+                holder.liquidItemSlots += slot
                 if (canCollect) holder.liquidSlots += slot
+            } else if (slot == availableSlots.firstOrNull() && itemLore.isNotEmpty()) {
+                // 液体が空でも投入済みアイテムのLoreを確認できるよう、見た目は白ガラスの
+                // まま、最初の枠だけを内容アイコンとして扱います。
+                inventory.setItem(slot, GuiMenuItems.icon(Material.WHITE_STAINED_GLASS_PANE, " ", lore))
+                holder.liquidItemSlots += slot
             } else {
                 inventory.setItem(slot, GuiMenuItems.backgroundPane(Material.WHITE_STAINED_GLASS_PANE, ""))
             }
         }
     }
 
-    private fun liquidDisplayState(player: Player, data: PersistedCookingStation?): LiquidDisplayState? {
+    private fun liquidDisplayState(player: Player, data: PersistedCookingStation?): LiquidDisplayState {
         val session = data?.session
         if (session?.state == CookingProcessState.READY_LIQUID) {
-            val reservoir = session.reservoir ?: return null
+            val reservoir = requireNotNull(session.reservoir)
             val recipe = configuration.liquidRecipes[session.recipeId]
             val residualId = recipe?.residualLiquids?.keys?.singleOrNull()
             if (residualId != null) {
                 val contents = CookingLiquidContents.of(mapOf(residualId to reservoir.remaining))
                 return LiquidDisplayState(
+                    contents,
                     liquidDisplayName(player, contents),
                     reservoir.remaining,
                     reservoir.maximum,
@@ -630,21 +694,31 @@ internal class UnifiedCookingController(
             }
             // 既存の通常料理の液体成果物も同じパネル枠へ表示し、旧「液体成果物」ラベルは使いません。
             return LiquidDisplayState(
+                CookingLiquidContents.empty(),
                 liquidResultName(player, reservoir.customItemId),
                 reservoir.remaining,
                 reservoir.maximum,
                 true
             )
         }
-
         val contents = CookingLiquidContents.of(data?.liquidContents.orEmpty())
-        if (contents.isEmpty() || !contents.containsNonWater()) return null
         return LiquidDisplayState(
-            liquidDisplayName(player, contents),
+            contents,
+            contents.takeUnless(CookingLiquidContents::isEmpty)?.let { liquidDisplayName(player, it) },
             contents.total,
             CookingLiquidContents.MAX_CAPACITY,
             CookingLiquidPresentation.isCollectable(contents)
         )
+    }
+
+    /** 液体領域へ投入したアイテムを、保存順のままLoreへ表示します。 */
+    private fun liquidAreaItemLore(items: List<CookingLiquidAreaItem>): List<GuiLoreLine> =
+        items.map { stored -> GuiLoreLine.Component(liquidAreaItemComponent(decode(stored.serializedItem))) }
+
+    private fun liquidAreaItemComponent(item: ItemStack): Component {
+        val displayName = item.itemMeta?.displayName()
+            ?: Component.translatable(item.type.translationKey())
+        return Component.text("×${item.amount} ", NamedTextColor.GRAY).append(displayName)
     }
 
     private fun liquidDisplayName(player: Player, contents: CookingLiquidContents): String {
@@ -670,6 +744,123 @@ internal class UnifiedCookingController(
     }
 
     /**
+     * 液体領域のクリックを、液体回収・投入アイテムのLIFO回収・新規投入へ振り分けます。
+     * 容器を持っている場合だけ液体回収を優先し、それ以外の実アイテムは待機材料として登録します。
+     */
+    private fun handleLiquidAreaClick(
+        player: Player,
+        event: InventoryClickEvent,
+        holder: UnifiedCookingHolder,
+        session: CookingStationSession?,
+    ) {
+        val cursor = event.cursor
+        if (event.rawSlot in holder.liquidSlots && isLiquidCollectionContainer(holder, session, cursor)) {
+            if (session == null) collectInputLiquid(player, event, holder)
+            else collectLiquid(player, event, holder, session)
+            return
+        }
+
+        if (cursor.type.isAir) {
+            if (event.rawSlot in holder.liquidItemSlots) {
+                removeLastLiquidAreaItem(player, holder)
+            }
+            return
+        }
+        insertLiquidAreaItem(
+            player,
+            holder,
+            cursor,
+            amount = if (event.click == ClickType.RIGHT) 1 else cursor.amount,
+        )
+    }
+
+    /** 指定された液体領域クリックが、液体回収用の容器を持つ操作かを判定します。 */
+    private fun isLiquidCollectionContainer(
+        holder: UnifiedCookingHolder,
+        session: CookingStationSession?,
+        cursor: ItemStack,
+    ): Boolean {
+        if (cursor.type.isAir) return false
+        val required = when {
+            session == null -> {
+                val data = stations[holder.stationKey] ?: return false
+                CookingLiquidPresentation.recoveryFor(CookingLiquidContents.of(data.liquidContents))
+                    ?.containerMaterial
+            }
+            session.state == CookingProcessState.READY_LIQUID ->
+                session.reservoir?.containerMaterial?.let(Material::matchMaterial)
+            else -> null
+        }
+        return required == cursor.type
+    }
+
+    /** 液体領域へ実アイテムを1スタック登録し、表示を更新します。 */
+    private fun insertLiquidAreaItem(
+        player: Player,
+        holder: UnifiedCookingHolder,
+        source: ItemStack,
+        amount: Int = source.amount,
+    ): Boolean {
+        val item = source.clone().also { it.amount = amount }
+        if (item.amount <= 0 || !appendLiquidAreaItem(holder, item)) return false
+
+        val remaining = source.clone().also { it.amount -= amount }
+        player.setItemOnCursor(remaining.takeUnless { it.amount <= 0 })
+        return true
+    }
+
+    /**
+     * プレイヤーインベントリ・クリック・ドラッグの全投入経路が参照する共通登録処理です。
+     * 釜の入力アイテムはGUIスロットへ置かず、保存順だけを論理状態として保持します。
+     */
+    private fun appendLiquidAreaItem(holder: UnifiedCookingHolder, item: ItemStack): Boolean {
+        if (holder.equipment != CookingStation.CAULDRON || !realItem(item)) return false
+        val key = holder.stationKey
+        val current = synchronizeCauldronState(key)
+            ?: stations[key]
+            ?: PersistedCookingStation(CookingStation.CAULDRON)
+        if (current.equipment != CookingStation.CAULDRON) return false
+        if (!CookingInventoryInteractionPolicy.allowsInputWorkspace(current.session?.state)) return false
+        val nextItems = CookingLiquidAreaStack.push(
+            current.liquidAreaItems,
+            CookingLiquidAreaItem(encode(item), removable = true),
+        ) ?: return false
+        stations[key] = current.copy(
+            equipment = CookingStation.CAULDRON,
+            liquidAreaItems = nextItems,
+        )
+        dirty = true
+        flush()
+        val owner = Bukkit.getPlayer(holder.ownerId)
+        if (owner?.openInventory?.topInventory?.holder === holder) {
+            render(owner, holder.backingInventory, holder)
+        }
+        return true
+    }
+
+    /** 最後に投入した、取り出し可能なアイテムだけをカーソルへ戻します。 */
+    private fun removeLastLiquidAreaItem(player: Player, holder: UnifiedCookingHolder): Boolean {
+        val key = holder.stationKey
+        val current = stations[key] ?: return false
+        if (!CookingInventoryInteractionPolicy.allowsInputWorkspace(current.session?.state)) return false
+        val removal = CookingLiquidAreaStack.pop(current.liquidAreaItems) ?: return false
+        val item = decode(removal.item.serializedItem)
+        player.setItemOnCursor(item)
+        val updated = current.copy(liquidAreaItems = removal.remaining)
+        if (updated.session == null && updated.workspaceItems.isEmpty() &&
+            updated.liquidContents.isEmpty() && updated.liquidAreaItems.isEmpty()
+        ) {
+            stations.remove(key)
+        } else {
+            stations[key] = updated
+        }
+        dirty = true
+        flush()
+        render(player, player.openInventory.topInventory, holder)
+        return true
+    }
+
+    /**
      * プレイヤー側のシフトクリックを、料理ステーションの入力スロットへ限定して実行します。
      *
      * CC-SystemのGUI保護は、表示専用アイテムが上部から流出する一括移送を防止しています。
@@ -685,6 +876,12 @@ internal class UnifiedCookingController(
         val sourceInventory = event.clickedInventory ?: return
         val source = sourceInventory.getItem(event.slot)?.clone()?.takeUnless { it.type.isAir } ?: return
         if (CCSystem.getAPI().getGuiElementService().isGuiItem(source)) return
+
+        if (holder.equipment == CookingStation.CAULDRON) {
+            if (!appendLiquidAreaItem(holder, source)) return
+            sourceInventory.setItem(event.slot, null)
+            return
+        }
 
         val targetSlots = CookingInventoryInteractionPolicy.transferableInputSlots(
             holder.inputSlots,
@@ -884,7 +1081,7 @@ internal class UnifiedCookingController(
         holder: UnifiedCookingHolder
     ) {
         val key = holder.stationKey
-        val data = stations[key] ?: return
+        val data = synchronizeCauldronState(key) ?: stations[key] ?: return
         if (data.session != null) return
         val block = key.blockIfLoaded() ?: return
         val contents = CookingLiquidContents.of(data.liquidContents)
@@ -921,7 +1118,7 @@ internal class UnifiedCookingController(
             player.setItemOnCursor(cursor)
         }
         setCauldronContents(block, remaining)
-        if (remaining.isEmpty() && data.workspaceItems.isEmpty()) stations.remove(key)
+        if (remaining.isEmpty() && data.workspaceItems.isEmpty() && data.liquidAreaItems.isEmpty()) stations.remove(key)
         else stations[key] = updated
         dirty = true
         flush()
@@ -955,7 +1152,8 @@ internal class UnifiedCookingController(
         // 処理中に次回バッチ用として投入された材料は、現行成果物をすべて回収しても残します。
         // 液体の残量がある場合も同様に、空のセッションだけを消して設備状態を保持します。
         if (next.state == CookingProcessState.IDLE &&
-            updated.workspaceItems.isEmpty() && updated.liquidContents.isEmpty()
+            updated.workspaceItems.isEmpty() && updated.liquidContents.isEmpty() &&
+            updated.liquidAreaItems.isEmpty()
         ) {
             stations.remove(holder.stationKey)
         } else {
@@ -980,6 +1178,18 @@ internal class UnifiedCookingController(
         else {
             levelled.level = remaining
             block.blockData = levelled
+        }
+        // 水も表示対象の論理液体として同期し、成果物回収後に古い満水表示を残しません。
+        val current = stations[holder.stationKey]
+        if (current != null && current.liquidContents.keys.all { it == CookingLiquidIds.WATER }) {
+            stations[holder.stationKey] = current.copy(
+                liquidContents = if (remaining <= 0) {
+                    emptyMap()
+                } else {
+                    mapOf(CookingLiquidIds.WATER to CookingLiquidVolume.fromVanillaLevel(remaining))
+                }
+            )
+            dirty = true
         }
     }
 
@@ -1085,9 +1295,18 @@ internal class UnifiedCookingController(
         if (holder.equipment == CookingStation.PAN && !samePan(player, holder)) {
             player.sendMessage(message(player, "cooking.error.no_pan")); return
         }
-        val items = UnifiedCookingLayout.TIMED_WORK.mapNotNull(inventory::getItem).filter(::realItem)
+        val data = if (holder.equipment == CookingStation.CAULDRON) {
+            synchronizeCauldronState(holder.stationKey)
+        } else {
+            stations[holder.stationKey]
+        }
+        val items = if (holder.equipment == CookingStation.CAULDRON) {
+            data?.liquidAreaItems.orEmpty().map { decode(it.serializedItem) }
+        } else {
+            UnifiedCookingLayout.TIMED_WORK.mapNotNull(inventory::getItem).filter(::realItem)
+        }
         if (holder.equipment == CookingStation.CAULDRON && items.isEmpty()) {
-            val contents = currentLiquidContents(block)
+            val contents = currentLiquidContents(block, data)
             if (contents.containsNonWater()) {
                 val recipe = CookingLiquidRecipeMatcher.find(contents, configuration.liquidRecipes.values)
                 if (recipe == null) {
@@ -1330,6 +1549,9 @@ internal class UnifiedCookingController(
     }
 
     private fun persistWorkspace(inventory: Inventory, holder: UnifiedCookingHolder) {
+        // 大釜の入力は液体領域の論理スタックへ即時保存するため、通常のスロット走査で
+        // 白ガラスや液体表示を「空のワークスペース」として上書きしてはいけません。
+        if (holder.equipment == CookingStation.CAULDRON) return
         val current = stations[holder.stationKey]
         if (!CookingInventoryInteractionPolicy.allowsInputWorkspace(current?.session?.state)) return
         val items = holder.inputSlots.mapNotNull { slot ->
@@ -1353,6 +1575,8 @@ internal class UnifiedCookingController(
 
     private fun dropContents(block: Block, data: PersistedCookingStation) {
         data.workspaceItems.values.map(::decode).forEach { block.world.dropItemNaturally(block.location, it) }
+        data.liquidAreaItems.map { decode(it.serializedItem) }
+            .forEach { block.world.dropItemNaturally(block.location, it) }
         data.session?.originalInputs?.forEach { block.world.dropItemNaturally(block.location, decode(it.serializedItem)) }
         data.session?.outputStacks?.forEach { output -> block.world.dropItemNaturally(block.location, outputItem(output, null)) }
         // READY_LIQUID の残液は session.reservoir が所有するため二重に出さず、
@@ -1520,13 +1744,16 @@ internal class UnifiedCookingHolder(
 ) : InventoryHolder {
     lateinit var backingInventory: Inventory
     val outputIndices = mutableMapOf<Int, Int>()
-    /** 液体表示として占有している全枠。空き枠も投入欄から除外します。 */
+    /** 液体領域として描画・クリック判定する枠です。空き枠も入力を受け付けます。 */
     val liquidDisplaySlots = mutableSetOf<Int>()
+    /** 現在、容器による液体回収を受け付ける表示枠です。 */
     val liquidSlots = mutableSetOf<Int>()
-    val inputSlots: List<Int> = if (equipment == CookingStation.CUTTING) {
-        UnifiedCookingLayout.CUTTING_WORK + UnifiedCookingLayout.TOOL
-    } else {
-        UnifiedCookingLayout.TIMED_WORK
+    /** 投入済みアイテムのLIFO回収を受け付ける、実際に描画された枠です。 */
+    val liquidItemSlots = mutableSetOf<Int>()
+    val inputSlots: List<Int> = when {
+        equipment == CookingStation.CUTTING -> UnifiedCookingLayout.CUTTING_WORK + UnifiedCookingLayout.TOOL
+        equipment == CookingStation.CAULDRON -> UnifiedCookingLayout.LIQUID_OUTPUT_ORDER
+        else -> UnifiedCookingLayout.TIMED_WORK
     }
     override fun getInventory(): Inventory = backingInventory
 }

@@ -2,6 +2,44 @@ package jp.awabi2048.cccontent.features.cooking
 
 import kotlin.math.roundToLong
 
+/**
+ * 大釜の液体領域へ投入した、次回調理用のアイテムです。
+ *
+ * 液体領域の表示枠とアイテム保存枠は別の概念なので、表示スロット番号ではなく投入順で
+ * 保持します。removableは将来、調理工程へ固定された材料などを同じスタックへ保持する
+ * ための契約です。現在の通常投入は取り出し可能として登録します。
+ */
+data class CookingLiquidAreaItem(
+    val serializedItem: String,
+    val removable: Boolean = true,
+) {
+    init {
+        require(serializedItem.isNotBlank())
+    }
+}
+
+data class CookingLiquidAreaRemoval(
+    val item: CookingLiquidAreaItem,
+    val remaining: List<CookingLiquidAreaItem>,
+)
+
+/** 大釜の液体領域へ投入したアイテムのLIFO契約を一元管理します。 */
+object CookingLiquidAreaStack {
+    const val MAX_ENTRIES = 5
+
+    fun push(
+        current: List<CookingLiquidAreaItem>,
+        item: CookingLiquidAreaItem,
+    ): List<CookingLiquidAreaItem>? =
+        if (current.size >= MAX_ENTRIES) null else current + item
+
+    fun pop(current: List<CookingLiquidAreaItem>): CookingLiquidAreaRemoval? {
+        val item = current.lastOrNull() ?: return null
+        if (!item.removable) return null
+        return CookingLiquidAreaRemoval(item, current.dropLast(1))
+    }
+}
+
 data class CookingStoredInput(
     val ingredientId: String,
     val amount: Int,
