@@ -41,8 +41,8 @@ class CookingConfigurationTest {
         assertEquals(53, section.getKeys(false).size());
         for (String id : section.getKeys(false)) {
             assertTrue(Set.of("PAN", "CAULDRON").contains(recipes.getString("recipes." + id + ".equipment")));
-            assertTrue(recipes.getString("recipes." + id + ".result.item_model")
-                .startsWith("kota_server:custom_item/cooking/"));
+            assertFalse(recipes.contains("recipes." + id + ".result.item_model"));
+            assertFalse(recipes.contains("recipes." + id + ".failure_result.item_model"));
             assertFalse(recipes.contains("recipes." + id + ".completion"));
             assertFalse(recipes.contains("recipes." + id + ".quality"));
             assertFalse(recipes.contains("recipes." + id + ".score"));

@@ -12,7 +12,6 @@ variants:
       lore:
         - "&7右クリックで桜テーマのヘッド一覧を開く"
         - "&7ヘッド選択後、確認ダイアログで交換"
-      custom_model_data: 5101
     gui:
       title: "&0&l桜ヘッドセレクター"
       theme_icon_material: CHERRY_SAPLING
@@ -63,7 +62,6 @@ variants:
       lore:
         - "&7右クリックでハロウィンテーマのヘッド一覧を開く"
         - "&7ヘッド選択後、確認ダイアログで交換"
-      custom_model_data: 5102
     gui:
       title: "&0&lハロウィンヘッドセレクター"
       theme_icon_material: JACK_O_LANTERN

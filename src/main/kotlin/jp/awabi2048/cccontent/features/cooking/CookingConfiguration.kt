@@ -2,7 +2,6 @@ package jp.awabi2048.cccontent.features.cooking
 
 import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import org.bukkit.Material
-import org.bukkit.NamespacedKey
 import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
@@ -56,7 +55,6 @@ data class CookingEffectDefinition(val type: String, val amplifier: Int, val dur
 data class UnifiedCookingResult(
     val customItemId: String,
     val baseMaterial: Material,
-    val itemModel: NamespacedKey,
     val container: Material?,
     val liquidPane: Material?,
     val nutrition: Int,
@@ -261,8 +259,6 @@ object UnifiedCookingConfigurationLoader {
     private fun loadResult(section: ConfigurationSection, file: File, failure: Boolean): UnifiedCookingResult {
         val customId = requireString(section, "custom_item_id", file)
         val base = requireMaterial(section, "base_material", file)
-        val model = NamespacedKey.fromString(requireString(section, "item_model", file))
-            ?: error("${file.path} result item_model is invalid")
         val container = section.getString("container")?.let { Material.matchMaterial(it) ?: error("invalid container $it") }
         val pane = section.getString("liquid_pane")?.let { Material.matchMaterial(it) ?: error("invalid liquid_pane $it") }
         val effects = section.getStringList("effects").map { encoded ->
@@ -273,7 +269,6 @@ object UnifiedCookingConfigurationLoader {
         return UnifiedCookingResult(
             customId,
             base,
-            model,
             container,
             pane,
             if (failure) 0 else section.getInt("nutrition", 0),

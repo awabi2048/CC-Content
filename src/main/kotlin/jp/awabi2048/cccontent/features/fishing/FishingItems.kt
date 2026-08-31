@@ -8,6 +8,7 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.items.ContentItemModels
 import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
 import jp.awabi2048.cccontent.persistence.ContentPdcKeys
 import net.kyori.adventure.text.Component
@@ -97,7 +98,7 @@ class FishingItems(
             .decoration(TextDecoration.ITALIC, false))
         meta.lore(listOf(Component.text(message(player, "fishing.dictionary.description.${catch.fishId}"), NamedTextColor.GRAY)
             .decoration(TextDecoration.ITALIC, false)))
-        meta.setItemModel(NamespacedKey("kota_server", "custom_item/fishing/fish/${catch.fishId}"))
+        meta.setItemModel(ContentItemModels.fishingFish(catch.fishId))
         meta.setMaxStackSize(64)
         meta.persistentDataContainer.set(fishId, PersistentDataType.STRING, catch.fishId)
         meta.persistentDataContainer.set(fishItemSchema, PersistentDataType.INTEGER, 2)
@@ -159,6 +160,7 @@ class FishingItems(
         override val id = "rod_${definition.id}"
         override val displayName = "Fishing Rod"
         override val canStack = false
+        override val itemModel = ContentItemModels.fishingRod(definition.id)
 
         override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
@@ -192,7 +194,7 @@ class FishingItems(
         override val feature = "fishing"
         override val id = "bait_${definition.id}"
         override val displayName = "Fishing Bait"
-        override val itemModel = NamespacedKey.minecraft(definition.material.key.key)
+        override val itemModel = ContentItemModels.fishingBait(definition.id)
 
         override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
@@ -232,7 +234,7 @@ class FishingItems(
             PoisonousPotatoComponentPack.applyNonConsumable(item)
             val meta = item.itemMeta
             meta.displayName(Component.text(message(player, "custom_items.fishing.dictionary.name")))
-            meta.setItemModel(NamespacedKey.minecraft("book"))
+            meta.setItemModel(ContentItemModels.fishingDictionary())
             meta.setMaxStackSize(1)
             meta.lore(CCSystem.getAPI().getLoreService().render(
                 GuiLoreSpec.Blocks(listOf(GuiLoreBlock(listOf(
