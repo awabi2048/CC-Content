@@ -19,13 +19,20 @@ internal data class CookingLiquidColor(
 /** 液体を1回分回収するときの容器と、釜から減らす論理構成です。 */
 internal data class CookingLiquidRecovery(
     val customItemId: String,
-    val containerMaterial: Material,
+    val container: CookingLiquidContainerDefinition,
     val consumedAmounts: Map<String, Int>
 ) {
     init {
         require(customItemId.isNotBlank())
         require(consumedAmounts.isNotEmpty() && consumedAmounts.values.all { it > 0 })
+        require(consumedAmounts.values.sum() == container.capacityUnits) {
+            "Liquid recovery amount must match the capacity of ${container.id}"
+        }
     }
+
+    /** 既存の回収処理が比較する物理素材を、抽象容器定義から導出します。 */
+    val containerMaterial: Material
+        get() = container.material
 
     val consumedUnits: Int = consumedAmounts.values.sum()
 }
@@ -65,7 +72,7 @@ internal object CookingLiquidPresentation {
             collectable = true,
             recovery = CookingLiquidRecovery(
                 CookingLiquidIds.SEA_WATER_BUCKET,
-                Material.BUCKET,
+                CookingLiquidContainers.BUCKET,
                 mapOf(CookingLiquidIds.SEA_WATER to CookingLiquidVolume.UNITS_PER_CAULDRON)
             )
         ),
@@ -75,7 +82,7 @@ internal object CookingLiquidPresentation {
             collectable = true,
             recovery = CookingLiquidRecovery(
                 CookingLiquidIds.SOY_MILK_BOTTLE,
-                Material.GLASS_BOTTLE,
+                CookingLiquidContainers.BOTTLE,
                 mapOf(CookingLiquidIds.SOY_MILK to 1)
             )
         ),
@@ -85,7 +92,7 @@ internal object CookingLiquidPresentation {
             collectable = true,
             recovery = CookingLiquidRecovery(
                 CookingLiquidIds.NIGARI_BOTTLE,
-                Material.GLASS_BOTTLE,
+                CookingLiquidContainers.BOTTLE,
                 mapOf(CookingLiquidIds.BITTERN to 1)
             )
         )
@@ -115,6 +122,15 @@ internal object CookingLiquidPresentation {
 
     fun recoveryFor(contents: CookingLiquidContents): CookingLiquidRecovery? =
         definitionFor(contents)?.takeIf { it.collectable }?.recovery
+
+    /** 各液体の出力容器も、回収契約と同じ液体別対応表から解決します。 */
+    fun containerFor(liquidId: String): CookingLiquidContainerDefinition? =
+        definitions[liquidId]?.recovery?.container
+
+    /** 液体容器アイテムを釜へ投入するときも、同じ液体ごとの容器契約を参照します。 */
+    fun inputFor(customItemId: String): CookingLiquidRecovery? =
+        definitions.values.mapNotNull(CookingLiquidDefinition::recovery)
+            .firstOrNull { it.customItemId == customItemId }
 
     fun orderedLiquidIds(contents: CookingLiquidContents): List<String> =
         definitions.keys.filter { contents.amount(it) > 0 }

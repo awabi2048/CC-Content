@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.cooking;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,5 +28,19 @@ class CookingLiquidAreaStackTest {
         var fixed = new CookingLiquidAreaItem("fixed", false);
 
         assertNull(CookingLiquidAreaStack.INSTANCE.pop(List.of(first, fixed)));
+    }
+
+    @Test
+    void acceptsExactlyFiveMaterialEntriesAndRejectsTheSixth() {
+        var entries = new ArrayList<CookingLiquidAreaItem>();
+        for (int index = 0; index < CookingLiquidAreaStack.MAX_ENTRIES; index++) {
+            entries.add(new CookingLiquidAreaItem("item-" + index, true));
+        }
+
+        assertEquals(5, entries.size());
+        assertNull(CookingLiquidAreaStack.INSTANCE.push(
+            entries,
+            new CookingLiquidAreaItem("item-5", true)
+        ));
     }
 }

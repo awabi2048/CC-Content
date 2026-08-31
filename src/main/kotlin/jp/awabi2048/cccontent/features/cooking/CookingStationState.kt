@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.cooking
 
+import org.bukkit.Material
 import kotlin.math.roundToLong
 
 /**
@@ -92,6 +93,11 @@ data class CookingRecipeSnapshot(
         require(experience >= 0)
         require(preparedQuality == null || preparedQuality in 0..100)
         require((resultKind == CookingResultKind.ITEM) == (containerMaterial == null))
+        containerMaterial?.let { raw ->
+            val material = Material.matchMaterial(raw)
+                ?: error("Unknown liquid container material: $raw")
+            CookingLiquidContainers.requireMaterial(material)
+        }
     }
 }
 
@@ -109,7 +115,23 @@ data class CookingReservoir(
         require(maximum in 1..CookingLiquidContents.MAX_CAPACITY)
         require(remaining in 0..maximum)
         require(containerMaterial.isNotBlank())
+        require(maximum % containerDefinition.capacityUnits == 0) {
+            "Liquid reservoir maximum must be divisible by the container capacity"
+        }
+        require(remaining % containerDefinition.capacityUnits == 0) {
+            "Liquid reservoir remaining amount must be divisible by the container capacity"
+        }
     }
+
+    /** 保存文字列から、容量規定を持つ抽象容器へ解決します。 */
+    val containerDefinition: CookingLiquidContainerDefinition
+        get() = CookingLiquidContainers.requireMaterial(
+            Material.matchMaterial(containerMaterial)
+                ?: error("Unknown liquid container material: $containerMaterial")
+        )
+
+    val containerCapacityUnits: Int
+        get() = containerDefinition.capacityUnits
 }
 
 data class CookingStationSession(
@@ -271,7 +293,7 @@ object CookingStationStateMachine {
                 output.customItemId,
                 amount,
                 amount,
-                output.container.name,
+                output.container.material.name,
                 failed = false
             )
         }
@@ -326,11 +348,12 @@ object CookingStationStateMachine {
     ): CookingStationSession? {
         if (!canCollectLiquid(session, collectable) || session.state != CookingProcessState.READY_LIQUID) return null
         val reservoir = session.reservoir ?: return null
-        if (reservoir.remaining <= 0) return null
+        val containerUnits = reservoir.containerCapacityUnits
+        if (reservoir.remaining < containerUnits) return null
         // 固形成果物を最初の液体容器へ同梱するレシピは、1バッチ1容器の時だけ
         // 二重取得や未回収状態を作らずに確定できます。
-        if (collectSolidResultWithLiquid && reservoir.maximum != 1) return null
-        val next = reservoir.remaining - 1
+        if (collectSolidResultWithLiquid && reservoir.maximum != containerUnits) return null
+        val next = reservoir.remaining - containerUnits
         val outputStacks = if (collectSolidResultWithLiquid) emptyList() else session.outputStacks
         return session.copy(
             state = if (next == 0) {
@@ -338,7 +361,7 @@ object CookingStationStateMachine {
             } else CookingProcessState.READY_LIQUID,
             reservoir = if (next == 0) null else reservoir.copy(remaining = next),
             outputStacks = outputStacks,
-            consumedWaterUnits = (session.consumedWaterUnits + if (session.reservedWaterUnits > 0) 1 else 0)
+            consumedWaterUnits = (session.consumedWaterUnits + if (session.reservedWaterUnits > 0) containerUnits else 0)
                 .coerceAtMost(session.reservedWaterUnits)
         )
     }

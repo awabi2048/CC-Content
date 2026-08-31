@@ -33,6 +33,21 @@ class CookingInventoryInteractionPolicyTest {
     }
 
     @Test
+    void 大釜材料投入は液体ありの場合だけアイドル中と処理中に許可する() {
+        var empty = CookingLiquidContents.Companion.empty();
+        var water = CookingLiquidContents.Companion.of(java.util.Map.of("water", 1));
+
+        assertFalse(CookingInventoryInteractionPolicy.INSTANCE.allowsLiquidAreaMaterialInput(empty, null));
+        assertTrue(CookingInventoryInteractionPolicy.INSTANCE.allowsLiquidAreaMaterialInput(water, null));
+        assertTrue(CookingInventoryInteractionPolicy.INSTANCE.allowsLiquidAreaMaterialInput(
+            water, CookingProcessState.PROCESSING_NORMAL
+        ));
+        assertFalse(CookingInventoryInteractionPolicy.INSTANCE.allowsLiquidAreaMaterialInput(
+            water, CookingProcessState.READY_LIQUID
+        ));
+    }
+
+    @Test
     void シフト移送は利用可能な通常入力スロットだけへ限定する() {
         assertEquals(
             List.of(20, 22),

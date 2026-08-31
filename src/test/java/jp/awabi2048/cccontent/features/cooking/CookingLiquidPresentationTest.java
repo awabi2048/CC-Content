@@ -1,12 +1,14 @@
 package jp.awabi2048.cccontent.features.cooking;
 
 import org.junit.jupiter.api.Test;
+import org.bukkit.Material;
 
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CookingLiquidPresentationTest {
@@ -45,5 +47,37 @@ class CookingLiquidPresentationTest {
             Map.of("soy_milk", 1),
             soyMilk.minusAll(recovery.getConsumedAmounts()).getAmounts()
         );
+    }
+
+    @Test
+    void containerDefinitionsExposeCanonicalCapacityAndLiquidSpecificMapping() {
+        var containers = CookingLiquidContainers.INSTANCE;
+
+        assertEquals(200, containers.getBOTTLE().getCapacityMillibuckets());
+        assertEquals(1, containers.getBOTTLE().getCapacityUnits());
+        assertEquals(200, containers.getBOWL().getCapacityMillibuckets());
+        assertEquals(1, containers.getBOWL().getCapacityUnits());
+        assertEquals(1000, containers.getBUCKET().getCapacityMillibuckets());
+        assertEquals(5, containers.getBUCKET().getCapacityUnits());
+
+        var seaInput = CookingLiquidPresentation.INSTANCE.inputFor("cooking.sea_water_bucket");
+        assertNotNull(seaInput);
+        assertEquals(Material.BUCKET, seaInput.getContainer().getMaterial());
+        assertEquals(5, seaInput.getConsumedUnits());
+
+        var soyInput = CookingLiquidPresentation.INSTANCE.inputFor("cooking.soy_milk_bottle");
+        assertNotNull(soyInput);
+        assertEquals(Material.GLASS_BOTTLE, soyInput.getContainer().getMaterial());
+        assertEquals(1, soyInput.getConsumedUnits());
+        assertNull(CookingLiquidPresentation.INSTANCE.inputFor("cooking.unknown_liquid_container"));
+    }
+
+    @Test
+    void plusAllMergesLiquidComponentsWithoutBypassingCapacityValidation() {
+        var merged = CookingLiquidContents.Companion.empty()
+            .plusAll(Map.of("soy_milk", 1, "bittern", 1));
+
+        assertEquals(Map.of("soy_milk", 1, "bittern", 1), merged.getAmounts());
+        assertEquals(2, merged.getTotal());
     }
 }

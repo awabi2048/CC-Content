@@ -30,6 +30,18 @@ internal object CookingInventoryInteractionPolicy {
         state == null || CookingStationStateMachine.isProcessingState(state)
 
     /**
+     * 大釜の液体領域へ材料を投入できる条件です。
+     *
+     * 釜が空のときは、画面上の枠がクリック可能に見えても投入を受け付けません。表示側と
+     * クリック側が別々に「液体あり」を判定すると、Loreだけが出る、またはLoreなしで投入
+     * できるといった状態差が生じるため、液体状態と調理状態をここで一つにまとめます。
+     */
+    fun allowsLiquidAreaMaterialInput(
+        contents: CookingLiquidContents,
+        state: CookingProcessState?,
+    ): Boolean = !contents.isEmpty() && allowsInputWorkspace(state)
+
+    /**
      * プレイヤーインベントリからのシフト移送先を返します。
      * 処理中は次回調理用ワークスペースとしても利用でき、液体表示・成果物として管理している枠は
      * 移送先から除外します。

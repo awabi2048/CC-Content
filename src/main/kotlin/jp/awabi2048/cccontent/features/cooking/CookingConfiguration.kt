@@ -74,7 +74,7 @@ data class UnifiedCookingRecipe(
 data class UnifiedLiquidOutput(
     val liquidId: String,
     val customItemId: String,
-    val container: Material
+    val container: CookingLiquidContainerDefinition
 )
 
 data class UnifiedLiquidCookingRecipe(
@@ -355,7 +355,13 @@ object UnifiedCookingConfigurationLoader {
                 UnifiedLiquidOutput(
                     liquidId,
                     requireString(output, "custom_item_id", file),
-                    requireMaterial(output, "container", file)
+                    CookingLiquidContainers.requireMaterial(requireMaterial(output, "container", file)).also { actual ->
+                        CookingLiquidPresentation.containerFor(liquidId)?.let { expected ->
+                            require(actual == expected) {
+                                "${file.path}.recipes.$rawId.liquid_outputs.$liquidId must use ${expected.material.name}"
+                            }
+                        }
+                    },
                 )
             }.orEmpty()
             residual.keys.forEach { liquidId ->

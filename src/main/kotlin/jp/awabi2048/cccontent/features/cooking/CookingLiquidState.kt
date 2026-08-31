@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.cooking
 
+import org.bukkit.Material
 import kotlin.math.roundToInt
 
 /** 釜へ投入できる液体の論理IDです。物理ブロックの水位とは分離して保存します。 */
@@ -12,6 +13,42 @@ object CookingLiquidIds {
     const val SEA_WATER_BUCKET = "cooking.sea_water_bucket"
     const val SOY_MILK_BOTTLE = "cooking.soy_milk_bottle"
     const val NIGARI_BOTTLE = "cooking.nigari_bottle"
+}
+
+/**
+ * 液体を出し入れする容器の抽象定義です。
+ *
+ * GUIや物理釜はmBを直接扱わず、この定義を通して正準単位へ変換します。瓶・ボウルは
+ * 200mB、バケツは1000mBという規定をここへ集約し、液体ごとの対応容器から参照します。
+ */
+data class CookingLiquidContainerDefinition(
+    val id: String,
+    val material: Material,
+    val capacityMillibuckets: Int,
+) {
+    init {
+        require(id.matches(Regex("[a-z0-9_]+")))
+        require(capacityMillibuckets > 0)
+        require(capacityMillibuckets % CookingLiquidVolume.MILLIBUCKETS_PER_UNIT == 0) {
+            "Liquid container capacity must be a multiple of ${CookingLiquidVolume.MILLIBUCKETS_PER_UNIT}mB"
+        }
+    }
+
+    val capacityUnits: Int = capacityMillibuckets / CookingLiquidVolume.MILLIBUCKETS_PER_UNIT
+}
+
+/** 現在の液体システムが扱う容器の素材・容量対応を一元管理します。 */
+internal object CookingLiquidContainers {
+    val BOTTLE = CookingLiquidContainerDefinition("bottle", Material.GLASS_BOTTLE, 200)
+    val BOWL = CookingLiquidContainerDefinition("bowl", Material.BOWL, 200)
+    val BUCKET = CookingLiquidContainerDefinition("bucket", Material.BUCKET, 1000)
+
+    private val byMaterial = listOf(BOTTLE, BOWL, BUCKET).associateBy { it.material }
+
+    fun forMaterial(material: Material): CookingLiquidContainerDefinition? = byMaterial[material]
+
+    fun requireMaterial(material: Material): CookingLiquidContainerDefinition =
+        forMaterial(material) ?: error("Unsupported liquid container material: $material")
 }
 
 /**
@@ -81,6 +118,16 @@ data class CookingLiquidContents(
         require(amount > 0)
         val next = amounts.toMutableMap()
         next[liquidId] = (next[liquidId] ?: 0) + amount
+        return of(next)
+    }
+
+    /** 複数の容器内容を一括投入し、容量検証を1回のドメイン操作として行います。 */
+    fun plusAll(additions: Map<String, Int>): CookingLiquidContents {
+        require(additions.isNotEmpty() && additions.values.all { it > 0 })
+        val next = amounts.toMutableMap()
+        additions.forEach { (liquidId, amount) ->
+            next[liquidId] = (next[liquidId] ?: 0) + amount
+        }
         return of(next)
     }
 
