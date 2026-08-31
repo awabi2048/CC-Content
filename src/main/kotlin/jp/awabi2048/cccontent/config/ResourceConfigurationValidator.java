@@ -57,6 +57,7 @@ public final class ResourceConfigurationValidator {
         validatePartyConfigs(configRoot, configs, errors);
         validateFishingConfigs(configRoot, configs, errors);
         validateMiniGameConfigs(configRoot, configs, errors);
+        validateEnvironmentRegionConfig(configRoot, configs, errors);
         validateResourceCollectionConfigs(configRoot, configs, errors);
         validateSukimaDungeonConfigs(configRoot, configs, errors);
         return errors;
@@ -536,7 +537,7 @@ public final class ResourceConfigurationValidator {
             Map<String, Object> state = requireMap(config, "state", configFile, errors);
             if (state != null) requirePositiveInteger(state.get("flush_interval_ticks"), configFile, "state.flush_interval_ticks", errors);
         }
-        for (String name : List.of("ingredients.yml", "cutting.yml", "recipe.yml")) {
+        for (String name : List.of("ingredients.yml", "cutting.yml", "recipe.yml", "liquid_recipes.yml")) {
             Path file = configRoot.resolve("cooking/" + name);
             Map<String, Object> root = rootMap(configs, file, errors);
             if (root != null) {
@@ -791,6 +792,76 @@ public final class ResourceConfigurationValidator {
                 "burl_override_chance",
                 errors
             );
+        }
+    }
+
+    private static void validateEnvironmentRegionConfig(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path file = configRoot.resolve("environment/regions.yml");
+        Map<String, Object> root = rootMap(configs, file, errors);
+        if (root == null) return;
+
+        Map<String, Object> groups = requireMap(root, "biome_groups", file, errors);
+        if (groups != null) {
+            requireNonEmpty(groups, file, "biome_groups", errors);
+            for (Map.Entry<String, Object> entry : groups.entrySet()) {
+                String path = "biome_groups." + entry.getKey();
+                if (!(entry.getValue() instanceof List<?> biomes) || biomes.isEmpty() ||
+                    biomes.stream().anyMatch(value -> !isNonBlankString(value) ||
+                        !value.toString().matches("[a-z0-9_.-]+:[a-z0-9_./-]+"))) {
+                    errors.add(format("invalid environment biome group", file, path,
+                        "a non-empty list of namespaced biome keys is required"));
+                }
+            }
+        }
+
+        Map<String, Object> profiles = requireMap(root, "biome_profiles", file, errors);
+        if (profiles != null) {
+            requireNonEmpty(profiles, file, "biome_profiles", errors);
+            Set<String> climates = Set.of("TEMPERATE", "COLD", "WARM", "DRY", "TROPICAL", "WET", "MOUNTAIN", "NETHER", "UNKNOWN");
+            Set<String> terrains = Set.of("FIELD", "FOREST", "JUNGLE", "TAIGA", "WETLAND", "COAST", "OCEAN", "MOUNTAIN", "BADLANDS", "NETHER", "UNKNOWN");
+            Set<String> waters = Set.of("LAND", "RIVER", "OCEAN", "NONE", "UNKNOWN");
+            for (Map.Entry<String, Object> entry : profiles.entrySet()) {
+                String path = "biome_profiles." + entry.getKey();
+                Map<String, Object> profile = asMap(entry.getValue());
+                if (profile == null) {
+                    errors.add(format("invalid environment biome profile", file, path, "profile must be a section"));
+                    continue;
+                }
+                requireString(profile, "climate", file, path + ".climate", errors);
+                requireString(profile, "terrain", file, path + ".terrain", errors);
+                requireString(profile, "water", file, path + ".water", errors);
+                if (profile.get("climate") instanceof String value && !climates.contains(value)) {
+                    errors.add(format("invalid environment climate", file, path + ".climate", "unsupported climate"));
+                }
+                if (profile.get("terrain") instanceof String value && !terrains.contains(value)) {
+                    errors.add(format("invalid environment terrain", file, path + ".terrain", "unsupported terrain"));
+                }
+                if (profile.get("water") instanceof String value && !waters.contains(value)) {
+                    errors.add(format("invalid environment water", file, path + ".water", "unsupported water region"));
+                }
+            }
+        }
+
+        Map<String, Object> vertical = requireMap(root, "vertical_regions", file, errors);
+        if (vertical != null) {
+            requireNonEmpty(vertical, file, "vertical_regions", errors);
+            for (Map.Entry<String, Object> entry : vertical.entrySet()) {
+                String path = "vertical_regions." + entry.getKey();
+                Map<String, Object> range = asMap(entry.getValue());
+                if (range == null) {
+                    errors.add(format("invalid environment vertical region", file, path, "region must be a section"));
+                    continue;
+                }
+                requireIntegerRange(range.get("minimum_y"), Integer.MIN_VALUE, Integer.MAX_VALUE,
+                    file, path + ".minimum_y", errors);
+                requireIntegerRange(range.get("maximum_y"), Integer.MIN_VALUE, Integer.MAX_VALUE,
+                    file, path + ".maximum_y", errors);
+                if (range.get("minimum_y") instanceof Number minimum && range.get("maximum_y") instanceof Number maximum &&
+                    minimum.doubleValue() > maximum.doubleValue()) {
+                    errors.add(format("invalid environment vertical range", file, path,
+                        "minimum_y must not exceed maximum_y"));
+                }
+            }
         }
     }
 

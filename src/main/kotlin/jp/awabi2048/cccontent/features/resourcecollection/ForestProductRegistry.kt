@@ -1,5 +1,9 @@
 package jp.awabi2048.cccontent.features.resourcecollection
 
+import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver
+import jp.awabi2048.cccontent.features.environment.EnvironmentConditions
+import jp.awabi2048.cccontent.features.environment.EnvironmentPosition
+import org.bukkit.World
 import org.bukkit.Material
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
@@ -63,11 +67,12 @@ data class ForestProductResolution(
 )
 
 class ForestProductRegistry private constructor(
-    val settings: ForestProductSettings
+    val settings: ForestProductSettings,
+    private val environmentResolver: CollectionEnvironmentResolver
 ) {
     fun resolve(
         species: TreeSpecies,
-        biomeKey: String,
+        conditions: EnvironmentConditions,
         worldSeed: Long,
         rootX: Int,
         rootY: Int,
@@ -75,13 +80,13 @@ class ForestProductRegistry private constructor(
         discoveryBonus: Double
     ): ForestProductResolution? {
         if (!settings.enabled) return null
-        val base = resolveBaseProduct(species, biomeKey) ?: return null
+        val base = resolveBaseProduct(environmentResolver, species, conditions) ?: return null
         val fixedValue = stableValue(worldSeed, rootX, rootY, rootZ, species, 0x4650524f44554354L)
         val threshold = settings.baseDiscoveryChance +
             discoveryBonus.coerceIn(0.0, settings.maximumDiscoveryBonus)
         if (fixedValue >= threshold) return null
         val product = if (
-            isBurlEnvironment(species, biomeKey) &&
+            isBurlEnvironment(environmentResolver, species, conditions) &&
             stableValue(worldSeed, rootX, rootY, rootZ, species, 0x4255524c574f4f44L) <
             settings.burlOverrideChance
         ) {
@@ -92,10 +97,38 @@ class ForestProductRegistry private constructor(
         return ForestProductResolution(product, fixedValue)
     }
 
+    fun resolve(
+        species: TreeSpecies,
+        biomeKey: String,
+        worldSeed: Long,
+        rootX: Int,
+        rootY: Int,
+        rootZ: Int,
+        discoveryBonus: Double
+    ): ForestProductResolution? = resolve(
+        species,
+        environmentResolver.conditions(
+            biomeKey,
+            World.Environment.NORMAL,
+            EnvironmentPosition("unknown", rootX, rootY, rootZ)
+        ),
+        worldSeed,
+        rootX,
+        rootY,
+        rootZ,
+        discoveryBonus
+    )
+
     companion object {
         private const val CONFIG_PATH = "config/resource_collection/forest_products.yml"
 
-        fun load(plugin: JavaPlugin): ForestProductRegistry {
+        fun load(plugin: JavaPlugin): ForestProductRegistry =
+            load(plugin, CollectionEnvironmentResolver.load(plugin))
+
+        fun load(
+            plugin: JavaPlugin,
+            environmentResolver: CollectionEnvironmentResolver
+        ): ForestProductRegistry {
             val file = ensureFile(plugin)
             val config = YamlConfiguration.loadConfiguration(file)
             require(config.get("schema_version") is Number && config.getInt("schema_version") == 2) {
@@ -112,53 +145,79 @@ class ForestProductRegistry private constructor(
                     "base=${settings.baseDiscoveryChance} bonus=${settings.maximumDiscoveryBonus} " +
                     "burl=${settings.burlOverrideChance}"
             )
-            return ForestProductRegistry(settings)
+            return ForestProductRegistry(settings, environmentResolver)
         }
 
-        fun of(settings: ForestProductSettings): ForestProductRegistry = ForestProductRegistry(settings)
+        fun of(settings: ForestProductSettings): ForestProductRegistry =
+            ForestProductRegistry(settings, CollectionEnvironmentResolver.defaults())
 
         fun resolveBaseProduct(species: TreeSpecies, biomeKey: String): ForestProductType? {
-            val biome = biomeKey.substringAfter(':').lowercase()
+            val resolver = CollectionEnvironmentResolver.defaults()
+            return resolveBaseProduct(
+                resolver,
+                species,
+                resolver.conditions(biomeKey, World.Environment.NORMAL)
+            )
+        }
+
+        private fun resolveBaseProduct(
+            environmentResolver: CollectionEnvironmentResolver,
+            species: TreeSpecies,
+            conditions: EnvironmentConditions
+        ): ForestProductType? {
             return when (species) {
-                TreeSpecies.SPRUCE -> when (biome) {
-                    "old_growth_pine_taiga", "old_growth_spruce_taiga" -> ForestProductType.TREE_RESIN
+                TreeSpecies.SPRUCE -> when {
+                    environmentResolver.isInBiomeGroup(conditions, "forest_product_old_growth_pine_taiga") -> ForestProductType.TREE_RESIN
                     else -> ForestProductType.PINE_CONE
                 }
-                TreeSpecies.BIRCH -> when (biome) {
-                    "old_growth_birch_forest" -> ForestProductType.TINDER_FUNGUS
+                TreeSpecies.BIRCH -> when {
+                    environmentResolver.isInBiomeGroup(conditions, "forest_product_old_growth_birch_forest") -> ForestProductType.TINDER_FUNGUS
                     else -> ForestProductType.BIRCH_OUTER_BARK
                 }
-                TreeSpecies.OAK -> when (biome) {
-                    "swamp" -> ForestProductType.TINDER_FUNGUS
+                TreeSpecies.OAK -> when {
+                    environmentResolver.isInBiomeGroup(conditions, "forest_product_oak_swamp") -> ForestProductType.TINDER_FUNGUS
                     else -> ForestProductType.TANNIN_BARK
                 }
                 TreeSpecies.DARK_OAK -> ForestProductType.TANNIN_BARK
-                TreeSpecies.PALE_OAK -> when (biome) {
-                    "pale_garden" -> ForestProductType.TINDER_FUNGUS
+                TreeSpecies.PALE_OAK -> when {
+                    environmentResolver.isInBiomeGroup(conditions, "forest_product_pale_garden") -> ForestProductType.TINDER_FUNGUS
                     else -> null
                 }
                 TreeSpecies.JUNGLE -> ForestProductType.AROMATIC_WOOD_CHIP
                 TreeSpecies.ACACIA -> ForestProductType.ACACIA_GUM
-                TreeSpecies.MANGROVE -> when (biome) {
-                    "mangrove_swamp" -> ForestProductType.TANNIN_BARK
+                TreeSpecies.MANGROVE -> when {
+                    environmentResolver.isInBiomeGroup(conditions, "forest_product_mangrove_swamp") -> ForestProductType.TANNIN_BARK
                     else -> null
                 }
-                TreeSpecies.CHERRY -> when (biome) {
-                    "cherry_grove" -> ForestProductType.AROMATIC_WOOD_CHIP
+                TreeSpecies.CHERRY -> when {
+                    environmentResolver.isInBiomeGroup(conditions, "forest_product_cherry_grove") -> ForestProductType.AROMATIC_WOOD_CHIP
                     else -> null
                 }
             }
         }
 
         fun isBurlEnvironment(species: TreeSpecies, biomeKey: String): Boolean {
-            val biome = biomeKey.substringAfter(':').lowercase()
-            return when (biome) {
-                "old_growth_pine_taiga", "old_growth_spruce_taiga" -> species == TreeSpecies.SPRUCE
-                "old_growth_birch_forest" -> species == TreeSpecies.BIRCH
-                "dark_forest" -> species == TreeSpecies.DARK_OAK || species == TreeSpecies.OAK
-                "jungle", "sparse_jungle", "bamboo_jungle" -> species == TreeSpecies.JUNGLE
-                "eroded_savanna" -> species == TreeSpecies.ACACIA
-                "cherry_grove" -> species == TreeSpecies.CHERRY
+            val resolver = CollectionEnvironmentResolver.defaults()
+            return isBurlEnvironment(
+                resolver,
+                species,
+                resolver.conditions(biomeKey, World.Environment.NORMAL)
+            )
+        }
+
+        private fun isBurlEnvironment(
+            environmentResolver: CollectionEnvironmentResolver,
+            species: TreeSpecies,
+            conditions: EnvironmentConditions
+        ): Boolean {
+            return when {
+                environmentResolver.isInBiomeGroup(conditions, "forest_product_old_growth_pine_taiga") -> species == TreeSpecies.SPRUCE
+                environmentResolver.isInBiomeGroup(conditions, "forest_product_old_growth_birch_forest") -> species == TreeSpecies.BIRCH
+                environmentResolver.isInBiomeGroup(conditions, "forest_product_dark_forest") ->
+                    species == TreeSpecies.DARK_OAK || species == TreeSpecies.OAK
+                environmentResolver.isInBiomeGroup(conditions, "forest_product_jungle") -> species == TreeSpecies.JUNGLE
+                environmentResolver.isInBiomeGroup(conditions, "forest_product_eroded_savanna") -> species == TreeSpecies.ACACIA
+                environmentResolver.isInBiomeGroup(conditions, "forest_product_cherry_grove") -> species == TreeSpecies.CHERRY
                 else -> false
             }
         }

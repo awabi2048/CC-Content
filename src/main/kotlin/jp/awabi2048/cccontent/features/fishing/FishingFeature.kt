@@ -14,6 +14,7 @@ import jp.awabi2048.cccontent.features.catalog.CatalogCondition
 import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import jp.awabi2048.cccontent.items.ContentItemModels
+import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver
 import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.profile.FisherSkillProfile
@@ -113,7 +114,8 @@ class FishingFeature(
             plugin,
             settings.naturalFishingGround,
             isFisher = { fisherContext(it).active },
-            random = random
+            random = random,
+            environmentResolver = CollectionEnvironmentResolver.load(plugin)
         ).also(NaturalFishingGroundService::start)
         plugin.server.pluginManager.registerEvents(this, plugin)
         searchTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable { updateSearchActionBars() }, 10L, 10L)
@@ -152,8 +154,8 @@ class FishingFeature(
     private fun journalRecordIcon(player: Player, record: CatchJournalRecord): ItemStack {
         val item = ItemStack(settings.fishes.firstOrNull { it.id == record.fishId }?.material ?: Material.COD)
         item.editMeta { meta ->
-            meta.displayName(Component.text(message(player, "fishing.catalog.item.${record.fishId}")))
             // ジャーナル内の魚アイコンも実アイテムと同じ表示経路を使います。
+            meta.displayName(Component.text(message(player, "fishing.catalog.item.${record.fishId}")))
             meta.setItemModel(ContentItemModels.fishingFish(record.fishId))
             meta.lore(listOf(
                 Component.empty(),
@@ -238,6 +240,7 @@ class FishingFeature(
 
     private fun createGyotaku(player: Player, record: CatchJournalRecord): ItemStack = ItemStack(Material.PAPER).apply {
         editMeta { meta ->
+            meta.setItemModel(ContentItemModels.fishingGyotaku(record.fishId))
             meta.displayName(Component.text(message(player, "fishing.journal.gyotaku_name", "fish" to message(player, "fishing.catalog.item.${record.fishId}"))))
             meta.lore(listOf(
                 Component.text(message(player, "fishing.journal.gyotaku_description_1", "angler" to record.anglerName)),

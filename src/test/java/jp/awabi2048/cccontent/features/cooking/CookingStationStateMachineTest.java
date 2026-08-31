@@ -76,7 +76,7 @@ class CookingStationStateMachineTest {
         assertEquals(CookingProcessState.READY_LIQUID, finished.getState());
         assertEquals(2, finished.getReservoir().getMaximum());
         assertFalse(finished.getReservoir().getFailed());
-        CookingStationSession oneCollected = CookingStationStateMachine.collectLiquid(finished);
+        CookingStationSession oneCollected = CookingStationStateMachine.collectLiquid(finished, true);
         assertNotNull(oneCollected);
         assertEquals(1, oneCollected.getConsumedWaterUnits());
         assertEquals(1, oneCollected.getReservoir().getRemaining());
@@ -93,6 +93,19 @@ class CookingStationStateMachineTest {
     }
 
     @Test
+    void liquidCollectionRequiresACollectableLiquidAndNoActiveProcessing() {
+        assertTrue(CookingStationStateMachine.canCollectLiquid(null, true));
+        assertFalse(CookingStationStateMachine.canCollectLiquid(null, false));
+
+        CookingStationSession processing = CookingStationStateMachine.start(
+            recipe(CookingStation.PAN, CookingResultKind.ITEM, 0),
+            snapshot(recipe(CookingStation.PAN, CookingResultKind.ITEM, 0)),
+            "player", 1, CookingHeat.HIGH, List.of(INPUT), 0.0
+        );
+        assertFalse(CookingStationStateMachine.canCollectLiquid(processing, true));
+    }
+
+    @Test
     void containerRemaindersRemainAfterLastLiquidServing() {
         CookingRecipeDefinition recipe = recipe(CookingStation.CAULDRON, CookingResultKind.BOTTLE, 1);
         CookingStoredInput honey = new CookingStoredInput("honey", 1, "serialized", "GLASS_BOTTLE", 1);
@@ -102,7 +115,7 @@ class CookingStationStateMachineTest {
         CookingStationStep.Completed completed = (CookingStationStep.Completed)
             CookingStationStateMachine.tick(session, CookingHeat.HIGH);
         CookingStationSession ready = CookingStationStateMachine.finish(completed.getSession(), recipe);
-        CookingStationSession afterLiquid = CookingStationStateMachine.collectLiquid(ready);
+        CookingStationSession afterLiquid = CookingStationStateMachine.collectLiquid(ready, true);
         assertNotNull(afterLiquid);
         assertEquals(CookingProcessState.READY_ITEM, afterLiquid.getState());
         assertEquals(CookingOutputKind.MATERIAL, afterLiquid.getOutputStacks().getFirst().getKind());

@@ -2,6 +2,8 @@ package jp.awabi2048.cccontent.features.resourcecollection;
 
 import com.awabi2048.ccsystem.api.time.Season;
 import com.awabi2048.ccsystem.api.localization.generated.ContentResourceCollectionKeys;
+import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver;
+import org.bukkit.World;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -41,5 +43,18 @@ class SeasonalPlantRegistryTest {
         assertNull(registry.select(Season.SPRING, Material.SHORT_GRASS, "minecraft:plains", 64, new Random(1)));
         assertNull(registry.select(Season.SPRING, Material.FERN, "minecraft:forest", 64, new Random(1)));
         assertNull(registry.select(Season.SPRING, Material.FERN, "minecraft:plains", 40, new Random(1)));
+    }
+
+    @Test
+    void selectionCanConsumeConditionsResolvedFromTheEventPosition() {
+        var registry = SeasonalPlantRegistry.Companion.of(true, List.of(springFern));
+        var conditions = CollectionEnvironmentResolver.Companion.defaults().conditions(
+            "minecraft:plains", World.Environment.NORMAL, 64
+        );
+
+        assertEquals(
+            springFern,
+            registry.select(Season.SPRING, Material.FERN, conditions, new Random(1))
+        );
     }
 }

@@ -16,7 +16,7 @@ class CookingStateStoreTest {
     @TempDir Path temp;
 
     @Test
-    void roundTripsVersionThreeStationSnapshot() throws Exception {
+    void roundTripsCurrentStationSnapshot() throws Exception {
         Path file = temp.resolve("state.yml");
         CookingStateStore store = new CookingStateStore(file.toFile());
         CookingStationKey key = new CookingStationKey(UUID.randomUUID(), -12, 64, 33);
@@ -31,14 +31,15 @@ class CookingStateStoreTest {
             2, 160, 73, CookingProcessState.PAUSED_NO_HEAT, List.of(), null, 0
         );
         PersistedCookingStation expected = new PersistedCookingStation(
-            CookingStation.CAULDRON, session, Map.of(20, "idle-item"), true, false, Set.of("collector")
+            CookingStation.CAULDRON, session, Map.of(), true, false, Set.of("collector"), Map.of(),
+            List.of(new CookingLiquidAreaItem("idle-item", true))
         );
 
         store.save(Map.of(key, expected));
         Map<CookingStationKey, PersistedCookingStation> loaded = store.load();
 
         assertEquals(expected, loaded.get(key));
-        assertTrue(Files.readString(file).contains("schema_version: 3"));
+        assertTrue(Files.readString(file).contains("schema_version: 5"));
         assertTrue(Files.readString(file).contains("recipe_snapshot:"));
     }
 
@@ -61,7 +62,87 @@ class CookingStateStoreTest {
 
         assertTrue(new CookingStateStore(file.toFile()).load().isEmpty());
         String replaced = Files.readString(file);
-        assertTrue(replaced.contains("schema_version: 3"));
+        assertTrue(replaced.contains("schema_version: 5"));
         assertFalse(replaced.contains("legacy"));
+    }
+
+    @Test
+    void migratesLegacyThreeLevelLiquidAmountsToCanonicalUnits() throws Exception {
+        Path file = temp.resolve("legacy-volume.yml");
+        Files.writeString(file, """
+            schema_version: 3
+            stations:
+              station:
+                station: 00000000-0000-0000-0000-000000000001;1;2;3
+                equipment: CAULDRON
+                status: IDLE
+                liquid_contents:
+                  sea_water: 3
+                workspace_items: []
+              station2:
+                station: 00000000-0000-0000-0000-000000000002;1;2;3
+                equipment: CAULDRON
+                status: IDLE
+                liquid_contents:
+                  water: 2
+                workspace_items: []
+            """);
+
+        Map<CookingStationKey, PersistedCookingStation> loaded = new CookingStateStore(file.toFile()).load();
+        assertEquals(Map.of("sea_water", 5), loaded.values().stream()
+            .filter(station -> station.getLiquidContents().containsKey("sea_water"))
+            .findFirst().orElseThrow().getLiquidContents());
+        assertEquals(Map.of("water", 3), loaded.values().stream()
+            .filter(station -> station.getLiquidContents().containsKey("water"))
+            .findFirst().orElseThrow().getLiquidContents());
+        assertTrue(Files.readString(file).contains("schema_version: 5"));
+    }
+
+    @Test
+    void roundTripsLiquidAreaItemsInInsertionOrderWithRemovalFlags() throws Exception {
+        Path file = temp.resolve("liquid-area-items.yml");
+        CookingStationKey key = new CookingStationKey(UUID.randomUUID(), 7, 64, -4);
+        PersistedCookingStation expected = new PersistedCookingStation(
+            CookingStation.CAULDRON, null, Map.of(), false, false, Set.of(),
+            Map.of("water", 2),
+            List.of(
+                new CookingLiquidAreaItem("first-item", true),
+                new CookingLiquidAreaItem("fixed-item", false)
+            )
+        );
+
+        CookingStateStore store = new CookingStateStore(file.toFile());
+        store.save(Map.of(key, expected));
+
+        assertEquals(expected, store.load().get(key));
+        assertTrue(Files.readString(file).contains("liquid_area_items:"));
+    }
+
+    @Test
+    void migratesLegacyCauldronWorkspaceIntoLiquidAreaStack() throws Exception {
+        Path file = temp.resolve("legacy-cauldron-workspace.yml");
+        Files.writeString(file, """
+            schema_version: 4
+            stations:
+              station:
+                station: 00000000-0000-0000-0000-000000000003;1;2;3
+                equipment: CAULDRON
+                status: IDLE
+                workspace_items:
+                  - slot: 24
+                    serialized_item: last-item
+                  - slot: 20
+                    serialized_item: first-item
+            """);
+
+        PersistedCookingStation loaded = new CookingStateStore(file.toFile()).load().values()
+            .stream().findFirst().orElseThrow();
+
+        assertEquals(List.of(
+            new CookingLiquidAreaItem("first-item", true),
+            new CookingLiquidAreaItem("last-item", true)
+        ), loaded.getLiquidAreaItems());
+        assertTrue(loaded.getWorkspaceItems().isEmpty());
+        assertTrue(Files.readString(file).contains("schema_version: 5"));
     }
 }

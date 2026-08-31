@@ -1,12 +1,15 @@
 package jp.awabi2048.cccontent.features.fishing
 
 import com.awabi2048.ccsystem.CCSystem
+import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver
+import jp.awabi2048.cccontent.features.environment.WaterRegion
 import net.kyori.adventure.text.Component
 import org.bukkit.HeightMap
 import org.bukkit.Location
 import org.bukkit.Particle
 import org.bukkit.Sound
 import org.bukkit.World
+import org.bukkit.block.Block
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitTask
@@ -37,7 +40,8 @@ class NaturalFishingGroundService(
     private val plugin: JavaPlugin,
     private val settings: NaturalFishingGroundSettings,
     private val isFisher: (Player) -> Boolean,
-    private val random: Random = Random()
+    private val random: Random = Random(),
+    private val environmentResolver: CollectionEnvironmentResolver = CollectionEnvironmentResolver.defaults()
 ) {
     private val grounds = mutableListOf<NaturalFishingGround>()
     private val nextRollAt = mutableMapOf<UUID, Long>()
@@ -124,7 +128,7 @@ class NaturalFishingGroundService(
 
     private fun validateArea(center: Location, radius: Int): Boolean {
         val centerBlock = center.block
-        if (!isFishingBiome(centerBlock.biome.key.key)) return false
+        if (!isFishingBiome(centerBlock)) return false
         if ((FishingWaterAnalyzer.analyze(center)?.depth ?: 0) < 2) return false
 
         val marginRadius = (radius * 1.5).roundToInt()
@@ -148,7 +152,7 @@ class NaturalFishingGroundService(
                     coreTotal++
                     if (surface != null) {
                         coreWater++
-                        if (isFishingBiome(surface.block.biome.key.key)) coreFishingBiomes++
+                        if (isFishingBiome(surface.block)) coreFishingBiomes++
                     }
                 }
             }
@@ -242,7 +246,11 @@ class NaturalFishingGroundService(
         private fun Location.distanceSquaredSafe(other: Location): Double =
             if (world?.uid == other.world?.uid) distanceSquared(other) else Double.POSITIVE_INFINITY
 
-        private fun isFishingBiome(id: String): Boolean =
-            id == "river" || id == "frozen_river" || id.endsWith("ocean")
+    }
+
+    /** 釣り場の水域判定も共有 resolver を通し、海・河川の定義を他の収集要素と揃えます。 */
+    private fun isFishingBiome(block: Block): Boolean {
+        val water = environmentResolver.at(block).water
+        return water == WaterRegion.RIVER || water == WaterRegion.OCEAN
     }
 }

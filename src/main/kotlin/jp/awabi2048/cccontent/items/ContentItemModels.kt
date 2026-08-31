@@ -15,6 +15,7 @@ object ContentItemModels {
     private const val PREFIX = "custom_item"
 
     fun cooking(id: String): NamespacedKey = custom("cooking/$id")
+    fun cookingLiquidDisplay(): NamespacedKey = cooking("liquid_display")
 
     fun brewery(id: String): NamespacedKey = custom("brewery/$id")
     fun breweryPrepared(preparationId: String): NamespacedKey = brewery("prepared/$preparationId")

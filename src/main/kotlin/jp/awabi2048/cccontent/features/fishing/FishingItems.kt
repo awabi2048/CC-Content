@@ -226,6 +226,7 @@ class FishingItems(
         override val displayName = "Fish Dictionary"
         override val canStack = false
         override val canPlace = false
+        override val itemModel = ContentItemModels.fishingDictionary()
 
         override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 

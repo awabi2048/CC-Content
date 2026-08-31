@@ -72,6 +72,8 @@ class BreweryItemCodec(private val plugin: JavaPlugin) {
     fun createFermentedBottle(recipeId: String, quality: Double, muddy: Boolean, history: String, recipe: BreweryRecipe, player: Player?): ItemStack {
         val item = ItemStack(Material.POTION)
         val meta = item.itemMeta ?: return item
+        // 発酵段階も表示経路を固定し、将来はレシピ別モデルへ差し替えられるようにします。
+        meta.setItemModel(if (muddy) ContentItemModels.breweryFailed(recipeId) else ContentItemModels.breweryFermented(recipeId))
         meta.displayName(Component.text(text(player, if (muddy) "brewery.item.name.muddy" else "brewery.item.name.fermented",
             "recipe" to text(player, "brewery.recipe.$recipeId.name"),
             "product" to text(player, "brewery.recipe.$recipeId.middle.name"))))

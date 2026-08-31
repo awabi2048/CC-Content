@@ -7,27 +7,80 @@ import java.io.File
 internal data class PersistedCookingStation(
     val equipment: CookingStation,
     val session: CookingStationSession? = null,
+    // 処理中にも次回バッチ用の待機材料を保持できる。現行バッチはsession.originalInputsが所有する。
     val workspaceItems: Map<Int, String> = emptyMap(),
     val experienceAwarded: Boolean = false,
     val starterCatalogAwarded: Boolean = false,
-    val collectorIds: Set<String> = emptySet()
-)
+    val collectorIds: Set<String> = emptySet(),
+    val liquidContents: Map<String, Int> = emptyMap(),
+    /** 釜の液体領域へ投入した待機材料。保存順がそのままLIFOの底から頂点になります。 */
+    val liquidAreaItems: List<CookingLiquidAreaItem> = emptyList(),
+) {
+    /** 液体状態追加後の既存7引数構築を維持し、投入スタックなしの状態を扱います。 */
+    constructor(
+        equipment: CookingStation,
+        session: CookingStationSession?,
+        workspaceItems: Map<Int, String>,
+        experienceAwarded: Boolean,
+        starterCatalogAwarded: Boolean,
+        collectorIds: Set<String>,
+        liquidContents: Map<String, Int>,
+    ) : this(
+        equipment,
+        session,
+        workspaceItems,
+        experienceAwarded,
+        starterCatalogAwarded,
+        collectorIds,
+        liquidContents,
+        emptyList(),
+    )
+
+    /** 既存の6引数構築を維持し、液体状態を持たない保存データを自然に扱います。 */
+    constructor(
+        equipment: CookingStation,
+        session: CookingStationSession?,
+        workspaceItems: Map<Int, String>,
+        experienceAwarded: Boolean,
+        starterCatalogAwarded: Boolean,
+        collectorIds: Set<String>
+    ) : this(
+        equipment,
+        session,
+        workspaceItems,
+        experienceAwarded,
+        starterCatalogAwarded,
+        collectorIds,
+        emptyMap(),
+        emptyList(),
+    )
+
+    init {
+        require(liquidAreaItems.size <= CookingLiquidAreaStack.MAX_ENTRIES)
+    }
+}
 
 internal class CookingStateStore(private val file: File) {
     fun load(): MutableMap<CookingStationKey, PersistedCookingStation> {
         if (!file.exists()) return mutableMapOf()
         val root = YamlConfiguration.loadConfiguration(file)
-        if ((root.get("schema_version") as? Number)?.toInt() != CURRENT_SCHEMA_VERSION) {
+        val schemaVersion = (root.get("schema_version") as? Number)?.toInt()
+        val stations = root.getConfigurationSection("stations")
+        if (stations == null || schemaVersion !in SUPPORTED_SCHEMA_VERSIONS) {
             save(emptyMap())
             return mutableMapOf()
         }
-        val stations = root.getConfigurationSection("stations") ?: return mutableMapOf()
-        return stations.getKeys(false).associate { pathKey ->
+
+        val migrated = schemaVersion == LEGACY_VOLUME_SCHEMA_VERSION
+        val requiresSchemaUpgrade = schemaVersion != CURRENT_SCHEMA_VERSION
+        val loaded = stations.getKeys(false).associate { pathKey ->
             val section = section(stations, pathKey)
             val key = CookingStationKey.deserialize(string(section, "station"))
                 ?: error("${file.path}.stations.$pathKey.station is invalid")
-            key to loadStation(section)
+            key to loadStation(section, migrated)
         }.toMutableMap()
+        if (requiresSchemaUpgrade) save(loaded)
+        return loaded
     }
 
     fun save(stations: Map<CookingStationKey, PersistedCookingStation>) {
@@ -46,8 +99,17 @@ internal class CookingStateStore(private val file: File) {
     ) {
         target.set("station", key.serialize())
         target.set("equipment", persisted.equipment.name)
+        if (persisted.liquidContents.isNotEmpty()) {
+            target.set("liquid_contents", persisted.liquidContents.toSortedMap())
+        }
         target.set("workspace_items", persisted.workspaceItems.toSortedMap().map { (slot, item) ->
             linkedMapOf("slot" to slot, "serialized_item" to item)
+        })
+        target.set("liquid_area_items", persisted.liquidAreaItems.map { item ->
+            linkedMapOf(
+                "serialized_item" to item.serializedItem,
+                "removable" to item.removable,
+            )
         })
         val session = persisted.session
         if (session == null) {
@@ -107,13 +169,45 @@ internal class CookingStateStore(private val file: File) {
         target.set("prepared_quality", snapshot.preparedQuality)
     }
 
-    private fun loadStation(section: ConfigurationSection): PersistedCookingStation {
+    private fun loadStation(section: ConfigurationSection, migrateLegacyVolume: Boolean): PersistedCookingStation {
         val equipment = enum<CookingStation>(section, "equipment")
+        val liquidSection = section.getConfigurationSection("liquid_contents")
+        val storedLiquidContents = liquidSection?.getKeys(false)?.associateWith { id ->
+            integer(liquidSection, id)
+        }.orEmpty()
+        val liquidContents = if (migrateLegacyVolume) {
+            migrateLegacyLiquidContents(storedLiquidContents)
+        } else {
+            storedLiquidContents
+        }
         val workspace = section.getMapList("workspace_items").associate { raw ->
             mapInt(raw, "slot") to mapString(raw, "serialized_item")
         }
+        val configuredLiquidAreaItems = section.getMapList("liquid_area_items").map { raw ->
+            CookingLiquidAreaItem(
+                mapString(raw, "serialized_item"),
+                raw["removable"] as? Boolean ?: true,
+            )
+        }
+        // 旧実装の釜は5つのスロット番号Mapへ材料を保存していたため、旧データをスロット順の
+        // LIFOスタックへ一度だけ移します。釜では以後workspace_itemsを使わず、二重ドロップを防ぎます。
+        val migratedLiquidAreaItems = if (equipment == CookingStation.CAULDRON && configuredLiquidAreaItems.isEmpty()) {
+            workspace.toSortedMap().values.map { CookingLiquidAreaItem(it, removable = true) }
+        } else {
+            emptyList()
+        }
+        val liquidAreaItems = configuredLiquidAreaItems.ifEmpty { migratedLiquidAreaItems }
+        val effectiveWorkspace = if (equipment == CookingStation.CAULDRON) emptyMap() else workspace
         val status = enum<CookingProcessState>(section, "status")
-        if (status == CookingProcessState.IDLE) return PersistedCookingStation(equipment, null, workspace)
+        if (status == CookingProcessState.IDLE) {
+            return PersistedCookingStation(
+                equipment = equipment,
+                session = null,
+                workspaceItems = effectiveWorkspace,
+                liquidContents = CookingLiquidContents.of(liquidContents).amounts,
+                liquidAreaItems = liquidAreaItems,
+            )
+        }
         val snapshot = loadSnapshot(section(section, "recipe_snapshot"))
         val inputs = section.getMapList("original_inputs").map { raw ->
             CookingStoredInput(
@@ -143,9 +237,11 @@ internal class CookingStateStore(private val file: File) {
             integer(section, "water_consumed")
         )
         return PersistedCookingStation(
-            equipment, session, workspace,
+            equipment, session, effectiveWorkspace,
             boolean(section, "experience_awarded"), boolean(section, "starter_catalog_awarded"),
-            section.getStringList("collector_uuids").toSet()
+            section.getStringList("collector_uuids").toSet(),
+            CookingLiquidContents.of(liquidContents).amounts,
+            liquidAreaItems,
         )
     }
 
@@ -175,7 +271,24 @@ internal class CookingStateStore(private val file: File) {
     private fun mapBoolean(map: Map<*, *>, key: String): Boolean =
         map[key] as? Boolean ?: error("${file.path} map.$key must be a boolean")
 
+    /** schema 3では海水の満量と通常水位を3段階値で保存していたため、起動時に一度だけ移行します。 */
+    private fun migrateLegacyLiquidContents(amounts: Map<String, Int>): Map<String, Int> = amounts.mapValues { (id, amount) ->
+        when {
+            id == CookingLiquidIds.SEA_WATER && amount == 3 -> CookingLiquidVolume.UNITS_PER_CAULDRON
+            id == CookingLiquidIds.WATER && amount in 1..CookingLiquidVolume.VANILLA_CAULDRON_LEVELS ->
+                CookingLiquidVolume.fromVanillaLevel(amount)
+            else -> amount
+        }
+    }
+
     private companion object {
-        const val CURRENT_SCHEMA_VERSION = 3
+        const val LEGACY_VOLUME_SCHEMA_VERSION = 3
+        const val LEGACY_WORKSPACE_SCHEMA_VERSION = 4
+        const val CURRENT_SCHEMA_VERSION = 5
+        val SUPPORTED_SCHEMA_VERSIONS = setOf(
+            LEGACY_VOLUME_SCHEMA_VERSION,
+            LEGACY_WORKSPACE_SCHEMA_VERSION,
+            CURRENT_SCHEMA_VERSION,
+        )
     }
 }

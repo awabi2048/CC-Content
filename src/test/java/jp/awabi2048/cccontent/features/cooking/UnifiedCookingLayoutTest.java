@@ -13,6 +13,7 @@ class UnifiedCookingLayoutTest {
         assertEquals(List.of(11, 12, 13, 14, 15, 20, 21, 22, 23, 24), UnifiedCookingLayout.INSTANCE.getCUTTING_WORK());
         assertEquals(List.of(20, 21, 22, 23, 24), UnifiedCookingLayout.INSTANCE.getTIMED_WORK());
         assertEquals(List.of(22, 21, 23, 20, 24), UnifiedCookingLayout.INSTANCE.getTIMED_OUTPUT_ORDER());
+        assertEquals(List.of(20, 21, 22, 23, 24), UnifiedCookingLayout.INSTANCE.getLIQUID_OUTPUT_ORDER());
         assertEquals(4, UnifiedCookingLayout.INFO);
         assertEquals(36, UnifiedCookingLayout.CLOSE);
         assertEquals(38, UnifiedCookingLayout.TOOL);
@@ -20,5 +21,16 @@ class UnifiedCookingLayoutTest {
         assertEquals(42, UnifiedCookingLayout.STATE);
         assertEquals(44, UnifiedCookingLayout.HEAT);
         assertEquals(10, Set.copyOf(UnifiedCookingLayout.INSTANCE.getCUTTING_WORK()).size());
+    }
+
+    @Test
+    void liquidDisplayKeepsOnePanelPerCanonicalUnit() {
+        assertEquals(List.of(20), UnifiedCookingLayout.INSTANCE.liquidDisplayOrder(1));
+        assertEquals(List.of(20, 21), UnifiedCookingLayout.INSTANCE.liquidDisplayOrder(2));
+        assertEquals(List.of(20, 21, 22, 23, 24), UnifiedCookingLayout.INSTANCE.liquidDisplayOrder(5));
+        assertEquals(
+            List.of(21, 23),
+            UnifiedCookingLayout.INSTANCE.liquidDisplayOrder(2, List.of(21, 23, 24))
+        );
     }
 }

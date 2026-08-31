@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.cooking
 
+import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver
 import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import jp.awabi2048.cccontent.features.rank.RankManager
@@ -66,7 +67,14 @@ class CookingFeature(
         val preparations = BreweryPreparationConfigurationLoader.load(plugin.dataFolder, loaded.ingredients)
         configuration = loaded
         items = CookingItems(loaded).also(CookingItems::register)
-        controller = UnifiedCookingController(plugin, rankManagerProvider, catalogStore, loaded, preparations)
+        controller = UnifiedCookingController(
+            plugin,
+            rankManagerProvider,
+            catalogStore,
+            loaded,
+            preparations,
+            CollectionEnvironmentResolver.load(plugin)
+        )
             .also(UnifiedCookingController::initialize)
         vanillaRecipes = CookingVanillaRecipeController(plugin, rankManagerProvider, catalogStore)
             .also(CookingVanillaRecipeController::initialize)
@@ -84,7 +92,8 @@ class CookingFeature(
             "config/cooking/config.yml",
             "config/cooking/ingredients.yml",
             "config/cooking/cutting.yml",
-            "config/cooking/recipe.yml"
+            "config/cooking/recipe.yml",
+            "config/cooking/liquid_recipes.yml"
         ).forEach(::ensureFile)
     }
 

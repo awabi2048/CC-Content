@@ -1,0 +1,48 @@
+package jp.awabi2048.cccontent.features.environment;
+
+import org.bukkit.World;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class CollectionEnvironmentResolverTest {
+    private final CollectionEnvironmentResolver resolver = CollectionEnvironmentResolver.Companion.defaults();
+
+    @Test
+    void positionConditionsShareTemperateAndVerticalClassification() {
+        var conditions = resolver.conditions(
+            "minecraft:flower_forest", World.Environment.NORMAL,
+            new EnvironmentPosition("minecraft:world", 12, 64, -4)
+        );
+
+        assertEquals(ClimateRegion.TEMPERATE, conditions.getClimate());
+        assertEquals("minecraft:world", conditions.getPosition().getWorldKey());
+        assertEquals(12, conditions.getPosition().getX());
+        assertEquals(64, conditions.getPosition().getY());
+        assertEquals(-4, conditions.getPosition().getZ());
+        assertTrue(resolver.isInBiomeGroup("minecraft:flower_forest", "temperate"));
+        assertTrue(resolver.isInBiomeGroup(conditions, "temperate"));
+        assertTrue(conditions.hasVerticalRegion("wild_gathering"));
+        assertEquals(
+            ClimateRegion.TEMPERATE,
+            resolver.conditions("minecraft:plains", World.Environment.NORMAL, 64).getClimate()
+        );
+    }
+
+    @Test
+    void soybeanTemperateGroupIncludesTheExpandedNormalBiomeSet() {
+        assertTrue(resolver.isInBiomeGroup("minecraft:birch_forest", "temperate"));
+        assertTrue(resolver.isInBiomeGroup("minecraft:dark_forest", "temperate"));
+        assertTrue(resolver.isInBiomeGroup("minecraft:cherry_grove", "temperate"));
+        assertTrue(!resolver.isInBiomeGroup("minecraft:taiga", "temperate"));
+    }
+
+    @Test
+    void oceanFamilyIsAnExplicitSharedCondition() {
+        var conditions = resolver.conditions("minecraft:deep_warm_ocean", World.Environment.NORMAL, 32);
+
+        assertEquals(WaterRegion.OCEAN, conditions.getWater());
+        assertTrue(resolver.isOceanFamily(conditions));
+    }
+}

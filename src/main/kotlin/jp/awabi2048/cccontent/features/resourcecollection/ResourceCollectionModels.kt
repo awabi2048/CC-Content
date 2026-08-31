@@ -1,5 +1,9 @@
 package jp.awabi2048.cccontent.features.resourcecollection
 
+import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver
+import jp.awabi2048.cccontent.features.environment.ClimateRegion
+import jp.awabi2048.cccontent.features.environment.EnvironmentConditions
+import jp.awabi2048.cccontent.features.environment.TerrainRegion
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import org.bukkit.Material
 import org.bukkit.block.data.Ageable
@@ -234,14 +238,18 @@ data class MineralInspectionResult(
 )
 
 object MineralCompanionPolicy {
-    fun inspect(environment: World.Environment, biomeKey: String, y: Int): MineralInspectionResult {
+    fun inspect(environment: World.Environment, biomeKey: String, y: Int): MineralInspectionResult =
+        inspect(environment, biomeKey, y, CollectionEnvironmentResolver.defaults())
+
+    /** 採掘事象の位置から解決済み条件を受け取り、同じ分類階層を再利用します。 */
+    fun inspect(conditions: EnvironmentConditions): MineralInspectionResult {
         val altitude = when {
-            y >= 96 -> MineralAltitudeBand.HIGH
-            y >= 32 -> MineralAltitudeBand.SHALLOW
-            y >= 0 -> MineralAltitudeBand.MIDDLE
+            conditions.hasVerticalRegion("mineral_high") -> MineralAltitudeBand.HIGH
+            conditions.hasVerticalRegion("mineral_shallow") -> MineralAltitudeBand.SHALLOW
+            conditions.hasVerticalRegion("mineral_middle") -> MineralAltitudeBand.MIDDLE
             else -> MineralAltitudeBand.DEEP
         }
-        val biome = biomeBand(environment, biomeKey)
+        val biome = biomeBand(conditions.climate, conditions.terrain, conditions.worldEnvironment)
         val resourceId = when {
             biome == MineralBiomeBand.NETHER -> "sulfur"
             altitude == MineralAltitudeBand.DEEP -> "calcite_fragment"
@@ -251,14 +259,24 @@ object MineralCompanionPolicy {
         return MineralInspectionResult(altitude, biome, resourceId)
     }
 
-    private fun biomeBand(environment: World.Environment, biomeKey: String): MineralBiomeBand {
+    fun inspect(
+        environment: World.Environment,
+        biomeKey: String,
+        y: Int,
+        environmentResolver: CollectionEnvironmentResolver
+    ): MineralInspectionResult = inspect(environmentResolver.conditions(biomeKey, environment, y = y))
+
+    private fun biomeBand(
+        climate: ClimateRegion,
+        terrain: TerrainRegion,
+        environment: World.Environment
+    ): MineralBiomeBand {
         if (environment == World.Environment.NETHER) return MineralBiomeBand.NETHER
-        val key = biomeKey.lowercase()
         return when {
-            listOf("frozen", "snow", "ice", "cold", "grove").any(key::contains) -> MineralBiomeBand.COLD
-            listOf("desert", "badlands", "savanna").any(key::contains) -> MineralBiomeBand.DRY
-            listOf("swamp", "mangrove", "jungle", "river", "ocean").any(key::contains) -> MineralBiomeBand.WET
-            listOf("mountain", "peak", "slope", "windswept", "stony").any(key::contains) -> MineralBiomeBand.MOUNTAIN
+            climate == ClimateRegion.COLD -> MineralBiomeBand.COLD
+            climate == ClimateRegion.DRY -> MineralBiomeBand.DRY
+            climate == ClimateRegion.WET || climate == ClimateRegion.TROPICAL -> MineralBiomeBand.WET
+            terrain == TerrainRegion.MOUNTAIN -> MineralBiomeBand.MOUNTAIN
             else -> MineralBiomeBand.TEMPERATE
         }
     }

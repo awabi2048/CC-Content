@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.resourcecollection
 
 import com.awabi2048.ccsystem.CCSystem
+import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver
 import jp.awabi2048.cccontent.features.rank.RankManager
 import jp.awabi2048.cccontent.features.rank.profession.profile.FarmerSkillProfile
 import jp.awabi2048.cccontent.features.rank.profession.profile.LumberjackSkillProfile
@@ -27,10 +28,13 @@ class ResourceCollectionFeature(
         if (!settings.enabled) return
         items = ResourceCollectionItems(plugin)
         items.register()
-        val seasonalPlants = SeasonalPlantRegistry.load(plugin)
-        val forestProducts = ForestProductRegistry.load(plugin)
+        val environmentResolver = CollectionEnvironmentResolver.load(plugin)
+        val seasonalPlants = SeasonalPlantRegistry.load(plugin, environmentResolver)
+        val forestProducts = ForestProductRegistry.load(plugin, environmentResolver)
         plugin.server.pluginManager.registerEvents(this, plugin)
-        specialist = SpecialistCollectionService(plugin, rankManager, settings, seasonalPlants, forestProducts, random)
+        specialist = SpecialistCollectionService(
+            plugin, rankManager, settings, seasonalPlants, forestProducts, random, environmentResolver
+        )
         plugin.server.pluginManager.registerEvents(specialist, plugin)
         plugin.logger.info("Resource Collection: normal bonus resources enabled; legacy EXP and craft rules disabled")
     }
