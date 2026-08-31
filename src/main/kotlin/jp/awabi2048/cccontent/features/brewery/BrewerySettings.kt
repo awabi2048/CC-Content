@@ -160,10 +160,10 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
             ?: error("Breweryレシピ設定にpreparationsセクションがありません")
         val families = yml.getConfigurationSection("brew_families")
             ?: error("Breweryレシピ設定にbrew_familiesセクションがありません")
-        require(preparations.getKeys(false).size == 26) { "preparations must contain exactly 26 entries" }
+        require(preparations.getKeys(false).isNotEmpty()) { "preparations must not be empty" }
         return families.getKeys(false).associateWith { familyId ->
             parseFamily(familyId, requireNotNull(families.getConfigurationSection(familyId)), preparations)
-        }.also { require(it.size == 26) { "brew_families must contain exactly 26 families" } }
+        }.also { require(it.isNotEmpty()) { "brew_families must not be empty" } }
     }
 
     private fun parseFamily(

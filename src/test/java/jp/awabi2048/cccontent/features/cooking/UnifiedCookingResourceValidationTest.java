@@ -16,9 +16,12 @@ class UnifiedCookingResourceValidationTest {
 
         assertEquals(100, configuration.getIngredients().size());
         assertEquals(35, configuration.getCuttingRecipes().size());
-        assertEquals(53, configuration.getRecipes().size());
+        assertEquals(55, configuration.getRecipes().size());
         assertEquals(48, configuration.getRecipes().values().stream()
             .filter(recipe -> recipe.getDefinition().getExperience() > 0).count());
+        assertEquals(CookingStation.FERMENTATION,
+            configuration.getRecipes().get("soy_sauce").getDefinition().getStation());
+        assertNull(configuration.getRecipes().get("soy_sauce").getDefinition().getHeat());
         assertTrue(configuration.getCuttingRecipes().containsKey("fillet_pufferfish"));
         assertFalse(configuration.getCuttingRecipes().containsKey("fillet_ancient_coelacanth"));
         assertTrue(configuration.getRecipes().keySet().containsAll(Set.of(

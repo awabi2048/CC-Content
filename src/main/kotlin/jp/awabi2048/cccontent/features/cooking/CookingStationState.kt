@@ -76,7 +76,7 @@ data class CookingRecipeSnapshot(
     val resultAmountPerScale: Int,
     val failureResultId: String,
     val durationSeconds: Int,
-    val expectedHeat: CookingHeat,
+    val expectedHeat: CookingHeat?,
     val waterUnits: Int,
     val resultKind: CookingResultKind,
     val containerMaterial: String?,
@@ -139,7 +139,7 @@ data class CookingStationSession(
     val recipeSnapshot: CookingRecipeSnapshot,
     val starterId: String,
     val scale: Int,
-    val startHeat: CookingHeat,
+    val startHeat: CookingHeat?,
     val failureCommitted: Boolean,
     val originalInputs: List<CookingStoredInput>,
     val reservedWaterUnits: Int,
@@ -187,12 +187,11 @@ object CookingStationStateMachine {
         recipeSnapshot: CookingRecipeSnapshot,
         starterId: String,
         scale: Int,
-        actualHeat: CookingHeat,
+        actualHeat: CookingHeat?,
         inputs: List<CookingStoredInput>,
         processingTimeReduction: Double
     ): CookingStationSession {
-        require(recipe.station == CookingStation.PAN || recipe.station == CookingStation.CAULDRON)
-        require(recipe.heat != null)
+        require(recipe.station in setOf(CookingStation.PAN, CookingStation.CAULDRON, CookingStation.FERMENTATION))
         require(recipeSnapshot.expectedHeat == recipe.heat)
         require(recipeSnapshot.durationSeconds == recipe.durationSeconds)
         require(recipeSnapshot.waterUnits == recipe.waterUnits)
@@ -200,7 +199,9 @@ object CookingStationStateMachine {
         require(processingTimeReduction in 0.0..1.0)
         val ticks = (recipe.durationSeconds * 20.0 * (1.0 - processingTimeReduction))
             .roundToLong().coerceAtLeast(1L)
-        val failure = actualHeat != recipe.heat
+        // 熱源不要の借用設備はnull同士を正常系として扱い、従来の加熱レシピだけが
+        // 異なる火力を失敗へ確定します。設備の物理名はここでは参照しません。
+        val failure = recipe.heat != null && actualHeat != recipe.heat
         return CookingStationSession(
             recipe.id,
             recipeSnapshot,
@@ -219,10 +220,14 @@ object CookingStationStateMachine {
     @JvmStatic
     fun tick(session: CookingStationSession, currentHeat: CookingHeat?): CookingStationStep {
         require(session.state in processingStates)
-        val pausedState = when {
-            currentHeat == null -> CookingProcessState.PAUSED_NO_HEAT
-            currentHeat != session.startHeat -> CookingProcessState.PAUSED_WRONG_HEAT
-            else -> null
+        val pausedState = if (session.recipeSnapshot.expectedHeat == null) {
+            null
+        } else {
+            when {
+                currentHeat == null -> CookingProcessState.PAUSED_NO_HEAT
+                currentHeat != session.startHeat -> CookingProcessState.PAUSED_WRONG_HEAT
+                else -> null
+            }
         }
         if (pausedState != null) return CookingStationStep.Updated(session.copy(state = pausedState))
         val processingState = if (session.failureCommitted) {

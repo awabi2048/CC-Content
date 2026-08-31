@@ -1,4 +1,4 @@
-config_version: 3
+config_version: 4
 
 recipes:
   cooked_rice:
@@ -78,6 +78,53 @@ recipes:
       custom_item_id: cooking.burnt_bottle_liquid
       base_material: POISONOUS_POTATO
       liquid_pane: GRAY_STAINED_GLASS_PANE
+      max_stack_size: 1
+      amount_per_scale: 1
+  soy_sauce_moromi:
+    equipment: CAULDRON
+    group: INTERMEDIATE_MATERIAL
+    tier: BASIC
+    heat: NORMAL
+    ingredients:
+      resource_soybean: 2
+      wheat: 1
+      resource_rock_salt: 1
+    water_units: 1
+    duration_seconds: 10
+    exp: 0
+    result:
+      kind: ITEM
+      custom_item_id: cooking.soy_sauce_moromi
+      base_material: POISONOUS_POTATO
+      nutrition: 0
+      saturation_modifier: 0.0
+      max_stack_size: 16
+      amount_per_scale: 1
+    failure_result:
+      custom_item_id: cooking.burnt_solid_food
+      base_material: POISONOUS_POTATO
+      max_stack_size: 1
+      amount_per_scale: 1
+  soy_sauce:
+    equipment: FERMENTATION
+    group: INTERMEDIATE_MATERIAL
+    tier: BASIC
+    ingredients:
+      soy_sauce_moromi: 1
+    water_units: 0
+    duration_seconds: 120
+    exp: 0
+    result:
+      kind: ITEM
+      custom_item_id: cooking.soy_sauce
+      base_material: POISONOUS_POTATO
+      nutrition: 0
+      saturation_modifier: 0.0
+      max_stack_size: 16
+      amount_per_scale: 1
+    failure_result:
+      custom_item_id: cooking.burnt_solid_food
+      base_material: POISONOUS_POTATO
       max_stack_size: 1
       amount_per_scale: 1
   rice_vinegar:

@@ -12,7 +12,7 @@ class CookingVanillaDefinitionsTest {
     @Test
     void containsEverySpecifiedCraftingFurnaceAndSmokerDefinition() {
         var definitions = CookingVanillaDefinitions.INSTANCE.getAll();
-        assertEquals(16, definitions.size());
+        assertEquals(15, definitions.size());
         assertTrue(definitions.stream().anyMatch(it ->
             it.getId().equals("soy_milk_bottle") &&
                 it.getIngredients().equals(Map.of("resource.soybean", 1, "minecraft:glass_bottle", 1))

@@ -31,6 +31,10 @@ class CookingConfigurationTest {
         assertTrue(Files.isRegularFile(ROOT.resolve("ingredients.yml")));
         assertTrue(Files.isRegularFile(ROOT.resolve("cutting.yml")));
         assertTrue(Files.isRegularFile(ROOT.resolve("recipe.yml")));
+        assertEquals(3, YamlConfiguration.loadConfiguration(ROOT.resolve("ingredients.yml").toFile())
+            .getInt("config_version"));
+        assertEquals(4, YamlConfiguration.loadConfiguration(ROOT.resolve("recipe.yml").toFile())
+            .getInt("config_version"));
     }
 
     @Test
@@ -38,9 +42,10 @@ class CookingConfigurationTest {
         var recipes = YamlConfiguration.loadConfiguration(ROOT.resolve("recipe.yml").toFile());
         var section = recipes.getConfigurationSection("recipes");
         assertNotNull(section);
-        assertEquals(53, section.getKeys(false).size());
+        assertEquals(55, section.getKeys(false).size());
         for (String id : section.getKeys(false)) {
-            assertTrue(Set.of("PAN", "CAULDRON").contains(recipes.getString("recipes." + id + ".equipment")));
+            assertTrue(Set.of("PAN", "CAULDRON", "FERMENTATION")
+                .contains(recipes.getString("recipes." + id + ".equipment")));
             assertFalse(recipes.contains("recipes." + id + ".result.item_model"));
             assertFalse(recipes.contains("recipes." + id + ".failure_result.item_model"));
             assertFalse(recipes.contains("recipes." + id + ".completion"));

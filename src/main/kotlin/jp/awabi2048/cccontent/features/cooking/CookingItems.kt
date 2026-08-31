@@ -29,7 +29,7 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
             .distinctBy(CuttingRecipeDefinition::outputCustomItemId)
             .forEach { recipe -> register(IntermediateItem(recipe.outputCustomItemId)) }
         listOf(
-            "miso" to 16, "soy_sauce" to 16, "curry_roux" to 64, "butter" to 64,
+            "miso" to 16, "curry_roux" to 64, "butter" to 64,
             "dough" to 64, "sweet_dough" to 64, "carrot_cookie_dough" to 64, "roasted_coffee" to 64
         ).forEach { (id, stack) -> register(IntermediateItem("cooking.$id", stack)) }
         register(SeaWaterBucketItem())

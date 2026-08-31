@@ -4,6 +4,7 @@ import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver
 import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
 import jp.awabi2048.cccontent.features.rank.RankManager
+import jp.awabi2048.cccontent.features.processing.ProcessingEquipmentService
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
@@ -12,7 +13,8 @@ import java.io.File
 class CookingFeature(
     private val plugin: JavaPlugin,
     private val rankManagerProvider: () -> RankManager?,
-    private val catalogStore: CatalogStore
+    private val catalogStore: CatalogStore,
+    private val processingEquipmentService: ProcessingEquipmentService,
 ) {
     private var controller: UnifiedCookingController? = null
     private var vanillaRecipes: CookingVanillaRecipeController? = null
@@ -73,7 +75,8 @@ class CookingFeature(
             catalogStore,
             loaded,
             preparations,
-            CollectionEnvironmentResolver.load(plugin)
+            processingEquipmentService,
+            CollectionEnvironmentResolver.load(plugin),
         )
             .also(UnifiedCookingController::initialize)
         vanillaRecipes = CookingVanillaRecipeController(plugin, rankManagerProvider, catalogStore)

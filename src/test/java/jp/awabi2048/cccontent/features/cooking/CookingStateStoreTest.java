@@ -44,6 +44,33 @@ class CookingStateStoreTest {
     }
 
     @Test
+    void roundTripsExternalEquipmentSnapshotWithoutHeat() throws Exception {
+        Path file = temp.resolve("external.yml");
+        CookingStateStore store = new CookingStateStore(file.toFile());
+        CookingStationKey key = new CookingStationKey(UUID.randomUUID(), 4, 70, -8);
+        CookingRecipeSnapshot snapshot = new CookingRecipeSnapshot(
+            "cooking.soy_sauce", 1, "cooking.burnt_solid_food", 120,
+            null, 0, CookingResultKind.ITEM, null, null, 20, null, null
+        );
+        CookingStationSession session = new CookingStationSession(
+            "soy_sauce", snapshot, UUID.randomUUID().toString(), 1, null,
+            false, List.of(new CookingStoredInput("soy_sauce_moromi", 1, "serialized", null, 0)),
+            0, 2400, 2400, CookingProcessState.PROCESSING_NORMAL, List.of(), null, 0
+        );
+        PersistedCookingStation expected = new PersistedCookingStation(
+            CookingStation.FERMENTATION, session, Map.of(), false, false, Set.of()
+        );
+
+        store.save(Map.of(key, expected));
+
+        assertEquals(expected, store.load().get(key));
+        String serialized = Files.readString(file);
+        assertTrue(serialized.contains("equipment: FERMENTATION"));
+        // YamlConfigurationはnull値をキーごと省略するが、load側では省略を「熱源なし」と解釈する。
+        assertFalse(serialized.contains("heat:"));
+    }
+
+    @Test
     void roundTripsIdleWorkspaceWithoutSyntheticSession() {
         Path file = temp.resolve("idle.yml");
         CookingStateStore store = new CookingStateStore(file.toFile());
