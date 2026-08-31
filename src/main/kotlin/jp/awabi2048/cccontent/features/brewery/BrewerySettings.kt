@@ -35,7 +35,6 @@ data class BreweryRecipe(
     val finalOutputColor: String?,
     val finalOutputEffects: List<BreweryEffectDefinition>,
     val finalOutputGlint: Boolean,
-    val finalOutputCustomModelData: List<Int>,
     val agingVariants: List<BreweryAgingVariant>,
     val outputs: Map<String, BreweryOutputDefinition>
 )
@@ -46,7 +45,6 @@ data class BreweryOutputDefinition(
     val id: String,
     val glint: Boolean,
     val effects: List<BreweryEffectDefinition>,
-    val itemModel: String,
     val alcoholPercent: Double,
     val intoxicationPoints: Double,
     val soberingPoints: Double
@@ -213,7 +211,6 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
                 outputId,
                 output.getBoolean("glint"),
                 output.getStringList("effects").map { parseEffect(outputId, it) },
-                requiredString(output, "item_model"),
                 alcohol,
                 intoxication,
                 sobering
@@ -237,7 +234,7 @@ class BrewerySettingsLoader(private val plugin: JavaPlugin) {
             variants.firstOrNull()?.targetUnits ?: 0,
             variants.flatMap { it.barrelTypes }.toSet(), null,
             primaryOutput.alcoholPercent, null, primaryOutput.effects, primaryOutput.glint,
-            emptyList(), variants, outputs
+            variants, outputs
         )
     }
 

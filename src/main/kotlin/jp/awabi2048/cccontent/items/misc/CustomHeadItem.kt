@@ -6,7 +6,6 @@ import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.gui.GuiLoreSpec
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
-import jp.awabi2048.cccontent.util.ItemMetaCompat
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 import net.kyori.adventure.text.format.TextDecoration
@@ -44,7 +43,6 @@ class CustomHeadItem(
         })
         meta.setItemModel(NamespacedKey.minecraft(modelMaterial.key.key))
         meta.setMaxStackSize(1)
-        variant.itemCustomModelData?.let { ItemMetaCompat.setLegacyCustomModelData(meta, it) }
         meta.persistentDataContainer.set(variantKey, PersistentDataType.STRING, variant.variantId)
         item.itemMeta = meta
         return item

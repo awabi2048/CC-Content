@@ -7,6 +7,7 @@ import io.papermc.paper.datacomponent.item.FoodProperties
 import io.papermc.paper.datacomponent.item.consumable.ItemUseAnimation
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.items.ContentItemModels
 import jp.awabi2048.cccontent.persistence.ContentPdcKeys
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
@@ -60,7 +61,7 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
             }
             register(ResultItem(UnifiedCookingResult(
                 "cooking.${definition.id}", Material.POISONOUS_POTATO,
-                NamespacedKey("kota_server", "custom_item/cooking/${definition.id}"), null, null,
+                null, null,
                 nutrition, saturation, false, emptyList(), 16, definition.outputAmount
             )))
         }
@@ -106,7 +107,7 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
 
     private class ToolItem(id: String, private val durability: Int) : BaseCookingItem(id) {
         override val canStack = false
-        override val itemModel = NamespacedKey("kota_server", "custom_item/cooking/$id")
+        override val itemModel = ContentItemModels.cooking(id)
         override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
         override fun createItemForPlayer(player: Player?, amount: Int): ItemStack =
             ItemStack(Material.POISONOUS_POTATO).also { item ->
@@ -120,7 +121,7 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
     private class SeaWaterBucketItem : BaseCookingItem("sea_water_bucket") {
         override val canStack = false
         override val canPlace = true
-        override val itemModel = NamespacedKey("minecraft", "water_bucket")
+        override val itemModel = ContentItemModels.cooking("sea_water_bucket")
 
         override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
@@ -131,7 +132,7 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
     }
 
     private class LiquidBottleItem(fullId: String) : BaseCookingItem(fullId.removePrefix("cooking.")) {
-        override val itemModel = NamespacedKey("minecraft", "potion")
+        override val itemModel = ContentItemModels.cooking(id)
 
         override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
 
@@ -147,7 +148,7 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
     }
 
     private class IntermediateItem(fullId: String, private val maximumStack: Int = 64) : BaseCookingItem(fullId.removePrefix("cooking.")) {
-        override val itemModel = NamespacedKey("kota_server", "custom_item/cooking/$id")
+        override val itemModel = ContentItemModels.cooking(id)
         override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
         override fun createItemForPlayer(player: Player?, amount: Int): ItemStack =
             ItemStack(Material.POISONOUS_POTATO, amount.coerceAtLeast(1)).also { item ->
@@ -162,7 +163,7 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
 
     private class ResultItem(private val result: UnifiedCookingResult) :
         BaseCookingItem(result.customItemId.removePrefix("cooking.")) {
-        override val itemModel: NamespacedKey = result.itemModel
+        override val itemModel: NamespacedKey = ContentItemModels.cooking(result.customItemId.removePrefix("cooking."))
         override val keepConsumableComponent: Boolean = result.nutrition > 0 || result.alwaysEat
         override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
         override fun createItemForPlayer(player: Player?, amount: Int): ItemStack =

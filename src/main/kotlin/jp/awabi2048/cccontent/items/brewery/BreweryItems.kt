@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.items.brewery
 
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.CustomItemI18n
+import jp.awabi2048.cccontent.items.ContentItemModels
 import net.kyori.adventure.text.Component
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -18,7 +19,7 @@ class BrewerySampleFilterItem(private val plugin: JavaPlugin) : CustomItem {
         "§7蒸留時間 -15%",
         "§71蒸留ごとに耐久を1消費"
     )
-    override val itemModel: NamespacedKey = NamespacedKey.minecraft("shears")
+    override val itemModel: NamespacedKey = ContentItemModels.brewery("sample_filter")
 
     private val key = NamespacedKey(plugin, "brewery_filter_sample")
 
@@ -47,7 +48,7 @@ class BreweryCulturedYeastItem(private val plugin: JavaPlugin) : CustomItem {
     override val id: String = "cultured_yeast"
     override val displayName: String = "§a培養済み酵母"
     override val lore: List<String> = listOf("§7醸造原液を発酵させるための酵母")
-    override val itemModel: NamespacedKey = NamespacedKey("kota_server", "custom_item/brewery/cultured_yeast")
+    override val itemModel: NamespacedKey = ContentItemModels.brewery("cultured_yeast")
 
     private val key = NamespacedKey(plugin, "brewery_cultured_yeast")
 

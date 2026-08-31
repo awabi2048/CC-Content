@@ -14,6 +14,7 @@ import jp.awabi2048.cccontent.features.rank.profession.profile.BrewerSkillProfil
 import jp.awabi2048.cccontent.features.brewery.item.BreweryItemCodec
 import jp.awabi2048.cccontent.gui.GuiMenuItems
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.items.ContentItemModels
 import jp.awabi2048.cccontent.persistence.ContentPdcKeys
 import jp.awabi2048.cccontent.util.PotionEffectTypeResolver
 import net.kyori.adventure.text.Component
@@ -614,7 +615,8 @@ internal class UnifiedCookingController(
             return ItemStack(Material.POTION, amount).also { item ->
                 item.editMeta { meta ->
                     meta.displayName(Component.text(message(player ?: return@editMeta, "brewery.item.name.muddy")))
-                    meta.setItemModel(org.bukkit.NamespacedKey("kota_server", "custom_item/brewery/${id.removePrefix("brewery.")}"))
+                    val failureId = id.removePrefix("brewery.failed_")
+                    meta.setItemModel(ContentItemModels.breweryFailed(failureId))
                     meta.persistentDataContainer.set(ContentPdcKeys.customItemId, PersistentDataType.STRING, id)
                 }
             }

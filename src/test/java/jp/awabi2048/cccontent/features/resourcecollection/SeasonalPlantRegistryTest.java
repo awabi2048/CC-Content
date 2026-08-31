@@ -22,8 +22,7 @@ class SeasonalPlantRegistryTest {
         Set.of(Material.FERN),
         Set.of("minecraft:plains"),
         60,
-        100,
-        "kota_server:custom_item/resource/approved_spring_fern"
+        100
     );
 
     @Test
