@@ -1,5 +1,6 @@
 schema_version: 2
-config_version: 2
+# 環境条件を biome_keys / y 範囲から共有 resolver 参照へ移行した定義版です。
+config_version: 3
 enabled: true
 
 gathering:
