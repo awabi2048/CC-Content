@@ -150,6 +150,7 @@ internal class UnifiedCookingController(
         val clickedInventory = event.clickedInventory
         val topInventory = event.view.topInventory
         val session = stations[holder.stationKey]?.session
+        val inputWorkspaceAllowed = CookingInventoryInteractionPolicy.allowsInputWorkspace(session?.state)
 
         // プレイヤーインベントリは、料理GUIを開いたまま整理できるように通常操作を通します。
         // ただしシフト移送とダブルクリックはGUI上部へ影響するため、料理側で安全な範囲を
@@ -159,7 +160,7 @@ internal class UnifiedCookingController(
             when (event.action) {
                 InventoryAction.MOVE_TO_OTHER_INVENTORY -> {
                     event.isCancelled = true
-                    if (session == null) movePlayerItemToInput(event, holder)
+                    if (inputWorkspaceAllowed) movePlayerItemToInput(event, holder, inputWorkspaceAllowed)
                 }
                 InventoryAction.COLLECT_TO_CURSOR -> {
                     event.isCancelled = true
@@ -167,7 +168,7 @@ internal class UnifiedCookingController(
                         player,
                         event,
                         holder,
-                        includeInputSlots = session == null,
+                        includeInputSlots = inputWorkspaceAllowed,
                     )
                 }
                 else -> Unit
@@ -215,7 +216,7 @@ internal class UnifiedCookingController(
             return
         }
         if (raw in allowed) {
-            if (session != null || !CookingInventoryInteractionPolicy.allowsInputClick(event.click)) {
+            if (!inputWorkspaceAllowed || !CookingInventoryInteractionPolicy.allowsInputClick(event.click)) {
                 event.isCancelled = true
                 return
             }
@@ -223,6 +224,10 @@ internal class UnifiedCookingController(
             if (event.action == InventoryAction.COLLECT_TO_CURSOR) {
                 event.isCancelled = true
                 collectToCursor(player, event, holder, includeInputSlots = true)
+            } else {
+                // InventoryClickEvent はバニラの内容反映前に通知されるため、次tickで
+                // 実際に反映された待機材料を保存します。調理中も投入できる入力は次回バッチ用です。
+                scheduleWorkspacePersistence(player, topInventory, holder)
             }
         }
     }
@@ -230,14 +235,27 @@ internal class UnifiedCookingController(
     @EventHandler(ignoreCancelled = true)
     fun onDrag(event: InventoryDragEvent) {
         val holder = event.view.topInventory.holder as? UnifiedCookingHolder ?: return
+        val player = event.whoClicked as? Player ?: return
+        if (player.uniqueId != holder.ownerId) {
+            event.isCancelled = true
+            return
+        }
+        val session = stations[holder.stationKey]?.session
+        val inputWorkspaceAllowed = CookingInventoryInteractionPolicy.allowsInputWorkspace(session?.state)
         if (event.rawSlots.any { it in holder.liquidDisplaySlots }) {
             event.isCancelled = true
         }
         if (event.rawSlots.any { it < event.view.topInventory.size && it !in holder.inputSlots }) {
             event.isCancelled = true
         }
-        if (stations[holder.stationKey]?.session != null && event.rawSlots.any { it in holder.inputSlots }) {
+        if (!inputWorkspaceAllowed && event.rawSlots.any { it in holder.inputSlots }) {
             event.isCancelled = true
+        }
+        if (!event.isCancelled && inputWorkspaceAllowed &&
+            event.rawSlots.any { it < event.view.topInventory.size && it in holder.inputSlots }
+        ) {
+            // InventoryDragEvent も内容反映前に通知されるため、次tickで待機材料を保存します。
+            scheduleWorkspacePersistence(player, event.view.topInventory, holder)
         }
     }
 
@@ -660,7 +678,12 @@ internal class UnifiedCookingController(
      * その保護を無効化せず、料理側が把握している「現在入力可能な枠」だけを明示的に移送先へ
      * することで、入力操作とGUIアイテム保護を同時に成立させます。
      */
-    private fun movePlayerItemToInput(event: InventoryClickEvent, holder: UnifiedCookingHolder) {
+    private fun movePlayerItemToInput(
+        event: InventoryClickEvent,
+        holder: UnifiedCookingHolder,
+        inputWorkspaceAllowed: Boolean,
+    ) {
+        if (!inputWorkspaceAllowed) return
         val sourceInventory = event.clickedInventory ?: return
         val source = sourceInventory.getItem(event.slot)?.clone()?.takeUnless { it.type.isAir } ?: return
         if (CCSystem.getAPI().getGuiElementService().isGuiItem(source)) return
@@ -669,7 +692,7 @@ internal class UnifiedCookingController(
             holder.inputSlots,
             holder.liquidDisplaySlots,
             holder.outputIndices.keys,
-            processing = stations[holder.stationKey]?.session != null,
+            inputWorkspaceAllowed = inputWorkspaceAllowed,
         )
         if (targetSlots.isEmpty()) return
 
@@ -728,7 +751,9 @@ internal class UnifiedCookingController(
                 holder.inputSlots,
                 holder.liquidDisplaySlots,
                 holder.outputIndices.keys,
-                processing = stations[holder.stationKey]?.session != null,
+                inputWorkspaceAllowed = CookingInventoryInteractionPolicy.allowsInputWorkspace(
+                    stations[holder.stationKey]?.session?.state
+                ),
             )
         } else {
             emptyList()
@@ -925,11 +950,19 @@ internal class UnifiedCookingController(
         if (successful && firstCollection) {
             catalogStore.record(player.uniqueId, CatalogType.COOKING, next.recipeId, obtained = true)
         }
-        if (next.state == CookingProcessState.IDLE) stations.remove(holder.stationKey)
-        else stations[holder.stationKey] = current.copy(
-            session = next,
+        val updated = current.copy(
+            session = next.takeUnless { it.state == CookingProcessState.IDLE },
             collectorIds = if (firstCollection) current.collectorIds + collectorId else current.collectorIds
         )
+        // 処理中に次回バッチ用として投入された材料は、現行成果物をすべて回収しても残します。
+        // 液体の残量がある場合も同様に、空のセッションだけを消して設備状態を保持します。
+        if (next.state == CookingProcessState.IDLE &&
+            updated.workspaceItems.isEmpty() && updated.liquidContents.isEmpty()
+        ) {
+            stations.remove(holder.stationKey)
+        } else {
+            stations[holder.stationKey] = updated
+        }
         dirty = true
         flush()
         render(player, player.openInventory.topInventory, holder)
@@ -1163,6 +1196,12 @@ internal class UnifiedCookingController(
     }
 
     private fun cancel(player: Player, holder: UnifiedCookingHolder) {
+        // 調理中の入力欄は次回バッチ用の待機領域として利用できるため、取消しによる再描画の前に
+        // GUI上の最新内容を保存します。これを先に行わないと、取消し時の成果物描画で待機材料が
+        // 見えなくなり、閉じるまでに保存されなかった材料を失う可能性があります。
+        if (player.openInventory.topInventory.holder === holder) {
+            persistWorkspace(player.openInventory.topInventory, holder)
+        }
         val data = stations[holder.stationKey] ?: return
         val session = data.session ?: return
         if (configuration.liquidRecipes.containsKey(session.recipeId)) {
@@ -1186,7 +1225,7 @@ internal class UnifiedCookingController(
         ticks++
         stations.entries.toList().forEach { (key, data) ->
             val session = data.session ?: return@forEach
-            if (session.state !in PROCESSING_STATES) return@forEach
+            if (!CookingStationStateMachine.isProcessingState(session.state)) return@forEach
             val block = key.blockIfLoaded() ?: return@forEach
             val currentHeat = stationHeat(block, data.equipment)
             when (val step = CookingStationStateMachine.tick(session, currentHeat)) {
@@ -1198,6 +1237,9 @@ internal class UnifiedCookingController(
                     dirty = true
                 }
                 is CookingStationStep.Completed -> {
+                    // 完了描画は入力スロットへ成果物を重ねるため、直前に開いていたGUIから
+                    // 処理中の待機材料を取り込みます。待機材料は現行バッチへ混ぜません。
+                    val activeData = captureWorkspaceBeforeSessionTransition(key, data)
                     val liquidRecipe = configuration.liquidRecipes[session.recipeId]
                     val finished = if (liquidRecipe != null) {
                         updateLiquidProcessingLevel(block, liquidRecipe, step.session)
@@ -1206,26 +1248,26 @@ internal class UnifiedCookingController(
                         CookingStationStateMachine.finishLiquid(step.session, liquidRecipe)
                     } else {
                         val definition = configuration.recipes[session.recipeId]?.definition
-                            ?: snapshotDefinition(data.equipment, step.session)
+                            ?: snapshotDefinition(activeData.equipment, step.session)
                         CookingStationStateMachine.finish(step.session, definition)
                     }
                     val successful = !finished.failureCommitted && finished.recipeSnapshot.experience > 0
                     val starter = UUID.fromString(finished.starterId)
-                    if (successful && !data.experienceAwarded) {
+                    if (successful && !activeData.experienceAwarded) {
                         rankManagerProvider()?.addProfessionExp(starter, finished.recipeSnapshot.experience)
                     }
-                    if (successful && !data.starterCatalogAwarded) {
+                    if (successful && !activeData.starterCatalogAwarded) {
                         catalogStore.record(starter, CatalogType.COOKING, finished.recipeId, obtained = false)
                     }
-                    stations[key] = data.copy(
+                    stations[key] = activeData.copy(
                         session = finished,
                         liquidContents = if (liquidRecipe != null) {
                             CookingLiquidContents.of(liquidRecipe.residualLiquids).amounts
                         } else {
-                            data.liquidContents
+                            activeData.liquidContents
                         },
-                        experienceAwarded = data.experienceAwarded || successful,
-                        starterCatalogAwarded = data.starterCatalogAwarded || successful
+                        experienceAwarded = activeData.experienceAwarded || successful,
+                        starterCatalogAwarded = activeData.starterCatalogAwarded || successful
                     )
                     dirty = true
                     flush()
@@ -1259,14 +1301,44 @@ internal class UnifiedCookingController(
             session.recipeSnapshot.experience, session.recipeSnapshot.resultKind
         )
 
+    /**
+     * 処理完了直前の表示更新で上書きされる前に、開いているGUIの待機材料を状態へ取り込みます。
+     * 通常のクリック後保存は次tickに行うため、同じtickで完了した場合にも材料を失わないための
+     * 境界処理です。
+     */
+    private fun captureWorkspaceBeforeSessionTransition(
+        key: CookingStationKey,
+        fallback: PersistedCookingStation,
+    ): PersistedCookingStation {
+        val player = locks[key]?.let(Bukkit::getPlayer) ?: return fallback
+        val inventory = player.openInventory.topInventory
+        val holder = inventory.holder as? UnifiedCookingHolder ?: return fallback
+        if (holder.stationKey != key || holder.ownerId != player.uniqueId) return fallback
+        persistWorkspace(inventory, holder)
+        return stations[key] ?: fallback
+    }
+
+    /** バニラのInventory変更後に待機材料を設備状態へ反映します。 */
+    private fun scheduleWorkspacePersistence(
+        player: Player,
+        inventory: Inventory,
+        holder: UnifiedCookingHolder,
+    ) {
+        Bukkit.getScheduler().runTask(plugin, Runnable {
+            if (!player.isOnline || player.openInventory.topInventory !== inventory) return@Runnable
+            if (inventory.holder !== holder) return@Runnable
+            persistWorkspace(inventory, holder)
+        })
+    }
+
     private fun persistWorkspace(inventory: Inventory, holder: UnifiedCookingHolder) {
-        if (stations[holder.stationKey]?.session != null) return
         val current = stations[holder.stationKey]
+        if (!CookingInventoryInteractionPolicy.allowsInputWorkspace(current?.session?.state)) return
         val items = holder.inputSlots.mapNotNull { slot ->
             inventory.getItem(slot)?.takeIf(::realItem)?.let { slot to encode(it) }
         }.toMap()
         if (items.isEmpty()) {
-            if (current?.liquidContents?.isNotEmpty() == true) {
+            if (current?.session != null || current?.liquidContents?.isNotEmpty() == true) {
                 stations[holder.stationKey] = current.copy(workspaceItems = emptyMap())
             } else {
                 stations.remove(holder.stationKey)
@@ -1287,7 +1359,7 @@ internal class UnifiedCookingController(
         data.session?.outputStacks?.forEach { output -> block.world.dropItemNaturally(block.location, outputItem(output, null)) }
         // READY_LIQUID の残液は session.reservoir が所有するため二重に出さず、
         // 釜へ投入済みの処理中液体と、未処理の待機液体だけを容器へ戻します。
-        if (data.session == null || data.session.state in PROCESSING_STATES) {
+        if (data.session == null || CookingStationStateMachine.isProcessingState(data.session.state)) {
             dropLogicalLiquidContents(block, data.liquidContents)
         }
         data.session?.reservoir?.let { reservoir ->
@@ -1413,10 +1485,6 @@ internal class UnifiedCookingController(
             Material.BARRIER, Material.LIME_CONCRETE, Material.RED_CONCRETE,
             Material.BOOK, Material.CLOCK, Material.GRAY_DYE, Material.LIGHT_BLUE_DYE,
             Material.YELLOW_DYE, Material.LIME_DYE, Material.RED_DYE
-        )
-        private val PROCESSING_STATES = setOf(
-            CookingProcessState.PROCESSING_NORMAL, CookingProcessState.PROCESSING_FAILURE,
-            CookingProcessState.PAUSED_NO_HEAT, CookingProcessState.PAUSED_WRONG_HEAT
         )
     }
 }

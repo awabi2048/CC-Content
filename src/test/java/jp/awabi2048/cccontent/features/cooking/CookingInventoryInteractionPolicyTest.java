@@ -23,17 +23,26 @@ class CookingInventoryInteractionPolicyTest {
     }
 
     @Test
-    void シフト移送はアイドル中の通常入力スロットだけへ限定する() {
+    void 入力ワークスペースはアイドル中と処理中に利用できる() {
+        assertTrue(CookingInventoryInteractionPolicy.INSTANCE.allowsInputWorkspace(null));
+        assertTrue(CookingInventoryInteractionPolicy.INSTANCE.allowsInputWorkspace(CookingProcessState.PROCESSING_NORMAL));
+        assertTrue(CookingInventoryInteractionPolicy.INSTANCE.allowsInputWorkspace(CookingProcessState.PAUSED_WRONG_HEAT));
+        assertFalse(CookingInventoryInteractionPolicy.INSTANCE.allowsInputWorkspace(CookingProcessState.READY_ITEM));
+        assertFalse(CookingInventoryInteractionPolicy.INSTANCE.allowsInputWorkspace(CookingProcessState.READY_LIQUID));
+    }
+
+    @Test
+    void シフト移送は利用可能な通常入力スロットだけへ限定する() {
         assertEquals(
             List.of(20, 22),
             CookingInventoryInteractionPolicy.INSTANCE.transferableInputSlots(
-                List.of(20, 21, 22), Set.of(21), Set.of(), false
+                List.of(20, 21, 22), Set.of(21), Set.of(), true
             )
         );
         assertEquals(
             List.of(),
             CookingInventoryInteractionPolicy.INSTANCE.transferableInputSlots(
-                List.of(20, 21, 22), Set.of(), Set.of(), true
+                List.of(20, 21, 22), Set.of(), Set.of(), false
             )
         );
     }

@@ -7,6 +7,7 @@ import java.io.File
 internal data class PersistedCookingStation(
     val equipment: CookingStation,
     val session: CookingStationSession? = null,
+    // 処理中にも次回バッチ用の待機材料を保持できる。現行バッチはsession.originalInputsが所有する。
     val workspaceItems: Map<Int, String> = emptyMap(),
     val experienceAwarded: Boolean = false,
     val starterCatalogAwarded: Boolean = false,

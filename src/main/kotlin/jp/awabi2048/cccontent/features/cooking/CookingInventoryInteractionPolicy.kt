@@ -21,16 +21,26 @@ internal object CookingInventoryInteractionPolicy {
     fun allowsInputClick(click: ClickType): Boolean = click !in NON_INTERACTIVE_INPUT_CLICKS
 
     /**
+     * 入力領域を次回調理用のワークスペースとして利用できる状態かを返します。
+     *
+     * 処理中に投入されたアイテムは実行中のバッチへ後から混入させず、次回調理の待機材料として
+     * 保存します。完成物を表示している状態では、同じ5枠が成果物表示と重なるため編集できません。
+     */
+    fun allowsInputWorkspace(state: CookingProcessState?): Boolean =
+        state == null || CookingStationStateMachine.isProcessingState(state)
+
+    /**
      * プレイヤーインベントリからのシフト移送先を返します。
-     * 処理中は入力をロックし、液体表示・成果物として管理している枠は移送先から除外します。
+     * 処理中は次回調理用ワークスペースとしても利用でき、液体表示・成果物として管理している枠は
+     * 移送先から除外します。
      */
     fun transferableInputSlots(
         inputSlots: Collection<Int>,
         liquidDisplaySlots: Collection<Int>,
         outputSlots: Collection<Int>,
-        processing: Boolean,
+        inputWorkspaceAllowed: Boolean,
     ): List<Int> {
-        if (processing) return emptyList()
+        if (!inputWorkspaceAllowed) return emptyList()
         val excluded = liquidDisplaySlots.toSet() + outputSlots
         return inputSlots.filter { it >= 0 && it !in excluded }.distinct()
     }

@@ -109,6 +109,10 @@ sealed interface CookingStationStep {
 }
 
 object CookingStationStateMachine {
+    /** 処理中および熱源待ちで、現行バッチがまだ完了していない状態かを返します。 */
+    @JvmStatic
+    fun isProcessingState(state: CookingProcessState): Boolean = state in processingStates
+
     /**
      * 液体回収の可否を、GUI表示と実操作から同じ条件で参照します。
      * READY_LIQUIDは調理完了後の残留液体であり、処理中の状態には含めません。
