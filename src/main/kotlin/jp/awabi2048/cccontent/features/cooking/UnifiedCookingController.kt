@@ -102,7 +102,9 @@ internal class UnifiedCookingController(
     /** 海水バケツは通常の水入りバケツとして使えるため、採取結果だけを差し替えます。 */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     fun onSeaWaterBucketFill(event: PlayerBucketFillEvent) {
-        if (event.getBucket() != Material.WATER_BUCKET) return
+        // PlayerBucketFillEvent の getBucket() は、取得前に持っていた空バケツです。
+        // WATER_BUCKET は取得後の itemStack 側の種類であり、ここでは比較しません。
+        if (event.getBucket() != Material.BUCKET) return
         val source = event.getBlockClicked()
         if (!surfaceWaterRegionAnalyzer.hasMinimumSurfaceWater(source)) return
         val seaWaterBucket = CustomItemManager.createItem(CookingLiquidIds.SEA_WATER_BUCKET) ?: return
