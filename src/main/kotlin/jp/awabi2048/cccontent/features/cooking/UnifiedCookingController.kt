@@ -125,9 +125,10 @@ internal class UnifiedCookingController(
         if (contents.isEmpty()) return
         // 最後の水を汲み切った場合、newState は通常の CAULDRON になり
         // Levelled ではありません。その場合も保存済みの通常水を消します。
-        val level = (event.newState.blockData as? Levelled)?.level ?: 0
-        stations[key] = if (level <= 0) data.copy(liquidContents = emptyMap()) else
-            data.copy(liquidContents = mapOf(CookingLiquidIds.WATER to level))
+        val physicalLevel = (event.newState.blockData as? Levelled)?.level ?: 0
+        val logicalUnits = CookingLiquidVolume.fromVanillaLevel(physicalLevel)
+        stations[key] = if (logicalUnits <= 0) data.copy(liquidContents = emptyMap()) else
+            data.copy(liquidContents = mapOf(CookingLiquidIds.WATER to logicalUnits))
         dirty = true
     }
 
@@ -257,7 +258,11 @@ internal class UnifiedCookingController(
         val item = event.item ?: return false
         val customId = CustomItemManager.identify(item)?.fullId ?: return false
         val input = when (customId) {
-            CookingLiquidIds.SEA_WATER_BUCKET -> CookingLiquidInput(CookingLiquidIds.SEA_WATER, 3, Material.BUCKET)
+            CookingLiquidIds.SEA_WATER_BUCKET -> CookingLiquidInput(
+                CookingLiquidIds.SEA_WATER,
+                CookingLiquidVolume.UNITS_PER_CAULDRON,
+                Material.BUCKET
+            )
             CookingLiquidIds.SOY_MILK_BOTTLE -> CookingLiquidInput(CookingLiquidIds.SOY_MILK, 1, Material.GLASS_BOTTLE)
             CookingLiquidIds.NIGARI_BOTTLE -> CookingLiquidInput(CookingLiquidIds.BITTERN, 1, Material.GLASS_BOTTLE)
             else -> return false
@@ -311,7 +316,7 @@ internal class UnifiedCookingController(
         }
         val level = waterLevel(block)
         return if (block.type == Material.WATER_CAULDRON && level > 0) {
-            CookingLiquidContents.of(mapOf(CookingLiquidIds.WATER to level))
+            CookingLiquidContents.of(mapOf(CookingLiquidIds.WATER to CookingLiquidVolume.fromVanillaLevel(level)))
         } else {
             CookingLiquidContents.empty()
         }
@@ -323,10 +328,11 @@ internal class UnifiedCookingController(
             return
         }
         if (block.type != Material.WATER_CAULDRON) block.type = Material.WATER_CAULDRON
-        setCauldronLevel(block, contents.total)
+        setCauldronPhysicalLevel(block, CookingLiquidVolume.toVanillaLevel(contents.total))
     }
 
-    private fun setCauldronLevel(block: Block, level: Int) {
+    /** processing_levels専用の物理水位設定です。論理単位からの変換は呼び出し側で行います。 */
+    private fun setCauldronPhysicalLevel(block: Block, level: Int) {
         if (level <= 0) {
             block.type = Material.CAULDRON
             return
@@ -536,16 +542,33 @@ internal class UnifiedCookingController(
             player.sendMessage(message(player, "cooking.error.container_required"))
             return
         }
+        val recipe = configuration.liquidRecipes[session.recipeId]
+        val collectSolidResultWithLiquid = recipe?.collectSolidResultWithLiquid == true
         val result = CustomItemManager.createItemForPlayer(reservoir.customItemId, player, 1) ?: return
-        if (cursor.amount == 1) {
+        val cursorAmount = cursor.amount
+        val bundledResults = if (collectSolidResultWithLiquid) {
+            session.outputStacks.map { outputItem(it, player) }
+        } else {
+            emptyList()
+        }
+        // 空瓶が複数ある場合だけ液体成果物もインベントリへ送るため、
+        // 同梱する固形成果物と合わせて事前に収納可能性を検証します。
+        val inventoryItems = bundledResults + if (cursorAmount > 1) listOf(result) else emptyList()
+        val inventoryPlan = inventoryInsertionPlan(player, inventoryItems) ?: run {
+            player.sendMessage(message(player, "cooking.error.inventory_full"))
+            return
+        }
+        val next = CookingStationStateMachine.collectLiquid(session, collectSolidResultWithLiquid) ?: return
+        if (cursorAmount == 1) {
             player.setItemOnCursor(result)
         } else {
-            if (!canFit(player, result)) return
-            player.inventory.addItem(result)
+            player.inventory.setStorageContents(inventoryPlan)
             cursor.amount -= 1
             player.setItemOnCursor(cursor)
         }
-        val next = CookingStationStateMachine.collectLiquid(session) ?: return
+        if (cursorAmount == 1 && bundledResults.isNotEmpty()) {
+            player.inventory.setStorageContents(inventoryPlan)
+        }
         consumeNewWater(holder, session, next)
         consumeLiquidContents(holder, session)
         updateAfterCollection(holder, next, player)
@@ -625,12 +648,36 @@ internal class UnifiedCookingController(
     }
 
     private fun canFit(player: Player, item: ItemStack): Boolean {
-        var remaining = item.amount
-        player.inventory.storageContents.forEach { existing ->
-            if (existing == null || existing.type.isAir) remaining -= item.maxStackSize
-            else if (existing.isSimilar(item)) remaining -= existing.maxStackSize - existing.amount
+        return inventoryInsertionPlan(player, listOf(item)) != null
+    }
+
+    /** 複数成果物を一度に収納できるか、実際のインベントリを変更せずに計画します。 */
+    private fun inventoryInsertionPlan(player: Player, items: List<ItemStack>): Array<ItemStack?>? {
+        val simulated = player.inventory.storageContents.map { it?.clone() }.toMutableList()
+        items.forEach { item ->
+            var remaining = item.amount
+            for (index in simulated.indices) {
+                val existing = simulated[index] ?: continue
+                if (existing.type.isAir || !existing.isSimilar(item)) continue
+                val capacity = (existing.maxStackSize - existing.amount).coerceAtLeast(0)
+                val inserted = minOf(remaining, capacity)
+                existing.amount += inserted
+                remaining -= inserted
+                if (remaining == 0) break
+            }
+            if (remaining > 0) {
+                for (index in simulated.indices) {
+                    val existing = simulated[index]
+                    if (existing != null && !existing.type.isAir) continue
+                    val inserted = minOf(remaining, item.maxStackSize)
+                    simulated[index] = item.clone().also { it.amount = inserted }
+                    remaining -= inserted
+                    if (remaining == 0) break
+                }
+            }
+            if (remaining > 0) return null
         }
-        return remaining <= 0
+        return simulated.toTypedArray()
     }
 
     private fun startCutting(player: Player, inventory: Inventory, holder: UnifiedCookingHolder) {
@@ -870,7 +917,7 @@ internal class UnifiedCookingController(
         val stage = ((elapsed * recipe.processingLevels.size) / session.totalTicks)
             .toInt()
             .coerceIn(0, recipe.processingLevels.lastIndex)
-        setCauldronLevel(block, recipe.processingLevels[stage])
+        setCauldronPhysicalLevel(block, recipe.processingLevels[stage])
     }
 
     private fun snapshotDefinition(equipment: CookingStation, session: CookingStationSession): CookingRecipeDefinition =
@@ -929,7 +976,8 @@ internal class UnifiedCookingController(
                 else -> return@forEach
             }
             val containerCount = if (liquidId == CookingLiquidIds.SEA_WATER) {
-                (amount + 2) / 3
+                (amount + CookingLiquidVolume.UNITS_PER_CAULDRON - 1) /
+                    CookingLiquidVolume.UNITS_PER_CAULDRON
             } else {
                 amount
             }

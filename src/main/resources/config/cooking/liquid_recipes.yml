@@ -6,7 +6,7 @@ recipes:
   sea_salt:
     equipment: CAULDRON
     heat: NORMAL
-    liquid_inputs: { sea_water: 3 }
+    liquid_inputs: { sea_water: 5 }
     duration_seconds: 60
     exp: 0
     processing_levels: [3, 2, 1]
@@ -16,6 +16,7 @@ recipes:
       max_stack_size: 64
       amount_per_scale: 1
     residual_liquids: { bittern: 1 }
+    collect_result_with_liquid: true
     liquid_outputs:
       bittern:
         custom_item_id: cooking.nigari_bottle

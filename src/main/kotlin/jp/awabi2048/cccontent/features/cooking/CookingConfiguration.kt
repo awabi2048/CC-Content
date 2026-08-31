@@ -87,7 +87,9 @@ data class UnifiedLiquidCookingRecipe(
     val result: UnifiedCookingResult,
     val residualLiquids: Map<String, Int>,
     val liquidOutputs: Map<String, UnifiedLiquidOutput>,
-    val processingLevels: List<Int> = emptyList()
+    val processingLevels: List<Int> = emptyList(),
+    /** trueの場合、液体を最初に1容器回収する操作へ固形成果物も同梱します。 */
+    val collectSolidResultWithLiquid: Boolean = false
 ) {
     val stationRecipe: CookingRecipeDefinition
         get() = CookingRecipeDefinition(
@@ -324,6 +326,10 @@ object UnifiedCookingConfigurationLoader {
             require(residual.values.sum() <= CookingLiquidContents.MAX_CAPACITY) {
                 "${file.path}.recipes.$rawId.residual_liquids exceeds cauldron capacity"
             }
+            val collectSolidResultWithLiquid = raw.getBoolean("collect_result_with_liquid", false)
+            require(!collectSolidResultWithLiquid || residual.values.sum() == 1) {
+                "${file.path}.recipes.$rawId.collect_result_with_liquid requires exactly one residual unit"
+            }
             val outputSection = raw.getConfigurationSection("liquid_outputs")
             val outputs = outputSection?.getKeys(false)?.associateWith { liquidId ->
                 require(liquidId in residual) {
@@ -346,7 +352,8 @@ object UnifiedCookingConfigurationLoader {
             require(levels.isEmpty() || levels.size == 3) {
                 "${file.path}.recipes.$rawId.processing_levels must contain exactly three levels"
             }
-            require(levels.all { it in 1..CookingLiquidContents.MAX_CAPACITY }) {
+            // processing_levelsはメニュー量ではなく、バニラ釜の視覚演出用の物理水位です。
+            require(levels.all { it in 1..CookingLiquidVolume.VANILLA_CAULDRON_LEVELS }) {
                 "${file.path}.recipes.$rawId.processing_levels contains an invalid level"
             }
             id to UnifiedLiquidCookingRecipe(
@@ -358,7 +365,8 @@ object UnifiedCookingConfigurationLoader {
                 result,
                 residual,
                 outputs,
-                levels
+                levels,
+                collectSolidResultWithLiquid
             )
         }.also { require(it.isNotEmpty()) { "${file.path}.recipes must not be empty" } }
     }

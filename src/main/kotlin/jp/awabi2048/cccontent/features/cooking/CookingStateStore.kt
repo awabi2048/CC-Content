@@ -36,17 +36,22 @@ internal class CookingStateStore(private val file: File) {
     fun load(): MutableMap<CookingStationKey, PersistedCookingStation> {
         if (!file.exists()) return mutableMapOf()
         val root = YamlConfiguration.loadConfiguration(file)
-        if ((root.get("schema_version") as? Number)?.toInt() != CURRENT_SCHEMA_VERSION) {
+        val schemaVersion = (root.get("schema_version") as? Number)?.toInt()
+        val stations = root.getConfigurationSection("stations")
+        if (stations == null || schemaVersion !in SUPPORTED_SCHEMA_VERSIONS) {
             save(emptyMap())
             return mutableMapOf()
         }
-        val stations = root.getConfigurationSection("stations") ?: return mutableMapOf()
-        return stations.getKeys(false).associate { pathKey ->
+
+        val migrated = schemaVersion == LEGACY_VOLUME_SCHEMA_VERSION
+        val loaded = stations.getKeys(false).associate { pathKey ->
             val section = section(stations, pathKey)
             val key = CookingStationKey.deserialize(string(section, "station"))
                 ?: error("${file.path}.stations.$pathKey.station is invalid")
-            key to loadStation(section)
+            key to loadStation(section, migrated)
         }.toMutableMap()
+        if (migrated) save(loaded)
+        return loaded
     }
 
     fun save(stations: Map<CookingStationKey, PersistedCookingStation>) {
@@ -129,12 +134,17 @@ internal class CookingStateStore(private val file: File) {
         target.set("prepared_quality", snapshot.preparedQuality)
     }
 
-    private fun loadStation(section: ConfigurationSection): PersistedCookingStation {
+    private fun loadStation(section: ConfigurationSection, migrateLegacyVolume: Boolean): PersistedCookingStation {
         val equipment = enum<CookingStation>(section, "equipment")
         val liquidSection = section.getConfigurationSection("liquid_contents")
-        val liquidContents = liquidSection?.getKeys(false)?.associateWith { id ->
+        val storedLiquidContents = liquidSection?.getKeys(false)?.associateWith { id ->
             integer(liquidSection, id)
         }.orEmpty()
+        val liquidContents = if (migrateLegacyVolume) {
+            migrateLegacyLiquidContents(storedLiquidContents)
+        } else {
+            storedLiquidContents
+        }
         val workspace = section.getMapList("workspace_items").associate { raw ->
             mapInt(raw, "slot") to mapString(raw, "serialized_item")
         }
@@ -209,7 +219,19 @@ internal class CookingStateStore(private val file: File) {
     private fun mapBoolean(map: Map<*, *>, key: String): Boolean =
         map[key] as? Boolean ?: error("${file.path} map.$key must be a boolean")
 
+    /** schema 3では海水の満量と通常水位を3段階値で保存していたため、起動時に一度だけ移行します。 */
+    private fun migrateLegacyLiquidContents(amounts: Map<String, Int>): Map<String, Int> = amounts.mapValues { (id, amount) ->
+        when {
+            id == CookingLiquidIds.SEA_WATER && amount == 3 -> CookingLiquidVolume.UNITS_PER_CAULDRON
+            id == CookingLiquidIds.WATER && amount in 1..CookingLiquidVolume.VANILLA_CAULDRON_LEVELS ->
+                CookingLiquidVolume.fromVanillaLevel(amount)
+            else -> amount
+        }
+    }
+
     private companion object {
-        const val CURRENT_SCHEMA_VERSION = 3
+        const val LEGACY_VOLUME_SCHEMA_VERSION = 3
+        const val CURRENT_SCHEMA_VERSION = 4
+        val SUPPORTED_SCHEMA_VERSIONS = setOf(LEGACY_VOLUME_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION)
     }
 }

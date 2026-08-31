@@ -25,9 +25,10 @@ class CookingLiquidRecipeTest {
         assertNotNull(tofu);
         assertEquals(CookingHeat.NORMAL, salt.getHeat());
         assertEquals(60, salt.getDurationSeconds());
-        assertEquals(Map.of("sea_water", 3), salt.getLiquidInputs());
+        assertEquals(Map.of("sea_water", 5), salt.getLiquidInputs());
         assertEquals(Map.of("bittern", 1), salt.getResidualLiquids());
         assertEquals(Material.GRAY_STAINED_GLASS_PANE.name(), salt.getSnapshot().getLiquidPaneMaterial());
+        assertTrue(salt.getCollectSolidResultWithLiquid());
         assertEquals(30, tofu.getDurationSeconds());
         assertEquals(Map.of("soy_milk", 1, "bittern", 1), tofu.getLiquidInputs());
         assertEquals(4, tofu.getResult().getAmountPerScale());
@@ -70,5 +71,10 @@ class CookingLiquidRecipeTest {
         assertEquals(1, finished.getReservoir().getRemaining());
         assertEquals("cooking.nigari_bottle", finished.getReservoir().getCustomItemId());
         assertEquals(Material.GLASS_BOTTLE.name(), finished.getReservoir().getContainerMaterial());
+
+        var collected = CookingStationStateMachine.INSTANCE.collectLiquid(finished, true);
+        assertNotNull(collected);
+        assertEquals(CookingProcessState.IDLE, collected.getState());
+        assertTrue(collected.getOutputStacks().isEmpty());
     }
 }

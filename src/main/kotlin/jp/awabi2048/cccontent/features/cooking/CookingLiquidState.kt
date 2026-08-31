@@ -1,5 +1,7 @@
 package jp.awabi2048.cccontent.features.cooking
 
+import kotlin.math.roundToInt
+
 /** 釜へ投入できる液体の論理IDです。物理ブロックの水位とは分離して保存します。 */
 object CookingLiquidIds {
     const val WATER = "water"
@@ -10,6 +12,44 @@ object CookingLiquidIds {
     const val SEA_WATER_BUCKET = "cooking.sea_water_bucket"
     const val SOY_MILK_BOTTLE = "cooking.soy_milk_bottle"
     const val NIGARI_BOTTLE = "cooking.nigari_bottle"
+}
+
+/**
+ * 液体量の正準単位です。
+ *
+ * 釜の状態とメニュー表示は5単位を満容量とし、1単位を200mBとして扱います。
+ * バニラ釜の水位は3段階しかないため、そこへの反映だけは別の視覚変換を通します。
+ */
+object CookingLiquidVolume {
+    const val UNITS_PER_CAULDRON = 5
+    const val MILLIBUCKETS_PER_UNIT = 200
+    const val CAULDRON_CAPACITY_MILLIBUCKETS = UNITS_PER_CAULDRON * MILLIBUCKETS_PER_UNIT
+    const val VANILLA_CAULDRON_LEVELS = 3
+
+    @JvmStatic
+    fun toMillibuckets(units: Int): Int {
+        require(units in 0..UNITS_PER_CAULDRON)
+        return units * MILLIBUCKETS_PER_UNIT
+    }
+
+    /** 論理量を、プレイヤーに見えるバニラ釜の水位へ変換します。 */
+    @JvmStatic
+    fun toVanillaLevel(units: Int): Int {
+        require(units in 0..UNITS_PER_CAULDRON)
+        if (units == 0) return 0
+        return ((units * VANILLA_CAULDRON_LEVELS) + UNITS_PER_CAULDRON - 1) /
+            UNITS_PER_CAULDRON
+    }
+
+    /** 外部操作で変化したバニラ水位を、論理量へ戻します。 */
+    @JvmStatic
+    fun fromVanillaLevel(level: Int): Int {
+        require(level in 0..VANILLA_CAULDRON_LEVELS)
+        if (level == 0) return 0
+        return (level * UNITS_PER_CAULDRON.toDouble() / VANILLA_CAULDRON_LEVELS)
+            .roundToInt()
+            .coerceIn(1, UNITS_PER_CAULDRON)
+    }
 }
 
 /**
@@ -58,7 +98,7 @@ data class CookingLiquidContents(
     }
 
     companion object {
-        const val MAX_CAPACITY = 3
+        const val MAX_CAPACITY = CookingLiquidVolume.UNITS_PER_CAULDRON
 
         fun empty(): CookingLiquidContents = CookingLiquidContents(emptyMap())
 

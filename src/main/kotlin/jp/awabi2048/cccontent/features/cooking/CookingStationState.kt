@@ -66,7 +66,9 @@ data class CookingReservoir(
 ) {
     init {
         require(customItemId.isNotBlank())
-        require(maximum in 1..3)
+        // 液体レシピは5単位を使えるため、成果液の最大量も同じ正準単位で検証します。
+        // 通常の汁物は従来どおり1〜3食ですが、将来の液体レシピを物理水位へ制限しません。
+        require(maximum in 1..CookingLiquidContents.MAX_CAPACITY)
         require(remaining in 0..maximum)
         require(containerMaterial.isNotBlank())
     }
@@ -266,16 +268,25 @@ object CookingStationStateMachine {
     }
 
     @JvmStatic
-    fun collectLiquid(session: CookingStationSession): CookingStationSession? {
+    @JvmOverloads
+    fun collectLiquid(
+        session: CookingStationSession,
+        collectSolidResultWithLiquid: Boolean = false
+    ): CookingStationSession? {
         if (session.state != CookingProcessState.READY_LIQUID) return null
         val reservoir = session.reservoir ?: return null
         if (reservoir.remaining <= 0) return null
+        // 固形成果物を最初の液体容器へ同梱するレシピは、1バッチ1容器の時だけ
+        // 二重取得や未回収状態を作らずに確定できます。
+        if (collectSolidResultWithLiquid && reservoir.maximum != 1) return null
         val next = reservoir.remaining - 1
+        val outputStacks = if (collectSolidResultWithLiquid) emptyList() else session.outputStacks
         return session.copy(
             state = if (next == 0) {
-                if (session.outputStacks.isEmpty()) CookingProcessState.IDLE else CookingProcessState.READY_ITEM
+                if (outputStacks.isEmpty()) CookingProcessState.IDLE else CookingProcessState.READY_ITEM
             } else CookingProcessState.READY_LIQUID,
             reservoir = if (next == 0) null else reservoir.copy(remaining = next),
+            outputStacks = outputStacks,
             consumedWaterUnits = (session.consumedWaterUnits + if (session.reservedWaterUnits > 0) 1 else 0)
                 .coerceAtMost(session.reservedWaterUnits)
         )
