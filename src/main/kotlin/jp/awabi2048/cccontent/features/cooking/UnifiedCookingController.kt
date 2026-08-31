@@ -758,9 +758,17 @@ internal class UnifiedCookingController(
         session: CookingStationSession?,
     ) {
         val cursor = event.cursor
-        if (event.rawSlot in holder.liquidSlots && isLiquidCollectionContainer(holder, session, cursor)) {
-            if (session == null) collectInputLiquid(player, event, holder)
-            else collectLiquid(player, event, holder, session)
+        if (CookingLiquidContainers.forMaterial(cursor.type) != null) {
+            // 空瓶・空ボウル・空バケツは材料ではなく、液体回収操作としてだけ扱います。
+            // 回収可能な状態・対応容器・空き容量のいずれかを満たさない場合も、
+            // 材料スタックへ流さず、そのクリックを無操作で終えます。
+            if (event.rawSlot in holder.liquidDisplaySlots &&
+                event.rawSlot in holder.liquidSlots &&
+                isLiquidCollectionContainer(holder, session, cursor)
+            ) {
+                if (session == null) collectInputLiquid(player, event, holder)
+                else collectLiquid(player, event, holder, session)
+            }
             return
         }
 
@@ -819,6 +827,10 @@ internal class UnifiedCookingController(
      */
     private fun appendLiquidAreaItem(holder: UnifiedCookingHolder, item: ItemStack): Boolean {
         if (holder.equipment != CookingStation.CAULDRON || !realItem(item)) return false
+        // 容器は液体回収の操作対象であり、材料として保存しません。クリック・ドラッグ・
+        // シフト移送が別々の判定を持つと、経路によってだけ容器が材料化するため、共通登録点
+        // でも拒否します。
+        if (CookingLiquidContainers.forMaterial(item.type) != null) return false
         val key = holder.stationKey
         val current = synchronizeCauldronState(key)
             ?: stations[key]
