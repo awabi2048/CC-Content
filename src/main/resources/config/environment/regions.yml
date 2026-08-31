@@ -7,7 +7,7 @@ biome_groups:
   wetland: [minecraft:river, minecraft:swamp, minecraft:mangrove_swamp]
   warm_field: [minecraft:plains, minecraft:sunflower_plains, minecraft:savanna, minecraft:savanna_plateau, minecraft:windswept_savanna]
   jungle: [minecraft:jungle, minecraft:sparse_jungle, minecraft:bamboo_jungle]
-  dry_field: [minecraft:savanna, minecraft:savanna_plateau, minecraft:windswept_savanna, minecraft:wooded_badlands]
+  dry_field: [minecraft:savanna, minecraft:savanna_plateau, minecraft:windswept_savanna, minecraft:wooded_badlands, minecraft:eroded_savanna]
   forest: [minecraft:forest, minecraft:flower_forest, minecraft:birch_forest, minecraft:old_growth_birch_forest, minecraft:bamboo_jungle]
   tea_source: [minecraft:forest, minecraft:birch_forest, minecraft:old_growth_birch_forest, minecraft:taiga, minecraft:old_growth_pine_taiga, minecraft:old_growth_spruce_taiga, minecraft:bamboo_jungle]
   taiga: [minecraft:taiga, minecraft:old_growth_pine_taiga, minecraft:old_growth_spruce_taiga]

@@ -537,7 +537,7 @@ public final class ResourceConfigurationValidator {
             Map<String, Object> state = requireMap(config, "state", configFile, errors);
             if (state != null) requirePositiveInteger(state.get("flush_interval_ticks"), configFile, "state.flush_interval_ticks", errors);
         }
-        for (String name : List.of("ingredients.yml", "cutting.yml", "recipe.yml")) {
+        for (String name : List.of("ingredients.yml", "cutting.yml", "recipe.yml", "liquid_recipes.yml")) {
             Path file = configRoot.resolve("cooking/" + name);
             Map<String, Object> root = rootMap(configs, file, errors);
             if (root != null) {

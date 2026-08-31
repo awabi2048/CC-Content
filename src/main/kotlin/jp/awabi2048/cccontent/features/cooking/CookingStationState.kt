@@ -92,7 +92,8 @@ data class CookingStationSession(
         require(recipeId.isNotBlank())
         require(starterId.isNotBlank())
         require(scale in 1..5)
-        require(originalInputs.isNotEmpty())
+        // 液体レシピは投入物を釜の論理状態へ移した後に処理するため、元アイテムが空でも有効です。
+        require(originalInputs.all { it.amount > 0 })
         require(reservedWaterUnits in 0..3)
         require(totalTicks > 0)
         require(remainingTicks in 0..totalTicks)
@@ -198,6 +199,37 @@ object CookingStationStateMachine {
         }
     }
 
+    /**
+     * 液体構成を入力とする加工の完了処理です。
+     * 通常レシピの「容器入り液体」と異なり、固形成果物と釜へ残る液体を同時に確定します。
+     */
+    @JvmStatic
+    fun finishLiquid(
+        session: CookingStationSession,
+        recipe: UnifiedLiquidCookingRecipe
+    ): CookingStationSession {
+        require(session.remainingTicks == 0L)
+        require(session.recipeId == recipe.id)
+        val outputStacks = List(session.scale) {
+            CookingOutputStack(recipe.result.customItemId, recipe.result.amountPerScale, failed = false)
+        }
+        val reservoir = recipe.residualLiquids.entries.singleOrNull()?.let { (liquidId, amount) ->
+            val output = requireNotNull(recipe.liquidOutputs[liquidId])
+            CookingReservoir(
+                output.customItemId,
+                amount,
+                amount,
+                output.container.name,
+                failed = false
+            )
+        }
+        return session.copy(
+            state = if (reservoir == null) CookingProcessState.READY_ITEM else CookingProcessState.READY_LIQUID,
+            outputStacks = outputStacks,
+            reservoir = reservoir
+        )
+    }
+
     @JvmStatic
     fun cancel(session: CookingStationSession): CookingStationSession? {
         if (session.failureCommitted || session.state !in cancellableStates) return null
@@ -213,11 +245,17 @@ object CookingStationStateMachine {
 
     @JvmStatic
     fun collectSolid(session: CookingStationSession, stackIndex: Int): CookingStationSession? {
-        if (session.state != CookingProcessState.READY_ITEM && session.state != CookingProcessState.CANCELLED_RETURN) return null
+        if (session.state != CookingProcessState.READY_ITEM &&
+            session.state != CookingProcessState.READY_LIQUID &&
+            session.state != CookingProcessState.CANCELLED_RETURN) return null
         if (stackIndex !in session.outputStacks.indices) return null
         val remaining = session.outputStacks.toMutableList().also { it.removeAt(stackIndex) }
         return session.copy(
-            state = if (remaining.isEmpty()) CookingProcessState.IDLE else session.state,
+            state = when {
+                remaining.isNotEmpty() -> session.state
+                session.reservoir != null -> CookingProcessState.READY_LIQUID
+                else -> CookingProcessState.IDLE
+            },
             outputStacks = remaining,
             consumedWaterUnits = if (session.state == CookingProcessState.READY_ITEM) {
                 session.reservedWaterUnits

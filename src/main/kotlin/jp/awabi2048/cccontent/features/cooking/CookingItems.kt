@@ -31,8 +31,18 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
             "miso" to 16, "soy_sauce" to 16, "curry_roux" to 64, "butter" to 64,
             "dough" to 64, "sweet_dough" to 64, "carrot_cookie_dough" to 64, "roasted_coffee" to 64
         ).forEach { (id, stack) -> register(IntermediateItem("cooking.$id", stack)) }
+        register(SeaWaterBucketItem())
+        register(LiquidBottleItem(CookingLiquidIds.SOY_MILK_BOTTLE))
+        configuration.liquidRecipes.values
+            .flatMap { recipe -> recipe.liquidOutputs.values.map(UnifiedLiquidOutput::customItemId) }
+            .distinct()
+            .forEach { customItemId -> register(LiquidBottleItem(customItemId)) }
         configuration.recipes.values
             .flatMap { listOf(it.result, it.failureResult) }
+            .distinctBy(UnifiedCookingResult::customItemId)
+            .forEach { result -> register(ResultItem(result)) }
+        configuration.liquidRecipes.values
+            .map(UnifiedLiquidCookingRecipe::result)
             .distinctBy(UnifiedCookingResult::customItemId)
             .forEach { result -> register(ResultItem(result)) }
         CookingVanillaDefinitions.all.filter { it.experience > 0 }.forEach { definition ->
@@ -68,7 +78,7 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
 
     private abstract class BaseCookingItem(final override val id: String) : CustomItem {
         final override val feature = "cooking"
-        final override val canPlace = false
+        open override val canPlace = false
         override val displayName: String = id
 
         protected fun localizedMeta(item: ItemStack, player: Player?, maxStack: Int, model: NamespacedKey) {
@@ -104,6 +114,35 @@ class CookingItems(private val configuration: UnifiedCookingConfiguration) {
                 item.setData(DataComponentTypes.MAX_DAMAGE, durability)
                 item.unsetData(DataComponentTypes.FOOD)
                 item.unsetData(DataComponentTypes.CONSUMABLE)
+            }
+    }
+
+    private class SeaWaterBucketItem : BaseCookingItem("sea_water_bucket") {
+        override val canStack = false
+        override val canPlace = true
+        override val itemModel = NamespacedKey("minecraft", "water_bucket")
+
+        override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
+
+        override fun createItemForPlayer(player: Player?, amount: Int): ItemStack =
+            ItemStack(Material.WATER_BUCKET).also { item ->
+                localizedMeta(item, player, 1, requireNotNull(itemModel))
+            }
+    }
+
+    private class LiquidBottleItem(fullId: String) : BaseCookingItem(fullId.removePrefix("cooking.")) {
+        override val itemModel = NamespacedKey("minecraft", "potion")
+
+        override fun createItem(amount: Int): ItemStack = createItemForPlayer(null, amount)
+
+        override fun createItemForPlayer(player: Player?, amount: Int): ItemStack =
+            ItemStack(Material.POTION, amount.coerceAtLeast(1)).also { item ->
+                localizedMeta(item, player, 16, requireNotNull(itemModel))
+                item.unsetData(DataComponentTypes.FOOD)
+                item.unsetData(DataComponentTypes.CONSUMABLE)
+                item.editMeta { meta ->
+                    meta.persistentDataContainer.set(ContentPdcKeys.cookingStage, PersistentDataType.STRING, "LIQUID")
+                }
             }
     }
 

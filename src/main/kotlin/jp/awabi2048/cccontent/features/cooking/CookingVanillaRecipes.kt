@@ -30,6 +30,7 @@ internal data class VanillaCookingDefinition(
 
 internal object CookingVanillaDefinitions {
     val all = listOf(
+        craft("soy_milk_bottle", mapOf("resource.soybean" to 1, "minecraft:glass_bottle" to 1), 1),
         craft("miso", mapOf("resource.soybean" to 2, "resource.rice" to 1, "resource.rock_salt" to 1), 2),
         craft("soy_sauce", mapOf("resource.soybean" to 2, "minecraft:wheat" to 1, "resource.rock_salt" to 1, "minecraft:glass_bottle" to 1), 1),
         craft("curry_roux", mapOf("resource.spice_leaf" to 1, "minecraft:wheat" to 1, "minecraft:milk_bucket" to 1), 2),

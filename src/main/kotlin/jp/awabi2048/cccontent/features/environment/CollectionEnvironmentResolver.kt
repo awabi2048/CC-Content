@@ -316,7 +316,7 @@ class CollectionEnvironmentResolver private constructor(
                 "wetland" to minecraft("river", "swamp", "mangrove_swamp"),
                 "warm_field" to minecraft("plains", "sunflower_plains", "savanna", "savanna_plateau", "windswept_savanna"),
                 "jungle" to minecraft("jungle", "sparse_jungle", "bamboo_jungle"),
-                "dry_field" to minecraft("savanna", "savanna_plateau", "windswept_savanna", "wooded_badlands"),
+                "dry_field" to minecraft("savanna", "savanna_plateau", "windswept_savanna", "wooded_badlands", "eroded_savanna"),
                 "forest" to minecraft("forest", "flower_forest", "birch_forest", "old_growth_birch_forest", "bamboo_jungle"),
                 "tea_source" to minecraft(
                     "forest", "birch_forest", "old_growth_birch_forest", "taiga",
@@ -354,14 +354,37 @@ class CollectionEnvironmentResolver private constructor(
                     profiles[biome] = EnvironmentBiomeProfile(climate, terrain, water)
                 }
             }
+            fun assignOnly(
+                group: String,
+                acceptedBiomes: Set<String>,
+                climate: ClimateRegion,
+                terrain: TerrainRegion,
+                water: WaterRegion
+            ) {
+                groups[group].orEmpty().filter(acceptedBiomes::contains).forEach { biome ->
+                    profiles[biome] = EnvironmentBiomeProfile(climate, terrain, water)
+                }
+            }
             assign("temperate", ClimateRegion.TEMPERATE, TerrainRegion.FIELD, WaterRegion.LAND)
             assign("forest", ClimateRegion.TEMPERATE, TerrainRegion.FOREST, WaterRegion.LAND)
             assign("wetland", ClimateRegion.WET, TerrainRegion.WETLAND, WaterRegion.LAND)
             assign("jungle", ClimateRegion.TROPICAL, TerrainRegion.JUNGLE, WaterRegion.LAND)
             assign("taiga", ClimateRegion.COLD, TerrainRegion.TAIGA, WaterRegion.LAND)
-            assign("cold_field", ClimateRegion.COLD, TerrainRegion.FIELD, WaterRegion.LAND)
-            assign("dry_field", ClimateRegion.DRY, TerrainRegion.BADLANDS, WaterRegion.LAND)
-            assign("warm_field", ClimateRegion.WARM, TerrainRegion.FIELD, WaterRegion.LAND)
+            // 収集対象グループは意図的に重複するため、グループ全体をプロファイルへ
+            // 代入すると「平原」が温暖・寒冷へ上書きされます。既定プロファイルは
+            // biome_profiles の意味を保つため、気候が一意に決まる地形だけを選びます。
+            assignOnly(
+                "cold_field", setOf("minecraft:snowy_plains", "minecraft:grove"),
+                ClimateRegion.COLD, TerrainRegion.FIELD, WaterRegion.LAND
+            )
+            assignOnly(
+                "dry_field", setOf("minecraft:windswept_savanna", "minecraft:wooded_badlands", "minecraft:eroded_savanna"),
+                ClimateRegion.DRY, TerrainRegion.BADLANDS, WaterRegion.LAND
+            )
+            assignOnly(
+                "warm_field", setOf("minecraft:savanna", "minecraft:savanna_plateau"),
+                ClimateRegion.WARM, TerrainRegion.FIELD, WaterRegion.LAND
+            )
             groups["ocean_family"].orEmpty().forEach { biome ->
                 profiles[biome] = EnvironmentBiomeProfile(ClimateRegion.WET, TerrainRegion.OCEAN, WaterRegion.OCEAN)
             }

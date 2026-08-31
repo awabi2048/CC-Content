@@ -73,12 +73,67 @@ data class UnifiedCookingRecipe(
     val failureResult: UnifiedCookingResult
 )
 
+data class UnifiedLiquidOutput(
+    val liquidId: String,
+    val customItemId: String,
+    val container: Material,
+    val liquidPane: Material
+)
+
+data class UnifiedLiquidCookingRecipe(
+    val id: String,
+    val heat: CookingHeat,
+    val liquidInputs: Map<String, Int>,
+    val durationSeconds: Int,
+    val experience: Long,
+    val result: UnifiedCookingResult,
+    val residualLiquids: Map<String, Int>,
+    val liquidOutputs: Map<String, UnifiedLiquidOutput>,
+    val processingLevels: List<Int> = emptyList()
+) {
+    val stationRecipe: CookingRecipeDefinition
+        get() = CookingRecipeDefinition(
+            id,
+            CookingStation.CAULDRON,
+            "LIQUID",
+            CookingTier.BASIC,
+            heat,
+            emptyMap(),
+            0,
+            durationSeconds,
+            experience,
+            CookingResultKind.ITEM
+        )
+
+    val snapshot: CookingRecipeSnapshot
+        get() = CookingRecipeSnapshot(
+            result.customItemId,
+            result.amountPerScale,
+            result.customItemId,
+            durationSeconds,
+            heat,
+            0,
+            CookingResultKind.ITEM,
+            null,
+            residualLiquids.keys.singleOrNull()?.let { liquidOutputs[it]?.liquidPane?.name },
+            experience
+        )
+}
+
 data class UnifiedCookingConfiguration(
     val settings: UnifiedCookingSettings,
     val ingredients: Map<String, UnifiedCookingIngredient>,
     val cuttingRecipes: Map<String, CuttingRecipeDefinition>,
-    val recipes: Map<String, UnifiedCookingRecipe>
-)
+    val recipes: Map<String, UnifiedCookingRecipe>,
+    val liquidRecipes: Map<String, UnifiedLiquidCookingRecipe> = emptyMap()
+) {
+    constructor(
+        settings: UnifiedCookingSettings,
+        ingredients: Map<String, UnifiedCookingIngredient>,
+        cuttingRecipes: Map<String, CuttingRecipeDefinition>,
+        recipes: Map<String, UnifiedCookingRecipe>
+    ) : this(settings, ingredients, cuttingRecipes, recipes, emptyMap())
+}
 
 object UnifiedCookingConfigurationLoader {
     private val forbiddenRecipeFields = setOf(
@@ -92,8 +147,10 @@ object UnifiedCookingConfigurationLoader {
         val ingredients = loadIngredients(File(dataFolder, "config/cooking/ingredients.yml"))
         val cutting = loadCutting(File(dataFolder, "config/cooking/cutting.yml"), ingredients)
         val recipes = loadRecipes(File(dataFolder, "config/cooking/recipe.yml"), ingredients)
+        val liquidRecipes = loadLiquidRecipes(File(dataFolder, "config/cooking/liquid_recipes.yml"))
         validateRecipeConflicts(recipes.values.map(UnifiedCookingRecipe::definition))
-        return UnifiedCookingConfiguration(settings, ingredients, cutting, recipes)
+        validateLiquidRecipeConflicts(liquidRecipes.values)
+        return UnifiedCookingConfiguration(settings, ingredients, cutting, recipes, liquidRecipes)
     }
 
     @JvmStatic
@@ -244,6 +301,80 @@ object UnifiedCookingConfigurationLoader {
     }
 
     @JvmStatic
+    fun loadLiquidRecipes(file: File): Map<String, UnifiedLiquidCookingRecipe> {
+        val root = yaml(file)
+        requireExactInt(root, "config_version", 1, file)
+        val section = requireSection(root, "recipes", file)
+        return section.getKeys(false).associate { rawId ->
+            val raw = requireSection(section, rawId, file)
+            val id = "liquid:$rawId"
+            val inputSection = requireSection(raw, "liquid_inputs", file)
+            val inputs = inputSection.getKeys(false).associateWith { liquidId ->
+                requireStringId(liquidId, "${file.path}.recipes.$rawId.liquid_inputs")
+                requireInt(inputSection, liquidId, file).also { require(it > 0) }
+            }
+            require(inputs.isNotEmpty()) { "${file.path}.recipes.$rawId.liquid_inputs must not be empty" }
+            require(inputs.values.sum() in 1..CookingLiquidContents.MAX_CAPACITY) {
+                "${file.path}.recipes.$rawId.liquid_inputs exceeds cauldron capacity"
+            }
+            val result = loadResult(requireSection(raw, "result", file), file, false)
+            require(result.container == null) { "${file.path}.recipes.$rawId.result must be a solid item" }
+            val residual = optionalAmountMap(raw.getConfigurationSection("residual_liquids"), file, rawId)
+            require(residual.size <= 1) {
+                "${file.path}.recipes.$rawId supports at most one collectible residual liquid"
+            }
+            require(residual.values.sum() <= CookingLiquidContents.MAX_CAPACITY) {
+                "${file.path}.recipes.$rawId.residual_liquids exceeds cauldron capacity"
+            }
+            val outputSection = raw.getConfigurationSection("liquid_outputs")
+            val outputs = outputSection?.getKeys(false)?.associateWith { liquidId ->
+                require(liquidId in residual) {
+                    "${file.path}.recipes.$rawId.liquid_outputs contains a non-residual liquid: $liquidId"
+                }
+                val output = requireSection(outputSection, liquidId, file)
+                UnifiedLiquidOutput(
+                    liquidId,
+                    requireString(output, "custom_item_id", file),
+                    requireMaterial(output, "container", file),
+                    requireMaterial(output, "liquid_pane", file)
+                )
+            }.orEmpty()
+            residual.keys.forEach { liquidId ->
+                require(liquidId in outputs) {
+                    "${file.path}.recipes.$rawId is missing liquid_outputs.$liquidId"
+                }
+            }
+            val levels = raw.getIntegerList("processing_levels")
+            require(levels.isEmpty() || levels.size == 3) {
+                "${file.path}.recipes.$rawId.processing_levels must contain exactly three levels"
+            }
+            require(levels.all { it in 1..CookingLiquidContents.MAX_CAPACITY }) {
+                "${file.path}.recipes.$rawId.processing_levels contains an invalid level"
+            }
+            id to UnifiedLiquidCookingRecipe(
+                id,
+                enumValue(raw, "heat", file),
+                inputs,
+                requireInt(raw, "duration_seconds", file).also { require(it > 0) },
+                requireLong(raw, "exp", file).also { require(it >= 0) },
+                result,
+                residual,
+                outputs,
+                levels
+            )
+        }.also { require(it.isNotEmpty()) { "${file.path}.recipes must not be empty" } }
+    }
+
+    @JvmStatic
+    fun validateLiquidRecipeConflicts(recipes: Collection<UnifiedLiquidCookingRecipe>) {
+        val duplicateInputs = recipes.groupBy(UnifiedLiquidCookingRecipe::liquidInputs)
+            .filterValues { it.size > 1 }
+        require(duplicateInputs.isEmpty()) {
+            "Cooking liquid recipe conflict: ${duplicateInputs.values.flatten().map(UnifiedLiquidCookingRecipe::id)}"
+        }
+    }
+
+    @JvmStatic
     fun validateRecipeConflicts(recipes: Collection<CookingRecipeDefinition>) {
         val signatures = mutableMapOf<String, String>()
         recipes.forEach { recipe ->
@@ -283,6 +414,22 @@ object UnifiedCookingConfigurationLoader {
             section.getInt("max_stack_size", if (container == null) 16 else 1).also { require(it in 1..64) },
             section.getInt("amount_per_scale", 1).also { require(it > 0) }
         )
+    }
+
+    private fun optionalAmountMap(
+        section: ConfigurationSection?,
+        file: File,
+        recipeId: String
+    ): Map<String, Int> {
+        val actual = section ?: return emptyMap()
+        return actual.getKeys(false).associateWith { liquidId ->
+            requireStringId(liquidId, "${file.path}.recipes.$recipeId.residual_liquids")
+            requireInt(actual, liquidId, file).also { require(it > 0) }
+        }
+    }
+
+    private fun requireStringId(value: String, path: String) {
+        require(value.matches(Regex("[a-z0-9_]+"))) { "$path contains invalid liquid id: $value" }
     }
 
     private fun gcd(a: Int, b: Int): Int {

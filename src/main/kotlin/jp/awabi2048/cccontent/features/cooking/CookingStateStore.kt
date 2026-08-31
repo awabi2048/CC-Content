@@ -10,8 +10,27 @@ internal data class PersistedCookingStation(
     val workspaceItems: Map<Int, String> = emptyMap(),
     val experienceAwarded: Boolean = false,
     val starterCatalogAwarded: Boolean = false,
-    val collectorIds: Set<String> = emptySet()
-)
+    val collectorIds: Set<String> = emptySet(),
+    val liquidContents: Map<String, Int> = emptyMap()
+) {
+    /** 既存の6引数構築を維持し、液体状態を持たない保存データを自然に扱います。 */
+    constructor(
+        equipment: CookingStation,
+        session: CookingStationSession?,
+        workspaceItems: Map<Int, String>,
+        experienceAwarded: Boolean,
+        starterCatalogAwarded: Boolean,
+        collectorIds: Set<String>
+    ) : this(
+        equipment,
+        session,
+        workspaceItems,
+        experienceAwarded,
+        starterCatalogAwarded,
+        collectorIds,
+        emptyMap()
+    )
+}
 
 internal class CookingStateStore(private val file: File) {
     fun load(): MutableMap<CookingStationKey, PersistedCookingStation> {
@@ -46,6 +65,9 @@ internal class CookingStateStore(private val file: File) {
     ) {
         target.set("station", key.serialize())
         target.set("equipment", persisted.equipment.name)
+        if (persisted.liquidContents.isNotEmpty()) {
+            target.set("liquid_contents", persisted.liquidContents.toSortedMap())
+        }
         target.set("workspace_items", persisted.workspaceItems.toSortedMap().map { (slot, item) ->
             linkedMapOf("slot" to slot, "serialized_item" to item)
         })
@@ -109,11 +131,22 @@ internal class CookingStateStore(private val file: File) {
 
     private fun loadStation(section: ConfigurationSection): PersistedCookingStation {
         val equipment = enum<CookingStation>(section, "equipment")
+        val liquidSection = section.getConfigurationSection("liquid_contents")
+        val liquidContents = liquidSection?.getKeys(false)?.associateWith { id ->
+            integer(liquidSection, id)
+        }.orEmpty()
         val workspace = section.getMapList("workspace_items").associate { raw ->
             mapInt(raw, "slot") to mapString(raw, "serialized_item")
         }
         val status = enum<CookingProcessState>(section, "status")
-        if (status == CookingProcessState.IDLE) return PersistedCookingStation(equipment, null, workspace)
+        if (status == CookingProcessState.IDLE) {
+            return PersistedCookingStation(
+                equipment = equipment,
+                session = null,
+                workspaceItems = workspace,
+                liquidContents = CookingLiquidContents.of(liquidContents).amounts
+            )
+        }
         val snapshot = loadSnapshot(section(section, "recipe_snapshot"))
         val inputs = section.getMapList("original_inputs").map { raw ->
             CookingStoredInput(
@@ -145,7 +178,8 @@ internal class CookingStateStore(private val file: File) {
         return PersistedCookingStation(
             equipment, session, workspace,
             boolean(section, "experience_awarded"), boolean(section, "starter_catalog_awarded"),
-            section.getStringList("collector_uuids").toSet()
+            section.getStringList("collector_uuids").toSet(),
+            CookingLiquidContents.of(liquidContents).amounts
         )
     }
 

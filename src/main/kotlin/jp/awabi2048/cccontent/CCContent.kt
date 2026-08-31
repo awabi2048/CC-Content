@@ -1260,8 +1260,10 @@ class CCContent : JavaPlugin(), Listener {
             } ?: error("Missing bundled config: $resourcePath")
             val currentVersion = bundled.getInt("config_version", 1)
             val bundledDefinitionPaths = setOf(
+                "config/environment/regions.yml",
                 "config/resource_collection/seasonal_plants.yml",
-                "config/resource_collection/forest_products.yml"
+                "config/resource_collection/forest_products.yml",
+                "config/cooking/liquid_recipes.yml"
             )
             val classification = if (resourcePath in bundledDefinitionPaths || bundledMarkers.any(resourcePath::contains)) {
                 ConfigClassification.BUNDLED_DEFINITION

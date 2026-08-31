@@ -18,6 +18,10 @@ class CollectionEnvironmentResolverTest {
         assertEquals(ClimateRegion.TEMPERATE, conditions.getClimate());
         assertTrue(resolver.isInBiomeGroup("minecraft:flower_forest", "temperate"));
         assertTrue(conditions.hasVerticalRegion("wild_gathering"));
+        assertEquals(
+            ClimateRegion.TEMPERATE,
+            resolver.conditions("minecraft:plains", World.Environment.NORMAL, 64).getClimate()
+        );
     }
 
     @Test

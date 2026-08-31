@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent.features.cooking;
 import org.junit.jupiter.api.Test;
 
 import java.util.Set;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -11,7 +12,11 @@ class CookingVanillaDefinitionsTest {
     @Test
     void containsEverySpecifiedCraftingFurnaceAndSmokerDefinition() {
         var definitions = CookingVanillaDefinitions.INSTANCE.getAll();
-        assertEquals(15, definitions.size());
+        assertEquals(16, definitions.size());
+        assertTrue(definitions.stream().anyMatch(it ->
+            it.getId().equals("soy_milk_bottle") &&
+                it.getIngredients().equals(Map.of("resource.soybean", 1, "minecraft:glass_bottle", 1))
+        ));
         assertEquals(7, definitions.stream().filter(it -> it.getExperience() > 0).count());
         assertEquals(Set.of(CookingStation.CRAFTING, CookingStation.FURNACE, CookingStation.SMOKER),
             definitions.stream().map(VanillaCookingDefinition::getStation).collect(Collectors.toSet()));

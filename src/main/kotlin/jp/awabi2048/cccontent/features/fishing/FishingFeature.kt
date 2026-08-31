@@ -13,6 +13,7 @@ import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.catalog.CatalogCondition
 import jp.awabi2048.cccontent.features.catalog.CatalogItem
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
+import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver
 import jp.awabi2048.cccontent.features.rank.RankReleasePolicy
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import jp.awabi2048.cccontent.features.rank.profession.profile.FisherSkillProfile
@@ -112,7 +113,8 @@ class FishingFeature(
             plugin,
             settings.naturalFishingGround,
             isFisher = { fisherContext(it).active },
-            random = random
+            random = random,
+            environmentResolver = CollectionEnvironmentResolver.load(plugin)
         ).also(NaturalFishingGroundService::start)
         plugin.server.pluginManager.registerEvents(this, plugin)
         searchTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable { updateSearchActionBars() }, 10L, 10L)
