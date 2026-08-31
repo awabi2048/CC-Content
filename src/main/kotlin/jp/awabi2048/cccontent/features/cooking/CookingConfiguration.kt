@@ -176,7 +176,7 @@ object UnifiedCookingConfigurationLoader {
     @JvmStatic
     fun loadIngredients(file: File): Map<String, UnifiedCookingIngredient> {
         val root = yaml(file)
-        requireExactInt(root, "config_version", 2, file)
+        requireExactInt(root, "config_version", 3, file)
         val section = requireSection(root, "ingredients", file)
         return section.getKeys(false).associateWith { id ->
             val path = "ingredients.$id"
@@ -258,7 +258,7 @@ object UnifiedCookingConfigurationLoader {
         ingredients: Map<String, UnifiedCookingIngredient>
     ): Map<String, UnifiedCookingRecipe> {
         val root = yaml(file)
-        requireExactInt(root, "config_version", 3, file)
+        requireExactInt(root, "config_version", 4, file)
         val section = requireSection(root, "recipes", file)
         return section.getKeys(false).associateWith { id ->
             val raw = requireSection(section, id, file)

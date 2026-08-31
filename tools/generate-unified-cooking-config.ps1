@@ -127,7 +127,7 @@ foreach ($row in $fishRows) {
 }
 
 $recipeBuilder = [System.Text.StringBuilder]::new()
-[void]$recipeBuilder.AppendLine('config_version: 3')
+[void]$recipeBuilder.AppendLine('config_version: 4')
 [void]$recipeBuilder.AppendLine('')
 [void]$recipeBuilder.AppendLine('recipes:')
 
@@ -197,7 +197,7 @@ foreach ($line in $lines) {
 }
 
 $ingredientsBuilder = [System.Text.StringBuilder]::new()
-[void]$ingredientsBuilder.AppendLine('config_version: 2')
+[void]$ingredientsBuilder.AppendLine('config_version: 3')
 [void]$ingredientsBuilder.AppendLine('')
 [void]$ingredientsBuilder.AppendLine('ingredients:')
 foreach ($pair in $canonicalByAlias.GetEnumerator() | Sort-Object Key) {

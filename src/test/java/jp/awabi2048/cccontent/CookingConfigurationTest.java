@@ -31,6 +31,10 @@ class CookingConfigurationTest {
         assertTrue(Files.isRegularFile(ROOT.resolve("ingredients.yml")));
         assertTrue(Files.isRegularFile(ROOT.resolve("cutting.yml")));
         assertTrue(Files.isRegularFile(ROOT.resolve("recipe.yml")));
+        assertEquals(3, YamlConfiguration.loadConfiguration(ROOT.resolve("ingredients.yml").toFile())
+            .getInt("config_version"));
+        assertEquals(4, YamlConfiguration.loadConfiguration(ROOT.resolve("recipe.yml").toFile())
+            .getInt("config_version"));
     }
 
     @Test
