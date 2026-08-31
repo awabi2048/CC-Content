@@ -38,6 +38,7 @@ import org.bukkit.event.block.Action
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.CauldronLevelChangeEvent
 import org.bukkit.event.inventory.ClickType
+import org.bukkit.event.inventory.InventoryAction
 import org.bukkit.event.inventory.InventoryClickEvent
 import org.bukkit.event.inventory.InventoryCloseEvent
 import org.bukkit.event.inventory.InventoryDragEvent
@@ -141,12 +142,40 @@ internal class UnifiedCookingController(
         val holder = event.view.topInventory.holder as? UnifiedCookingHolder ?: return
         val player = event.whoClicked as? Player ?: return
         if (player.uniqueId != holder.ownerId) { event.isCancelled = true; return }
-        if (event.click in FORBIDDEN_CLICKS || player.gameMode == GameMode.CREATIVE) {
+        // クリエイティブ操作はGUI成果物の取引契約を迂回するため、領域にかかわらず禁止します。
+        if (player.gameMode == GameMode.CREATIVE) {
             event.isCancelled = true
             return
         }
-        val raw = event.rawSlot
+        val clickedInventory = event.clickedInventory
+        val topInventory = event.view.topInventory
         val session = stations[holder.stationKey]?.session
+
+        // プレイヤーインベントリは、料理GUIを開いたまま整理できるように通常操作を通します。
+        // ただしシフト移送とダブルクリックはGUI上部へ影響するため、料理側で安全な範囲を
+        // 明示的に処理してから、CC-SystemのGUI保護へ渡します。
+        if (clickedInventory != topInventory) {
+            if (clickedInventory != event.view.bottomInventory) return
+            when (event.action) {
+                InventoryAction.MOVE_TO_OTHER_INVENTORY -> {
+                    event.isCancelled = true
+                    if (session == null) movePlayerItemToInput(event, holder)
+                }
+                InventoryAction.COLLECT_TO_CURSOR -> {
+                    event.isCancelled = true
+                    collectToCursor(
+                        player,
+                        event,
+                        holder,
+                        includeInputSlots = session == null,
+                    )
+                }
+                else -> Unit
+            }
+            return
+        }
+
+        val raw = event.rawSlot
         if (raw in holder.outputIndices && session != null) {
             event.isCancelled = true
             collectSolid(player, event, holder, raw, session)
@@ -181,8 +210,21 @@ internal class UnifiedCookingController(
             return
         }
         val allowed = holder.inputSlots
-        if (raw in 0 until event.view.topInventory.size && raw !in allowed) event.isCancelled = true
-        if (session != null && raw in allowed) event.isCancelled = true
+        if (raw in 0 until topInventory.size && raw !in allowed) {
+            event.isCancelled = true
+            return
+        }
+        if (raw in allowed) {
+            if (session != null || !CookingInventoryInteractionPolicy.allowsInputClick(event.click)) {
+                event.isCancelled = true
+                return
+            }
+            // ダブルクリックは成果物・表示専用枠を巻き込まないよう、入力とプレイヤー側だけを集めます。
+            if (event.action == InventoryAction.COLLECT_TO_CURSOR) {
+                event.isCancelled = true
+                collectToCursor(player, event, holder, includeInputSlots = true)
+            }
+        }
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -609,6 +651,117 @@ internal class UnifiedCookingController(
         return item.itemMeta?.displayName()?.let(PlainTextComponentSerializer.plainText()::serialize)
             ?.takeIf(String::isNotBlank)
             ?: customItemId
+    }
+
+    /**
+     * プレイヤー側のシフトクリックを、料理ステーションの入力スロットへ限定して実行します。
+     *
+     * CC-SystemのGUI保護は、表示専用アイテムが上部から流出する一括移送を防止しています。
+     * その保護を無効化せず、料理側が把握している「現在入力可能な枠」だけを明示的に移送先へ
+     * することで、入力操作とGUIアイテム保護を同時に成立させます。
+     */
+    private fun movePlayerItemToInput(event: InventoryClickEvent, holder: UnifiedCookingHolder) {
+        val sourceInventory = event.clickedInventory ?: return
+        val source = sourceInventory.getItem(event.slot)?.clone()?.takeUnless { it.type.isAir } ?: return
+        if (CCSystem.getAPI().getGuiElementService().isGuiItem(source)) return
+
+        val targetSlots = CookingInventoryInteractionPolicy.transferableInputSlots(
+            holder.inputSlots,
+            holder.liquidDisplaySlots,
+            holder.outputIndices.keys,
+            processing = stations[holder.stationKey]?.session != null,
+        )
+        if (targetSlots.isEmpty()) return
+
+        val top = event.view.topInventory
+        var remaining = source.amount
+        val updates = linkedMapOf<Int, ItemStack>()
+
+        // まず同種の入力スタックへ補充し、残りを空き入力枠へ配置します。
+        targetSlots.forEach { slot ->
+            if (remaining <= 0) return@forEach
+            val existing = top.getItem(slot)?.takeUnless { it.type.isAir }
+            if (existing == null || CCSystem.getAPI().getGuiElementService().isGuiItem(existing)) return@forEach
+            if (!existing.isSimilar(source)) return@forEach
+            val capacity = (existing.maxStackSize - existing.amount).coerceAtLeast(0)
+            if (capacity <= 0) return@forEach
+            val moved = minOf(remaining, capacity)
+            updates[slot] = existing.clone().also { it.amount += moved }
+            remaining -= moved
+        }
+        targetSlots.forEach { slot ->
+            if (remaining <= 0) return@forEach
+            if (updates.containsKey(slot)) return@forEach
+            val existing = top.getItem(slot)?.takeUnless { it.type.isAir }
+            if (existing != null) return@forEach
+            val moved = minOf(remaining, source.maxStackSize)
+            updates[slot] = source.clone().also { it.amount = moved }
+            remaining -= moved
+        }
+        if (updates.isEmpty()) return
+
+        source.amount = remaining
+        sourceInventory.setItem(event.slot, source.takeUnless { it.amount <= 0 })
+        updates.forEach { (slot, item) -> top.setItem(slot, item) }
+        // シフト移送直後にも設備状態を更新し、GUIを閉じずに開始しても同じ入力を参照させます。
+        persistWorkspace(top, holder)
+    }
+
+    /**
+     * ダブルクリックの一括回収を、プレイヤーインベントリと通常入力枠だけに限定します。
+     * 成果物・液体表示・その他のGUI装飾をバニラ処理に巻き込ませないための手動実装です。
+     */
+    private fun collectToCursor(
+        player: Player,
+        event: InventoryClickEvent,
+        holder: UnifiedCookingHolder,
+        includeInputSlots: Boolean,
+    ) {
+        val cursor = event.cursor.clone().takeUnless { it.type.isAir } ?: return
+        if (CCSystem.getAPI().getGuiElementService().isGuiItem(cursor)) return
+        var remainingCapacity = (cursor.maxStackSize - cursor.amount).coerceAtLeast(0)
+        if (remainingCapacity <= 0) return
+
+        val top = event.view.topInventory
+        val inputSlots = if (includeInputSlots) {
+            CookingInventoryInteractionPolicy.transferableInputSlots(
+                holder.inputSlots,
+                holder.liquidDisplaySlots,
+                holder.outputIndices.keys,
+                processing = stations[holder.stationKey]?.session != null,
+            )
+        } else {
+            emptyList()
+        }
+        var changed = false
+        var changedTop = false
+
+        fun collect(inventory: Inventory, slot: Int, fromTop: Boolean) {
+            if (remainingCapacity <= 0) return
+            val item = inventory.getItem(slot)?.takeUnless { it.type.isAir } ?: return
+            if (CCSystem.getAPI().getGuiElementService().isGuiItem(item) || !item.isSimilar(cursor)) return
+            val moved = minOf(item.amount, remainingCapacity)
+            val remaining = item.clone().also { it.amount -= moved }
+            inventory.setItem(slot, remaining.takeUnless { it.amount <= 0 })
+            cursor.amount += moved
+            remainingCapacity -= moved
+            changed = true
+            changedTop = changedTop || fromTop
+        }
+
+        inputSlots.forEach { slot -> collect(top, slot, fromTop = true) }
+        val bottom = event.view.bottomInventory
+        for (slot in 0 until bottom.size) {
+            collect(bottom, slot, fromTop = false)
+            if (remainingCapacity <= 0) break
+        }
+        if (!changed) return
+
+        player.setItemOnCursor(cursor)
+        if (changedTop) {
+            // 入力スロットを回収した場合だけ設備の永続状態も同じ操作内で更新します。
+            persistWorkspace(top, holder)
+        }
     }
 
     private fun collectSolid(
@@ -1255,10 +1408,6 @@ internal class UnifiedCookingController(
 
 
     companion object {
-        private val FORBIDDEN_CLICKS = setOf(
-            ClickType.NUMBER_KEY, ClickType.SWAP_OFFHAND, ClickType.DOUBLE_CLICK,
-            ClickType.CREATIVE, ClickType.UNKNOWN
-        )
         private val UI_MATERIALS = setOf(
             Material.BLACK_STAINED_GLASS_PANE, Material.GRAY_STAINED_GLASS_PANE,
             Material.BARRIER, Material.LIME_CONCRETE, Material.RED_CONCRETE,
