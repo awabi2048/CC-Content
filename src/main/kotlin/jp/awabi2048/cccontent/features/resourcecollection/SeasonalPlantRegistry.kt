@@ -3,7 +3,9 @@ package jp.awabi2048.cccontent.features.resourcecollection
 import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import com.awabi2048.ccsystem.api.time.Season
 import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver
+import jp.awabi2048.cccontent.features.environment.EnvironmentConditions
 import org.bukkit.Material
+import org.bukkit.World
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
@@ -21,11 +23,20 @@ data class SeasonalPlantDefinition(
     val minimumY: Int,
     val maximumY: Int
 ) {
-    fun matches(season: Season, material: Material, biomeKey: String, y: Int): Boolean =
+    /** 収集対象位置から解決済みの環境条件だけを受け取り、個別の生Biome判定をしません。 */
+    fun matches(season: Season, material: Material, conditions: EnvironmentConditions): Boolean =
         weight(season) > 0 &&
             material in sourceMaterials &&
-            y in minimumY..maximumY &&
-            (biomeKeys.isEmpty() || biomeKey in biomeKeys)
+            conditions.position.y in minimumY..maximumY &&
+            (biomeKeys.isEmpty() || conditions.biomeKey in biomeKeys)
+
+    /** 既存の静的判定利用者も、同じ位置条件関数へ集約します。 */
+    fun matches(season: Season, material: Material, biomeKey: String, y: Int): Boolean =
+        matches(
+            season,
+            material,
+            CollectionEnvironmentResolver.defaults().conditions(biomeKey, World.Environment.NORMAL, y)
+        )
 
     fun weight(season: Season): Int = weightsBySeason[season] ?: 0
 }
@@ -37,12 +48,11 @@ class SeasonalPlantRegistry private constructor(
     fun select(
         season: Season,
         material: Material,
-        biomeKey: String,
-        y: Int,
+        conditions: EnvironmentConditions,
         random: Random
     ): SeasonalPlantDefinition? {
         if (!enabled) return null
-        val candidates = definitions.filter { it.matches(season, material, biomeKey, y) }
+        val candidates = definitions.filter { it.matches(season, material, conditions) }
         val totalWeight = candidates.sumOf { it.weight(season) }
         if (totalWeight <= 0) return null
         var cursor = random.nextInt(totalWeight)
@@ -53,18 +63,43 @@ class SeasonalPlantRegistry private constructor(
         return null
     }
 
+    fun select(
+        season: Season,
+        material: Material,
+        biomeKey: String,
+        y: Int,
+        random: Random
+    ): SeasonalPlantDefinition? = select(
+        season,
+        material,
+        CollectionEnvironmentResolver.defaults().conditions(biomeKey, World.Environment.NORMAL, y),
+        random
+    )
+
+    fun selectStable(
+        season: Season,
+        material: Material,
+        conditions: EnvironmentConditions,
+        seed: Long
+    ): SeasonalPlantDefinition? {
+        if (!enabled) return null
+        val candidates = definitions.filter { it.matches(season, material, conditions) }
+        val selected = GatheringPatchModel.weightedIndex(candidates.map { it.weight(season) }, seed) ?: return null
+        return candidates[selected]
+    }
+
     fun selectStable(
         season: Season,
         material: Material,
         biomeKey: String,
         y: Int,
         seed: Long
-    ): SeasonalPlantDefinition? {
-        if (!enabled) return null
-        val candidates = definitions.filter { it.matches(season, material, biomeKey, y) }
-        val selected = GatheringPatchModel.weightedIndex(candidates.map { it.weight(season) }, seed) ?: return null
-        return candidates[selected]
-    }
+    ): SeasonalPlantDefinition? = selectStable(
+        season,
+        material,
+        CollectionEnvironmentResolver.defaults().conditions(biomeKey, World.Environment.NORMAL, y),
+        seed
+    )
 
     fun size(): Int = definitions.size
 

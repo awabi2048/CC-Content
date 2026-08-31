@@ -92,6 +92,21 @@ data class CookingLiquidContents(
         return of(next)
     }
 
+    fun canMinus(amountsToRemove: Map<String, Int>): Boolean =
+        amountsToRemove.isNotEmpty() && amountsToRemove.values.all { it > 0 } &&
+            amountsToRemove.all { (liquidId, amount) -> this.amount(liquidId) >= amount }
+
+    /** 混合液の回収で、定義された構成を一度に減らします。 */
+    fun minusAll(amountsToRemove: Map<String, Int>): CookingLiquidContents {
+        require(canMinus(amountsToRemove)) { "Cooking liquid contents cannot subtract the requested composition" }
+        val next = amounts.toMutableMap()
+        amountsToRemove.forEach { (liquidId, amount) ->
+            val remaining = (next[liquidId] ?: 0) - amount
+            if (remaining <= 0) next.remove(liquidId) else next[liquidId] = remaining
+        }
+        return of(next)
+    }
+
     fun isPotentialInputFor(recipes: Collection<UnifiedLiquidCookingRecipe>): Boolean = recipes.any { recipe ->
         amounts.all { (liquidId, amount) -> amount <= (recipe.liquidInputs[liquidId] ?: 0) } &&
             recipe.liquidInputs.values.sum() <= MAX_CAPACITY

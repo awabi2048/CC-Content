@@ -109,6 +109,14 @@ sealed interface CookingStationStep {
 }
 
 object CookingStationStateMachine {
+    /**
+     * 液体回収の可否を、GUI表示と実操作から同じ条件で参照します。
+     * READY_LIQUIDは調理完了後の残留液体であり、処理中の状態には含めません。
+     */
+    @JvmStatic
+    fun canCollectLiquid(session: CookingStationSession?, collectable: Boolean): Boolean =
+        collectable && (session == null || session.state == CookingProcessState.READY_LIQUID)
+
     @JvmStatic
     fun start(
         recipe: CookingRecipeDefinition,
@@ -271,9 +279,10 @@ object CookingStationStateMachine {
     @JvmOverloads
     fun collectLiquid(
         session: CookingStationSession,
+        collectable: Boolean,
         collectSolidResultWithLiquid: Boolean = false
     ): CookingStationSession? {
-        if (session.state != CookingProcessState.READY_LIQUID) return null
+        if (!canCollectLiquid(session, collectable) || session.state != CookingProcessState.READY_LIQUID) return null
         val reservoir = session.reservoir ?: return null
         if (reservoir.remaining <= 0) return null
         // 固形成果物を最初の液体容器へ同梱するレシピは、1バッチ1容器の時だけ

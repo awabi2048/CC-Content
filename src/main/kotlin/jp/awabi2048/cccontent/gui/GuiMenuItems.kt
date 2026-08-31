@@ -13,6 +13,7 @@ import com.awabi2048.ccsystem.api.gui.GuiNameStyle
 import io.papermc.paper.datacomponent.DataComponentTypes
 import io.papermc.paper.datacomponent.item.TooltipDisplay
 import org.bukkit.Material
+import org.bukkit.NamespacedKey
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemFlag
@@ -36,7 +37,8 @@ object GuiMenuItems {
         material: Material,
         name: String,
         lore: List<GuiLoreLine> = emptyList(),
-        frame: GuiLoreFrame = GuiLoreFrame.NONE
+        frame: GuiLoreFrame = GuiLoreFrame.NONE,
+        itemModel: NamespacedKey? = null,
     ): ItemStack {
         return CCSystem.getAPI().getGuiElementService().item(
             GuiItemSpec(
@@ -47,7 +49,8 @@ object GuiMenuItems {
                     frame
                 ),
                 role = GuiElementRole.CONTENT,
-                amount = 1
+                amount = 1,
+                itemModel = itemModel,
             )
         )
     }

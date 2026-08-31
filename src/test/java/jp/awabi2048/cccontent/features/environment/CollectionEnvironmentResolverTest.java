@@ -12,11 +12,17 @@ class CollectionEnvironmentResolverTest {
     @Test
     void positionConditionsShareTemperateAndVerticalClassification() {
         var conditions = resolver.conditions(
-            "minecraft:flower_forest", World.Environment.NORMAL, 64
+            "minecraft:flower_forest", World.Environment.NORMAL,
+            new EnvironmentPosition("minecraft:world", 12, 64, -4)
         );
 
         assertEquals(ClimateRegion.TEMPERATE, conditions.getClimate());
+        assertEquals("minecraft:world", conditions.getPosition().getWorldKey());
+        assertEquals(12, conditions.getPosition().getX());
+        assertEquals(64, conditions.getPosition().getY());
+        assertEquals(-4, conditions.getPosition().getZ());
         assertTrue(resolver.isInBiomeGroup("minecraft:flower_forest", "temperate"));
+        assertTrue(resolver.isInBiomeGroup(conditions, "temperate"));
         assertTrue(conditions.hasVerticalRegion("wild_gathering"));
         assertEquals(
             ClimateRegion.TEMPERATE,

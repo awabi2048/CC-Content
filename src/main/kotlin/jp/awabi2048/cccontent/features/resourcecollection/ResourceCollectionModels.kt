@@ -2,6 +2,7 @@ package jp.awabi2048.cccontent.features.resourcecollection
 
 import jp.awabi2048.cccontent.features.environment.CollectionEnvironmentResolver
 import jp.awabi2048.cccontent.features.environment.ClimateRegion
+import jp.awabi2048.cccontent.features.environment.EnvironmentConditions
 import jp.awabi2048.cccontent.features.environment.TerrainRegion
 import jp.awabi2048.cccontent.features.rank.profession.Profession
 import org.bukkit.Material
@@ -240,20 +241,15 @@ object MineralCompanionPolicy {
     fun inspect(environment: World.Environment, biomeKey: String, y: Int): MineralInspectionResult =
         inspect(environment, biomeKey, y, CollectionEnvironmentResolver.defaults())
 
-    fun inspect(
-        environment: World.Environment,
-        biomeKey: String,
-        y: Int,
-        environmentResolver: CollectionEnvironmentResolver
-    ): MineralInspectionResult {
-        val conditions = environmentResolver.conditions(biomeKey, environment, y = y)
+    /** 採掘事象の位置から解決済み条件を受け取り、同じ分類階層を再利用します。 */
+    fun inspect(conditions: EnvironmentConditions): MineralInspectionResult {
         val altitude = when {
             conditions.hasVerticalRegion("mineral_high") -> MineralAltitudeBand.HIGH
             conditions.hasVerticalRegion("mineral_shallow") -> MineralAltitudeBand.SHALLOW
             conditions.hasVerticalRegion("mineral_middle") -> MineralAltitudeBand.MIDDLE
             else -> MineralAltitudeBand.DEEP
         }
-        val biome = biomeBand(conditions.climate, conditions.terrain, environment)
+        val biome = biomeBand(conditions.climate, conditions.terrain, conditions.worldEnvironment)
         val resourceId = when {
             biome == MineralBiomeBand.NETHER -> "sulfur"
             altitude == MineralAltitudeBand.DEEP -> "calcite_fragment"
@@ -262,6 +258,13 @@ object MineralCompanionPolicy {
         }
         return MineralInspectionResult(altitude, biome, resourceId)
     }
+
+    fun inspect(
+        environment: World.Environment,
+        biomeKey: String,
+        y: Int,
+        environmentResolver: CollectionEnvironmentResolver
+    ): MineralInspectionResult = inspect(environmentResolver.conditions(biomeKey, environment, y = y))
 
     private fun biomeBand(
         climate: ClimateRegion,

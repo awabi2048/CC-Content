@@ -4,6 +4,8 @@ import org.bukkit.World
 import org.bukkit.block.Block
 import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.file.YamlConfiguration
+import org.bukkit.Location
+import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 import java.util.Locale
@@ -98,6 +100,15 @@ class CollectionEnvironmentResolver private constructor(
 ) {
     fun at(block: Block): EnvironmentConditions = at(block.world, block.x, block.y, block.z)
 
+    /** プレイヤー起点の収集要素が、プレイヤーの立っている位置を判定するときの入口です。 */
+    fun at(player: Player): EnvironmentConditions = at(player.location)
+
+    /** ブロック以外のイベント発生位置も、同じ position -> conditions へ流します。 */
+    fun at(location: Location): EnvironmentConditions {
+        val world = requireNotNull(location.world) { "Environment condition location must have a world" }
+        return at(world, location.blockX, location.blockY, location.blockZ)
+    }
+
     fun at(world: World, x: Int, y: Int, z: Int): EnvironmentConditions = conditions(
         world.getBiome(x, y, z).key.toString(),
         world.environment,
@@ -146,6 +157,10 @@ class CollectionEnvironmentResolver private constructor(
 
     fun isInBiomeGroup(biomeKey: String, groupId: String): Boolean =
         normalizeBiomeKey(biomeKey) in groups[groupId.lowercase(Locale.ROOT)].orEmpty()
+
+    /** 位置から解決済みの条件を、そのまま収集要素のグループ判定へ渡します。 */
+    fun isInBiomeGroup(conditions: EnvironmentConditions, groupId: String): Boolean =
+        isInBiomeGroup(conditions.biomeKey, groupId)
 
     fun biomesInGroups(groupIds: Collection<String>): Set<String> =
         groupIds.flatMap { groups[it.lowercase(Locale.ROOT)].orEmpty() }.toSet()

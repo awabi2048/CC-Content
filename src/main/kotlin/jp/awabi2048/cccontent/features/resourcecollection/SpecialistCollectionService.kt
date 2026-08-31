@@ -240,10 +240,7 @@ class SpecialistCollectionService(
             return
         }
         val result = MineralCompanionPolicy.inspect(
-            block.world.environment,
-            block.biome.key.toString(),
-            block.y,
-            environmentResolver
+            environmentResolver.at(block)
         )
         player.swingMainHand()
         val materialHint = if (profile.detailedInspectionEnabled) {
@@ -474,7 +471,7 @@ class SpecialistCollectionService(
             val anchorBlock = origin.world.getBlockAt(patch.anchor.x, patch.anchor.y, patch.anchor.z)
             val seed = GatheringPatchModel.stableSeed(origin.world.seed, origin.world.uid, patch.anchor, season)
             val definition = seasonalPlants.selectStable(
-                season, anchorBlock.type, anchorBlock.biome.key.toString(), anchorBlock.y, seed
+                season, anchorBlock.type, environmentResolver.at(anchorBlock), seed
             ) ?: continue
             if (CustomItemManager.getItem(definition.customItemId) == null) {
                 plugin.logger.warning(
@@ -709,7 +706,7 @@ class SpecialistCollectionService(
         val discoveredNames = linkedSetOf<String>()
         val resolution = forestProducts.resolve(
             species,
-            root.biome.key.toString(),
+            environmentResolver.at(root),
             root.world.seed,
             root.x,
             root.y,
@@ -1019,10 +1016,7 @@ class SpecialistCollectionService(
         if (player.gameMode != GameMode.CREATIVE) player.damageItemStack(EquipmentSlot.HAND, 1)
         if (specialAmount > 0) {
             val result = MineralCompanionPolicy.inspect(
-                block.world.environment,
-                block.biome.key.toString(),
-                block.y,
-                environmentResolver
+                environmentResolver.at(block)
             )
             dropResourceNaturally(player, result.resourceId, specialAmount, block.location)
             sendCustomCollectionResult(

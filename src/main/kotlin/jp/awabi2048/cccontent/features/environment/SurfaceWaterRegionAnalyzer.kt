@@ -19,6 +19,7 @@ class SurfaceWaterRegionAnalyzer(
     }
 
     fun hasMinimumSurfaceWater(block: Block): Boolean {
+        // 引数はプレイヤー位置ではなく、バケツ採取イベントの水源ブロックです。
         if (block.type != Material.WATER || block.getRelative(BlockFace.UP).type != Material.AIR) return false
         if (!environmentResolver.isOceanFamily(environmentResolver.at(block))) return false
 

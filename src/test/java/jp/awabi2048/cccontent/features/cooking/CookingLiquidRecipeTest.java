@@ -10,6 +10,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CookingLiquidRecipeTest {
@@ -27,7 +28,7 @@ class CookingLiquidRecipeTest {
         assertEquals(60, salt.getDurationSeconds());
         assertEquals(Map.of("sea_water", 5), salt.getLiquidInputs());
         assertEquals(Map.of("bittern", 1), salt.getResidualLiquids());
-        assertEquals(Material.GRAY_STAINED_GLASS_PANE.name(), salt.getSnapshot().getLiquidPaneMaterial());
+        assertNull(salt.getSnapshot().getLiquidPaneMaterial());
         assertTrue(salt.getCollectSolidResultWithLiquid());
         assertEquals(30, tofu.getDurationSeconds());
         assertEquals(Map.of("soy_milk", 1, "bittern", 1), tofu.getLiquidInputs());
@@ -72,7 +73,7 @@ class CookingLiquidRecipeTest {
         assertEquals("cooking.nigari_bottle", finished.getReservoir().getCustomItemId());
         assertEquals(Material.GLASS_BOTTLE.name(), finished.getReservoir().getContainerMaterial());
 
-        var collected = CookingStationStateMachine.INSTANCE.collectLiquid(finished, true);
+        var collected = CookingStationStateMachine.INSTANCE.collectLiquid(finished, true, true);
         assertNotNull(collected);
         assertEquals(CookingProcessState.IDLE, collected.getState());
         assertTrue(collected.getOutputStacks().isEmpty());

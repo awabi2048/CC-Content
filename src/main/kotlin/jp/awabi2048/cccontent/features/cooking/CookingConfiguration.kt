@@ -114,9 +114,7 @@ data class UnifiedLiquidCookingRecipe(
             0,
             CookingResultKind.ITEM,
             null,
-            residualLiquids.keys.singleOrNull()?.let { liquidId ->
-                CookingLiquidPresentation.paneFor(CookingLiquidContents.of(mapOf(liquidId to 1))).name
-            },
+            null,
             experience
         )
 }
@@ -334,6 +332,15 @@ object UnifiedCookingConfigurationLoader {
             }
             require(residual.values.sum() <= CookingLiquidContents.MAX_CAPACITY) {
                 "${file.path}.recipes.$rawId.residual_liquids exceeds cauldron capacity"
+            }
+            residual.keys.forEach { liquidId ->
+                require(
+                    CookingLiquidPresentation.isCollectable(
+                        CookingLiquidContents.of(mapOf(liquidId to 1))
+                    )
+                ) {
+                    "${file.path}.recipes.$rawId.residual_liquids contains a non-collectable liquid: $liquidId"
+                }
             }
             val collectSolidResultWithLiquid = raw.getBoolean("collect_result_with_liquid", false)
             require(!collectSolidResultWithLiquid || residual.values.sum() == 1) {
