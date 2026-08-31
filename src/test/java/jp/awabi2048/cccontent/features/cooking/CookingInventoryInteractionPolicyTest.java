@@ -19,6 +19,7 @@ class CookingInventoryInteractionPolicyTest {
         assertTrue(CookingInventoryInteractionPolicy.INSTANCE.allowsInputClick(ClickType.NUMBER_KEY));
         assertTrue(CookingInventoryInteractionPolicy.INSTANCE.allowsInputClick(ClickType.SWAP_OFFHAND));
         assertTrue(CookingInventoryInteractionPolicy.INSTANCE.allowsInputClick(ClickType.DOUBLE_CLICK));
+        assertFalse(CookingInventoryInteractionPolicy.INSTANCE.allowsInputClick(ClickType.CREATIVE));
         assertFalse(CookingInventoryInteractionPolicy.INSTANCE.allowsInputClick(ClickType.UNKNOWN));
     }
 

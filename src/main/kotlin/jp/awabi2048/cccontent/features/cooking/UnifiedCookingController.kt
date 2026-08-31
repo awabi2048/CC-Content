@@ -23,7 +23,6 @@ import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
 import org.bukkit.Bukkit
 import org.bukkit.FluidCollisionMode
-import org.bukkit.GameMode
 import org.bukkit.Material
 import org.bukkit.block.Block
 import org.bukkit.block.BlockFace
@@ -142,11 +141,6 @@ internal class UnifiedCookingController(
         val holder = event.view.topInventory.holder as? UnifiedCookingHolder ?: return
         val player = event.whoClicked as? Player ?: return
         if (player.uniqueId != holder.ownerId) { event.isCancelled = true; return }
-        // クリエイティブ操作はGUI成果物の取引契約を迂回するため、領域にかかわらず禁止します。
-        if (player.gameMode == GameMode.CREATIVE) {
-            event.isCancelled = true
-            return
-        }
         val clickedInventory = event.clickedInventory
         val topInventory = event.view.topInventory
         val session = stations[holder.stationKey]?.session
@@ -216,6 +210,10 @@ internal class UnifiedCookingController(
             return
         }
         if (raw in allowed) {
+            // プレイヤーのゲームモードはメニュー操作の可否とは分離します。
+            // 特殊なClickType.CREATIVEだけは入力欄の通常取引を迂回し得るため、
+            // CookingInventoryInteractionPolicyで拒否します。ここでゲームモードを
+            // 先に一律拒否すると、クリエイティブ中のボタン操作や液体回収まで到達不能になります。
             if (!inputWorkspaceAllowed || !CookingInventoryInteractionPolicy.allowsInputClick(event.click)) {
                 event.isCancelled = true
                 return
