@@ -25,7 +25,8 @@ data class CropDefinition(
 }
 
 data class CropsSettings(
-    val crops: List<CropDefinition>
+    val crops: List<CropDefinition>,
+    val debug: Boolean = false
 ) {
     fun crop(id: String): CropDefinition? = crops.firstOrNull { it.id == id }
 
@@ -40,6 +41,7 @@ data class CropsSettings(
             require(config.getInt("config_version") == 1) {
                 "config/crops/crops.yml.config_version は 1 である必要があります"
             }
+            val debug = config.getBoolean("debug", false)
             val crops = config.getConfigurationSection("crops")?.getKeys(false).orEmpty().map { id ->
                 val path = "crops.$id"
                 val stageModels = config.getStringList("$path.stage_models").map {
@@ -59,7 +61,7 @@ data class CropsSettings(
                 )
             }
             require(crops.isNotEmpty()) { "config/crops/crops.yml に作物定義がありません" }
-            return CropsSettings(crops)
+            return CropsSettings(crops, debug)
         }
     }
 }

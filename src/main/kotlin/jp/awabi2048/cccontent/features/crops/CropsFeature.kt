@@ -55,7 +55,16 @@ class CropsFeature(private val plugin: CCContent) : Listener {
         plugin.server.pluginManager.registerEvents(this, plugin)
         growthTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable { tickGrowth() }, 20L, 20L)
         logger.setStatus("Crops", FeatureInitializationLogger.Status.SUCCESS)
-        logger.addSummaryMessage("Crops", "作物定義: ${settings.crops.size}件")
+        logger.addSummaryMessage("Crops", "作物定義: ${settings.crops.size}件, debug=${settings.debug}")
+        if (settings.debug) {
+            plugin.logger.info("[Crops][Debug] 初期化完了: debug=true, crops=${settings.crops.map { it.id }}")
+            settings.crops.forEach { def ->
+                plugin.logger.info(
+                    "[Crops][Debug] 定義 ${def.id}: maxStage=${def.maxStage}, ticksPerStage=${def.ticksPerStage}, " +
+                        "boneMealStages=${def.boneMealStages}, seed=${def.seedItemId}, harvest=${def.harvestItemId}"
+                )
+            }
+        }
     }
 
     fun shutdown() {
@@ -67,18 +76,50 @@ class CropsFeature(private val plugin: CCContent) : Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
     fun onPlace(event: PlayerInteractEvent) {
-        if (event.hand != EquipmentSlot.HAND) return
-        if (event.action != Action.RIGHT_CLICK_BLOCK) return
-        val item = event.item ?: return
-        if (item.type != Material.STICK) return
-        val block = event.clickedBlock ?: return
+        if (event.hand != EquipmentSlot.HAND) {
+            debugLog("onPlace: hand=${event.hand} != HAND のためスキップ player=${event.player.name}")
+            return
+        }
+        if (event.action != Action.RIGHT_CLICK_BLOCK) {
+            debugLog("onPlace: action=${event.action} != RIGHT_CLICK_BLOCK のためスキップ player=${event.player.name}")
+            return
+        }
+        val item = event.item
+        if (item == null) {
+            debugLog("onPlace: item=null のためスキップ player=${event.player.name} face=${event.blockFace}")
+            return
+        }
+        if (item.type != Material.STICK) {
+            debugLog("onPlace: item=${item.type} != STICK のためスキップ player=${event.player.name} face=${event.blockFace}")
+            return
+        }
+        val block = event.clickedBlock
+        if (block == null) {
+            debugLog("onPlace: clickedBlock=null のためスキップ player=${event.player.name}")
+            return
+        }
+        debugLog(
+            "onPlace: 試行 player=${event.player.name} block=${block.type} at=${block.x},${block.y},${block.z} " +
+                "face=${event.blockFace} above=${block.getRelative(BlockFace.UP).type} item=${item.type} hand=${event.hand}"
+        )
         // 上面以外（側面/下面）への誤設置と、隣接ブロックへの誤判定を防ぐため、上面ヒットのみを許可する。
-        if (event.blockFace != BlockFace.UP) return
-        if (block.type != Material.FARMLAND && block.type != Material.SOUL_SAND) return
-        if (!block.getRelative(BlockFace.UP).type.isAir) return
+        if (event.blockFace != BlockFace.UP) {
+            debugLog("onPlace: face=${event.blockFace} != UP のためスキップ（上面以外は設置不可）")
+            return
+        }
+        if (block.type != Material.FARMLAND && block.type != Material.SOUL_SAND) {
+            debugLog("onPlace: block.type=${block.type} は FARMLAND/SOUL_SAND ではないためスキップ")
+            return
+        }
+        val aboveType = block.getRelative(BlockFace.UP).type
+        if (!aboveType.isAir) {
+            debugLog("onPlace: 上が空気ではないためスキップ above=$aboveType at=${block.x},${block.y + 1},${block.z}")
+            return
+        }
 
         val loc = block.location.add(0.5, 1.0, 0.5)
         if (hasSupportNearby(loc)) {
+            debugLog("onPlace: hasSupportNearby=true のため設置をブロック loc=$loc")
             event.isCancelled = true
             event.setUseInteractedBlock(Event.Result.DENY)
             event.setUseItemInHand(Event.Result.DENY)
@@ -90,6 +131,7 @@ class CropsFeature(private val plugin: CCContent) : Listener {
         event.setUseItemInHand(Event.Result.DENY)
 
         spawnSupport(loc)
+        debugLog("onPlace: 支柱を設置 loc=$loc uuids stored in Interaction")
 
         val player = event.player
         if (player.gameMode != GameMode.CREATIVE) {
@@ -146,47 +188,75 @@ class CropsFeature(private val plugin: CCContent) : Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
     fun onEntityInteract(event: PlayerInteractEntityEvent) {
-        if (event.hand != EquipmentSlot.HAND) return
-        val interaction = supportOf(event.rightClicked) ?: return
+        if (event.hand != EquipmentSlot.HAND) {
+            debugLog("onEntityInteract: hand=${event.hand} != HAND のためスキップ player=${event.player.name}")
+            return
+        }
+        val interaction = supportOf(event.rightClicked)
+        if (interaction == null) {
+            debugLog("onEntityInteract: supportOf=null（Crops支柱ではない） entity=${event.rightClicked.type} player=${event.player.name}")
+            return
+        }
         event.isCancelled = true
 
         val player = event.player
         val pdc = interaction.persistentDataContainer
         val cropType = pdc.get(ContentPdcKeys.cropsCropType, PersistentDataType.STRING)
+        val stage = pdc.get(ContentPdcKeys.cropsStage, PersistentDataType.INTEGER) ?: 0
+        val progress = pdc.get(ContentPdcKeys.cropsProgress, PersistentDataType.INTEGER) ?: 0
         val mainHand = player.inventory.itemInMainHand
+        val seedCustom = CustomItemManager.identify(mainHand)
+        debugLog(
+            "onEntityInteract: player=${player.name} cropType=$cropType stage=$stage progress=$progress " +
+                "hand=${mainHand.type} seedId=${seedCustom?.fullId} at=${interaction.location.blockX},${interaction.location.blockY},${interaction.location.blockZ}"
+        )
 
         // 骨粉：未作付け・成熟済みでなければ1段階（設定値）進める
         if (mainHand.type == Material.BONE_MEAL && cropType != null) {
-            val def = settings.crop(cropType) ?: return
-            val stage = pdc.get(ContentPdcKeys.cropsStage, PersistentDataType.INTEGER) ?: 0
+            val def = settings.crop(cropType)
+            if (def == null) {
+                debugLog("onEntityInteract: 骨粉だが cropType=$cropType の定義が見つからない")
+                return
+            }
             if (stage < def.maxStage) {
+                val before = stage
+                val after = (stage + def.boneMealStages).coerceAtMost(def.maxStage)
                 consumeIfSurvival(player, mainHand)
-                setStage(interaction, def, (stage + def.boneMealStages).coerceAtMost(def.maxStage))
+                setStage(interaction, def, after)
+                debugLog("onEntityInteract: 骨粉で成長 $before -> $after (max=${def.maxStage})")
                 player.playSound(player.location, Sound.ITEM_BONE_MEAL_USE, 1.0f, 1.0f)
+            } else {
+                debugLog("onEntityInteract: 骨粉だが既に成熟 stage=$stage")
             }
             return
         }
 
         // 未作付け：種を持っていれば作付け
         if (cropType == null) {
-            val seedCustom = CustomItemManager.identify(mainHand)
             val def = settings.crops.firstOrNull { it.seedItemId == seedCustom?.fullId }
             if (def != null) {
+                debugLog("onEntityInteract: 作付け seed=${seedCustom?.fullId} -> ${def.id} stage 0")
                 consumeIfSurvival(player, mainHand)
                 pdc.set(ContentPdcKeys.cropsCropType, PersistentDataType.STRING, def.id)
                 setStage(interaction, def, 0)
                 player.sendMessage(localized(player, ContentCropsKeys.CROPS_PLANT))
+            } else {
+                debugLog("onEntityInteract: 未作付けだが手持ちは種ではない hand=${mainHand.type} seedId=${seedCustom?.fullId}")
             }
             return
         }
 
         // すでに作付け済み
-        val def = settings.crop(cropType) ?: return
-        val stage = pdc.get(ContentPdcKeys.cropsStage, PersistentDataType.INTEGER) ?: 0
-        val seedCustom = CustomItemManager.identify(mainHand)
+        val def = settings.crop(cropType)
+        if (def == null) {
+            debugLog("onEntityInteract: 作付け済みだが cropType=$cropType の定義が見つからない")
+            return
+        }
         val isSeed = settings.crops.any { it.seedItemId == seedCustom?.fullId }
+        debugLog("onEntityInteract: 作付け済み判定 isSeed=$isSeed stage=$stage max=${def.maxStage} hand=${mainHand.type}")
         if (stage >= def.maxStage) {
             if (!isSeed && mainHand.type != Material.BONE_MEAL) {
+                debugLog("onEntityInteract: 収穫実行 harvest=${def.harvestItemId} stage $stage -> 0")
                 val harvestItem = CustomItemManager.createItem(def.harvestItemId, 1)
                 if (harvestItem != null) {
                     player.inventory.addItem(harvestItem).values.forEach {
@@ -198,10 +268,14 @@ class CropsFeature(private val plugin: CCContent) : Listener {
                 player.sendMessage(localized(player, ContentCropsKeys.CROPS_HARVEST))
                 player.playSound(player.location, Sound.BLOCK_CROP_BREAK, 1.0f, 1.0f)
             } else if (isSeed) {
+                debugLog("onEntityInteract: 成熟だが手に種を持っているため収穫せず ALREADY_PLANTED")
                 player.sendMessage(localized(player, ContentCropsKeys.CROPS_ALREADY_PLANTED))
             }
         } else if (mainHand.type == Material.AIR) {
+            debugLog("onEntityInteract: 未成熟で空手のため NOT_READY stage=$stage max=${def.maxStage}")
             player.sendMessage(localized(player, ContentCropsKeys.CROPS_NOT_READY))
+        } else {
+            debugLog("onEntityInteract: 未成熟で種/骨粉以外のため何もしない hand=${mainHand.type}")
         }
     }
 
@@ -209,7 +283,12 @@ class CropsFeature(private val plugin: CCContent) : Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     fun onAttack(event: PrePlayerAttackEntityEvent) {
-        val interaction = supportOf(event.attacked) ?: return
+        val interaction = supportOf(event.attacked)
+        if (interaction == null) {
+            debugLog("onAttack: supportOf=null entity=${event.attacked.type} player=${event.player.name}")
+            return
+        }
+        debugLog("onAttack: 左クリック検知 player=${event.player.name} at=${interaction.location.blockX},${interaction.location.blockY},${interaction.location.blockZ}")
         event.isCancelled = true
         breakSupport(interaction, event.player)
     }
@@ -217,19 +296,34 @@ class CropsFeature(private val plugin: CCContent) : Listener {
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     fun onLegacyAttack(event: EntityDamageByEntityEvent) {
         val entity = event.entity
-        if (entity !is Interaction) return
-        val interaction = supportOf(entity) ?: return
+        if (entity !is Interaction) {
+            debugLog("onLegacyAttack: entity not Interaction type=${entity.type}")
+            return
+        }
+        val interaction = supportOf(entity)
+        if (interaction == null) {
+            debugLog("onLegacyAttack: supportOf=null")
+            return
+        }
+        debugLog("onLegacyAttack: 左クリック(legacy) player=${(event.damager as? Player)?.name} at=${interaction.location.blockX},${interaction.location.blockY},${interaction.location.blockZ}")
         event.isCancelled = true
         breakSupport(interaction, event.damager as? Player)
     }
 
     private fun breakSupport(interaction: Interaction, player: Player?) {
-        if (!interaction.isValid) return
+        if (!interaction.isValid) {
+            debugLog("breakSupport: interaction already invalid")
+            return
+        }
         val pdc = interaction.persistentDataContainer
+        val cropType = pdc.get(ContentPdcKeys.cropsCropType, PersistentDataType.STRING)
+        val stage = pdc.get(ContentPdcKeys.cropsStage, PersistentDataType.INTEGER)
+        debugLog("breakSupport: 実行 player=${player?.name} cropType=$cropType stage=$stage at=${interaction.location.blockX},${interaction.location.blockY},${interaction.location.blockZ}")
         findDisplay(pdc, ContentPdcKeys.cropsSupportDisplay)?.remove()
         findDisplay(pdc, ContentPdcKeys.cropsCropDisplay)?.remove()
         val loc = interaction.location.clone()
         interaction.remove()
+        debugLog("breakSupport: エンティティ除去完了")
         if (player != null && player.gameMode != GameMode.CREATIVE) {
             player.world.dropItemNaturally(loc, ItemStack(Material.STICK))
         }
@@ -239,11 +333,14 @@ class CropsFeature(private val plugin: CCContent) : Listener {
     // ---- 成長 ticker（読込中のみ進行） ----
 
     private fun tickGrowth() {
+        var grownCount = 0
+        var totalPlanted = 0
         for (world in plugin.server.worlds) {
             for (entity in world.getEntitiesByClass(Interaction::class.java)) {
                 val pdc = entity.persistentDataContainer
                 if (!pdc.has(ContentPdcKeys.cropsSupport, PersistentDataType.BYTE)) continue
                 val cropType = pdc.get(ContentPdcKeys.cropsCropType, PersistentDataType.STRING) ?: continue
+                totalPlanted++
                 val def = settings.crop(cropType) ?: continue
                 val stage = pdc.get(ContentPdcKeys.cropsStage, PersistentDataType.INTEGER) ?: 0
                 if (stage >= def.maxStage) continue
@@ -254,10 +351,15 @@ class CropsFeature(private val plugin: CCContent) : Listener {
                     pdc.set(ContentPdcKeys.cropsProgress, PersistentDataType.INTEGER, progress - def.ticksPerStage)
                     findDisplay(pdc, ContentPdcKeys.cropsCropDisplay)
                         ?.setItemStack(cropItemStack(def.stageModels.getOrNull(newStage)))
+                    debugLog("tickGrowth: 成長 ${entity.location.blockX},${entity.location.blockY},${entity.location.blockZ} $stage -> $newStage (crop=$cropType)")
+                    grownCount++
                 } else {
                     pdc.set(ContentPdcKeys.cropsProgress, PersistentDataType.INTEGER, progress)
                 }
             }
+        }
+        if (settings.debug && grownCount > 0) {
+            plugin.logger.info("[Crops][Debug] tickGrowth: $grownCount 件が成長（作付け総数 $totalPlanted）")
         }
     }
 
@@ -291,4 +393,9 @@ class CropsFeature(private val plugin: CCContent) : Listener {
 
     private fun localized(player: Player, key: LocalizationKey<String>): String =
         CCSystem.getAPI().getLocalized(player, key).replace('&', '§')
+
+    private fun debugLog(message: String) {
+        if (!::settings.isInitialized || !settings.debug) return
+        plugin.logger.info("[Crops][Debug] $message")
+    }
 }
