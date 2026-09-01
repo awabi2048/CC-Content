@@ -72,8 +72,10 @@ class CropsFeature(private val plugin: CCContent) : Listener {
         val item = event.item ?: return
         if (item.type != Material.STICK) return
         val block = event.clickedBlock ?: return
+        // 上面以外（側面/下面）への誤設置と、隣接ブロックへの誤判定を防ぐため、上面ヒットのみを許可する。
+        if (event.blockFace != BlockFace.UP) return
         if (block.type != Material.FARMLAND && block.type != Material.SOUL_SAND) return
-        if (block.getRelative(BlockFace.UP).type != Material.AIR) return
+        if (!block.getRelative(BlockFace.UP).type.isAir) return
 
         val loc = block.location.add(0.5, 1.0, 0.5)
         if (hasSupportNearby(loc)) {
