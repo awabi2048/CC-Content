@@ -20,6 +20,7 @@ object ContentFeatureCatalog {
         ContentFeature("seasonal", "Seasonal"),
         ContentFeature("sukima_dungeon", "Sukima Dungeon"),
         ContentFeature("party", "Party"),
+        ContentFeature("crops", "Crops"),
         ContentFeature("minigame", "Minigame", listOf("party"))
     )
 
