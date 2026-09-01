@@ -16,6 +16,12 @@ import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.Sound
 import org.bukkit.block.BlockFace
+import org.bukkit.event.block.BlockBreakEvent
+import org.bukkit.event.block.BlockFadeEvent
+import org.bukkit.event.entity.EntityInteractEvent
+import org.bukkit.util.Transformation
+import org.joml.Quaternionf
+import org.joml.Vector3f
 import org.bukkit.entity.Display
 import org.bukkit.entity.Entity
 import org.bukkit.entity.EntityType
@@ -143,18 +149,92 @@ class CropsFeature(private val plugin: CCContent) : Listener {
     }
 
     private fun hasSupportNearby(loc: Location): Boolean {
-        return loc.world?.getNearbyEntities(loc, 0.6, 1.5, 0.6).orEmpty().any { supportOf(it) != null }
+        val world = loc.world ?: return false
+        // 旧実装では 0.6x1.5x0.6 のAABBで隣接マスの支柱まで誤ヒットしていたため、
+        // 同ブロック厳密一致（distanceSquared < 0.25、半径0.5）のみを占有とみなす。
+        val candidates = world.getNearbyEntities(loc, 0.6, 0.6, 0.6).filter { supportOf(it) != null }
+        val filtered = candidates.filter { it.location.distanceSquared(loc) < 0.25 }
+        if (settings.debug) {
+            if (filtered.isNotEmpty()) {
+                filtered.forEach { entity ->
+                    debugLog(
+                        "hasSupportNearby hit reqLoc=${loc.blockX},${loc.blockY},${loc.blockZ} " +
+                            "exact=${entity.location} distSq=${entity.location.distanceSquared(loc)} valid=${entity.isValid}"
+                    )
+                }
+            } else if (candidates.isNotEmpty()) {
+                candidates.forEach { entity ->
+                    debugLog(
+                        "hasSupportNearby ignored neighbor reqLoc=${loc.blockX},${loc.blockY},${loc.blockZ} " +
+                            "neighbor=${entity.location} distSq=${entity.location.distanceSquared(loc)}"
+                    )
+                }
+            }
+        }
+        return filtered.isNotEmpty()
+    }
+
+    // ---- 農地破壊時の孤児除去 ----
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onFarmBlockBreak(event: BlockBreakEvent) {
+        val block = event.block
+        if (block.type != Material.FARMLAND && block.type != Material.SOUL_SAND) return
+        val loc = block.location.add(0.5, 1.0, 0.5)
+        removeOrphanSupportsAt(loc, "BlockBreak")
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onFarmBlockFade(event: BlockFadeEvent) {
+        val block = event.block
+        if (block.type != Material.FARMLAND) return
+        val loc = block.location.add(0.5, 1.0, 0.5)
+        removeOrphanSupportsAt(loc, "BlockFade")
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onEntityTrample(event: EntityInteractEvent) {
+        val block = event.block
+        if (block.type != Material.FARMLAND) return
+        val loc = block.location.add(0.5, 1.0, 0.5)
+        removeOrphanSupportsAt(loc, "Trample")
+    }
+
+    private fun removeOrphanSupportsAt(loc: Location, reason: String) {
+        val world = loc.world ?: return
+        val orphans = world.getNearbyEntities(loc, 0.5, 0.5, 0.5).mapNotNull { supportOf(it) }
+            .filter { it.location.distanceSquared(loc) < 0.25 }
+        if (orphans.isEmpty()) return
+        orphans.forEach { interaction ->
+            val pdc = interaction.persistentDataContainer
+            val cropType = pdc.get(ContentPdcKeys.cropsCropType, PersistentDataType.STRING)
+            debugLog("removeOrphanSupportsAt[$reason]: 除去 loc=$loc orphan=${interaction.location} cropType=$cropType")
+            findDisplay(pdc, ContentPdcKeys.cropsSupportDisplay)?.remove()
+            findDisplay(pdc, ContentPdcKeys.cropsCropDisplay)?.remove()
+            interaction.remove()
+        }
     }
 
     private fun spawnSupport(loc: Location) {
         val world = loc.world ?: return
+        // 農地の見た目表面（FARMLAND 0.9375 / SOUL_SAND 0.875）にディスプレイ底面を合わせる。
+        // ItemDisplay は中心原点のため、translation.y = surface - loc.y + 0.5*scale で補正する。
+        val farmBlock = world.getBlockAt(loc.blockX, loc.blockY - 1, loc.blockZ)
+        val baseTy = when (farmBlock.type) {
+            Material.SOUL_SAND -> 0.375f
+            else -> 0.4375f // FARMLAND 想定
+        }
+        val ty = baseTy + 0.015f // 微小な浮かせでZファイティング回避
+        val transformation = Transformation(Vector3f(0f, ty, 0f), Quaternionf(), Vector3f(1f, 1f, 1f), Quaternionf())
         val supportDisplay = world.spawnEntity(loc, EntityType.ITEM_DISPLAY) as ItemDisplay
         supportDisplay.setItemStack(supportItemStack())
         supportDisplay.billboard = Display.Billboard.FIXED
+        supportDisplay.transformation = transformation
 
         val cropDisplay = world.spawnEntity(loc, EntityType.ITEM_DISPLAY) as ItemDisplay
         cropDisplay.setItemStack(ItemStack(Material.AIR))
         cropDisplay.billboard = Display.Billboard.FIXED
+        cropDisplay.transformation = transformation
 
         val interaction = world.spawnEntity(loc, EntityType.INTERACTION) as Interaction
         interaction.interactionWidth = 0.8f
@@ -339,6 +419,18 @@ class CropsFeature(private val plugin: CCContent) : Listener {
             for (entity in world.getEntitiesByClass(Interaction::class.java)) {
                 val pdc = entity.persistentDataContainer
                 if (!pdc.has(ContentPdcKeys.cropsSupport, PersistentDataType.BYTE)) continue
+                // 下部ブロックが農地でなくなった孤児は自動除去（破壊イベントを取りこぼした場合の自己修復）
+                val farmBlock = world.getBlockAt(entity.location.blockX, entity.location.blockY - 1, entity.location.blockZ)
+                if (farmBlock.type != Material.FARMLAND && farmBlock.type != Material.SOUL_SAND) {
+                    debugLog(
+                        "tickGrowth: 孤児検知（下部ブロックが農地でなくなった） at=${entity.location.blockX},${entity.location.blockY},${entity.location.blockZ} " +
+                            "farm=${farmBlock.type} -> 除去"
+                    )
+                    findDisplay(pdc, ContentPdcKeys.cropsSupportDisplay)?.remove()
+                    findDisplay(pdc, ContentPdcKeys.cropsCropDisplay)?.remove()
+                    entity.remove()
+                    continue
+                }
                 val cropType = pdc.get(ContentPdcKeys.cropsCropType, PersistentDataType.STRING) ?: continue
                 totalPlanted++
                 val def = settings.crop(cropType) ?: continue
