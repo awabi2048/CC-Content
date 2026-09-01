@@ -23,6 +23,8 @@ import jp.awabi2048.cccontent.featurestate.ContentFeatureCatalog
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemInteractionListener
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.items.crops.SoybeanItem
+import jp.awabi2048.cccontent.items.crops.SoybeanSeedItem
 import jp.awabi2048.cccontent.persistence.ContentItemMigrationListener
 import jp.awabi2048.cccontent.items.misc.BigLight
 import jp.awabi2048.cccontent.items.misc.AutoIgnitionBoosterConfig
@@ -84,6 +86,7 @@ import jp.awabi2048.cccontent.features.arena.ArenaTokenExchangeMenu
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import jp.awabi2048.cccontent.features.brewery.BreweryFeature
 import jp.awabi2048.cccontent.features.cooking.CookingFeature
+import jp.awabi2048.cccontent.features.crops.CropsFeature
 import jp.awabi2048.cccontent.features.fishing.FishingFeature
 import jp.awabi2048.cccontent.features.catalog.CatalogCommand
 import jp.awabi2048.cccontent.features.catalog.CatalogStore
@@ -195,6 +198,7 @@ class CCContent : JavaPlugin(), Listener {
     private lateinit var catalogStore: CatalogStore
     private var resourceCollectionFeature: ResourceCollectionFeature? = null
     private var seasonalFeature: SeasonalFeature? = null
+    private var cropsFeature: CropsFeature? = null
     private var partyController: PartyController? = null
     private var minigameRuntime: MiniGameRuntime? = null
     private lateinit var npcMenuService: NpcMenuService
@@ -265,6 +269,7 @@ class CCContent : JavaPlugin(), Listener {
         featureInitLogger.registerFeature("SukimaDungeon")
         featureInitLogger.registerFeature("Party")
         featureInitLogger.registerFeature("Minigame")
+        featureInitLogger.registerFeature("Crops")
         featureInitLogger.registerFeature("Oage Shrine")
 
         // 無効featureの入口を先に閉じ、有効featureの初期化成功時だけ正規コマンドへ差し替える。
@@ -418,6 +423,12 @@ class CCContent : JavaPlugin(), Listener {
         initializeFeatureIfEnabled("Fishing", "fishing") {
             val feature = FishingFeature(this, catalogStore, myWorldBridge)
             fishingFeature = feature
+            feature.initialize(featureInitLogger)
+        }
+
+        initializeFeatureIfEnabled("Crops", "crops") {
+            val feature = CropsFeature(this)
+            cropsFeature = feature
             feature.initialize(featureInitLogger)
         }
 
@@ -630,6 +641,8 @@ class CCContent : JavaPlugin(), Listener {
         resourceCollectionFeature = null
         cleanup("seasonal") { seasonalFeature?.shutdown() }
         seasonalFeature = null
+        cleanup("crops") { cropsFeature?.shutdown() }
+        cropsFeature = null
         cleanup("party") { partyController?.close() }
         partyController = null
         cleanup("arena mission") { arenaMissionService?.shutdown() }
@@ -718,6 +731,7 @@ class CCContent : JavaPlugin(), Listener {
             "resource_collection" to "Resource Collection",
             "seasonal" to "Seasonal",
             "sukima_dungeon" to "SukimaDungeon",
+            "crops" to "Crops",
             "party" to "Party",
             "minigame" to "Minigame"
         )
@@ -1091,6 +1105,11 @@ class CCContent : JavaPlugin(), Listener {
             CustomItemManager.register(SukimaBookmarkNewItem())
             CustomItemManager.register(SukimaTalismanItem())
             CustomItemManager.register(SukimaWorldSproutItem())
+        }
+
+        if (isContentEnabled("crops")) {
+            CustomItemManager.register(SoybeanSeedItem())
+            CustomItemManager.register(SoybeanItem())
         }
     }
 
