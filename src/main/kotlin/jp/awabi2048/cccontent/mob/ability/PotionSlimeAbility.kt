@@ -34,6 +34,7 @@ class PotionSlimeAbility(
         world.playSound(location, Sound.ENTITY_SLIME_DEATH, 1.0f, 0.8f)
 
         val cloud = world.spawn(location, AreaEffectCloud::class.java)
+        cloud.markAsCcContentSystemEntity()
         cloud.addCustomEffect(PotionEffect(effectType, effectDurationTicks, effectAmplifier), true)
         cloud.radius = cloudRadius
         cloud.duration = cloudDurationTicks

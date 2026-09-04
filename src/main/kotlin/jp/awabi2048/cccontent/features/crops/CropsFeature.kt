@@ -9,6 +9,7 @@ import jp.awabi2048.cccontent.items.ContentItemModels
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.persistence.ContentPdcKeys
 import jp.awabi2048.cccontent.util.FeatureInitializationLogger
+import jp.awabi2048.cccontent.util.SystemEntityMarker
 import org.bukkit.Bukkit
 import org.bukkit.GameMode
 import org.bukkit.Location
@@ -227,16 +228,19 @@ class CropsFeature(private val plugin: CCContent) : Listener {
         val ty = baseTy + 0.015f // 微小な浮かせでZファイティング回避
         val transformation = Transformation(Vector3f(0f, ty, 0f), Quaternionf(), Vector3f(1f, 1f, 1f), Quaternionf())
         val supportDisplay = world.spawnEntity(loc, EntityType.ITEM_DISPLAY) as ItemDisplay
+        SystemEntityMarker.mark(supportDisplay, plugin)
         supportDisplay.setItemStack(supportItemStack())
         supportDisplay.billboard = Display.Billboard.FIXED
         supportDisplay.transformation = transformation
 
         val cropDisplay = world.spawnEntity(loc, EntityType.ITEM_DISPLAY) as ItemDisplay
+        SystemEntityMarker.mark(cropDisplay, plugin)
         cropDisplay.setItemStack(ItemStack(Material.AIR))
         cropDisplay.billboard = Display.Billboard.FIXED
         cropDisplay.transformation = transformation
 
         val interaction = world.spawnEntity(loc, EntityType.INTERACTION) as Interaction
+        SystemEntityMarker.mark(interaction, plugin)
         interaction.interactionWidth = 0.8f
         interaction.interactionHeight = 1.5f
         interaction.isPersistent = true

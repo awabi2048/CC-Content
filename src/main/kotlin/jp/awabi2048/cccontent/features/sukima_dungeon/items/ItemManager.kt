@@ -3,6 +3,7 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon.items
 
 import jp.awabi2048.cccontent.util.ItemMetaCompat
+import jp.awabi2048.cccontent.util.SystemEntityMarker
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
@@ -117,6 +118,7 @@ class ItemManager(private val plugin: JavaPlugin) {
 
         // Create Item Display
         val display = world.spawnEntity(location, EntityType.ITEM_DISPLAY) as ItemDisplay
+        SystemEntityMarker.mark(display, plugin)
         val itemStack = ItemStack(item.material)
         val meta = itemStack.itemMeta
         if (meta != null) {
@@ -184,6 +186,7 @@ class ItemManager(private val plugin: JavaPlugin) {
 
         // Create Interaction Entity
         val interaction = world.spawnEntity(location, EntityType.INTERACTION) as Interaction
+        SystemEntityMarker.mark(interaction, plugin)
         interaction.interactionWidth = 0.6f
         interaction.interactionHeight = 0.1f
         

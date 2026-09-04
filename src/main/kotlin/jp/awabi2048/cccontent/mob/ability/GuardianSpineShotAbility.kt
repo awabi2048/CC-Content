@@ -138,6 +138,7 @@ class GuardianSpineShotAbility(
         val world = guardian.world
         val start = guardian.location.clone().add(0.0, guardian.height * 0.5, 0.0)
         val display = world.spawnEntity(start, EntityType.ITEM_DISPLAY) as ItemDisplay
+        display.markAsCcContentSystemEntity(plugin)
         display.setItemStack(ItemStack(Material.LIGHTNING_ROD))
         display.billboard = Billboard.FIXED
 

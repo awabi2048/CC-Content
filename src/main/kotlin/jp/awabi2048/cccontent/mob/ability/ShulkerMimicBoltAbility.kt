@@ -81,6 +81,7 @@ class ShulkerMimicBoltAbility(
         rt.anchorLocation = anchor
 
         val display = slime.world.spawn(anchor.clone().add(0.0, headYOffset, 0.0), ItemDisplay::class.java)
+        display.markAsCcContentSystemEntity(context.plugin)
         display.setItemStack(createHeadItem())
         display.billboard = Display.Billboard.FIXED
         display.isInvulnerable = true

@@ -10,6 +10,7 @@ import java.util.Random
 
 import jp.awabi2048.cccontent.features.sukima_dungeon.mobs.MobManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.SukimaConfigHelper
+import jp.awabi2048.cccontent.util.SystemEntityMarker
 
 object StructureBuilder {
     private var loader: StructureLoader? = null
@@ -301,6 +302,7 @@ object StructureBuilder {
         // Randomly select and spawn NPCs
         npcMarkers.shuffled().take(targetNpcCount).forEach { loc ->
             val villager = world.spawn(loc, org.bukkit.entity.Villager::class.java)
+            SystemEntityMarker.mark(villager)
             villager.setAI(false)
             villager.isInvulnerable = true
             villager.setGravity(true)

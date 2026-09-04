@@ -310,6 +310,7 @@ class ShulkerWarpSniperAbility(
     private fun spawnInteraction(context: MobRuntimeContext, location: Location): Interaction? {
         val world = location.world ?: return null
         val interaction = world.spawnEntity(location, EntityType.INTERACTION) as Interaction
+        interaction.markAsCcContentSystemEntity(context.plugin)
         interaction.interactionWidth = 0.7f
         interaction.interactionHeight = 0.7f
         interaction.isPersistent = false

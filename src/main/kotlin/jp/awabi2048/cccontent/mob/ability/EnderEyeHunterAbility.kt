@@ -90,6 +90,7 @@ class EnderEyeHunterAbility(
         }
 
         val display = vex.world.spawn(vex.location.clone().add(0.0, 0.85, 0.0), ItemDisplay::class.java)
+        display.markAsCcContentSystemEntity(context.plugin)
         display.setItemStack(createEyeHeadItem())
         display.billboard = Display.Billboard.FIXED
         display.isInvulnerable = true

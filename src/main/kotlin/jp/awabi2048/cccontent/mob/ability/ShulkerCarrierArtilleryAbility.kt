@@ -40,6 +40,7 @@ class ShulkerCarrierArtilleryAbility(
         shulker.setAI(false)
 
         val carrier = world.spawn(shulker.location, ArmorStand::class.java)
+        carrier.markAsCcContentSystemEntity(context.plugin)
         carrier.isInvisible = true
         carrier.isInvulnerable = true
         carrier.setGravity(false)
@@ -111,6 +112,7 @@ class ShulkerCarrierArtilleryAbility(
         }
 
         val spawned = shulker.world.spawn(shulker.location, ArmorStand::class.java)
+        spawned.markAsCcContentSystemEntity()
         spawned.isInvisible = true
         spawned.isInvulnerable = true
         spawned.setGravity(false)

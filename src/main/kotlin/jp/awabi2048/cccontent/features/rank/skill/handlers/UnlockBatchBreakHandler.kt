@@ -1,6 +1,7 @@
 package jp.awabi2048.cccontent.features.rank.skill.handlers
 
 import jp.awabi2048.cccontent.CCContent
+import jp.awabi2048.cccontent.util.SystemEntityMarker
 import jp.awabi2048.cccontent.features.rank.job.BlockPositionCodec
 import jp.awabi2048.cccontent.features.rank.job.IgnoreBlockStore
 import jp.awabi2048.cccontent.features.rank.profession.Profession
@@ -652,6 +653,7 @@ class UnlockBatchBreakHandler(
                 entity.block = target.blockData
                 entity.isGlowing = true
             }
+            SystemEntityMarker.mark(display, CCContent.instance)
             indicators.add(display)
         }
 

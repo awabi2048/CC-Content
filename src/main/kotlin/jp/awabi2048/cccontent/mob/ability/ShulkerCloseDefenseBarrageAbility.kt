@@ -252,6 +252,7 @@ class ShulkerCloseDefenseBarrageAbility(
 
     private fun spawnVisualBullet(shooter: Shulker) {
         val bullet = shooter.world.spawn(shooter.eyeLocation.clone(), ShulkerBullet::class.java)
+        bullet.markAsCcContentSystemEntity()
         bullet.shooter = shooter
         bullet.addScoreboardTag(VISUAL_SHULKER_BULLET_TAG)
         bullet.target = resolveCombatTarget(shooter)

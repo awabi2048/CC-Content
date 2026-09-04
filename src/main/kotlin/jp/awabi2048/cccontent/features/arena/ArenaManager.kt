@@ -43,6 +43,7 @@ import jp.awabi2048.cccontent.mob.EntityMobSpawnOptions
 import jp.awabi2048.cccontent.mob.MobDefinition
 import jp.awabi2048.cccontent.mob.MobSpawnCondition
 import jp.awabi2048.cccontent.mob.MobService
+import jp.awabi2048.cccontent.util.SystemEntityMarker
 import jp.awabi2048.cccontent.mob.MobSpawnOptions
 import jp.awabi2048.cccontent.mob.ability.PeriodicCobwebAbility
 import jp.awabi2048.cccontent.structure.LoadedSchemStructure
@@ -3147,6 +3148,7 @@ class ArenaManager(
             ?.let { Bukkit.getEntity(it) as? ArmorStand }
             ?.takeIf { it.isValid && !it.isDead }
             ?: (world.spawnEntity(anchor, EntityType.ARMOR_STAND) as ArmorStand).also { spawned ->
+                SystemEntityMarker.mark(spawned, plugin)
                 configureDownedCarrier(spawned)
                 downState.carrierEntityId = spawned.uniqueId
             }
@@ -3155,6 +3157,7 @@ class ArenaManager(
             ?.let { Bukkit.getEntity(it) as? Shulker }
             ?.takeIf { it.isValid && !it.isDead }
             ?: (world.spawnEntity(anchor, EntityType.SHULKER) as Shulker).also { spawned ->
+                SystemEntityMarker.mark(spawned, plugin)
                 configureDownedShulker(spawned)
                 downState.shulkerEntityId = spawned.uniqueId
             }

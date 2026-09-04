@@ -16,6 +16,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
 import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
 import jp.awabi2048.cccontent.structure.SchemStructureService
 import jp.awabi2048.cccontent.structure.StructureSchemas
+import jp.awabi2048.cccontent.util.SystemEntityMarker
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.kyori.adventure.title.Title
@@ -406,6 +407,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         val world = markerLocation.world
         if (world == null) return null
         val marker = world.spawnEntity(markerLocation, EntityType.MARKER) as Marker
+        SystemEntityMarker.mark(marker, plugin)
         marker.addScoreboardTag(mode.tag)
         // 設置時の向き（yaw）を記録。connection_in/out 等の方向を持つマーカーで参照される。
         marker.addScoreboardTag("marker.facing.${facingYaw.toInt().mod(360)}")

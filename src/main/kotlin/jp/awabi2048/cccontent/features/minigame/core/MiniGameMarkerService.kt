@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.minigame.core
 
+import jp.awabi2048.cccontent.util.SystemEntityMarker
 import org.bukkit.Location
 import org.bukkit.Sound
 import org.bukkit.entity.EntityType
@@ -78,6 +79,7 @@ class MiniGameMarkerService(
         }
         val marker = MiniGameMarker(UUID.randomUUID(), game, data.ownerUuid, type, checkpointIndex)
         val entity = location.world?.spawnEntity(location, EntityType.MARKER) as? Marker ?: return
+        SystemEntityMarker.mark(entity, plugin)
         entity.isPersistent = true
         pdc.markEntity(entity, marker)
         consumeOne(player, item)

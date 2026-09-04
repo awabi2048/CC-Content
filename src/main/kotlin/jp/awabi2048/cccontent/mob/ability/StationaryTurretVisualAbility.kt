@@ -61,6 +61,7 @@ class StationaryTurretVisualAbility(
             anchor.clone().add(0.0, headYOffset, 0.0),
             ItemDisplay::class.java
         )
+        headDisplay.markAsCcContentSystemEntity(context.plugin)
         headDisplay.setItemStack(createHeadItem())
         headDisplay.billboard = Display.Billboard.FIXED
         headDisplay.isInvulnerable = true
@@ -75,6 +76,7 @@ class StationaryTurretVisualAbility(
             anchor.clone().add(0.0, frameYOffset, 0.0),
             BlockDisplay::class.java
         )
+        frameDisplay.markAsCcContentSystemEntity(context.plugin)
         frameDisplay.setBlock(Material.END_PORTAL_FRAME.createBlockData())
         frameDisplay.isInvulnerable = true
         frameDisplay.interpolationDuration = 2

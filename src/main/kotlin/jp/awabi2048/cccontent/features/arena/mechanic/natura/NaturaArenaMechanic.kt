@@ -3,6 +3,7 @@ package jp.awabi2048.cccontent.features.arena.mechanic.natura
 import jp.awabi2048.cccontent.features.arena.mechanic.ArenaMechanicContext
 import jp.awabi2048.cccontent.features.arena.mechanic.ArenaMechanicSupport
 import jp.awabi2048.cccontent.features.arena.mechanic.ArenaThemeMechanic
+import jp.awabi2048.cccontent.util.SystemEntityMarker
 import org.bukkit.Color
 import org.bukkit.Location
 import org.bukkit.Material
@@ -165,6 +166,7 @@ class NaturaArenaMechanic(private val plugin: JavaPlugin) : ArenaThemeMechanic {
                 Location(world, location.x + 0.5, startY, location.z + 0.5),
                 BlockDisplay::class.java
             )
+            SystemEntityMarker.mark(display, plugin)
             val dripstone = Material.POINTED_DRIPSTONE.createBlockData() as PointedDripstone
             dripstone.verticalDirection = BlockFace.DOWN
             display.setBlock(dripstone)
