@@ -89,6 +89,8 @@ open class TridentThrowAbility(
         direction.z += Random.nextDouble(-spread, spread)
 
         val projectile = entity.launchProjectile(Trident::class.java)
+        // 投擲中のトライデントはAbilityが追跡する補助Entityです。
+        projectile.markAsCcContentSystemEntity(context.plugin)
         projectile.shooter = entity
         projectile.velocity = direction.normalize().multiply(throwSpeed)
         projectile.isSilent = true

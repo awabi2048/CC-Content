@@ -8,6 +8,7 @@ import io.papermc.paper.datacomponent.item.consumable.ItemUseAnimation
 import jp.awabi2048.cccontent.items.CustomItem
 import jp.awabi2048.cccontent.items.CustomItemI18n
 import jp.awabi2048.cccontent.items.CustomItemManager
+import jp.awabi2048.cccontent.mob.ability.markAsCcContentSystemEntity
 import net.kyori.adventure.text.Component
 import org.bukkit.GameMode
 import org.bukkit.Material
@@ -245,6 +246,7 @@ class LargeExperienceBottleItem : CustomItem {
         event.isCancelled = true
         player.playSound(player.location, Sound.ENTITY_EXPERIENCE_BOTTLE_THROW, 0.9f, 1.0f)
         val bottle = player.launchProjectile(ThrownExpBottle::class.java)
+        bottle.markAsCcContentSystemEntity()
         bottle.velocity = player.eyeLocation.direction.clone().normalize().multiply(0.7).add(Vector(0.0, 0.1, 0.0))
         bottle.persistentDataContainer.set(SpecialCustomItemKeys.EXPERIENCE_BOTTLE, PersistentDataType.BYTE, 1)
         if (player.gameMode == GameMode.CREATIVE) return

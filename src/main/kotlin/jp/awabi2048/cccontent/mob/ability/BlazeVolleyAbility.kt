@@ -158,6 +158,9 @@ class BlazeVolleyAbility(
             ProjectileKind.SMALL_FIREBALL -> shooter.launchProjectile(SmallFireball::class.java)
             ProjectileKind.FIREBALL -> shooter.launchProjectile(Fireball::class.java)
         }
+        // 火球は通常のEntity選択にも現れるため、Abilityの管理対象であることを
+        // 生成直後に共通台帳へ記録して、汎用コマンドから操作できないようにします。
+        projectile.markAsCcContentSystemEntity(context.plugin)
         projectile.shooter = shooter
         projectile.velocity = direction.normalize().multiply(projectileSpeed)
         if (projectile is Fireball) {
