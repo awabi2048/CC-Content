@@ -34,6 +34,7 @@ class FlyingItemDisplay private constructor(
 
         fun spawn(world: World, location: Location, itemStack: ItemStack, spinning: Boolean = true): FlyingItemDisplay {
             val display = world.spawnEntity(location, EntityType.ITEM_DISPLAY) as ItemDisplay
+            display.markAsCcContentSystemEntity()
             display.setItemStack(itemStack.clone())
             display.billboard = Display.Billboard.FIXED
             display.brightness = Display.Brightness(15, 15)

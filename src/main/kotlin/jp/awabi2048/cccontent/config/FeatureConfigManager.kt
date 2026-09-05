@@ -11,6 +11,7 @@ object FeatureConfigManager {
     const val ARENA_REWARD_PATH = "config/arena/reward.yml"
     const val SUKIMA_SETTINGS_PATH = "config/sukima_dungeon/settings.yml"
     const val RANK_SETTINGS_PATH = "config/rank/settings.yml"
+    const val CROPS_SETTINGS_PATH = "config/crops/crops.yml"
 
     fun load(plugin: JavaPlugin, resourcePath: String): YamlConfiguration {
         val file = File(plugin.dataFolder, resourcePath)

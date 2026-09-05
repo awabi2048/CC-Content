@@ -24,6 +24,9 @@ object ContentItemModels {
 
     fun resource(id: String): NamespacedKey = custom("resource/$id")
 
+    /** 作物栽培（Crops）の表示モデル。id は crops.yml の support_model / stage_models とも整合する。 */
+    fun crops(id: String): NamespacedKey = custom("crops/$id")
+
     fun fishingFish(fishId: String): NamespacedKey = custom("fishing/fish/$fishId")
     fun fishingRod(rodId: String): NamespacedKey = custom("fishing/rod/$rodId")
     fun fishingBait(baitId: String): NamespacedKey = custom("fishing/bait/$baitId")

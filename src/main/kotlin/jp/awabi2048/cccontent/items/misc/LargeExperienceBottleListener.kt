@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.items.misc
 
+import jp.awabi2048.cccontent.util.SystemEntityMarker
 import org.bukkit.entity.ExperienceOrb
 import org.bukkit.event.EventHandler
 import org.bukkit.event.EventPriority
@@ -16,5 +17,6 @@ class LargeExperienceBottleListener : Listener {
 
         event.isCancelled = true
         bottle.world.spawn(bottle.location, ExperienceOrb::class.java) { orb -> orb.experience = 1500 }
+            .also { SystemEntityMarker.mark(it) }
     }
 }

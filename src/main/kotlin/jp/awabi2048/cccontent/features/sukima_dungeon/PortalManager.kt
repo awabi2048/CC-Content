@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
+import jp.awabi2048.cccontent.util.SystemEntityMarker
 import org.bukkit.Location
 import org.bukkit.Particle
 import org.bukkit.World
@@ -31,6 +32,7 @@ object PortalManager {
         val world = loc.world ?: throw IllegalStateException("World cannot be null")
         
         val interaction = world.spawnEntity(loc, EntityType.INTERACTION) as Interaction
+        SystemEntityMarker.mark(interaction, plugin)
         interaction.interactionWidth = 1.0f
         interaction.interactionHeight = 2.0f
         
@@ -54,12 +56,14 @@ object PortalManager {
         val world = location.world ?: throw IllegalStateException("World cannot be null")
         
         val interaction = world.spawnEntity(location, EntityType.INTERACTION) as Interaction
+        SystemEntityMarker.mark(interaction, plugin)
         interaction.interactionWidth = 1.0f
         interaction.interactionHeight = 2.0f
         interaction.addScoreboardTag("sd.portal.return")
         
         // Marker for compass
         val marker = world.spawnEntity(location, EntityType.MARKER) as org.bukkit.entity.Marker
+        SystemEntityMarker.mark(marker, plugin)
         marker.addScoreboardTag("sd.return_portal_marker")
         
         val session = PortalSession(

@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
+import jp.awabi2048.cccontent.util.SystemEntityMarker
 import org.bukkit.Material
 import org.bukkit.Particle
 import org.bukkit.World
@@ -59,6 +60,7 @@ object SproutManager {
             // Spawn tracker entity in the center of the block for particles and detection
             val trackerLoc = blockLoc.clone().add(0.5, 0.0, 0.5)
             val tracker = world.spawn(trackerLoc, ArmorStand::class.java)
+            SystemEntityMarker.mark(tracker, plugin)
             tracker.isVisible = false
             tracker.isMarker = true
             tracker.setGravity(false)

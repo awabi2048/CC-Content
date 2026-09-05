@@ -113,6 +113,7 @@ import jp.awabi2048.cccontent.mob.ability.BoomerangService
 import jp.awabi2048.cccontent.mob.ability.HomingArrowService
 import jp.awabi2048.cccontent.mob.ability.ShulkerWarpSniperAbility
 import jp.awabi2048.cccontent.mob.ability.ThrownWeaponService
+import jp.awabi2048.cccontent.util.SystemEntityMarker
 import org.bukkit.Bukkit
 import org.bukkit.Color
 import org.bukkit.FluidCollisionMode
@@ -602,6 +603,7 @@ class MobService(private val plugin: JavaPlugin) {
         val sessionKey = resolveSessionKey(options, world.name)
 
         val entity = world.spawnEntity(location, mobType.baseEntityType) as? LivingEntity ?: return null
+        SystemEntityMarker.mark(entity, plugin)
         markEntity(entity, definition, mobType, options)
         enforceStrictSpawnState(entity)
         applyDefinitionStats(entity, definition)
@@ -643,6 +645,7 @@ class MobService(private val plugin: JavaPlugin) {
         val sessionKey = resolveEntitySessionKey(options, world.name)
 
         val entity = world.spawnEntity(location, mobType.baseEntityType)
+        SystemEntityMarker.mark(entity, plugin)
         markEntityLike(entity, definition, mobType, options)
 
         val spawnContext = EntityMobSpawnContext(plugin, entity, definition, mobType, options)
@@ -959,6 +962,7 @@ class MobService(private val plugin: JavaPlugin) {
 
         val world = shooter.world
         val lingering = world.spawn(spawnLocation, LingeringPotion::class.java)
+        SystemEntityMarker.mark(lingering, plugin)
         lingering.shooter = shooter
         lingering.velocity = velocity
         lingering.item = item

@@ -26,6 +26,14 @@ object ContentPdcKeys {
     val gyotakuRecordId = current("catch_record_id")
     val itemSchemaVersion = current("item_schema_version")
 
+    // 作物栽培（Crops）: 支柱Interactionに集約して保存する状態
+    val cropsSupport = current("crops_support")
+    val cropsCropType = current("crops_crop_type")
+    val cropsStage = current("crops_stage")
+    val cropsProgress = current("crops_progress")
+    val cropsSupportDisplay = current("crops_support_display")
+    val cropsCropDisplay = current("crops_crop_display")
+
     /**
      * 正規キーを優先して読み、旧名前空間しかない場合は同値を正規キーへ移す。
      * 戻り値のchangedは呼出側がItemMetaをItemStackへ再設定する必要があることを示す。

@@ -14,7 +14,7 @@ class ContentFeatureStateTest {
         var statuses = new ContentFeatureState().statuses();
 
         assertEquals(List.of("arena", "rank", "brewery", "cooking", "fishing", "resource_collection",
-                "seasonal", "sukima_dungeon", "party", "minigame"),
+                "seasonal", "sukima_dungeon", "party", "crops", "minigame"),
             statuses.stream().map(s -> s.getFeature().getId()).toList());
         assertEquals("Resource Collection", statuses.get(5).getFeature().getDisplayName());
         assertEquals(List.of("rank"), statuses.get(4).getFeature().getDependencies());

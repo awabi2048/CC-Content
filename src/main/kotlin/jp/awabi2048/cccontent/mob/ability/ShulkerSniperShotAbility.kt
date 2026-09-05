@@ -180,6 +180,7 @@ class ShulkerSniperShotAbility(
 
     private fun spawnVisualBullet(world: org.bukkit.World, shooter: Shulker) {
         val bullet = world.spawn(shooter.eyeLocation.clone(), ShulkerBullet::class.java)
+        bullet.markAsCcContentSystemEntity()
         bullet.shooter = shooter
         bullet.addScoreboardTag(VISUAL_SHULKER_BULLET_TAG)
         bullet.target = resolveCombatTarget(shooter)

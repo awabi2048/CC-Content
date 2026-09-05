@@ -13,6 +13,7 @@ content_enabled:
   sukima_dungeon: true
   party: true
   minigame: true
+  crops: true
 
 persistence:
   flush_interval_minutes: 1

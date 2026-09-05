@@ -151,6 +151,7 @@ class StealthFangAbility(
             caster.location.clone()
         }
         val fangs = world.spawn(spawnLocation, EvokerFangs::class.java)
+        fangs.markAsCcContentSystemEntity(plugin)
         fangs.isSilent = true
         MobService.getInstance(plugin)?.markStealthFang(fangs)
     }

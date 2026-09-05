@@ -155,6 +155,7 @@ class EndWitherSentinelAbility(
 
     private fun spawnBodyDisplay(wither: Wither): ItemDisplay {
         return wither.world.spawn(wither.location.clone().add(0.0, 1.5, 0.0), ItemDisplay::class.java).apply {
+            markAsCcContentSystemEntity()
             setItemStack(ItemStack(Material.WITHER_SKELETON_SKULL))
             billboard = Display.Billboard.FIXED
             brightness = Display.Brightness(15, 15)
@@ -216,6 +217,7 @@ class EndWitherSentinelAbility(
 
     private fun spawnProjectileDisplay(location: Location, direction: Vector): ItemDisplay {
         return location.world.spawn(location, ItemDisplay::class.java).apply {
+            markAsCcContentSystemEntity()
             setItemStack(ItemStack(Material.WITHER_SKELETON_SKULL))
             billboard = Display.Billboard.FIXED
             brightness = Display.Brightness(15, 15)

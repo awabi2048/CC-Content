@@ -59,6 +59,7 @@ public final class ResourceConfigurationValidator {
         validateMiniGameConfigs(configRoot, configs, errors);
         validateEnvironmentRegionConfig(configRoot, configs, errors);
         validateResourceCollectionConfigs(configRoot, configs, errors);
+        validateCropsConfigs(configRoot, configs, errors);
         validateSukimaDungeonConfigs(configRoot, configs, errors);
         return errors;
     }
@@ -107,9 +108,9 @@ public final class ResourceConfigurationValidator {
 
         Map<String, Object> contentEnabled = requireMap(root, "content_enabled", file, errors);
         if (contentEnabled != null) {
-            Set<String> knownFeatures = Set.of(
+            Set<String> knownFeatures =             Set.of(
                 "arena", "rank", "brewery", "cooking", "fishing", "resource_collection",
-                "seasonal", "sukima_dungeon", "party", "minigame"
+                "seasonal", "sukima_dungeon", "party", "minigame", "crops"
             );
             contentEnabled.keySet().stream()
                 .filter(key -> !knownFeatures.contains(key))
@@ -127,6 +128,7 @@ public final class ResourceConfigurationValidator {
             requireBoolean(contentEnabled, "sukima_dungeon", file, "content_enabled.sukima_dungeon", errors);
             requireBoolean(contentEnabled, "party", file, "content_enabled.party", errors);
             requireBoolean(contentEnabled, "minigame", file, "content_enabled.minigame", errors);
+            requireBoolean(contentEnabled, "crops", file, "content_enabled.crops", errors);
         }
         Map<String, Object> persistence = requireMap(root, "persistence", file, errors);
         if (persistence != null) {
@@ -792,6 +794,46 @@ public final class ResourceConfigurationValidator {
                 "burl_override_chance",
                 errors
             );
+        }
+    }
+
+    private static void validateCropsConfigs(Path configRoot, Map<Path, Object> configs, List<String> errors) {
+        Path file = configRoot.resolve("crops/crops.yml");
+        Map<String, Object> root = asMap(configs.get(file));
+        if (root == null) {
+            errors.add(format("missing crops config", file, "<root>", "crops config is required"));
+            return;
+        }
+        requireIntegerRange(root.get("config_version"), 1, 1, file, "config_version", errors);
+        Map<String, Object> crops = requireMap(root, "crops", file, errors);
+        if (crops == null) return;
+        requireNonEmpty(crops, file, "crops", errors);
+        for (Map.Entry<String, Object> entry : crops.entrySet()) {
+            String path = "crops." + entry.getKey();
+            Map<String, Object> crop = asMap(entry.getValue());
+            if (crop == null) {
+                errors.add(format("invalid crop", file, path, "crop must be a section"));
+                continue;
+            }
+            requireString(crop, "seed_item", file, path + ".seed_item", errors);
+            requireString(crop, "harvest_item", file, path + ".harvest_item", errors);
+            requireString(crop, "support_model", file, path + ".support_model", errors);
+            requirePositiveInteger(crop.get("max_stage"), file, path + ".max_stage", errors);
+            requirePositiveInteger(crop.get("ticks_per_stage"), file, path + ".ticks_per_stage", errors);
+            requirePositiveInteger(crop.get("bone_meal_stages"), file, path + ".bone_meal_stages", errors);
+            Object stageModels = crop.get("stage_models");
+            if (!(stageModels instanceof List<?> models) || models.isEmpty()) {
+                errors.add(format("invalid crops stage_models", file, path + ".stage_models", "a non-empty list is required"));
+                continue;
+            }
+            Object maxStageObj = crop.get("max_stage");
+            if (maxStageObj instanceof Number maxStage) {
+                int expected = maxStage.intValue() + 1;
+                if (models.size() != expected) {
+                    errors.add(format("invalid crops stage_models", file, path + ".stage_models",
+                        "stage_models must have max_stage+1 (" + expected + ") entries"));
+                }
+            }
         }
     }
 

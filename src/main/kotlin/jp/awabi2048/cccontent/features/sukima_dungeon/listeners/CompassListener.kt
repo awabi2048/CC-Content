@@ -6,6 +6,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.CustomItemManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.SproutManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
+import jp.awabi2048.cccontent.util.SystemEntityMarker
 import org.bukkit.Bukkit
 import org.bukkit.Sound
 import org.bukkit.entity.Player
@@ -298,7 +299,7 @@ class CompassListener(private val plugin: JavaPlugin) : Listener {
                         d.isGlowing = true
                         d.glowColorOverride = org.bukkit.Color.fromRGB(8453761)
                         d.brightness = org.bukkit.entity.Display.Brightness(15, 15)
-                    }
+                    }.also { SystemEntityMarker.mark(it, plugin) }
                     session.markerEntities[sproutId] = display
                     
                     // discovery feedback
@@ -322,7 +323,7 @@ class CompassListener(private val plugin: JavaPlugin) : Listener {
                         d.isGlowing = true
                         d.glowColorOverride = org.bukkit.Color.AQUA
                         d.brightness = org.bukkit.entity.Display.Brightness(15, 15)
-                    }
+                    }.also { SystemEntityMarker.mark(it, plugin) }
                     session.markerEntities[portalId] = display
                     
                     // discovery feedback

@@ -1,0 +1,27 @@
+config_version: 1
+# 現状整理用のデバッグログを有効化する（true でコンソールへ詳細出力）
+debug: true
+
+# 作物栽培（Crops）の定義
+# 各作物は支柱に作付けし、時間経過（または骨粉）で段階的に成長する。
+# stage_models は max_stage + 1 件（段階 0 から max_stage）必要。
+crops:
+  soybean:
+    # 作付けに使うカスタムアイテムの fullId（feature.id）
+    seed_item: "crops.soybean_seed"
+    # 収穫で得られるカスタムアイテムの fullId
+    harvest_item: "crops.soybean"
+    # 最大成長段階（0 始まり）。収穫可能になるのはこの段階に達したとき。
+    max_stage: 3
+    # 1 段階の成長にかかるtick数（20tick = 1秒）。読込中のみ進行する。
+    ticks_per_stage: 2400
+    # 骨粉1回で進む段階数（0 で骨粉無効）
+    bone_meal_stages: 1
+    # 支柱の表示モデル（item_model ID）
+    support_model: "kota_server:custom_item/crops/support"
+    # 各成長段階の表示モデル（item_model ID）。インデックス = 段階。
+    stage_models:
+      - "kota_server:custom_item/crops/soybean_stage0"
+      - "kota_server:custom_item/crops/soybean_stage1"
+      - "kota_server:custom_item/crops/soybean_stage2"
+      - "kota_server:custom_item/crops/soybean_stage3"

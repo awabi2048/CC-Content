@@ -91,6 +91,8 @@ class WeaponThrowAbility(
         direction.z += Random.nextDouble(-spread, spread)
 
         val projectile = entity.launchProjectile(Arrow::class.java)
+        // 内部表示用の投擲体は通常のEntity操作対象へ公開しません。
+        projectile.markAsCcContentSystemEntity(context.plugin)
         projectile.shooter = entity
         projectile.velocity = direction.normalize().multiply(throwSpeed)
         projectile.isSilent = true

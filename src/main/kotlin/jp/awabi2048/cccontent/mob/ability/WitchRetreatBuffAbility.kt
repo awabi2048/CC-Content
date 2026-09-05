@@ -186,6 +186,7 @@ class WitchRetreatBuffAbility(
         val world = location.world ?: return
         val selected = retreatDebuffPool.randomOrNull() ?: return
         val cloud = world.spawn(location, AreaEffectCloud::class.java)
+        cloud.markAsCcContentSystemEntity()
         cloud.radius = retreatDebuffCloudRadius
         cloud.duration = retreatDebuffCloudDurationTicks
         cloud.setWaitTime(5)
