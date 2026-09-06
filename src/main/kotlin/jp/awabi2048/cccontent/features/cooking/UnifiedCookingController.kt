@@ -3,6 +3,8 @@ package jp.awabi2048.cccontent.features.cooking
 import jp.awabi2048.cccontent.gui.ManagedMenuPresenter
 
 import com.awabi2048.ccsystem.CCSystem
+import com.awabi2048.ccsystem.api.action.ContentAction
+import com.awabi2048.ccsystem.api.action.ContentActionType
 import com.awabi2048.ccsystem.api.gui.GuiLoreLine
 import com.awabi2048.ccsystem.api.localization.LocalizationKey
 import com.awabi2048.ccsystem.api.localization.generated.ContentCookingGeneratedKeys
@@ -1259,6 +1261,9 @@ internal class UnifiedCookingController(
         val firstCollection = collectorId !in current.collectorIds
         if (successful && firstCollection) {
             catalogStore.record(player.uniqueId, CatalogType.COOKING, next.recipeId, obtained = true)
+            // 醸造の BREWING_COMPLETED と対称になるよう、調理の初回成功回収を通知する。
+            // 契約型 COOKING_COMPLETED は CC-System 側に定義済みであり、発行自体に購読者への副作用はない。
+            publishCookingCompletion(player.uniqueId, next.recipeId)
         }
         val updated = current.copy(
             session = next.takeUnless { it.state == CookingProcessState.IDLE },
@@ -1278,6 +1283,25 @@ internal class UnifiedCookingController(
         dirty = true
         flush()
         render(player, player.openInventory.topInventory, holder)
+    }
+
+    /**
+     * 調理の成功回収を CC-System のアクション契約へ通知する。
+     * 醸造側の publishBrewingCompletion と対称の形式にし、購読側が recipeId で集計できるようにする。
+     */
+    private fun publishCookingCompletion(playerId: UUID, recipeId: String) {
+        CCSystem.getAPI().getContentActionDispatcher().publish(
+            ContentAction(
+                actionId = UUID.randomUUID(),
+                schemaVersion = 1,
+                occurredAt = CCSystem.getAPI().getSharedClockService().now().toInstant(),
+                playerId = playerId,
+                actionType = ContentActionType.COOKING_COMPLETED,
+                amount = 1L,
+                worldKey = null,
+                metadata = mapOf("recipeId" to recipeId)
+            )
+        )
     }
 
     private fun consumeNewWater(

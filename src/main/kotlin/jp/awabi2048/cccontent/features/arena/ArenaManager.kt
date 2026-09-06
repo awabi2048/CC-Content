@@ -8103,7 +8103,9 @@ class ArenaManager(
     }
 
     private fun updateBarrierReturnHoldStates(currentTick: Long) {
-        for (session in sessionsByWorld.values) {
+        // 帰還処理がセッション終了を伴うと sessionsByWorld から削除されるため、
+        // 反復中の ConcurrentModificationException を避けるよう snapshot して走査する。
+        for (session in sessionsByWorld.values.toList()) {
             val canReturn = session.barrierRestartCompleted || session.missionCompleted
             if (!canReturn) {
                 if (session.barrierReturnHoldTicksByParticipant.isNotEmpty()) {

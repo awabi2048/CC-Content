@@ -34,16 +34,16 @@ class ArenaHistoryStore(private val file: File) {
     }
 
     fun save() {
-        file.parentFile.mkdirs()
-        val yaml = YamlConfiguration()
-        yaml.set("records", records.map {
-            mapOf(
-                "player" to it.playerId.toString(),
-                "date" to it.date.toString(),
-                "difficulty_star" to it.difficultyStar,
-                "duration_seconds" to it.durationSeconds
-            )
-        })
-        yaml.save(file)
+        // クラッシュ途中の半端な書き込みで既存ファイルを壊さないよう原子保存する。内容・形式は従来通り。
+        ArenaYamlFiles.saveAtomically(file) {
+            set("records", records.map {
+                mapOf(
+                    "player" to it.playerId.toString(),
+                    "date" to it.date.toString(),
+                    "difficulty_star" to it.difficultyStar,
+                    "duration_seconds" to it.durationSeconds
+                )
+            })
+        }
     }
 }

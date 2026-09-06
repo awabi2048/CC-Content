@@ -836,19 +836,30 @@ class ArenaEnchantPedestalMenu(
         val baseItem = toolItem.clone()
         val consumedCatalysts = prepared.sortedBy { it.slot }.map { it.item.clone() }
         val workingTool = toolItem.clone()
-        var state = getOverEnchantState(workingTool)
-        prepared.sortedBy { it.slot }.forEach { preparedCatalyst ->
-            val catalyst = preparedCatalyst.catalyst
-            resolveAppliedEnchantments(catalyst).forEach { (enchantmentId, enchantment, resultingLevel) ->
-                workingTool.addUnsafeEnchantment(enchantment, resultingLevel)
-                val appliedOverLevel = resolveAppliedOverLevel(catalyst, enchantmentId)
-                state = applyOverEnchantEntry(state, enchantmentId, appliedOverLevel)
+        // 触媒消費後の工程で例外が起きても素材を失わないよう、入力スロット全体を退避する。
+        // 復旧時は退避時の内容へ戻し、鍛造失敗扱いとして経験値の返金へ回す。
+        val inputBackup = inputSlots().mapNotNull { slot ->
+            getInputItem(inventory, slot)?.clone()?.let { item -> slot to item }
+        }.toMap()
+        try {
+            var state = getOverEnchantState(workingTool)
+            prepared.sortedBy { it.slot }.forEach { preparedCatalyst ->
+                val catalyst = preparedCatalyst.catalyst
+                resolveAppliedEnchantments(catalyst).forEach { (enchantmentId, enchantment, resultingLevel) ->
+                    workingTool.addUnsafeEnchantment(enchantment, resultingLevel)
+                    val appliedOverLevel = resolveAppliedOverLevel(catalyst, enchantmentId)
+                    state = applyOverEnchantEntry(state, enchantmentId, appliedOverLevel)
+                }
+                consumeOneCatalyst(inventory, preparedCatalyst.slot)
             }
-            consumeOneCatalyst(inventory, preparedCatalyst.slot)
-        }
 
-        setOverEnchantState(workingTool, state)
-        applyOverEnchantLore(workingTool, state)
+            setOverEnchantState(workingTool, state)
+            applyOverEnchantLore(workingTool, state)
+        } catch (error: Exception) {
+            inputBackup.forEach { (slot, item) -> inventory.setItem(slot, item.clone()) }
+            plugin.logger.warning("[Arena] 祭壇の鍛造処理で例外が発生したため入力を復元しました: ${error.message}")
+            return false
+        }
 
         missionServiceProvider()?.recordOverEnchantSuccess(player.uniqueId, prepared.size)
         auditLogger.logPedestalTransform(player.uniqueId, player.name, baseItem, workingTool.clone(), consumedCatalysts)

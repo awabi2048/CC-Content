@@ -15,6 +15,7 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import jp.awabi2048.cccontent.features.arena.ArenaAuditLogger
 import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.arena.ArenaMenuItems
+import jp.awabi2048.cccontent.features.arena.ArenaYamlFiles
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeVariant
 import jp.awabi2048.cccontent.features.arena.ArenaManager
 import jp.awabi2048.cccontent.features.arena.ArenaStartResult
@@ -571,21 +572,22 @@ class ArenaMissionService(
 
     private fun saveMissionSet(missionSet: ArenaMissionSet) {
         val file = File(missionDir, CURRENT_MISSION_FILE_NAME)
-        val config = YamlConfiguration()
-        config.set("generated_at", missionSet.generatedAtMillis)
-        config.set(
-            "missions",
-            missionSet.missions.map { mission ->
-                linkedMapOf(
-                    "index" to mission.index,
-                    "mission_type_id" to mission.missionTypeId,
-                    "theme_id" to mission.themeId,
-                    "promoted" to mission.promoted,
-                    "max_participants" to mission.maxParticipants
-                )
-            }
-        )
-        config.save(file)
+        // クラッシュ途中の半端な書き込みで既存ファイルを壊さないよう原子保存する。内容・形式は従来通り。
+        ArenaYamlFiles.saveAtomically(file) {
+            set("generated_at", missionSet.generatedAtMillis)
+            set(
+                "missions",
+                missionSet.missions.map { mission ->
+                    linkedMapOf(
+                        "index" to mission.index,
+                        "mission_type_id" to mission.missionTypeId,
+                        "theme_id" to mission.themeId,
+                        "promoted" to mission.promoted,
+                        "max_participants" to mission.maxParticipants
+                    )
+                }
+            )
+        }
     }
 
     private fun loadCurrentMissionSet(): ArenaMissionSet {
@@ -989,24 +991,25 @@ class ArenaMissionService(
     private fun savePlayerData(playerId: UUID) {
         val data = playerCache[playerId] ?: return
         val file = File(playerDir, "$playerId.yml")
-        val config = YamlConfiguration()
-        config.set("arena.total_clear_count", data.totalMissionClearCount)
-        config.set("arena.total_mob_kill_count", data.totalMobKillCount)
-        config.set("arena.total_strong_enemy_kill_count", data.totalStrongEnemyKillCount)
-        config.set("arena.total_over_enchant_success_count", data.totalOverEnchantSuccessCount)
-        config.set("arena.barrier_restart_count", data.barrierRestartCount)
-        config.set("arena.lobby.visited", data.lobbyVisited)
-        config.set("arena.lobby.tutorial_completed", data.lobbyTutorialCompleted)
-        config.set("arena.license_tier", data.licenseTier.id)
-        config.set("arena.completed", data.completedMissionIndices.toList().sorted())
-        val shardCounterSection = linkedMapOf<String, Map<String, Int>>()
-        data.enchantShardKillCounters.toSortedMap().forEach { (shardKey, countsByMob) ->
-            shardCounterSection[shardKey] = countsByMob
-                .filterValues { it > 0 }
-                .toSortedMap()
+        // クラッシュ途中の半端な書き込みで既存ファイルを壊さないよう原子保存する。内容・形式は従来通り。
+        ArenaYamlFiles.saveAtomically(file) {
+            set("arena.total_clear_count", data.totalMissionClearCount)
+            set("arena.total_mob_kill_count", data.totalMobKillCount)
+            set("arena.total_strong_enemy_kill_count", data.totalStrongEnemyKillCount)
+            set("arena.total_over_enchant_success_count", data.totalOverEnchantSuccessCount)
+            set("arena.barrier_restart_count", data.barrierRestartCount)
+            set("arena.lobby.visited", data.lobbyVisited)
+            set("arena.lobby.tutorial_completed", data.lobbyTutorialCompleted)
+            set("arena.license_tier", data.licenseTier.id)
+            set("arena.completed", data.completedMissionIndices.toList().sorted())
+            val shardCounterSection = linkedMapOf<String, Map<String, Int>>()
+            data.enchantShardKillCounters.toSortedMap().forEach { (shardKey, countsByMob) ->
+                shardCounterSection[shardKey] = countsByMob
+                    .filterValues { it > 0 }
+                    .toSortedMap()
+            }
+            set("arena.enchant_shard_kill_counters", shardCounterSection.filterValues { it.isNotEmpty() })
         }
-        config.set("arena.enchant_shard_kill_counters", shardCounterSection.filterValues { it.isNotEmpty() })
-        config.save(file)
     }
 
     private fun loadPlayerData(file: File): ArenaPlayerMissionData {

@@ -32,9 +32,9 @@ class ArenaDailyEntryStore(private val file: File) {
     fun lastEntryDate(playerId: UUID): LocalDate? = lastEntryDates[playerId]
 
     fun save() {
-        file.parentFile.mkdirs()
-        val yaml = YamlConfiguration()
-        lastEntryDates.forEach { (player, date) -> yaml.set("entries.$player", date.toString()) }
-        yaml.save(file)
+        // クラッシュ途中の半端な書き込みで既存ファイルを壊さないよう原子保存する。内容・形式は従来通り。
+        ArenaYamlFiles.saveAtomically(file) {
+            lastEntryDates.forEach { (player, date) -> set("entries.$player", date.toString()) }
+        }
     }
 }
