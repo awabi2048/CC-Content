@@ -63,6 +63,7 @@ class CropsFeature(private val plugin: CCContent) : Listener {
         growthTask = plugin.server.scheduler.runTaskTimer(plugin, Runnable { tickGrowth() }, 20L, 20L)
         logger.setStatus("Crops", FeatureInitializationLogger.Status.SUCCESS)
         logger.addSummaryMessage("Crops", "作物定義: ${settings.crops.size}件, debug=${settings.debug}")
+        /* デバッグ出力凍結中（復帰時はこのブロックのコメントを外す）。
         if (settings.debug) {
             plugin.logger.info("[Crops][Debug] 初期化完了: debug=true, crops=${settings.crops.map { it.id }}")
             settings.crops.forEach { def ->
@@ -72,6 +73,7 @@ class CropsFeature(private val plugin: CCContent) : Listener {
                 )
             }
         }
+        */
     }
 
     fun shutdown() {
@@ -155,6 +157,7 @@ class CropsFeature(private val plugin: CCContent) : Listener {
         // 同ブロック厳密一致（distanceSquared < 0.25、半径0.5）のみを占有とみなす。
         val candidates = world.getNearbyEntities(loc, 0.6, 0.6, 0.6).filter { supportOf(it) != null }
         val filtered = candidates.filter { it.location.distanceSquared(loc) < 0.25 }
+        /* デバッグ出力凍結中（復帰時はこのブロックのコメントを外す）。
         if (settings.debug) {
             if (filtered.isNotEmpty()) {
                 filtered.forEach { entity ->
@@ -172,6 +175,7 @@ class CropsFeature(private val plugin: CCContent) : Listener {
                 }
             }
         }
+        */
         return filtered.isNotEmpty()
     }
 
@@ -454,9 +458,11 @@ class CropsFeature(private val plugin: CCContent) : Listener {
                 }
             }
         }
+        /* デバッグ出力凍結中（復帰時はこのブロックのコメントを外す）。
         if (settings.debug && grownCount > 0) {
             plugin.logger.info("[Crops][Debug] tickGrowth: $grownCount 件が成長（作付け総数 $totalPlanted）")
         }
+        */
     }
 
     // ---- ヘルパ ----
@@ -490,8 +496,10 @@ class CropsFeature(private val plugin: CCContent) : Listener {
     private fun localized(player: Player, key: LocalizationKey<String>): String =
         CCSystem.getAPI().getLocalized(player, key).replace('&', '§')
 
+    // デバッグ出力凍結中。各debugLog呼出は残し、ここで無効化する。復帰時は本体を戻す。
+    @Suppress("UNUSED_PARAMETER")
     private fun debugLog(message: String) {
-        if (!::settings.isInitialized || !settings.debug) return
-        plugin.logger.info("[Crops][Debug] $message")
+        /* if (!::settings.isInitialized || !settings.debug) return
+        plugin.logger.info("[Crops][Debug] $message") */
     }
 }
