@@ -362,8 +362,11 @@ class CatalogCommand(
         event.isCancelled = true
     }
 
+    // 図鑑画面はcatalog集約画面のため、fishing/cooking/breweryの本文・タイトル、content_managementの利用可否文、
+    // custom_itemsの餌名解決を同一text境界で扱う。単一ドメイン制限はPlayerInteractEventのERROR原因となるため拡張する。
+    // 画面契約・寸法・素材・配置・情報順・操作導線の変更はない。
     private fun text(player: Player, key: String, vararg placeholders: Pair<String, Any?>): String =
-        CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "catalog."), placeholders.associate { it.first to (it.second ?: "") }).replace('&', '§')
+        CCSystem.getAPI().getLocalized(player, jp.awabi2048.cccontent.util.ContentLocalizationKeys.text(key, "catalog.", "fishing.", "content_management.", "cooking.", "brewery.", "custom_items."), placeholders.associate { it.first to (it.second ?: "") }).replace('&', '§')
 }
 
 private class FishingDetailHolder(val owner: UUID, val returnPage: Int) : InventoryHolder {
