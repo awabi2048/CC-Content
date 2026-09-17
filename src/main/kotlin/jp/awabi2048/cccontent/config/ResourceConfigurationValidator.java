@@ -334,7 +334,8 @@ public final class ResourceConfigurationValidator {
             requirePositiveNumber(variant, "weight", file, variantName + ".weight", errors);
         }
         requirePositiveNumber(variant, "difficulty_star", file, variantName + ".difficulty_star", errors);
-        requirePositiveNumber(variant, "max_participants", file, variantName + ".max_participants", errors);
+        // max_participants / revive_max_per_player / revive_time_limit_seconds は仕様から除外したため検証しない。
+        // 人数上限は難易度starの中央対応表、蘇生は回数無制限・期限なしとする。
         Object wavesValue = variant.get("waves");
         if (!(wavesValue instanceof List<?> waves) || waves.isEmpty()) {
             errors.add(format("missing arena theme waves", file, variantName + ".waves", "at least one wave is required"));

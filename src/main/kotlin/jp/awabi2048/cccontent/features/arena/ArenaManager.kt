@@ -20,6 +20,7 @@ import jp.awabi2048.cccontent.config.FeatureConfigManager
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageGenerator
 import jp.awabi2048.cccontent.features.arena.generator.ArenaStageBuildException
 import jp.awabi2048.cccontent.features.arena.generator.ArenaTheme
+import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeDifficulty
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeLoader
 import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeLoadStatus
 import jp.awabi2048.cccontent.features.arena.generator.ArenaDoorAnimationPlacement
@@ -128,6 +129,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlin.math.sin
+import kotlin.random.Random
 
 sealed class ArenaStartResult {
     data class Success(
@@ -367,6 +369,8 @@ class ArenaManager(
         const val WAVE_CATCHUP_TELEPORT_DELAY_MILLIS = 30_000L
         const val DOWN_REVIVE_HOLD_SECONDS_DEFAULT = 3
         const val DOWN_REVIVE_RADIUS_DEFAULT = 2.5
+        // 蘇生1回ごとに加算する作業時間（秒）。被蘇生者の累積回数基準、上限なし。
+        const val REVIVE_HOLD_EXTRA_SECONDS_PER_COUNT = 2
         const val DOWN_SHULKER_FOLLOW_INTERVAL_TICKS_DEFAULT = 2L
         const val DOWN_GAME_OVER_BLINDNESS_TICKS = 200
         const val DOWN_GAME_OVER_RETURN_DELAY_MILLIS = 8000L
@@ -825,6 +829,13 @@ class ArenaManager(
                 "arena.messages.command.start_error.theme_not_found",
                 arrayOf("theme" to requestedTheme, "mob_type" to requestedTheme)
             ))
+        // CLEARING は実装待ちのため仕様から除外する。管理コマンド側でも選択不可だがAPI直呼びに備えてここで拒否する。
+        if (missionTypeId == ArenaMissionType.CLEARING) {
+            return completed(ArenaStartResult.Error(
+                "arena.messages.command.start_error.invalid_mission_type",
+                arrayOf("type" to missionTypeId.id)
+            ))
+        }
         if (promoted && theme.promotedVariant == null) {
             return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.promoted_not_configured",
@@ -845,7 +856,8 @@ class ArenaManager(
             ))
         }
 
-        val difficultyMaxParticipants = variant.maxParticipants.coerceIn(1, MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
+        // 参加人数上限はtheme個別設定ではなく難易度starの中央対応表に従う。
+        val difficultyMaxParticipants = ArenaThemeDifficulty.maxParticipantsForStar(variant.difficultyStar).coerceIn(1, MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT)
         val sanitizedMaxParticipants = maxParticipants.coerceIn(1, difficultyMaxParticipants)
         if (participantPlayers.size > sanitizedMaxParticipants) {
             return completed(ArenaStartResult.Error(
@@ -945,8 +957,6 @@ class ArenaManager(
             inviteMissionTitle = inviteMissionTitle,
             inviteMissionLore = inviteMissionLore,
             stageGenerationCompleted = !enableMultiplayerJoin,
-            reviveMaxPerPlayer = variant.reviveMaxPerPlayer,
-            reviveTimeLimitSeconds = variant.reviveTimeLimitSeconds,
             sidebarParticipantOrder = participantPlayers.map { it.uniqueId }.toMutableList(),
             sidebarParticipantNames = participantPlayers.associate { it.uniqueId to it.name }.toMutableMap()
         )
@@ -1641,6 +1651,40 @@ class ArenaManager(
         return selectedStar == promotedStar
     }
 
+    /**
+     * 需要モデルをtheme選択に適用する。代表★（normal variantのdifficultyStar）と目標★の距離で
+     * 需要重みを付け、theme固有weightと掛け合わせた加重抽選を行う。
+     */
+    fun selectThemeByDemand(themes: List<ArenaTheme>, random: Random = this.random): ArenaTheme {
+        require(themes.isNotEmpty()) { "themes must not be empty" }
+        val candidates = themes.filter { it.weight > 0 }
+        require(candidates.isNotEmpty()) { "有効なテーマweightがありません" }
+        val representativeStars = candidates.map { it.normalConfig.variant.difficultyStar }.distinct()
+        val target = demandModel.estimateTargetDifficulty(
+            representativeStars,
+            historyStore.all(),
+            sharedClock().currentDate()
+        )
+        val weights = candidates.map { theme ->
+            val demandWeight = demandModel.selectionWeight(theme.normalConfig.variant.difficultyStar, target)
+            (demandWeight * theme.weight.toDouble()).coerceAtLeast(0.0)
+        }
+        val total = weights.sum()
+        require(total > 0.0 && total.isFinite()) { "有効なテーマweightがありません" }
+        var roll = random.nextDouble() * total
+        candidates.forEachIndexed { index, theme ->
+            roll -= weights[index]
+            if (roll <= 0.0) return theme
+        }
+        return candidates.last()
+    }
+
+    /** 昇格有無は需要モデルと独立に promotion_probability の確率で決定する。 */
+    fun rollPromoted(theme: ArenaTheme, random: Random = this.random): Boolean {
+        if (theme.promotedVariant == null) return false
+        return random.nextDouble() < theme.promotionProbability
+    }
+
     private fun reserveDailyEntry(playerIds: Collection<UUID>): Boolean {
         val today = sharedClock().currentDate()
         return dailyEntryStore.tryReserveAll(playerIds, today)
@@ -1798,11 +1842,11 @@ class ArenaManager(
         event.keepLevel = true
 
         val otherAliveExists = hasOtherAliveNonDownParticipant(session, player.uniqueId)
+        // 蘇生の上限回数は廃止したため、回数条件は付けない。
         val reviveDisabled = isPlayerDowned(session, player.uniqueId) ||
             !isWaveCombatActive(session) ||
             !isMultiplayerSession(session) ||
-            !otherAliveExists ||
-            !canBeRevived(session, player.uniqueId)
+            !otherAliveExists
         val respawnLocation = resolveParticipantRespawnLocation(session, player) ?: return
         pendingDeathRespawns[player.uniqueId] = PendingArenaDeathRespawn(
             worldName = session.worldName,
@@ -2274,8 +2318,7 @@ class ArenaManager(
 
         val otherAliveExists = hasOtherAliveNonDownParticipant(session, player.uniqueId)
         if (!isMultiplayerSession(session) ||
-            !otherAliveExists ||
-            !canBeRevived(session, player.uniqueId)
+            !otherAliveExists
         ) {
             setPlayerDown(session, player, reviveDisabled = true)
             notifyParticipantDeath(player)
@@ -2855,14 +2898,6 @@ class ArenaManager(
         return session.reviveCountByPlayer[playerId] ?: 0
     }
 
-    private fun canBeRevived(session: ArenaSession, playerId: UUID): Boolean {
-        val maxCount = session.reviveMaxPerPlayer
-        if (maxCount == Int.MAX_VALUE) {
-            return true
-        }
-        return reviveCount(session, playerId) < maxCount
-    }
-
     private fun transitionSessionPhase(session: ArenaSession, phase: ArenaPhase) {
         if (session.phase == phase) {
             return
@@ -2900,10 +2935,9 @@ class ArenaManager(
         }
 
         val now = System.currentTimeMillis()
+        // 蘇生の制限時間は廃止し、蘇生可能ダウンは期限なしとする。蘇生不可（即ゲームオーバー）のみ即時期限とする。
         val reviveDeadline = if (reviveDisabled) {
             now
-        } else if (session.reviveTimeLimitSeconds > 0) {
-            now + session.reviveTimeLimitSeconds * 1000L
         } else {
             Long.MAX_VALUE
         }
@@ -3149,7 +3183,6 @@ class ArenaManager(
         }
 
         val reviveRadiusSquared = downReviveRadius * downReviveRadius
-        val requiredTicks = downReviveHoldSeconds * 20
         val currentTick = Bukkit.getCurrentTick().toLong()
 
         for (downedId in session.downedPlayers.keys.toList()) {
@@ -3164,6 +3197,9 @@ class ArenaManager(
                 clearReviveBindingForDowned(session, downedId, playInterruptedSound = false)
                 continue
             }
+
+            // 蘇生作業時間は被蘇生者の累積蘇生回数に応じて逓増する（基礎＋2秒×回数、上限なし）。
+            val requiredTicks = (downReviveHoldSeconds + REVIVE_HOLD_EXTRA_SECONDS_PER_COUNT * reviveCount(session, downedId)) * 20
 
             val holdState = session.reviveHoldStates.getOrPut(downedId) { ArenaReviveHoldState() }
             val reviverId = holdState.reviverPlayerId

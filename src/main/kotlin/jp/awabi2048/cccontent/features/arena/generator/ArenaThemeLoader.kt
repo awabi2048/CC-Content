@@ -54,10 +54,7 @@ data class ArenaThemeVariant(
     val difficultyStar: Int,
     val difficultyExpBonusRate: Double,
     val waveExpBonusRateIncrement: Double,
-    val maxParticipants: Int,
     val pedestalRoomProbability: Double,
-    val reviveMaxPerPlayer: Int,
-    val reviveTimeLimitSeconds: Int,
     val waves: List<ArenaWaveSpawnRule>
 )
 
@@ -150,9 +147,9 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             "ruins.yml"
         )
 
+        // CLEARING は実装待ちのため仕様から除外し、goal バリエーション要件は BARRIER_RESTART のみとする。
         val REQUIRED_GOAL_MISSION_TYPES = listOf(
-            ArenaMissionType.BARRIER_RESTART,
-            ArenaMissionType.CLEARING
+            ArenaMissionType.BARRIER_RESTART
         )
     }
 
@@ -448,11 +445,10 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
         val waveExpBonusRateIncrement = section
             .getDouble("wave_exp_bonus_rate_increment", fallback?.waveExpBonusRateIncrement ?: defaultWaveExpBonusRateIncrement)
             .coerceAtLeast(0.0)
-        val maxParticipants = section.getInt("max_participants", fallback?.maxParticipants ?: 6).coerceIn(1, 6)
         val pedestalRoomProbability = section.getDouble("pedestal_room_probability", fallback?.pedestalRoomProbability ?: 0.0).coerceIn(0.0, 1.0)
-        val reviveMaxPerPlayerRaw = section.getInt("revive_max_per_player", fallback?.reviveMaxPerPlayer ?: -1)
-        val reviveMaxPerPlayer = if (reviveMaxPerPlayerRaw <= 0) Int.MAX_VALUE else reviveMaxPerPlayerRaw
-        val reviveTimeLimitSeconds = section.getInt("revive_time_limit_seconds", fallback?.reviveTimeLimitSeconds ?: 0).coerceAtLeast(0)
+        // max_participants / revive_max_per_player / revive_time_limit_seconds は仕様から除外。
+        // 人数上限は ArenaThemeDifficulty のstar対応表、蘇生は回数無制限・期限なし＋作業時間逓増とする。
+        // 旧キーが残っていても無視する（エラーにしない）。
         val waveMaps = section.getMapList("waves")
         val waves = if (waveMaps.isEmpty() && fallback != null) {
             fallback.waves
@@ -478,10 +474,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             difficultyStar = difficultyStar,
             difficultyExpBonusRate = difficultyExpBonusRate,
             waveExpBonusRateIncrement = waveExpBonusRateIncrement,
-            maxParticipants = maxParticipants,
             pedestalRoomProbability = pedestalRoomProbability,
-            reviveMaxPerPlayer = reviveMaxPerPlayer,
-            reviveTimeLimitSeconds = reviveTimeLimitSeconds,
             waves = waves
         )
     }

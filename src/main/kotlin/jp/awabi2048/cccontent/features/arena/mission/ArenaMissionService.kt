@@ -22,7 +22,7 @@ import jp.awabi2048.cccontent.features.arena.ArenaStartResult
 import jp.awabi2048.cccontent.features.arena.event.ArenaMissionGeneratedEvent
 import jp.awabi2048.cccontent.features.arena.event.ArenaMissionStartRequestEvent
 import jp.awabi2048.cccontent.features.arena.event.ArenaSessionEndedEvent
-import jp.awabi2048.cccontent.features.arena.generator.ArenaTheme
+import jp.awabi2048.cccontent.features.arena.generator.ArenaThemeDifficulty
 import jp.awabi2048.cccontent.gui.MenuEventGuards
 import jp.awabi2048.cccontent.util.OageMessageSender
 import org.bukkit.Bukkit
@@ -548,10 +548,11 @@ class ArenaMissionService(
         }
         val random = Random.Default
         val missions = (0 until generateCount).map { index ->
-            val theme = selectWeightedTheme(weightedThemes, random)
+            // theme選択は需要モデル＋weightの加重抽選、昇格有無はpromotion_probabilityの独立抽選とする。
+            val theme = arenaManager.selectThemeByDemand(weightedThemes, random)
             val themeId = theme.id
             val missionType = ArenaMissionType.BARRIER_RESTART
-            val promoted = arenaManager.selectPromotedDifficulty(theme)
+            val promoted = arenaManager.rollPromoted(theme, random)
             val variant = theme.variant(promoted)
 
             ArenaMissionEntry(
@@ -560,7 +561,7 @@ class ArenaMissionService(
                 themeId = themeId,
                 promoted = promoted,
                 difficultyStar = variant.difficultyStar,
-                maxParticipants = variant.maxParticipants
+                maxParticipants = ArenaThemeDifficulty.maxParticipantsForStar(variant.difficultyStar)
             )
         }
 
@@ -655,6 +656,10 @@ class ArenaMissionService(
         if (missionTypeId.isBlank() || ArenaMissionType.fromId(missionTypeId) == null) {
             throw IllegalStateException("mission_type_id が不正です: $missionTypeId")
         }
+        // CLEARING は実装待ちのため仕様から除外する。保存済みデータに残っている場合は再生成させる。
+        if (missionTypeId == ArenaMissionType.CLEARING.id) {
+            throw IllegalStateException("CLEARING は実装待ちのため使用できません。ミッションを再生成してください")
+        }
 
         if (themeId.isBlank() || !arenaManager.getThemeIds().contains(themeId)) {
             throw IllegalStateException("theme_id が不正です: $themeId")
@@ -666,26 +671,12 @@ class ArenaMissionService(
             throw IllegalStateException("promoted が指定されていますが promoted 設定がありません: theme=$themeId")
         }
         val variant = theme.variant(promoted)
-        if (maxParticipants !in 1..variant.maxParticipants) {
-            throw IllegalStateException("max_participants が不正です: $maxParticipants (theme=$themeId promoted=$promoted max=${variant.maxParticipants})")
+        // 参加人数上限はtheme個別設定ではなく難易度starの中央対応表に従う。
+        val expectedMaxParticipants = ArenaThemeDifficulty.maxParticipantsForStar(variant.difficultyStar)
+        if (maxParticipants != expectedMaxParticipants) {
+            throw IllegalStateException("max_participants が不正です: $maxParticipants (theme=$themeId promoted=$promoted expected=$expectedMaxParticipants)")
         }
         return variant
-    }
-
-    private fun selectWeightedTheme(themes: List<ArenaTheme>, random: Random): ArenaTheme {
-        val totalWeight = themes.sumOf { it.weight.coerceAtLeast(0) }
-        if (totalWeight <= 0) {
-            throw IllegalStateException("有効なテーマweightがありません")
-        }
-
-        var roll = random.nextInt(totalWeight)
-        for (theme in themes) {
-            roll -= theme.weight
-            if (roll < 0) {
-                return theme
-            }
-        }
-        return themes.last()
     }
 
     private fun ensureCurrentMissionSet(): ArenaMissionSet {
