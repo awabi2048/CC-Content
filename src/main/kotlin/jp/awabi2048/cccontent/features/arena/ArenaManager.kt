@@ -8258,7 +8258,7 @@ class ArenaManager(
             advanceMarkerMiddleRingRotation(marker, holdProgress)
             val color = resolveActionMarkerDisplayColor(marker, currentTick, holdProgress)
             renderActionMarkerParticles(player, marker, color)
-            // 進行不能な先行ステップは赤で表示し、現在の進行地点と区別する。
+            // 通過済み（緑）・先行（赤）の進捗色分け表示。現在地点は通常色で描画済み。
             lobbyTutorialStates[playerId]?.let { renderUpcomingTutorialSteps(player, it) }
             if (isInsideActionMarkerRange(player.location, marker.center)) {
                 player.sendActionBar(
@@ -8723,18 +8723,24 @@ class ArenaManager(
             }
     }
 
-    // 進行不能な先行ステップを赤で表示する。完了済みは出さず、現在地点のみ通常色とする。
+    // チュートリアル手順の進捗色分け：通過済みは緑、現在は通常色（黄）、先行は赤（未活性色）で表示する。
+    // 現在マーカー自体は既存経路で描画されるため、ここでは通過済み・先行のみ扱う。
     private fun renderUpcomingTutorialSteps(player: Player, state: ArenaLobbyTutorialState) {
-        val upcomingRed = Color.RED
         state.stepLocations.forEachIndexed { index, stepLocation ->
-            if (index <= state.stepIndex) return@forEachIndexed
+            if (index == state.stepIndex) return@forEachIndexed
+            // 通過済みは緑、先行はゲーム内の赤（未活性色）に揃える。
+            val stepColor = if (index < state.stepIndex) {
+                ArenaActionMarkerState.RUNNING.defaultColor
+            } else {
+                ArenaActionMarkerState.PRE_ACTIVATED.defaultColor
+            }
             val world = stepLocation.world ?: return@forEachIndexed
             if (player.world.uid != world.uid) return@forEachIndexed
             val center = stepLocation.clone().add(0.0, ACTION_MARKER_CENTER_Y_OFFSET, 0.0)
-            val dust = Particle.DustOptions(upcomingRed, 0.5f)
+            val dust = Particle.DustOptions(stepColor, 0.5f)
             drawActionMarkerRing(player, center, ACTION_MARKER_OUTER_RING_RADIUS, ACTION_MARKER_OUTER_RING_HEIGHT, 32, dust)
             drawActionMarkerRing(player, center, ACTION_MARKER_INNER_RING_RADIUS, ACTION_MARKER_INNER_RING_HEIGHT, 24, dust)
-            drawActionMarkerEightPoints(player, center, 0.0, Particle.DustOptions(adjustMiddlePointColor(upcomingRed), 0.75f))
+            drawActionMarkerEightPoints(player, center, 0.0, Particle.DustOptions(adjustMiddlePointColor(stepColor), 0.75f))
         }
     }
 
