@@ -1518,6 +1518,8 @@ class ArenaManager(
 
     private fun showLobbyTutorialCompletedEffect(player: Player) {
         player.sendTitle("", ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_LOBBY_TUTORIAL_COMPLETED_TITLE), 10, 100, 10)
+        // 完了演出音：サブタイトル表示に合わせる。
+        player.playSound(player.location, "minecraft:block.beacon.power_select", 1.0f, 1.0f)
         playLobbyBgm(player)
     }
 
