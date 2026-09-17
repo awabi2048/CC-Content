@@ -198,8 +198,7 @@ data class ArenaSession(
     val reviveTargetByReviver: MutableMap<UUID, UUID> = mutableMapOf(),
     val reviveBossBarsByDowned: MutableMap<UUID, ArenaReviveBossBars> = mutableMapOf(),
     val reviveCountByPlayer: MutableMap<UUID, Int> = mutableMapOf(),
-    val reviveMaxPerPlayer: Int = Int.MAX_VALUE,
-    val reviveTimeLimitSeconds: Int = 0,
+    // 蘇生は回数無制限・期限なし。作業時間は reviveCountByPlayer に応じて逓増する。
     var arenaBgmMode: ArenaBgmMode = ArenaBgmMode.STOPPED,
     var arenaBgmSwitchRequest: ArenaBgmSwitchRequest? = null,
     var arenaBgmModeStartedTick: Long = 0L,

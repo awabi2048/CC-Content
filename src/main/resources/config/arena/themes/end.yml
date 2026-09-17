@@ -8,10 +8,7 @@ normal:
   difficulty_star: 3
   difficulty_exp_bonus_rate: 0.3
   wave_exp_bonus_rate_increment: 0.15
-  max_participants: 4
   pedestal_room_probability: 0.3
-  revive_max_per_player: 1
-  revive_time_limit_seconds: 20
   waves:
   - wave: 1
     spawn_interval: 16
@@ -116,10 +113,7 @@ promoted:
   difficulty_star: 4
   difficulty_exp_bonus_rate: 0.45
   wave_exp_bonus_rate_increment: 0.2
-  max_participants: 6
   pedestal_room_probability: 0.3
-  revive_max_per_player: 1
-  revive_time_limit_seconds: 15
   waves:
   - wave: 1
     spawn_interval: 14
