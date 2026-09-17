@@ -243,6 +243,7 @@ class ArenaListener(private val arenaManager: ArenaManager) : Listener {
     @EventHandler
     fun onPlayerChangedWorld(event: PlayerChangedWorldEvent) {
         arenaManager.clearLobbyTutorialState(event.player)
+        arenaManager.handleLobbyBgmOnWorldChange(event.player)
         arenaManager.handleUnauthorizedSessionWorldPresence(event.player)
     }
 

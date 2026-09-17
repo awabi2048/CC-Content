@@ -1,7 +1,6 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
 import com.awabi2048.ccsystem.CCSystem
-import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.util.ContentLocaleResolver
@@ -115,7 +114,8 @@ object DungeonManager {
             DungeonSessionManager.endSession(p)
             jp.awabi2048.cccontent.features.sukima_dungeon.DungeonSessionManager.removeSessionFromFile(CCContent.instance, p.uniqueId)
             ScoreboardManager.removeScoreboard(p)
-            BGMManager.stop(p)
+            // 脱出時はSUKIMA予約を解放する（ワールド変更検知でも解放されるため冪等）。
+            SukimaBgm.release(p)
 
             // Reset down state
             DungeonSessionManager.getSession(p)?.isDown = false

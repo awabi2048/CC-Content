@@ -9,6 +9,9 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.api.bgm.BgmRequest
+import com.awabi2048.ccsystem.api.bgm.BgmService
+import com.awabi2048.ccsystem.api.bgm.BgmSource
 import com.awabi2048.ccsystem.api.localization.generated.ContentArenaKeys
 
 import com.awabi2048.ccsystem.CCSystem
@@ -29,7 +32,6 @@ import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionModifiers
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
 import jp.awabi2048.cccontent.features.arena.mission.ArenaStatusSnapshot
-import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardData
@@ -320,7 +322,7 @@ class ArenaManager(
         const val POSITION_HISTORY_MAX_SAMPLES = 24
         const val ARENA_BGM_NORMAL_KEY_DEFAULT = "kota_server:ost_3.sukima_dungeon"
         const val ARENA_BGM_COMBAT_KEY_DEFAULT = "kota_server:ost_4.arena"
-        const val ARENA_BGM_LOBBY_KEY_DEFAULT = "kota_server:ost_3.sukima_dungeon"
+        const val ARENA_BGM_LOBBY_KEY_DEFAULT = "kota_server:ost_3.arena.calm"
         const val ARENA_BGM_NORMAL_BPM_DEFAULT = 120.0
         const val ARENA_BGM_COMBAT_BPM_DEFAULT = 140.0
         const val ARENA_BGM_LOBBY_BPM_DEFAULT = 120.0
@@ -388,8 +390,6 @@ class ArenaManager(
         const val FINAL_WAVE_OVERTIME_DISCHARGE_KNOCKBACK_BASE = 0.75
         const val LOBBY_TUTORIAL_HOLD_TICKS = 40
         const val LOBBY_TUTORIAL_COMPLETE_DELAY_TICKS = 40L
-        const val LOBBY_GUIDE_TOTAL_CHAT_LINES = 20
-        const val LOBBY_GUIDE_SEPARATOR = "――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――"
         const val LOBBY_GUIDE_SOUND_KEY = "minecraft:entity.villager.work_cartographer"
         const val LOBBY_MARKER_TAG_RETURN = "arena.marker.lobby"
         const val LOBBY_MARKER_TAG_MAIN = "arena.marker.lobby_main"
@@ -435,6 +435,21 @@ class ArenaManager(
     private val lobbyTutorialStates = mutableMapOf<UUID, ArenaLobbyTutorialState>()
     private val lobbyTutorialMarkers = mutableMapOf<UUID, ArenaActionMarker>()
     private val lobbyTutorialHoldStates = mutableMapOf<UUID, ArenaActionMarkerHoldState>()
+    // チュートリアル完了遅延演出の世代管理：再実行・移動後の旧タスク誤爆を防ぐ。
+    private val lobbyTutorialCompleteGenerations = mutableMapOf<UUID, Long>()
+    // ロビー移動の最終成功地点キャッシュ：マーカー未ロード時も立ち往生させないためのフォールバック。
+    // Marker実体走査はロード済みチャンクのみが対象のため、未ロード時はこの永続キャッシュで移動を継続する。
+    private data class CachedLobbyDestination(
+        val worldName: String,
+        val x: Double,
+        val y: Double,
+        val z: Double,
+        val yaw: Float,
+        val pitch: Float
+    )
+    private var cachedLobbyMainDestination: CachedLobbyDestination? = null
+    private var cachedLobbyTutorialStartDestination: CachedLobbyDestination? = null
+    private val lobbyDestinationCacheFile = File(plugin.dataFolder, "data/arena/lobby_destinations.yml")
     private val liftOccupiedMarkerKeys = mutableSetOf<String>()
     private val liftReturningMarkerKeys = mutableSetOf<String>()
     private val liftOccupiedWaiters = mutableSetOf<UUID>()
@@ -507,6 +522,7 @@ class ArenaManager(
     fun initialize(featureInitLogger: FeatureInitializationLogger? = null) {
         dailyEntryStore.load()
         historyStore.load()
+        loadLobbyDestinationCache()
         loadBattleConfigs()
         themeLoader.load(featureInitLogger)
         ensureDebugVoidWorldBootstrap()
@@ -1069,9 +1085,13 @@ class ArenaManager(
     fun stopSessionToLobby(player: Player, reason: String = ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_SESSION_ENDED)): Boolean {
         val session = getSession(player)
         val destination = if (session != null) resolveSessionLobbyLocation(session) else null
+        // セッション離脱と並行して旧チュートリアル残骸が残らないよう先に破棄する。
+        bumpLobbyTutorialGeneration(player.uniqueId)
+        clearLobbyTutorialState(player.uniqueId)
         val stopped = leavePlayerFromSession(player.uniqueId, reason, destination)
         if (stopped && destination != null) {
             markLobbyVisited(player.uniqueId)
+            rememberLobbyDestination(ArenaLobbyTargetType.MAIN, destination)
             playLobbyBgm(player)
         }
         return stopped
@@ -1089,9 +1109,12 @@ class ArenaManager(
         val worldName = playerToSessionWorld[playerId]
         val session = worldName?.let { sessionsByWorld[it] }
         val destination = if (session != null) resolveSessionLobbyLocation(session) else null
+        bumpLobbyTutorialGeneration(playerId)
+        clearLobbyTutorialState(playerId)
         val stopped = leavePlayerFromSession(playerId, localizedReason, destination)
         if (stopped && destination != null) {
             markLobbyVisited(playerId)
+            rememberLobbyDestination(ArenaLobbyTargetType.MAIN, destination)
             if (player != null && player.isOnline) {
                 playLobbyBgm(player)
             }
@@ -1105,10 +1128,32 @@ class ArenaManager(
         }
 
         val targetType = resolveLobbyTargetType(target.uniqueId, lobbyType)
-        val destinationResolved = resolveLobbyDestination(target.world, targetType) ?: return false
-        val snapshot = destinationResolved.first
+        val destinationResolved = resolveLobbyDestination(target.world, targetType)
+        // マーカー未ロード時は最終成功地点キャッシュで移動を継続し、立ち往生させない。
+        // キャッシュも使えない真の未定義時のみ失敗とし、対象者本人へ理由を通知する。
+        if (destinationResolved == null) {
+            val cached = resolveCachedLobbyLocation(targetType)
+            if (cached != null) {
+                return sendPlayerToCachedLobby(target, targetType, cached)
+            }
+            target.sendMessage(
+                ArenaI18n.text(target, ContentArenaKeys.ARENA_MESSAGES_COMMAND_START_ERROR_LOBBY_MARKER_NOT_FOUND)
+            )
+            plugin.logger.warning("[Arena] ロビー移動に失敗しました（マーカー未検出・キャッシュなし）: player=${target.name} type=$targetType")
+            return false
+        }
+        // 目的地のスナップショットは移動前の情報のため開始時には使わない。
+        // 開始直前に移動後のワールドから取り直す（下記の freshSnapshot）。
         val destination = destinationResolved.second
 
+        // テレポート確定前にチュートリアル状態を消さない：失敗時に進捗消失＋残留となるのを防ぐ。
+        val retainedState = lobbyTutorialStates[target.uniqueId]?.copy(
+            stepLocations = lobbyTutorialStates[target.uniqueId]?.stepLocations?.map { it.clone() } ?: emptyList()
+        )
+        val retainedMarker = lobbyTutorialMarkers[target.uniqueId]
+        val retainedHold = lobbyTutorialHoldStates[target.uniqueId]?.copy()
+        // 完了遅延演出の世代を進め、旧タスクの誤爆を無効化する。
+        bumpLobbyTutorialGeneration(target.uniqueId)
         clearLobbyTutorialState(target.uniqueId)
         val moved = if (getSession(target) != null) {
             leavePlayerFromSession(target.uniqueId, "", destination)
@@ -1116,17 +1161,67 @@ class ArenaManager(
             target.teleport(destination)
         }
         if (!moved) {
+            // 失敗時は状態を復元し、本人へ通知する（無言残留にしない）。
+            if (retainedState != null) lobbyTutorialStates[target.uniqueId] = retainedState
+            if (retainedMarker != null) lobbyTutorialMarkers[target.uniqueId] = retainedMarker
+            if (retainedHold != null) lobbyTutorialHoldStates[target.uniqueId] = retainedHold
+            target.sendMessage(
+                ArenaI18n.text(target, ContentArenaKeys.ARENA_MESSAGES_COMMAND_START_ERROR_LOBBY_MARKER_NOT_FOUND)
+            )
             return false
         }
 
         markLobbyVisited(target.uniqueId)
 
         if (targetType == ArenaLobbyTargetType.TUTORIAL) {
-            startLobbyTutorial(target, snapshot)
+            // テレポート成功後に取り直す：移動前のスナップショットが不完全（steps空）の場合、
+            // 古い情報のまま開始すると無言の即時完了になり「開始しない」に見える。
+            val freshSnapshot = findLoadedLobbyMarkerSnapshot(target.world)
+            if (!startLobbyTutorial(target, freshSnapshot)) {
+                return false
+            }
+            rememberLobbyDestination(targetType, destination)
+        } else {
+            rememberLobbyDestination(targetType, destination)
+            playLobbyBgm(target)
+        }
+        return true
+    }
+
+    // キャッシュ地点へのフォールバック移動：スナップショットは移動後に取り直す。
+    // テレポート自体がチャンク読み込みを兼ねるため、未ロードが原因の失敗はここで回復する。
+    private fun sendPlayerToCachedLobby(target: Player, targetType: ArenaLobbyTargetType, cached: Location): Boolean {
+        bumpLobbyTutorialGeneration(target.uniqueId)
+        clearLobbyTutorialState(target.uniqueId)
+        val moved = if (getSession(target) != null) {
+            leavePlayerFromSession(target.uniqueId, "", cached)
+        } else {
+            target.teleport(cached)
+        }
+        if (!moved) {
+            target.sendMessage(
+                ArenaI18n.text(target, ContentArenaKeys.ARENA_MESSAGES_COMMAND_START_ERROR_LOBBY_MARKER_NOT_FOUND)
+            )
+            return false
+        }
+        markLobbyVisited(target.uniqueId)
+        plugin.logger.info("[Arena] ロビーマーカー未検出のためキャッシュ地点で移動を継続しました: player=${target.name} type=$targetType world=${cached.world?.name}")
+        if (targetType == ArenaLobbyTargetType.TUTORIAL) {
+            // 移動後にロード済み状態で取り直し、ステップ欠落による即時完了の誤判定を減らす。
+            val snapshot = findLoadedLobbyMarkerSnapshot(target.world)
+            if (!startLobbyTutorial(target, snapshot)) {
+                return false
+            }
         } else {
             playLobbyBgm(target)
         }
         return true
+    }
+
+    private fun bumpLobbyTutorialGeneration(playerId: UUID): Long {
+        val next = (lobbyTutorialCompleteGenerations[playerId] ?: 0L) + 1L
+        lobbyTutorialCompleteGenerations[playerId] = next
+        return next
     }
 
     private fun resolveLobbyTargetType(playerId: UUID, lobbyType: String?): ArenaLobbyTargetType {
@@ -1161,6 +1256,11 @@ class ArenaManager(
             if (candidates.isEmpty()) {
                 return@forEach
             }
+            // TUTORIAL要求時はステップも揃った世界を選ぶ。
+            // startのみ有・steps空の不完全スナップショットを選ぶと開始直後に失敗するため、次ワールドを探す。
+            if (targetType == ArenaLobbyTargetType.TUTORIAL && snapshot.tutorialSteps.isEmpty()) {
+                return@forEach
+            }
             val picked = candidates[random.nextInt(candidates.size)].clone()
             return snapshot to picked
         }
@@ -1168,15 +1268,45 @@ class ArenaManager(
         return null
     }
 
+    // BGM取得の単一入口：再生・優先解決・寿命管理はCC-SystemのBgmServiceへ移譲する。
+    private fun bgm(): BgmService = CCSystem.getAPI().getBgmService()
+
+    // Arena設定トラックをBgmService要求へ変換する。音量・カテゴリは旧BGMManagerと同一（既定値）にする。
+    private fun bgmRequestOf(track: ArenaBgmTrackConfig): BgmRequest =
+        BgmRequest(soundKey = track.soundKey, loopTicks = track.loopTicks, pitch = track.pitch)
+
+    private fun bgmSourceOf(mode: ArenaBgmMode): BgmSource? = when (mode) {
+        ArenaBgmMode.NORMAL -> BgmSource.ARENA_NORMAL
+        ArenaBgmMode.COMBAT -> BgmSource.ARENA_COMBAT
+        ArenaBgmMode.STOPPED -> null
+    }
+
     private fun playLobbyBgm(player: Player) {
-        val track = arenaBgmConfig.lobby
-        BGMManager.playPrecise(player, track.soundKey, track.loopTicks, track.pitch)
+        // 上位予約がなければロビーBGMが有効化され、ワールドBGMは自動抑止される。
+        // 既存の同一要求が有効な場合は再頭出ししない。
+        bgm().acquire(player, BgmSource.ARENA_LOBBY, bgmRequestOf(arenaBgmConfig.lobby))
+    }
+
+    // ロビー系BGMを明示停止する：ロビー外（スポーン・別ワールド・ログアウト）への持ち越しを防ぐ。
+    // 解放後は下位予約（ワールドBGM）があれば自動復帰する。
+    private fun stopLobbyBgm(player: Player) {
+        bgm().stop(player, arenaBgmConfig.lobby.soundKey)
+    }
+
+    // Arena系の全予約を解放する。ワールド移動時の持ち越し対策。
+    private fun releaseArenaBgm(player: Player) {
+        bgm().release(player, BgmSource.ARENA_LOBBY)
+        bgm().release(player, BgmSource.ARENA_NORMAL)
+        bgm().release(player, BgmSource.ARENA_COMBAT)
     }
 
     private fun sendPlayerToLobbyOrSpawn(player: Player) {
         if (sendPlayerToLobby(player, "main")) {
             return
         }
+        // ロビー移動に失敗してスポーンへ逃がす場合、Arena系予約を解放してワールドBGMへ自動復帰させる。
+        stopLobbyBgm(player)
+        stopAllArenaBgmForPlayer(player)
         Bukkit.getWorlds().firstOrNull()?.spawnLocation?.let { spawn ->
             player.teleport(spawn)
         }
@@ -1190,6 +1320,76 @@ class ArenaManager(
 
     fun clearLobbyTutorialState(player: Player) {
         clearLobbyTutorialState(player.uniqueId)
+    }
+
+    // ロビー目的地キャッシュの読み込み：起動時に最終成功地点を復元する。
+    private fun loadLobbyDestinationCache() {
+        try {
+            val file = lobbyDestinationCacheFile
+            if (!file.exists()) return
+            val config = YamlConfiguration.loadConfiguration(file)
+            cachedLobbyMainDestination = readCachedDestination(config, "main")
+            cachedLobbyTutorialStartDestination = readCachedDestination(config, "tutorial")
+        } catch (e: Exception) {
+            plugin.logger.warning("[Arena] ロビー目的地キャッシュの読み込みに失敗しました: ${e.message}")
+        }
+    }
+
+    private fun readCachedDestination(config: FileConfiguration, key: String): CachedLobbyDestination? {
+        val worldName = config.getString("$key.world") ?: return null
+        if (!config.contains("$key.x") || !config.contains("$key.y") || !config.contains("$key.z")) return null
+        return CachedLobbyDestination(
+            worldName = worldName,
+            x = config.getDouble("$key.x"),
+            y = config.getDouble("$key.y"),
+            z = config.getDouble("$key.z"),
+            yaw = config.getDouble("$key.yaw", 0.0).toFloat(),
+            pitch = config.getDouble("$key.pitch", 0.0).toFloat()
+        )
+    }
+
+    // ロビー目的地キャッシュの保存：移動成功のたびに最終地点を更新する。
+    private fun rememberLobbyDestination(targetType: ArenaLobbyTargetType, destination: Location) {
+        val worldName = destination.world?.name ?: return
+        val cached = CachedLobbyDestination(worldName, destination.x, destination.y, destination.z, destination.yaw, destination.pitch)
+        when (targetType) {
+            ArenaLobbyTargetType.MAIN -> cachedLobbyMainDestination = cached
+            ArenaLobbyTargetType.TUTORIAL -> cachedLobbyTutorialStartDestination = cached
+            ArenaLobbyTargetType.AUTO -> return
+        }
+        try {
+            ArenaYamlFiles.saveAtomically(lobbyDestinationCacheFile) {
+                cachedLobbyMainDestination?.let { main ->
+                    set("main.world", main.worldName)
+                    set("main.x", main.x)
+                    set("main.y", main.y)
+                    set("main.z", main.z)
+                    set("main.yaw", main.yaw.toDouble())
+                    set("main.pitch", main.pitch.toDouble())
+                }
+                cachedLobbyTutorialStartDestination?.let { tutorial ->
+                    set("tutorial.world", tutorial.worldName)
+                    set("tutorial.x", tutorial.x)
+                    set("tutorial.y", tutorial.y)
+                    set("tutorial.z", tutorial.z)
+                    set("tutorial.yaw", tutorial.yaw.toDouble())
+                    set("tutorial.pitch", tutorial.pitch.toDouble())
+                }
+            }
+        } catch (e: Exception) {
+            plugin.logger.warning("[Arena] ロビー目的地キャッシュの保存に失敗しました: ${e.message}")
+        }
+    }
+
+    // キャッシュ地点の実体化：ワールドがロード済みの場合のみLocationを返す。
+    private fun resolveCachedLobbyLocation(targetType: ArenaLobbyTargetType): Location? {
+        val cached = when (targetType) {
+            ArenaLobbyTargetType.MAIN -> cachedLobbyMainDestination
+            ArenaLobbyTargetType.TUTORIAL -> cachedLobbyTutorialStartDestination
+            ArenaLobbyTargetType.AUTO -> null
+        } ?: return null
+        val world = Bukkit.getWorld(cached.worldName) ?: return null
+        return Location(world, cached.x, cached.y, cached.z, cached.yaw, cached.pitch)
     }
 
     private fun markLobbyVisited(playerId: UUID) {
@@ -1227,9 +1427,10 @@ class ArenaManager(
         )
     }
 
-    private fun startLobbyTutorial(player: Player, snapshot: ArenaLobbyMarkerSnapshot) {
+    // 戻り値が false の場合は開始失敗（ステップ未検出）。完了扱いにせず、呼出し元で失敗として扱う。
+    private fun startLobbyTutorial(player: Player, snapshot: ArenaLobbyMarkerSnapshot): Boolean {
         if (!player.isOnline) {
-            return
+            return false
         }
 
         val stepPairs = snapshot.tutorialSteps
@@ -1255,15 +1456,24 @@ class ArenaManager(
             .map { it.second }
 
         if (steps.isEmpty()) {
-            markLobbyTutorialCompleted(player.uniqueId)
-            showLobbyTutorialCompletedEffect(player)
-            return
+            // ステップ未検出時は完了扱いにせず明示失敗とする。
+            // 無言の即時完了は「テレポートされたが始まらない」という誤認の原因になる。
+            plugin.logger.warning("[Arena] ロビーチュートリアルを開始できません（ステップ未検出）: player=${player.name} world=${player.world.name}")
+            player.sendMessage(
+                ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_COMMAND_START_ERROR_LOBBY_MARKER_NOT_FOUND)
+            )
+            return false
         }
 
+        // チュートリアル中もロビーBGM予約を有効化する：セッション由来の無音遷移と、
+        // 非セッション由来の旧ループ放置との非対称を解消し、ワールドBGMとの重なりも防ぐ。
+        // 既存の同一要求が有効な場合は再頭出ししない。
+        bgm().acquire(player, BgmSource.ARENA_LOBBY, bgmRequestOf(arenaBgmConfig.lobby))
         val state = ArenaLobbyTutorialState(stepIndex = 0, stepLocations = steps)
         lobbyTutorialStates[player.uniqueId] = state
         tutorialCompletedParticipants.remove(player.uniqueId)
         spawnLobbyTutorialMarker(player, state)
+        return true
     }
 
     private fun spawnLobbyTutorialMarker(player: Player, state: ArenaLobbyTutorialState) {
@@ -1289,16 +1499,27 @@ class ArenaManager(
     private fun completeLobbyTutorial(player: Player) {
         clearLobbyTutorialState(player.uniqueId)
         markLobbyTutorialCompleted(player.uniqueId)
+        // 遅延演出の世代を固定し、再実行・ワールド移動後の旧タスク誤爆を防ぐ。
+        val generation = bumpLobbyTutorialGeneration(player.uniqueId)
+        val originWorldUid = player.world.uid
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             if (!player.isOnline) {
                 return@Runnable
             }
+            // 再実行されていたら旧完了効果を出さない。
+            if (lobbyTutorialCompleteGenerations[player.uniqueId] != generation) return@Runnable
+            // 別ワールドへ移動済みの場合は旧チュートリアルの効果を出さない。
+            if (player.world.uid != originWorldUid) return@Runnable
+            // チュートリアル状態が再開されていたら完了効果を出さない。
+            if (lobbyTutorialStates.containsKey(player.uniqueId)) return@Runnable
             showLobbyTutorialCompletedEffect(player)
         }, LOBBY_TUTORIAL_COMPLETE_DELAY_TICKS)
     }
 
     private fun showLobbyTutorialCompletedEffect(player: Player) {
         player.sendTitle("", ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_LOBBY_TUTORIAL_COMPLETED_TITLE), 10, 100, 10)
+        // 完了演出音：サブタイトル表示に合わせる。
+        player.playSound(player.location, "minecraft:block.beacon.power_select", 1.0f, 1.0f)
         playLobbyBgm(player)
     }
 
@@ -1370,6 +1591,7 @@ class ArenaManager(
         lobbyTutorialStates.clear()
         lobbyTutorialMarkers.clear()
         lobbyTutorialHoldStates.clear()
+        lobbyTutorialCompleteGenerations.clear()
         processPendingWorldDeletions()
     }
 
@@ -1390,6 +1612,18 @@ class ArenaManager(
         }
         sendPlayerToLobbyOrSpawn(player)
         return true
+    }
+
+    // ワールド移動時のロビーBGM持ち越し対策：移動先にロビーがなくセッション外なら
+    // Arena系予約を解放し、ワールドBGMへ自動復帰させる。
+    // sendPlayerToLobby内のテレポート直後に発火する分は、後続のacquireで上書きされるため安全。
+    fun handleLobbyBgmOnWorldChange(player: Player) {
+        bumpLobbyTutorialGeneration(player.uniqueId)
+        if (getSession(player) != null) return
+        if (!bgm().isPlaying(player)) return
+        val snapshot = findLoadedLobbyMarkerSnapshot(player.world)
+        if (snapshot.main.isNotEmpty() || snapshot.tutorialStart.isNotEmpty()) return
+        releaseArenaBgm(player)
     }
 
     fun getThemeIds(): Set<String> = themeLoader.getThemeIds()
@@ -1487,7 +1721,11 @@ class ArenaManager(
 
     fun handleParticipantQuit(player: Player) {
         handleInviteTargetUnavailable(player)
+        // 中断クリアと同時に遅延完了効果を無効化し、BGMループの持ち越しを防ぐ。
+        bumpLobbyTutorialGeneration(player.uniqueId)
         clearLobbyTutorialState(player)
+        // 最終救済（CCContent.onQuitのBgmService.stop）に加え、Arena側でもlobby予約を解放する。
+        stopLobbyBgm(player)
 
         val session = getSession(player) ?: return
         if (!session.participants.contains(player.uniqueId)) return
@@ -6434,7 +6672,7 @@ class ArenaManager(
         if (targets.isEmpty()) {
             return
         }
-        val allPlaying = targets.all { player -> BGMManager.isPlaying(player, track.soundKey) }
+        val allPlaying = targets.all { player -> bgm().isPlaying(player, track.soundKey) }
         if (!allPlaying) {
             startArenaBgmMode(session, currentMode, currentTick)
         }
@@ -6522,14 +6760,14 @@ class ArenaManager(
 
     private fun hasSessionArenaBgmPlayback(session: ArenaSession, mode: ArenaBgmMode): Boolean {
         val track = arenaBgmTrackForMode(mode) ?: return false
-        return arenaBgmPlaybackTargets(session).any { player -> BGMManager.isPlaying(player, track.soundKey) }
+        return arenaBgmPlaybackTargets(session).any { player -> bgm().isPlaying(player, track.soundKey) }
     }
 
     private fun hasArenaBgmPlayback(session: ArenaSession, participantId: UUID, mode: ArenaBgmMode): Boolean {
         val player = Bukkit.getPlayer(participantId) ?: return false
         if (!player.isOnline || player.world.name != session.worldName) return false
         val track = arenaBgmTrackForMode(mode) ?: return false
-        return BGMManager.isPlaying(player, track.soundKey)
+        return bgm().isPlaying(player, track.soundKey)
     }
 
     private fun isBeatBoundaryReached(
@@ -6569,10 +6807,10 @@ class ArenaManager(
         val delayTicks = (beatsUntilNextBoundary.toDouble() * track.beatTicks)
             .roundToLong()
             .coerceAtLeast(1L)
-        val playbackStartNanos = BGMManager.getPlaybackStartNanos(player)
+        val playbackStartNanos = bgm().getPlaybackStartNanos(player)
 
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
-            if (player.isOnline && BGMManager.getPlaybackStartNanos(player) == playbackStartNanos) {
+            if (player.isOnline && bgm().getPlaybackStartNanos(player) == playbackStartNanos) {
                 stopArenaBgmForPlayer(player)
             }
         }, delayTicks)
@@ -6589,15 +6827,16 @@ class ArenaManager(
 
     private fun startArenaBgmMode(session: ArenaSession, mode: ArenaBgmMode, startTick: Long) {
         val track = arenaBgmTrackForMode(mode) ?: return
+        val source = bgmSourceOf(mode) ?: return
         val currentMode = session.arenaBgmMode
         if (currentMode == mode && hasSessionArenaBgmPlayback(session, mode)) {
             session.arenaBgmSwitchRequest = null
             return
         }
 
+        // acquireが下位予約（ロビー・ワールドBGM）を自動抑止するため、手動の停止・抑止は不要。
         arenaBgmPlaybackTargets(session).forEach { player ->
-            stopAllArenaBgmForPlayer(player)
-            BGMManager.playPrecise(player, track.soundKey, track.loopTicks, track.pitch)
+            bgm().acquire(player, source, bgmRequestOf(track))
         }
         session.arenaBgmMode = mode
         session.arenaBgmModeStartedTick = startTick
@@ -6609,8 +6848,8 @@ class ArenaManager(
 
     private fun resumeArenaBgmForPlayer(session: ArenaSession, player: Player) {
         val track = arenaBgmTrackForMode(session.arenaBgmMode) ?: return
-        stopAllArenaBgmForPlayer(player)
-        BGMManager.playPrecise(player, track.soundKey, track.loopTicks, track.pitch)
+        val source = bgmSourceOf(session.arenaBgmMode) ?: return
+        bgm().acquire(player, source, bgmRequestOf(track))
     }
 
     private fun stopArenaBgm(session: ArenaSession) {
@@ -6653,13 +6892,13 @@ class ArenaManager(
 
     private fun stopArenaBgmForPlayer(player: Player) {
         arenaSessionBgmKeys().forEach { soundKey ->
-            BGMManager.stop(player, soundKey)
+            bgm().stop(player, soundKey)
         }
     }
 
     private fun stopAllArenaBgmForPlayer(player: Player) {
         arenaBgmKeys().forEach { soundKey ->
-            BGMManager.stop(player, soundKey)
+            bgm().stop(player, soundKey)
         }
     }
 
@@ -8011,6 +8250,8 @@ class ArenaManager(
         snapshot.forEach { (playerId, marker) ->
             val player = Bukkit.getPlayer(playerId)
             if (player == null || !player.isOnline || player.world.uid != marker.center.world?.uid) {
+                // 監視タスクによる黙示消去時も遅延完了効果を無効化する。
+                bumpLobbyTutorialGeneration(playerId)
                 clearLobbyTutorialState(playerId)
                 return@forEach
             }
@@ -8019,6 +8260,8 @@ class ArenaManager(
             advanceMarkerMiddleRingRotation(marker, holdProgress)
             val color = resolveActionMarkerDisplayColor(marker, currentTick, holdProgress)
             renderActionMarkerParticles(player, marker, color)
+            // 通過済み（緑）・先行（赤）の進捗色分け表示。現在地点は通常色で描画済み。
+            lobbyTutorialStates[playerId]?.let { renderUpcomingTutorialSteps(player, it) }
             if (isInsideActionMarkerRange(player.location, marker.center)) {
                 player.sendActionBar(
                     Component.text(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_LOBBY_TUTORIAL_HOLD_HINT))
@@ -8087,18 +8330,9 @@ class ArenaManager(
         spawnLobbyTutorialMarker(player, tutorialState)
     }
 
+    // チュートリアル文言は1行ずつ送る。枠・空白埋めはしない。
     private fun sendLobbyGuideMessage(player: Player, messageLines: List<String>) {
-        val bodyLineCount = LOBBY_GUIDE_TOTAL_CHAT_LINES - 2
-        val bodyLines = messageLines
-            .take(bodyLineCount)
-            .toMutableList()
-        while (bodyLines.size < bodyLineCount) {
-            bodyLines += ""
-        }
-
-        player.sendMessage(LOBBY_GUIDE_SEPARATOR)
-        bodyLines.forEach { line -> player.sendMessage(line) }
-        player.sendMessage(LOBBY_GUIDE_SEPARATOR)
+        messageLines.forEach { line -> player.sendMessage(line) }
         player.playSound(player.location, LOBBY_GUIDE_SOUND_KEY, 1.0f, 1.0f)
     }
 
@@ -8491,8 +8725,28 @@ class ArenaManager(
             }
     }
 
-    private fun renderActionMarkerParticles(player: Player, marker: ArenaActionMarker, color: Color) {
-        val center = marker.center
+    // チュートリアル手順の進捗色分け：通過済みは緑、現在は通常色（黄）、先行は赤（未活性色）で表示する。
+    // 現在マーカー自体は既存経路で描画されるため、ここでは通過済み・先行のみ扱う。
+    private fun renderUpcomingTutorialSteps(player: Player, state: ArenaLobbyTutorialState) {
+        state.stepLocations.forEachIndexed { index, stepLocation ->
+            if (index == state.stepIndex) return@forEachIndexed
+            // 通過済みは緑、先行はゲーム内の赤（未活性色）に揃える。
+            val stepColor = if (index < state.stepIndex) {
+                ArenaActionMarkerState.RUNNING.defaultColor
+            } else {
+                ArenaActionMarkerState.PRE_ACTIVATED.defaultColor
+            }
+            val world = stepLocation.world ?: return@forEachIndexed
+            if (player.world.uid != world.uid) return@forEachIndexed
+            val center = stepLocation.clone().add(0.0, ACTION_MARKER_CENTER_Y_OFFSET, 0.0)
+            val dust = Particle.DustOptions(stepColor, 0.5f)
+            drawActionMarkerRing(player, center, ACTION_MARKER_OUTER_RING_RADIUS, ACTION_MARKER_OUTER_RING_HEIGHT, 32, dust)
+            drawActionMarkerRing(player, center, ACTION_MARKER_INNER_RING_RADIUS, ACTION_MARKER_INNER_RING_HEIGHT, 24, dust)
+            drawActionMarkerEightPoints(player, center, 0.0, Particle.DustOptions(adjustMiddlePointColor(stepColor), 0.75f))
+        }
+    }
+
+    private fun renderActionMarkerParticles(player: Player, marker: ArenaActionMarker, color: Color) {        val center = marker.center
         val world = center.world ?: return
         if (player.world.uid != world.uid) return
 

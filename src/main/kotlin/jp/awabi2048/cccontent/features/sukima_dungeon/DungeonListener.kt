@@ -1,6 +1,5 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
-import jp.awabi2048.cccontent.features.common.BGMManager
 import org.bukkit.Material
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -28,10 +27,11 @@ class DungeonListener : Listener {
             }
         }
 
+        // ダンジョン出入りでSUKIMA予約を切替え、下位（Arena・ワールドBGM）とは自動調停する。
         if (isSukimaDungeonWorld(toWorld)) {
-            BGMManager.play(event.player, "default")
+            SukimaBgm.play(event.player)
         } else {
-            BGMManager.stop(event.player)
+            SukimaBgm.release(event.player)
         }
 
     }

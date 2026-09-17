@@ -12,6 +12,7 @@ import jp.awabi2048.cccontent.featurestate.ContentFeatureCatalog
 import jp.awabi2048.cccontent.featurestate.ContentFeatureState
 import jp.awabi2048.cccontent.featurestate.FeatureStateResultType
 import jp.awabi2048.cccontent.features.rank.command.RankCommand
+import jp.awabi2048.cccontent.util.ContentLocalizationKeys
 
 enum class ContentOperationalState {
     ENABLED,
@@ -253,8 +254,15 @@ class CCCommand(
     private fun hasAdminPermission(sender: CommandSender): Boolean =
         sender.hasPermission("cc-content.admin") || sender.isOp
 
-    private fun featureName(sender: CommandSender, featureId: String): String =
-        ContentManagementI18n.text(sender, "feature.$featureId")
+    // CC-Systemカタログにcontent_management.feature.cropsが存在しない場合でも/ccc statusを継続するため、
+    // 不足時はContentFeatureCatalogのdisplayNameへフォールバックする。本来はCC-System側へのキー追加が必要であり、
+    // ここでは欠損を警告ログとして記録し、コマンド自体のERROR化を防ぐ暫定橋渡しとする。
+    private fun featureName(sender: CommandSender, featureId: String): String {
+        val key = ContentLocalizationKeys.optionalText("content_management.feature.$featureId", "content_management.")
+        if (key != null) return ContentManagementI18n.text(sender, key)
+        Bukkit.getLogger().warning("[CC-Content] missing localization key: content_management.feature.$featureId (CC-Systemカタログへの追加が必要です。一時的にdisplayNameを使用します)")
+        return ContentFeatureCatalog.resolve(featureId)?.displayName ?: featureId
+    }
 
     private fun featureNames(sender: CommandSender, featureIds: List<String>): String =
         featureIds.joinToString("、") { featureName(sender, it) }

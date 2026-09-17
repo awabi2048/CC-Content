@@ -125,7 +125,6 @@ import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskLoader
 import jp.awabi2048.cccontent.features.rank.tutorial.task.TutorialTaskCheckerImpl
 import jp.awabi2048.cccontent.features.rank.listener.*
 // SukimaDungeon (GitHub版)
-import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.*
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureLoader
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.StructureBuilder
@@ -659,7 +658,7 @@ class CCContent : JavaPlugin(), Listener {
         cleanup("arena") { if (::arenaManager.isInitialized) arenaManager.shutdown() }
 
         cleanup("sukima portal") { PortalManager.shutdown() }
-        cleanup("bgm") { BGMManager.stopAll() }
+        cleanup("bgm") { CCSystem.getAPI().getBgmService().stopAll() }
         cleanup("dungeon sessions") { DungeonSessionManager.saveSessions(this) }
 
         cleanup("persistence task") { persistenceFlushTask?.cancel() }
@@ -1454,9 +1453,8 @@ class CCContent : JavaPlugin(), Listener {
      */
     private fun initializeSukimaDungeon() {
         try {
-            // 設定をリロード
+            // 設定をリロード（BGM設定は再生要求時に都度読むため事前読込しない）
             loadSukimaDungeonConfiguration()
-            BGMManager.loadConfig()
             
             val commandExecutor = MazeCommand(this, structureLoader)
             
@@ -1601,7 +1599,6 @@ class CCContent : JavaPlugin(), Listener {
         itemManager.load()
 
         StructureBuilder.init(structureLoader, mobManager, itemManager)
-        BGMManager.loadConfig()
     }
 
     private fun summonConfiguredMob(definitionId: String, location: org.bukkit.Location): org.bukkit.entity.Entity? {
@@ -1631,16 +1628,16 @@ class CCContent : JavaPlugin(), Listener {
     @EventHandler
     fun onJoin(event: PlayerJoinEvent) {
         PlayerDataManager.load(event.player)
-        
+
         // ダンジョン内にいる場合はBGMを再開
         if (isSukimaDungeonWorld(event.player.world)) {
-            BGMManager.play(event.player, "default")
+            SukimaBgm.play(event.player)
         }
     }
 
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
-        BGMManager.stop(event.player)
+        CCSystem.getAPI().getBgmService().stop(event.player)
         PlayerDataManager.unload(event.player)
         MenuCooldownManager.clearCooldown(event.player.uniqueId)
         rankManagerInstance?.hideProfessionBossBar(event.player.uniqueId)
