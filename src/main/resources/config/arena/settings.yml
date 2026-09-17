@@ -15,7 +15,7 @@ bgm:
     switch_interval_beats: 8
     pitch: 1.0
   lobby:
-    key: "kota_server:ost_3.sukima_dungeon"
+    key: "kota_server:ost_3.arena.calm"
     bpm: 120
     loop_beats: 384
     switch_interval_beats: 8

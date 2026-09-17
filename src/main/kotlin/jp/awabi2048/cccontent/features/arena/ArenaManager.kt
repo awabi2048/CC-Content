@@ -322,7 +322,7 @@ class ArenaManager(
         const val POSITION_HISTORY_MAX_SAMPLES = 24
         const val ARENA_BGM_NORMAL_KEY_DEFAULT = "kota_server:ost_3.sukima_dungeon"
         const val ARENA_BGM_COMBAT_KEY_DEFAULT = "kota_server:ost_4.arena"
-        const val ARENA_BGM_LOBBY_KEY_DEFAULT = "kota_server:ost_3.sukima_dungeon"
+        const val ARENA_BGM_LOBBY_KEY_DEFAULT = "kota_server:ost_3.arena.calm"
         const val ARENA_BGM_NORMAL_BPM_DEFAULT = 120.0
         const val ARENA_BGM_COMBAT_BPM_DEFAULT = 140.0
         const val ARENA_BGM_LOBBY_BPM_DEFAULT = 120.0
