@@ -128,6 +128,7 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 sealed class ArenaStartResult {
     data class Success(
@@ -399,6 +400,8 @@ class ArenaManager(
         const val LOBBY_MARKER_TAG_TUTORIAL_STEP = "arena.marker.lobby_tutorial_step"
         const val LOBBY_MARKER_TAG_PEDESTAL = "arena.marker.pedestal"
         const val LOBBY_TUTORIAL_STEP_INDEX_TAG_PREFIX = "arena.marker.lobby_tutorial_step.index."
+        // チュートリアル開始問題の究明用デバッグログ開閉。究明後に除去する。
+        const val LOBBY_TUTORIAL_DEBUG = true
 
         fun defaultSwitchIntervalBeats(): Int {
             return ARENA_BGM_SWITCH_INTERVAL_BEATS_DEFAULT
@@ -1130,6 +1133,7 @@ class ArenaManager(
         }
 
         val targetType = resolveLobbyTargetType(target.uniqueId, lobbyType)
+        tutorialDebug("移動要求: player=${target.name} type=$targetType from=${target.world.name}")
         val destinationResolved = resolveLobbyDestination(target.world, targetType)
         // マーカー未ロード時は最終成功地点キャッシュで移動を継続し、立ち往生させない。
         // キャッシュも使えない真の未定義時のみ失敗とし、対象者本人へ理由を通知する。
@@ -1162,6 +1166,7 @@ class ArenaManager(
         } else {
             target.teleport(destination)
         }
+        tutorialDebug("テレポート結果: player=${target.name} moved=$moved to=${destination.world?.name}(${destination.blockX},${destination.blockY},${destination.blockZ})")
         if (!moved) {
             // 失敗時は状態を復元し、本人へ通知する（無言残留にしない）。
             if (retainedState != null) lobbyTutorialStates[target.uniqueId] = retainedState
@@ -1226,6 +1231,13 @@ class ArenaManager(
         return next
     }
 
+    // デバッグログ出力（節目のみ）。動作には一切影響しない。
+    private fun tutorialDebug(message: String) {
+        if (LOBBY_TUTORIAL_DEBUG) {
+            plugin.logger.info("[Arena][Tutorial] $message")
+        }
+    }
+
     private fun resolveLobbyTargetType(playerId: UUID, lobbyType: String?): ArenaLobbyTargetType {
         return when (lobbyType?.lowercase(Locale.ROOT)) {
             "tutorial" -> ArenaLobbyTargetType.TUTORIAL
@@ -1256,17 +1268,21 @@ class ArenaManager(
                 ArenaLobbyTargetType.AUTO -> snapshot.main
             }
             if (candidates.isEmpty()) {
+                tutorialDebug("解決skip(候補空): type=$targetType world=${world.name}")
                 return@forEach
             }
             // TUTORIAL要求時はステップも揃った世界を選ぶ。
             // startのみ有・steps空の不完全スナップショットを選ぶと開始直後に失敗するため、次ワールドを探す。
             if (targetType == ArenaLobbyTargetType.TUTORIAL && snapshot.tutorialSteps.isEmpty()) {
+                tutorialDebug("解決skip(steps空): type=$targetType world=${world.name} start=${snapshot.tutorialStart.size}")
                 return@forEach
             }
             val picked = candidates[random.nextInt(candidates.size)].clone()
+            tutorialDebug("解決採用: type=$targetType world=${world.name} to=(${picked.blockX},${picked.blockY},${picked.blockZ}) steps=${snapshot.tutorialSteps.size}")
             return snapshot to picked
         }
 
+        tutorialDebug("解決失敗(全世界不完全): type=$targetType")
         return null
     }
 
@@ -1460,7 +1476,7 @@ class ArenaManager(
         if (steps.isEmpty()) {
             // ステップ未検出時は完了扱いにせず明示失敗とする。
             // 無言の即時完了は「テレポートされたが始まらない」という誤認の原因になる。
-            plugin.logger.warning("[Arena] ロビーチュートリアルを開始できません（ステップ未検出）: player=${player.name} world=${player.world.name}")
+            plugin.logger.warning("[Arena] ロビーチュートリアルを開始できません（ステップ未検出）: player=${player.name} world=${player.world.name} start=${snapshot.tutorialStart.size} steps=${snapshot.tutorialSteps.size}")
             player.sendMessage(
                 ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_COMMAND_START_ERROR_LOBBY_MARKER_NOT_FOUND)
             )
@@ -1475,6 +1491,18 @@ class ArenaManager(
         lobbyTutorialStates[player.uniqueId] = state
         tutorialCompletedParticipants.remove(player.uniqueId)
         spawnLobbyTutorialMarker(player, state)
+        // 開始成功の記録：step[0]位置・プレイヤー距離・Y幾何値を残し、不開始究明の基準にする。
+        val first = steps[0]
+        val dx = player.location.x - first.x
+        val dz = player.location.z - first.z
+        val centerY = first.y + ACTION_MARKER_CENTER_Y_OFFSET
+        val yDiff = kotlin.math.abs(player.location.y - (centerY - 0.5))
+        tutorialDebug(
+            "開始成功: player=${player.name} steps=${steps.size} " +
+                "step0=(${first.blockX},${first.blockY},${first.blockZ}) " +
+                "player=(${player.location.blockX},${player.location.blockY},${player.location.blockZ}) " +
+                "水平距離=${"%.2f".format(sqrt(dx * dx + dz * dz))} Y差=${"%.2f".format(yDiff)}"
+        )
         return true
     }
 
@@ -1506,14 +1534,25 @@ class ArenaManager(
         val originWorldUid = player.world.uid
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             if (!player.isOnline) {
+                tutorialDebug("完了抑止(オフライン): player=${player.name}")
                 return@Runnable
             }
             // 再実行されていたら旧完了効果を出さない。
-            if (lobbyTutorialCompleteGenerations[player.uniqueId] != generation) return@Runnable
+            if (lobbyTutorialCompleteGenerations[player.uniqueId] != generation) {
+                tutorialDebug("完了抑止(世代不一致): player=${player.name}")
+                return@Runnable
+            }
             // 別ワールドへ移動済みの場合は旧チュートリアルの効果を出さない。
-            if (player.world.uid != originWorldUid) return@Runnable
+            if (player.world.uid != originWorldUid) {
+                tutorialDebug("完了抑止(別ワールド): player=${player.name} now=${player.world.name}")
+                return@Runnable
+            }
             // チュートリアル状態が再開されていたら完了効果を出さない。
-            if (lobbyTutorialStates.containsKey(player.uniqueId)) return@Runnable
+            if (lobbyTutorialStates.containsKey(player.uniqueId)) {
+                tutorialDebug("完了抑止(再開中): player=${player.name}")
+                return@Runnable
+            }
+            tutorialDebug("完了演出: player=${player.name}")
             showLobbyTutorialCompletedEffect(player)
         }, LOBBY_TUTORIAL_COMPLETE_DELAY_TICKS)
     }
@@ -8251,6 +8290,10 @@ class ArenaManager(
             val player = Bukkit.getPlayer(playerId)
             if (player == null || !player.isOnline || player.world.uid != marker.center.world?.uid) {
                 // 監視タスクによる黙示消去時も遅延完了効果を無効化する。
+                tutorialDebug(
+                    "監視消去: player=$playerId online=${player?.isOnline} " +
+                        "playerWorld=${player?.world?.name} markerWorld=${marker.center.world?.name}"
+                )
                 bumpLobbyTutorialGeneration(playerId)
                 clearLobbyTutorialState(playerId)
                 return@forEach
@@ -8276,6 +8319,17 @@ class ArenaManager(
             if (holdState != null && holdState.heldTicks >= 20) {
                 player.playSound(player.location, Sound.BLOCK_BEACON_DEACTIVATE, 1.0f, 2.0f)
             }
+            if (holdState != null && holdState.heldTicks > 0) {
+                // 中断の節目記録：範囲内訳（Y差・水平距離）で不成立理由を判別する。
+                val dx = player.location.x - marker.center.x
+                val dz = player.location.z - marker.center.z
+                tutorialDebug(
+                    "HOLD中断: player=${player.name} held=${holdState.heldTicks} " +
+                        "sneak=${player.isSneaking} " +
+                        "水平距離=${"%.2f".format(sqrt(dx * dx + dz * dz))} " +
+                        "Y差=${"%.2f".format(abs(player.location.y - (marker.center.y - 0.5)))}"
+                )
+            }
             lobbyTutorialHoldStates.remove(playerId)
             return
         }
@@ -8285,6 +8339,7 @@ class ArenaManager(
             holdState.markerId = marker.id
             holdState.heldTicks = 0
             holdState.startSoundPlayed = false
+            tutorialDebug("HOLD開始: player=${player.name} marker=${marker.id}")
         }
 
         if (!holdState.startSoundPlayed) {
@@ -8296,6 +8351,7 @@ class ArenaManager(
         if (holdState.heldTicks < marker.holdTicksRequired) {
             return
         }
+        tutorialDebug("HOLD到達: player=${player.name} stepIndex=${lobbyTutorialStates[playerId]?.stepIndex}")
 
         transitionActionMarkerState(
             marker,
