@@ -20,6 +20,7 @@ import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.PortalManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.PortalSession
 import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
+import jp.awabi2048.cccontent.features.sukima_dungeon.SukimaBgm
 import jp.awabi2048.cccontent.util.cancelWithDebug
 import org.bukkit.event.player.PlayerInteractEntityEvent
 
@@ -446,8 +447,7 @@ class EntranceListener(private val plugin: JavaPlugin, private val loader: Struc
                 isMultiplayer = isMultiplayer
             )
             ScoreboardManager.setupScoreboard(player)
-            jp.awabi2048.cccontent.features.common.BGMManager.loadConfig()
-            jp.awabi2048.cccontent.features.common.BGMManager.play(player, "default")
+            SukimaBgm.play(player)
         }
     }
 }
