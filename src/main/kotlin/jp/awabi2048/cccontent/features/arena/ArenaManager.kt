@@ -1142,7 +1142,8 @@ class ArenaManager(
             plugin.logger.warning("[Arena] ロビー移動に失敗しました（マーカー未検出・キャッシュなし）: player=${target.name} type=$targetType")
             return false
         }
-        val snapshot = destinationResolved.first
+        // 目的地のスナップショットは移動前の情報のため開始時には使わない。
+        // 開始直前に移動後のワールドから取り直す（下記の freshSnapshot）。
         val destination = destinationResolved.second
 
         // テレポート確定前にチュートリアル状態を消さない：失敗時に進捗消失＋残留となるのを防ぐ。
@@ -1171,11 +1172,17 @@ class ArenaManager(
         }
 
         markLobbyVisited(target.uniqueId)
-        rememberLobbyDestination(targetType, destination)
 
         if (targetType == ArenaLobbyTargetType.TUTORIAL) {
-            startLobbyTutorial(target, snapshot)
+            // テレポート成功後に取り直す：移動前のスナップショットが不完全（steps空）の場合、
+            // 古い情報のまま開始すると無言の即時完了になり「開始しない」に見える。
+            val freshSnapshot = findLoadedLobbyMarkerSnapshot(target.world)
+            if (!startLobbyTutorial(target, freshSnapshot)) {
+                return false
+            }
+            rememberLobbyDestination(targetType, destination)
         } else {
+            rememberLobbyDestination(targetType, destination)
             playLobbyBgm(target)
         }
         return true
@@ -1202,7 +1209,9 @@ class ArenaManager(
         if (targetType == ArenaLobbyTargetType.TUTORIAL) {
             // 移動後にロード済み状態で取り直し、ステップ欠落による即時完了の誤判定を減らす。
             val snapshot = findLoadedLobbyMarkerSnapshot(target.world)
-            startLobbyTutorial(target, snapshot)
+            if (!startLobbyTutorial(target, snapshot)) {
+                return false
+            }
         } else {
             playLobbyBgm(target)
         }
@@ -1245,6 +1254,11 @@ class ArenaManager(
                 ArenaLobbyTargetType.AUTO -> snapshot.main
             }
             if (candidates.isEmpty()) {
+                return@forEach
+            }
+            // TUTORIAL要求時はステップも揃った世界を選ぶ。
+            // startのみ有・steps空の不完全スナップショットを選ぶと開始直後に失敗するため、次ワールドを探す。
+            if (targetType == ArenaLobbyTargetType.TUTORIAL && snapshot.tutorialSteps.isEmpty()) {
                 return@forEach
             }
             val picked = candidates[random.nextInt(candidates.size)].clone()
@@ -1422,9 +1436,10 @@ class ArenaManager(
         )
     }
 
-    private fun startLobbyTutorial(player: Player, snapshot: ArenaLobbyMarkerSnapshot) {
+    // 戻り値が false の場合は開始失敗（ステップ未検出）。完了扱いにせず、呼出し元で失敗として扱う。
+    private fun startLobbyTutorial(player: Player, snapshot: ArenaLobbyMarkerSnapshot): Boolean {
         if (!player.isOnline) {
-            return
+            return false
         }
 
         val stepPairs = snapshot.tutorialSteps
@@ -1450,9 +1465,13 @@ class ArenaManager(
             .map { it.second }
 
         if (steps.isEmpty()) {
-            markLobbyTutorialCompleted(player.uniqueId)
-            showLobbyTutorialCompletedEffect(player)
-            return
+            // ステップ未検出時は完了扱いにせず明示失敗とする。
+            // 無言の即時完了は「テレポートされたが始まらない」という誤認の原因になる。
+            plugin.logger.warning("[Arena] ロビーチュートリアルを開始できません（ステップ未検出）: player=${player.name} world=${player.world.name}")
+            player.sendMessage(
+                ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_COMMAND_START_ERROR_LOBBY_MARKER_NOT_FOUND)
+            )
+            return false
         }
 
         // チュートリアル中はCC-SystemのワールドBGMと重ならないよう抑止する。
@@ -1462,6 +1481,7 @@ class ArenaManager(
         lobbyTutorialStates[player.uniqueId] = state
         tutorialCompletedParticipants.remove(player.uniqueId)
         spawnLobbyTutorialMarker(player, state)
+        return true
     }
 
     private fun spawnLobbyTutorialMarker(player: Player, state: ArenaLobbyTutorialState) {
