@@ -9,6 +9,9 @@
 
 package jp.awabi2048.cccontent.features.arena
 
+import com.awabi2048.ccsystem.api.bgm.BgmRequest
+import com.awabi2048.ccsystem.api.bgm.BgmService
+import com.awabi2048.ccsystem.api.bgm.BgmSource
 import com.awabi2048.ccsystem.api.localization.generated.ContentArenaKeys
 
 import com.awabi2048.ccsystem.CCSystem
@@ -29,7 +32,6 @@ import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionModifiers
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionService
 import jp.awabi2048.cccontent.features.arena.mission.ArenaMissionType
 import jp.awabi2048.cccontent.features.arena.mission.ArenaStatusSnapshot
-import jp.awabi2048.cccontent.features.common.BGMManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.generator.VoidChunkGenerator
 import jp.awabi2048.cccontent.items.CustomItemManager
 import jp.awabi2048.cccontent.items.arena.ArenaEnchantShardData
@@ -1268,57 +1270,48 @@ class ArenaManager(
         return null
     }
 
+    // BGM取得の単一入口：再生・優先解決・寿命管理はCC-SystemのBgmServiceへ移譲する。
+    private fun bgm(): BgmService = CCSystem.getAPI().getBgmService()
+
+    // Arena設定トラックをBgmService要求へ変換する。音量・カテゴリは旧BGMManagerと同一（既定値）にする。
+    private fun bgmRequestOf(track: ArenaBgmTrackConfig): BgmRequest =
+        BgmRequest(soundKey = track.soundKey, loopTicks = track.loopTicks, pitch = track.pitch)
+
+    private fun bgmSourceOf(mode: ArenaBgmMode): BgmSource? = when (mode) {
+        ArenaBgmMode.NORMAL -> BgmSource.ARENA_NORMAL
+        ArenaBgmMode.COMBAT -> BgmSource.ARENA_COMBAT
+        ArenaBgmMode.STOPPED -> null
+    }
+
     private fun playLobbyBgm(player: Player) {
-        // CC-SystemのワールドBGMと二重再生にならないよう、先にワールドBGM側を止めてからロビーBGMを開始する。
-        // CC-System側APIに音楽専用口がないため、具象のMusicListenerへ協調停止を依頼する（既存のCCSystem直接参照と同型）。
-        suppressSystemWorldMusic(player)
-        val track = arenaBgmConfig.lobby
-        BGMManager.playPrecise(player, track.soundKey, track.loopTicks, track.pitch)
+        // 上位予約がなければロビーBGMが有効化され、ワールドBGMは自動抑止される。
+        // 既存の同一要求が有効な場合は再頭出ししない。
+        bgm().acquire(player, BgmSource.ARENA_LOBBY, bgmRequestOf(arenaBgmConfig.lobby))
     }
 
     // ロビー系BGMを明示停止する：ロビー外（スポーン・別ワールド・ログアウト）への持ち越しを防ぐ。
+    // 解放後は下位予約（ワールドBGM）があれば自動復帰する。
     private fun stopLobbyBgm(player: Player) {
-        BGMManager.stop(player, arenaBgmConfig.lobby.soundKey)
-        // normalとlobbyが同一キーの既定設定ではsession停止がlobbyを兼ねるが、
-        // キー分離後はlobby単独停止が必要になるため、ここで明示的に止める。
-        if (arenaBgmConfig.lobby.soundKey == arenaBgmConfig.normal.soundKey) {
-            return
-        }
+        bgm().stop(player, arenaBgmConfig.lobby.soundKey)
     }
 
-    // CC-SystemのワールドBGMを止める（Arena/ロビーBGMを優先させるための協調処理）。
-    private fun suppressSystemWorldMusic(player: Player) {
-        try {
-            val system = CCSystem.instance
-            if (!system.hasMusicListener()) return
-            system.musicListener.stopMusic(player)
-        } catch (_: Exception) {
-            // CC-System側の音楽機能が無効・未初期化の場合は何もしない（Arena単独で動作する）。
-        }
-    }
-
-    // Arena系BGMを止めてCC-SystemのワールドBGMへ戻す（ロビー外への正常な移管）。
-    private fun restoreSystemWorldMusic(player: Player) {
-        try {
-            val system = CCSystem.instance
-            if (!system.hasMusicListener()) return
-            system.musicListener.playMusic(player, player.world.key.toString())
-        } catch (_: Exception) {
-            // 復帰に失敗してもArena側の停止状態は維持する。
-        }
+    // Arena系の全予約を解放する。ワールド移動時の持ち越し対策。
+    private fun releaseArenaBgm(player: Player) {
+        bgm().release(player, BgmSource.ARENA_LOBBY)
+        bgm().release(player, BgmSource.ARENA_NORMAL)
+        bgm().release(player, BgmSource.ARENA_COMBAT)
     }
 
     private fun sendPlayerToLobbyOrSpawn(player: Player) {
         if (sendPlayerToLobby(player, "main")) {
             return
         }
-        // ロビー移動に失敗してスポーンへ逃がす場合、ロビーBGMループを持ち越さない。
+        // ロビー移動に失敗してスポーンへ逃がす場合、Arena系予約を解放してワールドBGMへ自動復帰させる。
         stopLobbyBgm(player)
         stopAllArenaBgmForPlayer(player)
         Bukkit.getWorlds().firstOrNull()?.spawnLocation?.let { spawn ->
             player.teleport(spawn)
         }
-        restoreSystemWorldMusic(player)
     }
 
     private fun clearLobbyTutorialState(playerId: UUID) {
@@ -1474,9 +1467,10 @@ class ArenaManager(
             return false
         }
 
-        // チュートリアル中はCC-SystemのワールドBGMと重ならないよう抑止する。
-        // 既存のロビーBGMループは継続させ、無音化はしない（開始前からの継続を優先）。
-        suppressSystemWorldMusic(player)
+        // チュートリアル中もロビーBGM予約を有効化する：セッション由来の無音遷移と、
+        // 非セッション由来の旧ループ放置との非対称を解消し、ワールドBGMとの重なりも防ぐ。
+        // 既存の同一要求が有効な場合は再頭出ししない。
+        bgm().acquire(player, BgmSource.ARENA_LOBBY, bgmRequestOf(arenaBgmConfig.lobby))
         val state = ArenaLobbyTutorialState(stepIndex = 0, stepLocations = steps)
         lobbyTutorialStates[player.uniqueId] = state
         tutorialCompletedParticipants.remove(player.uniqueId)
@@ -1620,17 +1614,16 @@ class ArenaManager(
         return true
     }
 
-    // ワールド移動時のロビーBGM持ち越し対策：移動先にロビーがなくセッション外ならArena系ループを止めてワールドBGMへ戻す。
-    // sendPlayerToLobby内のテレポート直後に発火する分は、後続のplayLobbyBgm/startLobbyTutorialで上書きされるため安全。
+    // ワールド移動時のロビーBGM持ち越し対策：移動先にロビーがなくセッション外なら
+    // Arena系予約を解放し、ワールドBGMへ自動復帰させる。
+    // sendPlayerToLobby内のテレポート直後に発火する分は、後続のacquireで上書きされるため安全。
     fun handleLobbyBgmOnWorldChange(player: Player) {
         bumpLobbyTutorialGeneration(player.uniqueId)
         if (getSession(player) != null) return
-        if (!BGMManager.isPlaying(player)) return
+        if (!bgm().isPlaying(player)) return
         val snapshot = findLoadedLobbyMarkerSnapshot(player.world)
         if (snapshot.main.isNotEmpty() || snapshot.tutorialStart.isNotEmpty()) return
-        stopLobbyBgm(player)
-        stopAllArenaBgmForPlayer(player)
-        restoreSystemWorldMusic(player)
+        releaseArenaBgm(player)
     }
 
     fun getThemeIds(): Set<String> = themeLoader.getThemeIds()
@@ -1731,7 +1724,7 @@ class ArenaManager(
         // 中断クリアと同時に遅延完了効果を無効化し、BGMループの持ち越しを防ぐ。
         bumpLobbyTutorialGeneration(player.uniqueId)
         clearLobbyTutorialState(player)
-        // 最終救済（CCContent.onQuitのBGMManager.stop）に加え、Arena側でもlobbyループを止める。
+        // 最終救済（CCContent.onQuitのBgmService.stop）に加え、Arena側でもlobby予約を解放する。
         stopLobbyBgm(player)
 
         val session = getSession(player) ?: return
@@ -6679,7 +6672,7 @@ class ArenaManager(
         if (targets.isEmpty()) {
             return
         }
-        val allPlaying = targets.all { player -> BGMManager.isPlaying(player, track.soundKey) }
+        val allPlaying = targets.all { player -> bgm().isPlaying(player, track.soundKey) }
         if (!allPlaying) {
             startArenaBgmMode(session, currentMode, currentTick)
         }
@@ -6767,14 +6760,14 @@ class ArenaManager(
 
     private fun hasSessionArenaBgmPlayback(session: ArenaSession, mode: ArenaBgmMode): Boolean {
         val track = arenaBgmTrackForMode(mode) ?: return false
-        return arenaBgmPlaybackTargets(session).any { player -> BGMManager.isPlaying(player, track.soundKey) }
+        return arenaBgmPlaybackTargets(session).any { player -> bgm().isPlaying(player, track.soundKey) }
     }
 
     private fun hasArenaBgmPlayback(session: ArenaSession, participantId: UUID, mode: ArenaBgmMode): Boolean {
         val player = Bukkit.getPlayer(participantId) ?: return false
         if (!player.isOnline || player.world.name != session.worldName) return false
         val track = arenaBgmTrackForMode(mode) ?: return false
-        return BGMManager.isPlaying(player, track.soundKey)
+        return bgm().isPlaying(player, track.soundKey)
     }
 
     private fun isBeatBoundaryReached(
@@ -6814,10 +6807,10 @@ class ArenaManager(
         val delayTicks = (beatsUntilNextBoundary.toDouble() * track.beatTicks)
             .roundToLong()
             .coerceAtLeast(1L)
-        val playbackStartNanos = BGMManager.getPlaybackStartNanos(player)
+        val playbackStartNanos = bgm().getPlaybackStartNanos(player)
 
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
-            if (player.isOnline && BGMManager.getPlaybackStartNanos(player) == playbackStartNanos) {
+            if (player.isOnline && bgm().getPlaybackStartNanos(player) == playbackStartNanos) {
                 stopArenaBgmForPlayer(player)
             }
         }, delayTicks)
@@ -6834,16 +6827,16 @@ class ArenaManager(
 
     private fun startArenaBgmMode(session: ArenaSession, mode: ArenaBgmMode, startTick: Long) {
         val track = arenaBgmTrackForMode(mode) ?: return
+        val source = bgmSourceOf(mode) ?: return
         val currentMode = session.arenaBgmMode
         if (currentMode == mode && hasSessionArenaBgmPlayback(session, mode)) {
             session.arenaBgmSwitchRequest = null
             return
         }
 
+        // acquireが下位予約（ロビー・ワールドBGM）を自動抑止するため、手動の停止・抑止は不要。
         arenaBgmPlaybackTargets(session).forEach { player ->
-            stopAllArenaBgmForPlayer(player)
-            suppressSystemWorldMusic(player)
-            BGMManager.playPrecise(player, track.soundKey, track.loopTicks, track.pitch)
+            bgm().acquire(player, source, bgmRequestOf(track))
         }
         session.arenaBgmMode = mode
         session.arenaBgmModeStartedTick = startTick
@@ -6855,9 +6848,8 @@ class ArenaManager(
 
     private fun resumeArenaBgmForPlayer(session: ArenaSession, player: Player) {
         val track = arenaBgmTrackForMode(session.arenaBgmMode) ?: return
-        stopAllArenaBgmForPlayer(player)
-        suppressSystemWorldMusic(player)
-        BGMManager.playPrecise(player, track.soundKey, track.loopTicks, track.pitch)
+        val source = bgmSourceOf(session.arenaBgmMode) ?: return
+        bgm().acquire(player, source, bgmRequestOf(track))
     }
 
     private fun stopArenaBgm(session: ArenaSession) {
@@ -6900,13 +6892,13 @@ class ArenaManager(
 
     private fun stopArenaBgmForPlayer(player: Player) {
         arenaSessionBgmKeys().forEach { soundKey ->
-            BGMManager.stop(player, soundKey)
+            bgm().stop(player, soundKey)
         }
     }
 
     private fun stopAllArenaBgmForPlayer(player: Player) {
         arenaBgmKeys().forEach { soundKey ->
-            BGMManager.stop(player, soundKey)
+            bgm().stop(player, soundKey)
         }
     }
 
