@@ -1,14 +1,14 @@
 ﻿config_version: 1
 
-promotion_probability: 0.25
+promotion_probability: 0.07
 
 normal:
-  weight: 5
+  weight: 10
   icon: CHISELED_SANDSTONE
   difficulty_star: 1
   difficulty_exp_bonus_rate: 0
   wave_exp_bonus_rate_increment: 0.05
-  pedestal_room_probability: 0.3
+  pedestal_room_probability: 0.05
   waves:
   - wave: 1
     spawn_interval: 20
@@ -271,7 +271,7 @@ promoted:
   difficulty_star: 2
   difficulty_exp_bonus_rate: 0.15
   wave_exp_bonus_rate_increment: 0.1
-  pedestal_room_probability: 0.3
+  pedestal_room_probability: 0.05
   waves:
   - wave: 1
     spawn_interval: 18

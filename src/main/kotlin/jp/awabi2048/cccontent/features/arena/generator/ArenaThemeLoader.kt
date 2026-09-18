@@ -403,11 +403,6 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
             ?: defaultDoorSoundPitch.toDouble()).toFloat().coerceIn(0.5f, 2.0f)
 
         val variant = parseThemeVariant(section, themeId, variantName, warnings, fallback?.variant) ?: return null
-        if (section.contains("orientation")) {
-            val warning = "[Arena] $THEME_CONFIG_DIR/$themeId.yml の orientation は廃止されました（ストラクチャーは NORTH 基準で保存される前提）。エントリを無視します: theme=$themeId variant=$variantName"
-            plugin.logger.warning(warning)
-            warnings.add(warning)
-        }
         val clearingBossMobId = if (section.contains("clearing_boss_mob_id")) {
             section.getString("clearing_boss_mob_id")?.trim()?.takeIf { it.isNotBlank() }
         } else {
