@@ -17,6 +17,7 @@ import org.bukkit.Location
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import org.enginehub.linbus.tree.LinCompoundTag
+import org.enginehub.linbus.tree.LinFloatTag
 import org.enginehub.linbus.tree.LinListTag
 import org.enginehub.linbus.tree.LinStringTag
 import org.enginehub.linbus.tree.LinTagType
@@ -344,8 +345,14 @@ class SchemStructureService(private val plugin: JavaPlugin) {
                 .build()
 
             // Marker は構造上の制御点なので、保存時はワールド依存NBTを持ち込まずタグだけを永続化する。
+            // ただし FAWE の貼付処理は Rotation を要求し、欠品時はエンティティを破棄するため既定値を付与する。
+            // Marker 自体に向きはないため [0, 0] で無害である（向き情報は marker.facing.* タグ側が保持する）。
+            val rotationList = LinListTag.builder(LinTagType.floatTag())
+                .addAll(listOf(LinFloatTag.of(0.0f), LinFloatTag.of(0.0f)))
+                .build()
             val normalizedNbt = LinCompoundTag.builder()
                 .put("Tags", tagList)
+                .put("Rotation", rotationList)
                 .build()
             state.nbtReference = LazyReference.computed(normalizedNbt)
         }
