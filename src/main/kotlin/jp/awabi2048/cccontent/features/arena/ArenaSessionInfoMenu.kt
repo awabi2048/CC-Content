@@ -51,6 +51,21 @@ class ArenaSessionInfoMenu(
         )
     }
 
+    /**
+     * Menu Runtime への登録解除と更新タスク停止を行う。
+     *
+     * 内部 lifecycle restart（`/cc reload` 等）や Arena 部分初期化失敗時の
+     * rollback から呼び出される。`MenuRuntimeService.unregister()` は
+     * 冪等であり、未登録状態での呼び出しも安全である。
+     * 解除漏れがあると次回初期化時に同一 route の重複登録で失敗するため、
+     * 参照の破棄だけでなく必ず本処理を経由する。
+     */
+    fun shutdown() {
+        activeUpdateTasks.values.forEach { it.cancel() }
+        activeUpdateTasks.clear()
+        CCSystem.getAPI().getMenuRuntimeService().unregister(OWNER, MENU_ID)
+    }
+
     fun openMenu(player: Player) {
         CCSystem.getAPI().getMenuRuntimeService().open(player, MenuRoute(OWNER, MENU_ID))
         startUpdateTask(player)

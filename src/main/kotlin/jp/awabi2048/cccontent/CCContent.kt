@@ -250,6 +250,9 @@ class CCContent : JavaPlugin(), Listener {
         instance = this
         myWorldBridge = DefaultMyWorldBridge()
         CCSystem.getAPI().getMenuCommandService().unregisterOwner("cc-content")
+        // 前回 shutdown が不完全だった場合に残存した route 定義を除去し、自己回復できるようにする。
+        // MenuCommandService 側と対になる防御的解除である。
+        CCSystem.getAPI().getMenuRuntimeService().unregisterOwner("cc-content")
         coreConfig = CoreConfigManager.load(this)
         catalogStore = CatalogStore(File(dataFolder, "data/catalog/state.yml"))
         processingEquipmentService = ProcessingEquipmentService()
@@ -384,6 +387,7 @@ class CCContent : JavaPlugin(), Listener {
                 arenaFeatureReady = true
             } catch (e: Exception) {
                 runCatching { arenaMissionService?.shutdown() }
+                runCatching { arenaSessionInfoMenu?.shutdown() }
                 runCatching {
                     if (::arenaManager.isInitialized) {
                         arenaManager.setPedestalMenuProvider(null)
@@ -645,6 +649,9 @@ class CCContent : JavaPlugin(), Listener {
         cleanup("party") { partyController?.close() }
         partyController = null
         cleanup("arena mission") { arenaMissionService?.shutdown() }
+        // Menu Runtime 登録の解除漏れは次回初期化時の重複登録失敗につながるため、
+        // 参照破棄の前に shutdown() で明示的に unregister する。
+        cleanup("arena session info menu") { arenaSessionInfoMenu?.shutdown() }
         arenaSessionInfoMenu = null
         arenaEnchantPedestalMenu = null
         arenaTokenExchangeMenu = null
@@ -656,6 +663,10 @@ class CCContent : JavaPlugin(), Listener {
         }
         arenaMissionService = null
         cleanup("arena") { if (::arenaManager.isInitialized) arenaManager.shutdown() }
+        // 内部 lifecycle restart でも次回 startPlugin() 前に全 route が除去されるようにする。
+        // onDisable() 側だけでは stopPlugin() 自体が throw した場合に到達できないため、
+        // stopPlugin() 自身の cleanup に含める。
+        cleanup("menu runtime") { CCSystem.getAPI().getMenuRuntimeService().unregisterOwner("cc-content") }
 
         cleanup("sukima portal") { PortalManager.shutdown() }
         cleanup("bgm") { CCSystem.getAPI().getBgmService().stopAll() }
@@ -1130,6 +1141,16 @@ class CCContent : JavaPlugin(), Listener {
 
     private fun closeFeatureEntryPointsAfterFailure(contentKey: String) {
         when (contentKey) {
+            "arena" -> {
+                // Arena 初期化失敗時は Menu Runtime 登録が残存すると次回初期化で
+                // 重複登録の二次障害になるため、ここでも防御的に rollback する。
+                runCatching { arenaSessionInfoMenu?.shutdown() }
+                arenaSessionInfoMenu = null
+                arenaEnchantPedestalMenu = null
+                runCatching { arenaTokenExchangeMenu?.shutdown() }
+                arenaTokenExchangeMenu = null
+                runCatching { CCSystem.getAPI().getMenuRuntimeService().unregisterOwner("cc-content") }
+            }
             "party" -> {
                 runCatching { partyController?.close() }
                 partyController = null
