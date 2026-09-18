@@ -536,7 +536,9 @@ class SchemStructureService(private val plugin: JavaPlugin) {
         entities: List<LoadedSchemEntity>,
         clipboard: Clipboard
     ): StructureMarkerValidation {
-        return StructureMarkerValidator.validateArena(
+        // lift の connection.in/out は向き自動判定の補助情報であり必須ではない。
+        // 不完全な Marker があれば厳格検証でエラーにする。通常 arena には影響しない。
+        return StructureMarkerValidator.validateArenaLift(
             StructureSchemas.arena("lift") ?: error("Arena lift schema is missing"),
             entities,
             clipboard.structureSize()

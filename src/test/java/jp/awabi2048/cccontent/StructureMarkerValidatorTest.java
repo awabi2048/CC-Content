@@ -206,6 +206,105 @@ class StructureMarkerValidatorTest {
     }
 
     @Test
+    void arenaLiftAcceptsMissingConnectionMarkers() {
+        StructureMarkerValidation result = StructureMarkerValidator.INSTANCE.validateArenaLift(
+            StructureSchemas.INSTANCE.arena("lift"),
+            List.of(),
+            new CcStructureSize(5, 3, 5)
+        );
+        assertTrue(result.isValid());
+    }
+
+    @Test
+    void arenaLiftAcceptsCorrectConnectionMarkers() {
+        StructureMarkerValidation result = StructureMarkerValidator.INSTANCE.validateArenaLift(
+            StructureSchemas.INSTANCE.arena("lift"),
+            List.of(inMarker(2, 0), outMarker(2, 4)),
+            new CcStructureSize(5, 3, 5)
+        );
+        assertTrue(result.isValid());
+    }
+
+    @Test
+    void arenaLiftRejectsOnlyInMarker() {
+        StructureMarkerValidation result = StructureMarkerValidator.INSTANCE.validateArenaLift(
+            StructureSchemas.INSTANCE.arena("lift"),
+            List.of(inMarker(2, 0)),
+            new CcStructureSize(5, 3, 5)
+        );
+        assertFalse(result.isValid());
+    }
+
+    @Test
+    void arenaLiftRejectsOnlyOutMarker() {
+        StructureMarkerValidation result = StructureMarkerValidator.INSTANCE.validateArenaLift(
+            StructureSchemas.INSTANCE.arena("lift"),
+            List.of(outMarker(2, 4)),
+            new CcStructureSize(5, 3, 5)
+        );
+        assertFalse(result.isValid());
+    }
+
+    @Test
+    void arenaLiftRejectsDuplicateSide() {
+        StructureMarkerValidation result = StructureMarkerValidator.INSTANCE.validateArenaLift(
+            StructureSchemas.INSTANCE.arena("lift"),
+            List.of(inMarker(2, 0), outMarker(2, 4), outMarker(3, 4)),
+            new CcStructureSize(5, 3, 5)
+        );
+        assertFalse(result.isValid());
+    }
+
+    @Test
+    void arenaLiftRejectsSwappedRoles() {
+        StructureMarkerValidation result = StructureMarkerValidator.INSTANCE.validateArenaLift(
+            StructureSchemas.INSTANCE.arena("lift"),
+            List.of(inMarker(2, 4), outMarker(2, 0)),
+            new CcStructureSize(5, 3, 5)
+        );
+        assertFalse(result.isValid());
+    }
+
+    @Test
+    void arenaLiftRejectsNonBoundaryMarker() {
+        // 境界に接しない Marker は向き判定に使えない不完全な配置としてエラーにする。
+        StructureMarkerValidation result = StructureMarkerValidator.INSTANCE.validateArenaLift(
+            StructureSchemas.INSTANCE.arena("lift"),
+            List.of(inMarker(2, 2)),
+            new CcStructureSize(5, 3, 5)
+        );
+        assertFalse(result.isValid());
+    }
+
+    @Test
+    void arenaLiftRejectsWrongEntityType() {
+        LoadedSchemEntity wrongType = new LoadedSchemEntity(
+            "minecraft:armor_stand",
+            2,
+            0,
+            0,
+            Set.of(StructureSchemas.ARENA_CONNECTION_OUT_TAG)
+        );
+        StructureMarkerValidation result = StructureMarkerValidator.INSTANCE.validateArenaLift(
+            StructureSchemas.INSTANCE.arena("lift"),
+            List.of(wrongType),
+            new CcStructureSize(5, 3, 5)
+        );
+        assertFalse(result.isValid());
+    }
+
+    @Test
+    void arenaStraightStillRequiresConnectionMarkers() {
+        // 通常 arena の検証仕様は変更しない。
+        StructureMarkerValidation result = StructureMarkerValidator.INSTANCE.validateArena(
+            StructureSchemas.INSTANCE.arena("straight"),
+            List.of(),
+            new CcStructureSize(5, 3, 5)
+        );
+        assertFalse(result.isValid());
+    }
+
+    @Test
     void sukimaRequiresMinecraftMarkerEntity() {
         LoadedSchemEntity wrongType = new LoadedSchemEntity(
             "minecraft:armor_stand",

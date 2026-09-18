@@ -10,6 +10,32 @@ data class DirectionalConnectionSides(
 }
 
 object StructureMarkerValidator {
+    /**
+     * lift 用の検証。connection.in/out は保存時の向き自動判定のための補助情報であり、
+     * runtime では使用されないため必須としない。
+     * タグ付きエンティティが1件もなければ正常とし、1件でもあれば設定ミス検出のため
+     * 厳格な [validateArena] へ委譲する。これにより「置かない運用」と「置いたが壊れている」
+     * 状態を区別する。境界外配置や型不正も「存在する」とみなし委譲先でエラーにする。
+     */
+    fun validateArenaLift(
+        schema: ArenaStructureSchema,
+        entities: List<LoadedSchemEntity>,
+        size: CcStructureSize
+    ): StructureMarkerValidation {
+        val hasConnectionMarker = entities.any { entity ->
+            StructureSchemas.ARENA_CONNECTION_TAGS.any { it in entity.scoreboardTags }
+        }
+        if (!hasConnectionMarker) {
+            return StructureMarkerValidation(
+                isValid = true,
+                missingMarkers = emptyList(),
+                extraMarkers = emptyList(),
+                warnings = emptyList()
+            )
+        }
+        return validateArena(schema, entities, size)
+    }
+
     fun validateArena(
         schema: ArenaStructureSchema,
         entities: List<LoadedSchemEntity>,
