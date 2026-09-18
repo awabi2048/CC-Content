@@ -354,7 +354,7 @@ class ArenaManager(
         const val ARENA_DEMAND_MAX_AGE_DAYS_DEFAULT = 90
         const val BARRIER_RETURN_HOLD_TICKS = 60
         const val MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT = 45
-        const val MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT = 16.0
+        const val MULTIPLAYER_INVITE_AUTO_DECLINE_DISTANCE_DEFAULT = 16.0
         const val MULTIPLAYER_MAX_PARTICIPANTS_DEFAULT = 6
         const val MULTIPLAYER_FAST_START_SNEAK_MILLIS = 3000L
         const val MULTIPLAYER_FAST_START_HINT_COOLDOWN_MILLIS = 10000L
@@ -471,8 +471,7 @@ class ArenaManager(
     private var shuttingDown: Boolean = false
     private var barrierRestartConfig = BarrierRestartConfig(30, 0.05)
     private var multiplayerJoinGraceSeconds = MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT
-    private var multiplayerJoinMarkerSearchRadius = MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
-    private var multiplayerInviteAutoDeclineDistance = MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
+    private var multiplayerInviteAutoDeclineDistance = MULTIPLAYER_INVITE_AUTO_DECLINE_DISTANCE_DEFAULT
     private var multiplayerStageBuildStepsPerTick = 1
     private var entranceLiftIntervalTicks = ENTRANCE_LIFT_INTERVAL_TICKS_DEFAULT
     private var entranceLiftTransferRiseBlocks = ENTRANCE_LIFT_TRANSFER_RISE_BLOCKS_DEFAULT
@@ -574,13 +573,9 @@ class ArenaManager(
             "multiplayer.join_grace_seconds",
             MULTIPLAYER_JOIN_GRACE_SECONDS_DEFAULT
         ).coerceAtLeast(1)
-        multiplayerJoinMarkerSearchRadius = config.getDouble(
-            "multiplayer.join_marker_search_radius",
-            MULTIPLAYER_JOIN_MARKER_SEARCH_RADIUS_DEFAULT
-        ).coerceAtLeast(1.0)
         multiplayerInviteAutoDeclineDistance = config.getDouble(
             "multiplayer.invite_auto_decline_distance",
-            multiplayerJoinMarkerSearchRadius
+            MULTIPLAYER_INVITE_AUTO_DECLINE_DISTANCE_DEFAULT
         ).coerceAtLeast(1.0)
         multiplayerStageBuildStepsPerTick = config
             .getInt("multiplayer.stage_build_steps_per_tick", 1)
@@ -878,10 +873,6 @@ class ArenaManager(
                 "arena.messages.command.start_error.multiple_lifts"))
         }
         if (enableMultiplayerJoin && !isEntranceLiftReady(liftMarkers)) {
-            return completed(ArenaStartResult.Error(
-                "arena.messages.command.start_error.lift_not_ready"))
-        }
-        if (enableMultiplayerJoin && !isNearEntranceLift(target.location, liftMarkers.single())) {
             return completed(ArenaStartResult.Error(
                 "arena.messages.command.start_error.lift_not_ready"))
         }
@@ -8191,11 +8182,6 @@ class ArenaManager(
         return world.getNearbyEntities(markerLocation, 1.0, 1.0, 1.0)
             .filterIsInstance<Marker>()
             .any { EntranceLiftGeometry.isHorizontal(it.scoreboardTags) }
-    }
-
-    private fun isNearEntranceLift(origin: Location, marker: Location): Boolean {
-        if (origin.world?.uid != marker.world?.uid) return false
-        return origin.distanceSquared(marker) <= multiplayerJoinMarkerSearchRadius * multiplayerJoinMarkerSearchRadius
     }
 
     private fun liftMarkerKey(location: Location): String {
