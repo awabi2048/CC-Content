@@ -14,7 +14,6 @@ import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
 import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
-import jp.awabi2048.cccontent.structure.CardinalDirection
 import jp.awabi2048.cccontent.structure.SchemStructureService
 import jp.awabi2048.cccontent.structure.StructureSchemas
 import jp.awabi2048.cccontent.util.SystemEntityMarker
@@ -92,6 +91,8 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         private const val ARENA_LIFT_STRUCTURE_PATH = "structures/arena/lift.schem"
         private const val MODE_SWITCH_COOLDOWN_MILLIS = 50L
         private const val DELETE_COOLDOWN_MILLIS = 150L
+        // リフトの正準向き(NORTH)に対応する yaw。設置時の向き記録に使用する。
+        private const val LIFT_CANONICAL_YAW = 180f
         // 旧 toolId から新 toolId への読み替え表。
         private val LEGACY_TOOL_IDS = mapOf("arena.other_marker_tool" to "arena.lobby_marker_tool")
     }
@@ -225,7 +226,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         val blockFace = event.blockFace
         val mode = getMode(item, definition)
         val placementLocation = resolvePlacementLocation(player, clickedBlock, blockFace, mode)
-        val marker = spawnMarker(placementLocation, mode, alignedYaw(player.location.yaw))
+        val marker = spawnMarker(placementLocation, mode, liftPlacementYaw(player, mode))
         if (definition.toolId == "arena.lobby_marker_tool" && mode.id == "lobby_tutorial_step") {
             val world = placementLocation.world
             if (world != null && marker != null) {
@@ -440,8 +441,16 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
     }
 
     /**
-     * 横リフトの設置位置を回転後の基準角ブロック中心へ正規化する。
-     * 箱は facing 方向へ伸び、マーカーはその逆端（基準角）に位置する前提のため、
+     * リフトの設置向き。プレイヤーの向きを一切影響させないため正準向き(NORTH)固定とする。
+     * facing タグ自体は汎用消費されるため維持し、値のみ固定する。
+     */
+    private fun liftPlacementYaw(player: Player, mode: MarkerToolMode): Float {
+        return if (mode.id == "lift_vertical" || mode.id == "lift_horizontal") LIFT_CANONICAL_YAW
+        else alignedYaw(player.location.yaw)
+    }
+
+    /**
+     * 横リフトの設置位置を基準角ブロック中心へ正規化する。
      * X/Z をブロック中心へ寄せてプレビューとの一致を保証する。Y は設置面の高さを維持する。
      * 縦モードおよび他ツールは従来通りスナップ位置をそのまま使用する。
      */
@@ -526,7 +535,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
 
     private fun drawPlacementPreview(location: Location, mode: MarkerToolMode, facingYaw: Float) {
         if (mode.id == "lift_vertical" || mode.id == "lift_horizontal") {
-            drawLiftPreview(location, mode, facingYaw)
+            drawLiftPreview(location, mode)
             return
         }
         drawDustLocationCubeOutline(location, 0.5, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
@@ -535,51 +544,38 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
     }
 
     /**
-     * リフトの設置プレビュー。縦は正準向きの箱、横は facing に応じて90°回転させた箱を表示する。
-     * 箱は facing 方向へ伸び、マーカーはその逆端（基準角）に位置する。
+     * リフトの設置プレビュー。プレイヤーの向きには一切影響されない。
+     * 縦は正準向きの箱、横は90°回転させた箱をマーカー位置基準で表示する。
      * リフトの向きは箱形状で示すため矢印は表示しない。
      */
-    private fun drawLiftPreview(location: Location, mode: MarkerToolMode, facingYaw: Float) {
+    private fun drawLiftPreview(location: Location, mode: MarkerToolMode) {
         val world = location.world ?: return
-        val horizontal = mode.id == "lift_horizontal"
-        val facing = CardinalDirection.fromPlayerYaw(facingYaw)
-        val sizes = liftFootprintSizes(facing, horizontal)
+        val sizes = liftFootprintSizes(mode.id == "lift_horizontal")
         if (sizes.first <= 0 || sizes.second <= 0 || sizes.third <= 0) {
             // lift.schem 不在時は通常プレビューへフォールバックする。
             drawDustLocationCubeOutline(location, 0.5, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
             return
         }
-        val (minX, minY, minZ) = liftBaseMinCorner(location.blockX, location.blockY, location.blockZ, facing, sizes)
         drawDustOutline(
             world,
-            minX.toDouble(), minY.toDouble(), minZ.toDouble(),
-            (minX + sizes.first).toDouble(), (minY + sizes.second).toDouble(), (minZ + sizes.third).toDouble(),
+            location.blockX.toDouble(), location.blockY.toDouble(), location.blockZ.toDouble(),
+            (location.blockX + sizes.first).toDouble(), (location.blockY + sizes.second).toDouble(), (location.blockZ + sizes.third).toDouble(),
             mode.previewColor, BLOCK_OUTLINE_DUST_SIZE
         )
     }
 
     /**
      * リフト footprint の回転後寸法 (sizeX, sizeY, sizeZ)。
-     * 正準向き(in=NORTH)に対し、横モードで EAST/WEST を向く場合は90°回転して X/Z を入替える。
+     * 横モードは90°回転して X/Z を入替える。プレイヤーの向きには依存しない。
      * プレビューと設置で共有し、見た目と設置位置の一致を保証する。
      */
-    private fun liftFootprintSizes(facing: CardinalDirection, horizontal: Boolean): Triple<Int, Int, Int> {
+    private fun liftFootprintSizes(horizontal: Boolean): Triple<Int, Int, Int> {
         val liftSize = resolveArenaLiftSize() ?: return Triple(0, 0, 0)
-        return if (horizontal && (facing == CardinalDirection.EAST || facing == CardinalDirection.WEST)) {
+        return if (horizontal) {
             Triple(liftSize.third, liftSize.second, liftSize.first)
         } else {
             Triple(liftSize.first, liftSize.second, liftSize.third)
         }
-    }
-
-    /**
-     * 回転後の footprint におけるマーカー基準角ブロック。
-     * 箱は facing 方向へ伸び、マーカーはその逆端に位置する。
-     */
-    private fun liftBaseMinCorner(markerBlockX: Int, markerBlockY: Int, markerBlockZ: Int, facing: CardinalDirection, sizes: Triple<Int, Int, Int>): Triple<Int, Int, Int> {
-        val minX = if (facing.dx < 0) markerBlockX - (sizes.first - 1) else markerBlockX
-        val minZ = if (facing.dz < 0) markerBlockZ - (sizes.third - 1) else markerBlockZ
-        return Triple(minX, markerBlockY, minZ)
     }
 
     /**
