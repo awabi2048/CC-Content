@@ -2,7 +2,6 @@ package jp.awabi2048.cccontent.features.arena;
 
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -73,35 +72,5 @@ class ArenaDemandModelTest {
         assertEquals(1.0, model.selectionWeight(3, 1.0), 1.0e-12);
         // 単一候補は履歴に関わらず確定で選ばれる。
         assertEquals(2, model.selectDifficulty(List.of(2), history, today));
-    }
-
-    @Test
-    void dailyEntryReservationSurvivesReload() throws Exception {
-        var file = Files.createTempFile("arena-daily", ".yml").toFile();
-        var player = UUID.randomUUID();
-        var today = LocalDate.of(2026, 7, 13);
-        var store = new ArenaDailyEntryStore(file);
-
-        assertTrue(store.tryReserve(player, today));
-        assertFalse(store.tryReserve(player, today));
-
-        var reloaded = new ArenaDailyEntryStore(file);
-        reloaded.load();
-        assertFalse(reloaded.tryReserve(player, today));
-        assertTrue(reloaded.tryReserve(player, today.plusDays(1)));
-    }
-
-    @Test
-    void reservesMultiplePlayersAtomicallyAtTheSameLocalDate() throws Exception {
-        var file = Files.createTempFile("arena-daily-group", ".yml").toFile();
-        var first = UUID.randomUUID();
-        var second = UUID.randomUUID();
-        var today = LocalDate.of(2026, 7, 13);
-        var store = new ArenaDailyEntryStore(file);
-
-        assertTrue(store.tryReserve(first, today));
-        assertFalse(store.tryReserveAll(List.of(first, second), today));
-        assertEquals(null, store.lastEntryDate(second));
-        assertTrue(store.tryReserveAll(List.of(first, second), today.plusDays(1)));
     }
 }

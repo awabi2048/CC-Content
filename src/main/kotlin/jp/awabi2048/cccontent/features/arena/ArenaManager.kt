@@ -459,9 +459,7 @@ class ArenaManager(
     private val liftOccupiedMarkerKeys = mutableSetOf<String>()
     private val liftReturningMarkerKeys = mutableSetOf<String>()
     private val liftOccupiedWaiters = mutableSetOf<UUID>()
-    private val dailyEntryStore = ArenaDailyEntryStore(File(plugin.dataFolder, "data/arena/daily_entries.yml"))
     private val historyStore = ArenaHistoryStore(File(plugin.dataFolder, "data/arena/history.yml"))
-    private val dailyEntryParticipantsByWorld = mutableMapOf<String, MutableSet<UUID>>()
     private var demandConfig = ArenaDemandConfig()
     private var demandModel = ArenaDemandModel(demandConfig)
     private var maintenanceTask: BukkitTask? = null
@@ -525,7 +523,6 @@ class ArenaManager(
     private var pedestalMenuProvider: (() -> ArenaEnchantPedestalMenu?)? = null
 
     fun initialize(featureInitLogger: FeatureInitializationLogger? = null) {
-        dailyEntryStore.load()
         historyStore.load()
         loadLobbyDestinationCache()
         loadBattleConfigs()
@@ -803,10 +800,6 @@ class ArenaManager(
         val participantPlayers = (listOf(target) + initialParticipants)
             .distinctBy { it.uniqueId }
 
-        if (participantPlayers.any { dailyEntryStore.lastEntryDate(it.uniqueId) == sharedClock().currentDate() }) {
-            return completed(ArenaStartResult.Error("arena.messages.mission.start_cancelled"))
-        }
-
         val alreadyInSession = participantPlayers.firstOrNull { playerToSessionWorld.containsKey(it.uniqueId) }
         if (alreadyInSession != null) {
             return completed(ArenaStartResult.Error(
@@ -1041,12 +1034,6 @@ class ArenaManager(
                 initializeBarrierRestartState(session)
                 startBarrierAmbientTask(session)
                 session.stageGenerationCompleted = true
-
-                if (!reserveDailyEntry(session.participants)) {
-                    terminateSession(session, false)
-                    return completed(ArenaStartResult.Error("arena.messages.mission.start_cancelled"))
-                }
-                dailyEntryParticipantsByWorld[session.worldName] = session.participants.toMutableSet()
 
                 session.participants.forEach { participantId ->
                     val participant = Bukkit.getPlayer(participantId) ?: return@forEach
@@ -1731,15 +1718,10 @@ class ArenaManager(
         return candidates.last()
     }
 
-    private fun reserveDailyEntry(playerIds: Collection<UUID>): Boolean {
-        val today = sharedClock().currentDate()
-        return dailyEntryStore.tryReserveAll(playerIds, today)
-    }
-
     private fun recordSuccessfulHistory(session: ArenaSession) {
         val date = sharedClock().currentDate()
         val durationSeconds = ((System.currentTimeMillis() - session.startedAtMillis) / 1000L).coerceAtLeast(0L)
-        val participantIds = dailyEntryParticipantsByWorld.remove(session.worldName).orEmpty()
+        val participantIds = session.participants.toSet()
         participantIds.forEach { playerId ->
             historyStore.add(ArenaHistoryRecord(playerId, date, session.difficultyStar, durationSeconds))
         }
@@ -3966,8 +3948,6 @@ class ArenaManager(
         transitionSessionPhase(session, ArenaPhase.TERMINATING)
         if (success) {
             recordSuccessfulHistory(session)
-        } else {
-            dailyEntryParticipantsByWorld.remove(session.worldName)
         }
         Bukkit.getPluginManager().callEvent(
             ArenaSessionEndedEvent(
@@ -7720,10 +7700,8 @@ class ArenaManager(
             .filter { !playerToSessionWorld.containsKey(it.uniqueId) || playerToSessionWorld[it.uniqueId] == session.worldName }
             .toList()
 
-        val today = sharedClock().currentDate()
-        val availableParticipants = participants.filter { dailyEntryStore.lastEntryDate(it.uniqueId) != today }
-        if (availableParticipants.none { it.uniqueId == session.ownerPlayerId } ||
-            !reserveDailyEntry(availableParticipants.map { it.uniqueId })) {
+        val availableParticipants = participants.toList()
+        if (availableParticipants.none { it.uniqueId == session.ownerPlayerId }) {
             terminateSession(
                 session,
                 false,
@@ -7731,9 +7709,6 @@ class ArenaManager(
             )
             return
         }
-
-        dailyEntryParticipantsByWorld.getOrPut(session.worldName) { mutableSetOf() }
-            .addAll(availableParticipants.map { it.uniqueId })
 
         availableParticipants.forEach { player ->
             session.participants.add(player.uniqueId)

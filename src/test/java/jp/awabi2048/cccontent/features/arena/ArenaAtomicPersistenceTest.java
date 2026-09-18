@@ -48,22 +48,6 @@ class ArenaAtomicPersistenceTest {
         assertNoTemporaryFiles(dir);
     }
 
-    @Test
-    void dailyEntryStoreRoundTripKeepsDates() throws Exception {
-        Path dir = Files.createTempDirectory("arena-daily");
-        var file = dir.resolve("daily_entries.yml").toFile();
-        var player = UUID.randomUUID();
-        var today = LocalDate.of(2026, 9, 7);
-        var store = new ArenaDailyEntryStore(file);
-
-        assertTrue(store.tryReserve(player, today));
-
-        var reloaded = new ArenaDailyEntryStore(file);
-        reloaded.load();
-        assertEquals(today, reloaded.lastEntryDate(player));
-        assertNoTemporaryFiles(dir);
-    }
-
     private static void assertNoTemporaryFiles(Path dir) throws Exception {
         try (Stream<Path> files = Files.list(dir)) {
             assertTrue(files.noneMatch(path -> path.getFileName().toString().contains(".tmp")));
