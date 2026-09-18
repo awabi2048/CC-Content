@@ -14,6 +14,7 @@ import jp.awabi2048.cccontent.features.arena.ArenaI18n
 import jp.awabi2048.cccontent.features.sukima_dungeon.MessageManager
 import jp.awabi2048.cccontent.features.sukima_dungeon.isSukimaDungeonWorld
 import jp.awabi2048.cccontent.items.PoisonousPotatoComponentPack
+import jp.awabi2048.cccontent.structure.CardinalDirection
 import jp.awabi2048.cccontent.structure.SchemStructureService
 import jp.awabi2048.cccontent.structure.StructureSchemas
 import jp.awabi2048.cccontent.util.SystemEntityMarker
@@ -50,6 +51,7 @@ import org.bukkit.util.BoundingBox
 import org.bukkit.util.Vector
 import java.time.Duration
 import java.util.UUID
+import kotlin.math.floor
 import kotlin.math.round
 
 class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
@@ -222,7 +224,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         val clickedBlock = event.clickedBlock ?: return
         val blockFace = event.blockFace
         val mode = getMode(item, definition)
-        val placementLocation = resolvePlacementLocation(player, clickedBlock, blockFace)
+        val placementLocation = resolvePlacementLocation(player, clickedBlock, blockFace, mode)
         val marker = spawnMarker(placementLocation, mode, alignedYaw(player.location.yaw))
         if (definition.toolId == "arena.lobby_marker_tool" && mode.id == "lobby_tutorial_step") {
             val world = placementLocation.world
@@ -413,13 +415,13 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         return marker
     }
 
-    private fun resolvePlacementLocation(player: Player, clickedBlock: Block, blockFace: BlockFace): Location {
+    private fun resolvePlacementLocation(player: Player, clickedBlock: Block, blockFace: BlockFace, mode: MarkerToolMode? = null): Location {
         if (player.isSneaking) {
             val rayTrace = placementRayTrace(player)
             val hitBlock = rayTrace?.hitBlock
             val hitFace = rayTrace?.hitBlockFace
             if (hitBlock != null && hitFace != null) {
-                return snapMarkerToFace(hitBlock, hitFace, rayTrace.hitPosition)
+                return normalizeLiftOrigin(snapMarkerToFace(hitBlock, hitFace, rayTrace.hitPosition), mode)
             }
         }
 
@@ -429,11 +431,28 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         } else {
             null
         }
-        return if (hitPosition != null) {
+        val snapped = if (hitPosition != null) {
             snapMarkerToFace(clickedBlock, blockFace, hitPosition)
         } else {
             markerFaceCenter(clickedBlock, blockFace)
         }
+        return normalizeLiftOrigin(snapped, mode)
+    }
+
+    /**
+     * 横リフトの設置位置を回転後の基準角ブロック中心へ正規化する。
+     * 箱は facing 方向へ伸び、マーカーはその逆端（基準角）に位置する前提のため、
+     * X/Z をブロック中心へ寄せてプレビューとの一致を保証する。Y は設置面の高さを維持する。
+     * 縦モードおよび他ツールは従来通りスナップ位置をそのまま使用する。
+     */
+    private fun normalizeLiftOrigin(snapped: Location, mode: MarkerToolMode?): Location {
+        if (mode?.id != "lift_horizontal" || snapped.world == null) return snapped
+        return Location(
+            snapped.world,
+            floor(snapped.x) + 0.5,
+            snapped.y,
+            floor(snapped.z) + 0.5
+        )
     }
 
     private fun placementRayTrace(player: Player) = player.world.rayTraceBlocks(
@@ -507,26 +526,60 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
 
     private fun drawPlacementPreview(location: Location, mode: MarkerToolMode, facingYaw: Float) {
         if (mode.id == "lift_vertical" || mode.id == "lift_horizontal") {
-            val world = location.world ?: return
-            val liftSize = resolveArenaLiftSize()
-            if (liftSize != null) {
-                val minX = location.blockX.toDouble()
-                val minY = location.blockY.toDouble()
-                val minZ = location.blockZ.toDouble()
-                val maxX = minX + liftSize.first.toDouble()
-                val maxY = minY + liftSize.second.toDouble()
-                val maxZ = minZ + liftSize.third.toDouble()
-                drawDustOutline(world, minX, minY, minZ, maxX, maxY, maxZ, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
-                // 横リフトは facing が本質的なため方向矢印も表示する。縦は真上に上昇するため不要。
-                if (mode.id == "lift_horizontal") {
-                    drawDirectionArrow(location, facingYaw, mode.previewColor)
-                }
-                return
-            }
+            drawLiftPreview(location, mode, facingYaw)
+            return
         }
         drawDustLocationCubeOutline(location, 0.5, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
         // 保存される facing と見た目がずれないよう、プレビューの矢印も4方向へ丸める。
         drawDirectionArrow(location, facingYaw, mode.previewColor)
+    }
+
+    /**
+     * リフトの設置プレビュー。縦は正準向きの箱、横は facing に応じて90°回転させた箱を表示する。
+     * 箱は facing 方向へ伸び、マーカーはその逆端（基準角）に位置する。
+     * リフトの向きは箱形状で示すため矢印は表示しない。
+     */
+    private fun drawLiftPreview(location: Location, mode: MarkerToolMode, facingYaw: Float) {
+        val world = location.world ?: return
+        val horizontal = mode.id == "lift_horizontal"
+        val facing = CardinalDirection.fromPlayerYaw(facingYaw)
+        val sizes = liftFootprintSizes(facing, horizontal)
+        if (sizes.first <= 0 || sizes.second <= 0 || sizes.third <= 0) {
+            // lift.schem 不在時は通常プレビューへフォールバックする。
+            drawDustLocationCubeOutline(location, 0.5, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
+            return
+        }
+        val (minX, minY, minZ) = liftBaseMinCorner(location.blockX, location.blockY, location.blockZ, facing, sizes)
+        drawDustOutline(
+            world,
+            minX.toDouble(), minY.toDouble(), minZ.toDouble(),
+            (minX + sizes.first).toDouble(), (minY + sizes.second).toDouble(), (minZ + sizes.third).toDouble(),
+            mode.previewColor, BLOCK_OUTLINE_DUST_SIZE
+        )
+    }
+
+    /**
+     * リフト footprint の回転後寸法 (sizeX, sizeY, sizeZ)。
+     * 正準向き(in=NORTH)に対し、横モードで EAST/WEST を向く場合は90°回転して X/Z を入替える。
+     * プレビューと設置で共有し、見た目と設置位置の一致を保証する。
+     */
+    private fun liftFootprintSizes(facing: CardinalDirection, horizontal: Boolean): Triple<Int, Int, Int> {
+        val liftSize = resolveArenaLiftSize() ?: return Triple(0, 0, 0)
+        return if (horizontal && (facing == CardinalDirection.EAST || facing == CardinalDirection.WEST)) {
+            Triple(liftSize.third, liftSize.second, liftSize.first)
+        } else {
+            Triple(liftSize.first, liftSize.second, liftSize.third)
+        }
+    }
+
+    /**
+     * 回転後の footprint におけるマーカー基準角ブロック。
+     * 箱は facing 方向へ伸び、マーカーはその逆端に位置する。
+     */
+    private fun liftBaseMinCorner(markerBlockX: Int, markerBlockY: Int, markerBlockZ: Int, facing: CardinalDirection, sizes: Triple<Int, Int, Int>): Triple<Int, Int, Int> {
+        val minX = if (facing.dx < 0) markerBlockX - (sizes.first - 1) else markerBlockX
+        val minZ = if (facing.dz < 0) markerBlockZ - (sizes.third - 1) else markerBlockZ
+        return Triple(minX, markerBlockY, minZ)
     }
 
     /**
