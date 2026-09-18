@@ -1,6 +1,6 @@
 package jp.awabi2048.cccontent.features.sukima_dungeon
 
-import org.bukkit.configuration.file.YamlConfiguration
+import jp.awabi2048.cccontent.features.playerdata.PlayerDataFiles
 import org.bukkit.entity.Player
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
@@ -23,8 +23,9 @@ object PlayerDataManager {
 
     fun load(player: Player): PlayerData {
         val file = File(dataDir, "${player.uniqueId}.yml")
+        // 破損時は隔離のうえ空扱いとなり、言語はデフォルト復帰する。
         val data = if (file.exists()) {
-            val config = YamlConfiguration.loadConfiguration(file)
+            val config = PlayerDataFiles.load(file)
             PlayerData(
                 lang = config.getString("sukima_dungeon.lang", "ja_jp") ?: "ja_jp"
             )
@@ -38,9 +39,10 @@ object PlayerDataManager {
     fun save(player: Player) {
         val data = dataCache[player.uniqueId] ?: return
         val file = File(dataDir, "${player.uniqueId}.yml")
-        val config = if (file.exists()) YamlConfiguration.loadConfiguration(file) else YamlConfiguration()
-        config.set("sukima_dungeon.lang", data.lang)
-        config.save(file)
+        // rank節を持つ同一ファイルを壊さないよう、読み込み＋原子保存を直列化する。
+        PlayerDataFiles.update(file) { config ->
+            config.set("sukima_dungeon.lang", data.lang)
+        }
     }
 
     fun getPlayerData(player: Player): PlayerData {

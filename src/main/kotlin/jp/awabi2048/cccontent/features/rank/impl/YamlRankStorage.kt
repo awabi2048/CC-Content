@@ -1,5 +1,6 @@
 package jp.awabi2048.cccontent.features.rank.impl
 
+import jp.awabi2048.cccontent.features.playerdata.PlayerDataFiles
 import jp.awabi2048.cccontent.features.rank.RankStorage
 import jp.awabi2048.cccontent.features.rank.tutorial.PlayerTutorialRank
 import jp.awabi2048.cccontent.features.rank.tutorial.TutorialRank
@@ -50,7 +51,8 @@ class YamlRankStorage(
         var discardedPlayers = 0
 
         for (playerFile in playerdataDirectory.listFiles { file -> file.isFile && file.extension == "yml" }.orEmpty()) {
-            val config = YamlConfiguration.loadConfiguration(playerFile)
+            // 破損ファイルは読み込み時に corrupted/ へ退避され、空扱いになる。
+            val config = PlayerDataFiles.load(playerFile)
             if (!config.isConfigurationSection("rank.profession")) continue
 
             backupDirectory.mkdirs()
@@ -59,8 +61,10 @@ class YamlRankStorage(
                 File(backupDirectory, playerFile.name).toPath(),
                 StandardCopyOption.REPLACE_EXISTING
             )
-            config.set("rank.profession", null)
-            config.save(playerFile)
+            // 他節を保持したまま原子的に更新する。直接上書きは行わない。
+            PlayerDataFiles.update(playerFile) { config ->
+                config.set("rank.profession", null)
+            }
             discardedPlayers++
         }
 
@@ -88,64 +92,64 @@ class YamlRankStorage(
     
     override fun saveTutorialRank(tutorialRank: PlayerTutorialRank) {
         val file = File(playerdataDirectory, "${tutorialRank.playerUuid}.yml")
-        val config = if (file.exists()) YamlConfiguration.loadConfiguration(file) else YamlConfiguration()
-        
-        // "rank.tutorial"セクションを作成または更新
-        val tutorialSection = config.getConfigurationSection("rank.tutorial")
-            ?: config.createSection("rank.tutorial")
-        tutorialSection.set("taskProgress.mobKills", null)
-        tutorialSection.set("taskProgress.blockMines", null)
-        tutorialSection.set("taskProgress.bossKills", null)
-        tutorialSection.set("taskProgress.items", null)
-        tutorialSection.set("currentRank", tutorialRank.currentRank.name)
-        tutorialSection.set("lastUpdated", tutorialRank.lastUpdated)
-        tutorialSection.set("lastPlayTime", tutorialRank.lastPlayTime)
-        
-        // タスク進捗を保存
-        val taskProgress = tutorialRank.taskProgress
-        tutorialSection.set("taskProgress.playTime", taskProgress.playTime)
-        tutorialSection.set("taskProgress.vanillaExp", taskProgress.vanillaExp)
-        tutorialSection.set("taskProgress.myWorldCreated", taskProgress.myWorldCreated)
-        tutorialSection.set("taskProgress.activeOverworldTime", taskProgress.activeOverworldTime)
-        tutorialSection.set("taskProgress.diamondOresMined", taskProgress.diamondOresMined)
-        tutorialSection.set("taskProgress.netherPortalIgnited", taskProgress.netherPortalIgnited)
-        tutorialSection.set("taskProgress.activeNetherResourceTime", taskProgress.activeNetherResourceTime)
-        tutorialSection.set("taskProgress.enderEyesCrafted", taskProgress.enderEyesCrafted)
-        tutorialSection.set("taskProgress.endPortalOpened", taskProgress.endPortalOpened)
-        
-        // モブ討伐数
-        taskProgress.mobKills.forEach { (mobType, count) ->
-            tutorialSection.set("taskProgress.mobKills.$mobType", count)
-        }
-        
-        // ブロック採掘数
-        taskProgress.blockMines.forEach { (blockType, count) ->
-            tutorialSection.set("taskProgress.blockMines.$blockType", count)
-        }
-        
-        // ボス討伐数
-        taskProgress.bossKills.forEach { (bossType, count) ->
-            tutorialSection.set("taskProgress.bossKills.$bossType", count)
-        }
-        
-        // アイテム所持数
-        taskProgress.items.forEach { (material, count) ->
-            tutorialSection.set("taskProgress.items.$material", count)
-        }
-        
+        // 同一ファイルを共有する他節（sukima_dungeon等）を消さないよう、読み込み＋原子保存を直列化する。
         try {
-            config.save(file)
+            PlayerDataFiles.update(file) { config ->
+                // "rank.tutorial"セクションを作成または更新
+                val tutorialSection = config.getConfigurationSection("rank.tutorial")
+                    ?: config.createSection("rank.tutorial")
+                tutorialSection.set("taskProgress.mobKills", null)
+                tutorialSection.set("taskProgress.blockMines", null)
+                tutorialSection.set("taskProgress.bossKills", null)
+                tutorialSection.set("taskProgress.items", null)
+                tutorialSection.set("currentRank", tutorialRank.currentRank.name)
+                tutorialSection.set("lastUpdated", tutorialRank.lastUpdated)
+                tutorialSection.set("lastPlayTime", tutorialRank.lastPlayTime)
+
+                // タスク進捗を保存
+                val taskProgress = tutorialRank.taskProgress
+                tutorialSection.set("taskProgress.playTime", taskProgress.playTime)
+                tutorialSection.set("taskProgress.vanillaExp", taskProgress.vanillaExp)
+                tutorialSection.set("taskProgress.myWorldCreated", taskProgress.myWorldCreated)
+                tutorialSection.set("taskProgress.activeOverworldTime", taskProgress.activeOverworldTime)
+                tutorialSection.set("taskProgress.diamondOresMined", taskProgress.diamondOresMined)
+                tutorialSection.set("taskProgress.netherPortalIgnited", taskProgress.netherPortalIgnited)
+                tutorialSection.set("taskProgress.activeNetherResourceTime", taskProgress.activeNetherResourceTime)
+                tutorialSection.set("taskProgress.enderEyesCrafted", taskProgress.enderEyesCrafted)
+                tutorialSection.set("taskProgress.endPortalOpened", taskProgress.endPortalOpened)
+
+                // モブ討伐数
+                taskProgress.mobKills.forEach { (mobType, count) ->
+                    tutorialSection.set("taskProgress.mobKills.$mobType", count)
+                }
+
+                // ブロック採掘数
+                taskProgress.blockMines.forEach { (blockType, count) ->
+                    tutorialSection.set("taskProgress.blockMines.$blockType", count)
+                }
+
+                // ボス討伐数
+                taskProgress.bossKills.forEach { (bossType, count) ->
+                    tutorialSection.set("taskProgress.bossKills.$bossType", count)
+                }
+
+                // アイテム所持数
+                taskProgress.items.forEach { (material, count) ->
+                    tutorialSection.set("taskProgress.items.$material", count)
+                }
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
-    
+
     override fun loadTutorialRank(playerUuid: UUID): PlayerTutorialRank? {
         val file = File(playerdataDirectory, "$playerUuid.yml")
         if (!file.exists()) return null
         
         return try {
-            val config = YamlConfiguration.loadConfiguration(file)
+            // 破損時は隔離のうえ空扱いとなり、デフォルト復帰する。BukkitのCannot load出力は出ない。
+            val config = PlayerDataFiles.load(file)
             val tutorialSection = config.getConfigurationSection("rank.tutorial") ?: return null
             
             val rawRankName = tutorialSection.getString("currentRank", "NEWBIE") ?: "NEWBIE"
@@ -217,10 +221,11 @@ class YamlRankStorage(
     
     override fun saveProfession(profession: PlayerProfession) {
         val file = File(playerdataDirectory, "${profession.playerUuid}.yml")
-        val config = if (file.exists()) YamlConfiguration.loadConfiguration(file) else YamlConfiguration()
-
-        val professionSection = config.getConfigurationSection("rank.profession")
-            ?: config.createSection("rank.profession")
+        // 同一ファイルを共有する他節を保持するため、読み込み＋原子保存を直列化する。
+        try {
+            PlayerDataFiles.update(file) { config ->
+                val professionSection = config.getConfigurationSection("rank.profession")
+                    ?: config.createSection("rank.profession")
         professionSection.set("schemaVersion", PROFESSION_SCHEMA_VERSION)
         professionSection.set("profession", profession.profession.id)
         professionSection.set("currentExp", profession.currentExp)
@@ -237,35 +242,34 @@ class YamlRankStorage(
             professionSection.set("skillActivationStates.$skillId", enabled)
         }
 
-        if (profession.profession.usesTypedAbilityAdapter) {
-            professionSection.set("featureToggles.batchProcessingEnabled", profession.featureToggles.batchProcessingEnabled)
-            professionSection.set("featureToggles.leafCleanupEnabled", profession.featureToggles.leafCleanupEnabled)
-            professionSection.set("featureToggles.automaticReplantEnabled", profession.featureToggles.automaticReplantEnabled)
-            professionSection.set("featureToggles.areaTillingEnabled", profession.featureToggles.areaTillingEnabled)
-            professionSection.set("featureToggles.areaHarvestEnabled", profession.featureToggles.areaHarvestEnabled)
-            professionSection.set("featureToggles.fishingInformationMode", profession.featureToggles.fishingInformationMode.name)
-            professionSection.set("cycleStatistics.validActions", profession.cycleStatistics.validActions)
-            professionSection.set("cycleStatistics.specialistActions", profession.cycleStatistics.specialistActions)
-            professionSection.set("cycleStatistics.highQualityActions", profession.cycleStatistics.highQualityActions)
-            professionSection.set("cycleStatistics.firstDiscoveries", profession.cycleStatistics.firstDiscoveries)
-        } else {
-            clearTypedProfessionFields(professionSection)
-        }
-        savePrestigeRecords(config, profession.prestigeRecords)
-
-        try {
-            config.save(file)
+                if (profession.profession.usesTypedAbilityAdapter) {
+                    professionSection.set("featureToggles.batchProcessingEnabled", profession.featureToggles.batchProcessingEnabled)
+                    professionSection.set("featureToggles.leafCleanupEnabled", profession.featureToggles.leafCleanupEnabled)
+                    professionSection.set("featureToggles.automaticReplantEnabled", profession.featureToggles.automaticReplantEnabled)
+                    professionSection.set("featureToggles.areaTillingEnabled", profession.featureToggles.areaTillingEnabled)
+                    professionSection.set("featureToggles.areaHarvestEnabled", profession.featureToggles.areaHarvestEnabled)
+                    professionSection.set("featureToggles.fishingInformationMode", profession.featureToggles.fishingInformationMode.name)
+                    professionSection.set("cycleStatistics.validActions", profession.cycleStatistics.validActions)
+                    professionSection.set("cycleStatistics.specialistActions", profession.cycleStatistics.specialistActions)
+                    professionSection.set("cycleStatistics.highQualityActions", profession.cycleStatistics.highQualityActions)
+                    professionSection.set("cycleStatistics.firstDiscoveries", profession.cycleStatistics.firstDiscoveries)
+                } else {
+                    clearTypedProfessionFields(professionSection)
+                }
+                savePrestigeRecords(config, profession.prestigeRecords)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
-    
+
     override fun loadProfession(playerUuid: UUID): PlayerProfession? {
         val file = File(playerdataDirectory, "$playerUuid.yml")
         if (!file.exists()) return null
 
         return try {
-            val config = YamlConfiguration.loadConfiguration(file)
+            // 破損時は隔離のうえ空扱いとなり、null復帰する。BukkitのCannot load出力は出ない。
+            val config = PlayerDataFiles.load(file)
             val professionSection = config.getConfigurationSection("rank.profession") ?: return null
 
             if (professionSection.getInt("schemaVersion", -1) != PROFESSION_SCHEMA_VERSION) {
@@ -331,9 +335,10 @@ class YamlRankStorage(
         val file = File(playerdataDirectory, "$playerUuid.yml")
         if (file.exists()) {
             try {
-                val config = YamlConfiguration.loadConfiguration(file)
-                config.set("rank.profession", null)  // "rank.profession"セクションを削除
-                config.save(file)
+                // 他節を保持したまま原子的に削除する。
+                PlayerDataFiles.update(file) { config ->
+                    config.set("rank.profession", null)  // "rank.profession"セクションを削除
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
