@@ -114,9 +114,9 @@ class StructureTransformTest {
     }
 
     @Test
-    void arenaOpenFramesDoNotRequireConnectionMarkers() {
-        assertFalse(StructureSchemas.INSTANCE.arenaRequiresConnectionMarkers("corridor.open_1"));
-        assertFalse(StructureSchemas.INSTANCE.arenaRequiresConnectionMarkers("corner.variant.open_12"));
+    void arenaOpenFramesRequireConnectionMarkers() {
+        assertTrue(StructureSchemas.INSTANCE.arenaRequiresConnectionMarkers("corridor.open_1"));
+        assertTrue(StructureSchemas.INSTANCE.arenaRequiresConnectionMarkers("corner.variant.open_12"));
         assertTrue(StructureSchemas.INSTANCE.arenaRequiresConnectionMarkers("corridor.closed"));
         assertTrue(StructureSchemas.INSTANCE.arenaRequiresConnectionMarkers("corner.variant.closed"));
         assertTrue(StructureSchemas.INSTANCE.arenaRequiresConnectionMarkers("corridor.open_0"));

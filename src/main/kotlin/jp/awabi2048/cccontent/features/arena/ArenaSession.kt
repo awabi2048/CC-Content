@@ -196,6 +196,8 @@ data class ArenaSession(
     val participantLocationHistory: MutableMap<UUID, ArrayDeque<TimedPlayerLocation>> = mutableMapOf(),
     val participantLastSampleMillis: MutableMap<UUID, Long> = mutableMapOf(),
     val downedPlayers: MutableMap<UUID, ArenaDownedPlayerState> = mutableMapOf(),
+    // アリーナ世界から次元移動した参加者のダウン状態は世界外でも維持し、強制死亡扱いとする。
+    val dimensionExitedDownedIds: MutableSet<UUID> = mutableSetOf(),
     val reviveHoldStates: MutableMap<UUID, ArenaReviveHoldState> = mutableMapOf(),
     val reviveTargetByReviver: MutableMap<UUID, UUID> = mutableMapOf(),
     val reviveBossBarsByDowned: MutableMap<UUID, ArenaReviveBossBars> = mutableMapOf(),

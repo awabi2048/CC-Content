@@ -100,12 +100,12 @@ object StructureSchemas {
         if (parts.first() == "goal") {
             return parts.getOrNull(1) == "barrier_restart"
         }
-        return parts.none { OPEN_FRAME_PATTERN.matches(it) }
+        // 開閉アニメの差分フレーム（*.open_N）も接続マーカーを要求する。
+        // 差分側の正準向きを保存時に確定させるための要件である。
+        return true
     }
 
     fun sukima(keyword: String): SukimaStructureSchema? = sukimaSchemas[keyword]
 
     private fun mobRequirement() = listOf(MarkerRequirement("sd.marker.mob"))
-
-    private val OPEN_FRAME_PATTERN = Regex("open_[1-9]\\d*")
 }

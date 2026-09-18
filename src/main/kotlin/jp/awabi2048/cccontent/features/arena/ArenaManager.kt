@@ -323,7 +323,7 @@ class ArenaManager(
         const val POSITION_HISTORY_RETENTION_MILLIS = 12_000L
         const val POSITION_HISTORY_MAX_SAMPLES = 24
         const val ARENA_BGM_NORMAL_KEY_DEFAULT = "kota_server:ost_3.sukima_dungeon"
-        const val ARENA_BGM_COMBAT_KEY_DEFAULT = "kota_server:ost_4.arena"
+        const val ARENA_BGM_COMBAT_KEY_DEFAULT = "kota_server:ost_4.arena.battle"
         const val ARENA_BGM_LOBBY_KEY_DEFAULT = "kota_server:ost_3.arena.calm"
         const val ARENA_BGM_NORMAL_BPM_DEFAULT = 120.0
         const val ARENA_BGM_COMBAT_BPM_DEFAULT = 140.0
@@ -401,6 +401,7 @@ class ArenaManager(
         const val LOBBY_MARKER_TAG_TUTORIAL_START = "arena.marker.lobby_tutorial_start"
         const val LOBBY_MARKER_TAG_TUTORIAL_STEP = "arena.marker.lobby_tutorial_step"
         const val LOBBY_MARKER_TAG_PEDESTAL = "arena.marker.pedestal"
+        const val JOIN_AREA_MARKER_TAG = "arena.marker.join_area"
         const val LOBBY_TUTORIAL_STEP_INDEX_TAG_PREFIX = "arena.marker.lobby_tutorial_step.index."
 
         fun defaultSwitchIntervalBeats(): Int {
@@ -883,6 +884,13 @@ class ArenaManager(
                 "arena.messages.command.start_error.lift_occupied"))
         }
 
+        // 参加待機の合流地点は参加エリアマーカーで判定する。開始時点で読み取って保持する。
+        val joinAreaMarkers = if (enableMultiplayerJoin) {
+            findLoadedJoinAreaMarkers()
+        } else {
+            emptyList()
+        }
+
         val lobbyMarkers = findLoadedLobbyMarkerSnapshot(target.world)
         if (lobbyMarkers.returnLobby.isEmpty()) {
             return completed(ArenaStartResult.Error(
@@ -935,7 +943,7 @@ class ArenaManager(
             mechanicMarkersByWave = mutableMapOf(),
             barrierLocation = placeholderLocation.clone(),
             barrierPointLocations = mutableListOf(),
-            joinAreaMarkerLocations = mutableListOf(),
+            joinAreaMarkerLocations = joinAreaMarkers.map { it.clone() }.toMutableList(),
             liftMarkerLocations = liftMarkers.map { it.clone() }.toMutableList(),
             entranceLiftHorizontal = liftMarkers.any { isHorizontalLiftMarker(it) },
             lobbyMarkerLocations = lobbyMarkers.returnLobby.map { it.clone() }.toMutableList(),
@@ -1615,6 +1623,29 @@ class ArenaManager(
             return false
         }
         sendPlayerToLobbyOrSpawn(player)
+        return true
+    }
+
+    /**
+     * アリーナ世界からの次元移動を検知し、移動済み参加者を蘇生不可ダウン扱いにする。例外は設けない。
+     * システム起因の転送は離脱処理で対応付けを先に外すため、ここでは外部要因の移動のみが対象になる。
+     */
+    fun handleParticipantArenaWorldExit(player: Player, fromWorldName: String): Boolean {
+        val session = getSession(player) ?: return false
+        if (fromWorldName != session.worldName) return false
+        if (!session.participants.contains(player.uniqueId)) return false
+        val existing = session.downedPlayers[player.uniqueId]
+        if (existing == null) {
+            setPlayerDown(session, player, reviveDisabled = true)
+        } else {
+            existing.reviveDisabled = true
+            if (existing.bleedoutAtMillis == Long.MAX_VALUE) {
+                existing.bleedoutAtMillis = System.currentTimeMillis()
+            }
+            existing.gameOverLocation = player.location.clone()
+        }
+        session.dimensionExitedDownedIds.add(player.uniqueId)
+        updateArenaSidebars()
         return true
     }
 
@@ -3115,14 +3146,20 @@ class ArenaManager(
 
             for (downedId in session.downedPlayers.keys.toList()) {
                 val downed = Bukkit.getPlayer(downedId)
-                if (downed == null || !downed.isOnline || downed.world.name != session.worldName) {
+                // 次元移動による強制死亡は世界外でも状態を維持する。随行シュルカーの追従のみ行わない。
+                val exitedWorld = downed == null || !downed.isOnline || downed.world.name != session.worldName
+                if (exitedWorld && !session.dimensionExitedDownedIds.contains(downedId)) {
+                    clearDownedState(session, downedId)
+                    continue
+                }
+                if (downed == null || !downed.isOnline) {
                     clearDownedState(session, downedId)
                     continue
                 }
 
                 val downState = session.downedPlayers[downedId]
                 applyDownedMovementLimit(downed, downState)
-                if (shouldFollowShulker) {
+                if (shouldFollowShulker && !session.dimensionExitedDownedIds.contains(downedId)) {
                     syncDownedShulker(session, downed, forceTeleport = false)
                 }
                 if (downState != null && downState.bleedoutAtMillis != Long.MAX_VALUE && System.currentTimeMillis() >= downState.bleedoutAtMillis) {
@@ -3506,6 +3543,7 @@ class ArenaManager(
     private fun clearDownedState(session: ArenaSession, playerId: UUID, playInterruptedSound: Boolean = true) {
         clearReviveBindingForDowned(session, playerId, playInterruptedSound)
         val downState = session.downedPlayers.remove(playerId)
+        session.dimensionExitedDownedIds.remove(playerId)
         session.reviveHoldStates.remove(playerId)
         restoreDownedWalkSpeed(session, playerId)
         restoreDownedJumpStrength(session, playerId)
@@ -4023,6 +4061,7 @@ class ArenaManager(
         session.participantLocationHistory.clear()
         session.participantLastSampleMillis.clear()
         session.downedPlayers.clear()
+        session.dimensionExitedDownedIds.clear()
         session.reviveHoldStates.clear()
         session.reviveTargetByReviver.clear()
         session.reviveBossBarsByDowned.values.forEach { hideReviveBossBarFromAll(session, it) }
@@ -7451,10 +7490,17 @@ class ArenaManager(
                 return@forEach
             }
 
-            val insideLiftArea = session.liftMarkerLocations.any { markerLocation ->
-                isInsideLiftArea(markerLocation, player.location, margin = MULTIPLAYER_LIFT_AREA_MARGIN, horizontal = session.entranceLiftHorizontal)
+            // 待機判定は参加エリアマーカーを基準に行う。参加エリア未設置の移行期間はリフト範囲へフォールバックする。
+            val insideWaitingArea = if (session.joinAreaMarkerLocations.isNotEmpty()) {
+                session.joinAreaMarkerLocations.any { markerLocation ->
+                    isInsideActionMarkerRange(player.location, markerLocation)
+                }
+            } else {
+                session.liftMarkerLocations.any { markerLocation ->
+                    isInsideLiftArea(markerLocation, player.location, margin = MULTIPLAYER_LIFT_AREA_MARGIN, horizontal = session.entranceLiftHorizontal)
+                }
             }
-            if (insideLiftArea) {
+            if (insideWaitingArea) {
                 waitingNow += candidateId
                 session.waitingOutsideTicksByPlayer.remove(candidateId)
                 return@forEach
@@ -7513,9 +7559,24 @@ class ArenaManager(
 
     private fun renderWaitingAreaParticles(session: ArenaSession, candidateIds: Set<UUID>, currentTick: Long) {
         if (currentTick % MULTIPLAYER_WAITING_AREA_PARTICLE_INTERVAL_TICKS != 0L) return
-        if (!session.multiplayerJoinEnabled || session.liftMarkerLocations.isEmpty()) return
-        val template = resolveEntranceLiftTemplate() ?: return
+        if (!session.multiplayerJoinEnabled) return
         val dust = Particle.DustOptions(Color.fromRGB(120, 240, 255), 1.1f)
+
+        // 待機表示も参加エリア基準とし、未設置時のみリフト範囲を表示する。
+        if (session.joinAreaMarkerLocations.isNotEmpty()) {
+            candidateIds
+                .asSequence()
+                .mapNotNull { Bukkit.getPlayer(it) }
+                .filter { it.isOnline }
+                .forEach { player ->
+                    session.joinAreaMarkerLocations
+                        .filter { marker -> marker.world?.uid == player.world.uid }
+                        .forEach { marker -> renderWaitingAreaBottom(player, marker, 1.0, 1.0, dust) }
+                }
+            return
+        }
+        if (session.liftMarkerLocations.isEmpty()) return
+        val template = resolveEntranceLiftTemplate() ?: return
 
         candidateIds
             .asSequence()
@@ -7524,23 +7585,32 @@ class ArenaManager(
             .forEach { player ->
                 session.liftMarkerLocations
                     .filter { marker -> marker.world?.uid == player.world.uid }
-                    .forEach { marker -> renderWaitingAreaBottom(player, marker, template, dust) }
+                    .forEach { marker ->
+                        renderWaitingAreaBottom(
+                            player,
+                            marker,
+                            EntranceLiftGeometry.footprintSizeX(template.sizeX, template.sizeZ, session.entranceLiftHorizontal).toDouble(),
+                            EntranceLiftGeometry.footprintSizeZ(template.sizeX, template.sizeZ, session.entranceLiftHorizontal).toDouble(),
+                            dust
+                        )
+                    }
             }
     }
 
     private fun renderWaitingAreaBottom(
         player: Player,
         markerLocation: Location,
-        template: EntranceLiftTemplate,
+        sizeX: Double,
+        sizeZ: Double,
         dust: Particle.DustOptions
     ) {
         val world = markerLocation.world ?: return
         if (player.world.uid != world.uid) return
 
         val minX = markerLocation.blockX.toDouble()
-        val maxX = markerLocation.blockX + template.sizeX.toDouble()
+        val maxX = markerLocation.blockX + sizeX
         val minZ = markerLocation.blockZ.toDouble()
-        val maxZ = markerLocation.blockZ + template.sizeZ.toDouble()
+        val maxZ = markerLocation.blockZ + sizeZ
         val y = markerLocation.blockY - 0.04
 
         var x = minX
@@ -8169,6 +8239,15 @@ class ArenaManager(
             .asSequence()
             .flatMap { world -> world.getEntitiesByClass(Marker::class.java).asSequence() }
             .filter { marker -> marker.scoreboardTags.contains(EntranceLiftGeometry.LIFT_TAG) }
+            .map { marker -> marker.location.clone() }
+            .toList()
+    }
+
+    private fun findLoadedJoinAreaMarkers(): List<Location> {
+        return Bukkit.getWorlds()
+            .asSequence()
+            .flatMap { world -> world.getEntitiesByClass(Marker::class.java).asSequence() }
+            .filter { marker -> marker.scoreboardTags.contains(JOIN_AREA_MARKER_TAG) }
             .map { marker -> marker.location.clone() }
             .toList()
     }

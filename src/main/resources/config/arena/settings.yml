@@ -9,7 +9,7 @@ bgm:
     switch_interval_beats: 8
     pitch: 1.0
   combat:
-    key: "kota_server:ost_4.arena"
+    key: "kota_server:ost_4.arena.battle"
     bpm: 140
     loop_beats: 384
     switch_interval_beats: 8
