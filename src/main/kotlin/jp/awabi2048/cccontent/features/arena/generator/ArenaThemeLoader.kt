@@ -21,6 +21,8 @@ data class ArenaTheme(
     val gridPitch: Int,
     val staticStructures: Map<ArenaStructureType, List<ArenaStaticStructureVariant>>,
     val animatedStructures: Map<ArenaStructureType, List<ArenaAnimatedStructureVariant>>,
+    // 応急措置：指定された系統のopen差分はZ反転で保存されているものとして貼付時に補正する。正準再保存後に空へ戻す。
+    val mirrorOpenFrameTypes: Set<String> = emptySet(),
 ) {
     val iconMaterial: Material get() = normalConfig.iconMaterial
     val weight: Int get() = normalConfig.weight
@@ -160,6 +162,7 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
 
     private data class ParsedThemeConfig(
         val promotionProbability: Double,
+        val mirrorOpenFrameTypes: Set<String>,
         val normalConfig: ArenaThemeConfig,
         val promotedConfig: ArenaThemeConfig?
     )
@@ -294,7 +297,8 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
                 promotedConfig = parsedThemeConfig.promotedConfig,
                 gridPitch = gridPitch,
                 staticStructures = loaded.staticStructures,
-                animatedStructures = loaded.animatedStructures
+                animatedStructures = loaded.animatedStructures,
+                mirrorOpenFrameTypes = parsedThemeConfig.mirrorOpenFrameTypes
             )
         }
 
@@ -341,9 +345,28 @@ class ArenaThemeLoader(private val plugin: JavaPlugin) {
 
         return ParsedThemeConfig(
             promotionProbability = promotionProbability,
+            mirrorOpenFrameTypes = parseMirrorOpenFrameTypes(themeConfig, sourcePath, themeId),
             normalConfig = normalConfig,
             promotedConfig = promotedConfig
         )
+    }
+
+    private fun parseMirrorOpenFrameTypes(
+        themeConfig: YamlConfiguration,
+        sourcePath: String,
+        themeId: String
+    ): Set<String> {
+        val knownKeywords = ArenaStructureType.entries.map { it.keyword }.toSet()
+        return themeConfig.getStringList("open_frame_mirror")
+            .map { it.trim().lowercase() }
+            .filter { it.isNotEmpty() }
+            .map { keyword ->
+                if (keyword !in knownKeywords) {
+                    throw IllegalStateException("[Arena] $sourcePath の open_frame_mirror に不明な系統があります: theme=$themeId value=$keyword")
+                }
+                keyword
+            }
+            .toSet()
     }
 
     private fun ensureDefaultThemeResources(themeConfigDir: File) {

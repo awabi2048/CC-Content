@@ -2,6 +2,10 @@
 
 promotion_probability: 0.07
 
+# 応急措置：cornerのopen差分はZ反転で保存されているため貼付時に補正する。正準データへ再保存した際は除去すること。
+open_frame_mirror:
+- corner
+
 normal:
   weight: 1
   icon: NETHER_BRICKS

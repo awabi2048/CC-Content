@@ -5583,12 +5583,15 @@ class ArenaManager(
     private fun applyDoorAnimationFrame(placement: ArenaDoorAnimationPlacement, frameIndex: Int) {
         val world = placement.placeOrigin.world ?: return
         val template = placement.openFrames.getOrNull(frameIndex - 1) ?: return
-        val origin = adjustedDoorAnimationOrigin(placement, template).apply { this.world = world }
+        // 応急措置：Z反転で保存されたopen差分は配置変換へ反転要素を合成して正しい向きに戻す。
+        val pasteTransform = StructureTransform(placement.rotationQuarter, mirrorX = placement.mirrored)
+            .let { base -> if (placement.mirrorOpenData) base.composedWith(StructureTransform.zMirror()) else base }
+        val origin = adjustedDoorAnimationOrigin(placement, template, pasteTransform).apply { this.world = world }
         template.structure.paste(
             origin,
             StructurePasteOptions(
-                rotationQuarter = placement.rotationQuarter,
-                mirrorX = placement.mirrored,
+                rotationQuarter = pasteTransform.normalizedQuarter,
+                mirrorX = pasteTransform.mirrorX,
                 pasteAir = true,
                 copyEntities = false,
                 copyBiomes = false
@@ -5598,11 +5601,12 @@ class ArenaManager(
 
     private fun adjustedDoorAnimationOrigin(
         placement: ArenaDoorAnimationPlacement,
-        frame: jp.awabi2048.cccontent.features.arena.generator.ArenaStructureTemplate
+        frame: jp.awabi2048.cccontent.features.arena.generator.ArenaStructureTemplate,
+        frameTransform: StructureTransform
     ): Location {
-        val transform = StructureTransform(placement.rotationQuarter, mirrorX = placement.mirrored)
-        val closedBounds = transform.bounds(placement.closedSize.x, placement.closedSize.z)
-        val frameBounds = transform.bounds(frame.size.x, frame.size.z)
+        val closedTransform = StructureTransform(placement.rotationQuarter, mirrorX = placement.mirrored)
+        val closedBounds = closedTransform.bounds(placement.closedSize.x, placement.closedSize.z)
+        val frameBounds = frameTransform.bounds(frame.size.x, frame.size.z)
         // WorldEdit は各templateの変換後bounds.minで内部補正するため、frameサイズ差があっても閉じた構造の基準点に合わせる。
         return placement.placeOrigin.clone().add(
             (frameBounds.minX - closedBounds.minX).toDouble(),

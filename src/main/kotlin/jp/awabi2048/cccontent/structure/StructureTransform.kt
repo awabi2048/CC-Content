@@ -55,6 +55,34 @@ data class StructureTransform(
         return StructurePoint2D(raw.x - bounds.minX, raw.z - bounds.minZ)
     }
 
+    /**
+     * [other] を先に適用した後にこの変換を適用する合成変換を返す。
+     * 両者が二面体群の要素であるため結果も同群に収まり、全8候補の一致で一意に定まる。
+     */
+    fun composedWith(other: StructureTransform): StructureTransform {
+        val probes = listOf(
+            StructurePoint2D(1.0, 0.0),
+            StructurePoint2D(0.0, 1.0),
+            StructurePoint2D(2.0, 1.0)
+        )
+        val expected = probes.map { probe ->
+            val inner = other.applyRawPoint(probe.x, probe.z)
+            applyRawPoint(inner.x, inner.z)
+        }
+        for (quarter in 0..3) {
+            for (mirrored in listOf(false, true)) {
+                val candidate = StructureTransform(quarter, mirrored)
+                if (probes.indices.all { index ->
+                    val actual = candidate.applyRawPoint(probes[index].x, probes[index].z)
+                    actual == expected[index]
+                }) {
+                    return candidate
+                }
+            }
+        }
+        error("D4 composition is not closed: this=$this other=$other")
+    }
+
     fun applyLocalMarkerEntityPoint(x: Double, z: Double, width: Int, depth: Int): StructurePoint2D {
         val local = applyLocalPoint(x, z, width, depth)
         // WorldEdit の mirrorX はエンティティ中心も反転するため、マーカーをブロック中心として読む用途ではXを1ブロック戻す。
@@ -79,6 +107,12 @@ data class StructureTransform(
     }
 
     companion object {
+        /**
+         * Z反転要素。(x, z) を (x, -z) へ写す。
+         * 旧式保存のopen差分に見られるカイラリティずれの補正専用。
+         */
+        fun zMirror(): StructureTransform = StructureTransform(2, mirrorX = true)
+
         fun rotationBetween(from: CardinalDirection, to: CardinalDirection): Int {
             return (0..3).first { StructureTransform(it).applyDirection(from) == to }
         }

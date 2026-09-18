@@ -123,7 +123,9 @@ data class ArenaDoorAnimationPlacement(
     val rotationQuarter: Int,
     val mirrored: Boolean,
     val closedSize: ArenaStructureSize,
-    val openFrames: List<ArenaStructureTemplate>
+    val openFrames: List<ArenaStructureTemplate>,
+    // 応急措置：open差分がZ反転で保存されている場合に貼付時補正する。
+    val mirrorOpenData: Boolean = false
 )
 
     private data class SelectedStructureVariant(
@@ -589,7 +591,8 @@ class ArenaStageGenerator {
             placements = job.placements,
             waves = job.waves,
             selectedByPlacementIndex = job.selectedByPlacementIndex,
-            placementOriginByIndex = job.placementOriginByIndex
+            placementOriginByIndex = job.placementOriginByIndex,
+            mirrorOpenFrameTypes = job.theme.mirrorOpenFrameTypes
         )
 
         if (job.validationIssues.isNotEmpty()) {
@@ -1058,7 +1061,8 @@ class ArenaStageGenerator {
         placements: List<TilePlacement>,
         waves: Int,
         selectedByPlacementIndex: Map<Int, SelectedStructureVariant>,
-        placementOriginByIndex: Map<Int, Location>
+        placementOriginByIndex: Map<Int, Location>,
+        mirrorOpenFrameTypes: Set<String> = emptySet()
     ): Map<Int, List<ArenaDoorAnimationPlacement>> {
         val result = mutableMapOf<Int, List<ArenaDoorAnimationPlacement>>()
 
@@ -1081,7 +1085,8 @@ class ArenaStageGenerator {
                         rotationQuarter = placement.transform.rotationQuarter,
                         mirrored = placement.transform.mirrored,
                         closedSize = variant.closedTemplate.size,
-                        openFrames = variant.openFrames
+                        openFrames = variant.openFrames,
+                        mirrorOpenData = placement.structureType.keyword in mirrorOpenFrameTypes
                     )
                 )
             }

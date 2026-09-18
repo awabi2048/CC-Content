@@ -121,4 +121,43 @@ class StructureTransformTest {
         assertTrue(StructureSchemas.INSTANCE.arenaRequiresConnectionMarkers("corner.variant.closed"));
         assertTrue(StructureSchemas.INSTANCE.arenaRequiresConnectionMarkers("corridor.open_0"));
     }
+
+    @Test
+    void zMirrorElementFlipsOnlyDepthAxis() {
+        StructureTransform mirror = StructureTransform.Companion.zMirror();
+        StructurePoint2D east = mirror.applyRawPoint(1, 2);
+        assertEquals(1.0, east.getX(), 1.0e-9);
+        assertEquals(-2.0, east.getZ(), 1.0e-9);
+    }
+
+    @Test
+    void composedTransformAppliesOtherFirst() {
+        StructureTransform mirror = StructureTransform.Companion.zMirror();
+        for (int quarter = 0; quarter < 4; quarter++) {
+            for (boolean mirrored : new boolean[]{false, true}) {
+                StructureTransform base = new StructureTransform(quarter, mirrored);
+                StructureTransform composed = base.composedWith(mirror);
+                double[][] probes = {{1, 0}, {0, 1}, {2, 1}, {3, 5}};
+                for (double[] probe : probes) {
+                    StructurePoint2D inner = mirror.applyRawPoint(probe[0], probe[1]);
+                    StructurePoint2D expected = base.applyRawPoint(inner.getX(), inner.getZ());
+                    StructurePoint2D actual = composed.applyRawPoint(probe[0], probe[1]);
+                    assertEquals(expected.getX(), actual.getX(), 1.0e-9);
+                    assertEquals(expected.getZ(), actual.getZ(), 1.0e-9);
+                }
+            }
+        }
+    }
+
+    @Test
+    void mirroredOpenDataCompositionRestoresCanonicalPaste() {
+        // 配置変換 T=(1,false) のもとでZ反転データを貼る合成変換は、反転なしデータの貼付と一致する。
+        StructureTransform placement = new StructureTransform(1, false);
+        StructureTransform effective = placement.composedWith(StructureTransform.Companion.zMirror());
+        StructurePoint2D mirrored = StructureTransform.Companion.zMirror().applyRawPoint(4, 7);
+        StructurePoint2D expected = placement.applyRawPoint(4, 7);
+        StructurePoint2D restored = effective.applyRawPoint(mirrored.getX(), mirrored.getZ());
+        assertEquals(expected.getX(), restored.getX(), 1.0e-9);
+        assertEquals(expected.getZ(), restored.getZ(), 1.0e-9);
+    }
 }
