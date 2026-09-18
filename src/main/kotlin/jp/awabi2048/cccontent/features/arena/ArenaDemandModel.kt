@@ -15,6 +15,8 @@ data class ArenaHistoryRecord(
 )
 
 data class ArenaDemandConfig(
+    // 需要応答型の難易度調整全体の有効化フラグ。falseの場合は履歴を参照せず純粋なweight抽選に戻る。
+    val enabled: Boolean = false,
     val halfLifeDays: Double = 30.0,
     val maxAgeDays: Int = 90,
     val clearCountWeight: Double = 1.0,
@@ -44,6 +46,9 @@ data class ArenaDemandConfig(
 }
 
 class ArenaDemandModel(private val config: ArenaDemandConfig) {
+    // 需要調整が無効かどうかの判定。無効時は履歴I/O自体を呼び出し側で省略するための公開判定。
+    fun isEnabled(): Boolean = config.enabled
+
     @JvmOverloads
     fun selectDifficulty(
         candidates: List<Int>,
@@ -53,6 +58,8 @@ class ArenaDemandModel(private val config: ArenaDemandConfig) {
     ): Int {
         require(candidates.isNotEmpty()) { "candidates must not be empty" }
         val uniqueCandidates = candidates.distinct()
+        // 無効時は需要を参照せず候補から一様ランダムに選ぶ。
+        if (!config.enabled) return uniqueCandidates.random(random)
         val target = estimateTargetDifficulty(uniqueCandidates, history, today)
         val scores = uniqueCandidates.map { candidate ->
             selectionWeight(candidate, target)
@@ -78,6 +85,8 @@ class ArenaDemandModel(private val config: ArenaDemandConfig) {
         require(candidates.isNotEmpty()) { "candidates must not be empty" }
         val uniqueCandidates = candidates.distinct()
         val neutralTarget = uniqueCandidates.average()
+        // 無効時は履歴集計を行わず候補中心をそのまま目標とする。
+        if (!config.enabled) return neutralTarget
         val playerStats = history.asSequence()
             .mapNotNull { record ->
                 val age = ChronoUnit.DAYS.between(record.date, today)
@@ -105,9 +114,10 @@ class ArenaDemandModel(private val config: ArenaDemandConfig) {
         return neutralTarget + (observedTarget - neutralTarget) * difficultyPull
     }
 
-    /** 候補ごとの信号は目標からの距離だけであり、履歴件数は使わない。 */
+    /** 候補ごとの信号は目標からの距離だけであり、履歴件数は使わない。無効時は需要重みを付けない。 */
     fun selectionWeight(candidate: Int, targetDifficulty: Double): Double {
         require(targetDifficulty.isFinite()) { "targetDifficulty must be finite" }
+        if (!config.enabled) return 1.0
         return exp(-kotlin.math.abs(candidate - targetDifficulty) * config.influenceStrength)
     }
 

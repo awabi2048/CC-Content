@@ -349,6 +349,7 @@ class ArenaManager(
         const val ENCHANT_SHARD_DROP_RATE_MULTIPLIER_DEFAULT = 1.0
         const val ENCHANT_SHARD_LOOTING_MULTIPLIER_PER_LEVEL_DEFAULT = 0.10
         const val STAGE_TRANSFER_BLINDNESS_TICKS = 60
+        const val ARENA_DEMAND_ENABLED_DEFAULT = false
         const val ARENA_DEMAND_HALF_LIFE_DAYS_DEFAULT = 30.0
         const val ARENA_DEMAND_MAX_AGE_DAYS_DEFAULT = 90
         const val BARRIER_RETURN_HOLD_TICKS = 60
@@ -560,6 +561,7 @@ class ArenaManager(
             corruptionRatioBase = missionConfig.getDouble("barrier_restart.corruption_ratio_base", 0.05).coerceAtLeast(0.0)
         )
         demandConfig = ArenaDemandConfig(
+            enabled = config.getBoolean("difficulty_demand.enabled", ARENA_DEMAND_ENABLED_DEFAULT),
             halfLifeDays = config.getDouble("difficulty_demand.half_life_days", ARENA_DEMAND_HALF_LIFE_DAYS_DEFAULT),
             maxAgeDays = config.getInt("difficulty_demand.max_age_days", ARENA_DEMAND_MAX_AGE_DAYS_DEFAULT),
             clearCountWeight = config.getDouble("difficulty_demand.weights.clear_count", 1.0),
@@ -1642,6 +1644,10 @@ class ArenaManager(
 
     fun selectPromotedDifficulty(theme: ArenaTheme): Boolean {
         val promotedStar = theme.promotedVariant?.difficultyStar ?: return false
+        // 需要調整が無効な場合は履歴を参照せず通常/昇格を一様ランダムで選ぶ。
+        if (!demandModel.isEnabled()) {
+            return random.nextInt(2) == 1
+        }
         val selectedStar = demandModel.selectDifficulty(
             listOf(theme.normalConfig.variant.difficultyStar, promotedStar),
             historyStore.all(),
@@ -1654,11 +1660,15 @@ class ArenaManager(
     /**
      * 需要モデルをtheme選択に適用する。代表★（normal variantのdifficultyStar）と目標★の距離で
      * 需要重みを付け、theme固有weightと掛け合わせた加重抽選を行う。
+     * 需要調整が無効な場合は履歴を参照せずtheme固有weightのみの加重抽選を行う。
      */
     fun selectThemeByDemand(themes: List<ArenaTheme>, random: Random = this.random): ArenaTheme {
         require(themes.isNotEmpty()) { "themes must not be empty" }
         val candidates = themes.filter { it.weight > 0 }
         require(candidates.isNotEmpty()) { "有効なテーマweightがありません" }
+        if (!demandModel.isEnabled()) {
+            return selectThemeByWeightOnly(candidates, random)
+        }
         val representativeStars = candidates.map { it.normalConfig.variant.difficultyStar }.distinct()
         val target = demandModel.estimateTargetDifficulty(
             representativeStars,
@@ -1683,6 +1693,19 @@ class ArenaManager(
     fun rollPromoted(theme: ArenaTheme, random: Random = this.random): Boolean {
         if (theme.promotedVariant == null) return false
         return random.nextDouble() < theme.promotionProbability
+    }
+
+    // 需要調整が無効な場合の純粋なtheme固有weightによる加重抽選。履歴と需要重みを使わない。
+    private fun selectThemeByWeightOnly(candidates: List<ArenaTheme>, random: Random): ArenaTheme {
+        val weights = candidates.map { it.weight.toDouble().coerceAtLeast(0.0) }
+        val total = weights.sum()
+        require(total > 0.0 && total.isFinite()) { "有効なテーマweightがありません" }
+        var roll = random.nextDouble() * total
+        candidates.forEachIndexed { index, theme ->
+            roll -= weights[index]
+            if (roll <= 0.0) return theme
+        }
+        return candidates.last()
     }
 
     private fun reserveDailyEntry(playerIds: Collection<UUID>): Boolean {
