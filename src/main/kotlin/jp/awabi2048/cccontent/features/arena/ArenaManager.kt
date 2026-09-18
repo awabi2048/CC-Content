@@ -946,6 +946,7 @@ class ArenaManager(
             barrierPointLocations = mutableListOf(),
             joinAreaMarkerLocations = mutableListOf(),
             liftMarkerLocations = liftMarkers.map { it.clone() }.toMutableList(),
+            entranceLiftHorizontal = liftMarkers.any { isHorizontalLiftMarker(it) },
             lobbyMarkerLocations = lobbyMarkers.returnLobby.map { it.clone() }.toMutableList(),
             lobbyMainMarkerLocations = lobbyMarkers.main.map { it.clone() }.toMutableList(),
             lobbyTutorialStartMarkerLocations = lobbyMarkers.tutorialStart.map { it.clone() }.toMutableList(),
@@ -7460,7 +7461,7 @@ class ArenaManager(
             }
 
             val insideLiftArea = session.liftMarkerLocations.any { markerLocation ->
-                isInsideLiftArea(markerLocation, player.location, margin = MULTIPLAYER_LIFT_AREA_MARGIN)
+                isInsideLiftArea(markerLocation, player.location, margin = MULTIPLAYER_LIFT_AREA_MARGIN, horizontal = session.entranceLiftHorizontal)
             }
             if (insideLiftArea) {
                 waitingNow += candidateId
@@ -7759,8 +7760,11 @@ class ArenaManager(
             }
 
         val baseLocation = baseMarker.block.location.clone().apply { this.world = introWorld }
+        // 動作基準の向きは選択された baseMarker から確定する。保持値は待機判定用にも使用する。
+        session.entranceLiftHorizontal = isHorizontalLiftMarker(baseMarker)
+        val horizontal = session.entranceLiftHorizontal
         val maxRise = entranceLiftMaxRiseBlocks
-        retainEntranceLiftChunkTickets(session, introWorld, baseLocation, liftTemplate, maxRise)
+        retainEntranceLiftChunkTickets(session, introWorld, baseLocation, liftTemplate, maxRise, horizontal)
 
         data class LiftPlayerUnit(
             val player: Player,
@@ -7802,18 +7806,18 @@ class ArenaManager(
             if (activeSession !== session) {
                 session.entranceLiftTask?.cancel()
                 session.entranceLiftTask = null
-                clearLiftFootprint(introWorld, baseLocation.clone().add(0.0, currentRise.toDouble(), 0.0), liftTemplate)
-                restoreLiftChainsInRange(introWorld, baseLocation, liftTemplate, baseLocation.blockY, baseLocation.blockY + maxRise)
+                clearLiftFootprint(introWorld, baseLocation.clone().add(0.0, currentRise.toDouble(), 0.0), liftTemplate, horizontal)
+                restoreLiftChainsInRange(introWorld, baseLocation, liftTemplate, baseLocation.blockY, baseLocation.blockY + maxRise, horizontal)
                 releaseEntranceLiftChunkTickets(session)
                 restorePlayerMovement(originalSpeeds)
                 return@Runnable
             }
 
-            playEntranceLiftTickSound(introWorld, entranceLiftSoundLocation(baseLocation, liftTemplate, currentRise))
+            playEntranceLiftTickSound(introWorld, entranceLiftSoundLocation(baseLocation, liftTemplate, currentRise, horizontal))
 
             if (!initialLiftPlaced) {
-                restoreLiftChainsInRange(introWorld, baseLocation, liftTemplate, baseLocation.blockY, baseLocation.blockY + maxRise)
-                placeLiftStructure(introWorld, baseLocation, liftTemplate)
+                restoreLiftChainsInRange(introWorld, baseLocation, liftTemplate, baseLocation.blockY, baseLocation.blockY + maxRise, horizontal)
+                placeLiftStructure(introWorld, baseLocation, liftTemplate, horizontal)
                 initialLiftPlaced = true
                 return@Runnable
             }
@@ -7863,25 +7867,25 @@ class ArenaManager(
 
             if (descending) {
                 val oldTopY = baseLocation.blockY + oldRise + liftTemplate.sizeY - 1
-                clearLiftLayer(introWorld, baseLocation, liftTemplate, oldTopY)
+                clearLiftLayer(introWorld, baseLocation, liftTemplate, oldTopY, horizontal)
                 val chainMinY = baseLocation.blockY + oldRise + liftTemplate.sizeY - 1
                 val chainMaxY = baseLocation.blockY + oldRise + liftTemplate.sizeY
                 val chainCeiling = baseLocation.blockY + maxRise
                 for (y in chainMinY..chainMaxY) {
                     if (y <= chainCeiling) {
-                        placeCornerChainsAtY(introWorld, baseLocation, liftTemplate, y)
+                        placeCornerChainsAtY(introWorld, baseLocation, liftTemplate, y, horizontal)
                     }
                 }
             } else {
                 val oldBottomY = baseLocation.blockY + oldRise
-                clearLiftLayer(introWorld, baseLocation, liftTemplate, oldBottomY)
+                clearLiftLayer(introWorld, baseLocation, liftTemplate, oldBottomY, horizontal)
             }
 
             val nextOrigin = baseLocation.clone().add(0.0, currentRise.toDouble(), 0.0)
-            placeLiftStructure(introWorld, nextOrigin, liftTemplate)
+            placeLiftStructure(introWorld, nextOrigin, liftTemplate, horizontal)
 
             if (descending && currentRise <= 0) {
-                restoreLiftChainsInRange(introWorld, baseLocation, liftTemplate, baseLocation.blockY, baseLocation.blockY + maxRise)
+                restoreLiftChainsInRange(introWorld, baseLocation, liftTemplate, baseLocation.blockY, baseLocation.blockY + maxRise, horizontal)
                 session.entranceLiftTask?.cancel()
                 session.entranceLiftTask = null
                 restorePlayerMovement(originalSpeeds)
@@ -7897,7 +7901,7 @@ class ArenaManager(
                 if (!unit.player.isOnline) return@forEach
                 if (unit.player.world.uid != introWorld.uid) return@forEach
 
-                val targetLocation = entranceLiftSeatLocation(baseLocation, liftTemplate, currentRise, unit.offsetX, unit.offsetZ)
+                val targetLocation = entranceLiftSeatLocation(baseLocation, liftTemplate, currentRise, unit.offsetX, unit.offsetZ, horizontal)
                 val synchronizedLocation = targetLocation.clone().apply {
                     val current = unit.player.location
                     yaw = current.yaw
@@ -7916,11 +7920,11 @@ class ArenaManager(
         }
     }
 
-    private fun entranceLiftSoundLocation(baseLocation: Location, template: EntranceLiftTemplate, rise: Int): Location {
+    private fun entranceLiftSoundLocation(baseLocation: Location, template: EntranceLiftTemplate, rise: Int, horizontal: Boolean): Location {
         return baseLocation.clone().add(
-            template.sizeX.toDouble() / 2.0,
+            EntranceLiftGeometry.footprintSizeX(template.sizeX, template.sizeZ, horizontal).toDouble() / 2.0,
             rise.toDouble(),
-            template.sizeZ.toDouble() / 2.0
+            EntranceLiftGeometry.footprintSizeZ(template.sizeX, template.sizeZ, horizontal).toDouble() / 2.0
         )
     }
 
@@ -7952,11 +7956,13 @@ class ArenaManager(
     private fun placeLiftStructure(
         world: World,
         origin: Location,
-        template: EntranceLiftTemplate
+        template: EntranceLiftTemplate,
+        horizontal: Boolean
     ) {
         template.structure.paste(
             origin.clone().apply { this.world = world },
             StructurePasteOptions(
+                rotationQuarter = EntranceLiftGeometry.rotationQuarter(horizontal),
                 pasteAir = true,
                 copyEntities = false,
                 copyBiomes = false
@@ -7968,12 +7974,15 @@ class ArenaManager(
         world: World,
         baseLocation: Location,
         template: EntranceLiftTemplate,
-        y: Int
+        y: Int,
+        horizontal: Boolean
     ) {
+        val sizeX = EntranceLiftGeometry.footprintSizeX(template.sizeX, template.sizeZ, horizontal)
+        val sizeZ = EntranceLiftGeometry.footprintSizeZ(template.sizeX, template.sizeZ, horizontal)
         val minX = baseLocation.blockX
-        val maxX = minX + template.sizeX - 1
+        val maxX = minX + sizeX - 1
         val minZ = baseLocation.blockZ
-        val maxZ = minZ + template.sizeZ - 1
+        val maxZ = minZ + sizeZ - 1
         for (x in minX..maxX) {
             for (z in minZ..maxZ) {
                 val block = world.getBlockAt(x, y, z)
@@ -7987,14 +7996,17 @@ class ArenaManager(
     private fun clearLiftFootprint(
         world: World,
         origin: Location,
-        template: EntranceLiftTemplate
+        template: EntranceLiftTemplate,
+        horizontal: Boolean
     ) {
+        val sizeX = EntranceLiftGeometry.footprintSizeX(template.sizeX, template.sizeZ, horizontal)
+        val sizeZ = EntranceLiftGeometry.footprintSizeZ(template.sizeX, template.sizeZ, horizontal)
         val minX = origin.blockX
         val minY = origin.blockY
         val minZ = origin.blockZ
-        val maxX = minX + template.sizeX - 1
+        val maxX = minX + sizeX - 1
         val maxY = minY + template.sizeY - 1
-        val maxZ = minZ + template.sizeZ - 1
+        val maxZ = minZ + sizeZ - 1
         for (x in minX..maxX) {
             for (y in minY..maxY) {
                 for (z in minZ..maxZ) {
@@ -8011,13 +8023,16 @@ class ArenaManager(
         world: World,
         baseLocation: Location,
         template: EntranceLiftTemplate,
-        y: Int
+        y: Int,
+        horizontal: Boolean
     ) {
+        val sizeX = EntranceLiftGeometry.footprintSizeX(template.sizeX, template.sizeZ, horizontal)
+        val sizeZ = EntranceLiftGeometry.footprintSizeZ(template.sizeX, template.sizeZ, horizontal)
         val corners = listOf(
             Pair(baseLocation.blockX, baseLocation.blockZ),
-            Pair(baseLocation.blockX + template.sizeX - 1, baseLocation.blockZ),
-            Pair(baseLocation.blockX, baseLocation.blockZ + template.sizeZ - 1),
-            Pair(baseLocation.blockX + template.sizeX - 1, baseLocation.blockZ + template.sizeZ - 1)
+            Pair(baseLocation.blockX + sizeX - 1, baseLocation.blockZ),
+            Pair(baseLocation.blockX, baseLocation.blockZ + sizeZ - 1),
+            Pair(baseLocation.blockX + sizeX - 1, baseLocation.blockZ + sizeZ - 1)
         )
         corners.forEach { (x, z) ->
             val block = world.getBlockAt(x, y, z)
@@ -8044,10 +8059,11 @@ class ArenaManager(
         baseLocation: Location,
         template: EntranceLiftTemplate,
         minY: Int,
-        maxY: Int
+        maxY: Int,
+        horizontal: Boolean
     ) {
         for (y in minY..maxY) {
-            placeCornerChainsAtY(world, baseLocation, template, y)
+            placeCornerChainsAtY(world, baseLocation, template, y, horizontal)
         }
     }
 
@@ -8056,12 +8072,13 @@ class ArenaManager(
         world: World,
         baseLocation: Location,
         liftTemplate: EntranceLiftTemplate,
-        maxRise: Int
+        maxRise: Int,
+        horizontal: Boolean
     ) {
         releaseEntranceLiftChunkTickets(session)
 
-        val footprintSizeX = liftTemplate.sizeX
-        val footprintSizeZ = liftTemplate.sizeZ
+        val footprintSizeX = EntranceLiftGeometry.footprintSizeX(liftTemplate.sizeX, liftTemplate.sizeZ, horizontal)
+        val footprintSizeZ = EntranceLiftGeometry.footprintSizeZ(liftTemplate.sizeX, liftTemplate.sizeZ, horizontal)
         val minX = baseLocation.blockX
         val minZ = baseLocation.blockZ
         val maxX = minX + footprintSizeX - 1
@@ -8127,12 +8144,13 @@ class ArenaManager(
         template: EntranceLiftTemplate,
         rise: Int,
         offsetX: Double,
-        offsetZ: Double
+        offsetZ: Double,
+        horizontal: Boolean
     ): Location {
         return baseLocation.clone().add(
-            template.sizeX.toDouble() / 2.0 + offsetX,
+            EntranceLiftGeometry.footprintSizeX(template.sizeX, template.sizeZ, horizontal).toDouble() / 2.0 + offsetX,
             rise.toDouble() + 1.0,
-            template.sizeZ.toDouble() / 2.0 + offsetZ
+            EntranceLiftGeometry.footprintSizeZ(template.sizeX, template.sizeZ, horizontal).toDouble() / 2.0 + offsetZ
         )
     }
 
@@ -8159,9 +8177,20 @@ class ArenaManager(
         return Bukkit.getWorlds()
             .asSequence()
             .flatMap { world -> world.getEntitiesByClass(Marker::class.java).asSequence() }
-            .filter { marker -> marker.scoreboardTags.contains("arena.marker.lift") }
+            .filter { marker -> marker.scoreboardTags.contains(EntranceLiftGeometry.LIFT_TAG) }
             .map { marker -> marker.location.clone() }
             .toList()
+    }
+
+    /**
+     * マーカー位置の向きを実体から解決する。副タグなし旧マーカーは縦扱いとする。
+     * セッション開始時・アニメーション開始時のみ呼び出し、tick 処理内では保持値を使用する。
+     */
+    private fun isHorizontalLiftMarker(markerLocation: Location): Boolean {
+        val world = markerLocation.world ?: return false
+        return world.getNearbyEntities(markerLocation, 1.0, 1.0, 1.0)
+            .filterIsInstance<Marker>()
+            .any { EntranceLiftGeometry.isHorizontal(it.scoreboardTags) }
     }
 
     private fun isNearEntranceLift(origin: Location, marker: Location): Boolean {
@@ -8248,7 +8277,7 @@ class ArenaManager(
         )
     }
 
-    private fun isInsideLiftArea(markerLocation: Location, playerLocation: Location, margin: Double = 0.0): Boolean {
+    private fun isInsideLiftArea(markerLocation: Location, playerLocation: Location, margin: Double = 0.0, horizontal: Boolean = false): Boolean {
         val markerWorld = markerLocation.world ?: return false
         if (playerLocation.world?.uid != markerWorld.uid) return false
 
@@ -8262,8 +8291,10 @@ class ArenaManager(
         val y = playerLocation.y
         val z = playerLocation.z
 
-        return x >= blockX - margin && x < blockX + template.sizeX.toDouble() + margin &&
-            z >= blockZ - margin && z < blockZ + template.sizeZ.toDouble() + margin &&
+        val sizeX = EntranceLiftGeometry.footprintSizeX(template.sizeX, template.sizeZ, horizontal).toDouble()
+        val sizeZ = EntranceLiftGeometry.footprintSizeZ(template.sizeX, template.sizeZ, horizontal).toDouble()
+        return x >= blockX - margin && x < blockX + sizeX + margin &&
+            z >= blockZ - margin && z < blockZ + sizeZ + margin &&
             y >= blockY - 1.0 - margin && y < blockY + template.sizeY.toDouble() + 1.0 + margin
     }
 

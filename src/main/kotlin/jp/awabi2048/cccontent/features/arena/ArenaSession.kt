@@ -138,6 +138,8 @@ data class ArenaSession(
     val barrierPointLocations: MutableList<Location>,
     val joinAreaMarkerLocations: MutableList<Location> = mutableListOf(),
     val liftMarkerLocations: MutableList<Location> = mutableListOf(),
+    // 動作基準リフトの向き。横モードでは footprint を回転させて扱う。副タグなし旧マーカーは false。
+    var entranceLiftHorizontal: Boolean = false,
     val lobbyMarkerLocations: MutableList<Location> = mutableListOf(),
     val lobbyMainMarkerLocations: MutableList<Location> = mutableListOf(),
     val lobbyTutorialStartMarkerLocations: MutableList<Location> = mutableListOf(),
