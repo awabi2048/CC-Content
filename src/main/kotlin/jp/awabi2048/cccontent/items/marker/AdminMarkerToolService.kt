@@ -59,7 +59,9 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         val nameKey: String,
         val fallbackName: String,
         val particle: Particle,
-        val previewColor: Color
+        val previewColor: Color,
+        // 向き等の補助タグ。基底 tag は runtime 検出互換のため維持する。
+        val extraTags: Set<String> = emptySet()
     )
 
     private data class MarkerToolDefinition(
@@ -88,6 +90,8 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         private const val ARENA_LIFT_STRUCTURE_PATH = "structures/arena/lift.schem"
         private const val MODE_SWITCH_COOLDOWN_MILLIS = 50L
         private const val DELETE_COOLDOWN_MILLIS = 150L
+        // 旧 toolId から新 toolId への読み替え表。
+        private val LEGACY_TOOL_IDS = mapOf("arena.other_marker_tool" to "arena.lobby_marker_tool")
     }
 
     private val toolIdKey = NamespacedKey(plugin, "admin_marker_tool_type")
@@ -135,8 +139,8 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
             unavailableMessage = { null }
         ),
         MarkerToolDefinition(
-            toolId = "arena.other_marker_tool",
-            displayNameKey = ContentCustomItemsKeys.CUSTOM_ITEMS_ARENA_OTHER_MARKER_TOOL_NAME,
+            toolId = "arena.lobby_marker_tool",
+            displayNameKey = ContentCustomItemsKeys.CUSTOM_ITEMS_ARENA_LOBBY_MARKER_TOOL_NAME,
             itemModel = NamespacedKey.minecraft("blaze_rod"),
             messageKeyPrefix = "marker",
             modes = listOf(
@@ -144,17 +148,10 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                 MarkerToolMode("lobby", "arena.marker.lobby", "modes.lobby", "§bロビー(帰還)", Particle.SOUL, Color.fromRGB(96, 224, 255)),
                 MarkerToolMode("lobby_main", "arena.marker.lobby_main", "modes.lobby_main", "§bロビー中央", Particle.SOUL_FIRE_FLAME, Color.fromRGB(96, 200, 255)),
                 MarkerToolMode("lobby_tutorial_start", "arena.marker.lobby_tutorial_start", "modes.lobby_tutorial_start", "§eチュートリアル開始", Particle.WAX_OFF, Color.fromRGB(255, 216, 96)),
-                MarkerToolMode("lobby_tutorial_step", "arena.marker.lobby_tutorial_step", "modes.lobby_tutorial_step", "§6チュートリアル途中", Particle.GLOW, Color.fromRGB(255, 176, 64))
-            ),
-            unavailableMessage = { null }
-        ),
-        MarkerToolDefinition(
-            toolId = "arena.lift_tool",
-            displayNameKey = ContentCustomItemsKeys.CUSTOM_ITEMS_ARENA_LIFT_TOOL_NAME,
-            itemModel = NamespacedKey.minecraft("blaze_rod"),
-            messageKeyPrefix = "marker",
-            modes = listOf(
-                MarkerToolMode("lift", "arena.marker.lift", "modes.lift", "§dリフト", Particle.END_ROD, Color.fromRGB(216, 128, 255))
+                MarkerToolMode("lobby_tutorial_step", "arena.marker.lobby_tutorial_step", "modes.lobby_tutorial_step", "§6チュートリアル途中", Particle.GLOW, Color.fromRGB(255, 176, 64)),
+                // リフトは縦/横で設置モードを分け、向きで対応させる。基底タグは共通のため runtime 検出は不変。
+                MarkerToolMode("lift_vertical", "arena.marker.lift", "modes.lift_vertical", "§dリフト(縦)", Particle.END_ROD, Color.fromRGB(216, 128, 255), setOf("arena.marker.lift.vertical")),
+                MarkerToolMode("lift_horizontal", "arena.marker.lift", "modes.lift_horizontal", "§dリフト(横)", Particle.END_ROD, Color.fromRGB(216, 128, 255), setOf("arena.marker.lift.horizontal"))
             ),
             unavailableMessage = { null }
         ),
@@ -227,7 +224,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         val mode = getMode(item, definition)
         val placementLocation = resolvePlacementLocation(player, clickedBlock, blockFace)
         val marker = spawnMarker(placementLocation, mode, alignedYaw(player.location.yaw))
-        if (definition.toolId == "arena.other_marker_tool" && mode.id == "lobby_tutorial_step") {
+        if (definition.toolId == "arena.lobby_marker_tool" && mode.id == "lobby_tutorial_step") {
             val world = placementLocation.world
             if (world != null && marker != null) {
                 val maxIndex = world.getEntitiesByClass(Marker::class.java)
@@ -338,8 +335,9 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
     }
 
     private fun resolveDefinition(item: ItemStack): MarkerToolDefinition? {
-        val toolId = item.itemMeta?.persistentDataContainer?.get(toolIdKey, PersistentDataType.STRING) ?: return null
-        return definitions[toolId]
+        val rawToolId = item.itemMeta?.persistentDataContainer?.get(toolIdKey, PersistentDataType.STRING) ?: return null
+        // 旧 toolId の読み替え。arena.lift_tool は読み替えない（再配布で対応）。
+        return definitions[LEGACY_TOOL_IDS[rawToolId] ?: rawToolId]
     }
 
     private fun getMode(item: ItemStack, definition: MarkerToolDefinition): MarkerToolMode {
@@ -365,7 +363,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         }
 
         return when (definition.toolId) {
-            "arena.structure_marker_tool", "arena.other_marker_tool", "arena.lift_tool", "arena.mechanic_marker_tool" ->
+            "arena.structure_marker_tool", "arena.lobby_marker_tool", "arena.mechanic_marker_tool" ->
                 ArenaI18n.text(player, fullKey, *placeholders)
             "sukima_dungeon.marker_tool" -> MessageManager.getMessage(
                 player,
@@ -409,6 +407,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
         val marker = world.spawnEntity(markerLocation, EntityType.MARKER) as Marker
         SystemEntityMarker.mark(marker, plugin)
         marker.addScoreboardTag(mode.tag)
+        mode.extraTags.forEach { marker.addScoreboardTag(it) }
         // 設置時の向き（yaw）を記録。connection_in/out 等の方向を持つマーカーで参照される。
         marker.addScoreboardTag("marker.facing.${facingYaw.toInt().mod(360)}")
         return marker
@@ -507,7 +506,7 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
     }
 
     private fun drawPlacementPreview(location: Location, mode: MarkerToolMode, facingYaw: Float) {
-        if (mode.id == "lift") {
+        if (mode.id == "lift_vertical" || mode.id == "lift_horizontal") {
             val world = location.world ?: return
             val liftSize = resolveArenaLiftSize()
             if (liftSize != null) {
@@ -518,6 +517,10 @@ class AdminMarkerToolService(private val plugin: JavaPlugin) : Listener {
                 val maxY = minY + liftSize.second.toDouble()
                 val maxZ = minZ + liftSize.third.toDouble()
                 drawDustOutline(world, minX, minY, minZ, maxX, maxY, maxZ, mode.previewColor, BLOCK_OUTLINE_DUST_SIZE)
+                // 横リフトは facing が本質的なため方向矢印も表示する。縦は真上に上昇するため不要。
+                if (mode.id == "lift_horizontal") {
+                    drawDirectionArrow(location, facingYaw, mode.previewColor)
+                }
                 return
             }
         }

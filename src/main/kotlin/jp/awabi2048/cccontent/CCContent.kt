@@ -1098,8 +1098,7 @@ class CCContent : JavaPlugin(), Listener {
 
         if (isContentEnabled("arena")) {
             CustomItemManager.register(ArenaStructureMarkerToolItem())
-            CustomItemManager.register(ArenaOtherMarkerToolItem())
-            CustomItemManager.register(ArenaLiftToolItem())
+            CustomItemManager.register(ArenaLobbyMarkerToolItem())
             CustomItemManager.register(ArenaMechanicMarkerToolItem())
             CustomItemManager.register(ArenaEnchantShardItem())
         }
