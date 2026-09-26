@@ -15,6 +15,8 @@ import com.awabi2048.ccsystem.api.gui.GuiMenuEntrySpec
 import com.awabi2048.ccsystem.api.gui.GuiNameSpec
 import com.awabi2048.ccsystem.api.gui.GuiValueTone
 import com.awabi2048.ccsystem.api.gui.MenuGesture
+import com.awabi2048.ccsystem.api.localization.LocalizationKey
+import com.awabi2048.ccsystem.api.localization.generated.CommonKeys
 import jp.awabi2048.cccontent.gui.ContentMenuActionSafety
 import jp.awabi2048.cccontent.CCContent
 import jp.awabi2048.cccontent.features.brewery.item.BreweryItemCodec
@@ -1510,7 +1512,7 @@ class BreweryController(
             }
         )
         state.inventory.setItem(4, uiItem(localePlayer, Material.BARREL, "brewery.ui.title.fermentation", "header"))
-        state.inventory.setItem(FERMENT_CLOSE_SLOT, uiItem(localePlayer, Material.BARRIER, "catalog.close", "close"))
+        state.inventory.setItem(FERMENT_CLOSE_SLOT, uiItem(localePlayer, Material.BARRIER, CommonKeys.CATALOG_CLOSE, "close"))
         state.inventory.setItem(FERMENT_INFO_SLOT, uiItem(localePlayer, Material.PAPER, "brewery.ui.title.fermentation", "info"))
         releaseBreweryFermentationLeaseIfIdle(state)
     }
@@ -1562,6 +1564,14 @@ class BreweryController(
     private fun uiItem(player: Player?, material: Material, nameKey: String, kind: String): ItemStack {
         return CCSystem.getAPI().getGuiElementService().item(
             GuiItemSpec(material, GuiNameSpec.Text(i18n(player, nameKey), com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT), GuiLoreSpec.None, GuiElementRole.DECORATION, 1)
+        ).also { markUi(it, kind) }
+    }
+
+    private fun uiItem(player: Player?, material: Material, nameKey: LocalizationKey<String>, kind: String): ItemStack {
+        return CCSystem.getAPI().getGuiElementService().item(
+            GuiItemSpec(material, GuiNameSpec.Text(
+                CCSystem.getAPI().getLocalized(player, nameKey).replace('&', '§'),
+                com.awabi2048.ccsystem.api.gui.GuiNameStyle.DEFAULT), GuiLoreSpec.None, GuiElementRole.DECORATION, 1)
         ).also { markUi(it, kind) }
     }
 
@@ -1669,7 +1679,7 @@ class BreweryController(
             if (state.running) "brewery.ui.action.stop" else "brewery.ui.action.start"
         ))
         state.inventory.setItem(4, uiItem(localePlayer, Material.BREWING_STAND, "brewery.ui.title.distillation", "header"))
-        state.inventory.setItem(DISTILL_CLOSE_SLOT, uiItem(localePlayer, Material.BARRIER, "catalog.close", "close"))
+        state.inventory.setItem(DISTILL_CLOSE_SLOT, uiItem(localePlayer, Material.BARRIER, CommonKeys.CATALOG_CLOSE, "close"))
         state.inventory.setItem(DISTILL_INFO_SLOT, uiItem(localePlayer, Material.PAPER, "brewery.ui.title.distillation", "info"))
         releaseBreweryDistillationLeaseIfIdle(state)
     }
@@ -1813,7 +1823,7 @@ class BreweryController(
         state.inventory.setItem(clockSlot, placeholder(Material.CLOCK, "clock"))
         val closeSlot = if (state.size == BarrelSize.BIG) 45 else 36
         val infoSlot = if (state.size == BarrelSize.BIG) 53 else 44
-        state.inventory.setItem(closeSlot, uiItem(localePlayer, Material.BARRIER, "catalog.close", "close"))
+        state.inventory.setItem(closeSlot, uiItem(localePlayer, Material.BARRIER, CommonKeys.CATALOG_CLOSE, "close"))
         state.inventory.setItem(infoSlot, uiItem(localePlayer, Material.PAPER, "brewery.ui.aging_core", "info"))
         releaseBreweryAgingLeaseIfIdle(state)
     }
