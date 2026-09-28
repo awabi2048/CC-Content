@@ -60,6 +60,8 @@ import net.kyori.adventure.bossbar.BossBar
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.HoverEvent
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
+import net.kyori.adventure.util.TriState
+import io.papermc.paper.math.Position
 import io.papermc.paper.scoreboard.numbers.NumberFormat
 import org.bukkit.Bukkit
 import org.bukkit.Color
@@ -7063,6 +7065,8 @@ class ArenaManager(
     private fun createArenaWorld(worldName: String = "arena.${UUID.randomUUID()}"): World? {
         val creator = WorldCreator(NamespacedKey.minecraft(worldName))
         creator.generator(VoidChunkGenerator())
+        creator.keepSpawnLoaded(TriState.FALSE)
+        creator.forcedSpawnPosition(Position.block(0, 64, 0), 0f, 0f)
         val world = creator.createWorld()
         world?.let { configureArenaVoidWorld(it) }
         return world

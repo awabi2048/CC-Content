@@ -8,6 +8,8 @@ import jp.awabi2048.cccontent.world.WorldSettingsHelper
 import org.bukkit.Bukkit
 import org.bukkit.GameRules
 import org.bukkit.World
+import io.papermc.paper.math.Position
+import net.kyori.adventure.util.TriState
 import org.bukkit.WorldCreator
 import org.bukkit.NamespacedKey
 import java.util.UUID
@@ -37,7 +39,9 @@ object DungeonManager {
     private fun createOrLoadWorld(worldName: String, themeId: String? = null): World? {
         val creator = WorldCreator(NamespacedKey.minecraft(worldName))
         creator.generator(VoidChunkGenerator())
-        
+        creator.keepSpawnLoaded(TriState.FALSE)
+        creator.forcedSpawnPosition(Position.block(0, 64, 0), 0f, 0f)
+
         // TODO: バイオーム設定は一時的にコメントアウト
         // if (themeId != null) {
         //     creator.biomeProvider(jp.awabi2048.cccontent.features.sukima_dungeon.generator.ThemeBiomeProvider(themeId))
