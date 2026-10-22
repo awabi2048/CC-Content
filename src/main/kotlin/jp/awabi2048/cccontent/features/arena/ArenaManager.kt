@@ -299,6 +299,10 @@ class ArenaManager(
         const val DEBUG_VOID_TEMPLATE_MARKER_FILE_NAME = ".cc-debug-void-template"
         const val DEBUG_VOID_WORLD_TEMPLATE_NAME = "arena.debug.template"
         const val ARENA_POOL_WORLD_NAME_PREFIX = "arena.pool"
+        // アリーナが生成・管理する世界名の共通接頭辞（プール・デバッグ・撤去待ちの残骸を含む）。
+        const val ARENA_MANAGED_WORLD_NAME_PREFIX = "arena."
+        private const val UNAUTHORIZED_EJECT_MAX_ATTEMPTS = 5
+        private const val UNAUTHORIZED_EJECT_RETRY_TICKS = 20L
         const val ARENA_INVITE_CLAIM_OWNER = "cc-content:arena-invite"
         const val ARENA_INVITED_CLAIM_OWNER = "cc-content:arena-invited"
         const val ARENA_MAX_CONCURRENT_SESSIONS_DEFAULT = 3
@@ -905,6 +909,10 @@ class ArenaManager(
         val difficultyDisplay = ArenaMenuItems.difficultyStars(variant.difficultyStar)
         if (enableMultiplayerJoin && CCSystem.getAPI().getPlayerInteractionClaimService()
                 .claim(target.uniqueId, PlayerInteractionChannel.SECONDARY, ARENA_INVITE_CLAIM_OWNER) == null) {
+            // 入力権の確保に失敗した場合は、先に取得したプールワールドを
+            // 何も配置していないため READY キューへ戻す。戻さないと
+            // 失敗を繰り返すたびに利用可能なプール枠が枯渇する。
+            markArenaWorldReady(world.name)
             return completed(ArenaStartResult.Error("arena.messages.command.start_error.interaction_busy"))
         }
         val session = ArenaSession(
@@ -1301,16 +1309,17 @@ class ArenaManager(
         bgm().release(player, BgmSource.ARENA_COMBAT)
     }
 
-    private fun sendPlayerToLobbyOrSpawn(player: Player) {
+    // 退出先としてロビーを優先し、使えない場合はワールドスポーンへ逃がす。
+    // 戻り値は最終的に退出できたかどうか。失敗時は呼び出し側で再試行を検討する。
+    private fun sendPlayerToLobbyOrSpawn(player: Player): Boolean {
         if (sendPlayerToLobby(player, "main")) {
-            return
+            return true
         }
         // ロビー移動に失敗してスポーンへ逃がす場合、Arena系予約を解放してワールドBGMへ自動復帰させる。
         stopLobbyBgm(player)
         stopAllArenaBgmForPlayer(player)
-        Bukkit.getWorlds().firstOrNull()?.spawnLocation?.let { spawn ->
-            player.teleport(spawn)
-        }
+        val spawn = Bukkit.getWorlds().firstOrNull()?.spawnLocation ?: return false
+        return player.teleport(spawn)
     }
 
     private fun clearLobbyTutorialState(playerId: UUID) {
@@ -1602,8 +1611,16 @@ class ArenaManager(
     }
 
     fun canEnterSessionWorld(player: Player, worldName: String): Boolean {
-        val session = sessionsByWorld[worldName] ?: return true
-        return ArenaPermissions.hasAdminAccess(player) || session.participants.contains(player.uniqueId)
+        sessionsByWorld[worldName]?.let { session ->
+            return ArenaPermissions.hasAdminAccess(player) || session.participants.contains(player.uniqueId)
+        }
+        // アリーナ管理下の世界（プール待機中・テンプレート・撤去待ちの残骸）は、
+        // アクティブなセッションが無くても管理者以外の立ち入りを許可しない。
+        // READY 待機中の世界への外部侵入が、次のセッションに残留物を持ち込むのを防ぐ。
+        if (worldName.startsWith(ARENA_MANAGED_WORLD_NAME_PREFIX)) {
+            return ArenaPermissions.hasAdminAccess(player)
+        }
+        return true
     }
 
     fun handleUnauthorizedSessionWorldPresence(player: Player): Boolean {
@@ -1611,8 +1628,28 @@ class ArenaManager(
         if (canEnterSessionWorld(player, worldName)) {
             return false
         }
-        sendPlayerToLobbyOrSpawn(player)
+        ejectUnauthorizedArenaWorldPlayer(player, UNAUTHORIZED_EJECT_MAX_ATTEMPTS)
         return true
+    }
+
+    // ロビー・スポーンへの退出が両方失敗しても放置しない。
+    // 外部要因のテレポート取消は一時的なことが多いため、一定回数だけ遅延再試行する。
+    private fun ejectUnauthorizedArenaWorldPlayer(player: Player, remainingAttempts: Int) {
+        if (sendPlayerToLobbyOrSpawn(player)) {
+            return
+        }
+        plugin.logger.warning(
+            "[Arena] アリーナ管理世界からの退出に失敗しました: player=${player.uniqueId} " +
+                "world=${player.world.name} remainingAttempts=$remainingAttempts"
+        )
+        if (remainingAttempts <= 0) {
+            return
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            if (!player.isOnline) return@Runnable
+            if (canEnterSessionWorld(player, player.world.name)) return@Runnable
+            ejectUnauthorizedArenaWorldPlayer(player, remainingAttempts - 1)
+        }, UNAUTHORIZED_EJECT_RETRY_TICKS)
     }
 
     /**
@@ -1723,7 +1760,9 @@ class ArenaManager(
     private fun recordSuccessfulHistory(session: ArenaSession) {
         val date = sharedClock().currentDate()
         val durationSeconds = ((System.currentTimeMillis() - session.startedAtMillis) / 1000L).coerceAtLeast(0L)
-        val participantIds = session.participants.toSet()
+        // 成功履歴の対象者は達成時点の有資格者集合で固定する。終了時の残存参加者ではなく
+        // 達成を確定した時点のメンバーへ記録し、帰還・切断の順序で履歴が変わらないようにする。
+        val participantIds = session.missionClearParticipantIds.toSet()
         participantIds.forEach { playerId ->
             historyStore.add(ArenaHistoryRecord(playerId, date, session.difficultyStar, durationSeconds))
         }
@@ -1806,6 +1845,17 @@ class ArenaManager(
 
         stopArenaBgmForPlayer(player)
         session.progressBossBar?.let { player.hideBossBar(it) }
+        // リフト拘束中の切断はタスク内復元を経由しないため、オンラインの
+        // うちに移動能力を元へ戻す（walkSpeed/属性はログインを跨いで持続する）。
+        restoreEntranceLiftMovement(session, player.uniqueId)
+        // ダウン中の切断も同様に、制限後の値が永続化されないようオンラインのうちに戻す。
+        // 退避値は保持したまま論理状態だけ残し、復帰時に制限を再適用する。
+        if (session.downedPlayers.containsKey(player.uniqueId)) {
+            session.downedOriginalWalkSpeeds[player.uniqueId]?.let { player.walkSpeed = it }
+            session.downedOriginalJumpStrengths[player.uniqueId]?.let { original ->
+                player.getAttribute(Attribute.JUMP_STRENGTH)?.baseValue = original
+            }
+        }
         hideJoinCountdownBossBar(session, player.uniqueId)
         clearReviveBindingByReviver(session, player.uniqueId)
         removeArenaSidebar(player.uniqueId)
@@ -1823,7 +1873,9 @@ class ArenaManager(
             ) {
                 return@Runnable
             }
-            terminateSession(session, false)
+            // 達成済みセッションが全員切断で閉じる場合も、終了結果は達成フラグから決める。
+            // 切断順序によって成功履歴が消えないようにする。
+            terminateSession(session, session.missionCompleted || session.barrierRestartCompleted)
         })
     }
 
@@ -1833,6 +1885,9 @@ class ArenaManager(
             if (pendingLobbyReturnPlayers.remove(player.uniqueId)) {
                 sendPlayerToLobbyOrSpawn(player)
             }
+            // セッション外のログインでも、残留位置がアリーナ管理世界なら退出させる。
+            // ワールド変更イベントはログイン位置には発火しないため、ここで検査する。
+            handleUnauthorizedSessionWorldPresence(player)
             return
         }
 
@@ -1850,6 +1905,20 @@ class ArenaManager(
         player.teleport(destination)
         applySessionGameMode(session, player)
         player.removePotionEffect(PotionEffectType.BLINDNESS)
+        val downedState = session.downedPlayers[player.uniqueId]
+        if (downedState != null) {
+            // 切断前に保持した論理ダウン状態を復帰時に再適用する。
+            // 切断時に実体へ戻した移動制限・演出を再度与え、無料蘇生にならないようにする。
+            player.health = 1.0
+            player.fireTicks = 0
+            player.fallDistance = 0.0f
+            player.velocity = Vector(0.0, 0.0, 0.0)
+            player.walkSpeed = if (downedState.reviveDisabled) DOWNED_GAME_OVER_WALK_SPEED else DOWNED_PLAYER_WALK_SPEED
+            player.getAttribute(Attribute.JUMP_STRENGTH)?.baseValue = 0.0
+            if (!session.dimensionExitedDownedIds.contains(player.uniqueId)) {
+                syncDownedShulker(session, player, forceTeleport = true)
+            }
+        }
         val now = System.currentTimeMillis()
         session.participantLocationHistory[player.uniqueId] = ArrayDeque<TimedPlayerLocation>().apply {
             addLast(TimedPlayerLocation(now, destination.clone()))
@@ -1976,6 +2045,7 @@ class ArenaManager(
         // 髫ｰ蜉ｱ繝ｻ繝ｻ・ｨ陟托ｽｱ・朱・・ｹ譏ｴ繝ｻ邵ｺ蜥擾ｽｹ譎｢・ｽ・ｧ驛｢譎｢・ｽ・ｳ鬨ｾ蛹・ｽｽ・ｨ: 驛｢譎・鯵邵ｺ蟶ｷ・ｹ・ｧ繝ｻ・ｹ驛｢譎・ｺ｢郢晢ｽｻ驛｢譎｢・ｽ・ｳ髣厄ｽｴ陷･・ｲ繝ｻ・ｽ繝ｻ・ｮ驛｢・ｧ陋幢ｽｵ邵ｺ諷包ｽｹ譎・ｱ堤ｹ晢ｽｻ
         session.clearingBossLocations.clear()
         session.clearingBossLocations.addAll(stage.clearingBossLocations.map { it.clone() })
+        session.stageBuildApplied = true
 
         val now = System.currentTimeMillis()
         session.participantLocationHistory[session.ownerPlayerId] = ArrayDeque<TimedPlayerLocation>().apply {
@@ -3130,13 +3200,14 @@ class ArenaManager(
 
             for (downedId in session.downedPlayers.keys.toList()) {
                 val downed = Bukkit.getPlayer(downedId)
-                // 次元移動による強制死亡は世界外でも状態を維持する。随行シュルカーの追従のみ行わない。
-                val exitedWorld = downed == null || !downed.isOnline || downed.world.name != session.worldName
-                if (exitedWorld && !session.dimensionExitedDownedIds.contains(downedId)) {
-                    clearDownedState(session, downedId)
+                if (downed == null || !downed.isOnline) {
+                    // 切断中もダウン状態はセッションの論理状態として保持する。
+                    // ワールド内の実体への処理は行わず、復帰時に制限と演出を再適用する。
                     continue
                 }
-                if (downed == null || !downed.isOnline) {
+                // 次元移動による強制死亡は世界外でも状態を維持する。随行シュルカーの追従のみ行わない。
+                val exitedWorld = downed.world.name != session.worldName
+                if (exitedWorld && !session.dimensionExitedDownedIds.contains(downedId)) {
                     clearDownedState(session, downedId)
                     continue
                 }
@@ -3162,7 +3233,12 @@ class ArenaManager(
                             1000L
                         }
                         if (downState.reviveDisabled) {
-                            transitionToGameOver(session)
+                            // 蘇生不可ダウンの確定は個人の失格。生存者が残る限り
+                            // セッション全体の敗北にはせず、他の参加者の進行・BGMを継続する。
+                            // 全滅したときだけセッションを GAME_OVER へ遷移する。
+                            if (!hasOtherAliveNonDownParticipant(session, downedId)) {
+                                transitionToGameOver(session)
+                            }
                             stopArenaBgmForPlayer(downed)
                         }
                         downed.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, blindnessTicks, 0, false, false, false))
@@ -3686,13 +3762,15 @@ class ArenaManager(
     }
 
     private fun applyAmountModifiers(minAmount: Int, maxAmount: Int, lootingLevel: Int): Int {
+        // amount: 0-2 等で 0 が抽選された場合はアイテムを生成しない。
+        // 幸運補正は抽選結果へ加算するため、0 抽選時でも幸運分だけ落ちることがある。
         val base = if (minAmount == maxAmount) {
             minAmount
         } else {
             random.nextInt(minAmount, maxAmount + 1)
         }
         val lootingBonus = if (lootingLevel > 0) random.nextInt(lootingLevel + 1) else 0
-        return (base + lootingBonus).coerceAtLeast(1)
+        return (base + lootingBonus).coerceAtLeast(0)
     }
 
     private fun resolveLootingLevel(inventory: PlayerInventory): Int {
@@ -3911,6 +3989,7 @@ class ArenaManager(
         session.waitingSubtitleNextTickByPlayer.remove(playerId)
         session.waitingOutsideTicksByPlayer.remove(playerId)
         session.entranceLiftLockedParticipants.remove(playerId)
+        restoreEntranceLiftMovement(session, playerId)
         session.arenaPreparingUntilMillisByParticipant.remove(playerId)
         hideJoinCountdownBossBar(session, playerId)
         releaseInvitedPlayerLock(playerId)
@@ -3936,6 +4015,10 @@ class ArenaManager(
 
         if (session.participants.isEmpty()) {
             terminateSession(session, session.missionCompleted || session.barrierRestartCompleted)
+        } else {
+            // 残った参加者が全員オフライン（切断したままのダウン参加者など）なら、
+            // オンラインの退出者がいなくなった時点でセッションを閉じる。
+            scheduleTerminateIfAllParticipantsLoggedOut(session.worldName)
         }
         return true
     }
@@ -3973,6 +4056,9 @@ class ArenaManager(
         session.transitionTasks.clear()
         session.entranceLiftTask?.cancel()
         session.entranceLiftTask = null
+        // リフトタスクを直接取消した場合はタスク内の復元分岐が走らないため、
+        // セッション側の退避値から移動能力を確実に復元する。
+        restoreAllEntranceLiftMovement(session)
         releaseEntranceLiftChunkTickets(session)
         session.stageBuildTask?.cancel()
         session.stageBuildTask = null
@@ -4156,6 +4242,20 @@ class ArenaManager(
         }
 
         cleanupNonPlayerEntities(world)
+
+        if (!session.stageBuildApplied) {
+            // 生成途中の失敗・取消ではセッションの範囲情報が実配置を表していない。
+            // 部分配置を残したまま READY へ戻さないよう、ワールドを再生成して
+            // 汚れのない状態でプールへ返す。再生成に失敗した場合は BROKEN で隔離する。
+            if (resetArenaPoolWorld(worldName)) {
+                markArenaWorldReady(worldName)
+                logArenaPoolState("cleanup regenerated unbuilt world", worldName)
+            } else {
+                markArenaWorldBroken(worldName)
+                logArenaPoolState("cleanup regeneration failed", worldName)
+            }
+            return
+        }
 
         val cleanupBounds = collectCleanupBounds(session)
         if (cleanupBounds.isEmpty()) {
@@ -5341,7 +5441,7 @@ class ArenaManager(
 
         session.missionCompleted = true
         session.missionClearParticipantIds.addAll(session.participants)
-        arenaMissionService?.completeActiveMission(session.ownerPlayerId, session.missionClearParticipantIds)
+        arenaMissionService?.completeActiveMission(session.worldName, session.missionClearParticipantIds)
         session.finalWaveStartedAtMillis = 0L
         stopWaveSpawning(session, session.waves)
 
@@ -6098,7 +6198,7 @@ class ArenaManager(
         session.barrierRestarting = false
         session.barrierRestartCompleted = true
         session.missionClearParticipantIds.addAll(session.participants)
-        arenaMissionService?.completeActiveMission(session.ownerPlayerId, session.missionClearParticipantIds)
+        arenaMissionService?.completeActiveMission(session.worldName, session.missionClearParticipantIds)
         session.finalWaveStartedAtMillis = 0L
         stopWaveSpawning(session, session.waves)
 
@@ -7832,11 +7932,10 @@ class ArenaManager(
             playerUnits += LiftPlayerUnit(player, offset.first, offset.second)
         }
 
-        val originalSpeeds = mutableMapOf<UUID, Pair<Float, Double>>()
         participants.forEach { player ->
             val walkSpeed = player.walkSpeed
             val jumpStrength = player.getAttribute(Attribute.JUMP_STRENGTH)?.value ?: 1.0
-            originalSpeeds[player.uniqueId] = walkSpeed to jumpStrength
+            session.entranceLiftOriginalSpeeds[player.uniqueId] = walkSpeed to jumpStrength
             player.walkSpeed = 0f
             player.getAttribute(Attribute.JUMP_STRENGTH)?.baseValue = 0.0
         }
@@ -7853,7 +7952,7 @@ class ArenaManager(
                 clearLiftFootprint(introWorld, baseLocation.clone().add(0.0, currentRise.toDouble(), 0.0), liftTemplate, horizontal)
                 restoreLiftChainsInRange(introWorld, baseLocation, liftTemplate, baseLocation.blockY, baseLocation.blockY + maxRise, horizontal)
                 releaseEntranceLiftChunkTickets(session)
-                restorePlayerMovement(originalSpeeds)
+                restoreAllEntranceLiftMovement(session)
                 return@Runnable
             }
 
@@ -7872,6 +7971,7 @@ class ArenaManager(
             if (!transferBlindnessApplied && currentRise >= transferBlindnessRise) {
                 transferBlindnessApplied = true
                 participants.forEach { player ->
+                    if (player.uniqueId !in session.participants) return@forEach
                     if (!player.isOnline || player.world.uid != introWorld.uid) return@forEach
                     player.addPotionEffect(PotionEffect(PotionEffectType.BLINDNESS, STAGE_TRANSFER_BLINDNESS_TICKS, 0, false, false, false))
                 }
@@ -7887,7 +7987,7 @@ class ArenaManager(
                     session.arenaPreparingUntilMillisByParticipant.remove(player.uniqueId)
                     session.entranceLiftLockedParticipants.remove(player.uniqueId)
                 }
-                restorePlayerMovement(originalSpeeds)
+                restoreAllEntranceLiftMovement(session)
                 session.participantSpawnProtectionUntilMillis = System.currentTimeMillis() + 4000L
                 setDoorActionMarkersReadySilently(session, 1)
                 broadcastStageStartMessage(session)
@@ -7932,7 +8032,7 @@ class ArenaManager(
                 restoreLiftChainsInRange(introWorld, baseLocation, liftTemplate, baseLocation.blockY, baseLocation.blockY + maxRise, horizontal)
                 session.entranceLiftTask?.cancel()
                 session.entranceLiftTask = null
-                restorePlayerMovement(originalSpeeds)
+                restoreAllEntranceLiftMovement(session)
                 releaseEntranceLiftChunkTickets(session)
                 Bukkit.getScheduler().runTaskLater(plugin, Runnable {
                     releaseOccupiedLiftMarkers(session)
@@ -7942,6 +8042,8 @@ class ArenaManager(
             }
 
             playerUnits.forEach { unit ->
+                // リフト拘束が解除された参加者（離脱・復元済み）は座席追従から外す。
+                if (unit.player.uniqueId !in session.entranceLiftLockedParticipants) return@forEach
                 if (!unit.player.isOnline) return@forEach
                 if (unit.player.world.uid != introWorld.uid) return@forEach
 
@@ -7956,11 +8058,17 @@ class ArenaManager(
         }, 0L, entranceLiftIntervalTicks)
     }
 
-    private fun restorePlayerMovement(originalSpeeds: Map<UUID, Pair<Float, Double>>) {
-        originalSpeeds.forEach { (playerId, speeds) ->
-            val player = Bukkit.getPlayer(playerId) ?: return@forEach
-            player.walkSpeed = speeds.first
-            player.getAttribute(Attribute.JUMP_STRENGTH)?.baseValue = speeds.second
+    private fun restoreEntranceLiftMovement(session: ArenaSession, playerId: UUID) {
+        val speeds = session.entranceLiftOriginalSpeeds.remove(playerId) ?: return
+        val player = Bukkit.getPlayer(playerId) ?: return
+        if (!player.isOnline) return
+        player.walkSpeed = speeds.first
+        player.getAttribute(Attribute.JUMP_STRENGTH)?.baseValue = speeds.second
+    }
+
+    private fun restoreAllEntranceLiftMovement(session: ArenaSession) {
+        session.entranceLiftOriginalSpeeds.keys.toList().forEach { playerId ->
+            restoreEntranceLiftMovement(session, playerId)
         }
     }
 
@@ -8201,6 +8309,9 @@ class ArenaManager(
     private fun teleportLiftParticipantsToStage(session: ArenaSession, participants: List<Player>, world: World) {
         val now = System.currentTimeMillis()
         participants.forEach { player ->
+            // リフト開始時点の集合ではなく、転送時点の参加資格を再判定する。
+            // 開始後に離脱した参加者をステージへ連れ戻さないため。
+            if (player.uniqueId !in session.participants) return@forEach
             if (!player.isOnline) return@forEach
             val spawnLocation = session.entranceLocation.clone().apply {
                 this.world = world

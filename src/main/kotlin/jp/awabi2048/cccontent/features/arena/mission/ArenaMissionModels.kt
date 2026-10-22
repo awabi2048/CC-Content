@@ -264,10 +264,16 @@ object ArenaMissionLayout {
 }
 
 class ArenaMissionMenuHolder(
-    ownerId: UUID
+    ownerId: UUID,
+    // 一覧のクリック解決は表示時点の世代で固定する。
+    // 日次更新で一覧が入れ替わっても、表示した項目と確認対象が一致するようにする。
+    val missionSet: ArenaMissionSet
 ) : OwnedMenuHolder(ownerId)
 
 class ArenaMissionConfirmHolder(
     ownerId: UUID,
-    val missionIndex: Int
+    // 確認画面の対象は表示時点の世代・エントリで固定する。
+    // 日次更新でミッション一覧が入れ替わっても、確認した内容と開始対象がずれないようにする。
+    val missionSet: ArenaMissionSet,
+    val mission: ArenaMissionEntry
 ) : OwnedMenuHolder(ownerId)
