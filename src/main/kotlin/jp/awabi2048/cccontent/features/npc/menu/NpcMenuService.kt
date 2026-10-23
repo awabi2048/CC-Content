@@ -180,7 +180,9 @@ class NpcMenuService(
 
     @EventHandler
     fun onArenaSessionEnded(event: ArenaSessionEndedEvent) {
-        if (event.success) {
+        // アリーナ達成のバイト完了対象は達成時点の有資格者に限る。
+        // 途中離脱したオーナーへは記録しない。
+        if (event.success && event.ownerPlayerId in event.participantIds) {
             markPartTimeCompleted(event.ownerPlayerId, PART_TIME_TASK_ARENA)
         }
     }

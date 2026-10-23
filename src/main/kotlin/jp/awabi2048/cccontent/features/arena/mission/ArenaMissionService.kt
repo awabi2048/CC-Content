@@ -88,7 +88,11 @@ class ArenaMissionService(
     private val auditLogger = ArenaAuditLogger(plugin)
     private var currentMissionSet: ArenaMissionSet? = null
     private val playerCache = mutableMapOf<UUID, ArenaPlayerMissionData>()
-    private val activeMissions = mutableMapOf<UUID, ArenaActiveMissionRecord>()
+
+    // アクティブミッションの記録はセッションのワールド名で紐付ける。
+    // 同一オーナーが連続してセッションを開始しても、各セッションの終了イベントが
+    // 自身のセッションに対応する記録だけを更新する。
+    private val activeMissions = mutableMapOf<String, ArenaActiveMissionRecord>()
     private var strongEnemyMobTypeIds: Set<String> = DEFAULT_STRONG_ENEMY_MOB_TYPE_IDS
     private var generateCount: Int = MISSION_SLOT_LIMIT
 
@@ -161,7 +165,7 @@ class ArenaMissionService(
     fun openMenu(player: Player): Boolean {
         return try {
             val missionSet = ensureCurrentMissionSet()
-            val holder = ArenaMissionMenuHolder(player.uniqueId)
+            val holder = ArenaMissionMenuHolder(player.uniqueId, missionSet)
             val inventory = Bukkit.createInventory(holder, ArenaMissionLayout.MENU_SIZE, ArenaMissionLayout.MENU_TITLE)
             holder.backingInventory = inventory
             renderMenu(player, inventory, missionSet)
@@ -202,9 +206,10 @@ class ArenaMissionService(
         savePlayerData(playerId)
     }
 
-    fun completeActiveMission(ownerPlayerId: UUID, participantIds: Collection<UUID>): Boolean {
-        val activeRecord = activeMissions.remove(ownerPlayerId) ?: return false
-        recordCompletedMission(activeRecord, participantIds + ownerPlayerId)
+    fun completeActiveMission(sessionWorldName: String, participantIds: Collection<UUID>): Boolean {
+        val activeRecord = activeMissions.remove(sessionWorldName) ?: return false
+        // 達成者は達成時点の有資格者集合だけから決める。途中離脱したオーナーは含めない。
+        recordCompletedMission(activeRecord, participantIds)
         return true
     }
 
@@ -246,11 +251,8 @@ class ArenaMissionService(
         }
 
         val missionIndex = ArenaMissionLayout.missionIndexForSlot(rawSlot) ?: return true
-        val missionSet = getCurrentMissionSetOrNull() ?: run {
-            player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MENU_OPEN_FAILED))
-            return true
-        }
-        val mission = missionSet.missions.getOrNull(missionIndex) ?: return true
+        // クリックの解決は一覧表示時の世代で行い、表示中に入れ替わった一覧を引かない。
+        val mission = holder.missionSet.missions.getOrNull(missionIndex) ?: return true
 
         playUiClick(player)
 
@@ -268,7 +270,7 @@ class ArenaMissionService(
             return true
         }
 
-        if (!openMissionConfirmMenu(player, mission.index)) {
+        if (!openMissionConfirmMenu(player, holder.missionSet, mission)) {
             player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MENU_OPEN_FAILED))
         }
         return true
@@ -282,7 +284,15 @@ class ArenaMissionService(
         return when (rawSlot) {
             ArenaMissionLayout.CONFIRM_OK_SLOT -> {
                 playUiClick(player)
-                startMission(player, holder.missionIndex)
+                // 確認画面表示後に日次更新でミッション一覧が入れ替わった場合は、
+                // 表示内容と異なるミッションを開始しないよう一覧へ戻す。
+                if (getCurrentMissionSetOrNull() !== holder.missionSet) {
+                    if (!openMenu(player)) {
+                        player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MENU_OPEN_FAILED))
+                    }
+                    return true
+                }
+                startMission(player, holder.mission)
                 true
             }
             ArenaMissionLayout.CONFIRM_CANCEL_SLOT -> {
@@ -298,12 +308,14 @@ class ArenaMissionService(
 
     @EventHandler
     fun onArenaSessionEnded(event: ArenaSessionEndedEvent) {
-        val activeRecord = activeMissions.remove(event.ownerPlayerId) ?: return
+        // 終了したセッションに対応する記録だけを消費する。
+        // オーナー単位で引くと、別セッションの結果が新しいセッションの記録を上書きする。
+        val activeRecord = activeMissions.remove(event.worldName) ?: return
         if (!event.success) {
             return
         }
 
-        recordCompletedMission(activeRecord, event.participantIds + event.ownerPlayerId)
+        recordCompletedMission(activeRecord, event.participantIds)
     }
 
     private fun recordCompletedMission(activeRecord: ArenaActiveMissionRecord, participantIds: Collection<UUID>) {
@@ -342,16 +354,9 @@ class ArenaMissionService(
         }
     }
 
-    private fun startMission(player: Player, missionIndex: Int) {
-        val missionSet = getCurrentMissionSetOrNull() ?: run {
-            player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MISSION_NOT_FOUND))
-            return
-        }
-        val mission = missionSet.missions.getOrNull(missionIndex) ?: run {
-            player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MISSION_NOT_FOUND))
-            return
-        }
-
+    private fun startMission(player: Player, mission: ArenaMissionEntry) {
+        // 開始対象は確認画面で提示したエントリそのものを使い、開始時に一覧を引き直さない。
+        // 世代の整合は呼び出し側で確認済み。
         if (isMissionCompleted(player.uniqueId, mission.index)) {
             player.sendMessage(ArenaI18n.text(player, ContentArenaKeys.ARENA_MESSAGES_MISSION_ALREADY_COMPLETED))
             return
@@ -400,7 +405,12 @@ class ArenaMissionService(
                 missionTypeId = missionType
             )) {
                 is ArenaStartResult.Success -> {
-                    activeMissions[player.uniqueId] = ArenaActiveMissionRecord(mission.index, mission)
+                    val sessionWorldName = arenaManager.getSession(player)?.worldName
+                    if (sessionWorldName != null) {
+                        activeMissions[sessionWorldName] = ArenaActiveMissionRecord(mission.index, mission)
+                    } else {
+                        plugin.logger.warning("[Arena] セッション開始直後のワールドを特定できず、アクティブミッションを記録できませんでした: player=${player.uniqueId}")
+                    }
                     Bukkit.getScheduler().runTaskLater(plugin, Runnable {
                         if (player.isOnline) {
                             OageMessageSender.send(
@@ -746,11 +756,8 @@ class ArenaMissionService(
         inventory.setItem(ArenaMissionLayout.CONFIRM_CANCEL_SLOT, createActionItem(Material.RED_WOOL, ArenaI18n.text(player, ContentArenaKeys.ARENA_UI_CONFIRM_CANCEL_NAME), ArenaI18n.stringList(player, ContentArenaKeys.ARENA_UI_CONFIRM_CANCEL_LORE).map(GuiLoreLine::Text)))
     }
 
-    private fun openMissionConfirmMenu(player: Player, missionIndex: Int): Boolean {
-        val missionSet = getCurrentMissionSetOrNull() ?: return false
-        val mission = missionSet.missions.getOrNull(missionIndex) ?: return false
-
-        val holder = ArenaMissionConfirmHolder(player.uniqueId, missionIndex)
+    private fun openMissionConfirmMenu(player: Player, missionSet: ArenaMissionSet, mission: ArenaMissionEntry): Boolean {
+        val holder = ArenaMissionConfirmHolder(player.uniqueId, missionSet, mission)
         val inventory = Bukkit.createInventory(holder, ArenaMissionLayout.CONFIRM_SIZE, ArenaMissionLayout.CONFIRM_TITLE)
         holder.backingInventory = inventory
         renderConfirmMenu(player, inventory, mission)

@@ -155,6 +155,10 @@ data class ArenaSession(
     var inviteMissionLore: List<String> = emptyList(),
     var phase: ArenaPhase = ArenaPhase.PREPARING,
     var stageGenerationCompleted: Boolean = true,
+    // 生成結果がセッション範囲情報へ適用済みかどうか。失敗・取消時の清掃範囲が
+    // 正しいのは true のときだけであり、false のまま終了した場合は範囲を信頼せず
+    // ワールドの再生成へ倒す。
+    var stageBuildApplied: Boolean = false,
     var stageGenerationWaitTitleShown: Boolean = false,
     var stageBuildTask: BukkitTask? = null,
     var currentWave: Int = 0,
@@ -218,6 +222,10 @@ data class ArenaSession(
     var waitingAllSneakingSinceMillis: Long? = null,
     var waitingFastStartHintCooldownUntilMillis: Long = 0L,
     val entranceLiftLockedParticipants: MutableSet<UUID> = mutableSetOf(),
+    // リフト拘束中に0へ変更した移動能力の退避先。タスク内の復元だけでは
+    // タスク直接取消（終了・失敗・離脱・ログアウト）で復元が漏れるため、
+    // セッション状態として保持し、全終了経路から復元できるようにする。
+    val entranceLiftOriginalSpeeds: MutableMap<UUID, Pair<Float, Double>> = mutableMapOf(),
     var entranceLiftChunkTicketWorldName: String? = null,
     val entranceLiftChunkTicketKeys: MutableSet<Long> = mutableSetOf(),
     var entranceLiftTask: BukkitTask? = null,
